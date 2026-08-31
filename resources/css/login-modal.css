@@ -1,0 +1,293 @@
+/* Zefanya — Login modal
+   Depends on design-system.css for tokens.
+   Loaded sitewide alongside landing.css since the modal is triggered from the navbar. */
+
+.html-body .login-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: rgba(30, 27, 27, 0.55);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.html-body .login-modal-overlay.is-open {
+  display: flex !important;
+  opacity: 1;
+  visibility: visible;
+}
+
+.html-body .login-modal {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10) var(--space-8) var(--space-8);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(12px) scale(0.98);
+  transition: transform 0.25s ease;
+}
+
+.html-body .login-modal-overlay.is-open .login-modal {
+  transform: translateY(0) scale(1);
+}
+
+.html-body .login-modal__close {
+  all: unset;
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.html-body .login-modal__close:hover {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-800);
+}
+
+.html-body .login-modal__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+
+.html-body .login-modal__brand .brand__logo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+}
+
+.html-body .login-modal__title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 26px;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.html-body .login-modal__subtitle {
+  margin-top: var(--space-2);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.html-body .login-modal__error {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background-color: #fbe9e7;
+  border: 1px solid #e8a49c;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: #a5333d;
+}
+
+.html-body .login-modal__form {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-6);
+}
+
+.html-body .login-modal__label {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.html-body .login-modal__label:not(:first-child) {
+  margin-top: var(--space-4);
+}
+
+.html-body .login-modal__input {
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--space-4);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.html-body .login-modal__input::placeholder {
+  color: var(--text-muted);
+}
+
+.html-body .login-modal__input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.html-body .login-modal__password-wrap {
+  position: relative;
+}
+
+.html-body .login-modal__password-wrap .login-modal__input {
+  padding-right: 44px;
+}
+
+.html-body .login-modal__toggle-visibility {
+  all: unset;
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.html-body .login-modal__toggle-visibility:hover {
+  color: var(--color-primary-800);
+}
+
+.html-body .login-modal__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+}
+
+.html-body .login-modal__remember {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.html-body .login-modal__remember input {
+  accent-color: var(--color-primary-700);
+  width: 14px;
+  height: 14px;
+}
+
+.html-body .login-modal__forgot {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-primary-800);
+  transition: opacity 0.2s ease;
+}
+
+.html-body .login-modal__forgot:hover {
+  opacity: 0.75;
+}
+
+.html-body .login-modal__submit {
+  margin-top: var(--space-6);
+  height: 46px;
+  background-color: var(--color-neutral-950);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.html-body .login-modal__submit:hover {
+  background-color: var(--color-primary-800);
+}
+
+.html-body .login-modal__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.html-body .login-modal__divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: var(--border-default);
+}
+
+.html-body .login-modal__divider-label {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.html-body .login-modal__guest {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-5);
+  padding: 13px 0;
+  background-color: transparent;
+  color: var(--color-primary-800);
+  border: 1px solid var(--color-primary-800);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1.4px;
+  text-align: center;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.html-body .login-modal__guest:hover {
+  background-color: var(--color-primary-800);
+  color: var(--text-inverse);
+}
+
+.html-body .login-modal__footer {
+  margin-top: var(--space-5);
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.html-body .login-modal__footer a {
+  color: var(--color-primary-800);
+  font-weight: 600;
+}
+
+.html-body .login-modal__footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .html-body .login-modal {
+    padding: var(--space-8) var(--space-6) var(--space-6);
+  }
+}

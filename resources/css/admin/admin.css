@@ -1,0 +1,375 @@
+@import '../design-system.css';
+@import 'admin-registration.css';
+
+/* Zefanya — Admin panel shell + dashboard overview
+   Depends on design-system.css (loaded first via landing.css or directly). */
+
+/* ===== Shell layout ===== */
+.admin-body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+}
+
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ===== Sidebar nav — corrected for guaranteed contrast =====
+   Replaces the var(--text-inverse)/var(--bg-sidebar-hover) version.
+   Hardcoded to Zefanya's actual palette so it doesn't depend on
+   design-system.css resolving those tokens correctly. */
+
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  flex: 0 0 240px;
+  background-color: #1e1b1b;
+  padding: 24px 0;
+}
+
+.admin-sidebar__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0 24px 20px;
+  border-bottom: 1px solid rgba(255, 248, 247, 0.12);
+  margin-bottom: 20px;
+}
+
+.admin-sidebar__brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-sidebar__brand-row img {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.admin-sidebar__brand-row span {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.admin-sidebar__brand-role {
+  font-family: "Montserrat", Helvetica, sans-serif;
+  font-size: 11px;
+  color: rgba(255, 248, 247, 0.55);
+  margin-left: 48px;
+}
+
+.admin-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+  flex: 1;
+}
+
+.admin-sidebar__nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-family: "Montserrat", Helvetica, sans-serif;
+  font-weight: 500;
+  font-size: 13.5px;
+  color: rgba(255, 248, 247, 0.78);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-sidebar__nav a svg {
+  flex: 0 0 auto;
+  color: rgba(255, 248, 247, 0.78);
+  transition: color 0.15s ease;
+}
+
+.admin-sidebar__nav a:hover {
+  background-color: rgba(255, 248, 247, 0.1);
+  color: #ffffff;
+}
+
+.admin-sidebar__nav a:hover svg {
+  color: #ffffff;
+}
+
+.admin-sidebar__nav a.is-active {
+  background-color: #79545c;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 0 #f7d6d0;
+}
+
+.admin-sidebar__nav a.is-active svg {
+  color: #ffffff;
+}
+
+.admin-sidebar__nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f7d6d0;
+  color: #1e1b1b;
+  border-radius: 9999px;
+  font-family: "Montserrat", Helvetica, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-sidebar__nav a.is-active .admin-sidebar__nav-badge {
+  background-color: #ffffff;
+  color: #79545c;
+}
+
+.admin-sidebar__logout {
+  padding: 0 12px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 248, 247, 0.12);
+  padding-top: 16px;
+}
+
+.admin-sidebar__logout button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-family: "Montserrat", Helvetica, sans-serif;
+  font-weight: 500;
+  font-size: 13.5px;
+  color: rgba(255, 248, 247, 0.78);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.admin-sidebar__logout button:hover {
+  background-color: rgba(255, 248, 247, 0.1);
+  color: #ffffff;
+}
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-8);
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.admin-topbar__title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.admin-topbar__user {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.admin-content {
+  flex: 1;
+  padding: var(--space-8);
+}
+
+.admin-page-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 28px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.admin-page-subtitle {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: var(--space-2) 0 0;
+}
+
+/* ===== Summary strip ===== */
+.dash-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+}
+
+.dash-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+}
+
+.dash-summary-item__value {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 26px;
+  color: var(--text-primary);
+}
+
+.dash-summary-item__label {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1200px) {
+  .dash-summary-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .dash-summary-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Admin login card ===== */
+.admin-login-body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-page);
+  padding: var(--space-6);
+}
+
+.admin-login-card {
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10) var(--space-8) var(--space-8);
+  box-shadow: var(--shadow-lg);
+}
+
+.admin-login-card__logo {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  margin: 0 auto var(--space-5);
+}
+
+.admin-login-card__title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 24px;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+
+.admin-login-card__subtitle {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: var(--space-2) 0 0;
+}
+
+.admin-login-card__error {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background-color: #fbe9e7;
+  border: 1px solid #e8a49c;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: #a5333d;
+}
+
+.admin-login-card__label {
+  display: block;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.admin-login-card__label:first-of-type {
+  margin-top: var(--space-6);
+}
+
+.admin-login-card__remember {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.admin-login-card__remember input {
+  accent-color: var(--color-primary-700);
+}
+
+/* ===== Sidebar color overrides (forced) ===== */
+.admin-sidebar__nav a,
+.admin-sidebar__nav a span,
+.admin-sidebar__nav a svg,
+.admin-sidebar__logout button,
+.admin-sidebar__logout button span,
+.admin-sidebar__logout button svg {
+  color: rgba(255, 248, 247, 0.72) !important;
+}
+
+.admin-sidebar__nav a:hover,
+.admin-sidebar__nav a:hover span,
+.admin-sidebar__nav a:hover svg,
+.admin-sidebar__logout button:hover,
+.admin-sidebar__logout button:hover span,
+.admin-sidebar__logout button:hover svg {
+  color: #ffffff !important;
+}
+
+.admin-sidebar__nav a.is-active,
+.admin-sidebar__nav a.is-active span,
+.admin-sidebar__nav a.is-active svg {
+  color: #ffffff !important;
+}

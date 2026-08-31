@@ -1,0 +1,318 @@
+/* ===== Zefanya Design System =====
+   Color tokens, typography, and component styles.
+   Load this first, then page-specific styles. */
+
+:root {
+  /* ===== Primary ===== */
+  --color-primary-50: #fdf5f7;
+  --color-primary-100: #fbeaed;
+  --color-primary-200: #f5d3da;
+  --color-primary-300: #e2b4bd;
+  --color-primary-400: #d4949f;
+  --color-primary-500: #c07a85;
+  --color-primary-600: #a65f6b;
+  --color-primary-700: #8b4a55;
+  --color-primary-800: #79545c;
+  --color-primary-900: #5f4047;
+  --color-primary-950: #3a262b;
+
+  /* ===== Secondary ===== */
+  --color-secondary-50: #fef7f6;
+  --color-secondary-100: #fdf0ee;
+  --color-secondary-200: #fbe0dc;
+  --color-secondary-300: #f7d6d0;
+  --color-secondary-400: #f0bfb6;
+  --color-secondary-500: #e8a59b;
+  --color-secondary-600: #d98a7f;
+  --color-secondary-700: #c47065;
+  --color-secondary-800: #a85a50;
+  --color-secondary-900: #8c4a41;
+  --color-secondary-950: #4a2521;
+
+  /* ===== Tertiary ===== */
+  --color-tertiary-50: #f5f8f5;
+  --color-tertiary-100: #e8f0e8;
+  --color-tertiary-200: #d1e1d1;
+  --color-tertiary-300: #adc7ad;
+  --color-tertiary-400: #8aab8a;
+  --color-tertiary-500: #6b916b;
+  --color-tertiary-600: #547654;
+  --color-tertiary-700: #445f44;
+  --color-tertiary-800: #394d39;
+  --color-tertiary-900: #304030;
+  --color-tertiary-950: #1a231a;
+
+  /* ===== Neutral ===== */
+  --color-neutral-50: #faf9f9;
+  --color-neutral-100: #f3f2f2;
+  --color-neutral-200: #e8e6e6;
+  --color-neutral-300: #d4d1d1;
+  --color-neutral-400: #a9a4a4;
+  --color-neutral-500: #7c7676;
+  --color-neutral-600: #635e5e;
+  --color-neutral-700: #504b4b;
+  --color-neutral-800: #3d3939;
+  --color-neutral-900: #2a2727;
+  --color-neutral-950: #1e1b1b;
+
+  /* ===== Semantic ===== */
+  --color-success: var(--color-tertiary-500);
+  --color-warning: #d4a017;
+  --color-error: #c44a4a;
+  --color-info: var(--color-primary-500);
+
+  /* ===== Background ===== */
+  --bg-page: var(--color-primary-50);
+  --bg-surface: #ffffff;
+  --bg-sidebar: var(--color-neutral-950);
+  --bg-sidebar-hover: rgba(255, 248, 247, 0.08);
+  --bg-sidebar-active: rgba(226, 180, 189, 0.2);
+
+  /* ===== Text ===== */
+  --text-primary: var(--color-neutral-950);
+  --text-secondary: var(--color-neutral-600);
+  --text-muted: var(--color-neutral-500);
+  --text-inverse: #fff8f7;
+
+  /* ===== Border ===== */
+  --border-light: var(--color-neutral-200);
+  --border-default: var(--color-neutral-300);
+  --border-focus: var(--color-primary-400);
+
+  /* ===== Typography ===== */
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Montserrat", Helvetica, sans-serif;
+
+  /* ===== Spacing ===== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ===== Radius ===== */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* ===== Shadows ===== */
+  --shadow-sm: 0 1px 3px rgba(30, 27, 27, 0.08);
+  --shadow-md: 0 4px 12px rgba(30, 27, 27, 0.1);
+  --shadow-lg: 0 12px 32px rgba(30, 27, 27, 0.15);
+}
+
+/* ===== Reset ===== */
+* {
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+body, p, span, label, input, select, textarea, button {
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 44px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  text-decoration: none;
+  border: none;
+}
+
+.btn--primary {
+  background-color: var(--color-primary-800);
+  color: var(--text-inverse);
+}
+.btn--primary:hover {
+  background-color: var(--color-primary-900);
+}
+
+.btn--secondary {
+  background-color: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}
+.btn--secondary:hover {
+  background-color: var(--color-neutral-300);
+}
+
+.btn--inverted {
+  background-color: var(--color-neutral-950);
+  color: var(--text-inverse);
+}
+.btn--inverted:hover {
+  background-color: var(--color-neutral-900);
+}
+
+.btn--outlined {
+  background-color: transparent;
+  color: var(--color-neutral-700);
+  border: 1px solid var(--color-neutral-400);
+}
+.btn--outlined:hover {
+  border-color: var(--color-neutral-600);
+  color: var(--color-neutral-900);
+}
+
+/* ===== Inputs ===== */
+.input {
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--space-4);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 42px;
+  padding: 0 var(--space-3);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+.search-bar input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.search-bar input:focus {
+  outline: none;
+}
+
+/* ===== Progress bar ===== */
+.progress {
+  height: 8px;
+  background-color: var(--color-neutral-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.progress__bar {
+  height: 100%;
+  background-color: var(--color-primary-700);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+.progress__bar--tertiary {
+  background-color: var(--color-tertiary-500);
+}
+
+/* ===== Navigation pills ===== */
+.nav-pills {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+}
+.nav-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.nav-pill:hover {
+  background-color: var(--color-neutral-100);
+  color: var(--text-primary);
+}
+.nav-pill.is-active {
+  background-color: var(--color-primary-800);
+  color: var(--text-inverse);
+}
+
+/* ===== Action buttons (square) ===== */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--text-inverse);
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s ease;
+}
+.action-btn:hover {
+  opacity: 0.85;
+}
+.action-btn--edit { background-color: var(--color-primary-700); }
+.action-btn--categorize { background-color: var(--color-tertiary-500); }
+.action-btn--tag { background-color: var(--color-secondary-500); }
+.action-btn--delete { background-color: var(--color-error); }
+
+/* ===== Tags (pill) ===== */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background-color: var(--color-secondary-200);
+  color: var(--color-primary-900);
+}
+.tag--tertiary {
+  background-color: var(--color-tertiary-200);
+  color: var(--color-tertiary-900);
+}
+.tag--neutral {
+  background-color: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}
