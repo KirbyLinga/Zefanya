@@ -24,7 +24,7 @@
       <span class="role-card__cta">REGISTER AS BUYER</span>
     </a>
 
-    <a href="{{ route('register.seller') }}" class="role-card">
+    <a href="#" data-seller-register-trigger class="role-card">
       <div class="role-card__icon">
         <i data-lucide="store" width="24" height="24"></i>
       </div>
@@ -64,6 +64,9 @@
 </main>
 
 @include('Components.buyer-register-modal')
+@include('Components.buyer-verify-otp-modal')
+@include('Components.seller-register-modal')
+@include('Components.seller-verify-otp-modal')
 
 @endsection
 
@@ -71,4 +74,4 @@
   <script>
     if (window.lucide) { lucide.createIcons(); }
   </script>
-@endpush    
+@endpush

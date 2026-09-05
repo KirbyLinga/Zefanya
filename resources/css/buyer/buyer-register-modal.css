@@ -32,7 +32,7 @@
   background-color: var(--bg-surface);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  padding: 40px 48px 36px;
+  padding: 48px 56px 48px;
   box-shadow: var(--shadow-lg);
   transform: translateY(12px) scale(0.98);
   transition: transform 0.25s ease;
@@ -96,8 +96,8 @@
 .html-body .buyer-modal__form {
   display: flex;
   flex-direction: column;
-  margin-top: var(--space-6);
-  gap: var(--space-6);
+  margin-top: var(--space-8);
+  gap: var(--space-8);
 }
 
 .html-body .buyer-modal__row {
@@ -124,12 +124,12 @@
   letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--text-secondary);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .html-body .buyer-modal__field input,
 .html-body .buyer-modal__field select {
-  height: 46px;
+  height: 48px;
   padding: 0 var(--space-4);
   background-color: var(--bg-surface);
   border: 1px solid var(--border-default);
@@ -138,6 +138,16 @@
   font-size: 14px;
   color: var(--text-primary);
   transition: border-color 0.2s ease;
+}
+
+.html-body .buyer-modal__field input::placeholder,
+.html-body .buyer-modal__field select::placeholder {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.html-body .buyer-modal__field input[readonly]::placeholder {
+  color: var(--text-secondary);
 }
 
 .html-body .buyer-modal__field input:focus,
@@ -165,9 +175,37 @@
   color: var(--color-error);
 }
 
+/* ===== Password fields ===== */
+.html-body .buyer-modal__password-wrap {
+  position: relative;
+}
+
+.html-body .buyer-modal__password-wrap input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.html-body .buyer-modal__toggle-visibility {
+  all: unset;
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.html-body .buyer-modal__toggle-visibility:hover {
+  color: var(--color-primary-800);
+}
+
 /* ===== Address block ===== */
 .html-body .buyer-modal__address {
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-8) 56px var(--space-3);
   background-color: var(--color-primary-50);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
@@ -177,7 +215,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .html-body .buyer-modal__toggle-address {
@@ -196,12 +234,41 @@
 
 .html-body .buyer-modal__address .buyer-modal__row {
   margin-bottom: 0;
+  gap: var(--space-5);
+}
+
+.html-body .buyer-modal__address .buyer-modal__manual-fields {
+  margin-top: var(--space-6);
+}
+
+.html-body .buyer-modal__address .buyer-modal__field label {
+  margin-bottom: var(--space-3);
+}
+
+.html-body .buyer-modal__address .buyer-modal__field select,
+.html-body .buyer-modal__address .buyer-modal__field input {
+  height: 48px;
+  font-size: 14px;
+}
+
+.html-body .buyer-modal__address .buyer-modal__field input::placeholder {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.html-body .buyer-modal__address .buyer-modal__field select {
+  font-size: 14px;
 }
 
 .html-body .buyer-modal__address .buyer-modal__field select:disabled {
   background-color: var(--color-neutral-100);
   color: var(--text-muted);
   cursor: not-allowed;
+  font-size: 12.5px;
+}
+
+.html-body .buyer-modal__address .buyer-modal__field-error {
+  margin-top: var(--space-2);
 }
 
 /* ===== File upload ===== */
@@ -223,8 +290,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: 40px;
-  padding: 0 var(--space-4);
+  height: 48px;
+  padding: 0 var(--space-5);
   background-color: var(--bg-surface);
   border: 1px solid var(--color-primary-800);
   border-radius: var(--radius-sm);
@@ -304,4 +371,75 @@
   .html-body .buyer-modal__field--small {
     flex: 1;
   }
+}
+
+/* ===== OTP modal inputs ===== */
+.html-body .buyer-otp-inputs {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.html-body .buyer-otp-input {
+  width: 100%;
+  height: 56px;
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.2s ease;
+  -moz-appearance: textfield;
+}
+
+.html-body .buyer-otp-input::-webkit-outer-spin-button,
+.html-body .buyer-otp-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.html-body .buyer-otp-input:focus {
+  border-color: var(--border-focus);
+}
+
+.html-body .buyer-otp-input.has-error {
+  border-color: var(--color-error);
+}
+
+.html-body .buyer-modal__otp-resend {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+.html-body .buyer-modal__otp-resend-btn {
+  all: unset;
+  font-weight: 600;
+  color: var(--color-primary-800);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.html-body .buyer-modal__otp-resend-btn:hover {
+  color: var(--color-primary-700);
+}
+
+.html-body .buyer-modal__otp-resend-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.html-body .buyer-modal__otp-resend-status {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--text-muted);
 }

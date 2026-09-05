@@ -21,7 +21,10 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Unified registration queue (buyers + sellers)
     Route::get('/registrations', [RegistrationController::class, 'index'])->name('registrations.index');
-    Route::post('/registrations/{buyer}/approve', [RegistrationController::class, 'approve'])->name('registrations.approve');
-    Route::post('/registrations/{buyer}/reject', [RegistrationController::class, 'reject'])->name('registrations.reject');
+    Route::post('/registrations/buyer/{buyer}/approve', [RegistrationController::class, 'approveBuyer'])->name('registrations.buyer.approve');
+    Route::post('/registrations/buyer/{buyer}/reject', [RegistrationController::class, 'rejectBuyer'])->name('registrations.buyer.reject');
+    Route::post('/registrations/seller/{seller}/approve', [RegistrationController::class, 'approveSeller'])->name('registrations.seller.approve');
+    Route::post('/registrations/seller/{seller}/reject', [RegistrationController::class, 'rejectSeller'])->name('registrations.seller.reject');
 });

@@ -5,15 +5,10 @@ namespace App\Notifications;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class BuyerRegistrationDecision extends Notification
+class SellerRegistrationDecision extends Notification
 {
-    // Not queued, same reasoning as BuyerVerifyEmail: low volume (one per
-    // admin decision), and you don't currently have a queue worker running
-    // in production, so queuing it means it silently never sends.
+    // Not queued — same reasoning as BuyerRegistrationDecision.
 
-    /**
-     * @param  'approved'|'rejected'  $decision
-     */
     public function __construct(
         public string $decision,
         public ?string $reason = null,
@@ -28,19 +23,19 @@ class BuyerRegistrationDecision extends Notification
     {
         $message = (new MailMessage)
             ->subject($this->decision === 'approved'
-                ? 'Your buyer registration has been approved'
-                : 'Your buyer registration was not approved');
+                ? 'Your seller registration has been approved'
+                : 'Your seller registration was not approved');
 
         if ($this->decision === 'approved') {
             return $message
                 ->greeting("Welcome, {$notifiable->fullName()}!")
-                ->line('Your buyer account has been approved. You can now log in and start shopping.')
+                ->line("Your seller account for \"{$notifiable->business_name}\" has been approved.")
                 ->action('Log in', url('/login'));
         }
 
         return $message
             ->greeting("Hi {$notifiable->fullName()},")
-            ->line('Unfortunately your buyer registration was not approved.')
+            ->line('Unfortunately your seller registration was not approved.')
             ->when($this->reason, fn ($msg) => $msg->line("Reason: {$this->reason}"))
             ->line('You are welcome to submit a new registration with corrected information.');
     }
