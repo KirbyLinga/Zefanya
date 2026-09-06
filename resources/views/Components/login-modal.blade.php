@@ -25,7 +25,7 @@
             </div>
         @endif
 
-        <form class="login-modal__form" method="POST" action="{{ Route::has('login.post') ? route('login.post') : '#' }}">
+        <form class="login-modal__form" method="POST" action="{{ route('buyer.login.submit') }}">
             @csrf
 
             <label class="login-modal__label" for="loginEmail">Email address</label>

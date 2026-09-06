@@ -16,6 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
         ]);
+
+        // Guard-aware guest redirect. Laravel's auth middleware redirects
+        // unauthenticated users using this callback. Buyer routes bounce to
+        // the buyer login; everything else (admin, etc.) bounces to admin.
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->routeIs('buyer.*') || $request->is('buyer/*')) {
+                return route('buyer.login');
+            }
+
+            return route('admin.login');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

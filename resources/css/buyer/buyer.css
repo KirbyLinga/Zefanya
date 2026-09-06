@@ -1,1 +1,286 @@
-/* Buyer shared: layout shell, navbar, footer, buttons, tokens */
+/* resources/css/buyer/buyer.css
+   Shared across every Buyer page: layout tokens, header/footer, the product
+   card component (used by Home, Categories, and Products), and the three
+   global overlay widgets (cart drawer, quick-view modal, chat panel) that
+   live in Buyer/Layouts/app.blade.php and are present on every page. */
+
+:root{
+  --primary:#E2B4BD;
+  --primary-dark:#C88A96;
+  --secondary:#F7D6D0;
+  --tertiary:#ADC7AD;
+  --tertiary-dark:#7FA080;
+  --neutral:#7C7676;
+  --ink:#3A2529;
+  --ink-soft:#5B4448;
+  --cream:#FBF5F3;
+  --paper:#FFFFFF;
+  --line:#EBDDDA;
+  --radius-sm:6px;
+  --radius-md:12px;
+  --shadow:0 10px 30px -14px rgba(58,37,41,0.25);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Montserrat',sans-serif;
+  color:var(--ink);
+  background:var(--cream);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.serif{font-family:'Playfair Display',serif;}
+a{text-decoration:none;color:inherit;}
+button{font-family:inherit;cursor:pointer;}
+.container{max-width:1200px;margin:0 auto;padding:0 32px;}
+::selection{background:var(--primary);color:#fff;}
+
+/* ---------- Top utility bar ---------- */
+.utility-bar{
+  background:var(--ink);
+  color:#F3E7E4;
+  font-size:12.5px;
+  letter-spacing:.02em;
+  text-align:center;
+  padding:7px 12px;
+}
+
+/* ---------- Header ---------- */
+header{
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:40;
+}
+.header-row{
+  display:flex;align-items:center;gap:28px;
+  padding:18px 32px;max-width:1200px;margin:0 auto;
+}
+.logo{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo-mark{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--secondary));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Playfair Display',serif;font-weight:700;color:var(--ink);font-size:16px;
+}
+.logo-word{font-size:23px;font-weight:600;letter-spacing:.01em;}
+
+.cat-select{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 16px;border:1px solid var(--line);border-radius:999px;
+  font-size:13.5px;color:var(--ink-soft);background:var(--cream);
+  flex-shrink:0;position:relative;
+}
+.cat-select i.fa-chevron-down{font-size:10px;}
+
+.search-wrap{flex:1;position:relative;max-width:560px;}
+.search-wrap input{
+  width:100%;padding:12px 46px 12px 18px;border-radius:999px;
+  border:1px solid var(--line);font-size:13.5px;background:var(--cream);
+  font-family:inherit;color:var(--ink);
+}
+.search-wrap input:focus{outline:2px solid var(--primary);outline-offset:1px;background:#fff;}
+.search-wrap button{
+  position:absolute;right:5px;top:5px;bottom:5px;aspect-ratio:1;
+  border:none;border-radius:50%;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+}
+
+.header-icons{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;}
+.icon-btn{
+  position:relative;width:42px;height:42px;border-radius:50%;border:none;
+  background:transparent;display:flex;align-items:center;justify-content:center;
+  color:var(--ink-soft);font-size:17px;transition:background .15s;
+}
+.icon-btn:hover{background:var(--secondary);color:var(--ink);}
+.badge{
+  position:absolute;top:3px;right:4px;min-width:16px;height:16px;padding:0 4px;
+  background:var(--primary-dark);color:#fff;border-radius:999px;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;
+}
+.account-btn{display:flex;align-items:center;gap:9px;padding:6px 14px 6px 6px;border:none;background:transparent;border-radius:999px;}
+.account-btn:hover{background:var(--secondary);}
+.avatar{
+  width:32px;height:32px;border-radius:50%;background:var(--tertiary);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;
+  font-family:'Playfair Display',serif;
+}
+.account-name{font-size:13px;font-weight:600;}
+.account-name small{display:block;font-size:10.5px;font-weight:400;color:var(--neutral);}
+
+.dropdown{
+  position:absolute;top:calc(100% + 10px);right:0;background:#fff;
+  border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow);
+  width:230px;padding:8px;display:none;z-index:50;
+}
+.dropdown.open{display:block;}
+.dropdown a, .dropdown button.dd-item{
+  display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;
+  font-size:13.5px;color:var(--ink-soft);width:100%;border:none;background:none;text-align:left;
+}
+.dropdown a:hover, .dropdown button.dd-item:hover{background:var(--cream);color:var(--ink);}
+.dropdown hr{border:none;border-top:1px solid var(--line);margin:6px 4px;}
+.dropdown a i, .dropdown button i{width:16px;color:var(--primary-dark);}
+.dropdown .logout{color:#A7444F;}
+.dropdown .logout i{color:#A7444F;}
+
+/* ---------- Section shell (used by every page's sections) ---------- */
+section{padding:44px 0;}
+.section-head{
+  display:flex;align-items:baseline;justify-content:space-between;margin-bottom:24px;gap:20px;flex-wrap:wrap;
+}
+.section-head h2{font-size:27px;font-weight:600;margin:0;}
+.section-head .sub{color:var(--neutral);font-size:13px;margin-top:4px;}
+.view-all{font-size:12.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;}
+.view-all i{font-size:11px;}
+
+/* ---------- Product card component (Home, Categories, Products all use this) ---------- */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+.card{
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius-md);
+  overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s;
+}
+.card:hover{box-shadow:var(--shadow);transform:translateY(-3px);}
+.card-media{
+  aspect-ratio:1/1;background:linear-gradient(135deg,var(--secondary),var(--primary));
+  position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.card-media i{font-size:34px;color:#fff;opacity:.85;}
+.tag{
+  position:absolute;top:10px;left:10px;background:var(--ink);color:#fff;
+  font-size:10px;font-weight:700;letter-spacing:.03em;padding:4px 8px;border-radius:5px;
+}
+.tag.new{background:var(--tertiary-dark);}
+.wish-toggle{
+  position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;
+  background:#fff;border:none;display:flex;align-items:center;justify-content:center;color:var(--neutral);font-size:13px;
+}
+.wish-toggle.active{color:#C4495A;}
+.card-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
+.card-body .name{font-size:13.5px;font-weight:600;line-height:1.35;min-height:36px;}
+.price-row{display:flex;align-items:baseline;gap:8px;}
+.price{font-weight:700;font-size:14.5px;color:var(--ink);}
+.price-old{font-size:11.5px;color:var(--neutral);text-decoration:line-through;}
+.sold-bar{height:6px;border-radius:999px;background:var(--secondary);overflow:hidden;}
+.sold-bar i{display:block;height:100%;background:var(--primary-dark);}
+.sold-label{font-size:10.5px;color:var(--neutral);}
+.add-btn{
+  margin-top:4px;width:100%;padding:9px;border-radius:999px;border:1px solid var(--ink);
+  background:transparent;font-size:12px;font-weight:600;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s;
+}
+.add-btn:hover{background:var(--ink);color:#fff;}
+
+/* ---------- Filter tabs (Home's "Picked for you", also usable on Products) ---------- */
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;}
+.tab{
+  padding:9px 18px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  font-size:12.5px;font-weight:600;color:var(--ink-soft);
+}
+.tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+/* ---------- Footer ---------- */
+footer{background:var(--ink);color:#EADFDC;margin-top:20px;padding:48px 0 22px;}
+.footer-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:32px;margin-bottom:32px;}
+footer h4{font-size:13px;letter-spacing:.03em;margin:0 0 14px;color:#fff;font-weight:600;}
+footer ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
+footer a{font-size:12.5px;color:#C9B9B6;}
+footer .foot-logo{font-family:'Playfair Display',serif;font-size:21px;color:#fff;margin-bottom:10px;}
+footer .foot-desc{font-size:12.5px;color:#C9B9B6;line-height:1.6;max-width:280px;}
+.footer-bottom{border-top:1px solid #4d3a3e;padding-top:18px;font-size:11.5px;color:#C9B9B6;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.header-icon-wrap{position:relative;}
+
+/* ---------- Cart Drawer (global overlay, lives in the layout) ---------- */
+.overlay{
+  position:fixed;inset:0;background:rgba(58,37,41,.35);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.overlay.open{opacity:1;pointer-events:auto;}
+.drawer{
+  position:fixed;top:0;right:0;height:100%;width:400px;max-width:92vw;background:#fff;z-index:61;
+  box-shadow:-14px 0 40px rgba(58,37,41,.25);transform:translateX(100%);transition:transform .25s ease;
+  display:flex;flex-direction:column;
+}
+.drawer.open{transform:translateX(0);}
+.drawer-head{padding:20px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+.drawer-head h3{margin:0;font-size:19px;}
+.drawer-close{background:none;border:none;font-size:18px;color:var(--neutral);}
+.drawer-body{flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:16px;}
+.cart-item{display:flex;gap:12px;}
+.cart-thumb{width:64px;height:64px;border-radius:10px;background:linear-gradient(135deg,var(--secondary),var(--primary));flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;}
+.cart-item-info{flex:1;}
+.cart-item-info .cname{font-size:13px;font-weight:600;margin-bottom:3px;}
+.cart-item-info .cvar{font-size:11px;color:var(--neutral);margin-bottom:8px;}
+.qty-stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;}
+.qty-stepper button{width:26px;height:26px;border:none;background:none;font-size:13px;color:var(--ink-soft);}
+.qty-stepper span{width:24px;text-align:center;font-size:12.5px;font-weight:600;}
+.cart-item .cprice{font-size:13px;font-weight:700;white-space:nowrap;}
+.voucher-row{display:flex;gap:8px;}
+.voucher-row input{flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--line);font-size:12.5px;font-family:inherit;}
+.voucher-row button{padding:0 16px;border-radius:8px;border:none;background:var(--ink);color:#fff;font-size:12px;font-weight:600;}
+.pay-options{display:flex;flex-direction:column;gap:8px;}
+.pay-option{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;}
+.pay-option input{accent-color:var(--primary-dark);}
+.drawer-foot{padding:18px 22px;border-top:1px solid var(--line);}
+.sum-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;}
+.sum-row.total{font-size:15px;font-weight:700;color:var(--ink);margin-top:8px;}
+.checkout-btn{width:100%;padding:14px;border-radius:999px;border:none;background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;margin-top:12px;}
+
+/* ---------- Quick view modal (global overlay — triggered from any product card) ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(58,37,41,.4);z-index:70;display:none;
+  align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.open{display:flex;}
+.qv-modal{
+  background:#fff;border-radius:16px;max-width:760px;width:100%;display:flex;overflow:hidden;
+  box-shadow:0 30px 60px -20px rgba(58,37,41,.4);max-height:90vh;
+}
+.qv-media{flex:1;background:linear-gradient(135deg,var(--secondary),var(--primary));display:flex;align-items:center;justify-content:center;}
+.qv-media i{font-size:64px;color:#fff;opacity:.9;}
+.qv-info{flex:1;padding:30px;overflow-y:auto;position:relative;}
+.qv-close{position:absolute;top:16px;right:16px;background:none;border:none;font-size:17px;color:var(--neutral);}
+.qv-info h3{margin:0 0 8px;font-size:22px;}
+.qv-info .qv-price{font-size:19px;font-weight:700;margin-bottom:4px;}
+.qv-info .qv-old{font-size:12.5px;color:var(--neutral);text-decoration:line-through;margin-left:8px;}
+.qv-rating{font-size:12px;color:var(--neutral);margin-bottom:18px;}
+.qv-rating i{color:#E0A93D;}
+.opt-label{font-size:11.5px;font-weight:700;letter-spacing:.03em;color:var(--ink-soft);margin-bottom:8px;}
+.swatches{display:flex;gap:9px;margin-bottom:18px;}
+.swatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+.swatch.selected{border-color:var(--ink);}
+.size-opts{display:flex;gap:9px;margin-bottom:20px;}
+.size-opt{width:38px;height:36px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;background:#fff;}
+.size-opt.selected{background:var(--ink);color:#fff;border-color:var(--ink);}
+.qv-actions{display:flex;gap:12px;align-items:center;margin-top:10px;}
+.qv-add{flex:1;padding:13px;border-radius:999px;border:none;background:var(--ink);color:#fff;font-weight:600;font-size:13px;}
+
+/* ---------- Chat panel (global floating widget) ---------- */
+.chat-panel{
+  position:fixed;bottom:24px;right:24px;width:320px;background:#fff;border-radius:16px;
+  box-shadow:var(--shadow);border:1px solid var(--line);z-index:65;display:none;flex-direction:column;overflow:hidden;
+}
+.chat-panel.open{display:flex;}
+.chat-head{background:var(--ink);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;}
+.chat-head span{font-size:13.5px;font-weight:600;}
+.chat-head button{background:none;border:none;color:#fff;font-size:15px;}
+.chat-body{padding:16px;display:flex;flex-direction:column;gap:10px;height:230px;overflow-y:auto;background:var(--cream);}
+.msg{max-width:78%;padding:9px 12px;border-radius:12px;font-size:12.5px;line-height:1.4;}
+.msg.store{background:#fff;border:1px solid var(--line);border-bottom-left-radius:3px;align-self:flex-start;}
+.msg.me{background:var(--primary-dark);color:#fff;border-bottom-right-radius:3px;align-self:flex-end;}
+.chat-input{display:flex;border-top:1px solid var(--line);}
+.chat-input input{flex:1;border:none;padding:12px 14px;font-size:12.5px;font-family:inherit;}
+.chat-input button{border:none;background:none;color:var(--primary-dark);padding:0 14px;font-size:15px;}
+
+/* ---------- Toast (global) ---------- */
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;padding:12px 22px;border-radius:999px;font-size:12.5px;
+  opacity:0;pointer-events:none;transition:.25s;z-index:80;display:flex;align-items:center;gap:8px;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast i{color:var(--tertiary);}
+
+@media(max-width:980px){
+  .grid{grid-template-columns:repeat(2,1fr);}
+  .footer-grid{grid-template-columns:1fr 1fr;}
+  .cat-select,.search-wrap{display:none;}
+  .qv-modal{flex-direction:column;max-height:85vh;}
+}

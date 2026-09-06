@@ -24,5 +24,10 @@ class AppServiceProvider extends ServiceProvider
             ->prefix('admin')
             ->name('admin.')
             ->group(base_path('routes/admin.php'));
+
+        // buyer.php already applies its own prefix('buyer') and name('buyer.')
+        // inside the file (line 9), so we only wrap it in the web middleware here.
+        Route::middleware('web')
+            ->group(base_path('routes/buyer.php'));
     }
 }

@@ -1,11 +1,12 @@
 <?php
 // Add to routes/web.php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Buyer\LoginController;
 use App\Http\Controllers\RegisterBuyerController;
-use App\Http\Controllers\VerifyBuyerOtpController;
 use App\Http\Controllers\RegisterSellerController;
+use App\Http\Controllers\VerifyBuyerOtpController;
 use App\Http\Controllers\VerifySellerOtpController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('LandingPage.index');
@@ -79,11 +80,27 @@ Route::get('/shop', function () {
     return view('LandingPage.index');
 })->name('shop.browse');
 
-Route::get('/login', function () {
-    return redirect()->back();
-})->name('login');
+/*
+|--------------------------------------------------------------------------
+| Buyer Authentication Routes
+|--------------------------------------------------------------------------
+| Guest-only login form + POST handler. The old stubs (redirect()->back()
+| with a TODO) are deleted — this replaces them.
+|
+| The modal in login-modal.blade.php submits here via classic form POST.
+| The controller also handles AJAX/JSON for programmatic clients.
+|
+| Named buyer.login / buyer.login.post / buyer.logout — the "buyer."
+| prefix avoids colliding with the admin guard's "login" name.
+*/
 
-Route::post('/login', function () {
-    // TODO: implement real authentication
-    return redirect()->route('home');
-})->name('login.post');
+Route::middleware('guest:buyer')->group(function () {
+    Route::get('/login', [LoginController::class, 'show'])->name('buyer.login');
+    Route::post('/login', [LoginController::class, 'login'])
+        ->name('buyer.login.submit')
+        ->middleware('throttle:5,1');
+});
+
+Route::post('/logout', [LoginController::class, 'logout'])
+    ->name('buyer.logout')
+    ->middleware('auth:buyer');
