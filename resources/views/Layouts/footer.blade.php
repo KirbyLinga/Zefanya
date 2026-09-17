@@ -8,11 +8,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
-    @vite(['resources/css/design-system.css', 'resources/css/landing.css', 'resources/css/login-modal.css'])
+    @vite(['resources/css/app.css', 'resources/css/login-modal.css'])
     @stack('styles')
 </head>
 <body>
-<div class="html-body">
+<div class="html-body min-w-0 overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
     {{-- ===== Top navbar (shared) ===== --}}
     @include('Components.navbar')
@@ -21,51 +21,51 @@
     @yield('hero')
 
     {{-- ===== Page content ===== --}}
-    <div class="main">
+    <div class="relative mx-auto mt-0.5 flex w-full max-w-[1440px] flex-1 flex-col items-start">
         @yield('content')
     </div>
 
     {{-- ===== Footer (shared) ===== --}}
-    <footer class="site-footer">
-        <div class="site-footer__inner">
-            <div class="site-footer__grid">
-                <div class="footer-col">
-                    <h4 class="footer-col__title">Customer Service</h4>
-                    <ul class="footer-col__links">
-                        <li><a href="#">Help Center</a></li>
-                        <li><a href="#">How to Buy</a></li>
-                        <li><a href="#">Return &amp; Refund</a></li>
-                        <li><a href="#">Contact Us</a></li>
+    <footer class="mt-[100px] w-full bg-secondary-300">
+        <div class="mx-auto flex max-w-[1440px] flex-col gap-16 px-16 pb-12 pt-24 max-lg:gap-12 max-lg:px-8 max-lg:pt-20 max-sm:px-4 max-sm:pb-10 max-sm:pt-16">
+            <div class="grid grid-cols-4 gap-8 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                <div class="flex min-w-0 flex-col gap-5">
+                    <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">Customer Service</h4>
+                    <ul class="m-0 flex list-none flex-col gap-3 p-0">
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Help Center</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">How to Buy</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Return &amp; Refund</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Contact Us</a></li>
                     </ul>
                 </div>
 
-                <div class="footer-col">
-                    <h4 class="footer-col__title">About Zefanya</h4>
-                    <ul class="footer-col__links">
-                        <li><a href="#">About Us</a></li>
-                        <li><a href="#">Careers</a></li>
-                        <li><a href="#">Privacy Policy</a></li>
-                        <li><a href="#">Terms of Service</a></li>
+                <div class="flex min-w-0 flex-col gap-5">
+                    <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">About Zefanya</h4>
+                    <ul class="m-0 flex list-none flex-col gap-3 p-0">
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">About Us</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Careers</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Privacy Policy</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Terms of Service</a></li>
                     </ul>
                 </div>
 
-                <div class="footer-col">
-                    <h4 class="footer-col__title">Join Us</h4>
-                    <ul class="footer-col__links">
-                        <li><a href="#">Seller Center</a></li>
-                        <li><a href="#">Become a Courier</a></li>
-                        <li><a href="#">Affiliate Program</a></li>
+                <div class="flex min-w-0 flex-col gap-5">
+                    <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">Join Us</h4>
+                    <ul class="m-0 flex list-none flex-col gap-3 p-0">
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Seller Center</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Become a Courier</a></li>
+                        <li><a href="#" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Affiliate Program</a></li>
                     </ul>
                 </div>
 
-                <div class="footer-col">
-                    <h4 class="footer-col__title">Download App</h4>
-                    <div class="footer-app-buttons">
-                        <button class="footer-app-btn" type="button">
+                <div class="flex min-w-0 flex-col gap-5">
+                    <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">Download App</h4>
+                    <div class="flex w-full max-w-[252px] flex-col gap-3">
+                        <button class="flex h-11 cursor-pointer items-center justify-center gap-2.5 whitespace-nowrap rounded-sm border border-line bg-cream px-4 font-sans text-xs font-semibold leading-[14.4px] tracking-[1.2px] text-neutral-950 transition-colors duration-200 hover:bg-white [&_svg]:shrink-0" type="button">
                             <i data-lucide="apple" width="16" height="16"></i>
                             <span>APP STORE</span>
                         </button>
-                        <button class="footer-app-btn" type="button">
+                        <button class="flex h-11 cursor-pointer items-center justify-center gap-2.5 whitespace-nowrap rounded-sm border border-line bg-cream px-4 font-sans text-xs font-semibold leading-[14.4px] tracking-[1.2px] text-neutral-950 transition-colors duration-200 hover:bg-white [&_svg]:shrink-0" type="button">
                             <i data-lucide="play" width="16" height="16"></i>
                             <span>GOOGLE PLAY</span>
                         </button>
@@ -73,11 +73,11 @@
                 </div>
             </div>
 
-            <div class="site-footer__bottom">
-                <p class="site-footer__copyright">&copy; {{ date('Y') }} ZEFANYA. ALL RIGHTS RESERVED.</p>
-                <div class="site-footer__social">
-                    <a href="#" aria-label="Email"><i data-lucide="at-sign" width="20" height="20"></i></a>
-                    <a href="#" aria-label="Website"><i data-lucide="globe" width="20" height="20"></i></a>
+            <div class="flex items-center justify-between gap-4 border-t border-line pt-6 max-sm:flex-col max-sm:items-start max-sm:gap-4">
+                <p class="m-0 font-sans text-xs font-semibold leading-[14.4px] tracking-[1.2px] text-muted-ink">&copy; {{ date('Y') }} ZEFANYA. ALL RIGHTS RESERVED.</p>
+                <div class="flex items-center gap-4">
+                    <a href="#" aria-label="Email" class="inline-flex items-center text-neutral-950 transition-colors duration-150 hover:text-primary-800"><i data-lucide="at-sign" width="20" height="20"></i></a>
+                    <a href="#" aria-label="Website" class="inline-flex items-center text-neutral-950 transition-colors duration-150 hover:text-primary-800"><i data-lucide="globe" width="20" height="20"></i></a>
                 </div>
             </div>
         </div>

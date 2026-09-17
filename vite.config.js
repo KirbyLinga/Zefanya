@@ -1,12 +1,14 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
     plugins: [
+        tailwindcss(),
         laravel({
             input: [
+                'resources/css/app.css',
                 'resources/css/design-system.css',
-                'resources/css/landing.css',
                 'resources/css/login-modal.css',
                 'resources/css/auth-buttons.css',
                 'resources/css/admin/admin.css',

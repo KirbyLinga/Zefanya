@@ -1,0 +1,278 @@
+/* ======================================================================
+   Zefanya — Tailwind CSS v4 entry point
+   Single source of truth for design tokens across all areas
+   (landing, buyer, seller, admin).
+
+   Token sources:
+   - resources/css/design-system.css (primary/secondary/tertiary/neutral
+     scales, semantic colors, fonts, shadows) — the shared palette.
+   - The landing SCSS palette, whose unique values are registered as
+     clearly named extensions rather than duplicating scales:
+       --color-cream        #fff8f7  page/navbar background (landing)
+       --color-blush        #faf2f1  card / dropdown background (landing)
+       --color-line         #e8e2e0  hairline borders (landing)
+       --color-muted-ink    #4f4446  landing secondary text
+       --color-price-muted  #a99b98  struck-through (old) price
+   Landing's rose-* values map exactly onto the shared scales:
+       rose-100 → primary-100, rose-300 → secondary-300,
+       rose-800 → primary-800, rose-900 → primary-900,
+       ink → neutral-950, ink-soft → neutral-600.
+
+   The `:root` block in @layer base re-exports every legacy token as a
+   CSS custom property so the not-yet-migrated CSS files
+   (login-modal.css, auth-pages.css, seller/admin CSS, …) that consume
+   var(--color-*), var(--space-*) etc. keep rendering identically while
+   the migration is phased.
+   ====================================================================== */
+
+@import 'tailwindcss';
+
+@theme {
+    /* ===== Primary (dusty rose / mauve) ===== */
+    --color-primary-50: #fdf5f7;
+    --color-primary-100: #fbeaed;
+    --color-primary-200: #f5d3da;
+    --color-primary-300: #e2b4bd;
+    --color-primary-400: #d4949f;
+    --color-primary-500: #c07a85;
+    --color-primary-600: #a65f6b;
+    --color-primary-700: #8b4a55;
+    --color-primary-800: #79545c;
+    --color-primary-900: #5f4047;
+    --color-primary-950: #3a262b;
+
+    /* ===== Secondary (soft coral) ===== */
+    --color-secondary-50: #fef7f6;
+    --color-secondary-100: #fdf0ee;
+    --color-secondary-200: #fbe0dc;
+    --color-secondary-300: #f7d6d0;
+    --color-secondary-400: #f0bfb6;
+    --color-secondary-500: #e8a59b;
+    --color-secondary-600: #d98a7f;
+    --color-secondary-700: #c47065;
+    --color-secondary-800: #a85a50;
+    --color-secondary-900: #8c4a41;
+    --color-secondary-950: #4a2521;
+
+    /* ===== Tertiary (sage green) ===== */
+    --color-tertiary-50: #f5f8f5;
+    --color-tertiary-100: #e8f0e8;
+    --color-tertiary-200: #d1e1d1;
+    --color-tertiary-300: #adc7ad;
+    --color-tertiary-400: #8aab8a;
+    --color-tertiary-500: #6b916b;
+    --color-tertiary-600: #547654;
+    --color-tertiary-700: #445f44;
+    --color-tertiary-800: #394d39;
+    --color-tertiary-900: #304030;
+    --color-tertiary-950: #1a231a;
+
+    /* ===== Neutral (warm gray) ===== */
+    --color-neutral-50: #faf9f9;
+    --color-neutral-100: #f3f2f2;
+    --color-neutral-200: #e8e6e6;
+    --color-neutral-300: #d4d1d1;
+    --color-neutral-400: #a9a4a4;
+    --color-neutral-500: #7c7676;
+    --color-neutral-600: #635e5e;
+    --color-neutral-700: #504b4b;
+    --color-neutral-800: #3d3939;
+    --color-neutral-900: #2a2727;
+    --color-neutral-950: #1e1b1b;
+
+    /* ===== Semantic ===== */
+    --color-success: #6b916b;
+    --color-warning: #d4a017;
+    --color-error: #c44a4a;
+    --color-info: #c07a85;
+
+    /* ===== Landing extensions ===== */
+    --color-cream: #fff8f7;
+    --color-blush: #faf2f1;
+    --color-line: #e8e2e0;
+    --color-muted-ink: #4f4446;
+    --color-price-muted: #a99b98;
+
+    /* ===== Buyer extensions (from buyer.css — kept pixel-identical;
+            values equal to shared scales reuse those tokens: buyer
+            --primary→primary-300, --secondary→secondary-300,
+            --tertiary→tertiary-300, --neutral→neutral-500) ===== */
+    --color-buyer-primary-dark: #c88a96;
+    --color-buyer-tertiary-dark: #7fa080;
+    --color-buyer-ink: #3a2529;
+    --color-buyer-ink-soft: #5b4448;
+    --color-buyer-cream: #fbf5f3;
+    --color-buyer-line: #ebddda;
+
+    /* Wishlist heart when toggled on (buyer.css `.wish-toggle.active{
+       color:#C4495A}`). Named by purpose: the heart in the product cards. */
+    --color-buyer-wish: #c4495a;
+
+    /* Buyer footer (Buyer/Layouts/footer.blade.php) — one-off hexes from
+       buyer.css with no other user; named by purpose, not by location.
+         footer-text  #EADFDC  default footer copy
+         footer-muted #C9B9B6  links / legal line
+         footer-rule  #4d3a3e  hairline above the legal line */
+    --color-buyer-footer-text: #eadfdc;
+    --color-buyer-footer-muted: #c9b9b6;
+    --color-buyer-footer-rule: #4d3a3e;
+
+    --shadow-buyer: 0 10px 30px -14px rgba(58, 37, 41, 0.25);
+
+    /* ===== Typography ===== */
+    --font-serif: "Playfair Display", Georgia, serif;
+    --font-sans: "Montserrat", Helvetica, sans-serif;
+
+    /* ===== Shadows (design-system values) ===== */
+    --shadow-sm: 0 1px 3px rgba(30, 27, 27, 0.08);
+    --shadow-md: 0 4px 12px rgba(30, 27, 27, 0.1);
+    --shadow-lg: 0 12px 32px rgba(30, 27, 27, 0.15);
+}
+
+@layer base {
+    /* Legacy CSS custom properties — kept in sync with
+       resources/css/design-system.css until every area is migrated. */
+    :root {
+        /* Primary */
+        --color-primary-50: #fdf5f7;
+        --color-primary-100: #fbeaed;
+        --color-primary-200: #f5d3da;
+        --color-primary-300: #e2b4bd;
+        --color-primary-400: #d4949f;
+        --color-primary-500: #c07a85;
+        --color-primary-600: #a65f6b;
+        --color-primary-700: #8b4a55;
+        --color-primary-800: #79545c;
+        --color-primary-900: #5f4047;
+        --color-primary-950: #3a262b;
+
+        /* Secondary */
+        --color-secondary-50: #fef7f6;
+        --color-secondary-100: #fdf0ee;
+        --color-secondary-200: #fbe0dc;
+        --color-secondary-300: #f7d6d0;
+        --color-secondary-400: #f0bfb6;
+        --color-secondary-500: #e8a59b;
+        --color-secondary-600: #d98a7f;
+        --color-secondary-700: #c47065;
+        --color-secondary-800: #a85a50;
+        --color-secondary-900: #8c4a41;
+        --color-secondary-950: #4a2521;
+
+        /* Tertiary */
+        --color-tertiary-50: #f5f8f5;
+        --color-tertiary-100: #e8f0e8;
+        --color-tertiary-200: #d1e1d1;
+        --color-tertiary-300: #adc7ad;
+        --color-tertiary-400: #8aab8a;
+        --color-tertiary-500: #6b916b;
+        --color-tertiary-600: #547654;
+        --color-tertiary-700: #445f44;
+        --color-tertiary-800: #394d39;
+        --color-tertiary-900: #304030;
+        --color-tertiary-950: #1a231a;
+
+        /* Neutral */
+        --color-neutral-50: #faf9f9;
+        --color-neutral-100: #f3f2f2;
+        --color-neutral-200: #e8e6e6;
+        --color-neutral-300: #d4d1d1;
+        --color-neutral-400: #a9a4a4;
+        --color-neutral-500: #7c7676;
+        --color-neutral-600: #635e5e;
+        --color-neutral-700: #504b4b;
+        --color-neutral-800: #3d3939;
+        --color-neutral-900: #2a2727;
+        --color-neutral-950: #1e1b1b;
+
+        /* Semantic */
+        --color-success: var(--color-tertiary-500);
+        --color-warning: #d4a017;
+        --color-error: #c44a4a;
+        --color-info: var(--color-primary-500);
+
+        /* Background */
+        --bg-page: var(--color-primary-50);
+        --bg-surface: #ffffff;
+        --bg-sidebar: var(--color-neutral-950);
+        --bg-sidebar-hover: rgba(255, 248, 247, 0.08);
+        --bg-sidebar-active: rgba(226, 180, 189, 0.2);
+
+        /* Text */
+        --text-primary: var(--color-neutral-950);
+        --text-secondary: var(--color-neutral-600);
+        --text-muted: var(--color-neutral-500);
+        --text-inverse: #fff8f7;
+
+        /* Border */
+        --border-light: var(--color-neutral-200);
+        --border-default: var(--color-neutral-300);
+        --border-focus: var(--color-primary-400);
+
+        /* Typography */
+        --font-serif: "Playfair Display", Georgia, serif;
+        --font-sans: "Montserrat", Helvetica, sans-serif;
+
+        /* Spacing */
+        --space-1: 4px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 20px;
+        --space-6: 24px;
+        --space-8: 32px;
+        --space-10: 40px;
+        --space-12: 48px;
+        --space-16: 64px;
+
+        /* DECIDED (dev, post-migration): --space-24 was undefined in
+           design-system.css, collapsing auth-pages.css's bottom padding
+           to 0. Dev approved defining it (96px, continuing the scale) as
+           an explicit intentional change — the register hero now gets its
+           intended bottom padding. */
+        --space-24: 96px;
+
+        /* Radius */
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --radius-xl: 12px;
+        --radius-full: 9999px;
+    }
+
+    * {
+        -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+        text-decoration: none;
+    }
+
+    /* Ported from design-system.css (its `html, body { margin: 0; min-height:
+       100% }` — `margin: 0` is already handled by preflight) so that layouts
+       can stop loading design-system.css without losing anything. */
+    html, body {
+        min-height: 100%;
+    }
+
+    /* Preserved from _base.scss (landing): high-visibility focus ring on
+       buttons. TODO(dev): confirm whether this blue ring is an intended
+       design token or an accident — tracked in docs/css-migration-notes.md. */
+    button:focus-visible {
+        outline: 2px solid #4a90e2 !important;
+        outline: -webkit-focus-ring-color auto 5px !important;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-serif);
+        font-weight: 400;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    body, p, span, label, input, select, textarea, button {
+        font-family: var(--font-sans);
+        color: var(--text-secondary);
+    }
+}
+

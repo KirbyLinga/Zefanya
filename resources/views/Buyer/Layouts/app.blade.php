@@ -8,7 +8,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-@vite(['resources/css/design-system.css', 'resources/css/landing.css', 'resources/css/login-modal.css', 'resources/css/auth-buttons.css', 'resources/css/buyer/buyer.css', 'resources/css/buyer/buyer-register-modal.css'])
+{{-- Buyer phase: `design-system.css` DELIBERATELY REMOVED from this array.
+     It was compiled UNLAYERED (no @layer in the built asset) and therefore
+     BEAT every Tailwind utility on `h1-h6`, `p`, `span`, `label`, `button`,
+     `input`, `select`, `textarea` (it forces `color: var(--text-primary)`
+     on headings and `color: var(--text-secondary)` + Montserrat on the
+     rest). Utilities live in `@layer utilities`, and unlayered normal
+     declarations outrank ALL layered ones regardless of specificity — so
+     e.g. `<h4 class="text-white">` silently rendered dark.
+     Its entire token set (80 tokens, verified) is re-exported by
+     `app.css`'s `@layer base :root`, and its element rules are ported into
+     `app.css`'s `@layer base` with identical values, so nothing visual is
+     lost. No buyer markup uses its component classes (.btn/.input/
+     .search-bar/.progress/.nav-pill/.action-btn).
+     Same state the landing layout is already in. See
+     docs/css-migration-notes.md → "CROSS-CUTTING HAZARD". --}}
+@vite(['resources/css/app.css', 'resources/css/login-modal.css', 'resources/css/auth-buttons.css', 'resources/css/buyer/buyer.css', 'resources/css/buyer/buyer-register-modal.css'])
 @stack('styles')
 <script>
   // Mirror the landing page pattern: ensure .html-body class is present.
@@ -27,6 +42,7 @@
 <div class="html-body">
 
 @include('Components.navbar', [
+    'variant' => 'buyer',         // dark filled Login / outlined Register (replaces auth-buttons.css)
     'showLoginModal' => true,
     'hideGuestInLogin' => true,   // Hide "Continue as Guest" on buyer pages
     'showRegisterModal' => true,  // Open buyer register modal directly
