@@ -1,7 +1,24 @@
 {{-- resources/views/Components/navbar.blade.php
      Usage: @include('Components.navbar', [
          'cartCount' => 3,               // optional, defaults to 0
+         'showLoginModal' => true,        // show login modal on click
+         'hideGuestInLogin' => false,     // hide "Continue as Guest" in login modal
+         'showRegisterModal' => false,    // show buyer register modal directly (vs link to register.type)
      ]) --}}
+@php
+    $cartCount = $cartCount ?? 0;
+    $showLoginModal = $showLoginModal ?? true;
+    $hideGuestInLogin = $hideGuestInLogin ?? false;
+    $showRegisterModal = $showRegisterModal ?? false;
+
+    // On auth pages the navbar Login button should link to /login instead of
+    // opening the buyer modal (the page already has its own login form).
+    $isAuthPage = request()->is('login') || request()->is('buyer/login') || request()->is('seller/login');
+    if ($isAuthPage) {
+        $showLoginModal = false;
+    }
+@endphp
+
 <div class="topnavbar-shared">
     <div class="navbar">
         {{-- Left group: brand --}}
@@ -29,7 +46,7 @@
             <div class="icon-group">
                 <a href="{{ Route::has('cart') ? route('cart') : '#' }}" class="icon-wrapper" aria-label="Cart">
                     <i data-lucide="shopping-cart" width="20" height="20"></i>
-                    <span class="icon-badge">{{ $cartCount ?? 0 }}</span>
+                    <span class="icon-badge">{{ $cartCount }}</span>
                 </a>
                 <a href="#" class="icon-wrapper" aria-label="Wishlist">
                     <i data-lucide="heart" width="20" height="20"></i>
@@ -39,8 +56,32 @@
             <div class="nav-divider"></div>
 
             <div class="auth-group">
-                <a href="#" data-login-trigger>Login</a>
-                <a href="{{ Route::has('register.type') ? route('register.type') : '#' }}">Register</a>
+                @if ($showLoginModal)
+                    {{-- Login button - opens modal, optionally hides "Continue as Guest" --}}
+                    <a href="#"
+                       data-login-trigger
+                       @if ($hideGuestInLogin) data-hide-guest="true" @endif
+                       class="auth-btn login-btn">
+                        Login
+                    </a>
+                @else
+                    {{-- Login link - goes to login page --}}
+                    <a href="{{ Route::has('login') ? route('login') : '#' }}" class="auth-btn login-btn">
+                        Login
+                    </a>
+                @endif
+
+                @if ($showRegisterModal)
+                    {{-- Register button - opens buyer register modal directly (for Buyer Page) --}}
+                    <a href="#" data-buyer-register-trigger class="auth-btn register-btn">
+                        Register
+                    </a>
+                @else
+                    {{-- Register link - goes to register type selection page (for Landing Page) --}}
+                    <a href="{{ Route::has('register.type') ? route('register.type') : '#' }}" class="auth-btn register-btn">
+                        Register
+                    </a>
+                @endif
             </div>
         </div>
     </div>

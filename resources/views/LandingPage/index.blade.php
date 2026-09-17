@@ -49,7 +49,7 @@
                 ['icon' => 'utensils',     'label' => 'Food and Gourmet'],
                 ['icon' => 'car',          'label' => 'Automotive & Motorcycle'],
                 ['icon' => 'sofa',         'label' => 'Furniture and Office Equipment'],
-                ['icon' => 'gem',          'label' => 'Jewelry and Watches'],
+                ['icon' => 'gem',          'label' => 'Jewelry   and Watches'],
                 ['icon' => 'pencil-ruler', 'label' => 'Office and School Supplies'],
             ] as $cat)
                 <div class="div-4">

@@ -167,7 +167,7 @@
                 <label for="sellerLineOfBusiness">Line of business *</label>
                 <select name="line_of_business_id" id="sellerLineOfBusiness" required>
                     <option value="" disabled {{ old('line_of_business_id') ? '' : 'selected' }}>Select category</option>
-                    @foreach (\App\Models\Category::orderBy('label')->get() as $category)
+                    @foreach (\App\Models\Shared\Category::orderBy('label')->get() as $category)
                         <option value="{{ $category->id }}" {{ (string) old('line_of_business_id') === (string) $category->id ? 'selected' : '' }}>
                             {{ $category->label }}
                         </option>

@@ -119,6 +119,7 @@ header{
 .dropdown a:hover, .dropdown button.dd-item:hover{background:var(--cream);color:var(--ink);}
 .dropdown hr{border:none;border-top:1px solid var(--line);margin:6px 4px;}
 .dropdown a i, .dropdown button i{width:16px;color:var(--primary-dark);}
+.dropdown form{display:block;margin:0;padding:0;}
 .dropdown .logout{color:#A7444F;}
 .dropdown .logout i{color:#A7444F;}
 

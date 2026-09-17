@@ -26,7 +26,7 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $buyer = \App\Models\Buyer::where('email', $credentials['email'])->first();
+        $buyer = \App\Models\Buyer\Buyer::where('email', $credentials['email'])->first();
 
         // Distinguish "wrong password" from "right password, wrong status"
         // so the person knows what's actually blocking them.

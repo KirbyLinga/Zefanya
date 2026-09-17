@@ -8,14 +8,35 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-@vite(['resources/css/buyer/buyer.css'])
+@vite(['resources/css/design-system.css', 'resources/css/landing.css', 'resources/css/login-modal.css', 'resources/css/auth-buttons.css', 'resources/css/buyer/buyer.css', 'resources/css/buyer/buyer-register-modal.css'])
 @stack('styles')
+<script>
+  // Mirror the landing page pattern: ensure .html-body class is present.
+  // This is required by login-modal.css, landing.css, auth-pages.css, and
+  // buyer-register-modal.css (all use .html-body as a selector ancestor).
+  (function () {
+    var html = document.documentElement;
+    if (html && !html.classList.contains('html-body')) {
+      html.classList.add('html-body');
+    }
+  })();
+</script>
 </head>
 <body>
 
-@include('Buyer.Layouts.navbar')
+<div class="html-body">
+
+@include('Components.navbar', [
+    'showLoginModal' => true,
+    'hideGuestInLogin' => true,   // Hide "Continue as Guest" on buyer pages
+    'showRegisterModal' => true,  // Open buyer register modal directly
+])
 
 @yield('content')
+
+@include('Components.login-modal')
+
+@include('Components.buyer-register-modal')
 
 @include('Buyer.Layouts.footer')
 
@@ -24,10 +45,10 @@
      since product cards (which trigger quick-view) and the cart/chat
      launchers live in the navbar/every product grid. --}}
 
-<div class="overlay" id="overlay" onclick="closeAllPanels()"></div>
+<div class="overlay js-overlay" id="overlay"></div>
 
 <aside class="drawer" id="cartDrawer">
-  <div class="drawer-head"><h3 class="serif">Your cart</h3><button class="drawer-close" onclick="toggleCart()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="drawer-head"><h3 class="serif">Your cart</h3><button class="drawer-close js-cart-toggle"><i class="fa-solid fa-xmark"></i></button></div>
   <div class="drawer-body">
     {{-- TODO: hardcoded cart contents, matching the original mockup.
          Replace with a real @foreach over cart items once Cart is built
@@ -73,14 +94,14 @@
   </div>
 </aside>
 
-<div class="modal-overlay" id="qvOverlay" onclick="if(event.target===this)closeQuickView()">
+<div class="modal-overlay js-qv-overlay" id="qvOverlay">
   {{-- TODO: static placeholder product, matching the original mockup.
        Once Products exist, populate this dynamically (data attributes on
        the card + JS, or a fetch) instead of hardcoding "Ceramic Mug Set". --}}
   <div class="qv-modal">
     <div class="qv-media"><i class="fa-solid fa-mug-hot"></i></div>
     <div class="qv-info">
-      <button class="qv-close" onclick="closeQuickView()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="qv-close js-qv-close"><i class="fa-solid fa-xmark"></i></button>
       <h3>Ceramic Mug Set (4pc)</h3>
       <div class="qv-rating"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star-half-stroke"></i> 4.8 · 2,104 sold</div>
       <div class="qv-price">Rp185.000<span class="qv-old">Rp250.000</span></div>
@@ -104,10 +125,10 @@
       </div>
 
       <div class="opt-label">QUANTITY</div>
-      <div class="qty-stepper" style="margin-bottom:6px;"><button onclick="stepQty(-1)">-</button><span id="qvQty">1</span><button onclick="stepQty(1)">+</button></div>
+      <div class="qty-stepper" style="margin-bottom:6px;"><button class="js-qv-qty-down">-</button><span id="qvQty">1</span><button class="js-qv-qty-up">+</button></div>
 
       <div class="qv-actions">
-        <button class="qv-add" onclick="addToCart()">Add to cart</button>
+        <button class="qv-add js-qv-add" data-product-id="1">Add to cart</button>
         <button class="icon-btn" style="border:1px solid var(--line);"><i class="fa-regular fa-heart"></i></button>
       </div>
     </div>
@@ -117,7 +138,7 @@
 <div class="chat-panel" id="chatPanel">
   {{-- TODO: static conversation, matching the original mockup. Wire up to
        Chat/index and Chat/show once the chat backend exists. --}}
-  <div class="chat-head"><span>Hearth & Nest · Store chat</span><button onclick="toggleChat()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="chat-head"><span>Hearth & Nest · Store chat</span><button class="js-chat-toggle"><i class="fa-solid fa-xmark"></i></button></div>
   <div class="chat-body">
     <div class="msg store">Hi! Thanks for your order 🌿 it's been packed and handed to courier.</div>
     <div class="msg me">Great, do you know when it'll arrive?</div>
@@ -127,6 +148,10 @@
 </div>
 
 <div class="toast" id="toast"><i class="fa-solid fa-circle-check"></i> Added to cart</div>
+
+<script src="{{ asset('js/lucide.min.js') }}"></script>
+<script>lucide.createIcons();</script>
+</div>
 
 @vite(['resources/js/buyer/buyer.js'])
 @stack('scripts')

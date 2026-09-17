@@ -211,17 +211,3 @@
     window.openSellerOtpModal = openOtpModal;
 })();
 </script>
-        });
-    });
-
-    closeBtn.addEventListener('click', closeOtpModal);
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOtpModal(); });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeOtpModal();
-    });
-        inputs.forEach(function (i) { i.classList.add('has-error'); });
-    }
-
-    function collectOtp() {
-        return inputs.map(function (i) { return i.value; }).join('');
-    }

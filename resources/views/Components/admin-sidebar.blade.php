@@ -16,7 +16,7 @@
             <a href="{{ route('admin.registrations.index') }}" class="{{ request()->routeIs('admin.registrations.*') ? 'is-active' : '' }}">
                 <i data-lucide="user-check" width="18" height="18"></i>
                 <span>Registrations</span>
-                @php $pendingCount = \App\Models\Buyer::where('status', 'pending')->count(); @endphp
+                @php $pendingCount = \App\Models\Buyer\Buyer::where('status', 'pending')->count(); @endphp
                 @if ($pendingCount > 0)
                     <span class="admin-sidebar__nav-badge">{{ $pendingCount }}</span>
                 @endif

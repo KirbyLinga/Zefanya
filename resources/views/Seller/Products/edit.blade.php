@@ -3,8 +3,10 @@
 @section('title', 'Edit Product')
 
 @section('content')
-<div class="seller-products-edit">
-    <h1>Edit Product</h1>
-    <p>Update your product listing.</p>
-</div>
+    <h1 class="admin-page-title">Edit Product</h1>
+    <p class="admin-page-subtitle">{{ $product->name }}</p>
+
+    <form method="POST" action="{{ route('seller.products.update', $product) }}" enctype="multipart/form-data" class="sp-form">
+        @include('Seller.Products._form')
+    </form>
 @endsection

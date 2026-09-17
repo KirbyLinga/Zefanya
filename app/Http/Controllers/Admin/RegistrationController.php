@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Buyer;
-use App\Models\Seller;
-use App\Notifications\BuyerRegistrationDecision;
-use App\Notifications\SellerRegistrationDecision;
+use App\Models\Buyer\Buyer;
+use App\Models\Seller\Seller;
+use App\Notifications\Buyer\BuyerRegistrationDecision;
+use App\Notifications\Seller\SellerRegistrationDecision;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -47,7 +47,7 @@ class RegistrationController extends Controller
                 'created_at' => $s->created_at,
             ]);
 
-        $pending = $buyers->merge($sellers)->sortBy('created_at');
+        $pending = $buyers->concat($sellers)->sortBy('created_at');
 
         $selectedId = $request->query('view');
         $selectedType = $request->query('type');

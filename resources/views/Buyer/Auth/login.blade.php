@@ -13,13 +13,17 @@
         <h1 class="auth-card__title">Welcome back</h1>
         <p class="auth-card__subtitle">Log in to continue to Zefanya.</p>
 
-        @if ($errors->any())
+        @if (session('auth.status_message'))
+            <div class="auth-card__error">
+                {{ session('auth.status_message') }}
+            </div>
+        @elseif ($errors->any())
             <div class="auth-card__error">
                 {{ $errors->first() }}
             </div>
         @endif
 
-        <form class="auth-card__form" method="POST" action="{{ route('buyer.login.submit') }}">
+        <form class="auth-card__form" method="POST" action="{{ route('unified.login') }}">
             @csrf
 
             <label class="auth-card__label" for="loginEmail">Email address</label>

@@ -229,8 +229,19 @@
         document.body.style.overflow = '';
     }
 
+    // Expose openModal globally so navbar and other triggers can open this modal
+    // Supports optional options object for future extensibility
+    window.openBuyerRegisterModal = function (e, options) {
+        if (e) e.preventDefault();
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    };
+
     document.querySelectorAll('[data-buyer-register-trigger]').forEach(function (el) {
-        el.addEventListener('click', openModal);
+        el.addEventListener('click', function (e) {
+            window.openBuyerRegisterModal(e);
+        });
     });
 
     closeBtn.addEventListener('click', closeModal);

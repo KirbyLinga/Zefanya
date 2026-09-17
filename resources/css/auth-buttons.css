@@ -1,0 +1,62 @@
+/* Zefanya — Auth button styles for navbar
+   Used by landing page and buyer pages to ensure consistent Login/Register buttons */
+
+
+
+/* Auth buttons in navbar */
+.html-body .auth-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.html-body .auth-btn {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  text-decoration: none;
+  display: inline-block;
+  border: none;
+}
+
+.html-body .auth-btn.login-btn {
+  background-color: var(--color-neutral-950);
+  color: var(--text-inverse);
+}
+
+.html-body .auth-btn.login-btn:hover {
+  background-color: var(--color-primary-800);
+  color: var(--text-inverse);
+}
+
+.html-body .auth-btn.register-btn {
+  background-color: transparent;
+  color: var(--color-primary-800);
+  border: 1px solid var(--color-primary-800);
+}
+
+.html-body .auth-btn.register-btn:hover {
+  background-color: var(--color-primary-800);
+  color: var(--text-inverse);
+}
+
+.html-body .auth-group a {
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .html-body .auth-group {
+    gap: var(--space-2);
+  }
+  
+  .html-body .auth-btn {
+    padding: var(--space-2) var(--space-4);
+    font-size: 12px;
+  }
+}

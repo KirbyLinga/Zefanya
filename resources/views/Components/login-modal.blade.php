@@ -19,13 +19,17 @@
         <h2 class="login-modal__title" id="loginModalTitle">Welcome back</h2>
         <p class="login-modal__subtitle">Log in to continue to Zefanya.</p>
 
-        @if ($errors->any())
+        @if (session('auth.status_message'))
+            <div class="login-modal__error">
+                {{ session('auth.status_message') }}
+            </div>
+        @elseif ($errors->any())
             <div class="login-modal__error">
                 {{ $errors->first() }}
             </div>
         @endif
 
-        <form class="login-modal__form" method="POST" action="{{ route('buyer.login.submit') }}">
+        <form class="login-modal__form" method="POST" action="{{ route('unified.login') }}">
             @csrf
 
             <label class="login-modal__label" for="loginEmail">Email address</label>
@@ -66,13 +70,13 @@
             <button type="submit" class="login-modal__submit">LOG IN</button>
         </form>
 
-        <div class="login-modal__divider">
+        <div class="login-modal__divider" id="loginModalDivider">
             <span class="login-modal__divider-line"></span>
             <span class="login-modal__divider-label">or</span>
             <span class="login-modal__divider-line"></span>
         </div>
 
-        <a href="{{ Route::has('shop.browse') ? route('shop.browse') : '#' }}" class="login-modal__guest">
+        <a href="{{ route('buyer.home') }}" class="login-modal__guest" id="loginModalGuest">
             CONTINUE AS GUEST
         </a>
 
@@ -92,12 +96,21 @@
     var closeBtn = document.getElementById('loginModalClose');
     var toggleBtn = document.getElementById('togglePassword');
     var passwordInput = document.getElementById('loginPassword');
+    var loginForm = overlay.querySelector('.login-modal__form');
+    var divider = document.getElementById('loginModalDivider');
+    var guestLink = document.getElementById('loginModalGuest');
 
-    function openModal(e) {
+    function openModal(e, options) {
         if (e) e.preventDefault();
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
+
+        // If options.hideGuest is true, hide the "Continue as Guest" section
+        if (options && options.hideGuest && divider && guestLink) {
+            divider.style.display = 'none';
+            guestLink.style.display = 'none';
+        }
     }
 
     function closeModal() {
@@ -106,8 +119,18 @@
         document.body.style.overflow = '';
     }
 
+    // Expose openModal globally so addToCart() can trigger it
+    // Supports optional options object: { hideGuest: true }
+    window.openLoginModal = function (e, options) {
+        openModal(e, options);
+    };
+
     document.querySelectorAll('[data-login-trigger]').forEach(function (el) {
-        el.addEventListener('click', openModal);
+        el.addEventListener('click', function (e) {
+            // Check if the trigger element has data-hide-guest attribute
+            var hideGuest = el.getAttribute('data-hide-guest') === 'true';
+            openModal(e, { hideGuest: hideGuest });
+        });
     });
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
@@ -128,5 +151,14 @@
             if (window.lucide) lucide.createIcons();
         });
     }
+
+    // Success callback — called after successful login/register.
+    // The login form submits via classic POST (page reload), so this fires
+    // on the next page load if a pending cart action exists.
+    window.addEventListener('load', function () {
+        if (typeof retryPendingCartAction === 'function') {
+            retryPendingCartAction();
+        }
+    });
 })();
 </script>

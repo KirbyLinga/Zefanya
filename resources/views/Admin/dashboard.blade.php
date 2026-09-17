@@ -9,7 +9,7 @@
     @php
         $buyersTableExists = \Illuminate\Support\Facades\Schema::hasTable('buyers');
         $pendingCount = $buyersTableExists
-            ? \App\Models\Buyer::where('status', 'pending')->count()
+            ? \App\Models\Buyer\Buyer::where('status', 'pending')->count()
             : 0;
     @endphp
 

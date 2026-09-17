@@ -1,16 +1,19 @@
 <?php
 // Add to routes/web.php
 
-use App\Http\Controllers\Buyer\LoginController;
-use App\Http\Controllers\RegisterBuyerController;
-use App\Http\Controllers\RegisterSellerController;
-use App\Http\Controllers\VerifyBuyerOtpController;
-use App\Http\Controllers\VerifySellerOtpController;
+use App\Http\Controllers\Buyer\RegisterBuyerController;
+use App\Http\Controllers\Seller\RegisterSellerController;
+use App\Http\Controllers\Buyer\VerifyBuyerOtpController;
+use App\Http\Controllers\Seller\VerifySellerOtpController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('LandingPage.index');
 })->name('home');
+
+// Unified login entry point (GET) — buyer | seller split.
+Route::get('/login', [App\Http\Controllers\Auth\LoginChoiceController::class, 'show'])
+    ->name('login');
 
 Route::get('/register', function () {
     return view('Auth.Register-Type');
@@ -80,27 +83,20 @@ Route::get('/shop', function () {
     return view('LandingPage.index');
 })->name('shop.browse');
 
-/*
-|--------------------------------------------------------------------------
-| Buyer Authentication Routes
-|--------------------------------------------------------------------------
-| Guest-only login form + POST handler. The old stubs (redirect()->back()
-| with a TODO) are deleted — this replaces them.
-|
-| The modal in login-modal.blade.php submits here via classic form POST.
-| The controller also handles AJAX/JSON for programmatic clients.
-|
-| Named buyer.login / buyer.login.post / buyer.logout — the "buyer."
-| prefix avoids colliding with the admin guard's "login" name.
-*/
+// ============================================================================
+// Unified login entry point
+// ============================================================================
+// POST /login  →  Auth\UnifiedLoginController@login
+//   Tries seller guard first, then buyer. Redirects by role:
+//     seller → seller.dashboard
+//     buyer  → buyer.home
+// Standalone auth pages (buyer/login, seller/login) point here too so the
+// modal and the no-JS pages share a single auth backend.
+Route::post('/login', [App\Http\Controllers\Auth\UnifiedLoginController::class, 'login'])
+    ->name('unified.login')
+    ->middleware('throttle:5,1');
 
-Route::middleware('guest:buyer')->group(function () {
-    Route::get('/login', [LoginController::class, 'show'])->name('buyer.login');
-    Route::post('/login', [LoginController::class, 'login'])
-        ->name('buyer.login.submit')
-        ->middleware('throttle:5,1');
-});
-
-Route::post('/logout', [LoginController::class, 'logout'])
-    ->name('buyer.logout')
-    ->middleware('auth:buyer');
+// POST /logout  → clears every active guard (seller + buyer) and returns home.
+Route::post('/logout', [App\Http\Controllers\Auth\UnifiedLoginController::class, 'logout'])
+    ->name('unified.logout')
+    ->middleware('throttle:5,1');

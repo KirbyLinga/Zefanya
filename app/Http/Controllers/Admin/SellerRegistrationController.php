@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Seller;
-use App\Notifications\SellerRegistrationDecision;
+use App\Models\Seller\Seller;
+use App\Notifications\Seller\SellerRegistrationDecision;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
