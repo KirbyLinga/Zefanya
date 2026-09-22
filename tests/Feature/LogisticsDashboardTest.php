@@ -8,8 +8,10 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Verifies the logistics "Sorting Center" shell renders for an approved
- * logistics provider and is gated correctly for everyone else.
+ * Verifies the logistics dashboard (seller-mirrored layout) renders for an
+ * approved logistics provider, is gated correctly for everyone else, and
+ * shows honest empty states — no fake operational numbers, since no
+ * courier/parcel/delivery tables exist yet.
  */
 class LogisticsDashboardTest extends TestCase
 {
@@ -19,6 +21,7 @@ class LogisticsDashboardTest extends TestCase
     {
         return LogisticsProvider::factory()->create([
             'email' => 'claire@example.com',
+            'business_name' => 'Cruz Logistics Services',
             'status' => LogisticsProviderStatus::Approved->value,
             'email_verified_at' => now(),
         ]);
@@ -44,26 +47,46 @@ class LogisticsDashboardTest extends TestCase
 
     public function test_dashboard_renders_for_an_approved_provider(): void
     {
-        $this->actingAs($this->approvedLogisticsProvider(), 'logistics')
+        $provider = $this->approvedLogisticsProvider();
+
+        $this->actingAs($provider, 'logistics')
             ->get(route('logistics.dashboard'))
             ->assertOk()
-            ->assertSee('Sorting Center', true)
-            ->assertSee('Hub 04', true)
-            ->assertSee('ZEF-982410', true)
-            ->assertSee('ZEF-982415', true)
-            ->assertSee('842 parcels', true)
+            ->assertSee('Welcome back, '.$provider->business_name)
             ->assertSee('data-theme-toggle', true);
     }
 
-    public function test_status_pills_cover_all_variants(): void
+    public function test_dashboard_shows_honest_empty_states_without_fake_numbers(): void
     {
         $html = $this->actingAs($this->approvedLogisticsProvider(), 'logistics')
             ->get(route('logistics.dashboard'))
             ->assertOk()
             ->getContent();
 
-        foreach (['Delivered', 'Sorting', 'Pending Approval', 'Pending', 'In Transit'] as $label) {
-            $this->assertStringContainsString($label, $html, "Status label [{$label}] missing.");
-        }
+        // Empty states are shown for every panel that has no backing data.
+        $this->assertStringContainsString('No delivery data yet', $html);
+        $this->assertStringContainsString('No applications yet', $html);
+        $this->assertStringContainsString('No parcels yet', $html);
+
+        // Stat cards render the null placeholder, never a fabricated value.
+        $this->assertStringContainsString('Parcels in hub', $html);
+        $this->assertStringNotContainsString('ZEF-9824', $html);
+        $this->assertStringNotContainsString('842 parcels', $html);
+    }
+
+    public function test_sidebar_links_only_to_wired_routes_without_fake_badges(): void
+    {
+        $html = $this->actingAs($this->approvedLogisticsProvider(), 'logistics')
+            ->get(route('logistics.dashboard'))
+            ->assertOk()
+            ->getContent();
+
+        // The one wired route renders as a real link; future areas stay inert.
+        $this->assertStringContainsString(route('logistics.dashboard'), $html);
+        $this->assertStringContainsString('Courier Applications', $html);
+
+        // The old stub's fabricated nav badges are gone.
+        $this->assertStringNotContainsString('8 new', $html);
+        $this->assertStringNotContainsString('lg-nav-badge', $html);
     }
 }

@@ -33,16 +33,16 @@ After writing any flash-then-redirect flow, trace the one response object actual
 ## A "stale test" may actually be a wrong assumption about the route under test
 
 ### What happened
-`NavbarTest::test_signed_in_buyers_see_account_dropdown...` failed and looked like a regression from navbar edits. Investigation showed `route('home')` is the landing page (`/`, `LandingPage.index`), whose navbar include uses `variant => 'landing'` — documented to always show plain Login/Register for guests and buyers alike.
+`NavbarTest::test_signed_in_buyers_see_account_dropdown...` failed and looked like a regression from navbar edits. `route('home')` IS the landing page (`/`, `LandingPage.index`) — that part is correct. **The conclusion originally recorded here was wrong**: it claimed the landing shell's navbar include uses `variant => 'landing'`, so plain Login/Register for a signed-in buyer is "documented expected" behaviour. It is not.
 
 ### Why it was wrong
-Assuming `home` = buyer home (`buyer.home`) led to hunting a regression that did not exist in the tested path.
+`Layouts/footer.blade.php` is the landing + register/pending/login shell and must pass `@include('Components.navbar', ['variant' => 'buyer'])` — commit `f85f485`, the same commit that added `NavbarTest`, sets it that way. With `'buyer'`, a signed-in buyer sees the account dropdown on `/` and guests still see plain Login/Register (`Components/navbar.blade.php` header confirms both variants render identically for guests). The include had only become `'landing'` in an uncommitted edit, so the test was reporting a REAL regression. Restoring `'buyer'` turns the suite green (138 passed).
 
 ### Correct rule
-Resolve the actual route/view a failing test exercises before blaming recent changes; `php artisan route:list` first, diff of the touched files second.
+`Layouts/footer.blade.php` (public/landing + auth shell) → `variant => 'buyer'`. Never change it to `'landing'`: `'landing'` discards the signed-in buyer's account state on the landing page.
 
 ### Prevention
-When a test fails, identify the exact controller/view under test and read its variant/branch conditions before editing code that merely looks related.
+When a test fails, resolve the exact route/view under test (`php artisan route:list`) AND run `git diff` on the include/template before calling the test stale. A failure that the committed code does not produce points at YOUR uncommitted change, not at the test.
 
 ## Never git-stash to "check a pre-existing failure" without realizing untracked files go too
 
@@ -71,4 +71,19 @@ Any text-bearing `<span>` inside an element whose color is set by a utility clas
 
 ### Prevention
 When text color "won't change", check whether the text node is in a `<span>`/`<p>`/`<button>` targeted by the base-layer color rule before suspecting JIT purge or browser cache. Audit existing sidebars (admin, buyer nav) for the same pattern.
+
+## Unrequested sidebar wired into a SHARED public shell (+ a phantom buyer sidebar)
+
+### What happened
+Uncommitted work changed `resources/views/Layouts/footer.blade.php` — it wrapped `@yield('content')` in a flex row with `@include('Components.sidebars.landing')` and switched the navbar include to `variant => 'landing'`. Three view components were left in `resources/views/Components/sidebars/` (`landing`, `buyer`, `auth`); none was included anywhere except that one line, two were malformed (two whole sidebars concatenated in one file; a `@php` block closed by a stray `</aside>`), and there was no contract for any of it. Developer response: *"dont change anything in the landing page also why is there a sidebar what im trying to say is to fix the navbar dont add sidebar for the buyer."*
+
+### Why it was wrong
+`Layouts/footer.blade.php` is **shared** — landing page, buyer register/pending pages, seller login, logistics register/OTP — so a "landing" sidebar silently appeared on all of them, and the `variant => 'landing'` switch came bundled with it (breaking `NavbarTest` on `/`). A sidebar in the buyer area was never requested and contradicts the buyer area's settled top-navbar-only layout (`Buyer/Layouts/app.blade.php`). Presenting an unapproved navigation change as a done feature is scope creep.
+
+### Correct rule
+Landing, buyer and auth navigation is the **top navbar only**. Never include a sidebar in `Layouts/footer.blade.php` or `Buyer/Layouts/app.blade.php`; sidebars belong only to the shells whose design owns one (`Layouts/seller`, `Layouts/logistics`, `Admin/Layouts/app`).
+
+### Prevention
+Before wiring a sibling area's pattern (sidebar rail) into a shell, list that shell's consumers (`Get-ChildItem -Recurse resources/views -Include *.blade.php | Select-String 'extends'`). Treat any edit to a SHARED layout as a change to every consumer, and never bundle an unrelated navbar variant change with a visual experiment. Unreferenced/duplicate component files must not be left in `resources/views/Components/`.
+
 

@@ -278,7 +278,9 @@ html[data-theme="dark"] {
    .zf-theme-ready on the next frame) and never for reduced-motion users. */
 @media (prefers-reduced-motion: no-preference) {
     html.zf-theme-ready .seller-body,
-    html.zf-theme-ready .seller-body * {
+    html.zf-theme-ready .seller-body *,
+    html.zf-theme-ready .logistics-body,
+    html.zf-theme-ready .logistics-body * {
         transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
     }
 }

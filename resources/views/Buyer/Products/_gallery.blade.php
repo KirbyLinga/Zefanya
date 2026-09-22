@@ -12,8 +12,8 @@
 <div class="flex flex-col gap-3">
 
   {{-- Main image --}}
-  <div class="relative overflow-hidden rounded-3xl bg-secondary-100">
-    <div class="aspect-[4/5] w-full sm:aspect-[3/4]">
+    <div class="relative mx-auto w-full max-w-[480px] overflow-hidden rounded-3xl bg-secondary-100">
+    <div class="aspect-[4/3] max-h-[900px]">
       <img
         id="pdp-main-img"
         src="{{ $mainImg ?? '' }}"
@@ -44,7 +44,7 @@
     </button>
   </div>
 
-  {{-- Thumbnail strip --}}
+    {{-- Thumbnail strip --}}
   <div class="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Product images">
     @foreach ($thumbImgs as $i => $thumb)
       <button
@@ -69,6 +69,28 @@
         </div>
       </button>
     @endforeach
+  </div>
+
+  {{-- Product description (under image, left side) --}}
+  @if ($product->description)
+    <p class="mt-4 text-[14px] leading-relaxed text-buyer-ink-soft">
+      {{ $product->description }}
+    </p>
+  @endif
+
+  {{-- Ratings summary line --}}
+  <div class="mt-4 flex items-center gap-3 text-[12px] text-buyer-ink-soft">
+    <div class="flex items-center gap-0.5">
+      @for ($s = 1; $s <= 5; $s++)
+        <i data-lucide="star"
+           class="h-[12px] w-[12px] {{ $s <= floor($rating) ? 'text-primary-500' : 'text-neutral-200' }}"></i>
+      @endfor
+    </div>
+    <span class="font-semibold text-buyer-ink">{{ number_format($rating, 1) }}</span>
+    <span class="text-neutral-300">·</span>
+    <span class="text-neutral-400">{{ number_format($reviewCount) }} Reviews</span>
+    <span class="text-neutral-300">·</span>
+    <span class="text-neutral-400">{{ number_format($soldCount) }} Sold</span>
   </div>
 
 </div>

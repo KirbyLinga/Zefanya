@@ -16,14 +16,15 @@
 
      GUEST AUTH RENDERING RULES
      ─────────────────────────────────────────────────────────────────────────
-     landing variant  → always shows plain-text Login / Register (no buyer
-                        auth check; buyer account widget never appears)
-     buyer variant    → checks Auth::guard('buyer'):
-                          signed-in  → avatar + account dropdown
-                          guest      → same plain-text Login / Register
+     landing variant  → checks Auth::guard('buyer') like the buyer variant:
+                          signed-in buyer → avatar + account dropdown
+                          guest           → Login / Register
+                        (cart/wishlist icons also shown; same layout as buyer)
+     buyer variant    → identical behaviour to landing variant above.
 
-     The plain Login / Register links are identical on both variants so the
-     navbar looks exactly the same for any unauthenticated visitor.
+     Both variants run the same buyer guard check and produce the same
+     output. Keeping the two names allows individual pages to opt in or out
+     of future variant-specific behaviour without a bulk rename.
      ─────────────────────────────────────────────────────────────────────────
 --}}
 @php
@@ -38,9 +39,12 @@
         $showLoginModal = false;
     }
 
-    // ── Buyer auth state (buyer variant only) ────────────────────────────────
+    // ── Buyer auth state (landing + buyer variants) ──────────────────────────
+    // 'landing' now also reflects buyer session so a logged-in buyer sees
+    // their account dropdown on the public landing/marketing pages too,
+    // exactly like they do on /buyer/* pages.
     $buyerUser = null;
-    if ($variant === 'buyer') {
+    if ($variant === 'buyer' || $variant === 'landing') {
         $buyerUser = Auth::guard('buyer')->check()
             ? Auth::guard('buyer')->user()
             : null;

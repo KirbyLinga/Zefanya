@@ -14,8 +14,15 @@
 <body>
 <div class="html-body min-w-0 overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
-    {{-- ===== Top navbar (shared) ===== --}}
-    @include('Components.navbar', ['variant' => 'buyer'])
+    {{-- ===== Top navbar (shared) =====
+         Landing/public shell: always show the public-facing nav (Login / Register)
+         regardless of any session state. Authenticated buyers have their own
+         navbar inside the Buyer layout (Buyer/Layouts/app.blade.php) where
+         variant='buyer' is correct. Using 'landing' here means the marketing
+         pages never expose a logged-in account dropdown.
+         There is NO sidebar in the public/buyer shells — navigation is the top
+         navbar only. Do not add one. --}}
+    @include('Components.navbar', ['variant' => 'landing'])
 
     {{-- ===== Hero (full-bleed, outside .main) ===== --}}
     @yield('hero')

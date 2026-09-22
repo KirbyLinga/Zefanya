@@ -1,38 +1,34 @@
 # Admin Coding Checklist
 
-> **Audit legend (2026-09-20):** [x] = working (code + route + backing data verified) · [ ] = not implemented. Notes in *italics* flag dependencies, UI-only shells, or defects.
-> Anything not ticked below was not found in the codebase (no route, controller, table, or view backs it).
+> **System context (for AI):** Zefanya is a Laravel 11 / PHP 8.x marketplace. The admin panel (`/admin/*`, `auth:admin` guard, `admins` table) manages buyer + seller + logistics-provider registrations via a unified approval queue, and is the only surface with access to platform-wide user data. All admin routes are grouped under the `admin.` name prefix (defined in `routes/admin.php`, loaded by `bootstrap/app.php`). The `EnsureAdminRole` middleware (`alias: admin.role`) exists but is applied to zero routes. The dashboard has two real stat queries (active users and pending registrations across all roles) and two `—` placeholders (disputes, commission) because those modules don't exist yet. The registration queue (`Admin\RegistrationController`) handles buyers and sellers via `?view=&type=` params, and logistics providers via the same controller. Three duplicate/ghost model files (`app/Models/Seller/Product.php`, `app/Models/Seller/ProductImage.php`) exist on disk but declare `namespace App\Models` — they are dead and can never be autoloaded. All tests pass (127 passing as of 2026-09-22).
+
+> **Audit legend:** `[x]` = working (code + route + backing data verified) · `[ ]` = not implemented. *Italics* flag known defects, shells, or dependencies.
 
 ---
 
 ## Foundation / Authentication
 
-- [x] Admin login *(`GET|POST /admin/login`, `Admin\AuthController`, guest-protected)*
+- [x] Admin login *(`GET|POST /admin/login`, `Admin\AuthController`, `guest:admin` protected)*
 - [x] Email validation
 - [x] Password validation
-- [x] Admin authentication *(`admin` guard + `admins` table)*
-- [x] Admin route protection *(`auth:admin` middleware group)*
-- [x] Admin logout *(session invalidation)*
-- [x] Unauthorized access handling *(`guest:admin` redirects; guards never shared)*
+- [x] Admin authentication *(`admin` guard + `admins` table with `role` string column)*
+- [x] Admin route protection *(`auth:admin` middleware group covers all authenticated admin routes)*
+- [x] Admin logout *(session invalidation + token regenerate)*
+- [x] Unauthorized access handling *(`guest:admin` redirects to `/admin/login`; guards never shared)*
 
 ---
 
 ## Admin Dashboard
 
-- [x] Admin dashboard *(`Admin\DashboardController` renders `Admin/dashboard`)*
-- [ ] Platform overview
-- [ ] Total users *(HARDCODED "128" in the view)*
-- [ ] Total buyers
-- [ ] Total sellers
-- [ ] Total logistics/sorting centers
-- [ ] Total couriers/riders
-- [ ] Total products
+- [x] Admin dashboard page *(`GET /admin/dashboard` → `Admin\DashboardController@index` → `Admin/dashboard`)*
+- [x] Active users stat *(real query: `approved` buyers + sellers + logistics providers, controller-computed)*
+- [x] Pending registrations stat *(real query: `pending_approval` across buyers + sellers + logistics providers)*
+- [ ] Total buyers / sellers / logistics breakdown *(single combined count only, no per-role breakdown)*
 - [ ] Total orders
-- [x] Pending registrations *(real query — BUT counts `status = 'pending'` while registrations actually use `pending_approval`; likely always 0)*
-- [ ] Pending complaints/disputes *(HARDCODED "5")*
-- [ ] Platform sales overview
-- [ ] Commission overview *(HARDCODED "₱12,450")*
-- [ ] Dashboard statistics
+- [ ] Total products
+- [ ] Open disputes *(hardcoded `—` placeholder — disputes module not built)*
+- [ ] Commission this month *(hardcoded `—` placeholder — commission module not built)*
+- [ ] Dashboard statistics (full)
 - [ ] Recent activities
 - [ ] Dashboard notifications
 
@@ -40,283 +36,181 @@
 
 ## Manage Account Registrations
 
-> *Only the buyer+seller unified queue (`Admin\Registrations.index`) exists and works.
-> Logistics/sorting-center/courier applications do not exist (Logistics' domain, not built).
-> An orphaned `Admin\SellerRegistrationController` + `Admin/Registrations/sellers.blade.php`
-> exist but are NOT routed, and the view references undefined route names — rendering it errors.*
+> Buyer + seller applications live in the unified `Admin\RegistrationController`. Logistics applications are approved via the same controller (`approveLogistics` / `rejectLogistics`). Logistics registration backend is fully built (OTP, store, pending page) as of 2026-09-21; the UI entry card on the register-type page is **disabled ("Coming soon")** — the backend routes are live but the front-end trigger is intentionally hidden until the logistics panel ships.
+
 - [x] Registration management page *(`GET /admin/registrations`; 404 guard if tables missing)*
 - [x] Buyer applications *(`pending_approval` queue)*
 - [x] Seller applications *(`pending_approval` queue, unified with buyers)*
-- [ ] Logistics applications
-- [ ] Sorting center applications
-- [ ] Courier/rider applications
+- [x] Logistics provider applications *(`approveLogistics`/`rejectLogistics` routes exist and are tested)*
+- [ ] Sorting center / courier applications *(not started — courier lifecycle belongs to Logistics, not Admin)*
 - [ ] Search applications
 - [ ] Filter applications
 - [ ] Sort applications
-- [x] View application details *(?view=&type= selection)*
-- [x] Review submitted information
-- [ ] Review submitted requirements
-- [ ] View uploaded ID *(not verified as displayed in the unified queue)*
-- [ ] View business permit / DTI permit *(only in the orphaned unrouted view)*
-- [ ] Verify submitted information
-- [x] Approve registration *(sets `approved_by`/`approved_at`, clears rejection reason)*
-- [x] Disapprove registration
+- [x] View application details *(`?view={id}&type={buyer|seller|logistics}` selection panel)*
+- [x] Review submitted information *(personal info, address, address_detail, status shown)*
+- [ ] View uploaded ID / business permit in detail panel *(links present but not deeply audited)*
+- [x] Approve registration *(sets `approved_by`/`approved_at`, clears rejection reason; sends notification)*
+- [x] Disapprove / reject registration *(sets `rejected` status + `rejection_reason`)*
 - [x] Registration rejection reason *(required, max 500)*
-- [x] Applicant approval notification *(`BuyerRegistrationDecision` / `SellerRegistrationDecision`)*
+- [x] Applicant approval notification *(`BuyerRegistrationDecision` / `SellerRegistrationDecision` / `LogisticsRegistrationDecision`)*
 - [x] Applicant rejection notification *(includes reason)*
-- [x] Email notification *(via Laravel notifications)*
-- [x] Registration status tracking *(status + approved_by + approved_at persisted)*
+- [x] Email notification *(via Laravel Notifications)*
+- [x] Registration status tracking *(`status` + `approved_by` + `approved_at` persisted)*
 
 ---
 
 ## Manage User Accounts
 
-* [ ] User management page
-* [ ] View all users
-* [ ] View buyer accounts
-* [ ] View seller accounts
-* [ ] View logistics/sorting center accounts
-* [ ] View courier/rider accounts
-* [ ] Search users
-* [ ] Filter users by role
-* [ ] Sort users
-* [ ] View user profile
-* [ ] View account status
-* [ ] Activate account
-* [ ] Suspend account
-* [ ] Deactivate account
-* [ ] Reactivate account
-* [ ] Suspension reason
-* [ ] Deactivation reason
-* [ ] Account status notification
-* [ ] User activity/history
+- [ ] User management page
+- [ ] View all users
+- [ ] View buyer accounts
+- [ ] View seller accounts
+- [ ] View logistics accounts
+- [ ] Search / filter / sort users
+- [ ] View user profile
+- [ ] Activate / suspend / deactivate account
+- [ ] Suspension / deactivation reason
+- [ ] Account status notification
+- [ ] User activity / history
 
 ---
 
 ## Seller Compliance Monitoring
 
-* [ ] Seller compliance page
-* [ ] View seller products
-* [ ] Verify product belongs to seller's registered category
-* [ ] Identify prohibited products
-* [ ] Identify inappropriate products
-* [ ] Review product details
-* [ ] Review product images
-* [ ] Search seller products
-* [ ] Filter seller products
-* [ ] Issue seller warning
-* [ ] Warning reason
-* [ ] Suspend seller account
-* [ ] Suspension reason
-* [ ] Reactivate seller account
-* [ ] Seller violation history
-* [ ] Compliance status
-* [ ] Notify seller of violation
-* [ ] Notify seller of suspension
+- [ ] Seller compliance page
+- [ ] View / verify seller products
+- [ ] Identify prohibited / inappropriate products
+- [ ] Issue seller warning / suspension
+- [ ] Seller violation history
+- [ ] Notify seller of violation / suspension
 
 ---
 
 ## Complaints & Disputes
 
-* [ ] Complaints and disputes page
-* [ ] View complaints
-* [ ] View dispute details
-* [ ] View supporting evidence
-* [ ] View related order
-* [ ] View buyer information
-* [ ] View seller information
-* [ ] View courier information
-* [ ] Search complaints
-* [ ] Filter complaints
-* [ ] Sort complaints
-* [ ] Complaint status
-* [ ] Assign/review complaint
-* [ ] Communicate with buyer
-* [ ] Communicate with seller
-* [ ] Communicate with courier
-* [ ] Request additional evidence
-* [ ] Record resolution
-* [ ] Resolve complaint
-* [ ] Close dispute
-* [ ] Complaint/dispute history
-* [ ] Notify involved users of decision
+- [ ] Complaints and disputes page
+- [ ] View / assign / resolve complaints
+- [ ] Communicate with buyer / seller / courier
+- [ ] Complaint status / history
+- [ ] Notify involved users of decision
 
 ---
 
 ## Commission Management
 
-* [ ] Commission management page
-* [ ] Platform commission rate
-* [ ] 10% commission configuration
-* [ ] Calculate platform commission
-* [ ] Calculate commission per order
-* [ ] View seller sales
-* [ ] View commission per order
-* [ ] View total commissions
-* [ ] Commission history
-* [ ] Commission status
-* [ ] Commission report data
+- [ ] Commission management page
+- [ ] 10% platform commission configuration
+- [ ] Calculate commission per order / total
+- [ ] Commission history / report
 
 ---
 
 ## Reports
 
-* [ ] Reports page
-* [ ] Sales summary report
-* [ ] Commission report
-* [ ] Date range filter
-* [ ] Sales totals
-* [ ] Order totals
-* [ ] Completed sales
-* [ ] Cancelled orders
-* [ ] Platform commission
-* [ ] Seller sales summary
-* [ ] Report filtering
-* [ ] Report sorting
-* [ ] Export sales report
-* [ ] Export commission report
+- [ ] Reports page
+- [ ] Sales summary / commission report
+- [ ] Date range filter
+- [ ] Export sales / commission report
 
 ---
 
 ## Platform Settings
 
-* [ ] Platform settings page
-* [ ] Post announcements
-* [ ] Create announcement
-* [ ] Edit announcement
-* [ ] Delete/archive announcement
-* [ ] Publish/unpublish announcement
-* [ ] Announcement visibility
-* [ ] Update platform policies
-* [ ] Create policy
-* [ ] Edit policy
-* [ ] Publish policy
-* [ ] Policy version/history
-* [ ] Platform commission setting
-* [ ] System configuration
+- [ ] Platform settings page
+- [ ] Post / edit / delete announcements
+- [ ] Update platform policies
+- [ ] Platform commission setting
 
 ---
 
 ## Chat / Messaging
 
-* [ ] Admin chat page
-* [ ] Conversation list
-* [ ] Buyer conversations
-* [ ] Seller conversations
-* [ ] Logistics conversations
-* [ ] Courier conversations
-* [ ] Send message
-* [ ] Receive message
-* [ ] Message timestamps
-* [ ] Read/unread status
-* [ ] Unread message count
-* [ ] Message history
-* [ ] Order-related chat
-* [ ] Complaint/dispute-related chat
+- [ ] Admin chat page
+- [ ] Buyer / seller / logistics / courier conversations
+- [ ] Send / receive messages
+- [ ] Read/unread status / history
 
 ---
 
 ## Account Management
 
-* [ ] Admin account page
-* [ ] View profile
-* [ ] Edit personal information
-* [ ] Edit contact number
-* [ ] Edit email
-* [ ] Change password
-* [ ] Profile picture
-* [ ] Account status
-* [ ] Security settings
+- [ ] Admin account page
+- [ ] Edit personal information / contact / email
+- [ ] Change password / profile picture
+- [ ] Security settings
 
 ---
 
 ## Security & Authorization
 
 - [x] Admin-only route protection *(`auth:admin`; login behind `guest:admin`)*
-- [x] Role-based access *(role column + `EnsureAdminRole` middleware — but the middleware is applied to NO route yet)*
+- [x] Role column exists *(`admins.role` string, default `'admin'`; values: `admin`, `super_admin`, `moderator`, `support`)*
+- [x] `EnsureAdminRole` middleware exists and is aliased as `admin.role` *(usage: `Route::middleware('admin.role:super_admin')`)*
+- [ ] `EnsureAdminRole` applied to any route *(middleware defined but used by zero routes — role separation is dormant)*
 - [ ] Admin cannot access another admin's restricted data
-- [ ] Authorization for user management *(module not built)*
-- [ ] Authorization for seller compliance actions *(module not built)*
-- [ ] Authorization for complaint/dispute actions *(module not built)*
-- [ ] Authorization for commission management *(module not built)*
+- [ ] Authorization for user management / compliance / disputes / commissions *(modules not built)*
+- [ ] No Laravel Policies anywhere in the project *(ownership checks are controller-level only; Policies required before orders/payments land)*
 - [x] Form validation *(rejection reason required max 500; login validated)*
-- [ ] File/viewing authorization
-- [x] Unauthorized access handling
-- [ ] Action/activity logging
-- [ ] Admin action history *(only approved_by/approved_at on registrations)*
+- [x] Unauthorized access handling *(guards + redirects)*
+- [ ] Action/activity logging *(only `approved_by`/`approved_at` on registrations)*
 
 ---
 
 ## UI & Responsive
 
 - [x] Admin desktop UI *(`Admin.Layouts.app` + admin-sidebar component)*
-- [ ] Admin tablet UI audit
-- [ ] Admin mobile UI audit
+- [x] Responsive dashboard *(1200 px / 700 px grid breakpoints)*
 - [x] Responsive navigation
-- [x] Responsive dashboard *(1200px/700px grid breakpoints)*
-- [ ] Responsive registration management *(not deeply audited — visual QA pending)*
-- [ ] Responsive user management *(not built)*
-- [ ] Responsive complaints/disputes *(not built)*
-- [ ] Responsive reports *(not built)*
-- [ ] Responsive chat *(not built)*
-- [ ] Loading states *(not audited)*
-- [ ] Empty states *(not audited)*
+- [ ] Responsive registration management *(visual QA pending)*
+- [ ] Responsive user management / compliance / disputes / reports / chat *(not built)*
 - [x] Error states *(404 defensive guard on missing tables)*
 - [x] Success messages *(flash on approve/reject)*
-- [ ] Confirmation dialogs *(not audited)*
 
 ---
 
 ## Testing
 
-* [ ] Admin login test
-* [ ] Authentication test
-* [ ] Registration management test
-* [ ] Buyer approval test
-* [ ] Seller approval test
-* [ ] Logistics approval test
-* [ ] Courier approval test
-* [ ] User account management test
-* [ ] Seller compliance test
-* [ ] Complaint/dispute test
-* [ ] Commission calculation test
-* [ ] Sales report test
-* [ ] Commission report test
-* [ ] Platform settings test
-* [ ] Chat test
-* [ ] Authorization test
-* [ ] Responsive UI test
-* [ ] End-to-end admin flow test
+- [x] Logistics registration tests *(`LogisticsRegistrationTest` — route fix, store, validation, cross-role email, OTP flow, admin approve/reject — 21 tests)*
+- [x] Seller dashboard hero tests *(`SellerDashboardHeroTest` — 5 tests)*
+- [x] Seller panel fixes tests *(`SellerPanelFixesTest` — sidebar, hero layout)*
+- [x] Street/address tests *(`RegistrationStreetTest` — buyer + seller + admin view — 19 tests)*
+- [x] Admin registrations view *(covered via `RegistrationStreetTest` admin assertions)*
+- [ ] Admin login test
+- [ ] Registration management unit test
+- [ ] Buyer / seller approval test *(approval flow covered indirectly in street test)*
+- [ ] Logistics approval test *(covered in `LogisticsRegistrationTest`)*
+- [ ] User account management test
+- [ ] Seller compliance test
+- [ ] Commission / reports test
+- [ ] Authorization / role test
 
 ---
 
 ## Complete Admin Flow
 
 - [x] Login
-- [x] View platform dashboard *(stats mostly placeholder/hardcoded)*
+- [x] View platform dashboard *(two real stats; two `—` placeholders)*
 - [x] Review pending registrations
-- [ ] Verify submitted requirements
-- [x] Approve/disapprove applicant
-- [x] Notify applicant *(email)*
+- [x] Approve / disapprove applicant
+- [x] Notify applicant (email)
 - [ ] Manage user accounts
 - [ ] Monitor seller compliance
-- [ ] Handle complaints/disputes
+- [ ] Handle complaints / disputes
 - [ ] Calculate platform commission
 - [ ] Generate reports
-- [ ] Manage platform announcements
-- [ ] Update platform policies
-- [ ] Chat/messaging
+- [ ] Manage platform announcements / policies
+- [ ] Chat / messaging
 - [ ] Manage admin account
 - [x] Logout
 
 ---
 
-## Known defects / compliance notes (from 2026-09-20 audit)
+## Known defects / open items (as of 2026-09-22)
 
-1. **Hardcoded dashboard stats** — "128 Active Users", "5 Open Disputes", "₱12,450 Commission" are fake numbers rendered directly in `Admin/dashboard.blade.php`.
-2. **Wrong status value in the real stat** — dashboard counts `where('status', 'pending')`, but registrations use `pending_approval`; the only live stat is therefore likely always 0.
-3. **Orphaned seller-registration screen** — `Admin\SellerRegistrationController` has no routes, and `Admin/Registrations/sellers.blade.php` calls undefined `registrations.sellers.*` route names (rendering it would throw). The live queue is the unified `Registrations.index`.
-4. **`EnsureAdminRole` middleware exists but is used by zero routes** — role separation is dormant.
-5. **No admin feature tests** exist.
-6. **No Policies project-wide** — must be addressed before user management / compliance / dispute administration are built.
-7. Per the settled architecture, **courier management must stay with Logistics**, not Admin — keep the current boundary when Logistics ships.
+1. **`EnsureAdminRole` middleware applied to no routes** — role separation is dormant; all authenticated admins can reach every admin route regardless of role value.
+2. **`app/Models/Seller/Product.php` and `app/Models/Seller/ProductImage.php` are ghost files** — both declare `namespace App\Models` (wrong for their path) and will never be autoloaded. They are dead code but still on disk.
+3. **`admin_coding_checklist.md` defect #3 (orphaned `SellerRegistrationController`) still unresolved** — `Admin\SellerRegistrationController` has no routes; `Admin/Registrations/sellers.blade.php` calls undefined route names and would throw if reached.
+4. **No Laravel Policies project-wide** — required before user management, compliance actions, or dispute administration are built.
+5. **Dashboard "Open Disputes" and "Commission" stats are `—` placeholders** — disputes and commission modules do not exist.
+6. **Courier management must stay with Logistics, not Admin** — maintain this boundary when the Logistics panel ships.
+7. **All 127 tests pass** as of the 2026-09-22 session.

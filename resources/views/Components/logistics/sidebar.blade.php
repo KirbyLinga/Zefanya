@@ -1,84 +1,83 @@
+@props([
+    'provider' => null,
+    'sections' => null,
+])
+
 @php
-/**
- * Logistics › Dispatch & Operations sidebar.
- * Mirrors resources/views/Components/seller/sidebar.blade.php. Icons render via
- * the bundled lucide (loaded by Layouts/logistics), not inline SVG.
- * Future area routes fall back to "#" through Route::has() so a link never 404s
- * before its route exists — only `logistics.dashboard` is wired today.
- */
+    // Default to the currently authenticated logistics provider so the layout
+    // can simply render <x-logistics.sidebar /> with no props. Both props are
+    // overridable so other logistics surfaces can reuse the sidebar with a
+    // custom provider or a trimmed nav. Mirrors x-seller.sidebar 1:1.
+    $provider = $provider ?? auth('logistics')->user();
+
+    // Only logistics.dashboard is wired today; the other areas fall back to
+    // "#" through Route::has() so a link never 404s before its route exists.
+    // No fake badges/counts — every area without backing data renders plain.
+    $sections ??= [
+        [
+            'label' => null,
+            'items' => [
+                ['route' => 'logistics.dashboard', 'icon' => 'layout-dashboard', 'label' => 'Dashboard'],
+            ],
+        ],
+        [
+            'label' => 'Operations',
+            'items' => [
+                ['route' => null, 'icon' => 'users', 'label' => 'Rider Management'],
+                ['route' => null, 'icon' => 'clipboard-check', 'label' => 'Courier Applications'],
+                ['route' => null, 'icon' => 'inbox', 'label' => 'Incoming Parcels'],
+                ['route' => null, 'icon' => 'archive', 'label' => 'Parcel Sorting'],
+                ['route' => null, 'icon' => 'map-pin', 'label' => 'Delivery Assignment'],
+                ['route' => null, 'icon' => 'activity', 'label' => 'Delivery Monitoring'],
+            ],
+        ],
+        [
+            'label' => 'Settings',
+            'items' => [
+                ['route' => null, 'icon' => 'user', 'label' => 'Account'],
+            ],
+        ],
+    ];
 @endphp
 
-<aside class="lg-sidebar" id="lgSidebar" aria-label="Logistics navigation">
-    <div class="lg-brand">
-        <span class="lg-brand-mark" aria-hidden="true">
-            <i data-lucide="package" width="20" height="20"></i>
-        </span>
-        <span class="lg-brand-text">
-            <span class="lg-brand-name">Zefanya</span>
-            <span class="lg-brand-sub">Dispatch &amp; Operations</span>
-        </span>
-    </div>
+<aside class="w-[240px] [&.is-collapsed]:w-[72px] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] flex flex-col flex-shrink-0 sticky top-0 h-[100dvh] overflow-hidden shadow-[2px_0_12px_rgba(192,122,133,0.06)] border-r border-[var(--sidebar-border)] transition-[width] duration-200 ease-out" id="logisticsSidebar">
+    <x-logistics.sidebar-brand />
 
-    @php
-        $sections = [
-            ['label' => 'Operations Core', 'items' => [
-                ['route' => 'logistics.dashboard', 'icon' => 'layout-dashboard', 'label' => 'Dashboard',          'badge' => null,  'dot' => false],
-                ['route' => null, 'icon' => 'users',           'label' => 'Rider Management',   'badge' => '24',    'dot' => false],
-                ['route' => null, 'icon' => 'clipboard-check', 'label' => 'Confirm &amp; Approve', 'badge' => '8 new', 'dot' => false, 'accent' => true],
-                ['route' => null, 'icon' => 'inbox',           'label' => 'Incoming Parcels',    'badge' => null,    'dot' => false],
-                ['route' => null, 'icon' => 'archive',         'label' => 'Parcel Sorting',     'badge' => null,    'dot' => false],
-                ['route' => null, 'icon' => 'map-pin',         'label' => 'Delivery Assignment','badge' => null,    'dot' => false],
-                ['route' => null, 'icon' => 'activity',        'label' => 'Delivery Monitoring', 'badge' => null,    'dot' => false],
-            ]],
-            ['label' => 'Intelligence &amp; Desk', 'items' => [
-                ['route' => null, 'icon' => 'bar-chart-3',    'label' => 'Reports &amp; Analytics', 'badge' => null, 'dot' => false],
-                ['route' => null, 'icon' => 'message-square', 'label' => 'Chat / Messaging',        'badge' => null, 'dot' => true],
-                ['route' => null, 'icon' => 'settings',       'label' => 'Account Management',    'badge' => null, 'dot' => false],
-            ]],
-        ];
-    @endphp
-
-    <nav class="lg-nav" aria-label="Main operations">
-        @foreach ($sections as $section)
-            @if (! empty($section['label']))
-                <p class="lg-nav-label">{{ $section['label'] }}</p>
-            @endif
-
-            @foreach ($section['items'] as $item)
-                @php
-                    $hasRoute = ! empty($item['route']) && \Illuminate\Support\Facades\Route::has($item['route']);
-                    $href     = $hasRoute ? route($item['route']) : '#';
-                    $isActive = $hasRoute ? request()->routeIs($item['route'].'*') : false;
-                @endphp
-                <a href="{{ $href }}"
-                   class="lg-nav-link{{ $isActive ? ' is-active' : '' }}"
-                   @if ($item['route'] === 'logistics.dashboard') aria-current="page" @endif
-                   aria-label="{{ $item['label'] }}{{ $item['badge'] ? ', '.$item['badge'] : '' }}"
-                   data-tooltip="{{ $item['label'] }}"
-                   data-lg-sidebar-item>
-                    <span class="lg-nav-icon"><i data-lucide="{{ $item['icon'] }}" width="18" height="18"></i></span>
-                    <span class="lg-nav-text">{{ $item['label'] }}</span>
-                    @if (! empty($item['badge']))
-                        <span class="lg-nav-badge{{ ($item['accent'] ?? false) ? ' lg-nav-badge--accent' : '' }}" aria-hidden="true">{{ $item['badge'] }}</span>
-                    @endif
-                    @if (! empty($item['dot']))
-                        <span class="lg-nav-dot" aria-hidden="true"></span>
-                    @endif
-                </a>
-            @endforeach
-        @endforeach
+    <nav class="flex flex-col gap-5 px-3 py-3 flex-1" id="logisticsNav">
+        <x-logistics.sidebar-nav :sections="$sections" />
     </nav>
 
-    <div class="lg-sidebar-foot">
-        <form method="POST" action="{{ route('unified.logout') }}">
-            @csrf
-            <button type="submit"
-                    class="lg-nav-link lg-nav-signout"
-                    data-tooltip="Sign Out"
-                    aria-label="Sign Out">
-                <span class="lg-nav-icon"><i data-lucide="log-out" width="18" height="18"></i></span>
-                <span class="lg-nav-text">Sign Out</span>
-            </button>
-        </form>
+    <div class="px-3 py-3 [.is-collapsed_&]:px-2 border-t border-[var(--sidebar-border)]">
+        <x-logistics.sidebar-user-panel :provider="$provider" />
+        <x-logistics.sidebar-logout />
     </div>
 </aside>
+
+{{-- Sidebar collapse toggle: vanilla JS, no framework. Reads the persisted
+     state from localStorage immediately so there is no expand-flash on
+     page load, then wires the hamburger button. Mirrors x-seller.sidebar. --}}
+<script>
+    (function () {
+        var KEY = 'logistics.sidebar.collapsed';
+        var sidebar = document.getElementById('logisticsSidebar');
+        var toggle = document.getElementById('logisticsSidebarToggle');
+        if (!sidebar || !toggle) { return; }
+
+        function apply(collapsed) {
+            sidebar.classList.toggle('is-collapsed', collapsed);
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            toggle.setAttribute('data-tooltip', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        }
+
+        var saved = null;
+        try { saved = localStorage.getItem(KEY); } catch (e) { /* storage unavailable */ }
+        apply(saved === '1');
+
+        toggle.addEventListener('click', function () {
+            var collapsed = !sidebar.classList.contains('is-collapsed');
+            apply(collapsed);
+            try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) { /* ignore */ }
+        });
+    })();
+</script>

@@ -19,7 +19,7 @@
     </nav>
 
     {{-- ── Two-column hero ── --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px] xl:grid-cols-[1fr_460px]">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr 420px] xl:grid-cols-2">
       @include('Buyer.Products._gallery')
       @include('Buyer.Products._buybox')
     </div>

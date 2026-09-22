@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Logistics · Zefanya')</title>
+    <title>@yield('title', 'Logistics Panel') — Zefanya</title>
 
     {{-- Theme init MUST run before the stylesheet paints: reads the persisted
          theme (localStorage 'zf-theme') and sets data-theme on <html>.
-         Default: light. No flash of the wrong theme. Mirrors Layouts/seller.blade.php. --}}
+         Default: light. No flash of the wrong theme. Mirrors Layouts/seller. --}}
     <script>
         (function () {
             try {
@@ -21,25 +21,37 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
 
-    @vite(['resources/css/app.css', 'resources/css/logistics/dashboard.css'])
+    @vite([
+        'resources/css/app.css',
+    ])
     @stack('styles')
 </head>
-<body class="lg-body">
-<div class="lg-shell">
-    @include('Components.logistics.sidebar')
+<body class="logistics-body">
+    <div class="flex min-h-screen items-stretch">
 
-    <div class="lg-main">
-        @include('Components.logistics.topbar')
-        <main class="lg-content" id="lgMain" tabindex="-1">
+        {{-- =========================== SIDEBAR =========================== --}}
+        {{-- Modular sidebar. Components live in resources/views/components/logistics/
+             and are scoped to the logistics module via the x-logistics.* prefix.
+             Structure mirrors x-seller.sidebar 1:1. --}}
+        <x-logistics.sidebar />
+
+        {{-- ============================ MAIN ============================= --}}
+        <div class="flex-1 min-w-0 p-8 bg-[var(--bg-page)]">
             @yield('content')
-        </main>
+        </div>
     </div>
-</div>
 
-    {{-- lucide powers the sidebar / table icon set — mirrors the seller layout,
-         which loads js/lucide.min.js before its scripts run. --}}
     <script src="{{ asset('js/lucide.min.js') }}"></script>
-    @vite('resources/js/logistics/dashboard.js')
+    <script>
+        lucide.createIcons();
+    </script>
+
+    {{-- Light/dark toggle + collapsed-sidebar tooltips — loaded here (not per
+         page) so the sidebar behaves on every logistics page. Mirrors the
+         seller layout's script loading. --}}
+    @vite('resources/js/seller/theme-toggle.js')
+    @vite('resources/js/logistics/sidebar-tooltips.js')
+
     @stack('scripts')
 </body>
 </html>

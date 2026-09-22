@@ -12,29 +12,8 @@
 
   {{-- Title --}}
   <h1 class="font-serif text-[24px] leading-[1.2] font-semibold text-buyer-ink sm:text-[28px]">
-    {{ $product->name }}
+      {{ $product->name }}
   </h1>
-
-  {{-- Rating + sold --}}
-  <div class="flex flex-wrap items-center gap-3 text-[12.5px]">
-    <div class="flex items-center gap-1">
-      @for ($s = 1; $s <= 5; $s++)
-        @if ($s <= floor($rating))
-          <i class="fa-solid fa-star text-[11px] text-buyer-star"></i>
-        @elseif ($s == ceil($rating) && $rating != floor($rating))
-          <i class="fa-solid fa-star-half-stroke text-[11px] text-buyer-star"></i>
-        @else
-          <i class="fa-regular fa-star text-[11px] text-neutral-300"></i>
-        @endif
-      @endfor
-      <span class="ml-1 font-semibold text-buyer-ink">{{ number_format($rating, 1) }}</span>
-    </div>
-    <a href="#pdp-reviews" class="text-neutral-400 underline-offset-2 hover:underline">
-      {{ number_format($reviewCount) }} Reviews
-    </a>
-    <span class="text-neutral-300">·</span>
-    <span class="text-neutral-400">{{ number_format($soldCount) }} Sold</span>
-  </div>
 
   {{-- Price block --}}
   <div class="rounded-2xl bg-secondary-50 px-4 py-3">
@@ -136,7 +115,7 @@
       data-stock="{{ $product->stock_quantity }}"
     >
       <i data-lucide="shopping-bag" width="15" height="15"></i>
-      Add to Atelier Bag
+      Checkout
     </button>
 
     {{-- Express Buy Now --}}
@@ -146,7 +125,7 @@
       class="flex w-full items-center justify-center gap-2 rounded-full border border-buyer-ink bg-transparent py-3.5 text-[13px] font-semibold text-buyer-ink transition-colors hover:bg-buyer-ink hover:text-white"
       data-product-id="{{ $product->id }}"
     >
-      Express Buy Now with 1-Click
+      Add to Cart
     </button>
   </div>
 
