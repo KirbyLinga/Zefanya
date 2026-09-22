@@ -21,7 +21,6 @@
             'label' => 'Catalog',
             'items' => [
                 ['route' => 'seller.products.index', 'icon' => 'package', 'label' => 'Products'],
-                ['route' => 'seller.inventory.index', 'icon' => 'boxes', 'label' => 'Inventory'],
                 ['route' => 'seller.vouchers.index', 'icon' => 'tag', 'label' => 'Discounts & Vouchers'],
             ],
         ],
@@ -49,14 +48,14 @@
     ];
 @endphp
 
-<aside class="seller-sidebar" id="sellerSidebar">
+<aside class="w-[240px] [&.is-collapsed]:w-[72px] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] flex flex-col flex-shrink-0 sticky top-0 h-[100dvh] overflow-hidden shadow-[2px_0_12px_rgba(192,122,133,0.06)] border-r border-[var(--sidebar-border)] transition-[width] duration-200 ease-out" id="sellerSidebar">
     <x-seller.sidebar-brand />
 
-    <nav class="seller-nav" id="sellerNav">
+    <nav class="flex flex-col gap-5 px-3 py-3 flex-1" id="sellerNav">
         <x-seller.sidebar-nav :sections="$sections" />
     </nav>
 
-    <div class="seller-sidebar__footer">
+    <div class="px-3 py-3 [.is-collapsed_&]:px-2 border-t border-[var(--sidebar-border)]">
         <x-seller.sidebar-user-panel :seller="$seller" />
         <x-seller.sidebar-logout />
     </div>
@@ -75,6 +74,8 @@
         function apply(collapsed) {
             sidebar.classList.toggle('is-collapsed', collapsed);
             toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            toggle.setAttribute('data-tooltip', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
         }
 
         var saved = null;

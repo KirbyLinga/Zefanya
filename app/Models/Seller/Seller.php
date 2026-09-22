@@ -2,13 +2,17 @@
 
 namespace App\Models\Seller;
 
+use App\Models\Product;
+use App\Models\Shared\Category;
+use Database\Factories\SellerFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\Shared\Category;
 
 class Seller extends Authenticatable
 {
-    use Notifiable;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -54,9 +58,30 @@ class Seller extends Authenticatable
         ];
     }
 
+    protected static function newFactory(): SellerFactory
+    {
+        return SellerFactory::new();
+    }
+
     public function lineOfBusiness()
     {
         return $this->belongsTo(Category::class, 'line_of_business_id');
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    public function storeInitials(): string
+    {
+        $letters = collect(preg_split('/\s+/', trim($this->business_name)) ?: [])
+            ->filter()
+            ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
+            ->take(2)
+            ->implode('');
+
+        return $letters !== '' ? $letters : 'S';
     }
 
     public function fullName(): string

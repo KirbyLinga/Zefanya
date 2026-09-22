@@ -3,7 +3,7 @@
 @section('title', 'Edit Voucher')
 
 @section('content')
-<div class="seller-vouchers-edit">
+<div>
     <h1>Edit Voucher</h1>
     <p>Update your discount voucher.</p>
 </div>

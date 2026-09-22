@@ -1,9 +1,14 @@
 <?php
+
 // Add to routes/web.php
 
+use App\Http\Controllers\Auth\LoginChoiceController;
+use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\Buyer\RegisterBuyerController;
-use App\Http\Controllers\Seller\RegisterSellerController;
 use App\Http\Controllers\Buyer\VerifyBuyerOtpController;
+use App\Http\Controllers\Logistics\RegisterLogisticsController;
+use App\Http\Controllers\Logistics\VerifyLogisticsOtpController;
+use App\Http\Controllers\Seller\RegisterSellerController;
 use App\Http\Controllers\Seller\VerifySellerOtpController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,7 +17,7 @@ Route::get('/', function () {
 })->name('home');
 
 // Unified login entry point (GET) — buyer | seller split.
-Route::get('/login', [App\Http\Controllers\Auth\LoginChoiceController::class, 'show'])
+Route::get('/login', [LoginChoiceController::class, 'show'])
     ->name('login');
 
 Route::get('/register', function () {
@@ -75,9 +80,31 @@ Route::get('/register/seller/pending', function () {
     return view('Seller.register-seller-pending');
 })->name('register.seller.pending');
 
+// Logistics registration routes — same shape as the seller flow. The GET entry
+// point forwards to the register-type page and opens the logistics modal
+// (previously it rendered Auth.register-logistics, which never existed → 500).
 Route::get('/register/logistics', function () {
-    return view('Auth.register-logistics');
+    return redirect()->route('register.type', ['open' => 'logistics']);
 })->name('register.logistics');
+
+Route::post('/register/logistics', [RegisterLogisticsController::class, 'store'])
+    ->name('register.logistics.store')
+    ->middleware('throttle:5,1');
+
+Route::get('/register/logistics/verify-otp/{logistics_provider}', [VerifyLogisticsOtpController::class, 'show'])
+    ->name('register.logistics.verify-otp');
+
+Route::post('/register/logistics/verify-otp/{logistics_provider}', [VerifyLogisticsOtpController::class, 'verify'])
+    ->name('register.logistics.verify-otp.store')
+    ->middleware('throttle:10,1');
+
+Route::post('/register/logistics/verify-otp/{logistics_provider}/resend', [VerifyLogisticsOtpController::class, 'resend'])
+    ->name('register.logistics.verify-otp.resend')
+    ->middleware('throttle:3,5');
+
+Route::get('/register/logistics/pending', function () {
+    return view('Logistics.register-logistics-pending');
+})->name('register.logistics.pending');
 
 Route::get('/shop', function () {
     return view('LandingPage.index');
@@ -92,11 +119,11 @@ Route::get('/shop', function () {
 //     buyer  → buyer.home
 // Standalone auth pages (buyer/login, seller/login) point here too so the
 // modal and the no-JS pages share a single auth backend.
-Route::post('/login', [App\Http\Controllers\Auth\UnifiedLoginController::class, 'login'])
+Route::post('/login', [UnifiedLoginController::class, 'login'])
     ->name('unified.login')
     ->middleware('throttle:5,1');
 
 // POST /logout  → clears every active guard (seller + buyer) and returns home.
-Route::post('/logout', [App\Http\Controllers\Auth\UnifiedLoginController::class, 'logout'])
+Route::post('/logout', [UnifiedLoginController::class, 'logout'])
     ->name('unified.logout')
     ->middleware('throttle:5,1');

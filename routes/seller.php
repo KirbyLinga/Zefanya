@@ -11,24 +11,24 @@ Route::prefix('seller')->name('seller.')->group(function () {
         Route::post('/login', [AuthController::class, 'login'])->name('login.post');
     });
 
-    Route::middleware('seller.approved')->group(function () {
+    Route::middleware(['auth:seller', 'seller.approved'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Product routes — these use the ProductController
+        // Product routes â€” these use the ProductController
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::patch('/products/{product}/status', [ProductController::class, 'toggleStatus'])->name('products.toggleStatus');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::delete('/products/{product}/images/{image}', [ProductController::class, 'deleteImage'])
             ->name('products.images.destroy');
 
-        // Remaining routes preserved unchanged
         Route::get('/inventory', function () {
-            return view('Seller.Inventory.index');
+            return to_route('seller.products.index');
         })->name('inventory.index');
 
         Route::get('/orders', function () {

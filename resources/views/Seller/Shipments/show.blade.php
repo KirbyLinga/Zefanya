@@ -3,7 +3,7 @@
 @section('title', 'Shipment Details')
 
 @section('content')
-<div class="seller-shipments-show">
+<div>
     <h1>Shipment Details</h1>
     <p>View shipment information.</p>
 </div>

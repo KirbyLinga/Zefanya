@@ -15,18 +15,18 @@
 <div class="html-body min-w-0 overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
     {{-- ===== Top navbar (shared) ===== --}}
-    @include('Components.navbar')
+    @include('Components.navbar', ['variant' => 'buyer'])
 
     {{-- ===== Hero (full-bleed, outside .main) ===== --}}
     @yield('hero')
 
     {{-- ===== Page content ===== --}}
-    <div class="relative mx-auto mt-0.5 flex w-full max-w-[1440px] flex-1 flex-col items-start">
+    <div class="relative mx-auto mt-0.5 flex w-full max-w-[1440px] flex-1 flex-col items-start px-16 max-lg:px-8 max-sm:px-4">
         @yield('content')
     </div>
 
     {{-- ===== Footer (shared) ===== --}}
-    <footer class="mt-[100px] w-full bg-secondary-300">
+    <footer class="mt-16 w-full bg-secondary-300 lg:mt-[100px]">
         <div class="mx-auto flex max-w-[1440px] flex-col gap-16 px-16 pb-12 pt-24 max-lg:gap-12 max-lg:px-8 max-lg:pt-20 max-sm:px-4 max-sm:pb-10 max-sm:pt-16">
             <div class="grid grid-cols-4 gap-8 max-lg:grid-cols-2 max-sm:grid-cols-1">
                 <div class="flex min-w-0 flex-col gap-5">

@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Seller;
 
+use App\Models\Buyer\Buyer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Unique;
 
 class StoreSellerRegistrationRequest extends FormRequest
 {
@@ -30,7 +30,7 @@ class StoreSellerRegistrationRequest extends FormRequest
                 'max:255',
                 'unique:sellers,email',
                 function ($attribute, $value, $fail) {
-                    if (\App\Models\Buyer\Buyer::where('email', $value)->exists()) {
+                    if (Buyer::where('email', $value)->exists()) {
                         $fail('This email is already registered as a buyer. Use a different email.');
                     }
                 },
@@ -49,7 +49,7 @@ class StoreSellerRegistrationRequest extends FormRequest
             'barangay' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
             'barangay_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
 
-            'street' => [Rule::requiredIf($isManual), 'nullable', 'string', 'max:255'],
+            'street' => ['required', 'string', 'max:255'],
             'house_number' => ['nullable', 'string', 'max:50'],
             'address_detail' => ['nullable', 'string', 'max:255'],
 
@@ -69,7 +69,7 @@ class StoreSellerRegistrationRequest extends FormRequest
             'upload_id.max' => 'Upload ID must be smaller than 5MB.',
             'business_permit.mimes' => 'Business permit must be a JPG, PNG, or PDF.',
             'business_permit.max' => 'Business permit must be smaller than 5MB.',
-            'street.required' => 'Street is required when entering your address manually.',
+            'street.required' => 'Street / house number is required.',
             'province.required' => 'Select a province, or switch to manual address entry.',
             'line_of_business_id.required' => 'Select your line of business.',
         ];

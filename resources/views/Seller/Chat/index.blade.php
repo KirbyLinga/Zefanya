@@ -3,7 +3,7 @@
 @section('title', 'Chat')
 
 @section('content')
-<div class="seller-chat">
+<div>
     <h1>Messages</h1>
     <p>Chat with customers.</p>
 </div>

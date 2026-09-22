@@ -2,12 +2,16 @@
 
 namespace App\Models\Buyer;
 
+use App\Models\CartItem;
+use Database\Factories\BuyerFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class Buyer extends Authenticatable
 {
-    use Notifiable;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -67,6 +71,18 @@ class Buyer extends Authenticatable
     public function isApproved(): bool
     {
         return $this->status === 'approved';
+    }
+
+    protected static function newFactory(): BuyerFactory
+    {
+        return BuyerFactory::new();
+    }
+
+    // ── Relationships ────────────────────────────────────────────────────────
+
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
     }
 
     public function isVerificationLinkExpired(): bool

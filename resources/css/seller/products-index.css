@@ -1,0 +1,760 @@
+/* ======================================================================
+   Zefanya — Seller › Products list
+   (resources/views/Seller/Products/index.blade.php)
+
+   Loaded with @vite from the page's @push('styles'). Plain CSS on purpose:
+   this is a data-dense table, so the layout lives here instead of in
+   Tailwind utilities. Uses the shared font tokens from app.css.
+   All selectors are .sp-* and scoped to .seller-body so nothing leaks.
+   ====================================================================== */
+
+/* The shared seller layout paints its main column pink and pads it by 32px
+   (p-8). This page used to bleed back over that padding with its own off-white
+   canvas; it now shares the layout's blush (--bg-page = primary-50) so every
+   seller page has the same background. The bleed + padding stay, so content
+   geometry is unchanged. */
+.seller-body .sp-page {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: -32px;
+  padding: 32px;
+  min-height: calc(100vh - 64px);
+  background-color: var(--bg-page);
+  color: var(--text-ink);
+  font-family: var(--font-sans);
+}
+
+.seller-body .sp-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Flash ---------- */
+.seller-body .sp-flash {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--pill-success-border);
+  border-radius: 8px;
+  background-color: var(--pill-success-bg);
+  color: var(--status-success);
+  font-size: 13px;
+}
+
+/* ---------- Header ---------- */
+.seller-body .sp-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.seller-body .sp-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--btn-primary-bg);
+}
+
+.seller-body .sp-subtitle {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--text-muted-2);
+}
+
+.seller-body .sp-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Buttons ---------- */
+.seller-body .sp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.seller-body .sp-btn--outline {
+  border-color: var(--border-btn-outline);
+  background-color: var(--btn-primary-text);
+  color: var(--text-body);
+}
+
+.seller-body .sp-btn--outline:hover {
+  border-color: var(--border-btn-outline-hover);
+  background-color: var(--bg-raised);
+}
+
+.seller-body .sp-btn--solid {
+  border-color: var(--btn-primary-bg);
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+.seller-body .sp-btn--solid:hover {
+  border-color: var(--btn-primary-bg-hover);
+  background-color: var(--btn-primary-bg-hover);
+}
+
+.seller-body .sp-btn--sm {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+.seller-body .sp-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- Card ---------- */
+.seller-body .sp-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--btn-primary-text);
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.04), 0 10px 28px -22px rgba(17, 17, 17, 0.35);
+  /* Dropdown popovers must be able to escape the card. */
+  overflow: visible;
+}
+
+/* ---------- Filter bar ---------- */
+.seller-body .sp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.seller-body .sp-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 240px;
+  max-width: 340px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background-color: var(--btn-primary-text);
+  color: var(--text-placeholder-2);
+}
+
+.seller-body .sp-search:focus-within {
+  border-color: var(--brand);
+}
+
+.seller-body .sp-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-ink);
+  outline: none;
+}
+
+.seller-body .sp-search input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.seller-body .sp-select {
+  height: 38px;
+  max-width: 200px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background-color: var(--btn-primary-text);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23706a63' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-body);
+  appearance: none;
+  cursor: pointer;
+}
+
+.seller-body .sp-select:focus {
+  border-color: var(--brand);
+  outline: none;
+}
+
+.seller-body .sp-select--sm {
+  height: 32px;
+  max-width: 84px;
+  padding-left: 10px;
+  font-size: 12.5px;
+}
+
+/* ---------- Active filter chips ---------- */
+.seller-body .sp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.seller-body .sp-chips__label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-placeholder-2);
+}
+
+.seller-body .sp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background-color: var(--bg-chip);
+  color: var(--text-muted-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.seller-body .sp-chip--active {
+  background-color: var(--pill-primary-bg);
+  color: var(--pill-primary-text);
+}
+
+.seller-body .sp-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  transition: background-color 0.18s ease;
+}
+
+.seller-body .sp-chip__remove:hover {
+  background-color: var(--pill-primary-bg-hover);
+}
+
+.seller-body .sp-chips__reset {
+  margin-left: 2px;
+  color: var(--text-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.seller-body .sp-chips__reset:hover {
+  color: var(--pill-primary-text);
+}
+
+/* ---------- Table ----------
+   No overflow on the wrapper: the row action menus are absolutely positioned
+   and would be clipped by a scrolling ancestor. Narrow screens drop columns
+   instead (see the media queries at the end). */
+.seller-body .sp-table-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+.seller-body .sp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.seller-body .sp-table th {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--text-placeholder-2);
+  white-space: nowrap;
+}
+
+.seller-body .sp-table__num {
+  text-align: right;
+}
+
+.seller-body .sp-table__actions {
+  width: 96px;
+  text-align: right;
+}
+
+.seller-body .sp-table__check {
+  width: 46px;
+  padding-left: 18px;
+  padding-right: 0;
+  text-align: left;
+}
+
+.seller-body .sp-table__check input {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  accent-color: var(--btn-primary-bg);
+  cursor: pointer;
+}
+
+.seller-body .sp-table__row {
+  border-bottom: 1px solid var(--border-row);
+  transition: background-color 0.15s ease;
+}
+
+.seller-body .sp-table__row:last-child {
+  border-bottom: 0;
+}
+
+.seller-body .sp-table__row:hover {
+  background-color: var(--bg-dim);
+}
+
+.seller-body .sp-table td {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-body);
+  vertical-align: middle;
+}
+
+/* ---------- Product cell ---------- */
+.seller-body .sp-product {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.seller-body .sp-product__thumb {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  object-fit: cover;
+  background-color: var(--bg-thumb);
+}
+
+.seller-body .sp-product__thumb--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-disabled);
+}
+
+.seller-body .sp-product__name {
+  font-weight: 600;
+  color: var(--btn-primary-bg);
+  overflow-wrap: anywhere;
+}
+
+.seller-body .sp-product__category {
+  color: var(--text-muted-2);
+}
+
+/* ---------- Stock pills ---------- */
+.seller-body .sp-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.seller-body .sp-pill--green {
+  background-color: var(--pill-success-bg);
+  color: var(--status-success);
+}
+
+.seller-body .sp-pill--amber {
+  background-color: var(--pill-warning-bg);
+  color: var(--status-warning);
+}
+
+.seller-body .sp-pill--rose {
+  background-color: var(--pill-danger-bg);
+  color: var(--status-danger);
+}
+
+/* ---------- Status ---------- */
+.seller-body .sp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.seller-body .sp-status__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* ---------- Monospace (price, ids) ---------- */
+.seller-body .sp-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Row actions ---------- */
+.seller-body .sp-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.seller-body .sp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-muted-2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.seller-body .sp-icon-btn:hover {
+  background-color: var(--bg-chip);
+  color: var(--btn-primary-bg);
+}
+
+/* ---------- Dropdowns (row kebab + bulk actions) ---------- */
+.seller-body .sp-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Hidden until the JS adds .is-open; the hidden attribute is kept in sync. */
+.seller-body .sp-dropdown__menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: auto;
+  z-index: 999;
+  min-width: 176px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-color: var(--btn-primary-text);
+  box-shadow: 0 12px 28px -12px rgba(17, 17, 17, 0.28);
+}
+
+.seller-body .sp-dropdown__menu--right {
+  left: auto;
+  right: 0;
+}
+
+.seller-body .sp-dropdown__menu.is-open {
+  display: block;
+}
+
+.seller-body .sp-dropdown__menu[hidden] {
+  display: none;
+}
+
+.seller-body .sp-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--text-ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.seller-body .sp-dropdown__item:hover {
+  background-color: var(--bg-raised);
+}
+
+.seller-body .sp-dropdown__item--danger {
+  color: var(--status-danger);
+}
+
+.seller-body .sp-dropdown__item--danger:hover {
+  background-color: var(--pill-danger-bg);
+}
+
+/* ---------- Footer ---------- */
+.seller-body .sp-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border-faint);
+}
+
+.seller-body .sp-footer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.seller-body .sp-footer__count {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted-2);
+}
+
+.seller-body .sp-rows {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted-2);
+}
+
+/* ---------- Pagination ----------
+   NOTE: the pager buttons are .sp-pager*. They must NOT share a class with the
+   page root (.sp-page = the off-white canvas), otherwise the root picks up the
+   button layout and the buttons pick up the canvas height. */
+.seller-body .sp-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.seller-body .sp-pager {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--btn-primary-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-body);
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.seller-body .sp-pager--edge {
+  padding: 0 12px;
+}
+
+.seller-body .sp-pager:hover {
+  border-color: var(--border-pager-hover);
+  background-color: var(--bg-raised);
+}
+
+.seller-body .sp-pager--active {
+  border-color: var(--btn-primary-bg);
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+.seller-body .sp-pager--disabled {
+  border-color: var(--border-faint);
+  background-color: var(--bg-dim);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.seller-body .sp-pager__gap {
+  padding: 0 2px;
+  color: var(--text-disabled);
+  font-size: 12.5px;
+}
+
+/* ---------- Empty state ---------- */
+.seller-body .sp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 72px 24px;
+  text-align: center;
+}
+
+.seller-body .sp-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--bg-soft);
+  color: var(--text-disabled);
+}
+
+.seller-body .sp-empty__title {
+  margin: 2px 0 0;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--btn-primary-bg);
+}
+
+.seller-body .sp-empty__text {
+  margin: 0;
+  max-width: 380px;
+  font-size: 12.5px;
+  color: var(--text-muted-2);
+}
+
+.seller-body .sp-empty .sp-btn {
+  margin-top: 6px;
+}
+
+/* ---------- Narrow screens: drop columns, stack the footer ---------- */
+@media (max-width: 1100px) {
+  .seller-body .sp-col--category {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .seller-body .sp-page {
+    /* Keep the full bleed (-32px) so the pink layout gutter stays covered. */
+    padding: 20px;
+  }
+
+  .seller-body .sp-table__num,
+  .seller-body .sp-table__actions {
+    display: none;
+  }
+
+  .seller-body .sp-table td,
+  .seller-body .sp-table th {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .seller-body .sp-table__check {
+    width: 38px;
+    padding-left: 12px;
+  }
+
+  .seller-body .sp-footer {
+    justify-content: flex-start;
+  }
+}
+
+/* ---------- Product modal loading / error states ---------- */
+.seller-body .sp-modal-loading,
+.seller-body .sp-modal-error {
+  padding: 36px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background-color: var(--bg-raised);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: center;
+  color: var(--text-muted-2);
+}
+
+.seller-body .sp-modal-error {
+  border-color: var(--border-error-soft);
+  background-color: var(--bg-error-soft);
+  color: var(--status-danger);
+}
+
+
+/* ---------- Status tone classes (dark-mode safe) ----------
+      The blade renders sp-tone-active, sp-tone-stock, etc. and public/js/seller/products-table.js
+   swaps the SAME classes after an inline status change (no raw hex utilities).
+   Tinted pill look in BOTH themes: bg = status color at ~16% alpha.
+   Padding is offset by negative margins so row geometry is unchanged. */
+.seller-body .sp-status.sp-tone-active,
+.seller-body .sp-status.sp-tone-stock,
+.seller-body .sp-status.sp-tone-inactive,
+.seller-body .sp-status.sp-tone-draft {
+  padding: 3px 9px;
+  margin: -3px -9px;
+  border-radius: 999px;
+}
+
+.seller-body .sp-tone-active {
+  color: var(--status-success);
+  background-color: color-mix(in srgb, var(--status-success) 16%, transparent);
+}
+
+.seller-body .sp-tone-stock {
+  color: var(--status-danger);
+  background-color: color-mix(in srgb, var(--status-danger) 16%, transparent);
+}
+
+.seller-body .sp-tone-inactive {
+  color: var(--status-warning);
+  background-color: color-mix(in srgb, var(--status-warning) 16%, transparent);
+}
+
+.seller-body .sp-tone-draft {
+  color: var(--text-muted);
+  background-color: color-mix(in srgb, var(--text-muted) 16%, transparent);
+}
+
+.seller-body .sp-dot-active { background-color: var(--status-success); }
+.seller-body .sp-dot-stock { background-color: var(--status-danger); }
+.seller-body .sp-dot-inactive { background-color: var(--status-warning-dot); }
+.seller-body .sp-dot-draft { background-color: var(--status-dot-draft); }
+
+/* Dark select arrow: the data-URI arrow cannot use var(), so swap the
+   whole image for a muted-neutral stroke under the dark theme. */
+html[data-theme='dark'] .seller-body .sp-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23B3A9A9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}

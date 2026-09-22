@@ -20,12 +20,265 @@ Confirmed decision: Tailwind v4 with `@tailwindcss/vite`, single entry
 | 6 | Landing — delete `landing.scss` + partials, remove from vite.config | ✅ DONE (dev pre-approved; git-recoverable) |
 | 7 | Buyer — setup (`app.css` first in buyer layout, buyer tokens, navbar `variant`) | ✅ Done |
 | 8 | Buyer — page-by-page audit | ✅ Done (findings below) |
-| 9 | Buyer — chunk a: footer (`Buyer/Layouts/footer.blade.php`) + removed `design-system.css` from the buyer layout (Hazard #1 root-cause fix) | ✅ Converted — awaiting dev visual verify |
-| 9b | Landing — re-check needed? Landing never loaded `design-system.css`, so Hazards #1 does not affect it. | ✅ No action |
-| 10 | Buyer — chunk b: Home + `home.css` + `home.js` card strings | ✅ Converted — awaiting dev visual verify (1 flagged deviation) |
-| 11 | Buyer — chunk c: layout widgets (cart drawer / quick-view / chat / toast) | ⬜ |
-| 12 | Buyer — chunk d: wrap-up (delete `buyer.css`, `auth-buttons.css`, 6 stub files, navbar legacy classes) | ⬜ |
-| 13+ | Seller → Admin | ⬜ |
+| 9 | Buyer — chunk a: footer + removed `design-system.css` from buyer layout | ✅ Converted |
+| 10 | Buyer — chunk b: Home + `home.css` + `home.js` card strings | ✅ Converted |
+| 11 | Buyer — chunk c: layout widgets + buyer.js null-guard fix | ✅ Converted |
+| 12 | Buyer — chunk d: wrap-up (deleted dead files, stripped legacy classes, pruned vite.config) | ✅ Done |
+| 13+ | **Shared auth CSS chain** | ⬜ |
+| 14 | Admin — page-by-page audit | ✅ Done (findings below) |
+| 15 | Admin — conversion | ✅ Done (ADMIN-b/c/d/e — awaiting dev visual verify) |
+
+---
+
+## Seller Phase (complete)
+
+| Chunk | Status | Files |
+|---|---|---|
+| A | ✅ DONE | `Layouts/seller.blade.php` (Hazard #1 fix), sidebar components (7 files), `seller-app.css` → DELETED |
+| B | ✅ DONE | `Seller/Dashboard/index.blade.php`, `seller-dashboard.css` → DELETED |
+| C | ✅ DONE | `Seller/Products/{index,show,create,edit,_form}.blade.php`, `seller-products.css` → DELETED |
+| D | ✅ DONE | 13 stub views (class cleanup), `seller/` dir deleted, vite.config pruned, docs updated |
+
+### Seller — summary
+- **3 legacy CSS files fully deleted**: `seller-app.css`, `seller-dashboard.css`, `seller-products.css`
+- **`resources/css/seller/` directory deleted** (empty)
+- **`vite.config.js` pruned**: 3 seller CSS entries removed, only `app.css` remains in seller `@vite`
+- **Hazard #1 resolved**: `design-system.css` removed from seller layout `@vite`, replaced with `app.css` (layered base rules)
+- **Hazard #2 clean**: No `@import` of design-system.css in any seller CSS file
+- **Collapse state** (`.seller-sidebar.is-collapsed`) preserved in `app.css` `@layer components`
+- **Icon scale on hover/active** preserved in `app.css` `@layer components`
+- **Total classes converted**: ~120 unique class names across 22+ Blade files → Tailwind utilities
+- **Element-selector hazards handled**: All descendant/element selectors (`.sp-form-field label`, `.sp-form-field input`, `.sp-card__body h3`, `.sp-card__image img`, `.sp-existing-image img`) converted to explicit inline classes on each element
+- **Seller auth pages** (login, pending, verify-otp): NOT converted — they extend `Layouts.footer` and use the shared auth chain (`auth.css`), handled separately
+- **`design-system.css`**: DELETED in ADMIN-e (see Admin Phase below) — `app.css` is the sole token source now
+
+---
+
+## Admin Phase — page-by-page audit (DONE — no markup converted yet)
+
+### Load map (Hazard #2 grep results)
+| File | How CSS loads |
+|---|---|
+| `Admin/Layouts/app.blade.php:11` | `@vite(['resources/css/admin/admin.css'])` — single entry, no `@stack('styles')` consumers |
+| `Admin/Auth/login.blade.php:11` | Standalone full HTML doc (no layout) — `@vite(['resources/css/admin/admin.css'])` directly |
+| `admin/admin.css:1` | **`@import '../design-system.css'`** ← the invisible-dependency trap (Hazard #2, live) |
+| `admin/admin.css:2` | `@import 'admin-registration.css'` |
+
+- Recursive Blade grep for `admin.css|design-system`: **only the two files above** (buyer hits are comments only).
+- `design-system.css` is currently loaded ONLY via `admin.css`'s `@import` — no Blade `@vite` references it anywhere anymore.
+- **No Admin JS exists** (`resources/js/` = `app.js`, `buyer/buyer.js`, `buyer/home.js`); grep for `admin-`/`reg-` class strings in JS: zero hits. No JS-coupling risk.
+- Only interactivity: inline `onclick="document.getElementById('rejectPanel').hidden = false"` — a `hidden` attribute toggle, no CSS class coupling. Safe.
+- `Components/admin-sidebar.blade.php` is the only shared component; `is-active` state is CSS-only (no JS toggles it).
+
+### Views → class inventory
+1. **Layouts/app**: `admin-body`, `admin-shell`, `admin-main`, `admin-topbar`, `__title`, `__user`, `admin-content`
+2. **Components/admin-sidebar**: `admin-sidebar`, `__brand`, `__brand-row` (+ descendant `img`, `span`), `__brand-role`, `__nav` (+ descendant `a`, `a:hover`, `a.is-active`, `a svg`), `__nav-badge` (+ `a.is-active .admin-sidebar__nav-badge`), `__logout` (+ `button`, `button:hover`)
+3. **dashboard**: `admin-page-title`, `admin-page-subtitle`, `dash-summary-strip`, `dash-summary-item`, `__value`, `__label`
+4. **Registrations/index + sellers** (identical class set): `reg-toast`, `reg-layout`, `reg-list`, `__header` (+ `h2`), `__item` (+ `.is-active`, `:hover`), `__avatar`, `__info`, `__name`, `__role`, `__empty`, `reg-count-badge`, `reg-status-badge` `--pending` (approved/rejected variants defined but UNUSED in views), `reg-detail`, `__header`, `__avatar`, `__email`, `__section` (+ `h4`), `__grid` (+ descendant `div`, `span`, `strong`), `__address`, `__documents`, `__id-link` (+ `:hover`), `__actions`, `__empty` (+ `p`), `reg-btn` `--approve`/`--reject`/`--reject-confirm`, `reg-reject-panel` (+ `label`, `textarea`)
+5. **Auth/login**: `admin-login-body`, `admin-login-card` (+ `__logo`, `__title`, `__subtitle`, `__error`, `__label`, `__remember`, `__remember input`), PLUS design-system shared classes `.input` and `.btn .btn--inverted`
+
+### CSS inventory
+- **`admin.css`** (375 lines): shell + sidebar + topbar + `dash-summary-*` + `admin-login-card*` + a **forced-override block (lines 352–375, `color: … !important`)** on nav links/spans/svgs + logout button states. Sidebar palette is HARDCODED (`#1e1b1b` bg, `#79545c` active, `#f7d6d0` badge/active-shadow, `rgba(255,248,247,.78)` text) — the `!important` block is a defensive duplicate that exists only to beat design-system's unlayered element rules; it must NOT be ported to utilities (utilities inherently win once the unlayered source is gone).
+- **`admin-registration.css`** (375 lines): all `reg-*` classes, almost entirely hardcoded hexes (not tokens); one breakpoint: `@media (max-width:1024px)` → `reg-layout` single column.
+- **`design-system.css`** (318 lines) as consumed by admin: tokens (`--bg-page`, `--bg-surface`, `--border-light/default`, `--radius-*`, `--space-*`, `--font-serif/sans`, `--text-primary/secondary`, `--text-inverse`, `--shadow-lg`, `--color-primary-700` for `accent-color`) + shared components `.btn`/`.btn--inverted`/`.input` (used by Admin login only within admin scope).
+
+### Hazard checks
+- **Hazard #1 — LIVE for admin**: `admin.css` `@import`s design-system UNLAYERED; its element rules (`h1–h6`, `body/p/span/label/input/select/textarea/button` font+color) outrank ALL Tailwind utilities. Same fix as Seller required before any conversion will visibly work.
+- **app.css coverage VERIFIED 1:1**: `@layer base :root` (lines 139–245) re-exports every token admin.css consumes (bg/text/border/radius/space/fonts/shadows — checked rule by rule against design-system.css values, including `--space-24` which design-system never defined but auth-pages needed). Element rules ported with identical values. **Zero app.css changes expected for the admin phase.**
+- **Hazard #2 mapped**: single entry point = admin.css's two `@import`s; both go dark the moment views stop loading admin.css.
+
+### Element-selector rules needing per-element conversion (seller discipline)
+`.admin-sidebar__brand-row img/span`, `.admin-sidebar__nav a(+svg)/a:hover/a.is-active`, `.admin-sidebar__logout button(+hover)`, `.reg-list__header h2`, `.reg-detail__section h4`, `.reg-detail__grid div/span/strong`, `.reg-reject-panel label/textarea` — all to be converted as explicit utilities on each element.
+
+### Proposed conversion chunks (awaiting developer approval)
+- **ADMIN-b — Hazard fix + shell + dashboard**: (1) remove `@import '../design-system.css'` from admin.css — zero visual delta: tokens still resolve via app.css re-export, element rules move from unlayered to identical layered values (design-system then has ZERO consumers → propose file + vite entry deletion at ADMIN-e); (2) both admin entry points swap `@vite` to `['resources/css/app.css', 'resources/css/admin/admin.css']` (app.css first — unlayered admin.css still wins ties for the not-yet-converted views, converted markup drops legacy classes); (3) convert Layouts/app + admin-sidebar; (4) convert dashboard (3 classes, trivial). admin-registration.css untouched.
+- **ADMIN-c — Registrations**: `Registrations/index` + `sellers` (same class set, convert once, apply twice) → delete `admin-registration.css`, drop its `@import`.
+- **ADMIN-d — Auth/login**: standalone page → app.css only; `.input`/`.btn--inverted` become utilities; delete `admin.css`, prune vite entry.
+- **ADMIN-e — design-system removal**: delete `resources/css/design-system.css` + prune `vite.config.js` (requires re-grep: `.input`/`.btn`/`.tag`/`.search-bar`/`.progress`/`.nav-pills`/`.action-btn` are design-system component classes that may have consumers OUTSIDE admin — verify before deletion; requires dev approval).
+
+### Chunk ADMIN-b — DONE (hazard fix + shell + sidebar + dashboard + login pulled forward)
+- ✅ `admin.css:1` `@import '../design-system.css'` **REMOVED** — Hazard #1 fix for admin (was live: unlayered element selectors outranked all utilities). Tokens resolve via app.css re-export (verified 1:1 in audit). **design-system.css now has ZERO consumers.**
+- ✅ Entry points: `Admin/Layouts/app.blade.php` → `@vite(['resources/css/app.css', 'resources/css/admin/admin.css'])`; `Admin/Auth/login.blade.php` → `@vite(['resources/css/app.css'])`.
+- ✅ Converted: layout shell (admin-body/shell/main/topbar/content), `Components/admin-sidebar` (all 10 links + badge + logout), dashboard (page title/subtitle + dash-summary strip). ~30 legacy class names dropped — `is-active` state expressed as conditional utilities (`$navLink`/`$navLinkActive`/`$badgeBase` @php vars); the `a.is-active .admin-sidebar__nav-badge` child-state rule became a conditional badge class. admin.css's `!important` override block NOT ported (it existed only to beat design-system element rules, which no longer load).
+- ⚠️ **SCOPE DEVIATION (reported, not silently done):** `Admin/Auth/login.blade.php` converted in THIS chunk instead of ADMIN-d. Reason: it was the ONLY consumer of design-system's `.input`/`.btn--inverted` component classes — leaving it on legacy classes would have broken its inputs/buttons the moment the `@import` was removed. ADMIN-d is reduced to "delete admin.css + prune vite entry".
+- ⚠️ **TRANSIENT DELTAS** on the not-yet-converted Registrations views (self-heal in ADMIN-c; listed for the dev's visual pass):
+  1. app.css preflight zeroes `<p>` margins → `.reg-list__empty p` / `.reg-detail__empty p` lose UA vertical margins.
+  2. app.css base `a { text-decoration: none }` → `.reg-detail__id-link` loses its UA underline (restated as `underline` utilities in ADMIN-c).
+  All headings on those views carry explicit size/weight in admin-registration.css, so preflight's heading reset causes no delta there.
+- ✅ Verified: `vite build` clean — `shadow-[inset_3px_0_0_0_#f7d6d0]`, `first-of-type:mt-6`, `max-[1200px]`/`max-[700px]`, `accent-primary-700`, `text-cream` all present in compiled app.css. `php artisan view:cache` passes. No legacy admin-* / dash-summary / admin-login / `class="input"` / `class="btn"` / `is-active` class usage remains in converted markup (grep-verified; comment-only mentions excluded).
+- ⚠️ **Out-of-scope finding (pre-existing, PRESERVED as-is):** `Admin/Auth/login.blade.php` has a stray `>` after `@csrf` (renders a literal `>` text node inside the form). Not a migration artifact; needs a dev decision — one-character fix on request.
+
+#### Chunk ADMIN-c — DONE (Registrations + admin-registration.css deleted)
+- ✅ `Admin/Registrations/index.blade.php` + `sellers.blade.php` converted (~50 class names, shared `$reg*` @php contract per file, same pattern as the sidebar). `reg-layout`'s own 1024px breakpoint kept as `max-[1024px]:grid-cols-1`.
+- ✅ `@import 'admin-registration.css'` removed from admin.css; **`resources/css/admin/admin-registration.css` DELETED** (pre-delete gate: recursive grep of blade/css/js/config → only comment mentions; zero `reg-` classes left in markup; no vite entry existed).
+- ✅ Both ADMIN-b transient deltas healed: `.reg-detail__id-link` gets explicit `underline` (legacy was UA underline); empty-state/address `<p>` margins restated as `my-[13px]`/`my-[13.5px]` (UA `margin: 1em 0` re-stated per element font size — fidelity, not decoration).
+- ✅ Legacy quirks preserved & documented in-file: `.reg-detail__section:last-of-type { border-bottom: none }` matched the last DIV child (reject/empty panel), never a section — so all sections keep their bottom border (plain `border-b` on all); `.reg-detail__documents` never had a CSS rule — its div stays bare; unused `--approved`/`--rejected` badge variants NOT ported (no view used them).
+- ✅ Verified: `vite build` clean (admin bundle 11.17 kB → 5.90 kB — deleted rules confirmed gone from the pipeline); `php artisan view:cache` passes; compiled app.css contains `grid-template-columns:340px 1fr`, `max-[1024px]`, `margin-block:13px/13.5px`, `#fdf1de`, `#a8cdb0`, `#e8a49c`, `#2f5c3a`, `#9a6a1f`, `#eaf3ec`, `truncate`.
+- One authoring slip made and fixed during this chunk: the @import removal initially produced an invalid `@import /* comment */ ''` line; corrected to a plain comment before any build ran.
+
+#### ADMIN-c deletion report
+- `admin-registration.css` — **DELETED** ✅
+- `admin.css` — now 100% dead weight: every class it defines (shell/sidebar/dash-summary/admin-login) is unused by any view. It only still loads because `Admin/Layouts/app.blade.php` @vites it. Dropping that entry and deleting the file can happen immediately (ADMIN-d collapses into a layout-entry removal + file deletion) — pending dev approval since it removes a legacy CSS file.
+- `design-system.css` — ZERO consumers; deletable at ADMIN-e (final re-grep + dev approval).
+
+### Chunks ADMIN-d + ADMIN-e — DONE (final admin cleanup, dev-approved together)
+- ✅ `Admin/Layouts/app.blade.php` → `@vite(['resources/css/app.css'])` only.
+- ✅ **`resources/css/admin/admin.css` DELETED** — was 100% dead weight (every class unused since ADMIN-b/c conversions; its Auth/login page had already converted in ADMIN-b). `resources/css/admin/` directory removed (empty).
+- ✅ **`resources/css/design-system.css` DELETED** — zero consumers since ADMIN-b (its only consumer was admin.css's `@import`, itself only consumed by views that have all converted). Pre-deletion re-grep of `.input`/`.btn*`/`.search-bar`/`.nav-pill*`/`.action-btn`/`.tag`/`.progress` across all views + JS: only BEM false-positives owned by auth/buyer-modal CSS (`buyer-modal__file-btn`, `buyer-otp-input`, …) — no design-system tokens.
+- ✅ `vite.config.js` pruned: `resources/css/design-system.css` and `resources/css/admin/admin.css` entries removed. Remaining entries: `app.css`, `login-modal.css`, `auth.css`, `buyer/buyer-register-modal.css`, `buyer/buyer.js`, `buyer/home.js` — ALL are still-referenced (the auth/login-modal/buyer-modal files belong to the pending shared-auth-chain chunk 13+).
+- ✅ `app.css` header + `:root` comments updated: design-system.css no longer described as a live token source (deleted; app.css is canonical).
+- ✅ Verified: `vite build` clean — 7 modules, 4 CSS chunks (login-modal, buyer-register-modal, auth, app); admin/design-system chunks gone from the manifest; `php artisan view:cache` passes. `resources/css/` now contains only `app.css`, `auth.css`, `auth-pages.css`, `login-modal.css`, `buyer/buyer-register-modal.css`.
+
+### Admin Phase — summary
+- **4 legacy CSS files fully deleted**: `admin/admin-registration.css`, `admin/admin.css`, `design-system.css` (+ `seller/` dir earlier in the Seller phase).
+- **Hazard #1 resolved for Admin** (ADMIN-b: design-system import removed before conversion), **Hazard #2 mapped & retired** (both @imports gone with their files).
+- **Zero app.css changes were needed** for the entire Admin phase — the audit-time 1:1 token verification held.
+- **Remaining vite entries are all shared-auth-chain scope** (chunk 13+): `login-modal.css`, `auth.css` (→ `auth-pages.css` + `buyer/buyer-register-modal.css`), plus buyer JS.
+
+---
+
+### Seller — conversion progress
+
+#### Chunk A — DONE (hazard fix + shell/sidebar)
+- ✅ `Layouts/seller.blade.php` `@vite`: `app.css` first (was `design-system.css`), seller-products.css, seller-dashboard.css
+- ✅ All 7 sidebar components converted to Tailwind utilities
+- ✅ `seller-app.css` DELETED (shell classes inline in layout + components)
+- ✅ Collapse rules (`.seller-sidebar.is-collapsed`) ported to `app.css` `@layer components`
+- ✅ Hazard #1 resolved for Seller area
+
+#### Chunk B — DONE (dashboard)
+- ✅ `Seller/Dashboard/index.blade.php` fully converted to Tailwind utilities
+- ✅ `seller-dashboard.css` DELETED (all classes converted inline)
+
+#### Phase-start blanket check (Hazard #2) — RESULTS
+1. **Blade `@vite` grep** (all `resources/views/Seller/**` + `Layouts/seller.blade.php`):
+   - `Layouts/seller.blade.php:10-15` — `@vite(['resources/css/design-system.css', 'resources/css/seller/seller-app.css', 'resources/css/seller/seller-products.css', 'resources/css/seller/seller-dashboard.css'])`
+   - Seller auth pages (`Seller/Auth/login.blade.php`, `register-seller-pending.blade.php`, `register-seller-verify-otp.blade.php`) — `@vite('resources/css/auth.css')` via `@push('styles')` (they `@extends('Layouts.footer')`, whose own `@vite` loads `app.css` + `login-modal.css`).
+   - **Zero other `@vite` hits in `resources/views/Seller/`** — no per-page CSS.
+2. **`@import` grep inside CSS** (all `resources/css/seller/*.css`):
+   - `seller-app.css` — **no `@import`**
+   - `seller-dashboard.css` — **no `@import`**
+   - `seller-products.css` — **no `@import`**
+   - (Contrast: `admin.css:1` DOES `@import '../design-system.css'` — the invisible-dependency trap. Seller has none.)
+3. **Conclusion**: Seller's ONLY `design-system.css` dependency is the `@vite` line in `Layouts/seller.blade.php`. No transitive `@import` trap. Hazard #2 clean for seller.
+
+#### Chunk C — DONE (products)
+- ✅ `Seller/Products/{index,show,create,edit,_form}.blade.php` all converted to Tailwind
+- ✅ `seller-products.css` DELETED — all 350 lines converted
+- ⚠️ Element-selector rules in seller-products.css required explicit conversion on each element (`.sp-form-field label`, `.sp-form-field input/select/textarea`, `.sp-card__body h3`, `.sp-card__image img`, `.sp-existing-image img`)
+
+---
+
+#### Step 1 — design-system.css removal (DONE in Chunk A)
+
+- ✅ `Layouts/seller.blade.php` `@vite` updated: `app.css` first + seller-products.css + seller-dashboard.css
+- ✅ Element-selector hazard cleared — h1-h6/p/span/label/button/input rules now layered in app.css, overridable by Tailwind utilities
+- ✅ `.seller-sidebar.is-collapsed` rules ported to `app.css` `@layer components` before seller-app.css deletion
+- ✅ Seller auth pages unaffected — they extend Layouts.footer and get tokens from app.css via the shared auth chain
+---
+
+#### Step 2 — full audit: every CSS/SCSS file used by seller views, `@vite`/`@import` map, custom classes
+
+##### 2a. Layout
+| File | Role | How loaded | CSS it pulls |
+|---|---|---|---|
+| `resources/views/Layouts/seller.blade.php` | Seller shell layout (sidebar + main) | `@vite` line 10-12: `app.css`, `seller/seller-products.css`, `seller/seller-dashboard.css` | Direct load of 3 files. design-system.css REMOVED in Chunk A (Hazard #1 fix). `seller-app.css` DELETED in Chunk A (classes converted to Tailwind). No `@stack('styles')` consumers inside seller proper (auth pages use `Layouts.footer` instead). |
+
+##### 2b. Seller CSS files (3 active, all in `resources/css/seller/`)
+| File | Size | Responsibility | `@import` of design-system? | Consumes tokens via `var()`? |
+|---|---|---|---|---|
+| `seller-app.css` | **DELETED** (Chunk A) | Shell: `.seller-layout`, `.seller-sidebar`, `.seller-sidebar__brand`, `.seller-sidebar__brand-text`, `.seller-sidebar__toggle`, `.seller-sidebar__toggle-icon`, `.seller-main`, `.seller-sidebar.is-collapsed*` — all converted to Tailwind utilities inline in layout + components. Collapse rules ported to `app.css` `@layer components`. | No | Yes — `--bg-page`, `--bg-sidebar`, `--text-inverse`, `--space-*`, `--radius-md` (all re-exported by app.css `@layer base :root`) |
+| `seller-dashboard.css` | 12079 bytes | Dashboard + shared panel/table/empty-state primitives: sidebar nav (`.seller-nav*`); stat cards (`.stat-card*`, 4 color variants); page header (`.seller-page-header*`); panels (`.panel*`, `.panel__header/title/badge/link`); sales chart SVG surface; low-stock list; `.seller-table`; `.empty-state*`; `.seller-sidebar__footer`, `.seller-sidebar__seller*` | No | Yes — heavy token consumer: `--space-*`, `--font-sans`, `--font-serif`, `--text-*`, `--bg-surface`, `--border-light`, `--radius-*`, `--color-primary-*`, `--color-secondary-*`, `--color-tertiary-*`, `--color-warning`, `--color-neutral-*`, `--color-secondary-500` |
+
+##### 2c. `@vite` / `@import` dependency map (seller area only)
+```
+Layouts/seller.blade.php  @vite →
+  ├─ app.css                ← NEW in Chunk A (replaces design-system.css, provides tokens + base rules)
+  ├─ seller/seller-products.css ← product UI; no @import; some hardcoded hexes
+  └─ seller/seller-dashboard.css ← dashboard/panels/tables; no @import; token-heavy
+
+  REMOVED: design-system.css (Hazard #1, Chunk A)
+  DELETED: seller-app.css (Chunk A — all classes converted to Tailwind, collapse rules → app.css @layer components)
+
+Seller auth pages (login, register-pending, verify-otp)  @extends Layouts.footer →
+  Layouts.footer @vite → app.css + login-modal.css
+  + @push('styles') @vite('auth.css')
+  auth.css @import → auth-pages.css + buyer/buyer-register-modal.css   ← these 2 consume design-system tokens via app.css :root re-export
+```
+Note: `auth.css` is NOT seller-specific — it's the shared auth chain used by buyer register flow too. Seller auth pages piggyback on it.
+| `seller-products.css` | 7556 bytes | Product UI: toast (`.sp-toast`), header (`.sp-header`), buttons (`.sp-btn*`, 5 variants), filters (`.sp-filters`), grid (`.sp-grid`), cards (`.sp-card*` including image/status/body/actions), status badges (`.sp-status-badge*`, 3 states), forms (`.sp-form*`, `.sp-form-field*`, `.sp-field-error`, `.sp-locked-category`, `.sp-field-hint`), file upload (`.sp-file-wrap`, `.sp-file-btn`, `.sp-file-name`, `.sp-existing-images`, `.sp-existing-image`, `.sp-primary-tag`), form rows | No | Mix: some rules use `var()` (only via the shared tokens inherited at runtime from `design-system.css` load), but MANY rules use hardcoded hex values directly (see token-consumption table below) |
+
+##### 2d. seller-products.css — detailed class inventory
+
+| Class | Purpose | Token usage / hardcoded values |
+|---|---|---|
+| `.sp-toast` | Success toast | Hardcoded: `#eaf3ec` bg, `#a8cdb0` border, `#2f5c3a` text, Montserrat 13px, radius 4px |
+| `.sp-header` | Page header row | Flex, gap, margin-bottom 24px |
+| `.sp-btn` | Base button | Montserrat 600 12.5px, height 42px, padding 0 20px, radius 4px, transition |
+| `.sp-btn--primary` | Primary button | Hardcoded: `#1e1b1b` bg, `#ffffff` text, hover `#79545c` bg |
+| `.sp-btn--outline` | Outline button | Hardcoded: transparent bg, `#79545c` text/border, hover swap |
+| `.sp-btn--danger` | Danger button | Hardcoded: transparent bg, `#a5333d` text/border, hover swap |
+| `.sp-btn--sm` | Small button | Height 34px, padding 0 14px, 11px |
+| `.sp-btn--submit` | Submit button | Margin-top 8px, width 100%, height 48px |
+| `.sp-filters` | Filter row | Flex, gap 12px, margin-bottom 24px |
+| `.sp-filters input[type="text"]` | Search input | Hardcoded: `#e8e2e0` border, radius 4px, Montserrat 13.5px, height 42px, max-width 320px |
+| `.sp-filters select` | Filter select | Hardcoded: `#e8e2e0` border, `#ffffff` bg, radius 4px, Montserrat 13.5px, height 42px |
+| `.sp-grid` | Product grid | `grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))`, gap 20px |
+| `.sp-card` | Product card | Hardcoded: `#ffffff` bg, `#e8e2e0` border, radius 8px, overflow hidden, column flex |
+| `.sp-card__image` | Image area | Aspect-ratio 1, hardcoded `#faf2f1` bg, position relative |
+| `.sp-card__image img` | Product image | Width/height 100%, object-fit cover |
+| `.sp-card__no-image` | No-image placeholder | Hardcoded `#79545c` color, centered flex |
+| `.sp-status-badge` | Status badge base | Absolute top-left 10px, padding 4px 10px, radius 9999px, Montserrat 600 10px uppercase |
+| `.sp-status-badge--active` | Active status | Hardcoded: `#eaf3ec` bg, `#2f5c3a` text |
+| `.sp-status-badge--draft` | Draft status | Hardcoded: `#f2ebe9` bg, `#4f4446` text |
+| `.sp-status-badge--inactive` | Inactive status | Hardcoded: `#fbe9e7` bg, `#a5333d` text |
+| `.sp-card__body` | Card body | Padding 14px 16px, column flex, gap 4px, flex 1 |
+| `.sp-error-summary` | Error message | Hardcoded: `#fbe9e7` bg, `#e8a49c` border, radius 4px, Montserrat 12.5px, `#a5333d` text |
+| `.sp-form-row` | Form row | Flex, gap 16px |
+| `.sp-form-field` | Form field | Flex column, flex 1 |
+| `.sp-form-field--small` | Small field | Flex 0 0 180px |
+| `.sp-form-field label` | Field label | Hardcoded: Montserrat 600 11px uppercase, `#4f4446` text, margin-bottom 8px |
+| `.sp-form-field input, select, textarea` | Form inputs | Hardcoded: padding 10px 14px, `#e8e2e0` border, radius 4px, Montserrat 13.5px, `#1e1b1b` text |
+| `.sp-form-field input:focus, select:focus, textarea:focus` | Focus state | Hardcoded: `outline: none`, `#79545c` border-color |
+| `.sp-field-error` | Field error text | Hardcoded: `#a5333d` text, Montserrat 11.5px, margin-top 5px |
+| `.sp-locked-category` | Locked category display | Hardcoded: `#faf2f1` bg, `#e8e2e0` border, radius 4px, `#4f4446` text, Montserrat 13.5px, gap 8px, padding 10px 14px |
+| `.sp-locked-category svg` | Lock icon | Hardcoded `#79545c` color, flex-shrink 0 |
+| `.sp-field-hint` | Field hint text | Hardcoded: `#4f4446` text, Montserrat 10.5px italic, margin-top 6px |
+| `.sp-file-wrap` | File upload wrapper | Flex, align-center, gap 12px |
+| `.sp-file-input` | Hidden file input | Position absolute, 1x1px, clip rect |
+| `.sp-file-btn` | File button | Hardcoded: `#ffffff` bg, `#79545c` border/text, radius 4px, Montserrat 600 11.5px, height 40px, padding 0 16px, gap 8px |
+| `.sp-file-btn:hover` | File button hover | Hardcoded: `#79545c` bg, `#ffffff` text |
+| `.sp-file-name` | File name text | Hardcoded: `#4f4446` text, Montserrat 12.5px, ellipsis |
+| `.sp-existing-images` | Existing images grid | Flex-wrap, gap 12px |
+| `.sp-existing-image` | Image thumbnail | Hardcoded: 80x80, radius 6px, overflow hidden, `#e8e2e0` border, position relative |
+| `.sp-existing-image img` | Thumbnail image | Width/height 100%, object-fit cover |
+| `.sp-primary-tag` | Primary badge | Hardcoded: `rgba(30,27,27,0.7)` bg, `#ffffff` text, 9px, bottom-left bar |
+| `.sp-existing-image form` | Delete form | Position absolute, top-right 4px |
+| `.sp-existing-image button` | Delete button | Hardcoded: `all: unset`, `rgba(30,27,27,0.7)` bg, `#ffffff` text, radius 9999px, 20x20, flex-center |
+| `@media (max-width: 640px)` | Responsive | `.sp-form-row` stacks, `.sp-header` stacks with gap 12px |
+
+### Buyer wrap-up (chunk d) deletions — dev visual-verified, committed
+- Deleted: `Buyer/Layouts/navbar.blade.php` (confirmed dead — no `@include`
+  anywhere; buyer + landing both use `Components/navbar`), `buyer/buyer.css`,
+  `buyer/home.css` (+ its `@vite` line in `Buyer/Home/index.blade.php`),
+  `auth-buttons.css`, and the 6 stub files (`account/cart/chat/checkout/
+  orders/products.css` — each re-verified comment-only immediately before
+  deletion, per the stub-deletion gate). `resources/css/buyer/` now holds
+  only `buyer-register-modal.css` (still loaded: buyer layout + auth pages
+  via `auth.css`).
+- `Buyer/Layouts/app.blade.php` `@vite` is now `app.css`, `login-modal.css`,
+  `buyer/buyer-register-modal.css`.
+- Legacy `auth-btn login-btn/register-btn` classes stripped from
+  `Components/navbar` (both variants Tailwind-only; buyer keeps 4px
+  `rounded-[4px]`, landing keeps 6px `rounded-md`).
+- `vite.config.js` pruned of all 9 deleted entries (stubs + `buyer.css` +
+  `home.css` + `auth-buttons.css`). Remaining entries: `app.css`,
+  `design-system.css` (seller/admin still need it), `login-modal.css`,
+  `admin.css`, `auth.css`, `buyer-register-modal.css`, 3 seller files,
+  2 buyer JS files.
+- Pre-existing `buyer.js` latent TypeError fixed separately (optional-chained
+  `accountDropdown` refs, lines 10/14) — reviewed independently of the
+  navbar deletion.
 
 ### Chunk 3/4 technical notes (verified in built CSS)
 - `--cat-per-view` remains a REAL custom property, set via Tailwind
@@ -213,7 +466,7 @@ Status (verified by grepping every `@vite`/`@import` — accurate as of Buyer ch
 | Landing (`Layouts/footer`) | **not loaded** — `@vite(['app.css','login-modal.css'])` | ✅ already app.css-only (why the landing conversion works) |
 | Buyer (`Buyer/Layouts/app.blade.php`) | **not loaded** — removed in chunk a; `@vite` is app.css + legacy files | ✅ done |
 | Buyer register flow (`Auth/Register-Type`, `Auth/register-buyer-pending`, `Buyer/register-buyer-pending`, `Buyer/register-buyer-check-email`) | **not loaded** — they `@extends('Layouts.footer')` and only `@push` `auth.css` (= `@import 'auth-pages.css' + 'buyer/buyer-register-modal.css'`). They get tokens from the layout's app.css. | ✅ relies on the `:root` re-export — do not remove it |
-| Seller (`Layouts/seller.blade.php`) | **explicitly loaded** (`@vite` line 11, before the 3 seller CSS files) | ⚠️ remove at the START of the Seller phase |
+| Seller (`Layouts/seller.blade.php`) | `app.css` now FIRST in `@vite` (Chunk A); `design-system.css` REMOVED | ✅ Hazard #1 fixed — tokens from app.css `@layer base`, element rules layered, utilities now work |
 | Admin (`Admin/Layouts/app.blade.php`, `Admin/Auth/login.blade.php`) | **via `@import '../design-system.css'`** at `admin.css` line 1 (which also imports `admin-registration.css`) — NOT via `@vite` | ⚠️ add `app.css` to the admin `@vite` and drop that import at the START of the Admin phase |
 
 ⚠️ Two traps this table encodes:
@@ -319,6 +572,11 @@ converted, and treat "delete the file" as a hard requirement at wrap-up.
   Legacy classes remain ONLY while auth-buttons.css is still loaded;
   TODO(buyer wrap-up): remove `auth-btn login-btn/register-btn` classes
   from navbar + delete `resources/css/auth-buttons.css` after visual verify.
+  Radius note (chunk c, verified): the buyer navbar variant already carries
+   `rounded-[4px]` on each variant branch (NOT the shared base), so deleting
+   `auth-buttons.css` at chunk d causes NO radius shift — its 4px rule merely
+   duplicates the utility value. Landing keeps `rounded-md` (6px) and never
+   loaded the file. Nothing further needed.
 
 ## Buyer phase — audit findings
 - **Scope is small:** ALL buyer sub-views (Products, Categories, Cart,

@@ -3,7 +3,7 @@
 @section('title', 'Create Voucher')
 
 @section('content')
-<div class="seller-vouchers-create">
+<div>
     <h1>Create New Voucher</h1>
     <p>Add a new discount voucher.</p>
 </div>

@@ -3,7 +3,7 @@
 @section('title', 'Account')
 
 @section('content')
-<div class="seller-account">
+<div>
     <h1>My Account</h1>
     <p>Manage your account settings.</p>
 </div>

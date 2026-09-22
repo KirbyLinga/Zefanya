@@ -7,7 +7,7 @@
     <div class="auth-card">
 
         <div class="auth-card__brand">
-            <img class="brand__logo" src="{{ asset('Images/Zefanya-Logo-128.png') }}" alt="Zefanya logo" />
+            <img class="brand__logo" src="{{ asset('Images/Zefanya-Logo.png') }}" alt="Zefanya logo" />
         </div>
 
         <h1 class="auth-card__title">Welcome back</h1>

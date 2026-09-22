@@ -4,8 +4,10 @@
    (landing, buyer, seller, admin).
 
    Token sources:
-   - resources/css/design-system.css (primary/secondary/tertiary/neutral
-     scales, semantic colors, fonts, shadows) — the shared palette.
+   - THIS FILE is now the single canonical token source. Its original source,
+     resources/css/design-system.css, was DELETED in ADMIN-e (zero consumers
+     after the landing/buyer/seller/admin migrations); every token it defined
+     lives on here in @theme + the @layer base re-export (values 1:1).
    - The landing SCSS palette, whose unique values are registered as
      clearly named extensions rather than duplicating scales:
        --color-cream        #fff8f7  page/navbar background (landing)
@@ -26,6 +28,7 @@
    ====================================================================== */
 
 @import 'tailwindcss';
+@import './theme.css';
 
 @theme {
     /* ===== Primary (dusty rose / mauve) ===== */
@@ -104,6 +107,10 @@
     --color-buyer-cream: #fbf5f3;
     --color-buyer-line: #ebddda;
 
+    /* Quick-view star gold (buyer.css `.qv-rating i{color:#E0A93D}`).
+       Named by purpose (no other user); chunk c. */
+    --color-buyer-star: #e0a93d;
+
     /* Wishlist heart when toggled on (buyer.css `.wish-toggle.active{
        color:#C4495A}`). Named by purpose: the heart in the product cards. */
     --color-buyer-wish: #c4495a;
@@ -130,8 +137,9 @@
 }
 
 @layer base {
-    /* Legacy CSS custom properties — kept in sync with
-       resources/css/design-system.css until every area is migrated. */
+    /* Legacy CSS custom properties — were kept in sync with
+       resources/css/design-system.css (deleted in ADMIN-e); this :root
+       block is their surviving re-export. */
     :root {
         /* Primary */
         --color-primary-50: #fdf5f7;
@@ -194,9 +202,9 @@
         /* Background */
         --bg-page: var(--color-primary-50);
         --bg-surface: #ffffff;
-        --bg-sidebar: var(--color-neutral-950);
-        --bg-sidebar-hover: rgba(255, 248, 247, 0.08);
-        --bg-sidebar-active: rgba(226, 180, 189, 0.2);
+
+        /* NOTE: seller sidebar tokens (--sidebar-*) live in theme.css now —
+           the single token source for the light/dark seller theme. */
 
         /* Text */
         --text-primary: var(--color-neutral-950);
@@ -273,6 +281,19 @@
     body, p, span, label, input, select, textarea, button {
         font-family: var(--font-sans);
         color: var(--text-secondary);
+    }
+}
+
+@layer components {
+    /* intentionally minimal — seller sidebar collapse states are expressed
+       with Tailwind `[&.is-collapsed]` / `[.is-collapsed_&]` variants in
+       resources/views/Components/seller/* so they win the cascade against
+       plain utilities (see css-migration notes). */
+
+    /* Seller sidebar keyboard focus ring (light blush theme). */
+    #sellerSidebar a:focus-visible {
+        outline: 2px solid var(--sidebar-active-bg);
+        outline-offset: -2px;
     }
 }
 

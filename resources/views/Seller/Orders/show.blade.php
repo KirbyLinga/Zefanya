@@ -3,7 +3,7 @@
 @section('title', 'Order Details')
 
 @section('content')
-<div class="seller-orders-show">
+<div>
     <h1>Order Details</h1>
     <p>View order information.</p>
 </div>

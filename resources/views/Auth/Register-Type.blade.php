@@ -33,7 +33,7 @@
       <span class="role-card__cta">REGISTER AS SELLER</span>
     </a>
 
-    <a href="{{ route('register.logistics') }}" class="role-card">
+    <a href="#" data-logistics-register-trigger class="role-card">
       <div class="role-card__icon">
         <i data-lucide="truck" width="24" height="24"></i>
       </div>
@@ -64,13 +64,13 @@
 </main>
 
 @include('Components.buyer-register-modal')
-@include('Components.buyer-verify-otp-modal')
 @include('Components.seller-register-modal')
-@include('Components.seller-verify-otp-modal')
+@include('Components.logistics-register-modal')
 
 @endsection
 
 @push('scripts')
+  @vite(['resources/js/buyer/buyer-register-modal.js', 'resources/js/seller/seller-register-modal.js', 'resources/js/logistics/logistics-register-modal.js'])
   <script>
     if (window.lucide) { lucide.createIcons(); }
   </script>

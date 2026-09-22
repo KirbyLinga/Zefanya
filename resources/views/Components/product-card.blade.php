@@ -8,7 +8,7 @@
          'badgeStyle' => 'new',            // optional: 'new' switches badge color
      ])
      Tailwind-only (migrated from _products.scss). Landing page only. --}}
-<div class="group flex flex-col overflow-hidden rounded-[10px] border border-line bg-white transition-[box-shadow,transform] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(41,38,38,0.12)]">
+<div class="group flex h-full flex-col overflow-hidden rounded-[10px] border border-line bg-white transition-[box-shadow,transform] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(41,38,38,0.12)]">
     <div class="relative block aspect-[0.82] overflow-hidden bg-blush">
         <div class="block aspect-[0.8] h-auto w-full bg-secondary-300 bg-cover bg-center bg-no-repeat" style="background-image: url('{{ asset('img/' . $image) }}')"></div>
 
@@ -23,7 +23,7 @@
         @endif
     </div>
 
-    <div class="flex flex-col gap-3.5 px-[18px] pb-5 pt-[18px] max-sm:gap-3 max-sm:px-3 max-sm:pb-4 max-sm:pt-3.5">
+    <div class="flex flex-1 flex-col gap-3.5 px-[18px] pb-5 pt-[18px] max-sm:gap-3 max-sm:px-3 max-sm:pb-4 max-sm:pt-3.5">
         <div>
             <div class="font-sans text-sm font-semibold leading-[1.5] text-neutral-950 max-sm:text-[13px]">{!! $title !!}</div>
         </div>
@@ -39,7 +39,7 @@
             </div>
         @endif
 
-        <button class="mt-0.5 inline-flex h-[42px] cursor-pointer items-center justify-center rounded border border-primary-800 bg-transparent text-xs font-semibold tracking-[1.4px] text-primary-800 transition-colors duration-200 hover:bg-primary-800 hover:text-white">
+        <button class="mt-auto inline-flex h-[42px] cursor-pointer items-center justify-center rounded border border-primary-800 bg-transparent text-xs font-semibold tracking-[1.4px] text-primary-800 transition-colors duration-200 hover:bg-primary-800 hover:text-white">
             <div class="inline-flex items-center justify-center"><i data-lucide="plus" width="14" height="14"></i></div>
             <div>ADD</div>
         </button>

@@ -2,6 +2,7 @@
 
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\User;
 
@@ -32,6 +33,11 @@ return [
             'driver' => 'session',
             'provider' => 'sellers',
         ],
+
+        'logistics' => [
+            'driver' => 'session',
+            'provider' => 'logistics',
+        ],
     ],
 
     'providers' => [
@@ -42,17 +48,22 @@ return [
 
         'admins' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Admin\Admin::class,
+            'model' => Admin::class,
         ],
 
         'buyers' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Buyer\Buyer::class,
+            'model' => Buyer::class,
         ],
 
         'sellers' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Seller\Seller::class,
+            'model' => Seller::class,
+        ],
+
+        'logistics' => [
+            'driver' => 'eloquent',
+            'model' => LogisticsProvider::class,
         ],
     ],
 
@@ -77,9 +88,15 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        'logistics' => [
+            'provider' => 'logistics',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
     ],
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
 ];
-

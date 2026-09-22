@@ -7,6 +7,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -58,6 +59,18 @@ class DashboardController extends Controller
         ])->values();
         // --------------------------------------------------------------------
 
+        // --- Notifications: only query if the table exists (Notifiable trait
+        //     is present on Seller, but the Laravel notifications table is not
+        //     yet migrated in this project). Empty state is rendered otherwise. ---
+        $notificationsTableExists = Schema::hasTable('notifications');
+        $notifications = $notificationsTableExists
+            ? $seller->notifications()->latest()->limit(8)->get()
+            : collect();
+        $unreadCount = $notificationsTableExists
+            ? $seller->unreadNotifications()->count()
+            : 0;
+        // --------------------------------------------------------------------
+
         return view('Seller.Dashboard.index', [
             'seller' => $seller,
             'totalSales' => $totalSales,
@@ -70,6 +83,8 @@ class DashboardController extends Controller
             'recentOrders' => $recentOrders,
             'salesTrend' => $salesTrend,
             'ordersModuleReady' => false,
+            'notifications' => $notifications,
+            'unreadCount' => $unreadCount,
         ]);
     }
 }

@@ -1,10 +1,14 @@
 <?php
 
-use App\Http\Controllers\Buyer\{
-    HomeController, CategoryController, ProductController,
-    CartController, CheckoutController, OrderController,
-    ChatController, AccountController, LoginController
-};
+use App\Http\Controllers\Buyer\AccountController;
+use App\Http\Controllers\Buyer\CartController;
+use App\Http\Controllers\Buyer\CategoryController;
+use App\Http\Controllers\Buyer\ChatController;
+use App\Http\Controllers\Buyer\CheckoutController;
+use App\Http\Controllers\Buyer\HomeController;
+use App\Http\Controllers\Buyer\LoginController;
+use App\Http\Controllers\Buyer\OrderController;
+use App\Http\Controllers\Buyer\ProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,6 +44,16 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
 
         Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
         Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
+        Route::get('/cart/summary', [CartController::class, 'summary'])->name('cart.summary');
+
+        // NOTE: the literal /cart/voucher routes MUST be registered before the
+        // DELETE /cart/{id} wildcard below, otherwise Laravel's registration-order
+        // matching sends "DELETE /buyer/cart/voucher" to CartController@destroy
+        // with $id = "voucher" (a TypeError, not the voucher endpoint).
+        Route::post('/cart/voucher', [CartController::class, 'applyVoucher'])->name('cart.voucher.apply');
+        Route::delete('/cart/voucher', [CartController::class, 'removeVoucher'])->name('cart.voucher.remove');
+
+        Route::delete('/cart', [CartController::class, 'bulkDestroy'])->name('cart.bulk-destroy');
         Route::patch('/cart/{id}', [CartController::class, 'update'])->name('cart.update');
         Route::delete('/cart/{id}', [CartController::class, 'destroy'])->name('cart.destroy');
 

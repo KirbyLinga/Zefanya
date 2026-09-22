@@ -12,30 +12,37 @@ class UnifiedLoginController extends Controller
     /**
      * Unified login endpoint.
      *
-     * Single entry point for both buyer and seller authentication.
+     * Single entry point for buyer, seller, and logistics provider authentication.
      * The system automatically determines the user's role upon successful
      * authentication and redirects accordingly:
-     *   - Seller → seller dashboard
-     *   - Buyer  → buyer home
+     *   - Seller    → seller dashboard
+     *   - Logistics → logistics dashboard
+     *   - Buyer     → buyer home
      *
-     * Priority: seller guard is tried first because it is the more
-     * privileged role. If a single email exists in both tables with a
-     * valid password, the seller session is preferred.
+     * Priority: seller guard is tried first because it is the most
+     * privileged role. Logistics is tried next, then buyer. If a single
+     * email exists in multiple tables with a valid password, the more
+     * privileged session is preferred.
      */
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        $email    = $credentials['email'];
+        $email = $credentials['email'];
         $password = $credentials['password'];
         $remember = $request->boolean('remember');
 
         // Try seller guard first (privileged role).
         if ($this->tryGuard('seller', $email, $password, $remember, $request)) {
             return redirect()->intended(route('seller.dashboard'));
+        }
+
+        // Fall back to logistics provider.
+        if ($this->tryGuard('logistics', $email, $password, $remember, $request)) {
+            return redirect()->intended(route('logistics.dashboard'));
         }
 
         // Fall back to buyer guard.
@@ -65,10 +72,18 @@ class UnifiedLoginController extends Controller
 
         $user = Auth::guard($guard)->user();
 
-        if ($user->status !== 'approved') {
+        // Status may be a plain string (Buyer/Seller) or a backed enum object
+        // (LogisticsProvider, which casts status to LogisticsProviderStatus).
+        $status = match (true) {
+            is_string($user->status) => $user->status,
+            $user->status instanceof \BackedEnum => $user->status->value,
+            default => '',
+        };
+
+        if ($status !== 'approved') {
             Auth::guard($guard)->logout();
 
-            $request->session()->flash('auth.status_message', $this->statusMessage($guard, $user->status));
+            $request->session()->flash('auth.status_message', $this->statusMessage($guard, $status));
 
             return false;
         }
@@ -81,16 +96,21 @@ class UnifiedLoginController extends Controller
     /**
      * Role-specific approval-status message.
      */
-    private function statusMessage(string $guard, string $status): string
+    private function statusMessage(string $guard, mixed $status): string
     {
+        $status = is_scalar($status) ? (string) $status : '';
+
         return match ([$guard, $status]) {
             ['seller', 'pending_verification'] => 'Your email has not been verified yet. Please check your email for the verification code.',
-            ['seller', 'pending_approval']     => 'Your seller account is still pending administrator approval.',
-            ['seller', 'rejected']             => 'Your seller registration was not approved. Please contact support or submit a new registration.',
-            ['buyer', 'pending_verification']  => 'Please verify your email before logging in. Check your inbox for the code.',
-            ['buyer', 'pending_approval']      => 'Your buyer registration is still awaiting administrator approval.',
-            ['buyer', 'rejected']              => 'Your buyer registration was not approved.',
-            default                            => 'Your account is not active.',
+            ['seller', 'pending_approval'] => 'Your seller account is still pending administrator approval.',
+            ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.',
+            ['logistics', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
+            ['logistics', 'pending_approval'] => 'Your logistics provider registration is still awaiting administrator approval.',
+            ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.',
+            ['buyer', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
+            ['buyer', 'pending_approval'] => 'Your buyer registration is still awaiting administrator approval.',
+            ['buyer', 'rejected'] => 'Your buyer registration was not approved.',
+            default => 'Your account is not active.',
         };
     }
 
@@ -100,6 +120,7 @@ class UnifiedLoginController extends Controller
     public function logout(Request $request)
     {
         Auth::guard('seller')->logout();
+        Auth::guard('logistics')->logout();
         Auth::guard('buyer')->logout();
 
         $request->session()->invalidate();

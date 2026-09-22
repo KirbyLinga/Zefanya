@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Seller\Seller;
+use App\Models\Shared\Category;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use App\Models\Shared\Category;
-use App\Models\Seller\Seller;
 
 class Product extends Model
 {
@@ -45,12 +47,34 @@ class Product extends Model
 
     public function images(): HasMany
     {
-        return $this->hasMany(ProductImage::class);
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
     }
 
-    public function scopeForSeller($query, int $sellerId)
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
+    public function scopeForSeller(Builder $query, int $sellerId): Builder
     {
         return $query->where('seller_id', $sellerId);
+    }
+
+    public function scopeActiveInStock(Builder $query): Builder
+    {
+        return $query->where('status', 'active')->where('stock_quantity', '>', 0);
+    }
+
+    public function formattedPrice(): string
+    {
+        return '₱'.number_format((float) $this->price, 2);
+    }
+
+    public function catalogImageUrl(): ?string
+    {
+        $image = $this->images->firstWhere('is_primary', true) ?? $this->images->first();
+
+        return $image !== null ? Storage::url($image->path) : null;
     }
 
     public static function generateUniqueSlug(string $name): string
@@ -64,7 +88,7 @@ class Product extends Model
             $count++;
         }
 
-                return $slug;
+        return $slug;
     }
 
     public function isOutOfStock(): bool

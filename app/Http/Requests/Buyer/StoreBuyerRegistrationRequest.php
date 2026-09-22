@@ -37,7 +37,7 @@ class StoreBuyerRegistrationRequest extends FormRequest
             'barangay' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
             'barangay_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
 
-            'street' => [Rule::requiredIf($isManual), 'nullable', 'string', 'max:255'],
+            'street' => ['required', 'string', 'max:255'],
             'house_number' => ['nullable', 'string', 'max:50'],
             'address_detail' => ['nullable', 'string', 'max:255'],
 
@@ -51,7 +51,7 @@ class StoreBuyerRegistrationRequest extends FormRequest
             'contact_no.regex' => 'Enter a valid PH mobile number (09XXXXXXXXX).',
             'upload_id.mimes' => 'Upload ID must be a JPG, PNG, or PDF.',
             'upload_id.max' => 'Upload ID must be smaller than 5MB.',
-            'street.required' => 'Street is required when entering your address manually.',
+            'street.required' => 'Street / house number is required.',
             'province.required' => 'Select a province, or switch to manual address entry.',
         ];
     }

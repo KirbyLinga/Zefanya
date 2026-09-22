@@ -13,7 +13,7 @@
         </button>
 
         <div class="login-modal__brand">
-            <img class="brand__logo" src="{{ asset('Images/Zefanya-Logo-128.png') }}" alt="Zefanya logo" />
+            <img class="brand__logo" src="{{ asset('Images/Zefanya-Logo.png') }}" alt="Zefanya logo" />
         </div>
 
         <h2 class="login-modal__title" id="loginModalTitle">Welcome back</h2>

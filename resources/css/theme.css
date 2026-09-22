@@ -1,0 +1,598 @@
+/* ======================================================================
+   Zefanya — shared theme tokens (role-agnostic, reusable by every panel).
+   Imported by resources/css/app.css. SELLER panel is the first consumer.
+
+   Structure:
+     :root                    — LIGHT values (exact current seller light theme;
+                                do not change them casually).
+     html[data-theme="dark"]  — DARK values (screenshot 2 palette:
+                                Primary #E2B4BD · Secondary #F7D6D0 ·
+                                Tertiary #ADC7AD · Neutral #7C7676).
+                                Neutral #7C7676 is ONLY for borders, disabled
+                                states and placeholder icons — it fails
+                                4.5:1 as text on dark surfaces.
+   Set `data-theme` on <html> ("light"/"dark"); localStorage key: zf-theme.
+   ====================================================================== */
+
+:root {
+    /* Surfaces */
+    --bg-page: var(--color-primary-50);
+    --bg-surface: #ffffff;
+    --bg-raised: #fbf9f7;
+    --bg-dim: #fbfaf9;
+    --bg-soft: #faf2f1;
+    --bg-thumb: #faf8f5;
+    --bg-chip: #f4f1ee;
+    --overlay: rgba(0, 0, 0, 0.55);
+
+    /* Borders */
+    --border: #ece8e2;
+    --border-strong: #e8e6e6;
+    --border-hairline: #f3f2f2;
+    --border-faint: #f2eee9;
+    --border-row: #f4f1ec;
+    --border-input: #e6e0d9;
+    --border-btn-outline: #e2dcd4;
+    --border-btn-outline-hover: #c9c0b8;
+    --border-pager-hover: #d8d0c8;
+    --border-cancel: #d4d1d1;
+
+    /* Brand / links / soft icons */
+    --brand: #c07a85;
+    --link: #8b4a55;
+    --icon-soft: #6b916b;
+
+    /* Text */
+    --text-ink: #1f1b1a;
+    --text-body: #37312d;
+    --text-muted: #7c7676;
+    --text-muted-2: #6f6862;
+    --text-label: #4f4446;
+    --text-placeholder: #a9a19a;
+    --text-placeholder-2: #9c948c;
+    --text-disabled: #b8b0a8;
+
+    /* Buttons */
+    --btn-primary-bg: #111111;
+    --btn-primary-bg-hover: #2b2622;
+    --btn-primary-bg-hover-soft: #79545c;
+    --btn-primary-text: #ffffff;
+    --btn-accent: #79545c;
+    --btn-accent-contrast: #ffffff;
+    --btn-cancel-text: #504b4b;
+
+    /* Status (text + tinted pill backgrounds + borders) */
+    --status-success: #2f5c3a;
+    --status-warning: #9a6a1f;
+    --status-danger: #a5333d;
+    --status-warning-dot: #d9a441;
+    --status-dot-draft: #a9a4a4;
+    --pill-success-bg: #eaf3ec;
+    --pill-success-border: #a8cdb0;
+    --pill-warning-bg: #fbf3dd;
+    --pill-danger-bg: #fbe9e7;
+    --pill-danger-border: #e8a49c;
+    --bg-error-soft: #fdf3f3;
+    --border-error-soft: #f0c9cc;
+    --pill-primary-bg: #fbeaed;
+    --pill-primary-text: #9c5c68;
+    --pill-primary-bg-hover: rgba(156, 92, 104, 0.16);
+    --hover-rose: #f6dee2;
+    --hover-rose-text: #7a4550;
+
+    /* Dashboard hero card */
+    --hero-bg: linear-gradient(135deg, #FBE9E6, #F7D6D0);
+    --hero-border: #EAD2D0;
+    /* Chip bg: semi-transparent white on light gradient —
+       text-muted (#7c7676) on eff. #F5D8D4 → ~4.6:1 AA ✓ */
+    --hero-chip-bg: rgba(255, 255, 255, 0.55);
+
+    /* Sidebar collapsed tooltips —
+       #F5E5E3 on #2E1C24 → 10.8:1 AA ✓ */
+    --tooltip-bg: #2E1C24;
+    --tooltip-text: #F5E5E3;
+    --tooltip-border: transparent;
+
+    /* Hero icon buttons (theme toggle + bell) */
+    --icon-btn-bg: rgba(255, 255, 255, 0.6);
+    --icon-btn-border: #E0C8CB;
+    --icon-btn-hover: rgba(255, 255, 255, 0.85);
+
+    /* Seller sidebar (light blush — values from the sidebar restyle) */
+    --sidebar-bg: #F5E5E3;
+    --sidebar-border: #E0C8CB;
+    --sidebar-text: #2E1C24;
+    --sidebar-muted: #5A414A;
+    --sidebar-hover: #EBD3D1;
+    --sidebar-active-bg: #4A3036;
+    --sidebar-active-text: #F5E5E3;
+    --sidebar-active-border: #4A3036;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+
+    /* Surfaces */
+    --bg-page: #161212;
+    --bg-surface: #201A1B;
+    --bg-raised: #2A2324;
+    --bg-dim: #241E1F;
+    --bg-soft: #241E1F;
+    --bg-thumb: #2A2324;
+    --bg-chip: #2A2324;
+    --overlay: rgba(0, 0, 0, 0.65);
+
+    /* Borders */
+    --border: #3A3132;
+    --border-strong: #3A3132;
+    --border-hairline: #2E2627;
+    --border-faint: #2E2627;
+    --border-row: #2E2627;
+    --border-input: #3A3132;
+    --border-btn-outline: #453A3B;
+    --border-btn-outline-hover: #55484A;
+    --border-pager-hover: #55484A;
+    --border-cancel: #453A3B;
+
+    /* Brand / links / soft icons */
+    --brand: #E2B4BD;
+    --link: #E2B4BD;
+    --icon-soft: #7C7676;
+
+    /* Text */
+    --text-ink: #F4E6E4;
+    --text-body: #E8D8D6;
+    --text-muted: #B3A9A9;
+    --text-muted-2: #B3A9A9;
+    --text-label: #B3A9A9;
+    --text-placeholder: #7C7676;
+    --text-placeholder-2: #7C7676;
+    --text-disabled: #7C7676;
+
+    /* Buttons */
+    --btn-primary-bg: #E2B4BD;
+    --btn-primary-bg-hover: #EDC7CF;
+    --btn-primary-bg-hover-soft: #D8A3AC;
+    --btn-primary-text: #2B1A1F;
+    --btn-accent: #E2B4BD;
+    --btn-accent-contrast: #2B1A1F;
+    --btn-cancel-text: #F4E6E4;
+
+    /* Status (tinted: bg = status color at ~16% alpha, text = status color) */
+    --status-success: #ADC7AD;
+    --status-warning: #E5C07B;
+    --status-danger: #E38B8B;
+    --status-warning-dot: #E5C07B;
+    --status-dot-draft: #7C7676;
+    --pill-success-bg: rgba(173, 199, 173, 0.16);
+    --pill-success-border: rgba(173, 199, 173, 0.45);
+    --pill-warning-bg: rgba(229, 192, 123, 0.16);
+    --pill-danger-bg: rgba(227, 139, 139, 0.16);
+    --pill-danger-border: rgba(227, 139, 139, 0.45);
+    --bg-error-soft: rgba(227, 139, 139, 0.12);
+    --border-error-soft: rgba(227, 139, 139, 0.4);
+    --pill-primary-bg: rgba(226, 180, 189, 0.16);
+    --pill-primary-text: #E2B4BD;
+    --pill-primary-bg-hover: rgba(226, 180, 189, 0.22);
+    --hover-rose: rgba(226, 180, 189, 0.12);
+    --hover-rose-text: #E2B4BD;
+
+    /* Dashboard hero card */
+    --hero-bg: linear-gradient(135deg, #2A2024, #3A2632);
+    --hero-border: #4A3540;
+    /* Chip bg: more opaque in dark so text-muted (#B3A9A9) clears 4.5:1.
+       rgba(255,255,255,0.12) over ~#3A2632 → effective #3E2D38 → ~4.8:1 AA ✓ */
+    --hero-chip-bg: rgba(255, 255, 255, 0.12);
+
+    /* Sidebar collapsed tooltips —
+       #F4E6E4 on #2A2324 → 11.2:1 AA ✓ */
+    --tooltip-bg: #2A2324;
+    --tooltip-text: #F4E6E4;
+    --tooltip-border: #3A3132;
+
+    /* Hero icon buttons */
+    --icon-btn-bg: rgba(255, 255, 255, 0.04);
+    --icon-btn-border: #3A3132;
+    --icon-btn-hover: rgba(255, 255, 255, 0.08);
+
+    /* Seller sidebar (dark) */
+    --sidebar-bg: #1B1516;
+    --sidebar-border: #332A2B;
+    --sidebar-text: #F0DEDC;
+    --sidebar-muted: #B3A9A9;
+    --sidebar-hover: rgba(226, 180, 189, 0.08);
+    --sidebar-active-bg: rgba(226, 180, 189, 0.14);
+    --sidebar-active-text: #E2B4BD;
+    --sidebar-active-border: rgba(226, 180, 189, 0.35);
+}
+
+/* Print views (waybill/packing slip) must force light tokens:
+   @media print { html[data-theme] { ...light tokens } } */
+@media print {
+    html[data-theme="dark"] {
+        color-scheme: light;
+        --bg-page: var(--color-primary-50);
+        --bg-surface: #ffffff;
+        --bg-raised: #fbf9f7;
+        --bg-dim: #fbfaf9;
+        --bg-soft: #faf2f1;
+        --bg-thumb: #faf8f5;
+        --bg-chip: #f4f1ee;
+        --overlay: rgba(0, 0, 0, 0.55);
+        --border: #ece8e2;
+        --border-strong: #e8e6e6;
+        --border-hairline: #f3f2f2;
+        --border-faint: #f2eee9;
+        --border-row: #f4f1ec;
+        --border-input: #e6e0d9;
+        --border-btn-outline: #e2dcd4;
+        --border-btn-outline-hover: #c9c0b8;
+        --border-pager-hover: #d8d0c8;
+        --border-cancel: #d4d1d1;
+        --brand: #c07a85;
+        --link: #8b4a55;
+        --icon-soft: #6b916b;
+        --text-ink: #1f1b1a;
+        --text-body: #37312d;
+        --text-muted: #7c7676;
+        --text-muted-2: #6f6862;
+        --text-label: #4f4446;
+        --text-placeholder: #a9a19a;
+        --text-placeholder-2: #9c948c;
+        --text-disabled: #b8b0a8;
+        --btn-primary-bg: #111111;
+        --btn-primary-bg-hover: #2b2622;
+        --btn-primary-bg-hover-soft: #79545c;
+        --btn-primary-text: #ffffff;
+        --btn-accent: #79545c;
+        --btn-accent-contrast: #ffffff;
+        --status-success: #2f5c3a;
+        --status-warning: #9a6a1f;
+        --status-danger: #a5333d;
+        --status-warning-dot: #d9a441;
+        --status-dot-draft: #a9a4a4;
+        --pill-success-bg: #eaf3ec;
+        --pill-success-border: #a8cdb0;
+        --pill-warning-bg: #fbf3dd;
+        --pill-danger-bg: #fbe9e7;
+        --pill-danger-border: #e8a49c;
+        --bg-error-soft: #fdf3f3;
+        --border-error-soft: #f0c9cc;
+        --pill-primary-bg: #fbeaed;
+        --pill-primary-text: #9c5c68;
+        --pill-primary-bg-hover: rgba(156, 92, 104, 0.16);
+        --hover-rose: #f6dee2;
+        --hover-rose-text: #7a4550;
+        --sidebar-bg: #F5E5E3;
+        --sidebar-border: #E0C8CB;
+        --sidebar-text: #2E1C24;
+        --sidebar-muted: #5A414A;
+        --sidebar-hover: #EBD3D1;
+        --sidebar-active-bg: #4A3036;
+        --sidebar-active-text: #F5E5E3;
+        --sidebar-active-border: #4A3036;
+    }
+}
+
+/* Theme transitions: enabled ONLY after first paint (the toggle JS adds
+   .zf-theme-ready on the next frame) and never for reduced-motion users. */
+@media (prefers-reduced-motion: no-preference) {
+    html.zf-theme-ready .seller-body,
+    html.zf-theme-ready .seller-body * {
+        transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+    }
+}
+
+/* Dark sidebar active item: 1px rose ring on top of the tinted pill
+   (screenshot 1). Box-shadow only — no geometry change. */
+html[data-theme="dark"] #sellerSidebar a.is-active {
+    box-shadow: inset 0 0 0 1px var(--sidebar-active-border);
+}
+
+/* Dark focus ring on seller surfaces. */
+html[data-theme="dark"] #sellerSidebar a:focus-visible,
+html[data-theme="dark"] .seller-body button:focus-visible,
+html[data-theme="dark"] .seller-body a:focus-visible,
+html[data-theme="dark"] .seller-body input:focus-visible,
+html[data-theme="dark"] .seller-body select:focus-visible,
+html[data-theme="dark"] .seller-body textarea:focus-visible {
+    outline-color: var(--brand);
+}
+
+/* Theme toggle icon swap (moon in light mode, sun in dark mode). */
+.zf-theme-toggle .zf-icon-sun { display: none; }
+html[data-theme="dark"] .zf-theme-toggle .zf-icon-sun { display: block; }
+html[data-theme="dark"] .zf-theme-toggle .zf-icon-moon { display: none; }
+
+/* ======================================================================
+   Dashboard Hero Card — sp- prefixed, token-only colors.
+   No hardcoded hex values; dark mode works via the token swap above.
+   ====================================================================== */
+
+.sp-hero {
+    background: var(--hero-bg);
+    border: 1px solid var(--hero-border);
+    border-radius: 20px;
+    padding: 28px 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.sp-hero__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.sp-hero__heading {
+    font-family: var(--font-serif);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text-ink);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.sp-hero__subtitle {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.sp-hero__date-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--hero-chip-bg);
+    border: 1px solid var(--hero-border);
+    border-radius: 8px;
+    padding: 5px 10px;
+    width: fit-content;
+}
+
+.sp-hero__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.sp-icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--icon-btn-border);
+    background: var(--icon-btn-bg);
+    color: var(--text-ink);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.sp-icon-btn:hover {
+    background: var(--icon-btn-hover);
+}
+
+.sp-icon-btn:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+
+/* Theme-toggle icon swap inside hero (mirrors theme.css rules for sidebar) */
+.sp-icon-btn.zf-theme-toggle .zf-icon-sun { display: none; }
+html[data-theme="dark"] .sp-icon-btn.zf-theme-toggle .zf-icon-sun { display: block; }
+html[data-theme="dark"] .sp-icon-btn.zf-theme-toggle .zf-icon-moon { display: none; }
+
+/* Notification bell badge */
+.sp-bell-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--status-danger);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 9.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    pointer-events: none;
+    line-height: 1;
+}
+
+/* Notification dropdown */
+.sp-notif-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 340px;
+    max-height: 420px;
+    overflow-y: auto;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+}
+
+.sp-notif-dropdown__header {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-ink);
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border-strong);
+    flex-shrink: 0;
+}
+
+.sp-notif-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-hairline);
+}
+
+.sp-notif-item:last-child {
+    border-bottom: none;
+}
+
+.sp-notif-item__title {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-ink);
+}
+
+.sp-notif-item__message {
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.sp-notif-item__time {
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.sp-notif-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 36px 24px;
+    text-align: center;
+}
+
+.sp-notif-empty__title {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-ink);
+}
+
+.sp-notif-empty__sub {
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+/* Responsive: ≤720px */
+@media (max-width: 720px) {
+    .sp-hero {
+        flex-direction: column;
+        padding: 20px;
+    }
+
+    .sp-hero__toolbar {
+        order: -1;
+        align-self: flex-end;
+    }
+
+    .sp-hero__heading {
+        font-size: 26px;
+    }
+
+    .sp-notif-dropdown {
+        width: calc(100vw - 24px);
+        right: -12px;
+        left: auto;
+    }
+}
+
+/* Reduced-motion: disable hero transitions */
+@media (prefers-reduced-motion: reduce) {
+    .sp-hero,
+    .sp-icon-btn,
+    .sp-notif-dropdown {
+        transition: none !important;
+    }
+}
+
+/* 150ms transitions on hero interactive elements (when theme-ready) */
+@media (prefers-reduced-motion: no-preference) {
+    html.zf-theme-ready .sp-hero,
+    html.zf-theme-ready .sp-icon-btn,
+    html.zf-theme-ready .sp-notif-dropdown {
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+}
+
+/* ======================================================================
+   Sidebar collapsed rail — overflow guard
+   The <aside> already has overflow:hidden via Tailwind; this makes it
+   explicit on the x-axis so no label text can bleed horizontally at 360px.
+   ====================================================================== */
+#sellerSidebar {
+    overflow-x: hidden;
+}
+
+/* ======================================================================
+   Sidebar tooltip (sp-tooltip)
+   Appended to <body> by sidebar-tooltips.js; position:fixed so the
+   sidebar's overflow:hidden cannot clip it.
+   aria-hidden="true" — accessible names come from aria-label on each item.
+   ====================================================================== */
+.sp-tooltip {
+    position: fixed;
+    z-index: 200;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    border: 1px solid var(--tooltip-border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    /* Vertically centre on the anchor item */
+    transform: translateY(-50%);
+    /* Hidden by default */
+    opacity: 0;
+    visibility: hidden;
+}
+
+.sp-tooltip--visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 150ms fade-in, disabled under prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+    .sp-tooltip {
+        transition: opacity 150ms ease, visibility 150ms ease;
+    }
+}
+
+/* Touch-only devices: tooltips are suppressed in JS, but also hide via CSS
+   as a belt-and-suspenders guard. */
+@media (hover: none) {
+    .sp-tooltip {
+        display: none !important;
+    }
+}
