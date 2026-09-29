@@ -1,0 +1,11 @@
+# Local agent/IDE state — not project source
+.cline/
+
+# Root-level screenshots from design-review passes
+/flutter_*.png
+
+# Stray export of mobile/lib/ (0.2 MB, referenced nowhere); lib/ is the source of truth
+/mobile/lib.zip
+
+# Golden-test diff output — Flutter writes these on failure
+/mobile/test/failures/
