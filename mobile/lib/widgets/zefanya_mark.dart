@@ -50,12 +50,16 @@ class ZefanyaMark extends StatelessWidget {
   const ZefanyaMark({
     super.key,
     this.size = 28,
-    this.color = AppColors.primaryDark,
+    this.color,
     this.strokeWidth = 5,
   });
 
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted: the palette resolves at runtime now,
+  /// so a default argument can't reference it. Falls back to
+  /// [AppColors.primaryDark] in the painter below.
+  final Color? color;
   final double strokeWidth;
 
   @override
@@ -64,7 +68,11 @@ class ZefanyaMark extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _MarkPainter(progress: 1, color: color, strokeWidth: strokeWidth),
+        painter: _MarkPainter(
+          progress: 1,
+          color: color ?? AppColors.primaryDark,
+          strokeWidth: strokeWidth,
+        ),
       ),
     );
   }
@@ -75,12 +83,14 @@ class ZefanyaLoader extends StatefulWidget {
   const ZefanyaLoader({
     super.key,
     this.size = 34,
-    this.color = AppColors.primaryDark,
+    this.color,
     this.strokeWidth = 5,
   });
 
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted — see [ZefanyaMark.color].
+  final Color? color;
   final double strokeWidth;
 
   @override
@@ -128,7 +138,7 @@ class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProvider
     if (_reduced) {
       return ZefanyaMark(
         size: widget.size,
-        color: widget.color,
+        color: widget.color ?? AppColors.primaryDark,
         strokeWidth: widget.strokeWidth,
       );
     }
@@ -142,7 +152,7 @@ class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProvider
           return CustomPaint(
             painter: _MarkPainter(
               progress: _progressFor(_controller.value),
-              color: widget.color,
+              color: widget.color ?? AppColors.primaryDark,
               strokeWidth: widget.strokeWidth,
               // Retraction eats the path from the start, so the stroke
               // travels rather than just shrinking in place.
@@ -167,13 +177,15 @@ class ZefanyaMarkTrace extends StatelessWidget {
     super.key,
     required this.progress,
     this.size = 34,
-    this.color = AppColors.primaryDark,
+    this.color,
     this.strokeWidth = 5,
   });
 
   final double progress;
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted — see [ZefanyaMark.color].
+  final Color? color;
   final double strokeWidth;
 
   @override
@@ -184,7 +196,7 @@ class ZefanyaMarkTrace extends StatelessWidget {
       child: CustomPaint(
         painter: _MarkPainter(
           progress: progress.clamp(0.0, 1.0),
-          color: color,
+          color: color ?? AppColors.primaryDark,
           strokeWidth: strokeWidth,
         ),
       ),

@@ -41,9 +41,10 @@ import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
-import '../buyer/widgets/product_card.dart' show ProductImage, productTint;
+import '../buyer/widgets/product_card.dart' show ProductImage;
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
+import '../../widgets/theme_toggle.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
 /// name/email/phone/address from the shared AuthState and edits them
@@ -91,6 +92,10 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 26),
+            Text('APPEARANCE', style: AppType.eyebrow),
+            const SizedBox(height: 12),
+            const ThemeToggle(),
+            const SizedBox(height: 26),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -116,7 +121,7 @@ class ProfileScreen extends StatelessWidget {
       // Asymmetric corners instead of the old uniform heroRadius — the
       // one feature surface on this screen picks up the same "leaf"
       // shape language as Home's cover story and feature tiles.
-      borderRadius: editorialRadius(0, big: ext.heroRadius * 1.4, small: 8),
+      borderRadius: editorialRadiusRaw(0, big: ext.heroRadius * 1.4, small: 8),
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
         decoration: BoxDecoration(
@@ -189,7 +194,7 @@ class ProfileScreen extends StatelessWidget {
                       onPressed: () => Navigator.of(context).push(
                         AppPageRoute(builder: (_) => const EditProfileScreen()),
                       ),
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.textOnDark),
+                      icon: Icon(Icons.edit_outlined, color: AppColors.textOnDark),
                       tooltip: 'Edit Profile',
                     ),
                   ],
@@ -243,8 +248,8 @@ class ProfileScreen extends StatelessWidget {
             bottom: -4,
             child: Container(
               padding: const EdgeInsets.all(5),
-              decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-              child: const Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
+              decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+              child: Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
             ),
           ),
         ],
@@ -264,7 +269,7 @@ class ProfileScreen extends StatelessWidget {
       errorBuilder: (context, error, stackTrace) => Container(
         color: AppColors.tertiary,
         alignment: Alignment.center,
-        child: const Icon(Icons.person, color: AppColors.textOnDark, size: 30),
+        child: Icon(Icons.person, color: AppColors.textOnLight, size: 30),
       ),
     );
   }
@@ -383,6 +388,13 @@ class _StatStrip extends StatelessWidget {
 /// Buyer-only. Same rule RecentlyViewedRail set: if there's no real
 /// history, this renders nothing rather than showing a placeholder —
 /// an empty "here's what you've been up to" is worse than no section.
+///
+/// Deliberately does NOT filter out what's already been bought, unlike
+/// Home's "pick up where you left off" rail (see `unpurchased` in
+/// recently_viewed_rail.dart). This one is a *record* of what this person
+/// looked at; a record that quietly edited out the purchases would be a
+/// worse lie than a slightly redundant strip. The merchandising surface
+/// filters because it's making a suggestion. A history doesn't.
 class _RecentlyLookedAt extends StatelessWidget {
   const _RecentlyLookedAt();
 
@@ -415,15 +427,11 @@ class _RecentlyLookedAt extends StatelessWidget {
                   // Alternating lean, same as any other row of these —
                   // a line of identical shapes is a uniform pattern
                   // again, which is what editorialRadius exists to break.
-                  borderRadius: editorialRadius(i, big: 20, small: 5),
+                  borderRadius: editorialRadius(i, ShapeTier.accent),
                   child: SizedBox(
                     width: 74,
                     height: 96,
-                    child: ProductImage(
-                      productId: product.id,
-                      tint: productTint(product.category),
-                      iconSize: 24,
-                    ),
+                    child: ProductImage(product: product, iconSize: 24),
                   ),
                 ),
               );
@@ -460,7 +468,7 @@ class _LedgerCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(left: BorderSide(color: AppColors.divider, width: 2)),
       ),
       child: Column(
@@ -469,7 +477,7 @@ class _LedgerCard extends StatelessWidget {
           for (var i = 0; i < rows.length; i++) ...[
             _rowTile(theme, rows[i]),
             if (i < rows.length - 1)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 14),
                 child: Divider(height: 1, color: AppColors.divider),
               ),

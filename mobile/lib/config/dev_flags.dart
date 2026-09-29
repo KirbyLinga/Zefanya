@@ -36,3 +36,49 @@ const bool kShowDevTools = bool.fromEnvironment(
   'zefanya.devTools',
   defaultValue: kDebugMode,
 );
+
+// ---------------------------------------------------------------------------
+// Backend mode
+// ---------------------------------------------------------------------------
+//
+// Which side of the mock/real boundary the app runs on. This is the ONE
+// switch; every repository choice reads it (see data/repositories/
+// repositories.dart) and nothing else in the app is allowed to ask "are we
+// online?" — a screen that branches on the backend mode would have two
+// behaviours to keep in step forever.
+//
+// Default is **off**, which means mock. That default is load-bearing rather
+// than a convenience: the Laravel API does not exist yet (no Sanctum, no
+// routes/api.php — see docs/api-contract.md), so a build that defaulted to
+// live would be a build that cannot run. Turning it on is a deliberate act:
+//
+//   flutter run --dart-define=zefanya.useLiveApi=true \
+//               --dart-define=zefanya.apiBaseUrl=https://api.example.test/api
+//
+// Compile-time rather than runtime so the mock data and the mock
+// repositories are tree-shaken out of a live release build, and so a live
+// build cannot be switched back to mock by editing a config file on a
+// device.
+const bool kUseLiveApi = bool.fromEnvironment(
+  'zefanya.useLiveApi',
+  defaultValue: false,
+);
+
+/// Base URL of the Laravel API, including the `/api` prefix.
+///
+/// Empty when unset. [ApiClient] treats an empty base URL as a configuration
+/// error and throws *before* any request rather than sending one to a
+/// relative path that would silently resolve against nothing.
+///
+/// Note there is no default pointing at a dev host: a hardcoded default would
+/// make "point it at staging" a code change, and it would be the one string
+/// most likely to get committed by accident.
+const String kApiBaseUrl = String.fromEnvironment('zefanya.apiBaseUrl');
+
+/// Whether the API config is complete enough to attempt a request.
+///
+/// Separate from [kUseLiveApi] because the two failures are different and
+/// deserve different messages: "the backend isn't wired up" (expected, mock
+/// mode) versus "you asked for live mode but didn't say where the API is"
+/// (a misconfiguration someone has to fix).
+bool get isApiConfigured => kUseLiveApi && kApiBaseUrl.isNotEmpty;

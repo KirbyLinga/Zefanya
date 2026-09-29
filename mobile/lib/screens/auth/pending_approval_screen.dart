@@ -198,7 +198,7 @@ class PendingApprovalScreen extends StatelessWidget {
           Container(
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
           // "Pending Verification" implies verification is underway,
@@ -223,7 +223,7 @@ class _WaitingArch extends StatelessWidget {
       child: Container(
         width: 132,
         height: 168,
-        color: AppColors.secondary,
+        color: AppColors.surfaceMuted,
         alignment: Alignment.center,
         child: const ZefanyaLoader(size: 52, strokeWidth: 5),
       ),

@@ -104,14 +104,14 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
           // Matches the real card's asymmetric corners, same reasoning as
           // the buyer grid's skeletons: shape shouldn't visibly change
           // when content replaces it.
-          decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: editorialRadius(i, big: 28, small: 8)),
+          decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: editorialRadius(i, ShapeTier.card)),
         ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return const EmptyState(
+    return EmptyState(
       icon: Icons.inbox_outlined,
       title: 'No pickups assigned right now',
       subtitle: 'Pull down to refresh',

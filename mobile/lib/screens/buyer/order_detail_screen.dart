@@ -20,6 +20,7 @@ import '../../data/mock_data.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
+import 'widgets/review_button.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../shared/chat_screen.dart';
 import 'courier_tracker_screen.dart';
@@ -36,12 +37,15 @@ class OrderDetailScreen extends StatelessWidget {
     OrderStatus.toRate: 'Delivered',
   };
 
-  static const _statusColors = {
-    OrderStatus.toShip: AppColors.neutral,
-    OrderStatus.inTransit: AppColors.warning,
-    OrderStatus.outForDelivery: AppColors.primaryDark,
-    OrderStatus.toRate: AppColors.tertiary,
-  };
+  // Resolved per call rather than cached in a `static const` map: warning
+  // and primaryDark have a different value in each mode, and a const map
+  // would freeze whichever mode happened to be active at first touch.
+  static Map<OrderStatus, Color> get _statusColors => {
+        OrderStatus.toShip: AppColors.neutral,
+        OrderStatus.inTransit: AppColors.warning,
+        OrderStatus.outForDelivery: AppColors.primaryDark,
+        OrderStatus.toRate: AppColors.tertiary,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +65,7 @@ class OrderDetailScreen extends StatelessWidget {
           children: [
             // ---- Receipt card ------------------------------------
             ClipRRect(
-              borderRadius: editorialRadius(0, tier: EditorialTier.card),
+              borderRadius: editorialRadius(0, ShapeTier.card),
               child: Container(
                 color: AppColors.surfaceMuted,
                 child: Column(
@@ -72,9 +76,9 @@ class OrderDetailScreen extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                       child: Row(
                         children: [
-                          const CircleAvatar(
+                          CircleAvatar(
                             radius: 18,
-                            backgroundColor: AppColors.secondary,
+                            backgroundColor: AppColors.surface,
                             child: Icon(Icons.storefront_outlined,
                                 size: 18, color: AppColors.primaryDark),
                           ),
@@ -95,7 +99,7 @@ class OrderDetailScreen extends StatelessWidget {
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: radiusOf(ShapeTier.pill),
                             ),
                             child: Text(
                               _statusLabels[order.status]!,
@@ -122,7 +126,7 @@ class OrderDetailScreen extends StatelessWidget {
                           const SizedBox(height: 6),
                           // ETA
                           _receiptLine(theme, 'Estimated Arrival', order.eta,
-                              valueColor: AppColors.primaryDark,
+                              valueColor: AppColors.accent,
                               valueBold: true),
                           if (milestone != null) ...[
                             const SizedBox(height: 6),
@@ -209,7 +213,7 @@ class _ActionCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(1, tier: EditorialTier.card),
+        borderRadius: editorialRadius(1, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -226,11 +230,7 @@ class _ActionCard extends StatelessWidget {
           ),
           if (order.status == OrderStatus.toRate) ...[
             const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.star_border, size: 16),
-              label: const Text('Leave a Review'),
-            ),
+            ReviewButton(order: order),
           ],
           if (order.status == OrderStatus.inTransit ||
               order.status == OrderStatus.outForDelivery) ...[
@@ -278,7 +278,7 @@ class _MilestoneTimeline extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(0, tier: EditorialTier.card),
+        borderRadius: editorialRadius(0, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,7 +325,7 @@ class _MilestoneTimeline extends StatelessWidget {
                     ),
                   ),
                   child: done && !active
-                      ? const Icon(Icons.check,
+                      ? Icon(Icons.check,
                           size: 8, color: AppColors.textOnDark)
                       : null,
                 ),

@@ -122,7 +122,17 @@ class _ChatScreenState extends State<ChatScreen> {
   // Deterministic per-contact color so different threads are visually
   // distinguishable instead of every avatar being the same flat sage
   // circle regardless of who you're talking to.
-  static const _avatarPalette = [AppColors.tertiary, AppColors.primary, AppColors.primaryDark, AppColors.secondary];
+  // Four mode-invariant pastels, because the initial on top of them is
+  // dark ink now: a light fill needs a dark initial. primaryDark used to
+  // be in this list, and it's a *dark* fill — so whichever thread hashed
+  // to it had near-white initials at 1.6:1 in light mode, and would have
+  // had near-black ones at the same ratio in dark.
+  static List<Color> get _avatarPalette => [
+        AppColors.tertiary,
+        AppColors.primary,
+        AppColors.secondary,
+        Color.lerp(AppColors.secondary, AppColors.tertiary, 0.5)!,
+      ];
 
   Color _avatarColorFor(String name) => _avatarPalette[name.hashCode.abs() % _avatarPalette.length];
 
@@ -143,16 +153,22 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 38,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                // Lightened, not darkened. The old gradient lerped toward
+                // black, which ate exactly the contrast the dark initial
+                // needs; a sheen toward white keeps the dimension and helps
+                // the ink instead of fighting it.
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [avatarColor, Color.lerp(avatarColor, Colors.black, 0.3)!],
+                  colors: [Color.lerp(avatarColor, Colors.white, 0.3)!, avatarColor],
                 ),
               ),
               alignment: Alignment.center,
               child: Text(
                 widget.contactName.isNotEmpty ? widget.contactName[0].toUpperCase() : '?',
-                style: const TextStyle(color: AppColors.textOnDark, fontWeight: FontWeight.w700),
+                // Dark ink, because every colour in _avatarPalette is a
+                // light pastel — see the note there.
+                style: TextStyle(color: AppColors.textOnLight, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 10),
@@ -227,7 +243,7 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: const Border(top: BorderSide(color: AppColors.divider)),
+        border: Border(top: BorderSide(color: AppColors.divider)),
         boxShadow: [
           BoxShadow(color: AppColors.neutral.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, -3)),
         ],
@@ -255,12 +271,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Container(
                   width: 42,
                   height: 42,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.primaryDark,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(Icons.send_rounded, size: 18, color: AppColors.textOnDark),
+                  child: Icon(Icons.send_rounded, size: 18, color: AppColors.textOnDark),
                 ),
               ),
             ),
@@ -397,7 +413,7 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
                     child: Container(
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryDark),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryDark),
                     ),
                   ),
                 ),

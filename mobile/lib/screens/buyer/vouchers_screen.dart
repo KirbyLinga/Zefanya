@@ -24,7 +24,9 @@
 //      read as a stub rather than a colored rectangle with text in it.
 
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
+import 'package:provider/provider.dart';
+import '../../state/cart_state.dart';
+import '../../data/mock_data.dart' show Voucher;
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -38,6 +40,11 @@ class VouchersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The catalogue is the repository's answer, reached through the cart state
+    // that loaded it — not a local constant, so a live build cannot show a
+    // wallet of vouchers the server never offered.
+    final vouchers = context.watch<CartState>().vouchers;
+
     return Scaffold(
       backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
       // Title out of the AppBar and into the app's own eyebrow +
@@ -45,7 +52,7 @@ class VouchersScreen extends StatelessWidget {
       appBar: AppBar(),
       body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-        itemCount: mockVouchers.length + 1,
+        itemCount: vouchers.length + 1,
         itemBuilder: (context, i) {
           if (i == 0) {
             return const EditorialHeader(
@@ -57,7 +64,7 @@ class VouchersScreen extends StatelessWidget {
           final index = i - 1;
           return StaggeredReveal(
             index: index,
-            child: _VoucherTile(voucher: mockVouchers[index], index: index),
+            child: _VoucherTile(voucher: vouchers[index], index: index),
           );
         },
       ),

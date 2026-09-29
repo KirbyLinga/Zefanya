@@ -3,9 +3,15 @@
 // Custom stroke-drawn icons for the bottom nav — the single most-
 // repeated icon surface in the app, seen on every screen, every
 // session. Everywhere else still uses Material Icons; this is scoped
-// deliberately narrow (5 icons, all geometrically simple and forgiving
+// deliberately narrow (8 icons, all geometrically simple and forgiving
 // to hand-code without a live render to check against) rather than
 // attempting a full icon set blind.
+//
+// The courier set (parcel / scooter / peso) was added late, and that
+// lateness was the tell: the buyer's four tabs had hand-drawn glyphs and
+// the courier's four were still stock Material outlines, so the two roles
+// were visibly two different apps on the most-seen surface in either of
+// them. Profile is shared — it's the same person, from two sides.
 //
 // Same drawing language as widgets/zefanya_mark.dart: stroke only, no
 // fill, round caps/joins, paths normalized to a 100x100 box. "Active"
@@ -17,7 +23,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-enum NavGlyph { home, search, categories, orders, profile }
+enum NavGlyph { home, search, categories, orders, profile, parcel, scooter, peso }
 
 List<Path> _pathsFor(NavGlyph glyph, Size size) {
   final s = size.shortestSide / 100;
@@ -90,6 +96,72 @@ List<Path> _pathsFor(NavGlyph glyph, Size size) {
         ..moveTo(p(22, 84).dx, p(22, 84).dy)
         ..quadraticBezierTo(p(50, 46).dx, p(50, 46).dy, p(78, 84).dx, p(78, 84).dy);
       return [head, shoulders];
+
+    // ── Courier set ───────────────────────────────────────────────────
+    //
+    // Both of these went through a rendered comparison before being kept —
+    // see test/nav_glyphs_golden_test.dart, which exists so the next person
+    // can do the same rather than taking the path data on faith.
+
+    case NavGlyph.parcel:
+      // A box with its lid folded open.
+      //
+      // The first version was a box with a lid line *and* a tape line, and
+      // at 20px it read as a window: two crossing lines inside a rectangle
+      // is the universal "layout/table" icon, and it sat one tab away from
+      // categories' four squares. The fold is the thing that makes it a box
+      // rather than a pane, and it also happens to mean "waiting to be
+      // collected", which is what this tab is.
+      final box = Path()
+        ..addRRect(RRect.fromRectAndRadius(
+          Rect.fromLTWH(p(20, 32).dx, p(20, 32).dy, 60 * s, 50 * s),
+          Radius.circular(5 * s),
+        ));
+      final lid = Path()
+        ..moveTo(p(20, 48).dx, p(20, 48).dy)
+        ..lineTo(p(50, 36).dx, p(50, 36).dy)
+        ..lineTo(p(80, 48).dx, p(80, 48).dy);
+      return [box, lid];
+
+    case NavGlyph.scooter:
+      // Two wheels, a rising deck and a steering column with a bar. Same
+      // two-wheeler motif the promo carousel already uses for this
+      // delivery story, drawn in the app's own stroke language. This one
+      // read correctly first time in the render, so it's unchanged.
+      final rearWheel = Path()..addOval(Rect.fromCircle(center: p(28, 72), radius: 11 * s));
+      final frontWheel = Path()..addOval(Rect.fromCircle(center: p(68, 72), radius: 11 * s));
+      final deck = Path()
+        ..moveTo(p(28, 72).dx, p(28, 72).dy)
+        ..lineTo(p(50, 60).dx, p(50, 60).dy)
+        ..lineTo(p(68, 60).dx, p(68, 60).dy);
+      final column = Path()
+        ..moveTo(p(68, 60).dx, p(68, 60).dy)
+        ..lineTo(p(60, 30).dx, p(60, 30).dy);
+      final bar = Path()
+        ..moveTo(p(50, 30).dx, p(50, 30).dy)
+        ..lineTo(p(70, 30).dx, p(70, 30).dy);
+      return [rearWheel, frontWheel, deck, column, bar];
+
+    case NavGlyph.peso:
+      // The peso sign itself, drawn large: stem, bowl, and the crossbar that
+      // is the only difference between ₱ and P.
+      //
+      // The first version was a coin stack, on the theory that a ₱ collapses
+      // at nav size. Rendered, it was the coin stack that failed — it read
+      // as a can, or a database icon, at every size — while the ₱ held at
+      // 20px because it's drawn out to ~72% of the box with a single
+      // crossbar (two bars would merge into one thick line at that size).
+      final stem = Path()
+        ..moveTo(p(34, 88).dx, p(34, 88).dy)
+        ..lineTo(p(34, 16).dx, p(34, 16).dy);
+      final bowl = Path()
+        ..moveTo(p(34, 18).dx, p(34, 18).dy)
+        ..quadraticBezierTo(p(70, 18).dx, p(70, 18).dy, p(70, 38).dx, p(70, 38).dy)
+        ..quadraticBezierTo(p(70, 56).dx, p(70, 56).dy, p(34, 56).dx, p(34, 56).dy);
+      final crossbar = Path()
+        ..moveTo(p(20, 62).dx, p(20, 62).dy)
+        ..lineTo(p(80, 62).dx, p(80, 62).dy);
+      return [stem, bowl, crossbar];
   }
 }
 
@@ -98,13 +170,17 @@ class NavIcon extends StatelessWidget {
     super.key,
     required this.glyph,
     this.size = 20,
-    this.color = AppColors.textSecondary,
+    this.color,
     this.strokeWidth = 2.0,
   });
 
   final NavGlyph glyph;
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted: the palette resolves at runtime now,
+  /// and a default argument has to be const. Falls back to
+  /// [AppColors.textSecondary] at paint time.
+  final Color? color;
   final double strokeWidth;
 
   @override
@@ -113,7 +189,7 @@ class NavIcon extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _NavIconPainter(glyph: glyph, color: color, strokeWidth: strokeWidth),
+        painter: _NavIconPainter(glyph: glyph, color: color ?? AppColors.textSecondary, strokeWidth: strokeWidth),
       ),
     );
   }

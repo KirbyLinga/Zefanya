@@ -7,19 +7,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/pricing.dart';
+import '../../data/api/api_exception.dart';
+import '../../data/mock_data.dart' show Order;
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/timed_snackbar.dart';
 import '../shared/edit_profile_screen.dart';
+import 'courier_tracker_screen.dart';
+import 'widgets/order_confirmation_dialog.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 import '../../widgets/editorial_shapes.dart';
-import '../../widgets/success_flourish.dart';
 
 enum PaymentMethod { cod, eWallet }
 
@@ -85,13 +89,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     setState(() => _isPlacingOrder = true);
 
-    // TODO: replace with a real "place order" API call.
-    await Future.delayed(const Duration(milliseconds: 700));
+    // Placing an order is now a real repository write (see
+    // OrderRepository.place), so the artificial delay that used to stand in for
+    // a network call is gone: it was simulating the thing that now actually
+    // happens, and leaving it in would add 700ms to every real request. In mock
+    // mode the write is local and instant, which is the honest behaviour.
+    final List<Order> placed;
+    try {
+      // Order first, then clear: placeOrders reads the selected lines, and
+      // clearSelected() removes them from the cart.
+      placed = await context.read<OrderState>().placeOrders(selectedItems);
+    } on ApiException catch (error) {
+      // The cart is deliberately NOT cleared on failure — a checkout that
+      // emptied the cart and then failed to place the order would be the worst
+      // possible outcome, because the buyer would have nothing left to retry
+      // with.
+      if (!mounted) return;
+      setState(() => _isPlacingOrder = false);
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(error.message),
+          persist: false,
+          action: error.isRetryable
+              ? SnackBarAction(
+                  label: 'Retry',
+                  onPressed: () => _placeOrder(selectedItems, total),
+                )
+              : null,
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
 
-    // Order first, then clear: placeOrders reads the selected lines, and
-    // clearSelected() removes them from the cart.
-    final placed = context.read<OrderState>().placeOrders(selectedItems);
     // One delivery job per order, landing on the courier's Pickup tab.
     // The courier is paid the standard fee whether or not the buyer's
     // shipping was free (the platform absorbs it). One fee per checkout,
@@ -110,14 +141,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _isPlacingOrder = false);
 
     if (!mounted) return;
+
+    // Guaranteed non-empty above (an empty selection returns before this), but
+    // the confirmation's primary action dereferences the first order, so it's
+    // worth not being able to crash on a confirmation screen.
+    if (placed.isEmpty) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+
+    // Captured before anything pops. After the dialog closes and the checkout
+    // route unwinds, `context` here is defunct — but the NavigatorState is
+    // still perfectly valid, and it's what has to carry the buyer onward.
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => _OrderConfirmationDialog(
+      builder: (_) => OrderConfirmationDialog(
+        orders: placed,
         total: total,
+        // Opens the same tracker the Orders tab pushes, for the order this
+        // checkout just created. Push *after* unwinding, so the buyer ends on
+        // [root, tracker] rather than a tracker buried under checkout.
+        onTrack: () {
+          navigator.pop(); // close the dialog
+          navigator.popUntil((route) => route.isFirst);
+          navigator.push(
+            AppPageRoute(builder: (_) => CourierTrackerScreen(order: placed.first)),
+          );
+        },
         onDone: () {
-          Navigator.of(context).pop(); // close dialog
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          navigator.pop(); // close the dialog
+          navigator.popUntil((route) => route.isFirst);
         },
       ),
     );
@@ -171,7 +227,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // product cards, cart tiles, and order cards. Four identical
         // uniform-radius surfaces stacked vertically reads as a flat
         // block, not four individual cards.
-        borderRadius: editorialRadius(index, big: 22, small: 8),
+        borderRadius: editorialRadius(index, ShapeTier.card),
         border: accentColor != null
             ? Border(left: BorderSide(color: accentColor, width: 3))
             : null,
@@ -466,59 +522,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ElevatedButton(
               onPressed: _isPlacingOrder ? null : () => _placeOrder(selectedItems, total),
               child: _isPlacingOrder
-                  ? const ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
+                  ? ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
                   : const Text('Place Order'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OrderConfirmationDialog extends StatelessWidget {
-  const _OrderConfirmationDialog({required this.total, required this.onDone});
-
-  final double total;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Dialog(
-      // Was a plain circular-radius rectangle — asymmetric corners now,
-      // same shape language as everywhere else, on the screen where a
-      // plain rectangle had been quietly left standing the longest.
-      shape: editorialShape(0, big: 30, small: 10),
-      backgroundColor: AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Was a static gradient circle with a Material check icon —
-            // this is the one moment in the whole purchase flow that
-            // matters most, and it had never been touched since the
-            // editorial pass landed everywhere else. See success_flourish.dart.
-            const SuccessFlourish(size: 88),
-            const SizedBox(height: 20),
-            Text('Order Placed!', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 12),
-            Text('TOTAL PAID', style: AppType.eyebrow),
-            const SizedBox(height: 4),
-            // Same oversized-numeral treatment as every price elsewhere —
-            // the total is the number this whole dialog exists to confirm.
-            Text('\u20b1${total.toStringAsFixed(0)}', style: AppType.priceNumeral(40)),
-            const SizedBox(height: 16),
-            Text(
-              'You can track its progress from the Orders tab.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(onPressed: onDone, child: const Text('Track Order')),
             ),
           ],
         ),

@@ -8,7 +8,9 @@
 // superseded by this one.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../shared/chat_screen.dart';
@@ -16,6 +18,7 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/staggered_reveal.dart';
+import 'widgets/delivery_completion_view.dart';
 import '../../utils/image_picker_helper.dart';
 
 class DeliveryTrackerScreen extends StatefulWidget {
@@ -32,6 +35,22 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
 
   bool get _proofUploaded => _proofImagePath != null;
 
+  /// Set when this job has just been completed, which swaps the whole screen
+  /// for the confirmation below. State rather than a route because the
+  /// completion *is* this screen's outcome, and because completing the job
+  /// removes it from CourierState — see the note in build().
+  bool _justCompleted = false;
+
+  /// Whether this particular completion earns the animation. Decided once,
+  /// at completion, by [_completeDelivery].
+  bool _celebrate = false;
+
+  /// True when the job being closed out was a return rather than a delivery
+  /// (`returnToSender` is a final step too). Kept separate from `_celebrate`
+  /// because the two are independent: a return is never celebrated, and the
+  /// copy has to be honest about which event just happened.
+  bool _returned = false;
+
   static const _steps = [
     (DeliveryMilestone.accepted,        'Assigned',           Icons.assignment_outlined),
     (DeliveryMilestone.arrivedAtSeller, 'At Seller',          Icons.storefront_outlined),
@@ -47,9 +66,24 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
 
   void _advance(CourierState courier, DeliveryMilestone current) {
     final next = _currentIndex(current) + 1;
-    if (next < _steps.length) {
-      courier.advanceMilestone(widget.jobId, _steps[next].$1);
-    }
+    if (next >= _steps.length) return;
+    final upcoming = _steps[next].$1;
+    // The dispatch step is the first moment the buyer's tracker can answer
+    // "who is bringing this", so that's where identity is recorded (and why
+    // it's null on every earlier step — the rider who collects a parcel
+    // isn't the rider who delivers it).
+    final dispatch = upcoming == DeliveryMilestone.assignedToRider;
+    final auth = context.read<AuthState>();
+    courier.advanceMilestone(
+      widget.jobId,
+      upcoming,
+      courierName: dispatch ? auth.name : null,
+      // The rider's own profile photo, if they've set one. Passed from the
+      // courier's session rather than looked up by the buyer — so the buyer's
+      // app never has access to a rider's account, only to this one value
+      // handed over with the assignment.
+      courierPhotoPath: dispatch ? auth.avatarPath : null,
+    );
   }
 
   /// Mark delivery failed — separate from _advance so it doesn't
@@ -62,14 +96,58 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     courier.advanceMilestone(widget.jobId, DeliveryMilestone.inTransit);
   }
 
-  void _completeDelivery(CourierState courier, double fee) {
-    courier.completeJob(widget.jobId);
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(content: Text('Delivery complete — ₱${fee.toStringAsFixed(2)} added to your earnings')),
-      );
-    Navigator.of(context).pop();
+  bool _isToday(DateTime when) {
+    final now = DateTime.now();
+    return when.year == now.year && when.month == now.month && when.day == now.day;
+  }
+
+  /// The moment this whole app exists to produce — so it gets a real
+  /// confirmation instead of a SnackBar.
+  ///
+  /// What it replaced: `showSnackBar('Delivery complete — ₱X added...')` +
+  /// `pop()`, i.e. a message that the *next* completion wipes
+  /// (`clearSnackBars`), describing a number that lives on a different tab,
+  /// over a screen the courier had already left. Three things had to become
+  /// true instead: the fee visible, the day's total visible, and nothing to
+  /// wait for.
+  ///
+  /// ## Tempo, and why this is NOT Checkout's flourish
+  ///
+  /// A buyer completes a purchase once, so that screen can afford ~1.5s of
+  /// monogram-trace-then-checkmark. A courier completes 20-40 deliveries a
+  /// shift, standing up, in daylight, holding a parcel — putting a
+  /// multi-second animation between every one of those would tax the exact
+  /// person whose time this app exists to save, and the next critique would
+  /// (correctly) be "the courier flow is sluggish."
+  ///
+  /// So the rule for this screen is **confirm the many, celebrate the few**:
+  /// an instant confirmation always (haptic + a static mark, no animation to
+  /// sit through), and the app's celebration asset spent only on the rare
+  /// beats — the first delivery of the day, and every fifth delivery overall
+  /// (5th, 10th, 15th…). That's the mirror of Checkout's "celebrate the
+  /// once", and it's the version of caring that doesn't fight the work.
+  void _completeDelivery(CourierState courier, {required DeliveryMilestone outcome}) {
+    final returned = outcome == DeliveryMilestone.returnToSender;
+    final firstToday = !courier.completedJobs.any((c) => _isToday(c.completedAt));
+    final completionNumber = courier.completedJobs.length + 1;
+
+    courier.completeJob(widget.jobId, returned: returned);
+
+    // Haptics: the one confirmation that works one-handed, through a phone
+    // case, without the courier looking up. Fired here rather than in the
+    // flourish because the fast path has no flourish to fire it for it.
+    final celebrating = !returned && (firstToday || completionNumber % 5 == 0);
+    if (!celebrating) HapticFeedback.mediumImpact();
+
+    setState(() {
+      _justCompleted = true;
+      _returned = returned;
+      // A return is never celebrated. `returnToSender` is a final step like
+      // `delivered`, so without this the app would throw confetti at a
+      // failed delivery — which is the kind of thing that only becomes
+      // obvious once the moment is loud enough to matter.
+      _celebrate = celebrating;
+    });
   }
 
   @override
@@ -78,6 +156,12 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     final ext = theme.extension<AppThemeExtension>()!;
     final courier = context.watch<CourierState>();
     final job = courier.jobById(widget.jobId);
+
+    // Checked before the null branch below, and the order is load-bearing:
+    // completing a job removes it from CourierState, so `job` is null by the
+    // very next frame — without this, the courier's confirmation would
+    // render as "This job is no longer available."
+    if (_justCompleted) return _buildCompletionScreen(context, courier);
 
     if (job == null) {
       // Shouldn't normally happen — only reachable if the job was
@@ -143,7 +227,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
           ],
         ],
       ),
-      bottomNavigationBar: _buildActionBar(theme, courier, milestone, job.fee),
+      bottomNavigationBar: _buildActionBar(theme, courier, milestone),
     );
   }
 
@@ -213,14 +297,14 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(index, big: 24, small: 8),
+        borderRadius: editorialRadius(index, ShapeTier.card),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 20,
             backgroundColor: AppColors.tertiary,
-            child: Icon(icon, color: AppColors.textOnDark, size: 18),
+            child: Icon(icon, color: AppColors.textOnLight, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -259,7 +343,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
           shape: BoxShape.circle,
         ),
@@ -273,7 +357,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(2, big: 24, small: 8),
+        borderRadius: editorialRadius(2, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,7 +408,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     // editorialRadius(1) so this card leans opposite to the location
     // cards above it — consistent with the alternating-lean pattern
     // everywhere else in the app.
-    final radius = editorialRadius(1, big: 24, small: 8);
+    final radius = editorialRadius(1, ShapeTier.card);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -339,7 +423,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.camera_alt_outlined, size: 16, color: AppColors.primaryDark),
+              Icon(Icons.camera_alt_outlined, size: 16, color: AppColors.primaryDark),
               const SizedBox(width: 8),
               Text('Proof of Delivery', style: theme.textTheme.titleSmall),
             ],
@@ -352,7 +436,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                 setState(() => _proofImagePath = picked.path);
               }
             },
-            borderRadius: editorialRadius(0, big: 20, small: 6),
+            borderRadius: editorialRadius(0, ShapeTier.accent),
             child: Container(
               height: 110,
               width: double.infinity,
@@ -360,7 +444,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                 color: _proofUploaded
                     ? AppColors.tertiary.withValues(alpha: 0.22)
                     : AppColors.surface,
-                borderRadius: editorialRadius(0, big: 20, small: 6),
+                borderRadius: editorialRadius(0, ShapeTier.accent),
                 border: Border.all(
                   color: _proofUploaded ? AppColors.tertiary : AppColors.divider,
                   width: _proofUploaded ? 1.5 : 1,
@@ -370,7 +454,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                   ? Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.check_circle_outline, color: AppColors.successText, size: 30),
+                        Icon(Icons.check_circle_outline, color: AppColors.successText, size: 30),
                         const SizedBox(height: 8),
                         Text('Photo attached', style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
@@ -395,7 +479,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     );
   }
 
-  Widget _buildActionBar(ThemeData theme, CourierState courier, DeliveryMilestone milestone, double fee) {
+  Widget _buildActionBar(ThemeData theme, CourierState courier, DeliveryMilestone milestone) {
     final (label, enabled, isFinalStep) = switch (milestone) {
       DeliveryMilestone.accepted        => ('Confirm Arrived at Seller', true, false),
       DeliveryMilestone.arrivedAtSeller => ('Confirm Pickup from Seller', true, false),
@@ -427,7 +511,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
               onPressed: !enabled
                   ? null
                   : isFinalStep
-                      ? () => _completeDelivery(courier, fee)
+                      ? () => _completeDelivery(courier, outcome: milestone)
                       : milestone == DeliveryMilestone.failedDelivery
                           ? () => _retryDelivery(courier)
                           : () => _advance(courier, milestone),
@@ -441,7 +525,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                 onPressed: () => _markFailed(courier),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
-                  side: const BorderSide(color: AppColors.danger),
+                  side: BorderSide(color: AppColors.danger),
                 ),
                 child: const Text('Mark Delivery Failed'),
               ),
@@ -449,6 +533,32 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Hands the completion off to [DeliveryCompletionView], which owns the
+  /// layout — and the tempo rule, and the return copy (see that file). The
+  /// numbers are gathered here because this class is the one already
+  /// watching CourierState.
+  Widget _buildCompletionScreen(BuildContext context, CourierState courier) {
+    final today = courier.completedJobs.where((c) => _isToday(c.completedAt)).toList();
+
+    CompletedJob? completed;
+    for (final c in courier.completedJobs) {
+      if (c.job.id == widget.jobId) completed = c;
+    }
+
+    // A return credits a share of the fee (kReturnFeeShare), not the full
+    // one — the payout is read from CompletedJob rather than from the job's
+    // posted fee, so this screen, the earnings totals and the profit log all
+    // agree on the number.
+    return DeliveryCompletionView(
+      fee: completed?.payout ?? 0,
+      todayTotal: today.fold<double>(0, (sum, c) => sum + c.payout),
+      todayCount: today.length,
+      returned: _returned,
+      celebrate: _celebrate,
+      onDone: () => Navigator.of(context).pop(),
     );
   }
 }

@@ -1,30 +1,57 @@
-// This is a basic Flutter widget test.
+// test/widget_test.dart
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// App-boot smoke test.
+//
+// This replaces the Flutter counter template that shipped here: it
+// asserted `find.text('0')` and tapped `Icons.add` against an app that has
+// never had a counter, so it failed on every run and made `flutter test`
+// useless — a real regression was indistinguishable from standing noise.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/main.dart';
+import 'package:zefanya/state/auth_state.dart';
+import 'package:zefanya/state/cart_state.dart';
+import 'package:zefanya/state/chat_state.dart';
+import 'package:zefanya/state/courier_state.dart';
+import 'package:zefanya/state/order_state.dart';
+import 'package:zefanya/state/recently_viewed_state.dart';
+import 'package:zefanya/state/theme_state.dart';
+import 'package:zefanya/state/wishlist_state.dart';
+
+Widget _bootApp() {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => AuthState()),
+      ChangeNotifierProvider(create: (_) => CartState()),
+      ChangeNotifierProvider(create: (_) => ChatState()),
+      ChangeNotifierProvider(create: (_) => CourierState()),
+      ChangeNotifierProvider(create: (_) => OrderState()),
+      ChangeNotifierProvider(create: (_) => RecentlyViewedState()),
+      ChangeNotifierProvider(create: (_) => WishlistState()),
+      ChangeNotifierProvider(create: (_) => ThemeState()),
+    ],
+    child: const MarketplaceApp(),
+  );
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MarketplaceApp());
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    // Tests have no network: google_fonts has to fall back rather than try
+    // to fetch Playfair/Montserrat over HTTP.
+    GoogleFonts.config.allowRuntimeFetching = false;
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('a signed-out cold start boots to the landing screen',
+      (tester) async {
+    await tester.pumpWidget(_bootApp());
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('BUY. SELL. DELIVER.'), findsOneWidget);
+    expect(find.text('BEGIN'), findsOneWidget);
   });
 }

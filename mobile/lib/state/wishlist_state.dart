@@ -4,28 +4,39 @@
 // Product Details toggles, and what Home's "Saved for later" rail shows.
 // Before this, the Product Details heart was an empty button.
 //
-// Same persistence pattern as RecentlyViewedState: only product ids are
-// stored (newest save first), rehydrated against mockProducts on read, so
-// a product removed from the catalog is silently dropped rather than
-// crashing.
+// Only product ids are stored (newest save first) and they resolve through the
+// [CatalogRepository], so an id the catalogue no longer lists is dropped rather
+// than crashing. Same "async source, sync view" shape as RecentlyViewedState:
+// the catalogue is indexed once and `items` resolves against that index, because
+// `items` is read inside `build()` and a widget cannot await.
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../data/mock_data.dart';
+import '../data/mock_data.dart' show Product;
+import '../data/repositories/catalog_repository.dart';
 
 class WishlistState extends ChangeNotifier {
+  /// [catalog] defaults to the mock repository so existing call sites and tests
+  /// are unaffected; `main.dart` passes the resolved bundle's repository.
+  WishlistState({CatalogRepository? catalog})
+      : _catalog = catalog ?? const MockCatalogRepository();
+
+  final CatalogRepository _catalog;
+
   static const _storageKey = 'wishlist';
 
   /// Most recently saved first.
   final List<String> _productIds = [];
 
-  /// Saved products, newest first. Ids no longer in the catalog are skipped.
-  List<Product> get items => _productIds
-      .map((id) => mockProducts.where((p) => p.id == id))
-      .where((matches) => matches.isNotEmpty)
-      .map((matches) => matches.first)
-      .toList(growable: false);
+  /// The catalogue as of the last [load] / [refreshCatalog]. See the header.
+  final Map<String, Product> _products = {};
+
+  /// Saved products, newest first. Ids no longer in the catalogue are skipped.
+  List<Product> get items => [
+        for (final id in _productIds)
+          if (_products[id] case final p?) p,
+      ];
 
   bool isSaved(String productId) => _productIds.contains(productId);
 
@@ -39,10 +50,29 @@ class WishlistState extends ChangeNotifier {
       _productIds
         ..clear()
         ..addAll(decoded);
+      await _indexCatalog();
     } catch (_) {
       // Corrupt/old data shape — start empty rather than crash.
       _productIds.clear();
     }
+  }
+
+  /// Re-reads the catalogue so [items] can resolve ids after a refresh.
+  Future<void> refreshCatalog() async {
+    try {
+      await _indexCatalog();
+      notifyListeners();
+    } catch (_) {
+      // Keep what we have: an empty wishlist rail reads as "your saves are
+      // gone", which is a worse lie than a slightly stale price.
+    }
+  }
+
+  Future<void> _indexCatalog() async {
+    final products = await _catalog.products();
+    _products
+      ..clear()
+      ..addEntries(products.map((p) => MapEntry(p.id, p)));
   }
 
   Future<void> _save() async {

@@ -20,7 +20,15 @@ class DeliveryDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final jobs = context.watch<CourierState>().jobsForDelivery;
+    final courier = context.watch<CourierState>();
+    final jobs = courier.jobsForDelivery;
+
+    // This is where a courier lands after completing a job, so today's
+    // takings belong here and not only on a tab they have to go and find —
+    // see the tempo note in DeliveryTrackerScreen._completeDelivery. Hidden
+    // at zero rather than showing "₱0", because an empty tally is noise on
+    // the first run of the day.
+    final tally = courier.todayEarnings > 0 ? _todayTally(theme, courier) : null;
 
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
@@ -28,10 +36,11 @@ class DeliveryDashboardScreen extends StatelessWidget {
       body: jobs.isEmpty
           ? Column(
               children: [
-                const EditorialHeader(
+                EditorialHeader(
                   eyebrow: 'FOR DELIVERY',
                   title: 'Out for Delivery',
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  trailing: tally,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 ),
                 Expanded(child: _buildEmptyState(theme)),
               ],
@@ -41,10 +50,11 @@ class DeliveryDashboardScreen extends StatelessWidget {
               itemCount: jobs.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  return const EditorialHeader(
+                  return EditorialHeader(
                     eyebrow: 'FOR DELIVERY',
                     title: 'Out for Delivery',
-                    padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+                    trailing: tally,
+                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
                   );
                 }
                 final job = jobs[i - 1];
@@ -63,8 +73,37 @@ class DeliveryDashboardScreen extends StatelessWidget {
     );
   }
 
+  /// The courier's day so far, in the header of the screen they return to
+  /// after every delivery.
+  ///
+  /// Deliberately small — a running total, not a dashboard. The Earnings tab
+  /// is where these numbers are the subject rather than context.
+  Widget _todayTally(ThemeData theme, CourierState courier) {
+    final now = DateTime.now();
+    final count = courier.completedJobs
+        .where((c) =>
+            c.completedAt.year == now.year &&
+            c.completedAt.month == now.month &&
+            c.completedAt.day == now.day)
+        .length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text('TODAY', style: AppType.eyebrow),
+        const SizedBox(height: 4),
+        Text('₱${courier.todayEarnings.toStringAsFixed(0)}', style: AppType.priceNumeral(24)),
+        const SizedBox(height: 2),
+        Text(
+          '$count delivered',
+          style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
   Widget _buildEmptyState(ThemeData theme) {
-    return const EmptyState(
+    return EmptyState(
       icon: Icons.local_shipping_outlined,
       title: 'Nothing out for delivery yet',
       subtitle: 'Picked-up items will show up here',

@@ -20,29 +20,43 @@ class CategoryProductsScreen extends StatelessWidget {
 
   final String category;
 
-  // Matches the tints in product_card.dart so the header color is
-  // consistent with the product image tints on this screen.
-  static Color _categoryTint(String category) => switch (category) {
-        'Fashion' => AppColors.secondary,
-        'Beauty' => AppColors.tertiary.withValues(alpha: 0.5),
-        _ => AppColors.primary.withValues(alpha: 0.45),
-      };
-
   @override
   Widget build(BuildContext context) {
     final products = mockProducts.where((p) => p.category == category).toList();
-    final tint = _categoryTint(category);
+    // The saturated version of the category's hue, for the band's rule.
+    // (The grid below uses productTint — the same hue *leaned onto* the
+    // card ground, which is the right treatment for a photo fill and the
+    // wrong one for a 3px line.)
+    final hue = productHue(category);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(),
       body: Column(
         children: [
-          // Tinted band: entering Fashion vs Home & Living feels different.
-          // The category color carries into the header rather than only
-          // appearing on the product images below.
+          // Category band: entering Fashion vs Home & Living feels
+          // different. The band itself is a surface tier — the same zone
+          // treatment Home's "Style Edit" band uses — with the category
+          // hue carried as the rule along its bottom edge rather than as
+          // the band's fill.
+          //
+          // Two things forced that split. The old pastel wash
+          // (`tint.withValues(alpha: 0.38)`) was a glowing panel on the
+          // dark ground: the brightest thing on the screen, above the
+          // products it was introducing. And no wash pale enough to be a
+          // wash leaves the 10pt eyebrow legible — against a blush-leaning
+          // band, textSecondary lands near 1.8:1, well under the 4.5:1
+          // small text needs. The hue still announces the category; the
+          // copy just isn't sitting on it any more.
+          //
+          // On paper the band is white and the rule has to darken to be
+          // seen at all; on ink the rule is the pale hue itself. See
+          // AppColors.ruleOnGround.
           Container(
-            color: tint.withValues(alpha: 0.38),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border(bottom: BorderSide(color: AppColors.ruleOnGround(hue), width: 3)),
+            ),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -73,7 +87,7 @@ class CategoryProductsScreen extends StatelessWidget {
                           '${products.length}',
                           style: AppType.priceNumeral(
                             38,
-                            color: AppColors.primaryDark.withValues(alpha: 0.6),
+                            color: AppColors.accent.withValues(alpha: 0.8),
                           ),
                         ),
                         Text('items', style: AppType.eyebrow),

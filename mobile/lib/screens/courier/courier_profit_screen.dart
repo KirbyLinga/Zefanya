@@ -88,7 +88,7 @@ class CourierProfitScreen extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(0, big: 22, small: 8),
+        borderRadius: editorialRadius(0, ShapeTier.card),
       ),
       child: Row(
         children: [
@@ -96,7 +96,7 @@ class CourierProfitScreen extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.25), shape: BoxShape.circle),
-            child: const Icon(Icons.payments_outlined, color: AppColors.primaryDark, size: 18),
+            child: Icon(Icons.payments_outlined, color: AppColors.primaryDark, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -119,7 +119,7 @@ class CourierProfitScreen extends StatelessWidget {
     return ClipRRect(
       // Asymmetric corners instead of the uniform heroRadius — same
       // shape language as the buyer side's hero surfaces.
-      borderRadius: editorialRadius(0, big: 40, small: 10),
+      borderRadius: editorialRadius(0, ShapeTier.hero),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -198,7 +198,7 @@ class CourierProfitScreen extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(1, big: 28, small: 8),
+        borderRadius: editorialRadius(1, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,7 +239,7 @@ class CourierProfitScreen extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(index, big: 22, small: 8),
+        borderRadius: editorialRadius(index, ShapeTier.card),
       ),
       child: Row(
         children: [
@@ -252,7 +252,7 @@ class CourierProfitScreen extends StatelessWidget {
                 colors: [AppColors.tertiary, Color.lerp(AppColors.tertiary, AppColors.primaryDark, 0.35)!],
               ),
             ),
-            child: const Icon(Icons.check, color: AppColors.textOnDark, size: 18),
+            child: Icon(Icons.check, color: AppColors.textOnDark, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -265,7 +265,7 @@ class CourierProfitScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text('₱${c.job.fee.toStringAsFixed(0)}', style: AppType.priceNumeral(20)),
+          Text('₱${c.payout.toStringAsFixed(0)}', style: AppType.priceNumeral(20)),
         ],
       ),
     );

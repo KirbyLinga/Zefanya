@@ -155,10 +155,14 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     });
   }
 
-  /// The band color for the "Style Edit" section. A section with its
-  /// own ground — entered and left through a curve — is what stops the
-  /// page reading as one continuous scroll of tiles.
-  static final Color _bandColor = AppColors.surface.withValues(alpha: 0.62);
+  /// The band color for the "Style Edit" section. Uses surface at full
+  /// opacity so it reads as a distinct zone against the background — at
+  /// partial alpha it was blending into the ground invisibly.
+  ///
+  /// A getter rather than a `static final`: the palette resolves at
+  /// runtime now, and a cached field would freeze whichever mode was
+  /// active on the first build.
+  Color get _bandColor => AppColors.surface;
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +222,11 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                                 padding: const EdgeInsets.only(top: 6),
                                 child: ZefanyaMark(
                                   size: 20,
-                                  color: AppColors.primaryDark.withValues(alpha: 0.75),
+                                  // Brand rose at 60% — reads as a quiet
+                                  // mark next to the wordmark in both
+                                  // modes, since primaryDark is itself
+                                  // mode-tuned (deep mauve → lifted rose).
+                                  color: AppColors.primaryDark.withValues(alpha: 0.6),
                                 ),
                               ),
                             ],
@@ -255,7 +263,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                       decoration: BoxDecoration(
                                         color: AppColors.primaryDark,
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius: radiusOf(ShapeTier.pill),
                                       ),
                                       child: Text(
                                         cartCount > 9 ? '9+' : '$cartCount',
@@ -327,7 +335,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           // Skeletons match the real tiles' asymmetric
                           // corners, so the shape doesn't visibly
                           // change when content arrives.
-                          borderRadius: editorialRadius(i),
+                          borderRadius: editorialRadius(i, ShapeTier.card),
                         ),
                       ),
                     ),
@@ -436,12 +444,12 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                 ),
               ),
               // ---- The feed --------------------------------------
-              // LinenDivider adds a material-texture moment between the
-              // editorial content above and the product grid below —
-              // a subtle woven band rather than a flat tinted diagonal.
-              SliverToBoxAdapter(
-                child: LinenDivider(height: 28),
-              ),
+              // 28px of plain air. A woven LinenDivider used to sit here —
+              // a crosshatch measuring ~1.1:1 in both modes, i.e. invisible,
+              // so it was only ever doing the spacing. Deleted rather than
+              // tuned: the editorial/grid boundary is already carried by
+              // the section band above and the eyebrow below.
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
@@ -464,8 +472,15 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     );
   }
 
-  /// Where each promo slide leads. Order matches `_slides` in
-  /// promo_carousel.dart: new arrivals, the Home & Living sale, shipping.
+  /// Where each promo slide leads. Keyed to the order of
+  /// `mockPromoSlides` in data/mock_data.dart: new arrivals, the Home &
+  /// Living sale, shipping.
+  ///
+  /// Still an index rather than a field on the slide, on purpose:
+  /// navigation targets are app structure, not campaign content, and
+  /// handing the data layer a route would mean a marketer could aim a
+  /// banner at any screen in the app. If slides ever reorder, this and the
+  /// list move together — which is why both sides say so.
   void _onPromoTap(int index) {
     final navigator = Navigator.of(context);
     if (index == 0) {

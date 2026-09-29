@@ -140,7 +140,7 @@ class _FeatureCategoryTile extends StatelessWidget {
       onTap: onTap,
       semanticLabel: '$category, $count item${count == 1 ? '' : 's'}. Browse.',
       child: ClipRRect(
-        borderRadius: editorialRadius(0, big: 32, small: 10),
+        borderRadius: editorialRadius(0, ShapeTier.card),
         child: Container(
           height: 168,
           color: AppColors.surfaceMuted,
@@ -162,7 +162,7 @@ class _FeatureCategoryTile extends StatelessWidget {
                         children: [
                           Text('Browse', style: theme.textTheme.labelLarge?.copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w700)),
                           const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward, size: 15, color: AppColors.primaryDark),
+                          Icon(Icons.arrow_forward, size: 15, color: AppColors.primaryDark),
                         ],
                       ),
                     ],
@@ -217,7 +217,7 @@ class _CategoryTile extends StatelessWidget {
       semanticLabel: '$category, $count item${count == 1 ? '' : 's'}',
       child: Card(
         clipBehavior: Clip.antiAlias,
-        shape: editorialShape(index),
+        shape: editorialShape(index, ShapeTier.card),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -231,9 +231,14 @@ class _CategoryTile extends StatelessWidget {
                 child: Container(
                   width: 40,
                   height: 52,
-                  color: productTint(category).withValues(alpha: 0.6),
+                  // Full-opacity tint: productTint is already a hue lean on
+                  // the card ground, so at 0.6 it composited away into the
+                  // card and the patch stopped reading as a distinct square.
+                  // tintInk for the glyph — the fill inverts per mode, so
+                  // the icon has to as well.
+                  color: productTint(category),
                   alignment: Alignment.center,
-                  child: Icon(icon, color: AppColors.primaryDark, size: 20),
+                  child: Icon(icon, color: AppColors.tintInk, size: 20),
                 ),
               ),
               const Spacer(),

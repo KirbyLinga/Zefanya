@@ -45,7 +45,7 @@ class FreeShippingMeter extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         decoration: BoxDecoration(
           color: AppColors.tertiary.withValues(alpha: 0.22),
-          borderRadius: editorialRadius(0, big: 24, small: 8),
+          borderRadius: editorialRadius(0, ShapeTier.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +75,7 @@ class FreeShippingMeter extends StatelessWidget {
               duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 420),
               curve: Curves.easeOutCubic,
               builder: (context, value, _) => ClipRRect(
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: radiusOf(ShapeTier.pill),
                 child: LinearProgressIndicator(
                   value: value,
                   minHeight: 6,

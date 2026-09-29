@@ -27,6 +27,7 @@ import '../../widgets/staggered_reveal.dart';
 import '../shared/chat_screen.dart';
 import 'order_detail_screen.dart';
 import 'courier_tracker_screen.dart';
+import 'widgets/review_button.dart';
 
 // OrderStatus and the order shape now live in data/mock_data.dart, so
 // Profile can read the same history instead of this screen owning a
@@ -167,7 +168,7 @@ class _StageNode extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: isPast
-                ? const Icon(Icons.check, size: 13, color: AppColors.textOnDark)
+                ? Icon(Icons.check, size: 13, color: AppColors.textOnDark)
                 : Text(
                     '${index + 1}',
                     style: theme.textTheme.labelSmall?.copyWith(
@@ -252,18 +253,21 @@ class _OrderCard extends StatelessWidget {
     OrderStatus.toRate: 'Delivered',
   };
 
-  static const _statusColors = {
-    OrderStatus.toShip: AppColors.neutral,
-    OrderStatus.inTransit: AppColors.warning,
-    OrderStatus.outForDelivery: AppColors.primaryDark,
-    OrderStatus.toRate: AppColors.tertiary,
-  };
+  // Resolved per call rather than cached in a `static const` map: warning
+  // and primaryDark have a different value in each mode, and a const map
+  // would freeze whichever mode happened to be active at first touch.
+  static Map<OrderStatus, Color> get _statusColors => {
+        OrderStatus.toShip: AppColors.neutral,
+        OrderStatus.inTransit: AppColors.warning,
+        OrderStatus.outForDelivery: AppColors.primaryDark,
+        OrderStatus.toRate: AppColors.tertiary,
+      };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final statusColor = _statusColors[order.status]!;
-    final radius = editorialRadius(index, big: 26, small: 8);
+    final radius = editorialRadius(index, ShapeTier.card);
 
     return InkWell(
       onTap: () => Navigator.of(context).push(
@@ -287,7 +291,7 @@ class _OrderCard extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      const Icon(Icons.storefront_outlined, size: 16, color: AppColors.textSecondary),
+                      Icon(Icons.storefront_outlined, size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -323,7 +327,7 @@ class _OrderCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.schedule, size: 14, color: AppColors.primaryDark),
+                    Icon(Icons.schedule, size: 14, color: AppColors.accent),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -334,7 +338,7 @@ class _OrderCard extends StatelessWidget {
                         // at a glance.
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primaryDark,
+                          color: AppColors.accent,
                         ),
                       ),
                     ),
@@ -361,7 +365,7 @@ class _OrderCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: radiusOf(ShapeTier.pill),
       ),
       child: Text(
         _statusLabels[order.status]!,
@@ -418,13 +422,12 @@ class _OrderCard extends StatelessWidget {
           ],
         );
       case OrderStatus.toRate:
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.star_border, size: 16),
-            label: const Text('Leave Review'),
-          ),
+        // Row+Expanded like the cases above rather than a bare button, so the
+        // delivered tab's action lines up with the other three.
+        return Row(
+          children: [
+            Expanded(child: ReviewButton(order: order, expanded: false)),
+          ],
         );
     }
   }

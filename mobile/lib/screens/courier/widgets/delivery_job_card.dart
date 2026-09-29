@@ -39,25 +39,28 @@ class DeliveryJobCard extends StatelessWidget {
     DeliveryMilestone.returnToSender:  'Returning',
   };
 
-  static const _statusColors = {
-    DeliveryMilestone.accepted:        AppColors.neutral,
-    DeliveryMilestone.arrivedAtSeller: AppColors.primary,
-    DeliveryMilestone.pickedUp:        AppColors.secondary,
-    DeliveryMilestone.atSortingCenter: AppColors.warning,
-    DeliveryMilestone.sorted:          AppColors.tertiary,
-    DeliveryMilestone.assignedToRider: AppColors.tertiary,
-    DeliveryMilestone.inTransit:       AppColors.primaryDark,
-    DeliveryMilestone.delivered:       AppColors.tertiary,
-    DeliveryMilestone.failedDelivery:  AppColors.danger,
-    DeliveryMilestone.returnToSender:  AppColors.danger,
-  };
+  // Resolved per call rather than cached in a `static const` map: several
+  // of these tokens (warning, primaryDark, danger) differ per mode, and a
+  // const map would freeze whichever mode loaded first.
+  static Map<DeliveryMilestone, Color> get _statusColors => {
+        DeliveryMilestone.accepted:        AppColors.neutral,
+        DeliveryMilestone.arrivedAtSeller: AppColors.primary,
+        DeliveryMilestone.pickedUp:        AppColors.secondary,
+        DeliveryMilestone.atSortingCenter: AppColors.warning,
+        DeliveryMilestone.sorted:          AppColors.tertiary,
+        DeliveryMilestone.assignedToRider: AppColors.tertiary,
+        DeliveryMilestone.inTransit:       AppColors.primaryDark,
+        DeliveryMilestone.delivered:       AppColors.tertiary,
+        DeliveryMilestone.failedDelivery:  AppColors.danger,
+        DeliveryMilestone.returnToSender:  AppColors.danger,
+      };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final job = assignedJob.job;
     final statusColor = _statusColors[assignedJob.milestone]!;
-    final shape = editorialRadius(index, big: 28, small: 8);
+    final shape = editorialRadius(index, ShapeTier.card);
 
     return InkWell(
       onTap: onTap,
@@ -79,7 +82,7 @@ class DeliveryJobCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: radiusOf(ShapeTier.pill),
                   ),
                   child: Text(
                     _statusLabels[assignedJob.milestone]!,
@@ -132,7 +135,7 @@ class DeliveryJobCard extends StatelessWidget {
             text: TextSpan(
               style: theme.textTheme.bodySmall,
               children: [
-                TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                TextSpan(text: '$label: ', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 TextSpan(text: value),
               ],
             ),

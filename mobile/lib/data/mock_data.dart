@@ -9,6 +9,12 @@
 // TODO: once the Laravel API is wired up, replace these constant lists
 // with real fetches, but keep the Product / DeliveryJob shapes similar
 // so screens don't need much rework.
+//
+// This file imports Flutter for exactly one reason: a promo slide's icon
+// is part of its content (a florist motif vs a shipping motif), so
+// [PromoSlide] carries an [IconData]. Nothing else here is framework-aware.
+
+import 'package:flutter/material.dart';
 
 class Product {
   const Product({
@@ -23,6 +29,7 @@ class Product {
     this.soldCount = 0,
     this.variants = const [],
     this.description = '',
+    this.images = const [],
   });
 
   final String id;
@@ -36,7 +43,63 @@ class Product {
   final int soldCount;
   final List<String> variants;
   final String description;
+
+  /// This product's photos, **cover first**.
+  ///
+  /// ## This is a placeholder shape, and here is what it commits to
+  ///
+  /// A product has an ordered list of photos, and the first one is the cover —
+  /// that is the whole contract, and it is the contract a Seller-side product
+  /// upload screen would have to produce, so both sides can be built against
+  /// it once rather than twice. Nothing here says *how many*; the layouts all
+  /// degrade to a single photo, which is the case the app shipped with for far
+  /// too long (see below).
+  ///
+  /// What is NOT settled, and shouldn't be guessed at in this file: whether a
+  /// photo is a URL, a storage key, or an object with a caption and an
+  /// ordering index; whether there's a per-variant photo set; and whether
+  /// sellers can reorder after upload. Those are the API's call, and this list
+  /// of strings is deliberately the smallest thing that can express "an
+  /// ordered set of photos per product".
+  ///
+  /// ## Why it exists at all
+  ///
+  /// Every product in this catalogue had exactly one image, while the product
+  /// page rendered a 1.05-aspect gallery and a "stacked" showcase — two
+  /// layouts whose whole visual premise is *there is more than one photo of
+  /// this thing*. That's the one place the mock data was actively lying to the
+  /// UI rather than just being thin. Adding the list makes those layouts true.
+  final List<String> images;
+
+  /// The photos to render — [images] when the catalogue has them, otherwise a
+  /// single placeholder derived from [id].
+  ///
+  /// The fallback lives here, on the product, rather than in the widgets: a
+  /// product with no photos still has a cover, and no downstream call site has
+  /// to special-case it. It's also why [images] can default to empty — a const
+  /// constructor cannot derive a URL from [id], so a non-empty default isn't
+  /// expressible.
+  List<String> get photos => images.isEmpty ? [placeholderPhoto(id, 0)] : images;
+
+  /// Whether there is more than one photo to look through. The gallery asks
+  /// this before drawing pager chrome, so a single-photo product gets no
+  /// dots and no counter rather than a pager over one page.
+  bool get hasGallery => photos.length > 1;
 }
+
+/// A placeholder photo URL for [seed] at [index].
+///
+/// Lorem Picsum is a stock-photo service built for exactly this: deterministic
+/// random photography for dev/demo UIs, not licensed for production. Seeded so
+/// the same product always shows the same photo instead of a new one on every
+/// rebuild. Swap the whole mechanism for seller uploads when those exist —
+/// this is scaffolding, not an asset pipeline.
+String placeholderPhoto(String seed, int index) =>
+    'https://picsum.photos/seed/$seed-$index/1000/1000';
+
+/// Builds [count] placeholder photos for a catalogue entry, cover first.
+List<String> mockPhotos(String seed, int count) =>
+    List<String>.generate(count, (index) => placeholderPhoto(seed, index));
 
 class DeliveryJob {
   const DeliveryJob({
@@ -48,6 +111,8 @@ class DeliveryJob {
     required this.packageSize,
     required this.fee,
     this.orderId,
+    this.courierName,
+    this.courierPhotoPath,
   });
 
   final String id;
@@ -63,6 +128,54 @@ class DeliveryJob {
   /// sample jobs. This is the link that lets OrderState show the courier's
   /// progress on the buyer's Orders screen.
   final String? orderId;
+
+  /// Who is carrying this parcel, once dispatch has assigned it.
+  ///
+  /// Null until then, and the null is meaningful rather than missing data:
+  /// before a rider exists there is nobody to name, so the buyer's tracker
+  /// says "not assigned yet" instead of inventing someone. It also means
+  /// the buyer's app can be shown a name without ever having access to a
+  /// courier's account — the assignment is data the API hands over, not a
+  /// session the buyer can see into.
+  ///
+  /// Recorded at the `assignedToRider` step, which is where the ERP spec's
+  /// dispatcher assigns a rider. See CourierState.advanceMilestone.
+  final String? courierName;
+
+  /// The delivering rider's profile photo, recorded alongside [courierName]
+  /// at the same dispatch step.
+  ///
+  /// A local file path (see utils/image_picker_helper.dart, which copies it
+  /// into app storage), not a URL — the same as [AuthState.avatarPath], which
+  /// is where it comes from. Null is the common case and is rendered as a
+  /// monogram of the rider's name rather than a generic glyph: an initial is
+  /// derived from data that *is* present, whereas a stock silhouette would be
+  /// a picture of nobody in particular standing in for a person.
+  ///
+  /// ## Consent, since this is a real photo of a real gig worker
+  ///
+  /// This is the rider's *own* profile photo, chosen by them in their own
+  /// profile screen, and it is shown to one buyer about one parcel they are
+  /// currently carrying. That is the narrowest honest version of the feature:
+  /// nothing is uploaded, nothing is public, no buyer can browse a rider, and
+  /// it stops being shown when the job does.
+  final String? courierPhotoPath;
+
+  /// Only identity can change after dispatch — a job's route, buyer
+  /// and fee are fixed when the seller confirms it. (Seeded sample jobs are
+  /// const and are never re-assigned; only checkout-dispatched ones are.)
+  DeliveryJob copyWith({String? courierName, String? courierPhotoPath}) => DeliveryJob(
+        id: id,
+        shopName: shopName,
+        pickupAddress: pickupAddress,
+        buyerName: buyerName,
+        deliveryArea: deliveryArea,
+        packageSize: packageSize,
+        fee: fee,
+        orderId: orderId,
+        courierName: courierName ?? this.courierName,
+        courierPhotoPath: courierPhotoPath ?? this.courierPhotoPath,
+      );
 }
 
 class Voucher {
@@ -106,6 +219,7 @@ class Order {
     required this.status,
     required this.eta,
     required this.itemSummary,
+    this.productIds = const [],
   });
 
   final String id;
@@ -113,6 +227,22 @@ class Order {
   final OrderStatus status;
   final String eta;
   final String itemSummary;
+
+  /// The catalogue items this order actually contains — ids from
+  /// `mockProducts`.
+  ///
+  /// This is the join key that lets purchase history talk to the rest of the
+  /// app ("stop showing me what I already bought"). [itemSummary] can't do
+  /// that job: it's the human-readable line the order card renders — prose
+  /// like `'Woven Rattan Tote Bag ×2'` — not an id. Checkout throws the ids
+  /// away when it builds that string, which is *why* the wishlist, the
+  /// recently-viewed rail and order history had no way to reference each
+  /// other.
+  ///
+  /// Empty means "contents unknown" (an order placed before this field
+  /// existed), not "bought nothing" — so consumers only ever exclude ids
+  /// they can actually match.
+  final List<String> productIds;
 
   /// True once the package has actually landed — what Profile counts
   /// as a completed order.
@@ -124,6 +254,7 @@ class Order {
         status: status ?? this.status,
         eta: eta ?? this.eta,
         itemSummary: itemSummary,
+        productIds: productIds,
       );
 }
 
@@ -160,6 +291,7 @@ const List<Order> mockOrders = [
     status: OrderStatus.toShip,
     eta: 'Seller ships within 1-2 days',
     itemSummary: 'Linen Blend Wrap Dress',
+    productIds: ['p1'],
   ),
   Order(
     id: 'ORD-10198',
@@ -167,6 +299,7 @@ const List<Order> mockOrders = [
     status: OrderStatus.inTransit,
     eta: 'Arriving Sep 3',
     itemSummary: 'Woven Rattan Tote Bag ×2',
+    productIds: ['p2'],
   ),
   Order(
     id: 'ORD-10122',
@@ -174,6 +307,7 @@ const List<Order> mockOrders = [
     status: OrderStatus.outForDelivery,
     eta: 'Arriving today, 2:00–5:00 PM',
     itemSummary: 'Sage Ceramic Mug Set',
+    productIds: ['p3'],
   ),
   Order(
     id: 'ORD-09876',
@@ -181,10 +315,11 @@ const List<Order> mockOrders = [
     status: OrderStatus.toRate,
     eta: 'Delivered Aug 20',
     itemSummary: 'Cotton Gauze Scarf',
+    productIds: ['p4'],
   ),
 ];
 
-const List<Product> mockProducts = [
+final List<Product> mockProducts = [
   Product(
     id: 'p1',
     name: 'Linen Blend Wrap Dress',
@@ -196,6 +331,10 @@ const List<Product> mockProducts = [
     ratingCount: 212,
     soldCount: 1100,
     variants: ['Small', 'Medium', 'Large', 'X-Large'],
+    // Counts differ per product on purpose: a real catalogue has sellers who
+    // upload one photo and sellers who upload eight, and the layouts have to
+    // survive both. See Product.images.
+    images: mockPhotos('p1', 4),
     description: 'A breathable linen-cotton blend wrap dress with adjustable tie waist. '
         'Soft, breathable, and finished with mother-of-pearl buttons. '
         'True to size — see the size guide for measurements.',
@@ -212,6 +351,7 @@ const List<Product> mockProducts = [
     variants: ['Natural', 'Natural (Large)'],
     description: 'Hand-woven rattan tote with a soft cotton lining and reinforced handles. '
         'Lightweight enough for everyday errands, sturdy enough for market runs.',
+    images: mockPhotos('p2', 3),
   ),
   Product(
     id: 'p3',
@@ -225,6 +365,7 @@ const List<Product> mockProducts = [
     variants: ['Set of 2', 'Set of 4'],
     description: 'Hand-thrown ceramic mugs in a muted sage glaze. Microwave and '
         'dishwasher safe, each piece kiln-finished with slight natural variation.',
+    images: mockPhotos('p3', 4),
   ),
   Product(
     id: 'p4',
@@ -238,6 +379,9 @@ const List<Product> mockProducts = [
     variants: ['Blush', 'Sage', 'Neutral'],
     description: 'Lightweight double-gauze scarf that softens with every wash. '
         'Works as a light wrap, a hair scarf, or a bag accent.',
+    // Two — the smallest gallery the pager has to handle without chrome
+    // getting silly.
+    images: mockPhotos('p4', 2),
   ),
   Product(
     id: 'p5',
@@ -250,6 +394,7 @@ const List<Product> mockProducts = [
     soldCount: 175,
     description: 'A hand-tied bundle of dried pampas, bunny tail grass, and native '
         'foliage. Arrives ready to display, no water needed.',
+    images: mockPhotos('p5', 3),
   ),
   Product(
     id: 'p6',
@@ -264,6 +409,7 @@ const List<Product> mockProducts = [
     variants: ['16x16', '18x18', '20x20'],
     description: 'Stonewashed linen cover with a hidden zip closure. Pairs well '
         'with the ceramic mug set for a matching shelf styling moment.',
+    images: mockPhotos('p6', 3),
   ),
   Product(
     id: 'p7',
@@ -277,6 +423,9 @@ const List<Product> mockProducts = [
     variants: ['One Size'],
     description: 'Wide-brim straw hat woven from natural raffia, with a soft '
         'cotton drawstring for a secure, adjustable fit.',
+    // One. A single-photo product is the case the gallery has to render
+    // without pager chrome, and there was no way to test that path before.
+    images: mockPhotos('p7', 1),
   ),
   Product(
     id: 'p8',
@@ -290,6 +439,7 @@ const List<Product> mockProducts = [
     variants: ['Set of 3'],
     description: 'Three cold-processed bar soaps scented with rosemary, '
         'chamomile, and sweet orange. Free from sulfates and parabens.',
+    images: mockPhotos('p8', 3),
   ),
 ];
 
@@ -360,3 +510,140 @@ const List<Voucher> mockVouchers = [
     category: 'Home & Living',
   ),
 ];
+
+// ---------------------------------------------------------------------------
+// Home promo carousel
+// ---------------------------------------------------------------------------
+//
+// Moved out of promo_carousel.dart, where each slide carried its own Color
+// values. That made "run a different campaign" an edit to a widget, and it
+// meant every slide had to know what colour it was in both modes — so the
+// brand's own colour decisions were being made three times, by three
+// slides, instead of once by the palette.
+//
+// Now a slide is content: copy, which layout it wants, which icon, and
+// *which ground* as a semantic choice ([PromoGround]). The carousel maps
+// that ground to palette tokens. Real campaigns replace this list, not the
+// widget.
+
+/// The layout a promo slide renders with. Three deliberately different
+/// compositions — a carousel of three identical templates is a slot
+/// machine, not a campaign.
+enum PromoSlideLayout {
+  /// Large eyebrow + stacked text left, decorative shape right.
+  textLeft,
+
+  /// Full-bleed tinted surface, centered bold headline, small icon seal.
+  centeredHero,
+
+  /// Split: icon motif fills the left half, copy lives on the right.
+  iconSplit,
+}
+
+/// Which brand ground a slide sits on.
+///
+/// Deliberately *not* a `Color`. The ground is a design-system decision that
+/// has to differ per mode — a deep sage ground reads as "calm and
+/// expensive" on ink and as a black-green block on paper — so that mapping
+/// belongs in the theme, not in the content.
+enum PromoGround { brandRose, sage, terracotta }
+
+/// One banner campaign slide. See [mockPromoSlides].
+class PromoSlide {
+  const PromoSlide({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.layout,
+    required this.ground,
+    required this.icon,
+    this.bigIcon,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+  final PromoSlideLayout layout;
+  final PromoGround ground;
+  final IconData icon;
+
+  /// Optional second, larger icon used as a background motif.
+  final IconData? bigIcon;
+}
+
+/// The live slides, in the order they advance. `buyer_shell`'s tap
+/// destinations are keyed to this order — see `_onPromoTap`.
+const List<PromoSlide> mockPromoSlides = [
+  // The brand slot: the brand rose gets the prime position so the banner
+  // matches the nav bar and buttons.
+  PromoSlide(
+    eyebrow: 'JUST ARRIVED',
+    title: 'New This\nSeason',
+    subtitle: 'Fresh arrivals from Willow & Bloom',
+    layout: PromoSlideLayout.textLeft,
+    ground: PromoGround.brandRose,
+    icon: Icons.local_florist_outlined,
+  ),
+
+  // Sage. It had been living only as a nav-bar badge and a background
+  // glow; giving it a whole banner surface is the first place it reads as
+  // a real second accent rather than decoration.
+  PromoSlide(
+    eyebrow: 'LIMITED TIME',
+    title: '15% Off\nHome & Living',
+    subtitle: 'Code NEWHOME15 · up to ₱150 off',
+    layout: PromoSlideLayout.centeredHero,
+    ground: PromoGround.sage,
+    icon: Icons.local_offer_outlined,
+    bigIcon: Icons.cottage_outlined,
+  ),
+
+  // Terracotta. The accent gets a full banner so it reads as a brand
+  // colour, not just a price tint.
+  PromoSlide(
+    eyebrow: 'ALWAYS ON',
+    title: 'Free\nShipping',
+    subtitle: 'On every order over ₱1,000',
+    layout: PromoSlideLayout.iconSplit,
+    ground: PromoGround.terracotta,
+    icon: Icons.local_shipping_outlined,
+    bigIcon: Icons.directions_bike_outlined,
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// Maker notes — the "FROM THE MAKER" section on Home
+// ---------------------------------------------------------------------------
+//
+// Keyed by *shop*, not by product: the note is the seller's voice, and a
+// shop says one thing regardless of which of their products you land on.
+//
+// Placeholder content, but the right shape — whatever replaces it (an API
+// field a seller types into) fills the same `makerNoteFor` lookup, so the
+// widget doesn't change. What changed here is the honesty of the shape: it
+// used to be four lines chosen by `sellerName.hashCode`, i.e. a shop's
+// "voice" was decided by a string hash, and the widget had no way to know
+// whether a shop had written anything at all.
+//
+// House rule for the copy: specific, plain, slightly unglamorous. "Fresh
+// arrivals from our shop" is what every marketplace writes, and the entire
+// point of this section is that it doesn't sound like that.
+const Map<String, String> mockMakerNotes = {
+  'Willow & Bloom Atelier':
+      'We only make what we can finish by hand in a week. That is the whole business plan.',
+  'Rattan & Reed Co.':
+      'Everything here starts on the same worktable, and most of it takes three tries.',
+  'Sage & Clay Studio':
+      'If a piece does not survive a week in my own house, it does not get listed.',
+  'Field & Fold Florals':
+      'I started making these for my sister. She still gets the first one of every batch.',
+};
+
+/// The maker note for a shop, or null when that seller hasn't written one.
+///
+/// Null rather than a generic fallback, deliberately: a shop with no note
+/// should render as a shop with no note (the section hides), not as a shop
+/// saying something it never said.
+String? makerNoteFor(String sellerName) => mockMakerNotes[sellerName];
+
+

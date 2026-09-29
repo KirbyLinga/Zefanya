@@ -121,11 +121,11 @@ class _SearchScreenState extends State<SearchScreen> {
         // Asymmetric corners rather than a pill — the field itself
         // picks up the same "leaf" shape as a product tile, since it's
         // standing in for the hero image every other screen opens with.
-        borderRadius: editorialRadius(0, big: 26, small: 10),
+        borderRadius: editorialRadius(0, ShapeTier.card),
       ),
       child: Row(
         children: [
-          const Icon(Icons.search, size: 22, color: AppColors.primaryDark),
+          Icon(Icons.search, size: 22, color: AppColors.primaryDark),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
@@ -143,7 +143,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           if (_query.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.close, size: 18, color: AppColors.primaryDark),
+              icon: Icon(Icons.close, size: 18, color: AppColors.primaryDark),
               onPressed: () {
                 _controller.clear();
                 _search('');

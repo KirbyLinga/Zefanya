@@ -19,8 +19,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/dev_flags.dart';
+import '../../data/api/api_exception.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/timed_snackbar.dart';
 import 'registration_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -56,20 +58,36 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Now a real repository call (see AuthState.login), so the artificial
+    // 600ms delay that used to stand in for it is gone for the same reason it
+    // was removed at checkout: it was simulating the thing that now actually
+    // happens, and it would add 600ms to every real sign-in. In mock mode the
+    // call resolves locally, which is the honest behaviour.
     setState(() => _isSubmitting = true);
 
-    // TODO: replace with a real auth call (Laravel API) once wired up,
-    // and pass the role/name/email the API returns to login() below.
-    await Future.delayed(const Duration(milliseconds: 600));
+    // With no backend yet, there's no server response to read a role or
+    // a name from, so the tester's selector supplies the role and the
+    // display name is the sample one. Both are *arguments* to the call
+    // below, and the status comes back from the repository — remove this
+    // stub once real auth returns all three.
+    try {
+      await context.read<AuthState>().login(
+            role: _loginAsRole,
+            email: _identifierController.text.trim(),
+            password: _passwordController.text,
+            name: 'Tristan Araneta',
+          );
+    } on ApiException catch (e) {
+      // Only reachable in a live build, where there is no API to sign in
+      // against yet: say so rather than appearing to have signed someone in.
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
-
-    context.read<AuthState>().login(
-          role: _loginAsRole,
-          name: 'Tristan Araneta',
-          email: _identifierController.text.trim(),
-        );
 
     // AuthGate (in main.dart) rebuilds to the right shell once the
     // state changes above — this just unwinds back to that root route.
@@ -169,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ElevatedButton(
                           onPressed: _isSubmitting ? null : _login,
                           child: _isSubmitting
-                              ? const ZefanyaLoader(
+                              ? ZefanyaLoader(
                                   size: 18, color: AppColors.textOnDark, strokeWidth: 4)
                               : const Text('Login'),
                         ),
@@ -257,7 +275,7 @@ class _LoginMasthead extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6),
               child: ZefanyaMark(
                 size: 20,
-                color: AppColors.primaryDark.withValues(alpha: 0.75),
+                color: AppColors.textPrimary.withValues(alpha: 0.45),
               ),
             ),
           ],
@@ -281,7 +299,7 @@ class _Panel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(0),
+        borderRadius: editorialRadius(0, ShapeTier.card),
         boxShadow: [
           BoxShadow(
             color: AppColors.neutral.withValues(alpha: 0.16),

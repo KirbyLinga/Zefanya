@@ -3,13 +3,13 @@
 // Shopping Cart screen. Reads/mutates the shared CartState (see
 // state/cart_state.dart) so Home, Product Details, and Checkout all
 // agree on what's actually in the cart. Voucher codes are validated
-// against data/mock_data.dart's mockVouchers (including a real
-// minimum-spend check) instead of accepting any typed string.
+// against the voucher catalogue the cart repository supplies (including a
+// real minimum-spend check) instead of accepting any typed string.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/pricing.dart';
-import '../../data/mock_data.dart';
+import '../../data/mock_data.dart' show Voucher;
 import '../../state/cart_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -60,7 +60,12 @@ class _CartScreenState extends State<CartScreen> {
     if (!mounted) return;
     setState(() => _isApplyingVoucher = false);
 
-    final match = mockVouchers.where((v) => v.code == code).toList();
+    // Read the cart now, after the await, rather than trusting a subtotal
+    // captured before it. A category voucher only counts its own category —
+    // and the voucher list itself is the repository's, not a local constant,
+    // so it's read from state rather than from `mock_data`.
+    final cart = context.read<CartState>();
+    final match = cart.vouchers.where((v) => v.code == code).toList();
     if (match.isEmpty) {
       // showTimedSnackBar replaces (rather than queues) the previous bar,
       // so mistyping a code twice in a row doesn't stack errors, and it
@@ -73,9 +78,7 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     final voucher = match.first;
-    // Read the cart now, after the await, rather than trusting a subtotal
-    // captured before it. A category voucher only counts its own category.
-    final base = voucherBase(voucher, context.read<CartState>().items);
+    final base = voucherBase(voucher, cart.items);
     if (base < voucher.minSpend) {
       final scope = voucher.category == null ? '' : ' of ${voucher.category}';
       showTimedSnackBar(
@@ -246,7 +249,7 @@ class _CartScreenState extends State<CartScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(index, big: 22, small: 8),
+        borderRadius: editorialRadius(index, ShapeTier.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,11 +259,11 @@ class _CartScreenState extends State<CartScreen> {
             onChanged: (v) => cart.toggleSelected(item, v ?? false),
           ),
           ClipRRect(
-            borderRadius: editorialRadius(index, big: 18, small: 6),
+            borderRadius: editorialRadius(index, ShapeTier.accent),
             child: SizedBox(
               width: 72,
               height: 72,
-              child: ProductImage(productId: item.product.id, tint: productTint(item.product.category)),
+              child: ProductImage(product: item.product),
             ),
           ),
           const SizedBox(width: 12),
@@ -295,7 +298,7 @@ class _CartScreenState extends State<CartScreen> {
                         fixedSize: const Size(32, 32),
                         tapTargetSize: MaterialTapTargetSize.padded,
                       ),
-                      icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
+                      icon: Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
                     ),
                   ],
                 ),
@@ -312,7 +315,7 @@ class _CartScreenState extends State<CartScreen> {
                       '₱${item.product.price.toStringAsFixed(2)}',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primaryDark,
+                        color: AppColors.accent,
                       ),
                     ),
                     _buildQtyStepper(cart, item),
@@ -346,7 +349,7 @@ class _CartScreenState extends State<CartScreen> {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.divider),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: radiusOf(ShapeTier.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -373,8 +376,9 @@ class _CartScreenState extends State<CartScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.5),
-        borderRadius: editorialRadius(1, big: 24, small: 8),
+        // secondary (light blush) was a jarring pale panel on the dark ground.
+        color: AppColors.surface,
+        borderRadius: editorialRadius(1, ShapeTier.card),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
@@ -382,7 +386,7 @@ class _CartScreenState extends State<CartScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.local_offer_outlined, size: 18, color: AppColors.primaryDark),
+              Icon(Icons.local_offer_outlined, size: 18, color: AppColors.primaryDark),
               const SizedBox(width: 8),
               Expanded(child: Text('Voucher & Promo Code', style: theme.textTheme.titleSmall)),
               TextButton(
@@ -405,7 +409,7 @@ class _CartScreenState extends State<CartScreen> {
               ElevatedButton(
                 onPressed: _isApplyingVoucher ? null : () => _applyCode(_voucherController.text),
                 child: _isApplyingVoucher
-                    ? const ZefanyaLoader(size: 16, color: AppColors.textOnDark, strokeWidth: 4)
+                    ? ZefanyaLoader(size: 16, color: AppColors.textOnDark, strokeWidth: 4)
                     : const Text('Apply'),
               ),
             ],
@@ -414,7 +418,7 @@ class _CartScreenState extends State<CartScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.check_circle_outline, size: 16, color: AppColors.successText),
+                Icon(Icons.check_circle_outline, size: 16, color: AppColors.successText),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -432,7 +436,7 @@ class _CartScreenState extends State<CartScreen> {
                     fixedSize: const Size(28, 28),
                     tapTargetSize: MaterialTapTargetSize.padded,
                   ),
-                  icon: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                  icon: Icon(Icons.close, size: 16, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -453,10 +457,11 @@ class _CartScreenState extends State<CartScreen> {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(28),
-          topRight: Radius.circular(10),
-        ),
+        // Was the pair (28/10) hand-rolled here, and the mirror image of
+        // it typed out a second time on the product screen — the same
+        // shape, spelled twice, which is exactly the drift a tier table
+        // exists to stop.
+        borderRadius: editorialRadius(0, ShapeTier.card),
         boxShadow: [
           BoxShadow(color: AppColors.neutral.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, -4)),
         ],

@@ -297,13 +297,27 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
         body: Column(
           children: [
-            // Per-step tinted header — the color changes as you advance
-            // so each step feels like entering a distinct zone, not just
-            // scrolling to a new section of the same neutral form.
+            // Per-step header — the step's accent rule changes as you
+            // advance so each step feels like entering a distinct zone,
+            // not just scrolling to a new section of the same neutral
+            // form.
+            //
+            // The band is a surface tier and the step hue is the rule
+            // along its bottom edge rather than its fill. As a fill the
+            // tint had two problems on the dark ground: the first step's
+            // blush at 45% put EditorialHeader's 10pt eyebrow at ~1.8:1,
+            // and the last step's rose at 8% composited to *below* the
+            // surrounding ground — so the very cue this band exists to
+            // give disappeared on the most serious step of the form.
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOut,
-              color: _stepTint(_currentStep),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  bottom: BorderSide(color: _stepTint(_currentStep), width: 3),
+                ),
+              ),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: Column(
                 children: [
@@ -363,16 +377,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  // Per-step tint — a soft wash that changes as the user advances
-  // so entering Address feels subtly different from entering Personal.
-  // Blush → sage → neutral pink → primary pink, cycling through the
-  // palette tokens without introducing any new colors.
-  Color _stepTint(_StepId id) => switch (id) {
-        _StepId.personal  => AppColors.secondary.withValues(alpha: 0.45),
-        _StepId.address   => AppColors.tertiary.withValues(alpha: 0.30),
-        _StepId.vehicle   => AppColors.primary.withValues(alpha: 0.30),
-        _StepId.documents => AppColors.primaryDark.withValues(alpha: 0.08),
-      };
+  // Per-step accent — the rule along the bottom of the step band, so
+  // entering Address reads as subtly different from entering Personal.
+  // Blush → sage → blush pink → rose, cycling the palette tokens without
+  // introducing any new colors. Routed through ruleOnGround because a rule
+  // and a fill need opposite treatment per mode: these hues are audible on
+  // a dark band and invisible on a white one until they're darkened.
+  Color _stepTint(_StepId id) => AppColors.ruleOnGround(switch (id) {
+        _StepId.personal  => AppColors.secondary,
+        _StepId.address   => AppColors.tertiary,
+        _StepId.vehicle   => AppColors.primary,
+        _StepId.documents => AppColors.primaryDark,
+      });
 
   // Contextual eyebrow copy — tells the user exactly what this step is
   // for rather than repeating "JOIN ZEFANYA" on every page.
@@ -399,7 +415,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget _buildStepControls(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         // A hairline rather than a shadow — the bar is a floor for the
         // scrolling step, not a card sitting on top of it.
         border: Border(top: BorderSide(color: AppColors.divider)),
@@ -420,7 +436,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _next,
               child: _isSubmitting
-                  ? const ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
+                  ? ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
                   : Text(_isLastStep ? 'Submit Registration' : 'Continue'),
             ),
           ),
@@ -601,7 +617,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       children: [
         Text(title.toUpperCase(), style: AppType.eyebrow),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Divider(color: AppColors.divider, thickness: 1, height: 1),
         ),
       ],
@@ -643,7 +659,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   // is the one before any of the role-specific steps exist.
   Widget _roleTile(ThemeData theme, UserRole role, String label, IconData icon, int index) {
     final selected = _role == role;
-    final radius = editorialRadius(index, big: 22, small: 6);
+    final radius = editorialRadius(index, ShapeTier.accent);
     return Semantics(
       button: true,
       selected: selected,
@@ -696,7 +712,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               enabledBorder: showError
                   ? OutlineInputBorder(
                       borderRadius: BorderRadius.circular(ext.utilityRadius),
-                      borderSide: const BorderSide(color: AppColors.danger),
+                      borderSide: BorderSide(color: AppColors.danger),
                     )
                   : null,
             ),
@@ -715,8 +731,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.secondary,
-                      borderRadius: BorderRadius.circular(999),
+                      color: AppColors.surfaceMuted,
+                      borderRadius: radiusOf(ShapeTier.pill),
                     ),
                     child: Text('$_age yrs old', style: theme.textTheme.labelSmall),
                   ),
@@ -795,7 +811,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     // Asymmetric corners, same as every other content surface in the
     // app. A slightly smaller "big" corner than the default 34 so a
     // stack of three of these (courier flow) doesn't read as scalloped.
-    final radius = editorialRadius(0, big: 24, small: 6);
+    final radius = editorialRadius(0, ShapeTier.accent);
 
     final Color borderColor = hasError
         ? AppColors.danger
@@ -957,7 +973,7 @@ class _StepNode extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: isPast
-                ? const Icon(Icons.check, size: 13, color: AppColors.textOnDark)
+                ? Icon(Icons.check, size: 13, color: AppColors.textOnDark)
                 : Text(
                     '${index + 1}',
                     style: theme.textTheme.labelSmall?.copyWith(

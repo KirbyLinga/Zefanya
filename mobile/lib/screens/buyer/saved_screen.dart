@@ -110,14 +110,13 @@ class _SavedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tint = productTint(product.category);
 
     return PressableScale(
       onTap: onTap,
       semanticLabel: '${product.name}, ₱${product.price.toStringAsFixed(0)}',
       child: Card(
         clipBehavior: Clip.antiAlias,
-        shape: editorialShape(index),
+        shape: editorialShape(index, ShapeTier.card),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -126,7 +125,7 @@ class _SavedCard extends StatelessWidget {
                 children: [
                   Hero(
                     tag: 'saved-${product.id}',
-                    child: ProductImage(productId: product.id, tint: tint),
+                    child: ProductImage(product: product),
                   ),
                   // Heart always visible — tapping it unsaves and the
                   // item disappears from the grid (Consumer rebuilds).
@@ -157,7 +156,7 @@ class _SavedCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
+                      Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
                       const SizedBox(width: 2),
                       Text(
                         product.rating.toStringAsFixed(1),

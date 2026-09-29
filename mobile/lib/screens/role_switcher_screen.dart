@@ -49,7 +49,8 @@ class RoleSwitcherScreen extends StatelessWidget {
                 icon: Icons.storefront_outlined,
                 title: 'Enter Buyer App',
                 subtitle: 'Browse, order, and track deliveries',
-                color: AppColors.primaryDark,
+                color: AppColors.roseGround,
+                ink: AppColors.textOnDark,
                 onTap: () => Navigator.of(context).push(
                   AppPageRoute(builder: (_) => const BuyerShell()),
                 ),
@@ -60,6 +61,7 @@ class RoleSwitcherScreen extends StatelessWidget {
                 title: 'Enter Courier App',
                 subtitle: 'Accept requests and manage deliveries',
                 color: AppColors.tertiary,
+                ink: AppColors.textOnLight,
                 onTap: () => Navigator.of(context).push(
                   AppPageRoute(builder: (_) => const CourierShell()),
                 ),
@@ -75,13 +77,13 @@ class RoleSwitcherScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.secondary,
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(ext.pillRadius),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.science_outlined, size: 14, color: AppColors.primaryDark),
+          Icon(Icons.science_outlined, size: 14, color: AppColors.primaryDark),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -104,6 +106,7 @@ class _RoleCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.color,
+    required this.ink,
     required this.onTap,
   });
 
@@ -111,6 +114,13 @@ class _RoleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
+
+  /// Ink for the icon disc. Passed in rather than hardcoded, because the
+  /// two callers use different fills: a rose ground (dark fill → light
+  /// ink) and a sage disc (light fill → dark ink). Same reason the palette
+  /// carries both [AppPalette.textOnDark] and [AppPalette.textOnLight] —
+  /// this icon used to be near-white on both, which was ~1.6:1 on the sage.
+  final Color ink;
   final VoidCallback onTap;
 
   @override
@@ -132,7 +142,7 @@ class _RoleCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: Icon(icon, color: AppColors.textOnDark, size: 22),
+                child: Icon(icon, color: ink, size: 22),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -145,7 +155,7 @@ class _RoleCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
+              Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
             ],
           ),
         ),

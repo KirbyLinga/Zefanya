@@ -25,18 +25,12 @@ class ShimmerBox extends StatefulWidget {
 }
 
 class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateMixin {
-  // The sweep used to run surfaceMuted -> surface -> surfaceMuted, but both
-  // of those are pure white (0xFFFFFFFF), so the gradient was white-to-white:
-  // no visible band, and white tiles on a near-white page barely read as
-  // skeletons at all. The band has to travel between two colors that
-  // actually differ. `_base` is a warm tint just deeper than the divider, so
-  // it holds up against the page gradient; `_highlight` is the card white.
-  //
-  // (The ShaderMask uses srcATop, which replaces the child's own color with
-  // the gradient wherever the child paints — so these two colors ARE the
-  // skeleton's look, whatever fill the wrapped Container declares.)
-  static const Color _base = Color(0xFFE6DAD8);
-  static const Color _highlight = AppColors.surface;
+  // The sweep has to travel between two values that actually differ *in
+  // the current mode*. On paper that pair is a warm tint → white; on ink
+  // it's a lifted dark → the card surface. Both pairs live in the palette,
+  // so this is no longer a set of constants.
+  Color get _base => AppColors.shimmerBase;
+  Color get _highlight => AppColors.shimmerHighlight;
 
   late final AnimationController _controller =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
@@ -72,7 +66,7 @@ class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateM
             return LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: const [_base, _highlight, _base],
+              colors: [_base, _highlight, _base],
               stops: const [0.35, 0.5, 0.65],
               transform: _SlideGradient(dx * t - bounds.width),
             ).createShader(bounds);

@@ -21,14 +21,39 @@ import '../../../widgets/heart_button.dart';
 import '../../../widgets/pressable_scale.dart';
 import '../../../widgets/zefanya_mark.dart';
 
-/// Soft per-category tint so grids aren't a wall of identical gray
-/// tiles even before real product photos exist. Shared so Search and
-/// Categories match Home's look exactly.
-Color productTint(String category) => switch (category) {
+/// Per-category tint for placeholder fills and category accents — so a
+/// grid isn't a wall of identical tiles even before real product photos
+/// exist. Shared so Search, Categories and Home match exactly.
+///
+/// These were light pastels (blush #F7D6D0, sage, soft pink) and read
+/// as a soft wash on the old near-white ground. On the dark card they
+/// read as a *glowing* rectangle in the one place a photo belongs —
+/// brighter than the product name, the price, and the card itself, so a
+/// tile mid-load looked like the bug and the loaded tile looked like the
+/// fix. They're now hue leans on the card ground (see
+/// [AppColors.hueOnSurface]): a warm rose, an olive and a terracotta
+/// that sit one step up from the card instead of a light year above it.
+///
+/// Hue — not brightness — is what tells the categories apart now, which
+/// is why each branch changes the *hue token*: blush for Fashion (the
+/// hero category, at the strongest lean), sage for Beauty, terracotta
+/// for Home & Living and anything a seller adds later.
+/// The raw brand hue for a category. Exposed separately from
+/// [productTint] because a *fill* and a *rule* need the same hue applied
+/// two different ways: the fill is a lean on the card ground, while the
+/// rule is a saturated line (see [AppColors.ruleOnGround]).
+Color productHue(String category) => switch (category) {
       'Fashion' => AppColors.secondary,
-      'Beauty' => AppColors.tertiary.withValues(alpha: 0.35),
-      _ => AppColors.primary.withValues(alpha: 0.35),
+      'Beauty' => AppColors.tertiary,
+      _ => AppColors.accent,
     };
+
+Color productTint(String category) {
+  // Fashion is the hero category, so its lean is the strongest of the
+  // three; the others stay a step quieter.
+  final amount = category == 'Fashion' ? 0.34 : 0.30;
+  return AppColors.hueOnSurface(productHue(category), amount);
+}
 
 /// Lorem Picsum (picsum.photos) is a placeholder-image service built
 /// specifically for this use case — random stock photography for
@@ -36,21 +61,82 @@ Color productTint(String category) => switch (category) {
 /// photo uploads once that exists; this is scaffolding, not an asset
 /// pipeline. Seeded by product id so the same product always shows the
 /// same photo instead of a new random one every rebuild.
+///
+/// A product photo, sized to the slot it lands in.
+///
+/// Takes the whole [Product] rather than an id and a tint, because it now
+/// needs something only the product knows: *which photo* to show, and its
+/// cover is [Product.photos]. The tint is derived here too (every one of the
+/// twelve call sites was passing `productTint(product.category)` by hand, so
+/// the argument was carrying no information — only a chance to get it wrong).
+/// With [photoIndex] this widget can render any photo of any product, which is
+/// what makes a swipeable gallery possible without a second image widget.
 class ProductImage extends StatelessWidget {
-  const ProductImage({super.key, required this.productId, required this.tint, this.iconSize = 40});
+  const ProductImage({
+    super.key,
+    required this.product,
+    this.photoIndex = 0,
+    this.iconSize = 40,
+  });
 
-  final String productId;
-  final Color tint;
+  final Product product;
+
+  /// Which of the product's photos to show. Out-of-range values clamp to the
+  /// cover rather than throwing: this is driven by a page index, and an image
+  /// that fails to appear is a far worse outcome than one that repeats.
+  final int photoIndex;
+
   final double iconSize;
+
+  /// The source's own edge, in pixels — the ceiling for any decode request,
+  /// since asking a 1000px image for more would only enlarge it. Matches the
+  /// size in [placeholderPhoto].
+  static const int _sourcePixels = 1000;
+
+  String get _url {
+    final photos = product.photos;
+    // Out-of-range falls back to the *cover*, in both directions. The
+    // obvious `clamp(0, length - 1)` is asymmetric: an index of 99 would
+    // land on the last photo and show a picture the card never showed,
+    // which is a worse outcome than repeating the cover — and it
+    // contradicted what this getter promised. Pinned by
+    // test/product_image_cache_test.dart.
+    final index =
+        (photoIndex >= 0 && photoIndex < photos.length) ? photoIndex : 0;
+    return photos[index];
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Image.network(
-      'https://picsum.photos/seed/$productId/400/400',
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      loadingBuilder: (context, child, progress) {
+    final tint = productTint(product.category);
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Unbounded (a row that will size to its child) — nothing to measure,
+        // so decode natively rather than guess.
+        final slotWidth =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : null;
+        final requested =
+            slotWidth == null ? _sourcePixels : (slotWidth * ratio).round();
+        final decode = requested.clamp(1, _sourcePixels);
+        // Never hand an unchanged size to ResizeImage: it would add a second
+        // cache entry for the same bitmap.
+        final cachePixels = decode >= _sourcePixels ? null : decode;
+
+        return Image.network(
+          // The URL comes from the product (see Product.photos), not from a
+          // template assembled here — so when real seller uploads arrive, this
+          // widget needs no change at all.
+          _url,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          // ResizeImage's dimensions are in *source* pixels, which is
+          // exactly what cacheWidth means to the engine.
+          cacheWidth: cachePixels,
+          cacheHeight: cachePixels,
+          loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         // Branded wait instead of Material's default spinner — this is
         // the most frequently-seen loading state in the whole app
@@ -61,17 +147,25 @@ class ProductImage extends StatelessWidget {
           alignment: Alignment.center,
           child: ZefanyaLoader(
             size: iconSize * 0.8,
-            color: AppColors.primaryDark.withValues(alpha: 0.55),
+            // tintInk, not a fixed brand token: the tint this sits on is a
+            // pale wash in light mode and a dark lean in dark mode, so the
+            // mark has to invert with it. A fixed light token disappears
+            // into the light wash; a fixed dark one disappears into the
+            // dark lean.
+            color: AppColors.tintInk.withValues(alpha: 0.75),
           ),
         );
       },
       // No internet, or picsum unreachable — fall back to the original
-      // tint + icon placeholder rather than a broken-image glyph.
+      // tint + icon placeholder rather than a broken-image glyph. Icon is
+      // tintInk for the same reason as the loader above.
       errorBuilder: (context, error, stackTrace) => Container(
-        color: tint,
-        alignment: Alignment.center,
-        child: Icon(Icons.image_outlined, size: iconSize, color: AppColors.neutral),
-      ),
+            color: tint,
+            alignment: Alignment.center,
+            child: Icon(Icons.image_outlined, size: iconSize, color: AppColors.tintInk),
+          ),
+        );
+      },
     );
   }
 }
@@ -122,7 +216,6 @@ class CoverStoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tint = productTint(product.category);
 
     return PressableScale(
       onTap: onTap,
@@ -222,7 +315,7 @@ class CoverStoryTile extends StatelessWidget {
                           ),
                           child: Hero(
                             tag: heroTag,
-                            child: ProductImage(productId: product.id, tint: tint),
+                            child: ProductImage(product: product),
                           ),
                         ),
                       ),
@@ -241,7 +334,7 @@ class CoverStoryTile extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.tertiary,
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: radiusOf(ShapeTier.pill),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.15),
@@ -253,7 +346,11 @@ class CoverStoryTile extends StatelessWidget {
                         child: Text(
                           'Featured',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: AppColors.primaryDark,
+                            // Ink for a light fill, not primaryDark: sage is
+                            // the same pastel in both modes, but primaryDark
+                            // is lifted in dark mode and could only manage
+                            // 2.43:1 on it. See AppPalette.textOnLight.
+                            color: AppColors.textOnLight,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -290,12 +387,11 @@ class WideProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tint = productTint(product.category);
 
     return Card(
       clipBehavior: Clip.antiAlias,
       // Leans the opposite way to the grid tile above it.
-      shape: editorialShape(1, big: 40, small: 8),
+      shape: editorialShape(1, ShapeTier.hero),
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
@@ -331,7 +427,7 @@ class WideProductTile extends StatelessWidget {
                 width: 120,
                 child: Hero(
                   tag: heroTag,
-                  child: ProductImage(productId: product.id, tint: tint),
+                  child: ProductImage(product: product),
                 ),
               ),
             ],
@@ -369,11 +465,10 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tint = productTint(product.category);
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      shape: editorialShape(index),
+      shape: editorialShape(index, ShapeTier.card),
       child: InkWell(
         onTap: onTap,
         child: Column(
@@ -384,7 +479,7 @@ class ProductCard extends StatelessWidget {
                 children: [
                   Hero(
                     tag: heroTag,
-                    child: ProductImage(productId: product.id, tint: tint),
+                    child: ProductImage(product: product),
                   ),
                   if (product.soldCount >= 500)
                     Positioned(
@@ -399,8 +494,12 @@ class ProductCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryDark,
-                            borderRadius: BorderRadius.circular(999),
+                            // roseGround, not primaryDark: this tag carries
+                            // 10pt text, and dark mode's lifted rose caps out
+                            // at 4.42:1 for *any* ink. roseGround is the rose
+                            // surface that text is allowed to sit on.
+                            color: AppColors.roseGround,
+                            borderRadius: radiusOf(ShapeTier.pill),
                             boxShadow: [
                               BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6, offset: const Offset(0, 2)),
                             ],
@@ -450,7 +549,7 @@ class ProductCard extends StatelessWidget {
                   // card from being just a name and a price.
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
+                      Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
                       const SizedBox(width: 2),
                       Text(
                         product.rating.toStringAsFixed(1),

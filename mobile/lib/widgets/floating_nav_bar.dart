@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import 'editorial_shapes.dart';
 import 'nav_icons.dart';
 
 class NavBarItem {
@@ -52,11 +53,15 @@ class FloatingNavBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: radiusOf(ShapeTier.hero),
           boxShadow: [
             BoxShadow(
-              color: AppColors.neutral.withValues(alpha: 0.18),
-              blurRadius: 20,
+              // Palette, not a literal: a 35%-black shadow reads on ink,
+              // where a soft warm-grey shadow is the one that reads on
+              // paper. Shadows and surface tiers are the same idea — depth
+              // — expressed with whatever the current ground supports.
+              color: AppColors.navShadow,
+              blurRadius: 24,
               offset: const Offset(0, 8),
             ),
           ],
@@ -99,7 +104,7 @@ class _NavIcon extends StatelessWidget {
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: radiusOf(ShapeTier.card),
         // TweenAnimationBuilder drives the icon/label color in sync with
         // the AnimatedContainer pill fill — they were previously instant
         // while the background eased, making the transition read as two
@@ -116,8 +121,12 @@ class _NavIcon extends StatelessWidget {
               curve: Curves.easeOut,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: selected ? AppColors.secondary : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
+                // A tint, not a fill: enough to read as "selected" on the
+                // nav surface without overwhelming the icon. The value is
+                // per mode — light blush was near-invisible on the dark
+                // nav ground, and a dark rose tint would be on white.
+                color: selected ? AppColors.navSelectedFill : Colors.transparent,
+                borderRadius: radiusOf(ShapeTier.card),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -140,7 +149,7 @@ class _NavIcon extends StatelessWidget {
                                 child: Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     color: AppColors.primaryDark,
                                     shape: BoxShape.circle,
                                   ),
@@ -163,7 +172,7 @@ class _NavIcon extends StatelessWidget {
                                 child: Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     color: AppColors.primaryDark,
                                     shape: BoxShape.circle,
                                   ),

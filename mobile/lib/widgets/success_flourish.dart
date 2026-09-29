@@ -145,7 +145,7 @@ class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProv
                 width: widget.size,
                 height: widget.size,
                 decoration: BoxDecoration(
-                  borderRadius: editorialRadius(0, big: widget.size * 0.42, small: widget.size * 0.14),
+                  borderRadius: editorialRadiusRaw(0, big: widget.size * 0.42, small: widget.size * 0.14),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,

@@ -81,6 +81,10 @@ class _LandingBackdropState extends State<LandingBackdrop>
 
   @override
   Widget build(BuildContext context) {
+    // Resolved once per build, not per animation frame: the blob set is
+    // mode-dependent and this widget repaints ~60x a second.
+    final blobs = _blobsFor(Theme.of(context).brightness);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = constraints.maxWidth;
@@ -89,26 +93,18 @@ class _LandingBackdropState extends State<LandingBackdrop>
         return Stack(
           fit: StackFit.expand,
           children: [
-            // Base warm wash — same recipe as AppAtmosphere's, so this
-            // screen still sits on the app's usual background color.
+            // Base warm wash — the same palette gradient AppAtmosphere
+            // paints, so the intro sits on the app's own ground in both
+            // modes instead of hand-rolling a second copy of it.
             DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topCenter,
-                  radius: 1.3,
-                  colors: [
-                    Color.lerp(AppColors.background, Colors.white, 0.55)!,
-                    AppColors.background,
-                  ],
-                ),
-              ),
+              decoration: BoxDecoration(gradient: AppColors.groundGradient),
             ),
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
                 final t = _controller.value; // 0..1, loops forever
                 return Stack(
-                  children: [for (final blob in _blobs) _buildBlob(blob, t, w, h)],
+                  children: [for (final blob in blobs) _buildBlob(blob, t, w, h)],
                 );
               },
             ),
@@ -178,64 +174,82 @@ class _Blob {
   final double phase;
 }
 
-const _blobs = [
-  _Blob(
-    color: AppColors.secondary,
-    size: 460,
-    alpha: 0.78,
-    centerX: 0.82,
-    centerY: 0.1,
-    orbitX: 0.30,
-    orbitY: 0.14,
-    speed: 1.0,
-    phase: 0.0,
-  ),
-  _Blob(
-    color: AppColors.tertiary,
-    size: 480,
-    alpha: 0.65,
-    centerX: 0.12,
-    centerY: 0.92,
-    orbitX: 0.26,
-    orbitY: 0.16,
-    speed: 0.8,
-    phase: 0.32,
-  ),
-  // Center blob — kept gentler than the rest on purpose. It sits
-  // behind the wordmark and tagline; visibility here trades directly
-  // against text contrast, so it stays the most conservative of the
-  // five rather than getting the same alpha bump as the corner shapes.
-  _Blob(
-    color: AppColors.primary,
-    size: 280,
-    alpha: 0.48,
-    centerX: 0.5,
-    centerY: 0.32,
-    orbitX: 0.20,
-    orbitY: 0.14,
-    speed: 1.3,
-    phase: 0.55,
-  ),
-  _Blob(
-    color: AppColors.primary,
-    size: 210,
-    alpha: 0.58,
-    centerX: 0.2,
-    centerY: 0.22,
-    orbitX: 0.16,
-    orbitY: 0.20,
-    speed: 0.6,
-    phase: 0.15,
-  ),
-  _Blob(
-    color: AppColors.tertiary,
-    size: 200,
-    alpha: 0.55,
-    centerX: 0.82,
-    centerY: 0.68,
-    orbitX: 0.20,
-    orbitY: 0.15,
-    speed: 1.15,
-    phase: 0.72,
-  ),
-];
+/// The five blobs, per mode.
+///
+/// Art direction, not a token, so it stays here rather than moving into
+/// the palette — but it has to exist per mode, because these two sets
+/// aren't the same shapes at different alphas. On paper the blobs are
+/// wide and pale (a saturated blob on white is a stain, and it sits
+/// behind the wordmark); on ink they're smaller and stronger, because a
+/// pale blob on ink is simply not there.
+///
+/// Positions, orbits and speeds are shared: the composition doesn't move,
+/// only what it's made of.
+List<_Blob> _blobsFor(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  return [
+    // Upper-right blush — main focal glow, large and warm
+    _Blob(
+      color: dark ? AppColors.primary : AppColors.secondary,
+      size: dark ? 500 : 460,
+      alpha: dark ? 0.45 : 0.78,
+      centerX: 0.82,
+      centerY: 0.1,
+      orbitX: 0.30,
+      orbitY: 0.14,
+      speed: 1.0,
+      phase: 0.0,
+    ),
+    // Lower-left sage — cool counterpoint to the blush
+    _Blob(
+      color: AppColors.tertiary,
+      size: dark ? 520 : 480,
+      alpha: dark ? 0.30 : 0.65,
+      centerX: 0.12,
+      centerY: 0.92,
+      orbitX: 0.26,
+      orbitY: 0.16,
+      speed: 0.8,
+      phase: 0.32,
+    ),
+    // Center rose — sits behind the wordmark, kept gentler than the rest
+    // on purpose: visibility here trades directly against text contrast.
+    // On ink, primaryDark carries it (more saturated than primary, so it
+    // reads as warmth without washing out the type); on paper, primary.
+    _Blob(
+      color: dark ? AppColors.primaryDark : AppColors.primary,
+      size: dark ? 320 : 280,
+      alpha: dark ? 0.35 : 0.48,
+      centerX: 0.5,
+      centerY: 0.32,
+      orbitX: 0.20,
+      orbitY: 0.14,
+      speed: 1.3,
+      phase: 0.55,
+    ),
+    // Upper-left blush — small roaming accent
+    _Blob(
+      color: dark ? AppColors.secondary : AppColors.primary,
+      size: dark ? 240 : 210,
+      alpha: dark ? 0.28 : 0.58,
+      centerX: 0.2,
+      centerY: 0.22,
+      orbitX: 0.16,
+      orbitY: 0.20,
+      speed: 0.6,
+      phase: 0.15,
+    ),
+    // Mid-right sage — small warm-cool contrast
+    _Blob(
+      color: AppColors.tertiary,
+      size: dark ? 220 : 200,
+      alpha: dark ? 0.25 : 0.55,
+      centerX: 0.82,
+      centerY: 0.68,
+      orbitX: 0.20,
+      orbitY: 0.15,
+      speed: 1.15,
+      phase: 0.72,
+    ),
+  ];
+}

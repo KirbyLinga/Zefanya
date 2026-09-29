@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../data/mock_data.dart';
+import '../../../state/cart_state.dart';
 import '../../../state/wishlist_state.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/app_page_route.dart';
@@ -29,6 +30,10 @@ class SavedRail extends StatelessWidget {
     final theme = Theme.of(context);
     final products = context.watch<WishlistState>().items;
     if (products.isEmpty) return const SizedBox.shrink();
+
+    final cartProductIds = {
+      for (final item in context.watch<CartState>().items) item.product.id,
+    };
 
     return Padding(
       // Spacing lives here, not at the call site, so an empty shortlist
@@ -77,6 +82,11 @@ class SavedRail extends StatelessWidget {
                 index: i,
                 onTap: () => onTapProduct(products[i]),
                 showHeart: true,
+                // The two features acknowledge each other here: the shortlist
+                // is where you decide what to buy, so "you already have one
+                // of these" is the one piece of cart state that changes what
+                // you do next. No other surface needs the echo.
+                inCart: cartProductIds.contains(products[i].id),
               ),
             ),
           ),

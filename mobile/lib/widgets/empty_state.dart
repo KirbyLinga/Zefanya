@@ -30,13 +30,18 @@ class EmptyState extends StatelessWidget {
   /// Optional button/widget below the copy.
   final Widget? action;
 
-  /// Arch background tint. Defaults to AppColors.secondary (blush).
+  /// Arch fill hue. A *hue*, not a fill: it's composited over the dark
+  /// ground by [AppColors.hueOnSurface], so the arch reads as a tinted
+  /// dark panel. Passing a pastel token ([AppColors.secondary]) and
+  /// painting it directly — even at 55% — made the one graphic moment
+  /// on an otherwise empty screen the brightest rectangle in the app,
+  /// at roughly 8:1 against the background instead of ~2:1.
   final Color? tint;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = tint ?? AppColors.secondary;
+    final color = AppColors.hueOnSurface(tint ?? AppColors.secondary);
 
     return Center(
       child: Padding(
@@ -49,12 +54,15 @@ class EmptyState extends StatelessWidget {
               child: Container(
                 width: 96,
                 height: 116,
-                color: color.withValues(alpha: 0.55),
+                color: color,
                 alignment: Alignment.center,
+                // tintInk on the arch fill: the fill is a pale wash in
+                // light mode and a dark lean in dark mode, so the glyph
+                // has to invert with it to stay visible.
                 child: Icon(
                   icon,
                   size: 40,
-                  color: AppColors.primaryDark.withValues(alpha: 0.7),
+                  color: AppColors.tintInk,
                 ),
               ),
             ),

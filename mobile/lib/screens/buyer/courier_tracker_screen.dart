@@ -8,14 +8,18 @@
 // state, no polling stub, just a live read of the same milestone map
 // the courier's own tracker writes to.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/mock_data.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
+import '../shared/chat_screen.dart';
 
 class CourierTrackerScreen extends StatelessWidget {
   const CourierTrackerScreen({super.key, required this.order});
@@ -87,12 +91,28 @@ class CourierTrackerScreen extends StatelessWidget {
               const SizedBox(height: 20),
             ],
 
-            // ---- Courier info -----------------------------------
-            if (job != null)
+            // ---- Who has it, then what it is --------------------
+            // Order is deliberate: the buyer's first question at this
+            // stage is "who is bringing this", not "what size is the box".
+            if (job != null) ...[
               StaggeredReveal(
                 index: 2,
-                child: _CourierInfo(theme: theme, job: job),
+                child: _CourierCard(
+                  theme: theme,
+                  job: job,
+                  // The rider's rating across all their rated deliveries —
+                  // null when they have none, which the card renders as
+                  // nothing rather than as a zero.
+                  averageRating: courier.averageRating,
+                  ratingCount: courier.ratingCount,
+                ),
               ),
+              const SizedBox(height: 12),
+              StaggeredReveal(
+                index: 3,
+                child: _DeliveryDetails(theme: theme, job: job),
+              ),
+            ],
           ],
         ),
       ),
@@ -135,13 +155,13 @@ class _StatusHero extends StatelessWidget {
         milestone == DeliveryMilestone.assignedToRider) {
       return AppColors.primaryDark;
     }
-    return AppColors.secondary;
+    return AppColors.neutral; // getting ready — neutral on dark, no blush
   }
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: editorialRadius(0, tier: EditorialTier.card),
+      borderRadius: editorialRadius(0, ShapeTier.card),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -200,7 +220,7 @@ class _ProgressTimeline extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(1, tier: EditorialTier.card),
+        borderRadius: editorialRadius(1, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,7 +265,7 @@ class _ProgressTimeline extends StatelessWidget {
                     border: Border.all(color: color, width: active ? 2 : 1.5),
                   ),
                   child: done
-                      ? const Icon(Icons.check,
+                      ? Icon(Icons.check,
                           size: 14, color: AppColors.textOnDark)
                       : Icon(icon,
                           size: 14,
@@ -301,7 +321,7 @@ class _FailureNotice extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.danger.withValues(alpha: 0.08),
-        borderRadius: editorialRadius(0, tier: EditorialTier.card),
+        borderRadius: editorialRadius(0, ShapeTier.card),
         border: Border(left: BorderSide(color: AppColors.danger, width: 3)),
       ),
       child: Column(
@@ -309,7 +329,7 @@ class _FailureNotice extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   size: 18, color: AppColors.danger),
               const SizedBox(width: 8),
               Text(
@@ -338,8 +358,14 @@ class _FailureNotice extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 
-class _CourierInfo extends StatelessWidget {
-  const _CourierInfo({required this.theme, required this.job});
+/// The parcel's own details: request id, size, destination.
+///
+/// Renamed from `_CourierInfo`, which is what it was called while it was
+/// the only courier-ish block on this screen — and while it contained no
+/// courier at all. Its header text already said "DELIVERY DETAILS"; the
+/// class name was the only thing still claiming otherwise.
+class _DeliveryDetails extends StatelessWidget {
+  const _DeliveryDetails({required this.theme, required this.job});
 
   final ThemeData theme;
   final DeliveryJob job;
@@ -350,7 +376,7 @@ class _CourierInfo extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(0, tier: EditorialTier.card),
+        borderRadius: editorialRadius(0, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,6 +409,186 @@ class _CourierInfo extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.w500)),
         ),
       ],
+    );
+  }
+}
+
+/// Who is carrying the parcel.
+///
+/// This is the half of the tracking experience the app was missing: the
+/// milestones above answer "what stage is it at" and nothing answered "who
+/// is doing this for me". Real delivery apps show a name because a name is
+/// what turns a progress bar into a person.
+///
+/// [DeliveryJob.courierName] is null until dispatch assigns a rider, and
+/// that's rendered as its own state rather than hidden — most of an order's
+/// life genuinely has no courier attached yet, and "waiting for a rider" is
+/// more honest than an empty card.
+///
+/// ## Photo, rating and contact: what each of them actually is
+///
+/// All three are now shown, and each is sourced rather than fabricated:
+///
+///  * **Photo** — the rider's own profile avatar, taken from their session at
+///    the dispatch step ([DeliveryJob.courierPhotoPath]). When it's absent
+///    (the common case — most riders never set one) the card falls back to a
+///    *monogram* of their initial, not a stock silhouette. A generic person
+///    glyph is a picture of nobody standing in for somebody; a letter is
+///    derived from data that is actually present.
+///  * **Rating** — the mean of the ratings buyers have left for this rider's
+///    deliveries, and it renders *nothing* until there is at least one (see
+///    CourierState.averageRating). A new rider must not be shown "0.0", which
+///    reads as the worst possible score rather than the absence of one.
+///  * **Contact** — a button into the same role-agnostic ChatScreen the
+///    seller threads already use, and only once a rider exists. This was
+///    previously left out as a policy question rather than an engineering
+///    one; it's included now because the alternative on a delivery day is a
+///    buyer with no way to say "the gate code is 4417", which is worse for
+///    both people.
+///
+/// ## Consent, because the photo is a real person
+///
+/// It's the rider's own avatar from their own profile screen, shown to one
+/// buyer about one parcel they are currently carrying. Nothing is uploaded,
+/// no buyer can browse riders, and it stops being shown when the job does.
+class _CourierCard extends StatelessWidget {
+  const _CourierCard({
+    required this.theme,
+    required this.job,
+    required this.averageRating,
+    required this.ratingCount,
+  });
+
+  final ThemeData theme;
+  final DeliveryJob job;
+
+  /// The rider's mean rating across their rated deliveries, or null when
+  /// they have none — null renders nothing rather than a zero.
+  final double? averageRating;
+  final int ratingCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = job.courierName;
+    final assigned = name != null;
+    final photo = job.courierPhotoPath;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: editorialRadius(1, ShapeTier.card),
+      ),
+      child: Row(
+        children: [
+          _CourierAvatar(photoPath: photo, name: name),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(assigned ? 'YOUR COURIER' : 'NO COURIER YET', style: AppType.eyebrow),
+                const SizedBox(height: 3),
+                Text(
+                  name ?? 'Waiting for a rider to be assigned',
+                  style: theme.textTheme.titleSmall,
+                ),
+                // Only once there is something to say. A rider with no
+                // ratings gets no rating line rather than an empty one.
+                if (assigned && averageRating != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.star_rounded,
+                          size: 14, color: AppColors.ratingStar),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${averageRating!.toStringAsFixed(1)} · $ratingCount '
+                        '${ratingCount == 1 ? 'delivery rated' : 'deliveries rated'}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (assigned)
+            // Contact, kept to an icon button so it doesn't compete with the
+            // order's own actions elsewhere on this screen.
+            IconButton(
+              tooltip: 'Message $name',
+              onPressed: () => Navigator.of(context).push(
+                AppPageRoute(
+                  builder: (_) => ChatScreen(
+                    contactName: name,
+                    contactRole: 'Courier',
+                  ),
+                ),
+              ),
+              icon: Icon(Icons.chat_bubble_outline, color: AppColors.primaryDark),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The rider's photo when they have one, their initial when they don't.
+///
+/// Never a generic person icon — see [_CourierCard].
+class _CourierAvatar extends StatelessWidget {
+  const _CourierAvatar({required this.photoPath, required this.name});
+
+  final String? photoPath;
+  final String? name;
+
+  static const double _size = 48;
+
+  @override
+  Widget build(BuildContext context) {
+    if (photoPath != null) {
+      return ClipOval(
+        child: Image.file(
+          File(photoPath!),
+          width: _size,
+          height: _size,
+          fit: BoxFit.cover,
+          // The file is gone (storage cleared, or this value restored on
+          // another device) — fall through to the monogram, which is the same
+          // fallback as having no photo at all, rather than a broken image.
+          errorBuilder: (context, error, stack) => _monogram(),
+        ),
+      );
+    }
+    return _monogram();
+  }
+
+  Widget _monogram() {
+    final trimmed = name?.trim() ?? '';
+    final initial = trimmed.isEmpty ? '?' : trimmed.characters.first.toUpperCase();
+
+    return Container(
+      width: _size,
+      height: _size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: name == null
+            ? AppColors.divider
+            : AppColors.hueOnSurface(AppColors.tertiary),
+      ),
+      child: name == null
+          ? Icon(Icons.hourglass_empty, size: 20, color: AppColors.textSecondary)
+          : Text(
+              initial,
+              style: AppType.sectionDisplay.copyWith(
+                fontSize: 20,
+                // Ink for a pale sage fill, in both modes — same rule as the
+                // Featured tag and the review badge (AppPalette.tintInk).
+                color: AppColors.tintInk,
+              ),
+            ),
     );
   }
 }

@@ -6,18 +6,25 @@
 // than a single hardcoded item, and Add to Cart / Buy Now write to
 // the shared CartState so Cart/Checkout reflect the same data.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../data/mock_data.dart';
 import '../../state/cart_state.dart';
+import '../../state/courier_state.dart';
+import '../../state/order_state.dart';
 import '../../state/recently_viewed_state.dart';
+import '../../state/review_state.dart';
 import '../../theme/app_theme.dart';
 import '../shared/chat_screen.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
+import 'review_screen.dart';
 import 'seller_screen.dart';
 import 'widgets/product_card.dart';
+import '../../utils/motion.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/cart_flight.dart';
@@ -49,6 +56,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   /// that should visibly travel.
   final GlobalKey _galleryKey = GlobalKey();
 
+  /// Which photo the gallery is showing. Driven by the pager and read by
+  /// the dot indicator — nothing else, so it's state rather than anything
+  /// derived.
+  int _photoIndex = 0;
+
+  final PageController _galleryController = PageController();
+
   /// True for the length of the cart-flight animation right after a tap.
   /// Without this, a second tap while the item is still flying added the
   /// quantity a second time (and, for Buy Now, pushed Checkout twice).
@@ -68,6 +82,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<RecentlyViewedState>().recordView(_product.id);
     });
+  }
+
+  @override
+  void dispose() {
+    _galleryController.dispose();
+    super.dispose();
   }
 
   void _incrementQty() {
@@ -97,12 +117,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       context,
       originKey: _galleryKey,
       thumbnail: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: ProductImage(
-          productId: _product.id,
-          tint: productTint(_product.category),
-          iconSize: 28,
-        ),
+        borderRadius: radiusOf(ShapeTier.card),
+        child: ProductImage(product: _product, iconSize: 28),
       ),
     );
 
@@ -177,7 +193,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           const SizedBox(height: 24),
                           _buildDescription(theme),
                           const SizedBox(height: 24),
-                          _buildReviewsSection(theme, ext),
+                          _buildReviewsSection(theme),
                         ],
                       ),
                     ),
@@ -240,23 +256,115 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildGallery(AppThemeExtension ext) {
-    // Uses the same tint helper + ProductImage as ProductCard so the
-    // Hero flight between grid and details is showing the same photo
-    // the whole time, not swapping mid-flight.
-    final image = ProductImage(productId: _product.id, tint: productTint(_product.category), iconSize: 64);
+    final photos = _product.photos;
+
+    Widget photo(int index) {
+      // Same ProductImage as ProductCard, so the Hero flight between grid
+      // and details shows the same photo the whole time instead of
+      // swapping mid-flight.
+      final image = ProductImage(
+        product: _product,
+        photoIndex: index,
+        iconSize: 64,
+      );
+      // The Hero wraps the cover *only*. Two pages carrying the same tag
+      // at once is a duplicate-tag error, and the shared-element flight
+      // always starts from the cover, so the other pages don't need one.
+      return index == 0 && widget.heroTag != null
+          ? Hero(tag: widget.heroTag!, child: image)
+          : image;
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: ClipRRect(
         // Asymmetric corners rather than a uniform cardRadius — same
         // shape language as the grid tiles this screen is entered from.
-        borderRadius: editorialRadius(0, big: 48, small: 10),
+        borderRadius: editorialRadius(0, ShapeTier.hero),
         child: AspectRatio(
           aspectRatio: 1.05,
           child: KeyedSubtree(
             key: _galleryKey,
-            child: widget.heroTag == null ? image : Hero(tag: widget.heroTag!, child: image),
+            // A product with one photo gets no pager at all: a swipeable
+            // page that cannot be swiped, and a single dot, are both
+            // worse than nothing (see Product.hasGallery).
+            child: _product.hasGallery
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      PageView.builder(
+                        controller: _galleryController,
+                        itemCount: photos.length,
+                        onPageChanged: (i) => setState(() => _photoIndex = i),
+                        itemBuilder: (context, i) => photo(i),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 10,
+                        child: Center(child: _buildGalleryDots(photos.length)),
+                      ),
+                    ],
+                  )
+                : photo(0),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Page dots for the gallery.
+  ///
+  /// Same shape, timing and colours as the promo carousel's indicator, because
+  /// this is the same idea in a second place. One difference, forced by sitting
+  /// on a photo rather than on the page ground: the row carries its own scrim,
+  /// because [AppColors.divider] is defined relative to a surface and an
+  /// arbitrary seller photo is not one.
+  ///
+  /// The active dot is accent, measured rather than assumed — 4.99:1 on the
+  /// scrim in light mode and 5.12:1 in dark, both clear of the 3:1 graphics
+  /// floor. (primaryDark was the first choice here and was worse: it wins on
+  /// paper at 9.07:1 but drops to 3.58:1 on ink, so it would have made the
+  /// indicator weakest in the mode with the darkest ground. Asserted in
+  /// theme_contrast_test.dart.)
+  ///
+  /// It is an *indicator*, not a control: a 6px dot is not a tap target, so
+  /// the swipe is the interaction and the [Semantics] label is how the
+  /// position gets announced. The inactive dots are deliberately faint — they
+  /// are not information, and the active dot plus that label carry the state.
+  Widget _buildGalleryDots(int count) {
+    return Semantics(
+      label: 'Photo ${_photoIndex + 1} of $count',
+      child: Container(
+        // Keyed so a test can count the dots through it. Without this there is
+        // no way to assert "one dot per photo" from outside the widget, since
+        // the dots are private and AnimatedContainer is used elsewhere.
+        key: const ValueKey('gallery-dots'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          // 85% opaque, so the scrim stays a predictable near-surface
+          // colour over a photo of any brightness — which is the premise
+          // the active dot's contrast depends on.
+          color: AppColors.surface.withValues(alpha: 0.85),
+          borderRadius: radiusOf(ShapeTier.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(count, (i) {
+            final active = i == _photoIndex;
+            return AnimatedContainer(
+              duration: reduceMotion(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: active ? AppColors.accent : AppColors.divider,
+                borderRadius: radiusOf(ShapeTier.pill),
+              ),
+            );
+          }),
         ),
       ),
     );
@@ -312,7 +420,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.star_rounded, size: 18, color: AppColors.ratingStar),
+            Icon(Icons.star_rounded, size: 18, color: AppColors.ratingStar),
             const SizedBox(width: 4),
             Text(_product.rating.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
             const SizedBox(width: 4),
@@ -340,10 +448,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 20,
             backgroundColor: AppColors.tertiary,
-            child: Icon(Icons.storefront_outlined, color: AppColors.textOnDark, size: 20),
+            child: Icon(Icons.storefront_outlined, color: AppColors.textOnLight, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -392,7 +500,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   // uses (Blush/Sage map straight to AppColors.secondary/tertiary) with
   // a few common extras so new color variants a seller adds later still
   // render as swatches rather than silently falling back to chips.
-  static const Map<String, Color> _colorNames = {
+  // Rebuilt per call rather than held as a `static const` map: blush, sage
+  // and the two rose names resolve to palette tokens, and primaryDark has
+  // a different value per mode — a const map would pin whichever mode
+  // happened to load first.
+  static Map<String, Color> get _colorNames => {
     'blush': AppColors.secondary,
     'sage': AppColors.tertiary,
     'neutral': Color(0xFFD8CFC9),
@@ -530,7 +642,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   Widget _stepperButton(IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: radiusOf(ShapeTier.pill),
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Icon(icon, size: 16, color: AppColors.textPrimary),
@@ -552,215 +664,231 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  void _showAllReviews(BuildContext context) {
-    final theme = Theme.of(context);
-    final ext = theme.extension<AppThemeExtension>()!;
+  /// Reviews, honestly scoped.
+  ///
+  /// Two different things live here and are deliberately not blended:
+  ///
+  ///  * The storefront's aggregate (`Product.rating` / `.ratingCount`) is
+  ///    catalogue data — one number the shop owns. It's rendered as a
+  ///    self-contained summary block, because it's complete on its own and
+  ///    doesn't need a list under it to make sense.
+  ///  * The reviews below it are the ones *this device* wrote, badged YOUR
+  ///    REVIEW so their provenance is unambiguous. See review_state.dart.
+  ///
+  /// What used to be here was two hardcoded tiles and a "See all" sheet
+  /// naming five invented buyers ('Marielle S.', 'Jonah P.', …) with invented
+  /// comments. That is a claim about human specificity with nothing behind it,
+  /// and it went the moment there was a real review to show instead. Other
+  /// buyers' written reviews need the reviews API; until then the honest
+  /// version is a real aggregate plus your own words.
+  Widget _buildReviewsSection(ThemeData theme) {
+    final myReviews = context.watch<ReviewState>().forProduct(_product.id);
+    final purchased =
+        context.watch<OrderState>().purchasedProductIds.contains(_product.id);
 
-    // Stub review data — replace with a real API call once the backend
-    // is wired. Shown here as three entries so the sheet has enough
-    // content to feel like a real screen rather than an empty slide.
-    final names = ['Marielle S.', 'Jonah P.', 'Celine R.', 'Marco T.', 'Ana G.'];
-    final comments = [
-      'Fabric feels premium and true to what\'s described. Would repurchase.',
-      'Arrived earlier than expected and well packaged. Very happy with it.',
-      'The color matches the photos exactly. Fits true to size.',
-      'Really good quality for the price. Will buy more colors.',
-      'Seller was very responsive. Product came neatly folded.',
-    ];
-    final ratings = [5, 4, 5, 4, 5];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            children: [
-              // Drag handle
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-                child: Row(
-                  children: [
-                    Text('Reviews', style: theme.textTheme.titleMedium),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${_product.ratingCount}',
-                        style: theme.textTheme.labelSmall,
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, size: 16, color: AppColors.ratingStar),
-                        const SizedBox(width: 4),
-                        Text(
-                          _product.rating.toStringAsFixed(1),
-                          style: theme.textTheme.titleSmall,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  itemCount: names.length,
-                  itemBuilder: (_, i) => _allReviewTile(theme, ext, i, names[i], comments[i], ratings[i]),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _allReviewTile(ThemeData theme, AppThemeExtension ext, int i, String name, String comment, int rating) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(i, big: 20, small: 8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(name, style: theme.textTheme.labelLarge),
-              const Spacer(),
-              Row(
-                children: List.generate(
-                  5,
-                  (star) => Icon(
-                    Icons.star_rounded,
-                    size: 14,
-                    color: star < rating ? AppColors.ratingStar : AppColors.divider,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(comment, style: theme.textTheme.bodySmall?.copyWith(height: 1.4)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsSection(ThemeData theme, AppThemeExtension ext) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Reviews header: eyebrow + display numeral so the section
-        // reads as a genuine feature, not a plain form label.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Column(
+        Text('WHAT BUYERS SAY', style: AppType.eyebrow),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: editorialRadius(0, ShapeTier.accent),
+          ),
+          child: Row(
+            children: [
+              // Display numeral, so the section reads as a genuine feature
+              // rather than a plain form label.
+              Text('${_product.ratingCount}', style: AppType.priceNumeral(34)),
+              const SizedBox(width: 12),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('WHAT BUYERS SAY', style: AppType.eyebrow),
-                  const SizedBox(height: 6),
+                  Text(
+                    _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
+                    style: AppType.eyebrow,
+                  ),
+                  const SizedBox(height: 4),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text('${_product.ratingCount}', style: AppType.priceNumeral(34)),
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
-                          style: AppType.eyebrow,
-                        ),
+                      Icon(Icons.star_rounded,
+                          size: 16, color: AppColors.ratingStar),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_product.rating.toStringAsFixed(1)} average',
+                        style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ),
                 ],
               ),
-            ),
-            TextButton(onPressed: () => _showAllReviews(context), child: const Text('See all')),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        if (_product.ratingCount == 0)
+        const SizedBox(height: 14),
+        for (final review in myReviews) _ownReviewTile(theme, review),
+        if (myReviews.isEmpty && _product.ratingCount == 0)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text('No reviews yet — be the first to leave one.', style: theme.textTheme.bodySmall),
-          )
-        else
-          ...List.generate(2, (i) => _reviewTile(theme, ext, i)),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text('No reviews yet — be the first to leave one.',
+                style: theme.textTheme.bodySmall),
+          ),
+        // Only offered when there's something to review: you can't rate a
+        // product you never received, and the button would have no order to
+        // attach the review to.
+        if (purchased && myReviews.isEmpty) ...[
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _openReview(context),
+              icon: const Icon(Icons.star_border, size: 16),
+              label: const Text('Write a Review'),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _reviewTile(ThemeData theme, AppThemeExtension ext, int i) {
-    final names = ['Marielle S.', 'Jonah P.'];
-    final comments = [
-      'Fabric feels premium and true to what\'s described. Would repurchase.',
-      'Arrived earlier than expected and well packaged. Very happy with it.',
-    ];
+  /// Opens the review form for this product against the order it was bought
+  /// on — the first order that contains it, which is the purchase the buyer is
+  /// most likely thinking about.
+  ///
+  /// Silent when no such order exists rather than falling back to some other
+  /// order: a review is attached to a real purchase, and inventing one would
+  /// put words in someone's mouth about a parcel they never got.
+  void _openReview(BuildContext context) {
+    final orders = context
+        .read<OrderState>()
+        .resolvedOrders(context.read<CourierState>());
+    for (final order in orders) {
+      if (order.productIds.contains(_product.id)) {
+        _pushReview(context, order);
+        return;
+      }
+    }
+  }
+
+  /// One review this device wrote, with its provenance stated rather than
+  /// implied — the badge is the whole point of this tile.
+  Widget _ownReviewTile(ThemeData theme, ProductReview review) {
+    final written = review.createdAt;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(i, big: 20, small: 8),
+        color: AppColors.surface,
+        borderRadius: editorialRadius(0, ShapeTier.accent),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(names[i], style: theme.textTheme.labelLarge),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.tertiary.withValues(alpha: 0.22),
+                  borderRadius: radiusOf(ShapeTier.pill),
+                ),
+                child: Text(
+                  'YOUR REVIEW',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    // Light ink on the pale sage fill, same rule as the
+                    // Featured tag — see AppPalette.textOnLight.
+                    color: AppColors.textOnLight,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
               const Spacer(),
               Row(
                 children: List.generate(
                   5,
                   (star) => Icon(
-                    Icons.star_rounded,
+                    star < review.stars
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
                     size: 14,
-                    color: star < 5 - i ? AppColors.ratingStar : AppColors.divider,
+                    color: star < review.stars
+                        ? AppColors.ratingStar
+                        : AppColors.textSecondary,
                   ),
                 ),
               ),
             ],
           ),
+          if (review.comment.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(review.comment,
+                style: theme.textTheme.bodySmall?.copyWith(height: 1.4)),
+          ],
+          if (review.photoPath != null) ...[
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: editorialRadius(0, ShapeTier.accent),
+              child: Image.file(
+                File(review.photoPath!),
+                width: 88,
+                height: 88,
+                fit: BoxFit.cover,
+                // The file is gone (cleared storage) — a label, not a broken
+                // glyph.
+                errorBuilder: (context, error, stack) => SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: Icon(Icons.image_not_supported_outlined,
+                      color: AppColors.textSecondary),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 6),
-          Text(comments[i], style: theme.textTheme.bodySmall?.copyWith(height: 1.4)),
+          Row(
+            children: [
+              Text(
+                '${written.day}/${written.month}/${written.year}',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => _editReview(context, review),
+                child: const Text('Edit'),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Re-opens the form for a review already written, against the order it came
+  /// from. ReviewScreen pre-fills from the existing review, so this is an edit
+  /// rather than a second opinion on the same purchase.
+  void _editReview(BuildContext context, ProductReview review) {
+    for (final order in context.read<OrderState>().orders) {
+      if (order.id == review.orderId) {
+        _pushReview(context, order);
+        return;
+      }
+    }
+  }
+
+  void _pushReview(BuildContext context, Order order) {
+    Navigator.of(context).push(
+      AppPageRoute(
+        builder: (_) => ReviewScreen(
+          order: order,
+          // Just this product: the rest of that order's items are either
+          // already reviewed or not what the buyer is looking at.
+          products: [_product],
+        ),
       ),
     );
   }
@@ -770,10 +898,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(28),
-        ),
+        // index 1 — the mirrored lean, so this bar and the cart's summary
+        // bar (index 0) lean opposite ways instead of both being typed by
+        // hand with one number swapped.
+        borderRadius: editorialRadius(1, ShapeTier.card),
         boxShadow: [
           BoxShadow(
             color: AppColors.neutral.withValues(alpha: 0.12),

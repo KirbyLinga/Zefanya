@@ -5,10 +5,15 @@
 // name — fine for this mock-data scope, but note that two different
 // contacts sharing a display name would collide; swap for a stable
 // conversation id once conversations come from a real backend.
+//
+// The history itself is the [ChatRepository]'s, not this class's: the threads,
+// the storage key and the JSON shape all live there now, and this class holds
+// only the loaded copy that the synchronous `messagesFor` reads. That is what
+// makes a live thread possible at all — see the note on `load()` for why the
+// cache is warmed from the repository rather than filled lazily.
 
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../data/repositories/chat_repository.dart';
 
 class ChatMessage {
   const ChatMessage({required this.text, required this.isMe, required this.time});
@@ -27,50 +32,54 @@ class ChatMessage {
 }
 
 class ChatState extends ChangeNotifier {
+  /// [repository] defaults to the mock implementation so existing call sites
+  /// (and tests) are unaffected; `main.dart` passes the resolved bundle's.
+  ///
+  /// The repository rather than this class owning its own storage: threads are
+  /// data, and one store is the only way two screens cannot disagree about what
+  /// was said.
+  ChatState({ChatRepository? repository})
+      : _repository = repository ?? MockChatRepository();
+
+  final ChatRepository _repository;
+
+  /// Threads as of the last [load] / [seedIfEmpty] / [addMessage].
+  ///
+  /// A cache because [messagesFor] is synchronous and called from `build()`.
   final Map<String, List<ChatMessage>> _threads = {};
 
-  static const _storageKey = 'chat_threads';
+  List<ChatMessage> messagesFor(String contactName) =>
+      List.unmodifiable(_threads[contactName] ?? const []);
 
-  List<ChatMessage> messagesFor(String contactName) => List.unmodifiable(_threads[contactName] ?? const []);
-
+  /// Call once before runApp (see main.dart).
   Future<void> load() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw == null) return;
-
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      _threads.clear();
-      decoded.forEach((contact, messages) {
-        _threads[contact] = (messages as List<dynamic>)
-            .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
-            .toList();
-      });
-    } catch (_) {
-      // Corrupt/old data shape — start with no history rather than crash.
-      _threads.clear();
-    }
+    await _repository.load();
+    // Warm the cache from the repository rather than leaving it empty until a
+    // thread is opened. An empty cache and "no history" would otherwise look
+    // identical, which is the confusion this persistence layer exists to avoid.
+    _threads
+      ..clear()
+      ..addAll(await _repository.threads());
   }
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode(_threads.map((contact, messages) => MapEntry(contact, messages.map((m) => m.toJson()).toList())));
-    await prefs.setString(_storageKey, encoded);
+  /// Seeds a thread with an opening message the first time it's opened — no-op
+  /// if the contact already has history (including from a previous session).
+  ///
+  /// The cache is refreshed from the repository afterwards rather than being
+  /// written here too: in live mode the thread is the *server's*, and a local
+  /// append would make the screen show a message the server never stored.
+  Future<void> seedIfEmpty(String contactName, ChatMessage greeting) async {
+    await _repository.seedIfEmpty(contactName, greeting);
+    await _refreshThread(contactName);
   }
 
-  /// Seeds a thread with an opening message the first time it's
-  /// opened — no-op if the contact already has history (including from
-  /// a previous session).
-  void seedIfEmpty(String contactName, ChatMessage greeting) {
-    if (_threads.containsKey(contactName)) return;
-    _threads[contactName] = [greeting];
+  Future<void> addMessage(String contactName, ChatMessage message) async {
+    await _repository.append(contactName, message);
+    await _refreshThread(contactName);
+  }
+
+  Future<void> _refreshThread(String contactName) async {
+    _threads[contactName] = await _repository.messagesFor(contactName);
     notifyListeners();
-    _save();
-  }
-
-  void addMessage(String contactName, ChatMessage message) {
-    _threads.putIfAbsent(contactName, () => []).add(message);
-    notifyListeners();
-    _save();
   }
 }

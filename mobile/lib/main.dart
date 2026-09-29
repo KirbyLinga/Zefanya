@@ -1,6 +1,8 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'config/dev_flags.dart';
+import 'data/repositories/repositories.dart';
 import 'theme/app_theme.dart';
 import 'state/auth_state.dart';
 import 'state/cart_state.dart';
@@ -8,6 +10,8 @@ import 'state/chat_state.dart';
 import 'state/courier_state.dart';
 import 'state/order_state.dart';
 import 'state/recently_viewed_state.dart';
+import 'state/review_state.dart';
+import 'state/theme_state.dart';
 import 'state/wishlist_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/pending_approval_screen.dart';
@@ -23,17 +27,41 @@ void main() async {
   // aren't guaranteed ready yet.
   WidgetsFlutterBinding.ensureInitialized();
 
-  final authState = AuthState();
-  final cartState = CartState();
-  final chatState = ChatState();
-  final courierState = CourierState();
-  final orderState = OrderState();
-  final recentlyViewedState = RecentlyViewedState();
-  final wishlistState = WishlistState();
+  // The one place the mock/real decision is made. Defaults to mock, because
+  // the Laravel API does not exist yet — see config/dev_flags.dart. Everything
+  // below receives interfaces and cannot tell which mode it is in, which is
+  // what keeps the switch a config change rather than a code change.
+  final repositories = Repositories.forMode(
+    useLive: kUseLiveApi,
+    baseUrl: kApiBaseUrl,
+  );
+
+  final authState = AuthState(repository: repositories.auth);
+  // The state classes that resolve catalogue ids take the repository, so they
+  // no longer reach into `mock_data` themselves.
+  final cartState = CartState(
+    catalog: repositories.catalog,
+    vouchers: repositories.cart,
+  );
+  final chatState = ChatState(repository: repositories.chat);
+  final courierState = CourierState(repository: repositories.courier);
+  final orderState = OrderState(repository: repositories.order);
+  final recentlyViewedState = RecentlyViewedState(catalog: repositories.catalog);
+  final reviewState = ReviewState(repository: repositories.review);
+  final wishlistState = WishlistState(catalog: repositories.catalog);
+  final themeState = ThemeState();
   // Restore any saved session/cart/chat/courier-job state before the
   // first frame, so nothing flashes empty then jumps to the real state,
   // and so AuthGate below has a real AccountStatus to gate the landing
   // screen on rather than a placeholder.
+  //
+  // Each `load()` here is also what pulls its repository's local restore
+  // (placed orders, written reviews, chat threads), which is why the bundle's
+  // own `Repositories.loadLocal()` is deliberately NOT in this list: it would
+  // read the same storage a second time for the same result. A live build must
+  // still not block its first frame on a network call that may be slow or
+  // unreachable, and every live repository's `load()` is a no-op for exactly
+  // that reason — see the note in repositories.dart.
   await Future.wait([
     authState.load(),
     cartState.load(),
@@ -41,7 +69,11 @@ void main() async {
     courierState.load(),
     orderState.load(),
     recentlyViewedState.load(),
+    reviewState.load(),
     wishlistState.load(),
+    // Restored before the first frame, so someone who chose dark doesn't
+    // get a flash of light on every cold start.
+    themeState.load(),
   ]);
 
   runApp(
@@ -53,7 +85,9 @@ void main() async {
         ChangeNotifierProvider.value(value: courierState),
         ChangeNotifierProvider.value(value: orderState),
         ChangeNotifierProvider.value(value: recentlyViewedState),
+        ChangeNotifierProvider.value(value: reviewState),
         ChangeNotifierProvider.value(value: wishlistState),
+        ChangeNotifierProvider.value(value: themeState),
       ],
       child: const MarketplaceApp(),
     ),
@@ -68,10 +102,27 @@ class MarketplaceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The palette every `AppColors.*` getter resolves against is decided
+    // here, at the root, before anything below builds. MaterialApp
+    // evaluates BOTH `theme` and `darkTheme` on every build (it needs both
+    // for the mode-switch animation), so neither factory can tell us which
+    // one actually won — this line is the single source of truth, and it
+    // runs before the first paint.
+    final themeState = context.watch<ThemeState>();
+    AppColors.apply(themeState.brightness);
+
     return MaterialApp(
       title: 'Marketplace',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeState.mode,
+      // Widgets read AppColors directly, so the palette flips instantly on
+      // toggle. Material's default theme cross-fade would leave
+      // Material-derived colours (text theme, borders) animating for
+      // 200ms against already-switched surfaces — a half-state on every
+      // flip, which is exactly what this refactor exists to avoid.
+      themeAnimationDuration: Duration.zero,
       // Paints the app's background once, here, instead of every Scaffold
       // repeating a flat fill. The stack itself lives in
       // widgets/app_atmosphere.dart so the landing screen can render the

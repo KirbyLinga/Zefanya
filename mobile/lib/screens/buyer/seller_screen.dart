@@ -165,7 +165,7 @@ class _SellerHero extends StatelessWidget {
       children: [
         // Gradient hero banner
         ClipRRect(
-          borderRadius: editorialRadius(0, tier: EditorialTier.hero),
+          borderRadius: editorialRadius(0, ShapeTier.hero),
           child: Container(
             margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
@@ -184,7 +184,7 @@ class _SellerHero extends StatelessWidget {
               children: [
                 // Back button
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: AppColors.textOnDark),
+                  icon: Icon(Icons.arrow_back, color: AppColors.textOnDark),
                   onPressed: () => Navigator.of(context).maybePop(),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -221,9 +221,9 @@ class _SellerHero extends StatelessWidget {
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
                   onPressed: onChat,
-                  icon: const Icon(Icons.chat_bubble_outline, size: 16,
+                  icon: Icon(Icons.chat_bubble_outline, size: 16,
                       color: AppColors.textOnDark),
-                  label: const Text('Chat with Seller',
+                  label: Text('Chat with Seller',
                       style: TextStyle(color: AppColors.textOnDark)),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(

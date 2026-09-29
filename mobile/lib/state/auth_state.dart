@@ -21,8 +21,28 @@
 // real API calls, and consider flutter_secure_storage instead of
 // shared_preferences once there's a real auth token to protect.
 
+// ## Where the answer comes from now
+//
+// Signing in and signing out go through an [AuthRepository]. That matters for
+// one specific reason: with no repository, a *live* build's login would still
+// mint a local "active" session, so the app would claim someone was signed in
+// against a server that had never heard of them. The status now comes back from
+// the repository — the mock returns exactly the session this class used to set
+// itself, so nothing about the flow changes in mock mode, and in live mode the
+// fake is gone.
+//
+// Registration is the one auth action still decided locally, because the form
+// has no password field for `register()` to send — see `submitForApproval`.
+//
+// What deliberately stays here: the profile fields (name, address, avatar) and
+// their prefs storage. Those are display data the app already owns; moving them
+// to the network would make every profile edit a request that can fail, which
+// changes Edit Profile's behaviour. See auth_repository.dart for the same
+// boundary stated from the other side.
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/repositories/auth_repository.dart';
 
 enum UserRole { buyer, courier }
 
@@ -40,6 +60,14 @@ enum AccountStatus {
 }
 
 class AuthState extends ChangeNotifier {
+  /// [repository] defaults to the mock implementation so existing call sites
+  /// (and tests) keep working unchanged; `main.dart` passes the resolved
+  /// bundle's, which is what makes the live switch possible.
+  AuthState({AuthRepository? repository})
+      : _repository = repository ?? const MockAuthRepository();
+
+  final AuthRepository _repository;
+
   UserRole? role;
   AccountStatus status = AccountStatus.loggedOut;
   String? lastName;
@@ -151,20 +179,42 @@ class AuthState extends ChangeNotifier {
   }
 
   /// Call after a successful login of an already-approved account.
-  void login({required UserRole role, String? name, String? email}) {
-    this.role = role;
-    status = AccountStatus.active;
-    this.name = name;
-    this.email = email;
-    memberSince ??= DateTime.now();
-    notifyListeners();
-    _save();
+  ///
+  /// The role and status are the *repository's* answer, not this method's
+  /// assertion — [AuthResult] exists precisely so "your credentials are fine
+  /// but your account isn't active yet" is expressible, which a locally-set
+  /// `status = active` cannot represent. In mock mode the answer is the same
+  /// active session this used to set directly, so routing is unchanged.
+  ///
+  /// A failure propagates: the login screen reports it rather than appearing to
+  /// sign someone in who was never signed in.
+  Future<void> login({
+    required UserRole role,
+    required String email,
+    required String password,
+    String? name,
+  }) async {
+    final result = await _repository.login(
+      role: role,
+      email: email,
+      password: password,
+    );
+    _applyResult(result, fallbackName: name);
+    await _save();
   }
 
   /// Call on registration submit for BOTH Buyer and Courier — every
   /// role now waits on review before becoming active, per the updated
   /// spec. PendingApprovalScreen reads `role` to show the right
   /// reviewer (administrator vs Logistics/Sorting Center).
+  ///
+  /// Still local, and that is a decision rather than an omission:
+  /// [AuthRepository.register] requires a password, and the registration form
+  /// does not collect one yet (the ERP flow adds it with the email OTP). Passing
+  /// an empty string to satisfy the signature would be inventing a credential —
+  /// exactly the fiction a repository is supposed to prevent — so the pending
+  /// status is set here until the form has a password to hand over. The endpoint
+  /// it will call is `POST /auth/{role}/register` (`docs/api-contract.md` §3.2).
   void submitForApproval({required UserRole role, String? name, String? email}) {
     this.role = role;
     status = AccountStatus.pendingApproval;
@@ -173,6 +223,18 @@ class AuthState extends ChangeNotifier {
     memberSince ??= DateTime.now();
     notifyListeners();
     _save();
+  }
+
+  /// Takes the repository's answer as the session, keeping whatever name the
+  /// caller supplied when the server didn't send one (it has no reason to
+  /// echo a display name back on a login).
+  void _applyResult(AuthResult result, {String? fallbackName}) {
+    role = result.role;
+    status = result.status;
+    name = result.name ?? fallbackName ?? name;
+    email = result.email ?? email;
+    memberSince ??= DateTime.now();
+    notifyListeners();
   }
 
   /// TEST-ONLY helper so the approval loop is verifiable without a
@@ -217,7 +279,16 @@ class AuthState extends ChangeNotifier {
     _save();
   }
 
-  void logout() {
+  /// Signs out: this device's session is cleared, then the repository is told
+  /// to revoke the server session.
+  ///
+  /// In that order on purpose. The person asked to be signed out of *this*
+  /// device and that part cannot fail, so it happens first; a revoke that fails
+  /// then propagates to the caller instead of being swallowed, because a live
+  /// token outliving the sign-out is the one outcome worse than an error. In
+  /// mock mode the repository's `logout()` is a no-op, so nothing about signing
+  /// out changes — see `docs/api-contract.md` §3.3.
+  Future<void> logout() async {
     role = null;
     status = AccountStatus.loggedOut;
     lastName = null;
@@ -234,6 +305,7 @@ class AuthState extends ChangeNotifier {
     avatarPath = null;
     memberSince = null;
     notifyListeners();
-    _save();
+    await _save();
+    await _repository.logout();
   }
 }

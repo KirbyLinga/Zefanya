@@ -23,48 +23,30 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Asymmetric corner radii — big on one diagonal, small on the other.
+// Re-exported so a widget that already imports the shapes file can name a
+// tier (`ShapeTier.card`) without a second import.
+export '../theme/app_theme.dart' show ShapeTier;
+
+/// Asymmetric corner radii — long on one diagonal, short on the other.
 ///
 /// [index] alternates the direction of the "leaf" so a grid of these
 /// doesn't become its own uniform pattern; pass the item's index and
-/// adjacent tiles will lean opposite ways.
+/// adjacent tiles lean opposite ways.
 ///
-/// ## Named tiers — prefer these over raw numbers at call sites:
+/// The corners themselves come from [ShapeTier] — the app's single shape
+/// vocabulary, defined in `theme/app_theme.dart` along with the reasoning
+/// and the table. This function is only the *applicator*: it turns a tier
+/// into four asymmetric radii, leaning per [index].
 ///
-/// | Tier            | big  | small | Used for                              |
-/// |-----------------|------|-------|---------------------------------------|
-/// | Hero   (44/10)  |  44  |  10   | Full-bleed feature surfaces (profile  |
-/// |                 |      |       | hero, earnings summary card)          |
-/// | Card   (28/8)   |  28  |   8   | Standard content cards (order cards,  |
-/// |                 |      |       | job cards, section panels)            |
-/// | Accent (20/6)   |  20  |   6   | Smaller inset surfaces (review tiles, |
-/// |                 |      |       | seller row, proof upload box)         |
-///
-/// Pass [index] so adjacent items lean opposite ways. Default values
-/// match the original `editorialRadius(i)` call sites (big:34, small:6)
-/// for backwards compat — prefer one of the named tiers above.
-///
-/// Quick usage:
 /// ```dart
-/// editorialRadius(index)                  // default (34/6), backwards compat
-/// editorialRadius(index, tier: EditorialTier.card)   // 28/8
-/// editorialRadius(index, tier: EditorialTier.hero)   // 44/10
-/// editorialRadius(index, tier: EditorialTier.accent) // 20/6
+/// editorialRadius(index, ShapeTier.card)    // 28 / 8
+/// editorialRadius(index, ShapeTier.hero)    // 44 / 10
+/// editorialRadius(index, ShapeTier.accent)  // 20 / 6
 /// ```
-enum EditorialTier {
-  /// 44/10 — full-bleed feature surfaces
-  hero,
-  /// 28/8 — standard content cards
-  card,
-  /// 20/6 — smaller inset surfaces
-  accent,
-}
-
-BorderRadius editorialRadius(int index, {double? big, double? small, EditorialTier? tier}) {
-  // Tier values take priority; explicit big/small override tier; defaults are 34/6.
-  final b = big ?? _tierBig(tier);
-  final s = small ?? _tierSmall(tier);
+BorderRadius editorialRadius(int index, ShapeTier tier) {
   final leanLeft = index.isEven;
+  final b = tier.big;
+  final s = tier.small;
   return BorderRadius.only(
     topLeft: Radius.circular(leanLeft ? b : s),
     topRight: Radius.circular(leanLeft ? s : b),
@@ -73,24 +55,40 @@ BorderRadius editorialRadius(int index, {double? big, double? small, EditorialTi
   );
 }
 
-double _tierBig(EditorialTier? tier) => switch (tier) {
-      EditorialTier.hero   => 44,
-      EditorialTier.card   => 28,
-      EditorialTier.accent => 20,
-      null                 => 34,
-    };
+/// Escape hatch for the two shapes whose corners scale with their own
+/// *measured size* rather than following a tier: the success flourish
+/// (fractions of its animation size) and the profile hero's deliberately
+/// oversized leaf. Prefer [editorialRadius] — if a third call site wants
+/// this, it probably wants a tier, and the tier table should grow instead
+/// of this list.
+BorderRadius editorialRadiusRaw(int index,
+    {required double big, required double small}) {
+  final leanLeft = index.isEven;
+  return BorderRadius.only(
+    topLeft: Radius.circular(leanLeft ? big : small),
+    topRight: Radius.circular(leanLeft ? small : big),
+    bottomLeft: Radius.circular(leanLeft ? small : big),
+    bottomRight: Radius.circular(leanLeft ? big : small),
+  );
+}
 
-double _tierSmall(EditorialTier? tier) => switch (tier) {
-      EditorialTier.hero   => 10,
-      EditorialTier.card   => 8,
-      EditorialTier.accent => 6,
-      null                 => 6,
-    };
+/// A tier as a uniform radius, for Material surfaces that take one number
+/// — buttons, fields, sheets, ink splashes. Saves every call site from
+/// re-deciding between 8, 12, 16 and "a big one".
+BorderRadius radiusOf(ShapeTier tier) => BorderRadius.circular(tier.symmetric);
 
 /// Same idea as a ShapeBorder, for widgets that take a `shape:` rather
 /// than a `borderRadius:` (Card, Material).
-RoundedRectangleBorder editorialShape(int index, {double? big, double? small, EditorialTier? tier}) {
-  return RoundedRectangleBorder(borderRadius: editorialRadius(index, big: big, small: small, tier: tier));
+RoundedRectangleBorder editorialShape(int index, ShapeTier tier) {
+  return RoundedRectangleBorder(borderRadius: editorialRadius(index, tier));
+}
+
+/// Escape hatch, as [editorialRadiusRaw] — for `shape:` call sites.
+RoundedRectangleBorder editorialShapeRaw(int index,
+    {required double big, required double small}) {
+  return RoundedRectangleBorder(
+    borderRadius: editorialRadiusRaw(index, big: big, small: small),
+  );
 }
 
 /// A "shop window" arch: semicircular top, softly-rounded feet.
@@ -363,69 +361,4 @@ class _DiagonalPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DiagonalPainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.rise != rise;
-}
-
-/// A linen-weave texture band — a horizontal strip with a fine crosshatch
-/// pattern drawn in code rather than a bitmap, so it scales cleanly at
-/// any DPI and never loads an asset. Used as a section divider to add
-/// material variation between content bands without color contrast.
-///
-/// The weave density is deliberately coarse (every [gap] pixels) so it
-/// reads as texture from a normal viewing distance without looking like
-/// a grid at close range.
-class LinenDivider extends StatelessWidget {
-  const LinenDivider({super.key, this.height = 32, this.color, this.gap = 6.0});
-
-  final double height;
-  final Color? color;
-  final double gap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _LinenPainter(
-          color: color ?? AppColors.neutral.withValues(alpha: 0.09),
-          gap: gap,
-        ),
-      ),
-    );
-  }
-}
-
-class _LinenPainter extends CustomPainter {
-  const _LinenPainter({required this.color, required this.gap});
-
-  final Color color;
-  final double gap;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 0.8
-      ..strokeCap = StrokeCap.round;
-
-    // Horizontal threads
-    for (double y = gap / 2; y < size.height; y += gap) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-
-    // Vertical threads — slightly more transparent so the weave feels
-    // woven, not like a plain grid.
-    final vertPaint = Paint()
-      ..color = color.withValues(alpha: color.a * 0.6)
-      ..strokeWidth = 0.8
-      ..strokeCap = StrokeCap.round;
-
-    for (double x = gap / 2; x < size.width; x += gap) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), vertPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LinenPainter old) =>
-      old.color != color || old.gap != gap;
 }

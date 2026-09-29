@@ -3,20 +3,44 @@
 // Global cart, exposed via Provider (see main.dart) — same pattern as
 // AuthState. Product Details adds to it, Cart reads/mutates it,
 // Checkout reads the selected subset and clears it on order placement.
-// This replaces each screen's old private hardcoded item list, which
-// is why "Woven Rattan Tote Bag" used to show a different price
-// depending which screen you were looking at.
 //
-// Persisted via shared_preferences: each item is stored as just a
-// product id + variant + quantity + selected (not the full Product),
-// then rehydrated by looking the id up in mockProducts on load() — so
-// if a product is ever removed from the catalog, any saved cart entry
-// for it is silently dropped rather than crashing.
+// ## Where the cart's data comes from now
+//
+// From a [CatalogRepository], not from `mockProducts`. That distinction is the
+// whole point of this pass: the cart stores product *ids*, and resolving an id
+// to a product is a data-layer question. Reaching into `mock_data` directly
+// worked exactly once — it could not survive the catalogue becoming a network
+// call without rewriting this file's rehydration, and every other state
+// class's alongside it.
+//
+// The voucher *catalogue* comes from a [CartRepository] for the same reason:
+// which vouchers exist is the server's answer, and the two screens that list
+// them (Cart's code box, the vouchers wallet) must not be reading a hardcoded
+// list while a live build believes they are. What a voucher is *worth* is a
+// different question, and stays in `config/pricing.dart`.
+//
+// The rehydration path is therefore: read saved ids from disk, ask the
+// repository for the catalogue, keep only the ids it still knows about. That
+// also means **an id the catalogue no longer lists is silently dropped**, which
+// is the same behaviour the cart already had (and is better than crashing on a
+// product that was delisted while it sat in someone's cart).
+//
+// ## A limitation worth stating, because live mode will hit it
+//
+// Rehydration asks for the *whole* catalogue and indexes it. That is correct
+// and cheap against the mock catalogue (8 products) and against a paginated
+// live catalogue it is a real weakness: a saved item on page 4 would vanish
+// from the cart because the first page didn't include it. The fix is a
+// server-side cart (`GET /cart`) rather than a client-side id list, which is
+// OPEN QUESTIONS §0.4 in `docs/api-contract.md` — recorded there rather than
+// guessed at here.
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../data/mock_data.dart';
+import '../data/repositories/cart_repository.dart';
+import '../data/repositories/catalog_repository.dart';
+import '../data/mock_data.dart' show Product, Voucher;
 
 class CartItem {
   CartItem({
@@ -35,7 +59,33 @@ class CartItem {
 }
 
 class CartState extends ChangeNotifier {
+  /// [catalog] defaults to the mock repository so existing call sites (and
+  /// tests) keep working unchanged. `main.dart` passes the resolved bundle's
+  /// repository explicitly, which is what makes the live switch possible.
+  ///
+  /// [vouchers] is named for the one thing that repository owns today — the
+  /// voucher catalogue — rather than for its interface name, because a
+  /// parameter called `cart` inside `CartState` would say nothing about what
+  /// was being handed over. See cart_repository.dart for why the maths stays in
+  /// `config/pricing.dart` and the line items stay here.
+  CartState({CatalogRepository? catalog, CartRepository? vouchers})
+      : _catalog = catalog ?? const MockCatalogRepository(),
+        _vouchers = vouchers ?? const MockCartRepository();
+
+  final CatalogRepository _catalog;
+  final CartRepository _vouchers;
+
   final List<CartItem> _items = [];
+
+  /// The vouchers on offer, as of the last [load].
+  ///
+  /// Cached because Cart and the vouchers wallet both read this from `build()`,
+  /// and because the *contents* are the server's answer — a screen must not be
+  /// able to hold a list that a later load replaces without it noticing.
+  List<Voucher> _offer = const [];
+
+  /// Vouchers the buyer can choose from. Empty means none are running.
+  List<Voucher> get vouchers => List.unmodifiable(_offer);
 
   static const _storageKey = 'cart_items';
 
@@ -46,26 +96,42 @@ class CartState extends ChangeNotifier {
 
   /// Call once before runApp (see main.dart) to restore the cart from disk.
   Future<void> load() async {
+    // The voucher catalogue first, and *outside* the try below: a failure to
+    // ask for it is a real "couldn't reach the server" in live mode, whereas
+    // everything inside the try is local restore where a corrupt value should
+    // cost one line rather than the whole account.
+    _offer = List.of(await _vouchers.vouchers());
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_storageKey);
       if (raw == null) return;
 
       final decoded = jsonDecode(raw) as List<dynamic>;
+      // One catalogue read for the whole restore, indexed by id — rather than
+      // one lookup per line, which would be N requests in live mode to resolve
+      // N ids.
+      final byId = <String, Product>{
+        for (final p in await _catalog.products()) p.id: p,
+      };
+
       _items.clear();
       for (final entry in decoded) {
         final map = entry as Map<String, dynamic>;
-        final matches = mockProducts.where((p) => p.id == map['productId']);
-        if (matches.isEmpty) continue; // product no longer in the catalog — drop it
+        final product = byId[map['productId']];
+        if (product == null) continue; // no longer in the catalogue — drop it
         _items.add(CartItem(
-          product: matches.first,
+          product: product,
           variant: map['variant'] as String? ?? '',
           quantity: map['quantity'] as int? ?? 1,
           selected: map['selected'] as bool? ?? true,
         ));
       }
     } catch (_) {
-      // Corrupt/old data shape — start with an empty cart rather than crash.
+      // Corrupt/old data shape, or the catalogue is unreachable — start with an
+      // empty cart rather than crash. In live mode this means a cart that
+      // cannot be restored renders as empty rather than as an error, which is a
+      // deliberate trade: a cart is trivially re-fillable, and blocking the
+      // whole app's startup on a network call would be worse.
       _items.clear();
     }
   }

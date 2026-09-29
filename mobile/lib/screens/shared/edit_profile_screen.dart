@@ -202,7 +202,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ElevatedButton(
               onPressed: _isSaving ? null : _save,
               child: _isSaving
-                  ? const ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
+                  ? ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
                   : const Text('Save Changes'),
             ),
           ],

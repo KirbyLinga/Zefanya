@@ -139,7 +139,9 @@ class _LandingScreenState extends State<LandingScreen>
                         // size, so 5 at 104px is proportionally correct
                         // but optically heavy for a mark this large.
                         strokeWidth: 4,
-                        color: AppColors.primaryDark,
+                        // textPrimary (warm off-white) on the dark backdrop —
+                        // primaryDark was near-invisible on the ink ground.
+                        color: AppColors.textPrimary,
                       ),
                       const SizedBox(height: 28),
                       _Fade(

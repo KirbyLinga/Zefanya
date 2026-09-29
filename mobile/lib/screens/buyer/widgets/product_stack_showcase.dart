@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/mock_data.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/editorial_shapes.dart';
 import '../product_details_screen.dart';
 import '../../../widgets/app_page_route.dart';
 import 'product_card.dart';
@@ -108,7 +109,6 @@ class _StackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
-    final tint = productTint(product.category);
 
     return SizedBox(
       width: width,
@@ -135,7 +135,7 @@ class _StackCard extends StatelessWidget {
                     width: double.infinity,
                     child: Stack(
                       children: [
-                        Hero(tag: heroTag, child: ProductImage(productId: product.id, tint: tint)),
+                        Hero(tag: heroTag, child: ProductImage(product: product)),
                         Positioned(
                           left: 8,
                           top: 8,
@@ -143,14 +143,14 @@ class _StackCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: AppColors.surface.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: radiusOf(ShapeTier.pill),
                             ),
                             child: Text(
                               product.category.toUpperCase(),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.4,
-                                color: AppColors.primaryDark,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
@@ -173,7 +173,7 @@ class _StackCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         '₱${product.price.toStringAsFixed(0)}',
-                        style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+                        style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.accent),
                       ),
                     ],
                   ),
