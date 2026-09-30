@@ -29,6 +29,7 @@
 // The *token* is different, and it is here, because it is the one thing that
 // must live in secure storage rather than preferences.
 
+import '../../config/dev_flags.dart';
 import '../../state/auth_state.dart';
 import '../api/api_exception.dart';
 import '../dto/registration_payload.dart';
@@ -43,6 +44,7 @@ class AuthResult {
     this.name,
     this.email,
     this.registrationStatus,
+    this.verificationId,
   });
 
   final UserRole role;
@@ -60,6 +62,29 @@ class AuthResult {
   /// True when the account exists and the credentials were accepted, but the
   /// registration isn't approved yet.
   bool get needsApproval => status == AccountStatus.pendingApproval;
+
+  /// The server's handle for confirming this registration's email, when it gave
+  /// one, and `null` when there is nothing to confirm.
+  ///
+  /// **Opaque, and treated as such.** The route is keyed on the server's own row
+  /// id (`POST /register/buyer/verify-otp/{buyer}`), so this app neither parses
+  /// it nor builds one out of what it does know: an email is not an id, and a
+  /// client that assembled its own handle would be guessing at a URL segment
+  /// whose only correct value comes from the server. It is carried so
+  /// [AuthRepository.verifyOtp] has something to send back, and for nothing
+  /// else. A `String` rather than an int for the same reason — the shape is the
+  /// server's business.
+  final String? verificationId;
+
+  /// Whether this answer opened an email gate the app could act on.
+  ///
+  /// Both halves are needed: `pending_verification` says there is a code to
+  /// confirm, and [verificationId] is what a confirmation would be sent
+  /// *against*. A screen checking only the status would render a code field
+  /// whose submit could never be addressed to anything.
+  bool get canConfirmEmail =>
+      registrationStatus == RemoteRegistrationStatus.pendingVerification &&
+      verificationId != null;
 }
 
 abstract class AuthRepository {
@@ -97,6 +122,43 @@ abstract class AuthRepository {
     required String email,
     required String password,
     required RegistrationProfile profile,
+  });
+
+  /// Confirms the emailed code that gates a registration.
+  ///
+  /// The two registration gates are not the same kind of wait, and this is the
+  /// only one the person can resolve alone: [register] answers
+  /// `pending_verification` with a [AuthResult.verificationId], and this call
+  /// trades that handle plus six digits for the account's next status — usually
+  /// `pending_approval`, the email gate closing and the human queue opening.
+  ///
+  /// A wrong or an expired code is a **rejection, not a failure**: the server
+  /// answers `422 {ok: false, message}`. It therefore does not arrive as a
+  /// [ValidationException] with an empty field map, which would claim the server
+  /// named a field when all it said was no — see the note on the mock.
+  ///
+  /// Returns [AuthResult] rather than `void` because confirming can change what
+  /// the account may do, and a screen that had to *assume* it worked would be
+  /// showing a status it invented in order to show one.
+  Future<AuthResult> verifyOtp({
+    required UserRole role,
+    required String verificationId,
+    required String code,
+  });
+
+  /// Sends a fresh code, invalidating the previous one.
+  ///
+  /// Returns nothing because the server's reply carries nothing: `{ok: true,
+  /// message}` and no new status or handle. A screen's copy for this is the
+  /// server's own sentence for that reason — "a new code has been sent" is a
+  /// claim only the party that sent the mail is in a position to make.
+  ///
+  /// Separate from [verifyOtp] rather than a flag on it: two requests with two
+  /// different answers, and the one that fails to *send* must not read like the
+  /// one that failed to *match*.
+  Future<void> resendOtp({
+    required UserRole role,
+    required String verificationId,
   });
 
   /// Signs out, server-side if there is a server.
@@ -155,6 +217,53 @@ class MockAuthRepository implements AuthRepository {
         registrationStatus: RemoteRegistrationStatus.pendingApproval,
       );
 
+  /// Accepts [kMockOtpCode] and rejects everything else the way the server does.
+  ///
+  /// The rejection is [RequestRejectedException], not [ValidationException], and
+  /// that is a faithful copy rather than a shortcut: a wrong code comes back as
+  /// `422 {ok: false, message: '...'}` with **no** `errors` map, where a
+  /// validation failure is a field bag. A field-keyed exception here would claim
+  /// the server had said *which* field was wrong when all it said was no — and
+  /// the screen would then highlight a field the real server never pointed at.
+  ///
+  /// The comparison is trimmed because the value comes from a text field, where
+  /// a trailing space is a typing artefact rather than a wrong code.
+  @override
+  Future<AuthResult> verifyOtp({
+    required UserRole role,
+    required String verificationId,
+    required String code,
+  }) async {
+    if (code.trim() != kMockOtpCode) {
+      throw const RequestRejectedException(
+        statusCode: 422,
+        message: "That code doesn't match. Please try again.",
+      );
+    }
+    // Confirmed, so the account leaves the email gate and joins the review
+    // queue: the same answer `register()` gives, reached from the other side.
+    return AuthResult(
+      role: role,
+      status: AccountStatus.pendingApproval,
+      registrationStatus: RemoteRegistrationStatus.pendingApproval,
+    );
+  }
+
+  /// A no-op, and the one place in mock mode that says the opposite of what
+  /// happened.
+  ///
+  /// Nothing sends an email, so "a new code has been sent" is fiction. It is
+  /// tolerable for the same reason the pending screen's reviewer copy is: the
+  /// only builds that can reach this in mock mode are dev-tools builds
+  /// ([kShowDevTools]), whose purpose is demonstrating a flow that has no
+  /// backend yet. A real build cannot arrive here at all, because `register()`
+  /// never answers `pending_verification` in mock mode.
+  @override
+  Future<void> resendOtp({
+    required UserRole role,
+    required String verificationId,
+  }) async {}
+
   @override
   Future<void> logout() async {}
 
@@ -204,6 +313,42 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     // not `POST /auth/buyer/register`. The string below is therefore this app's
     // own vocabulary and is not presented as the server's URL.
     return notWired('POST /auth/${role.name}/register', section: '§3.2');
+  }
+
+  /// The server's route for a role's confirmation, taken from
+  /// `web/routes/web.php` rather than from `docs/api-contract.md`.
+  ///
+  /// Two asymmetries are recorded here instead of being smoothed over: this app
+  /// says `courier` where the server says `logistics`, and the server's path
+  /// segment is named after its own model (`{buyer}`, `{logistics_provider}`)
+  /// while what this app holds is an opaque [AuthResult.verificationId]. No
+  /// contract section number is attached, deliberately — the document it would
+  /// point at is not in this repository, whereas the route file is. See
+  /// memory-bank/techContext.md.
+  static String verifyOtpRoute(UserRole role) => role == UserRole.buyer
+      ? 'POST /register/buyer/verify-otp/{buyer}'
+      : 'POST /register/logistics/verify-otp/{logistics_provider}';
+
+  @override
+  Future<AuthResult> verifyOtp({
+    required UserRole role,
+    required String verificationId,
+    required String code,
+  }) {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    // Unwritten on purpose, like every other live method here. Even the body's
+    // shape is a guess — the web modal posts a field named `otp`, and `code` is
+    // just as plausible — and a guess that has never run is not a feature.
+    return notWired(verifyOtpRoute(role));
+  }
+
+  @override
+  Future<void> resendOtp({
+    required UserRole role,
+    required String verificationId,
+  }) {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return notWired('${verifyOtpRoute(role)}/resend');
   }
 
   @override

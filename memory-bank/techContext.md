@@ -127,3 +127,23 @@
   outgoing subtree, so the *new* page renders empty and the form silently stops
   advancing. See `progress.md` — this was live in `registration_screen.dart` and
   is why the swept test exists.
+- **A pending-timer failure at teardown is evidence, not noise.** Flutter fails a
+  widget test with "A Timer is still pending even after the widget tree was
+  disposed", and the fix is usually in the *widget*, not the test. Two shapes
+  seen here: `StaggeredReveal` schedules its start with `Future.delayed(25ms ×
+  index)` and never cancels it (it checks `mounted` instead), so a test that ends
+  before the reveal has run must pump past it — and an unkeyed `ListView` whose
+  children shift slots (an `if`-guarded block appearing between them) is
+  re-inflated rather than reused, which restarts every reveal below it. Keying
+  those children fixed both the timer and a real re-fade the person would see.
+- **The live repositories throw *synchronously*** — they are not `async`, so the
+  `throw` happens while the argument is being built. In a test,
+  `expectLater(live.verifyOtp(...), throwsA(...))` fails as an uncaught error;
+  wrap the call: `expectLater(() async => live.verifyOtp(...), ...)`, which
+  handles a synchronous throw and a rejected future alike.
+- **Push a screen, then count its timers.** Anything on a route that owns a
+  repeating animation (a `ZefanyaLoader`) makes `pumpAndSettle` hang forever, and
+  anything that owns a one-shot `Timer` makes an early test end fail. The OTP
+  screen's harness therefore uses `pump(Duration)` at every step, and the
+  cooldown test asserts the countdown, then pumps the full cooldown to prove the
+  button comes back.

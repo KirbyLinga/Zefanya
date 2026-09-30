@@ -38,9 +38,15 @@
 // gate was reachable here, so this screen could afford to assume it. Now the
 // repository can answer `pending_verification`, and telling someone to wait
 // for a reviewer when their real blocker is an unconfirmed email strands them
-// on a person who was never going to be asked. The gate copy deliberately
-// does *not* offer an in-app code field, because this build has no OTP screen:
-// it names the action (confirm the emailed code) and where the action happens.
+// on a person who was never going to be asked.
+//
+// The email gate now *hands over* that step instead of describing it: the OTP
+// screen takes the six digits, so the action is the app's own "Enter Code"
+// button rather than a sentence pointing at the mail client. The previous
+// version of this file named the action and where it happened, which was the
+// honest thing to do while no field existed — and the rule it keeps arriving at
+// is "name it or provide it, never invent it", inventing being what the fake
+// reviewer ETA was.
 //
 // The two axes are independent: the gate copy is not gated on kShowDevTools,
 // because a repository that answers `pending_verification` is a repository
@@ -51,9 +57,11 @@ import 'package:provider/provider.dart';
 import '../../config/dev_flags.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
+import 'otp_screen.dart';
 
 class PendingApprovalScreen extends StatelessWidget {
   const PendingApprovalScreen({super.key});
@@ -67,6 +75,9 @@ class PendingApprovalScreen extends StatelessWidget {
     // Which of the two gates this is. Both read as "waiting", but only one has
     // something the person can do about it — see the header note.
     final awaitingEmail = auth.awaitsEmailVerification;
+    // Whether there is a handle to confirm *against*. The gate alone is not
+    // enough to offer a field for — see [AuthState.canConfirmEmail].
+    final canConfirmEmail = auth.canConfirmEmail;
     final email = auth.email;
     // Per the spec: Buyer/Seller applications are reviewed by the
     // administrator; Courier applications are reviewed by the
@@ -121,19 +132,23 @@ class PendingApprovalScreen extends StatelessWidget {
                 index: 2,
                 child: Text(
                   awaitingEmail
-                      // Names the action and where it happens. It does not
-                      // offer an in-app code field, because there isn't one:
-                      // the confirmation happens from the email itself
-                      // (server-side that is
-                      // `register.{buyer,logistics}.verify-otp`), and pointing
-                      // at a field that doesn't exist would be the same class of
-                      // lie as the reviewer ETA this file already removed.
-                      ? 'We emailed a confirmation code to '
-                          '${email ?? 'the address on your application'}. '
-                          'Confirming that code is what moves your application '
-                          'on to review, so check that inbox — including the '
-                          'spam folder, where a code from a new sender often '
-                          'lands.'
+                      // The action, now that there is somewhere to take it: the
+                      // OTP screen. The inner branch is the case where the server
+                      // named the email gate but sent no handle to confirm
+                      // against, where a field could only ever fail with "we
+                      // don't know which registration this is" — so the copy
+                      // points at the email rather than at this app.
+                      ? (canConfirmEmail
+                          ? 'We emailed a confirmation code to '
+                              '${email ?? 'the address on your application'}. '
+                              'Enter it below to move your application on to '
+                              'review.'
+                          : 'We emailed a confirmation code to '
+                              '${email ?? 'the address on your application'}. '
+                              'Confirming that code is what moves your '
+                              'application on to review, so check that inbox '
+                              '— including the spam folder, where a code from a '
+                              'new sender often lands.')
                       : kShowDevTools
                           ? '$reviewer is verifying your submitted credentials and '
                               'documents. We\'ll notify you by email the moment your '
@@ -177,6 +192,21 @@ class PendingApprovalScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // The email gate's action, and the reason this screen is no
+                    // longer purely a status report: it hands over the one step
+                    // the person can take. Offered only when there is a handle to
+                    // confirm against, because a field with nothing to send the
+                    // code to would fail in a way nobody could act on — see
+                    // AuthState.canConfirmEmail.
+                    if (awaitingEmail && canConfirmEmail) ...[
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).push(
+                          AppPageRoute(builder: (_) => const OtpScreen()),
+                        ),
+                        child: const Text('Enter Code'),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     ElevatedButton(
                       onPressed: () {
                         // TODO: replace with a real status-check API call.
@@ -215,6 +245,23 @@ class PendingApprovalScreen extends StatelessWidget {
                     ),
                     if (kShowDevTools) ...[
                       const SizedBox(height: 16),
+                      // TEST-ONLY: opens the *email* gate — and the OTP screen
+                      // behind it — without a mail server, so the confirmation
+                      // flow can be walked end to end. The mock cannot answer
+                      // `pending_verification` on its own, because there is no
+                      // mail to send; the gate is opened as an affordance rather
+                      // than faked as a registration answer. See
+                      // AuthState.debugStartEmailVerification.
+                      if (!canConfirmEmail)
+                        TextButton(
+                          onPressed: () {
+                            context.read<AuthState>().debugStartEmailVerification();
+                            Navigator.of(context).push(
+                              AppPageRoute(builder: (_) => const OtpScreen()),
+                            );
+                          },
+                          child: const Text('Enter Code (Test)'),
+                        ),
                       // TEST-ONLY: simulates an admin approving this courier so
                       // the whole loop is verifiable without a real backend.
                       // Remove once real admin approval is wired up.

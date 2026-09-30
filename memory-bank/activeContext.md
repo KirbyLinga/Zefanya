@@ -9,7 +9,7 @@ mock/live decision is a single config line in `main()`:
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **160 tests pass** (up from 141). Nothing is blocked
+`flutter analyze` is clean; **184 tests pass** (up from 141). Nothing is blocked
 on the user except the `docs/api-contract.md` question below.
 
 What this session actually changed:
@@ -55,6 +55,36 @@ What this session actually changed:
    registration form (a `DropdownButton`'s row is as wide as its *hint*, so a
    long hint or a large text scale pushes the arrow off the field). The Address
    step had never been rendered before, because of (1).
+
+7. **The OTP screen exists, so the email gate now has an action in it.** Until
+   this, the pending screen told someone "we emailed you a code" and then offered
+   nothing to do with it: the app describing a step and declining to provide it.
+   `lib/screens/auth/otp_screen.dart` takes the six digits (digits-only and
+   six-long, enforced by input formatters, so the validator answers only for
+   *completeness*), `AuthState.confirmEmail()`/`resendConfirmationCode()` submit
+   them through `AuthRepository.verifyOtp`/`resendOtp`, and a successful answer
+   unwinds to `AuthGate` — this app's single route root — so the person lands on
+   the *other* gate rather than on a screen describing it.
+8. **The handle is carried, persisted, and never invented.** `AuthResult` gained
+   an opaque `verificationId` (the server's own row id: an email is not an id),
+   `AuthState` persists it (`auth_verification_id`, additive), and
+   `canConfirmEmail` requires **both** the gate *and* the handle. A
+   `pending_verification` with no handle renders no field at all, because every
+   call the app could make would need something it does not have.
+9. **The mock cannot honestly open the email gate, so a dev-tools affordance
+   does.** Sending mail is not something the mock can do, and answering
+   `pending_verification` would send someone to an inbox that will never receive
+   anything — the exact lie the pending screen was rewritten to stop telling.
+   `AuthState.debugStartEmailVerification()` mirrors `debugApprovePendingAccount`
+   and opens the gate with `kMockVerificationId`, while `MockAuthRepository`
+   accepts `kMockOtpCode` and refuses every other code: the screen is reachable
+   by hand *and* its failure path is reachable.
+10. **A refused code is a rejection, not a validation error.** The server's 422
+    for a wrong code carries `{ok: false, message}` and no `errors` bag, so the
+    mock throws `RequestRejectedException` and the screen shows the server's own
+    sentence inline above the field (cleared on edit). The resend link counts
+    down 30s, but only after *this* screen sends a code — someone who opened the
+    screen because no mail came must be able to ask immediately.
 
 ## What the earlier session did (still the base of the data layer)
 
@@ -127,22 +157,40 @@ What this session actually changed:
 
 1. Decide what happens to `docs/api-contract.md` (commit it, or stop citing it).
    Its auth section is now known to be wrong, so "commit it" means correcting it
-   first.
-2. The OTP entry screen (a 6-digit field + resend), with `verifyOtp`/`resendOtp`
-   on `AuthRepository` and an opaque `verificationId` on `AuthResult` to carry the
-   server's `buyer_id`. `PendingApprovalScreen` already names the action, so this
-   is the screen that makes it actionable in-app.
-3. The courier registration form vs `StoreLogisticsRegistrationRequest` — a
-   product decision before any code (see the flag above).
-4. Tier 2's other half: sort / filter on category grids.
+   first. The OTP stubs show the pattern: where a real source exists in the repo
+   (`web/routes/web.php`), the endpoint is named from *that* and carries no §.
+2. The courier registration form vs `StoreLogisticsRegistrationRequest` — a
+   product decision before any code (see the flag above). The buyer half is
+   written and tested; the courier cannot register at all until this is settled.
+3. **Live mode cannot boot** — `main()` awaits `OrderState.load()`, which calls
+   `orders()`, which throws in live mode. Needs a design decision (boot with an
+   empty cache and say so visibly, versus staying unrunnable), because the pinned
+   "no silent fallback" rule forbids swallowing it.
+4. Tier 2's other half: sort / filter on category grids, then search history.
 
 ## Working notes / preferences
 
-- **Prove a guard can fail.** Done twice more this session:
-  `kMinPasswordLength` was drifted to 5 (breaking the pinned-constant test *and*
-  letting a 7-character password through the form) and `''` was sent instead of
-  the password (breaking exactly the one test that pins it). Both reverted. Same
-  idea as the 204px overflow test and the removed-courier-wiring proof.
+- **Prove a guard can fail.** Four families this session, each broken and then
+  reverted: `kMinPasswordLength` drifted to 5 (broke the pinned constant *and*
+  let a 7-character password through the form); `''` sent instead of the password
+  (broke exactly the one test pinning it); the mock's code check inverted (broke
+  exactly the three about accepting its own code and refusing others);
+  `canConfirmEmail` weakened to ignore the missing handle (broke exactly the two
+  that pin "no handle, no field"). The pattern worth keeping is *targeted*
+  failure: a guard whose removal breaks ten unrelated tests is a guard nobody can
+  reason about.
+- **A pending-timer failure in a widget test is evidence, not noise.** The OTP
+  screen's `ListView` children were unkeyed; adding the error block shifted their
+  slots, Flutter re-inflated the widgets *after* it, and each fresh
+  `StaggeredReveal` restarted its `Future.delayed` — surfacing as "A Timer is
+  still pending" at teardown, and *also* being a real visual bug (the Confirm
+  button re-faded when you retyped a digit after a refusal). Keying the children
+  fixed both. Pumping a second and moving on would have left the re-fade in the
+  app.
+- **The live repositories throw synchronously** (they are not `async`), so
+  `expectLater(live.verifyOtp(...), throwsA(...))` throws while *building* the
+  argument rather than while awaiting it. Wrap the call:
+  `expectLater(() async => live.verifyOtp(...), ...)`.
 - **Before reporting a bug, establish whose it is.** The registration stepping
   bug was confirmed *pre-existing* by stashing this session's `lib/` changes and
   reproducing it on committed code — `git stash push -- lib/`, run the probe,
@@ -152,12 +200,13 @@ What this session actually changed:
 - Goldens are tracked and assertable: `--update-goldens`, **then open the PNGs**.
   Assert geometry and colour, never copy.
 - Delete temporary harnesses (`tmp_*`) when done; keep the tree clean.
-- **The mobile tree is committed** (3 commits on `mobile-dev`, not pushed): the
-  root `.gitignore`, `memory-bank/`, and the mobile data layer. This session's
-  work is **uncommitted**: 4 modified files under `mobile/lib/`,
-  `mobile/test/auth_flow_test.dart`, and three new files
-  (`lib/data/dto/registration_payload.dart`, `test/registration_flow_test.dart`,
-  `test/registration_payload_test.dart`). A commit is due.
+- **The mobile tree is committed** (4 commits on `mobile-dev`, not pushed): the
+  root `.gitignore`, `memory-bank/`, the mobile data layer, and the
+  password/registration pass. The OTP pass is the fifth commit:
+  `lib/screens/auth/otp_screen.dart` and `test/otp_flow_test.dart` (both new) plus
+  edits to `auth_repository.dart`, `auth_state.dart`, `dev_flags.dart`,
+  `pending_approval_screen.dart`, `auth_flow_test.dart` and
+  `registration_flow_test.dart`.
 
 ## Earlier decisions, still standing
 

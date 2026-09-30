@@ -55,6 +55,9 @@ class _ScriptedAuthRepository implements AuthRepository {
   String? passwordSeen;
   String? emailSeen;
   RegistrationProfile? profileSeen;
+  String? otpCodeSeen;
+  String? verificationIdSeen;
+  bool resendCalled = false;
 
   @override
   Future<AuthResult> login({
@@ -81,6 +84,30 @@ class _ScriptedAuthRepository implements AuthRepository {
       registrationStatus: registrationStatus,
     );
   }
+
+  @override
+  Future<AuthResult> verifyOtp({
+    required UserRole role,
+    required String verificationId,
+    required String code,
+  }) async {
+    verificationIdSeen = verificationId;
+    otpCodeSeen = code;
+    // Confirmed. The gate this repository answers afterwards is the *admin* one,
+    // which is what the server sends once the email is settled — the same answer
+    // its `register()` gives for a buyer, reached from the other side.
+    return AuthResult(
+      role: role,
+      status: AccountStatus.pendingApproval,
+      registrationStatus: RemoteRegistrationStatus.pendingApproval,
+    );
+  }
+
+  @override
+  Future<void> resendOtp({
+    required UserRole role,
+    required String verificationId,
+  }) async => resendCalled = true;
 
   @override
   Future<void> logout() async {}

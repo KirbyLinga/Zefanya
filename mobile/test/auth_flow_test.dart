@@ -24,7 +24,9 @@ class _ScriptedAuthRepository implements AuthRepository {
 
   final AuthResult Function(UserRole role, String email) answer;
   String? passwordSeen;
+  String? otpCodeSeen;
   bool logoutCalled = false;
+  bool resendCalled = false;
 
   @override
   Future<AuthResult> login({
@@ -47,6 +49,25 @@ class _ScriptedAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async => logoutCalled = true;
+
+  /// The OTP half is `otp_flow_test`'s subject, so this fake answers it with the
+  /// scripted [answer] and a sample address: enough to satisfy the interface
+  /// without pretending to be a second OTP implementation here.
+  @override
+  Future<AuthResult> verifyOtp({
+    required UserRole role,
+    required String verificationId,
+    required String code,
+  }) async {
+    otpCodeSeen = code;
+    return answer(role, 'tristan@example.ph');
+  }
+
+  @override
+  Future<void> resendOtp({
+    required UserRole role,
+    required String verificationId,
+  }) async => resendCalled = true;
 
   @override
   Future<AuthResult?> refresh() async => null;

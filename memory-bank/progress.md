@@ -69,8 +69,27 @@
   live `register()` still throws `notWired(§3.2)`: the mapping is tested, the
   multipart transport is not written, because request code that has never run
   against a server is not a feature.
+- **The email gate has a screen (the OTP pass).** `screens/auth/otp_screen.dart`
+  collects the emailed six digits; `AuthRepository.verifyOtp`/`resendOtp` are its
+  seam; `AuthResult.verificationId` carries the server's opaque handle and
+  `AuthState` persists it, so the gate survives a cold start. `canConfirmEmail`
+  requires the gate **and** the handle, and the pending screen's "Enter Code"
+  button is gated on it. The live stubs name the *real* routes
+  (`POST /register/buyer/verify-otp/{buyer}` and
+  `POST /register/logistics/verify-otp/{logistics_provider}`, each with a
+  `/resend` sibling) read from `web/routes/web.php`, and cite no contract section:
+  the route file is in this repository and the document is not.
+- **The email gate is demonstrable in mock mode without lying.** `kMockOtpCode`
+  (`123456`) and `kMockVerificationId` live in `config/dev_flags.dart` — one
+  constant, two readers (the mock, and the screen's dev-only hint, which must
+  agree). The mock accepts the first and refuses everything else with the server's
+  own sentence as a `RequestRejectedException` (a 422 with no field bag, not a
+  `ValidationException`), and `AuthState.debugStartEmailVerification()` (dev-tools
+  only) opens the gate so the screen is reachable by hand. The mock's `register()`
+  still answers the **admin** gate: it has no mail to send, and claiming otherwise
+  would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 160 passing
+### Tests — 184 passing
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -92,6 +111,21 @@ pass for any reason at all), the Courier gets five named steps, `submitForApprov
 reaches the repository with the real password, mock mode is unchanged, the gate
 survives a cold start, an install predating the gate key reads as the admin
 gate, and the two gates render different copy.
+
+The OTP pass added **`otp_flow_test` (24)**, in three kinds: the mock's honesty
+rules (its own code accepted, every other refused with the server's sentence and
+no field bag, a mock registration landing on the admin gate with no handle), the
+seam (`confirmEmail` sends the registration's handle plus the six digits; a
+refused code leaves the gate open; the handle survives a cold start; logging out
+forgets it; no handle means no request at all; the dev-tools gate opens the mock
+gate without opening the answer), the live stubs (naming `/register/buyer/...`
+and `/register/logistics/...` from the route file, and a missing base URL being a
+*configuration* failure), and the screen (a short code never reaches the
+repository, the field cannot hold non-digits or a seventh digit, a refusal shows
+the server's sentence inline and clears on edit, the resend cooldown counts down
+and returns, a failed resend starts no cooldown, the dev hint names the code the
+mock actually accepts, and the round trip out of the pending screen and back with
+the gate flipped).
 
 **Both guard families were proved to fail on purpose.** Drifting
 `kMinPasswordLength` to 5 broke the payload test (`Expected: <8> Actual: <5>`)
@@ -119,16 +153,15 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
    throws `ApiNotImplementedException`, so the app dies before `runApp`. Correct
    for a build whose API doesn't exist, but it means "live" is not yet a state you
    can run and look at.
-2. **The OTP half of registration is not built.** The form now sends a password
-   and the pending screen tells the two gates apart, but there is no in-app field
-   for the emailed code. The server side exists
-   (`VerifyBuyerOtpController` / `VerifyLogisticsOtpController`: `POST
-   /register/buyer/verify-otp/{buyer}`, 6 digits matched against a sha256 hash,
-   10-minute expiry, a `resend` route, `422 {expired: true}` on expiry), and
-   `remote_status.dart` already maps all four statuses. Doing it means
-   `AuthRepository.verifyOtp`/`resendOtp`, a screen, and an opaque
-   `verificationId` on the result to carry the server's `buyer_id` — the current
-   `AuthResult` has nowhere to put it.
+2. **The OTP transport is unwritten (the screen is not).** `otp_screen.dart`,
+   `AuthRepository.verifyOtp`/`resendOtp`, the opaque `verificationId`, the
+   persisted handle and the mock's accepted code all exist and are tested. What is
+   missing is the request itself, which throws `ApiNotImplementedException` naming
+   `POST /register/buyer/verify-otp/{buyer}`. The server side is real
+   (`VerifyBuyerOtpController`: 6 digits against a sha256 hash, a 10-minute
+   expiry, a throttled `resend`, `422 {expired: true}` on expiry), so the shape is
+   known — but the body's field name is a choice between `otp` (what the web modal
+   posts) and `code`, and a guess that has never run is not a feature.
 3. **The Courier registration form does not match
    `StoreLogisticsRegistrationRequest`.** That request requires `business_name`
    (the form never asks for one) and `dti_permit_upload` (the form collects a
@@ -215,5 +248,32 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 - **Both new guard families were broken on purpose before being trusted.**
   Drifting `kMinPasswordLength` to 5 failed the pinned-constant test *and* let a
   7-character password through the form; sending `''` instead of the password
-  failed exactly the one test asserting it arrives. "Prove a guard can fail" is
-  now the first thing done after writing tests, not the last.
+  failed exactly the one test asserting it arrives. The OTP pass did it twice
+  more: inverting the mock's code check failed exactly the three tests about
+  accepting its own code and refusing others, and weakening `canConfirmEmail` to
+  ignore the missing handle failed exactly the two that pin "no handle, no field".
+  "Prove a guard can fail" is now the first thing done after writing tests, not
+  the last.
+- **The mock does not fake the email gate; a dev-tools affordance opens it.**
+  `MockAuthRepository.register()` keeps answering `pendingApproval`, because a
+  mock claiming `pending_verification` would send someone to an inbox nothing will
+  ever arrive in — the same class of lie as the reviewer ETA this screen already
+  had removed. The gate is entered by `debugStartEmailVerification()` (mirroring
+  `debugApprovePendingAccount`) with a handle the mock accepts, and the screen's
+  hint names the code it accepts, so the flow is finishable by hand in the one
+  build that exists to finish it.
+- **A wrong code is `RequestRejectedException`, not `ValidationException`.** The
+  server's 422 for a mismatch is `{ok: false, message}` with no `errors` bag, so a
+  field-keyed type would claim the server had said *which* field was wrong when
+  all it said was no.
+- **Resend returns nothing, and the screen borrows the server's sentence.** No new
+  status or handle comes back, so `resendOtp` is `Future<void>` and the copy is
+  "A new code has been sent." — a claim only the party that sent the mail can
+  make. The 30s cooldown starts *after* this screen sends one, never on arrival:
+  someone who opened the screen because no mail came must be able to ask at once.
+- **The OTP screen's list children are keyed.** The error block appears and
+  disappears between them, and unkeyed children shift slots on every toggle —
+  which made Flutter re-inflate everything below the error and restart each
+  `StaggeredReveal`'s delay. That was a real re-fade of the Confirm button when a
+  digit was retyped, and it surfaced first as a pending-timer failure in a test
+  that ended on the rebuild.

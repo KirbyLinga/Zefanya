@@ -82,3 +82,29 @@ const String kApiBaseUrl = String.fromEnvironment('zefanya.apiBaseUrl');
 /// mode) versus "you asked for live mode but didn't say where the API is"
 /// (a misconfiguration someone has to fix).
 bool get isApiConfigured => kUseLiveApi && kApiBaseUrl.isNotEmpty;
+
+// ---------------------------------------------------------------------------
+// Mock backend vocabulary
+// ---------------------------------------------------------------------------
+//
+// The two values that exist only because the mock has no mail to send with.
+// They live here rather than inside `MockAuthRepository` because *two* parties
+// need them: the mock, which decides the answer, and the OTP screen, which has
+// to tell a tester what to type in a dev-tools build. One constant with one
+// owner — a screen carrying its own copy of `'123456'` would keep working after
+// a change here and be wrong in the least noticeable way available.
+
+/// The confirmation code a **mock** registration accepts.
+///
+/// Every other code is rejected exactly as the server rejects a wrong one, so
+/// the failure path is demonstrable rather than merely written.
+const String kMockOtpCode = '123456';
+
+/// The handle a mock registration's confirmation is sent against.
+///
+/// The real one is the server's own row id (`register/buyer/verify-otp/{buyer}`)
+/// and this stands in for it because a mock registration has no row. It is what
+/// `AuthState.debugStartEmailVerification` puts on the session so the OTP screen
+/// has something to send the code back against.
+const String kMockVerificationId = 'mock-verification';
+

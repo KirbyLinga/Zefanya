@@ -46,6 +46,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/dev_flags.dart';
 import '../data/dto/registration_payload.dart';
 // Prefixed because this class has a getter of the same name
 // (`awaitsEmailVerification`); the two are the same decision, and the prefix is
@@ -92,6 +93,16 @@ class AuthState extends ChangeNotifier {
   /// over from an earlier session cannot end up describing this one.
   remote.RemoteRegistrationStatus? registrationStatus;
 
+  /// The server's handle for confirming this registration's email, when it gave
+  /// one. Opaque — see [AuthResult.verificationId] for why this app never parses
+  /// it or builds one of its own.
+  ///
+  /// Persisted, because the email gate outlives a lunch break: someone registers,
+  /// the mail arrives an hour later, and iOS may have killed the app in between.
+  /// Without this the pending screen could be rebuilt but the confirmation could
+  /// not, because there would be nothing to address the code *to*.
+  String? verificationId;
+
   String? lastName;
   String? firstName;
   String? middleInitial;
@@ -119,6 +130,10 @@ class AuthState extends ChangeNotifier {
   // null, and null renders as the admin-gate copy — which is what that build
   // was already showing. No migration needed and nothing changes on upgrade.
   static const _registrationStatusKey = 'auth_registration_status';
+  // Additive as well, and for the same reason: an install from before the OTP
+  // screen has no value here, `load()` reads that as null, and null means "no
+  // registration to confirm" — which is what that build was already showing.
+  static const _verificationIdKey = 'auth_verification_id';
   static const _lastNameKey = 'auth_last_name';
   static const _firstNameKey = 'auth_first_name';
   static const _middleInitialKey = 'auth_middle_initial';
@@ -154,6 +169,15 @@ class AuthState extends ChangeNotifier {
     return value != null && remote.awaitsEmailVerification(value);
   }
 
+  /// True when the email gate is open *and* there is a handle to confirm against.
+  ///
+  /// Both halves are required, and the second one is the half a screen would
+  /// forget: `pending_verification` alone says there is a code to type, but not
+  /// which registration it belongs to. Rendering a field whose submit could only
+  /// fail with "we don't know what to send it against" is worse than rendering
+  /// nothing, so this is the getter the pending screen gates its button on.
+  bool get canConfirmEmail => awaitsEmailVerification && verificationId != null;
+
   /// One-line summary for display — empty if nothing's been filled in yet.
   String get addressSummary {
     final parts = [street, barangay, municipality, province].where((p) => p != null && p.isNotEmpty);
@@ -187,6 +211,7 @@ class AuthState extends ChangeNotifier {
       registrationStatus = registrationRaw == null
           ? null
           : remote.RemoteRegistrationStatus.parse(registrationRaw);
+      verificationId = prefs.getString(_verificationIdKey);
       lastName = prefs.getString(_lastNameKey);
       firstName = prefs.getString(_firstNameKey);
       middleInitial = prefs.getString(_middleInitialKey);
@@ -220,6 +245,7 @@ class AuthState extends ChangeNotifier {
     // cannot turn a saved session into an unreadable one.
     await _setOrRemove(prefs, _registrationStatusKey, registrationStatus?.wire);
     role == null ? await prefs.remove(_roleKey) : await prefs.setString(_roleKey, role!.name);
+    await _setOrRemove(prefs, _verificationIdKey, verificationId);
     await _setOrRemove(prefs, _lastNameKey, lastName);
     await _setOrRemove(prefs, _firstNameKey, firstName);
     await _setOrRemove(prefs, _middleInitialKey, middleInitial);
@@ -293,6 +319,45 @@ class AuthState extends ChangeNotifier {
     await _save();
   }
 
+  /// Submits the emailed code that closes the first of the two registration
+  /// gates.
+  ///
+  /// What happens next is the *repository's* answer, exactly as in [login] and
+  /// [submitForApproval] — and it matters more here than anywhere else in this
+  /// class, because a wrong code and a right one arrive from the same button
+  /// press and only one of them moves the session on.
+  ///
+  /// Does nothing when [verificationId] or [role] is null. That is unreachable
+  /// through the UI, which only offers the field when [canConfirmEmail] is true,
+  /// and it answers by returning rather than by sending a request with a null
+  /// handle: "there is no registration to confirm" is not something a repository
+  /// call can express, and inventing a handle to send would be worse than the
+  /// silence.
+  Future<void> confirmEmail(String code) async {
+    final id = verificationId;
+    final currentRole = role;
+    if (id == null || currentRole == null) return;
+
+    final result = await _repository.verifyOtp(
+      role: currentRole,
+      verificationId: id,
+      code: code,
+    );
+    _applyResult(result);
+    await _save();
+  }
+
+  /// Asks for a fresh code. A failure propagates so the screen can say so: a
+  /// resend that quietly failed leaves someone watching an inbox for mail that
+  /// is not coming, which is the worse of the two outcomes available here.
+  Future<void> resendConfirmationCode() async {
+    final id = verificationId;
+    final currentRole = role;
+    if (id == null || currentRole == null) return;
+
+    await _repository.resendOtp(role: currentRole, verificationId: id);
+  }
+
   /// Takes the repository's answer as the session, keeping whatever name the
   /// caller supplied when the server didn't send one (it has no reason to
   /// echo a display name back on a login).
@@ -304,6 +369,11 @@ class AuthState extends ChangeNotifier {
     role = result.role;
     status = result.status;
     registrationStatus = result.registrationStatus;
+    // Assigned unconditionally for the same reason, and the consequence is the
+    // useful one: a successful confirmation comes back with no handle (there is
+    // nothing left to confirm), so the id clears itself the moment the email gate
+    // closes. Nothing has to remember to tidy it up.
+    verificationId = result.verificationId;
     name = result.name ?? fallbackName ?? name;
     email = result.email ?? email;
     memberSince ??= DateTime.now();
@@ -318,6 +388,30 @@ class AuthState extends ChangeNotifier {
       notifyListeners();
       _save();
     }
+  }
+
+  /// TEST-ONLY, the mirror of [debugApprovePendingAccount]: puts this session into
+  /// the *email* gate with a handle the mock accepts, so the OTP screen is
+  /// reachable by hand in a dev-tools build.
+  ///
+  /// It exists because the mock's `register()` cannot honestly answer
+  /// `pending_verification` — there is no mail, so claiming a code was sent would
+  /// send someone to check an inbox that will never receive anything, which is
+  /// the exact lie the pending screen was rewritten to stop telling. Opened
+  /// explicitly as a testing affordance instead of faked as a registration
+  /// answer. An unreachable screen, on the other hand, is one nobody ever looks
+  /// at, and a screen nobody looks at is a screen that is wrong on the day it is
+  /// finally reached.
+  ///
+  /// Refuses to run outside the pending state, so it cannot be used to skip a
+  /// registration that never happened. Remove along with the other dev-tools
+  /// affordances once a real registration answers `pending_verification`.
+  void debugStartEmailVerification() {
+    if (status != AccountStatus.pendingApproval || role == null) return;
+    registrationStatus = remote.RemoteRegistrationStatus.pendingVerification;
+    verificationId = kMockVerificationId;
+    notifyListeners();
+    _save();
   }
 
   /// Called from RegistrationScreen and EditProfileScreen — updates
@@ -365,6 +459,7 @@ class AuthState extends ChangeNotifier {
     role = null;
     status = AccountStatus.loggedOut;
     registrationStatus = null;
+    verificationId = null;
     lastName = null;
     firstName = null;
     middleInitial = null;
