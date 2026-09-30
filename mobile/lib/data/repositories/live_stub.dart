@@ -2,20 +2,21 @@
 //
 // The base every live (network) repository shares.
 //
-// ## Why a live repository is allowed to throw
+// ## Why some live methods are still allowed to throw
 //
-// The Laravel API does not exist yet — no Sanctum, no `routes/api.php`. So a
-// live repository cannot be *implemented*; it can only be *specified*. The
-// choice this file makes is to specify it loudly rather than plausibly:
-// every unimplemented method throws [ApiNotImplementedException] naming the
-// endpoint and the section of `docs/api-contract.md` that defines it.
+// The Laravel API now exists for the buyer half of registration and for sign-in
+// (`web/routes/api.php`), and [LiveAuthRepository] calls it for real — multipart
+// upload and all. Everything else (products, orders, cart, chat, courier jobs)
+// has no endpoint yet, and those methods throw [ApiNotImplementedException]
+// naming the endpoint instead of containing request code that has never run.
 //
-// The alternative — writing request-and-parse code against a contract nobody
-// has implemented — was rejected on purpose. It would look like progress, it
-// could not be tested, and its guesses (a field name, an envelope, a status
-// string) would be indistinguishable from decisions when the API lands. A
-// thrown exception naming the missing endpoint is worth more than a plausible
-// function that has never once run.
+// That rule is what this file is for, and it is worth restating now that part of
+// the API is real: request-and-parse code written against an endpoint nobody has
+// implemented would look like progress, could not be tested, and its guesses (a
+// field name, an envelope, a status string) would be indistinguishable from
+// decisions when the endpoint landed. The OTP body is the proof — the field is
+// named `otp` because that was *read* off the frozen web client
+// (`resources/js/buyer/buyer-register-modal.js`), not because it was plausible.
 //
 // ## What this base actually buys
 //
@@ -36,9 +37,11 @@ abstract class LiveRepository {
 
   /// Throws, naming what is missing.
   ///
-  /// Returns `Never` so it can stand in for any return type. Each call site
-  /// also records the contract section, which is what makes the failure
-  /// actionable rather than merely accurate.
+  /// Returns `Never` so it can stand in for any return type. Naming the endpoint
+  /// is what makes the failure actionable; `section` is passed only where the
+  /// missing piece is specified by a document this repository does not contain
+  /// (`docs/api-contract.md`). For a route that already exists in a route file
+  /// that *is* here, a section would be a pointer to nothing.
   Never notWired(String endpoint, {String? section}) =>
       throw ApiNotImplementedException(endpoint, contractSection: section);
 }

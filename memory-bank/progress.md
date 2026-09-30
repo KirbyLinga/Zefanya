@@ -32,7 +32,57 @@
   change never rewrites history), courier name recorded at `assignedToRider`
   and shown on the buyer's tracker with photo + contact (chat).
 
+### The API surface (new — the first live endpoints)
+
+- **`web/routes/api.php` + Sanctum.** `POST /api/login/buyer`,
+  `POST /api/register/buyer` (multipart), the two buyer OTP routes under
+  `/api/register/buyer/verify-otp/{buyer}`, `GET /api/me` and `POST /api/logout`.
+  Registered in `bootstrap/app.php` via `withRouting(api: …)`, which is what
+  makes the group session-less and CSRF-less — the two things a phone cannot
+  provide and the reason nothing here could work before.
+- **Buyers only, and the courier half names what is missing.** A courier call
+  throws `ApiNotImplementedException` naming `/register/logistics` instead of
+  posting the buyer's request under a different word. `HasApiTokens` is on
+  `Buyer` alone: a trait on a model nothing authenticates is an untested claim.
+- **One policy, on the model.** `Buyer::createFromRegistration()` (the single
+  spelling of what a new buyer row contains), `issueEmailVerificationCode()` (fresh
+  code + hash + 10-minute expiry, returning the raw code for the mail),
+  `verifyEmailCode()` (`hash_equals`, and a cleared column matches nothing) and
+  `isPastEmailVerification()`. The web controllers and the API controllers both
+  call these, so the two doors cannot drift — and the web suite still passes
+  unchanged (19 tests, same 2 pre-existing failures), which is what says the
+  extraction moved nothing.
+- **`LiveAuthRepository` is real for buyers**: `login` (stores the token via
+  `ApiClient.adoptToken`), `register` (multipart, `upload_id` from
+  `RegistrationProfile.govIdPath`, refused locally when there is no file),
+  `verifyOtp` (posts `{otp}` — read off the frozen web client, not guessed),
+  `resendOtp`, `logout` (revokes on the server, clears locally in a `finally`) and
+  `refresh` (`GET /me`; a 401 forgets the token and answers `null`).
+- **`ApiClient` grew exactly two things**: `postMultipart()` (a JSON body cannot
+  carry a file part) and `adoptToken`/`forgetToken` (it owned the vault but could
+  only read it). The timeout/socket/client mapping was extracted into one
+  `_dispatch` so both paths fail identically.
+- **Server tests: `tests/Feature/Api/` — 29 passing**, including the loop that
+  matters (`register` → read the code out of the notification → `confirm` →
+  `pending_approval`), the three gates told apart at sign-in, and "no token for an
+  account that cannot use one".
+- **Proven end to end over real HTTP against real MySQL** (`php artisan serve` +
+  `curl`, with the code read out of `laravel.log` because the mailer is `log`):
+  register 201 → wrong code 422 → expired code 422 (`expired: true`) → resend 200
+  → confirm 200 `pending_approval` → login 403 `PENDING_APPROVAL` → approve →
+  login 200 with a token → `GET /api/me` 200 → logout 200 → `/api/me` **401**. The
+  probe row, its upload and its process were all removed afterwards; the dev
+  database is back to the state it was in.
+- **The throttle prefix is not decoration.** `ThrottleRequests` keys a guest by
+  `domain|ip` with *no route in the key*, so every `throttle:…` route shares one
+  counter per address and the limit that applies is whichever route you hit. The
+  first real resend answered `429 Too Many Attempts` because four unrelated
+  requests had been counted against the same bucket. Each API route now passes a
+  prefix (`throttle:3,5,api-otp-resend`), which gives it its own counter — found
+  by running the thing, not by reading it. **The web routes still share one
+  bucket**; that is a live bug in the other surface and is flagged below.
 ### Data contracts
+
 - **`Product.images`** — ordered photo list, **cover first**. This is the
   contract a Seller-side upload screen would have to produce, so it was
   decided once rather than twice. `Product.photos` falls back to a single
@@ -89,7 +139,7 @@
   still answers the **admin** gate: it has no mail to send, and claiming otherwise
   would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 184 passing
+### Tests — 199 passing
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -126,6 +176,25 @@ the server's sentence inline and clears on edit, the resend cooldown counts down
 and returns, a failed resend starts no cooldown, the dev hint names the code the
 mock actually accepts, and the round trip out of the pending screen and back with
 the gate flipped).
+The API pass added **`live_auth_test.dart` (15)**, and it is the first suite here
+that asserts on *requests* rather than on results: a fake transport records what
+went over the wire, so the multipart body is checked for the server's own field
+names and for the uploaded file's actual bytes, `verifyOtp` is checked to post
+`{otp}` to the handle's path with no `Authorization` header attached, and login is
+checked to *store* the token rather than merely return it. The refusals are
+scripted, because they are the interesting ones: a shut gate arriving as
+`PendingApprovalException` rather than as a credential failure, a `200` with no
+token being malformed rather than a session, a `500` on logout still clearing the
+token, and a `401` on `/me` clearing a dead one.
+
+Two harness lessons, both found by the suite failing rather than by review: a
+multipart body cannot be decoded with `bytesToString()` (a JPEG is not UTF-8 — the
+recorder decodes Latin-1 instead, so the ASCII parts are still findable and the
+binary parts survive for a `contains` check on the file's own bytes), and
+`AuthResult`'s gate getter is `canConfirmEmail`, which requires the handle as well
+as the gate — a stronger assertion than the one that failed to compile.
+
+
 
 **Both guard families were proved to fail on purpose.** Drifting
 `kMinPasswordLength` to 5 broke the payload test (`Expected: <8> Actual: <5>`)
@@ -140,28 +209,38 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 ## What's left
 
 ### Blocked on a user decision
+- **The web routes' throttles share one bucket per IP.** `ThrottleRequests` keys a
+  guest by `domain|ip` with no route in the key, so `routes/web.php`'s
+  `throttle:5,1` (register), `throttle:10,1` (verify) and `throttle:3,5` (resend)
+  are three limits on *one* counter: three registration attempts consume the
+  resend budget, and on a carrier-NAT mobile connection the bucket is shared by
+  everyone behind that address. The API routes were fixed with a per-route prefix;
+  the web routes were left alone because changing them changes the web app's
+  behaviour, which is the user's call. Found by running the real flow.
 - **`docs/api-contract.md` is referenced 14× in `lib/` and does not exist in this
-  repo** (no `docs/`, nothing tracked). The live repositories' endpoint names and
-  section numbers came from it, so it needs to land in the repo or the stubs need
-  rewriting against whatever the real source is. See `techContext.md`. (One
-  citation was dropped this session — `AuthState` no longer points at §3.2, since
-  the endpoint is named in the live stub itself.)
+  repo** (no `docs/`, nothing tracked). Narrowed, not closed: the auth endpoints
+  no longer cite it — they are specified by `web/routes/api.php`, which is here —
+  but every endpoint that does not exist yet still points at a document nobody can
+  read. Either it lands corrected or those stubs name the route file when they
+  become real.
 
 ### Not built (ranked)
-1. **Live mode cannot actually boot.** `main()`'s `Future.wait` includes each
-   state's `load()`, and in live mode `OrderState.load()` → `OrderRepository.orders()`
-   throws `ApiNotImplementedException`, so the app dies before `runApp`. Correct
-   for a build whose API doesn't exist, but it means "live" is not yet a state you
-   can run and look at.
-2. **The OTP transport is unwritten (the screen is not).** `otp_screen.dart`,
-   `AuthRepository.verifyOtp`/`resendOtp`, the opaque `verificationId`, the
-   persisted handle and the mock's accepted code all exist and are tested. What is
-   missing is the request itself, which throws `ApiNotImplementedException` naming
-   `POST /register/buyer/verify-otp/{buyer}`. The server side is real
-   (`VerifyBuyerOtpController`: 6 digits against a sha256 hash, a 10-minute
-   expiry, a throttled `resend`, `422 {expired: true}` on expiry), so the shape is
-   known — but the body's field name is a choice between `otp` (what the web modal
-   posts) and `code`, and a guess that has never run is not a feature.
+1. **Live mode cannot actually boot** — and the reason has moved. The auth half
+   of the API now exists, works, and is proven over real HTTP (see the API
+   section above), so "no route the app could authenticate to" is no longer the
+   wall. What is left is the other repositories: `main()`'s `Future.wait`
+   includes every state's `load()`, and in live mode `OrderState.load()` →
+   `OrderRepository.orders()` throws `ApiNotImplementedException` before
+   `runApp`. So a live build still dies on launch, now because the *catalogue*
+   has no endpoint rather than because nothing does. Booting with an empty cache
+   and saying so visibly is still the honest option, and the pinned "no silent
+   fallback" rule still forbids swallowing it.
+2. **The courier half of the API does not exist.** The buyer half is real and
+   proven end to end; `LiveAuthRepository` names the missing routes
+   (`POST /login/logistics`, `POST /register/logistics`, their two OTP paths)
+   rather than sending a buyer's request with a different word in it. It waits on
+   the same product decision as the form (below), plus `logistics_providers`
+   having no rows in this environment's schema.
 3. **The Courier registration form does not match
    `StoreLogisticsRegistrationRequest`.** That request requires `business_name`
    (the form never asks for one) and `dti_permit_upload` (the form collects a

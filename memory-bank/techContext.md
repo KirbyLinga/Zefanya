@@ -45,29 +45,74 @@
    (seven interfaces, each with a `Mock…` and a `Live…` implementation), `api/`
    (`ApiClient`, typed exceptions, `SecureTokenStore`) and `dto/`. Which side is
    used is decided **once**, by `Repositories.forMode(useLive: kUseLiveApi, …)`
-   in `main()`. In live mode every repository method throws
-   `ApiNotImplementedException` naming its endpoint (see `live_stub.dart`).
+   in `main()`. In live mode a repository method with no endpoint behind it throws
+   `ApiNotImplementedException` naming that endpoint (see `live_stub.dart`); the
+   buyer auth half is real and calls `web/routes/api.php` — see `progress.md`.
    Still true: no product has more than one real photo
    (`picsum.photos/seed/$id`), so a real catalogue will break the gallery and
    stack-showcase layouts as built.
-3. **`docs/api-contract.md` does not exist in this repo.** 14 references across
+3. **`docs/api-contract.md` does not exist in this repo** — 14 references across
    12 files in `lib/` cite it by section (§0.1/§0.2/§0.4 open questions,
-   §3–§9 endpoints), and `docs/` is not tracked by git and not present on disk.
-   Every live repository therefore points at a document nobody can read. Either
-   it was never committed or it lives outside the repo — **worth resolving with
-   the user before more live-mode wiring is written**, because the stubs'
-   endpoint/section names were taken from it. Note also that the server's own
-   routes disagree with some of them: the real endpoints are `POST
-   /register/buyer` and `POST /register/logistics` (Inertia web controllers, no
-   `routes/api.php`, no Sanctum), which is neither the URL shape nor the
-   vocabulary the mobile stubs assume.
+   §3–§9 endpoints), and `docs/` is not tracked and not present on disk. Every
+   repository still unwired therefore points at a document nobody can read, and
+   for those the citation is the *only* record of the endpoint's name.
+   **Narrowed by the API pass, not closed.** The auth endpoints no longer cite it:
+   they are real, and `web/routes/api.php` is the authority for their paths and
+   payloads (the OTP body's field name was read off the frozen web client, not
+   recovered from a §). Its *auth* section, meanwhile, was wrong — the server
+   registers buyers at `POST /register/buyer` through Inertia web controllers,
+   with no `routes/api.php` and no token auth at all until this pass added one —
+   which is the failure mode a §-numbered citation has when the document is
+   neither in the repository nor in step with it. Either it lands corrected, or
+   each remaining stub names its route, or its absence, the way the auth half now
+   does.
 4. **`Product.rating` / `ratingCount` are catalogue constants.** They are
    server-owned aggregates this app cannot re-derive; see the reviews design
    rule in `systemPatterns.md`.
 
+## Running the server's tests and the app against it (verified in this checkout)
+
+This is environment knowledge that cost a session to acquire, and none of it is
+guessable from the repository:
+
+- **`php` is on PATH (8.5.9) and `composer` is installed**, but `pdo_sqlite` and
+  `sqlite3` are *commented out* in `C:\PHP\php.ini`. `phpunit.xml` sets
+  `DB_CONNECTION=sqlite` and `DB_DATABASE=:memory:`, so the server suite cannot
+  reach its database until the extension is loaded.
+- **`php artisan test` cannot be fixed with `php -d`**, because it shells out to
+  PHPUnit in a *child* process that does not inherit the flag — it fails 134 tests
+  with "could not find driver". Run PHPUnit directly instead:
+
+  ```
+  php -d extension=php_pdo_sqlite.dll vendor/bin/phpunit --colors=never
+  php -d extension=php_pdo_sqlite.dll vendor/bin/phpunit tests/Feature/Api
+  ```
+
+  With the driver loaded, migrations and bindings work on the in-memory database.
+- **Feature tests that render a Blade view also need a Vite build**
+  (`npm run build`); without `public/build/manifest.json` they fail with
+  "Vite manifest not found" and always will here until one is built. This is why
+  4 of `RegistrationStreetTest`'s 19 and 4 of `CartControllerTest`'s 21 fail
+  *before* any change — check the count, do not assume a regression. Nothing in
+  `tests/Feature/Api` renders a view, so that suite is green regardless.
+- **MySQL is up on 127.0.0.1:3306** (`.env` points at a real `Zefanya` database)
+  and `php artisan migrate:status` shows the buyers/categories/sellers tables
+  migrated with the product/order/logistics ones pending. A real HTTP round trip
+  therefore works: `php artisan serve --port=8123`, then `curl` against it.
+- **`MAIL_MAILER=log`**, so an OTP code is written to
+  `web/storage/logs/laravel.log` as `**Verification code: NNNNNN**`. That is how
+  the registration → confirm → approve → login loop was driven end to end without
+  a mail account.
+- `web/vendor` is **not** tracked by git, so installing a package changes
+  `composer.json`, `composer.lock` and new application files only — which is why
+  adding Sanctum was a reviewable diff rather than a vendor dump.
+
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (160 tests)
+
+## Conventions that matter when editing
+
+- **`flutter analyze` must be clean** and `flutter test` must pass (199 tests)
   before any change is considered done.
 - **State classes are caches over repositories.** Every state class that touches
   data takes its repository as a *constructor* argument defaulting to the mock

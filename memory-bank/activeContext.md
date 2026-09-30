@@ -2,15 +2,19 @@
 
 ## Where things stand
 
-The **mobile app's data layer is now behind repository interfaces**, and the
-mock/live decision is a single config line in `main()`:
+**The app can talk to its own server now.** A real API surface exists on the
+Laravel side (`web/routes/api.php` + Sanctum), and the app's live auth repository
+calls it for buyers: register (multipart, ID document and all) → confirm the
+emailed code → sign in → `GET /me` → sign out. The mock/live decision is still one
+config line in `main()`:
 
 ```dart
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **184 tests pass** (up from 141). Nothing is blocked
-on the user except the `docs/api-contract.md` question below.
+`flutter analyze` is clean; **199 mobile tests pass** (184 before this pass) and
+**29 server tests pass** in `tests/Feature/Api`. The whole loop was also driven
+once over real HTTP against real MySQL — probe row since deleted.
 
 What this session actually changed:
 
@@ -134,15 +138,35 @@ What this session actually changed:
 
 ## Flags raised and awaiting the user
 
+- **`routes/web.php`'s throttles share one bucket per IP.** Found by running the
+  real flow: `ThrottleRequests` keys a guest by `domain|ip` with no route in the
+  key, so register (5/min), verify (10/min) and resend (3/5min) are three limits
+  on the *same* counter — three registration attempts spend the resend budget, and
+  behind a carrier-NAT mobile connection everyone on that address shares it. The
+  new API routes each got a per-route prefix (`throttle:3,5,api-otp-resend`); the
+  web routes were left alone because changing them changes the web app's
+  behaviour, which is your call.
 - **`docs/api-contract.md` is cited 14× in `lib/` and does not exist in this
-  repo** (`docs/` is absent and untracked). The live stubs' endpoints and
-  section numbers came from it. It needs to be committed, or the stubs rewritten
-  against the real source. It is also **wrong about the auth endpoints**: the
-  server's routes are `POST /register/buyer` and `POST /register/logistics`
-  (Inertia web controllers; there is no `routes/api.php` and no Sanctum), not
-  `POST /auth/{role}/register`.
-- **Live mode still cannot boot**, by construction: `OrderState.load()` throws
-  in live mode and `main()` awaits it. Honest, but "live" is not yet runnable.
+  repo** (`docs/` is absent and untracked). Narrowed, not closed: the auth
+  endpoints are now specified by `web/routes/api.php`, which *is* here, and the
+  document's auth section was wrong anyway (Inertia controllers, no
+  `routes/api.php`, no token auth, different URL shapes). Every endpoint that does
+  not exist yet still cites it.
+- **Live mode still cannot boot** — for a smaller reason than before. The auth
+  half works end to end now; what kills launch is the catalogue: `main()` awaits
+  `OrderState.load()`, and its live repository throws
+  `ApiNotImplementedException` before `runApp`. Booting with an empty cache and
+  saying so visibly is the honest option, and the "no silent fallback" rule still
+  forbids swallowing it.
+- **The server sends a handle the app cannot read.** A sign-in that lands on the
+  email gate answers `403 {code: PENDING_VERIFICATION, verification_id: …}`, but
+  `PendingApprovalException` carries only `registrationStatus`, so an unverified
+  returning account can be *told* to confirm but not handed the screen that does
+  it. Small fix (field on the exception, populated by `ApiClient`, persisted by
+  `AuthState`); not done because nothing asserted it yet.
+- **The courier half has no API.** `LiveAuthRepository` names
+  `POST /login/logistics` and `POST /register/logistics` rather than dressing a
+  buyer request in courier words. It waits on the form decision below.
 - **The courier registration form does not match the server's request.** It
   collects a vehicle type and a plate number, which
   `StoreLogisticsRegistrationRequest` has no field for, and omits two fields that
@@ -155,21 +179,32 @@ What this session actually changed:
 
 ## Next steps
 
-1. Decide what happens to `docs/api-contract.md` (commit it, or stop citing it).
-   Its auth section is now known to be wrong, so "commit it" means correcting it
-   first. The OTP stubs show the pattern: where a real source exists in the repo
-   (`web/routes/web.php`), the endpoint is named from *that* and carries no §.
-2. The courier registration form vs `StoreLogisticsRegistrationRequest` — a
-   product decision before any code (see the flag above). The buyer half is
-   written and tested; the courier cannot register at all until this is settled.
-3. **Live mode cannot boot** — `main()` awaits `OrderState.load()`, which calls
-   `orders()`, which throws in live mode. Needs a design decision (boot with an
-   empty cache and say so visibly, versus staying unrunnable), because the pinned
-   "no silent fallback" rule forbids swallowing it.
-4. Tier 2's other half: sort / filter on category grids, then search history.
+1. **Whether live mode boots with an empty cache.** The auth path is real now;
+   the catalogue has no endpoint, and `main()` awaits it, so a live build still
+   dies before `runApp`. Either boot with empty state and a visible notice, or
+   wire the catalogue endpoints next and make live mode real.
+2. **The courier registration form vs `StoreLogisticsRegistrationRequest`** — a
+   product decision (see the flag). It now blocks the courier's API half as well
+   as the form.
+3. **Whether to fix the web routes' throttles too** (flag above). One word per
+   route, but it changes the web app's behaviour.
+4. **Two small app-side gaps the live path exposed**: carry `verification_id`
+   through `PendingApprovalException`, and decide whether `AuthState` calls
+   `refresh()` on boot now that `GET /me` exists — the repository method is
+   implemented and tested, and nothing calls it yet.
+5. Tier 2's other half: sort / filter on category grids, then search history.
 
 ## Working notes / preferences
 
+- **Run it, or it is not real.** Three things this pass were *only* visible by
+  executing the flow, and all three were wrong before that: the OTP body's field
+  name (settled by reading the frozen web client), the throttle bucket (a first
+  resend answered `429` because four unrelated requests shared its counter — the
+  web routes still have this), and the guard behaviour on a revoked token (which
+  the in-process PHPUnit test *cannot* observe, because Laravel reuses the app
+  inside one test method and Sanctum's request guard caches the user it resolved;
+  the 401 only appeared when each request was its own process). Reading the code
+  would have produced three confident, wrong sentences.
 - **Prove a guard can fail.** Four families this session, each broken and then
   reverted: `kMinPasswordLength` drifted to 5 (broke the pinned constant *and*
   let a 7-character password through the form); `''` sent instead of the password
@@ -200,13 +235,13 @@ What this session actually changed:
 - Goldens are tracked and assertable: `--update-goldens`, **then open the PNGs**.
   Assert geometry and colour, never copy.
 - Delete temporary harnesses (`tmp_*`) when done; keep the tree clean.
-- **The mobile tree is committed** (4 commits on `mobile-dev`, not pushed): the
-  root `.gitignore`, `memory-bank/`, the mobile data layer, and the
-  password/registration pass. The OTP pass is the fifth commit:
-  `lib/screens/auth/otp_screen.dart` and `test/otp_flow_test.dart` (both new) plus
-  edits to `auth_repository.dart`, `auth_state.dart`, `dev_flags.dart`,
-  `pending_approval_screen.dart`, `auth_flow_test.dart` and
-  `registration_flow_test.dart`.
+- **The tree is committed** (6 commits on `mobile-dev`, not pushed): the root
+  `.gitignore`, `memory-bank/`, the mobile data layer, the password/registration
+  pass, the OTP pass, and this one — the API surface. The last is the first commit
+  to touch **both** sides: `web/` (Sanctum, `routes/api.php`, two API controllers,
+  the buyer model's shared code policy, and `tests/Feature/Api`), `mobile/lib/`
+  (`LiveAuthRepository`, `ApiClient.postMultipart`, the two model-side refactors),
+  `mobile/test/live_auth_test.dart`, and the memory bank.
 
 ## Earlier decisions, still standing
 

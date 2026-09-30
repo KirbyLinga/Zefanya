@@ -357,41 +357,43 @@ void main() {
 
   // ---- Live mode -----------------------------------------------------------
 
-  group('live mode names the missing endpoint instead of guessing at it', () {
-    test('the routes come from the server, and are not dressed with a section',
+  group('live mode names what is missing instead of guessing at it', () {
+    test('the courier half names the endpoint the server does not have',
         () async {
       final live = Repositories.forMode(
         useLive: true,
         baseUrl: 'https://api.example.test',
       ).auth;
 
-      // The path segment is the server's own model name (`{buyer}`,
-      // `{logistics_provider}`) and no § is cited: `web/routes/web.php` is in
-      // this repository and the document those numbers point at is not. Read,
-      // not guessed — which is the whole difference between this and a
-      // plausible-looking request that has never run.
-      // Wrapped in a closure on purpose: the live methods throw *synchronously*
-      // (they are not `async`), so `expectLater(live.verifyOtp(...), ...)` would
-      // throw while building the argument rather than while awaiting it. An
-      // `async` closure turns either shape into a rejected future.
+      // The buyer half of this route is real now: `live_auth_test.dart` asserts
+      // the path, the `{otp: ...}` body and the gate that comes back, against a
+      // fake transport. What stays here is the asymmetry that is still true -
+      // this app says `courier` where the server says `logistics`, and
+      // `logistics_providers` has no API surface yet - so whoever greps for one
+      // of the two words finds the other one too.
+      //
+      // Called directly rather than through a closure: the live methods are
+      // `async` now, so a synchronous throw is no longer a shape that can
+      // happen here.
       await expectLater(
-        () async => live.verifyOtp(role: UserRole.buyer, verificationId: '1', code: '123456'),
+        live.verifyOtp(
+          role: UserRole.courier,
+          verificationId: '1',
+          code: '123456',
+        ),
         throwsA(isA<ApiNotImplementedException>().having(
           (e) => e.endpoint,
           'endpoint',
-          'POST /register/buyer/verify-otp/{buyer}',
+          '/register/logistics/verify-otp/1',
         )),
       );
 
-      // This app says `courier`; the server says `logistics`. The asymmetry is
-      // recorded at the route rather than smoothed away, so whoever greps for
-      // one of the two words finds the other one too.
       await expectLater(
-        () async => live.resendOtp(role: UserRole.courier, verificationId: '1'),
+        live.resendOtp(role: UserRole.courier, verificationId: '1'),
         throwsA(isA<ApiNotImplementedException>().having(
           (e) => e.endpoint,
           'endpoint',
-          'POST /register/logistics/verify-otp/{logistics_provider}/resend',
+          '/register/logistics/verify-otp/1/resend',
         )),
       );
     });

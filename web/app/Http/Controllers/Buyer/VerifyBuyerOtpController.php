@@ -32,7 +32,7 @@ class VerifyBuyerOtpController extends Controller
             'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
         ]);
 
-        if ($buyer->status === 'pending_approval' || $buyer->status === 'approved') {
+        if ($buyer->isPastEmailVerification()) {
             return response()->json([
                 'ok' => true,
                 'already_verified' => true,
@@ -40,10 +40,10 @@ class VerifyBuyerOtpController extends Controller
             ]);
         }
 
-        $incoming = hash('sha256', $data['otp']);
-
-        if ($buyer->email_verification_code === null
-            || ! hash_equals($buyer->email_verification_code, $incoming)) {
+        // The comparison lives on the model so this page and the mobile API's
+        // controller cannot grow different opinions about what "the code is
+        // right" means (`hash_equals`, and a cleared column matching nothing).
+        if (! $buyer->verifyEmailCode($data['otp'])) {
             return response()->json([
                 'ok' => false,
                 'message' => 'That code doesn\'t match. Please try again.',
@@ -73,21 +73,16 @@ class VerifyBuyerOtpController extends Controller
      */
     public function resend(Buyer $buyer): JsonResponse
     {
-        if ($buyer->status === 'pending_approval' || $buyer->status === 'approved') {
+        if ($buyer->isPastEmailVerification()) {
             return response()->json([
                 'ok' => false,
                 'message' => 'This account is already verified.',
             ], 422);
         }
 
-        $code = (string) random_int(100000, 999999);
-
-        $buyer->forceFill([
-            'email_verification_code' => hash('sha256', $code),
-            'email_verification_expires_at' => now()->addMinutes(10),
-        ])->save();
-
-        $buyer->notify(new BuyerVerifyOtp($code));
+        // Fresh code, hash stored, raw code returned — one policy, on the model,
+        // shared with the mobile API's resend.
+        $buyer->notify(new BuyerVerifyOtp($buyer->issueEmailVerificationCode()));
 
         Log::warning('Buyer OTP verification code resent', [
             'buyer_id' => $buyer->id,

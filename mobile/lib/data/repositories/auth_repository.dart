@@ -31,6 +31,7 @@
 
 import '../../config/dev_flags.dart';
 import '../../state/auth_state.dart';
+import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../dto/registration_payload.dart';
 import '../dto/remote_status.dart';
@@ -283,13 +284,45 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required UserRole role,
     required String email,
     required String password,
-  }) {
+  }) async {
+    // One path per role, because one guard is one provider: buyers and logistics
+    // providers are different tables with different credential rules, and a
+    // single endpoint with a `role` field would have to decide which one it
+    // means *after* accepting a password. The courier half has no route yet, so
+    // it names the one that is missing instead of pointing at the buyer's path
+    // with a different word in it.
+    if (role != UserRole.buyer) return notWired('POST /login/logistics');
+
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    // A separate login path per role, per the contract:
-    // `POST /auth/buyer/login` and `POST /auth/courier/login`, not one endpoint
-    // with a role field. One endpoint would be one guard, and token-per-guard
-    // is the point of splitting them.
-    return notWired('POST /auth/${role.name}/login', section: '§3.1');
+
+    final body = await client.postJson(
+      '/login/buyer',
+      authenticated: false,
+      body: {'email': email.trim(), 'password': password},
+    );
+
+    // Kept before the result is read: every `200` from this route carries a
+    // token, and a caller holding a result whose token was dropped is a session
+    // that looks signed in and authenticates nothing.
+    //
+    // A missing token is a malformed answer rather than a failed sign-in — the
+    // status was 200, so the server believed it signed someone in.
+    final token = body['token'];
+    if (token is! String || token.isEmpty) {
+      throw const MalformedResponseException(
+        message: 'The server accepted the sign-in but sent no token.',
+      );
+    }
+    await client.adoptToken(token);
+
+    // A shut gate never reaches here: the server answers `403` with its own
+    // `code` and `registration_status`, which `ApiClient` turns into
+    // `PendingApprovalException` so the screen can route to the right gate
+    // instead of reading as a wrong password. That exception does not carry the
+    // `verification_id` the same response includes, so a returning account that
+    // still has to confirm its email cannot be handed the confirm screen from
+    // the login screen yet — a gap recorded in memory-bank/progress.md.
+    return _resultFrom(body, role: role);
   }
 
   @override
@@ -298,68 +331,177 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required String email,
     required String password,
     required RegistrationProfile profile,
-  }) {
+  }) async {
+    // The courier form still does not match `StoreLogisticsRegistrationRequest`
+    // (see this file's header and memory-bank/progress.md), so there is nothing
+    // to send for that role: a mapping that can only produce a 422 is worse than
+    // none.
+    if (role != UserRole.buyer) return notWired('POST /register/logistics');
+
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    // The *mapping* already exists and is tested
-    // (`RegistrationProfile.toBuyerFields`), so what is missing here is only the
-    // transport: a multipart POST that sends those fields plus the ID image at
-    // `profile.govIdPath`. Left unwritten on purpose — request code that has
-    // never run against the server is not a feature, and this class's job is to
-    // name the endpoint that is missing rather than to guess at its shape.
-    //
-    // A naming note, because the guess would be wrong: this app says `courier`
-    // where the server says `logistics` (`register/logistics`,
-    // `logistics_providers`), and the server's route is `POST /register/buyer` —
-    // not `POST /auth/buyer/register`. The string below is therefore this app's
-    // own vocabulary and is not presented as the server's URL.
-    return notWired('POST /auth/${role.name}/register', section: '§3.2');
+
+    final idPath = profile.govIdPath;
+    if (idPath == null || idPath.trim().isEmpty) {
+      // Refused here rather than by the server. `upload_id` is `required`, so a
+      // round-trip would come back with a 422 saying the same thing — and this
+      // is the one field the form cannot enforce, because the file is evidence
+      // that has to be provided by hand.
+      throw const ValidationException(
+        fieldErrors: {'upload_id': 'Upload a photo or PDF of your ID.'},
+      );
+    }
+
+    // The ID document is a multipart part, not a field — which is exactly why
+    // `toBuyerFields` is named for fields and the path travels separately. Every
+    // value is stringified because multipart has no types: a `DateTime` or an
+    // `int` in this map would be sent as its `toString()` anyway, and doing it
+    // here means the shape is decided in one place rather than by the encoder.
+    final body = await client.postMultipart(
+      '/register/buyer',
+      authenticated: false,
+      fields: profile
+          .toBuyerFields(email: email, password: password)
+          .map((key, value) => MapEntry(key, '$value')),
+      files: {'upload_id': idPath},
+    );
+
+    // The answer carries the handle the confirm route is keyed on, and the gate
+    // — `pending_verification`, not the admin gate a browser registration would
+    // also start at. The app stores both: the gate picks the screen, the handle
+    // is what the screen sends the code against.
+    return _resultFrom(body, role: role);
   }
 
-  /// The server's route for a role's confirmation, taken from
-  /// `web/routes/web.php` rather than from `docs/api-contract.md`.
+  /// The confirm path for a role, with the opaque handle filled in.
   ///
-  /// Two asymmetries are recorded here instead of being smoothed over: this app
-  /// says `courier` where the server says `logistics`, and the server's path
-  /// segment is named after its own model (`{buyer}`, `{logistics_provider}`)
-  /// while what this app holds is an opaque [AuthResult.verificationId]. No
-  /// contract section number is attached, deliberately — the document it would
-  /// point at is not in this repository, whereas the route file is. See
-  /// memory-bank/techContext.md.
-  static String verifyOtpRoute(UserRole role) => role == UserRole.buyer
-      ? 'POST /register/buyer/verify-otp/{buyer}'
-      : 'POST /register/logistics/verify-otp/{logistics_provider}';
+  /// The paths come from `web/routes/api.php`: the route file is in this
+  /// repository and is therefore the authority, so no contract § is cited for
+  /// it. Two asymmetries are recorded here rather than smoothed over — this app
+  /// says `courier` where the server says `logistics`, and only the buyer half
+  /// is mounted so far.
+  static String verifyOtpPath(UserRole role, String verificationId) =>
+      role == UserRole.buyer
+          ? '/register/buyer/verify-otp/$verificationId'
+          : '/register/logistics/verify-otp/$verificationId';
 
   @override
   Future<AuthResult> verifyOtp({
     required UserRole role,
     required String verificationId,
     required String code,
-  }) {
+  }) async {
+    if (role != UserRole.buyer) {
+      return notWired(verifyOtpPath(role, verificationId));
+    }
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    // Unwritten on purpose, like every other live method here. Even the body's
-    // shape is a guess — the web modal posts a field named `otp`, and `code` is
-    // just as plausible — and a guess that has never run is not a feature.
-    return notWired(verifyOtpRoute(role));
+
+    // The field is `otp`, not `code` — read off the frozen web client
+    // (`resources/js/buyer/buyer-register-modal.js`), which posts `{otp: code}`
+    // to the same route. This is the one payload detail the app could have
+    // guessed wrong, and it is settled by a file rather than by a coin flip.
+    //
+    // Sent unauthenticated on purpose: the route is public because the person
+    // has no token yet — that is the whole reason they are here — and a token
+    // left over from a previous session would otherwise be attached by default
+    // and answered as a different caller.
+    final body = await client.postJson(
+      verifyOtpPath(role, verificationId),
+      authenticated: false,
+      body: {'otp': code.trim()},
+    );
+
+    // The answer is the admin gate, with no handle: the code is spent, and the
+    // app clears `verificationId` from this result rather than keeping a
+    // reference to a step it can no longer perform.
+    return _resultFrom(body, role: role);
   }
 
   @override
   Future<void> resendOtp({
     required UserRole role,
     required String verificationId,
-  }) {
+  }) async {
+    if (role != UserRole.buyer) {
+      // A bare call rather than a `return`: `notWired` throws, and Dart rejects
+      // `return <Never>` from an `async` method whose type is `Future<void>`
+      // (there is no value slot for it to occupy, unlike `Future<AuthResult>`).
+      notWired('${verifyOtpPath(role, verificationId)}/resend');
+    }
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('${verifyOtpRoute(role)}/resend');
+
+    // Nothing is read from the answer. The server says only that it sent one,
+    // and the screen's own sentence is that copy; a new code means the previous
+    // one is dead, which is a fact the caller has no use for beyond not typing
+    // the old one again.
+    await client.postJson(
+      '${verifyOtpPath(role, verificationId)}/resend',
+      authenticated: false,
+    );
   }
 
   @override
-  Future<void> logout() {
+  Future<void> logout() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('POST /auth/logout', section: '§3.3');
+
+    try {
+      // Revokes *this* token on the server, so "signed out" stops being a claim
+      // only this phone believes. Other sessions on the same account are
+      // untouched — signing out of one device is not signing out of all.
+      await client.postJson('/logout');
+    } finally {
+      // Local state is cleared whatever the server answered, and `finally` is
+      // what says so: someone who asked to be signed out while offline must not
+      // be left holding a usable token because the request could not be sent.
+      await client.forgetToken();
+    }
   }
 
   @override
-  Future<AuthResult?> refresh() {
+  Future<AuthResult?> refresh() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /auth/me', section: '§3.4');
+
+    try {
+      final body = await client.getJson('/me');
+      return _resultFrom(body, role: UserRole.buyer);
+    } on UnauthorizedException {
+      // A token the server has rejected is worse than no token — it keeps
+      // producing 401s — so the answer is to forget it, and `null` is the
+      // caller's word for "no session".
+      await client.forgetToken();
+      return null;
+    }
+    // A gate (`403`) is deliberately not caught here. The token is *valid* and
+    // the account is not usable yet, and flattening that into `null` would read
+    // as "no session" — the same small lie the two-gate pending screen exists to
+    // correct.
+  }
+
+  /// One reader for every answer that describes an account.
+  ///
+  /// Sign-in, registration and confirmation all end at the same two questions —
+  /// who is this, and which gate are they behind — so they share one mapper
+  /// rather than three that could disagree about what
+  /// `registration_status: 'pending_approval'` means.
+  ///
+  /// [unwrapMap] because the server may or may not wrap the body in a `data`
+  /// envelope, and [RemoteRegistrationStatus.parse] because an unrecognised
+  /// status must fail *safe*: `accountStatusFor` sends `unknown` to the pending
+  /// state rather than to active, on the grounds that granting access on doubt
+  /// is the one direction that cannot be walked back.
+  AuthResult _resultFrom(Map<String, Object?> body, {required UserRole role}) {
+    final payload = unwrapMap(body);
+    final remote = RemoteRegistrationStatus.parse(payload['registration_status']);
+
+    return AuthResult(
+      role: role,
+      status: accountStatusFor(remote),
+      registrationStatus: remote,
+      name: payload['name']?.toString(),
+      email: payload['email']?.toString(),
+      // Opaque, and kept as a string: it is a URL segment whose only correct
+      // value comes from the server, so this app neither parses it nor builds
+      // one out of something it does know (an email is not an id).
+      verificationId: payload['verification_id']?.toString(),
+    );
   }
 }

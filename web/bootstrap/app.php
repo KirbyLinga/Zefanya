@@ -11,6 +11,13 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        // The mobile app's surface. Registered here rather than added to every
+        // mobile-only endpoint's middleware, because the difference that matters
+        // is the whole group: `api` has no session and no CSRF token, which is
+        // exactly what a phone can offer. Everything under this prefix is
+        // token-authenticated or public-on-purpose; nothing shares a cookie with
+        // the web app.
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {

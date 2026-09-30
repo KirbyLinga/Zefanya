@@ -20,15 +20,15 @@
 // `dto/`). Keeping the client generic is what lets a live repository be
 // written — and tested against a fake — without this file changing.
 //
-// ## Endpoints are not called from here
+// ## Endpoints are called from the repositories, not from here
 //
-// Nothing in this pass calls a real endpoint. In mock mode no `ApiClient` is
-// even constructed (see `repositories/repositories.dart`), and in live mode
-// the repositories throw `ApiNotImplementedException` naming the contract
-// section that specifies them — because the Laravel API does not exist yet
-// (no Sanctum, no `routes/api.php`). The client's job right now is to be
-// *correct and testable* so that the day the first endpoint lands, only a
-// repository changes.
+// Nothing below knows what a product or an order is; that is a DTO mapper's job
+// (see `dto/`). What changed with the API pass is that the client is no longer
+// hypothetical: `POST /login/buyer`, `POST /register/buyer` (multipart, because
+// the ID document is a file part), the two OTP routes and `GET /me` are live,
+// and `LiveAuthRepository` is the thing that calls them. The other live
+// repositories still throw `ApiNotImplementedException` naming their endpoint,
+// so the day the next one lands, only that repository changes.
 
 import 'dart:async';
 import 'dart:convert';
@@ -153,10 +153,19 @@ class ApiClient {
       ..headers.addAll(await _headers(authenticated: authenticated));
     if (body != null) request.body = jsonEncode(body);
 
-    http.Response response;
+    return _interpret(await _dispatch(request));
+  }
+
+  /// Sends [request] and turns every transport failure into a type.
+  ///
+  /// Shared by the JSON and the multipart paths so the two cannot disagree
+  /// about what a dropped connection is called: the timeout/socket/client trio
+  /// below is one policy, and a second copy of it is how one endpoint ends up
+  /// throwing a raw `SocketException` at a screen.
+  Future<http.Response> _dispatch(http.BaseRequest request) async {
     try {
       final streamed = await _client.send(request).timeout(timeout);
-      response = await http.Response.fromStream(streamed).timeout(timeout);
+      return await http.Response.fromStream(streamed).timeout(timeout);
     } on TimeoutException catch (e) {
       // The one failure a user experiences as "nothing is happening", so it
       // has to become an error rather than a pending future.
@@ -177,10 +186,63 @@ class ApiClient {
         cause: e,
       );
     }
-
-    return _interpret(response);
   }
 
+  /// `POST [path]` as `multipart/form-data` — fields plus files.
+  ///
+  /// Registration is the only request in this app that carries a file, and a
+  /// JSON body cannot carry one: the server validates `upload_id` as
+  /// `file|mimes:jpg,jpeg,png,pdf|max:5120`, so it has to arrive as a real
+  /// part. Kept as its own method rather than folded into [postJson] so that a
+  /// caller cannot send a file's *path* where the file belongs — a mistake that
+  /// reads as a 422 about a missing upload rather than as a client bug.
+  ///
+  /// [files] maps the server's part name to a path on disk. A path that cannot
+  /// be read is a [ValidationException] against that part, because the one way
+  /// it happens in practice is a file the picker handed over and something else
+  /// has since removed — which the person can fix by choosing it again, and
+  /// which must not arrive as an unhandled `FileSystemException`.
+  Future<Map<String, Object?>> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    Map<String, String> files = const {},
+    bool authenticated = true,
+  }) async {
+    if (!isConfigured) throw const ApiNotConfiguredException();
+
+    final request = http.MultipartRequest('POST', _uri(path))
+      ..headers.addAll(await _headers(authenticated: authenticated));
+    // `_headers` sets `Content-Type: application/json` for the JSON paths, which
+    // would tell the server to decode this body as JSON and drop every part.
+    // `MultipartRequest` sets its own content type — with the boundary it just
+    // generated — so this one has to come back off.
+    request.headers.remove('Content-Type');
+    request.fields.addAll(fields);
+
+    for (final entry in files.entries) {
+      try {
+        request.files
+            .add(await http.MultipartFile.fromPath(entry.key, entry.value));
+      } on FileSystemException catch (e) {
+        throw ValidationException(
+          fieldErrors: {entry.key: 'That file could not be read. Please choose it again.'},
+          cause: e,
+        );
+      }
+    }
+
+    return _interpret(await _dispatch(request));
+  }
+
+  /// Replaces the stored bearer token.
+  ///
+  /// Here rather than in a login screen because the client owns the vault:
+  /// `TokenStore`'s reason for existing is that exactly one layer knows where a
+  /// token lives, and a screen that wrote it directly would make that two.
+  Future<void> adoptToken(String token) => _tokens.write(token);
+
+  /// Forgets the token — on logout, and when the server has rejected it.
+  Future<void> forgetToken() => _tokens.clear();
   /// Turns a raw response into either a decoded body or the right exception.
   ///
   /// The single place status codes become types. Everything above this line is
