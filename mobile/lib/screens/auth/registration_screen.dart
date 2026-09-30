@@ -56,11 +56,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
+import '../../data/dto/registration_payload.dart';
 import '../../data/mock_data.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../utils/motion.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/zefanya_mark.dart';
@@ -74,11 +77,18 @@ final RegExp _plateRegex = RegExp(r'^[A-Z]{2,3}[\s-]?\d{3,4}$');
 /// [vehicle], so position 2 means Documents for a Buyer and Vehicle for
 /// a Courier — anything keyed on the index would mix them up the moment
 /// someone flips the role toggle.
-enum _StepId { personal, address, vehicle, documents }
+///
+/// [credentials] was inserted between [personal] and [address], which is
+/// exactly what this design was built to survive: the enum is ordered for
+/// reading, the *page order* comes from [_RegistrationScreenState._steps], and
+/// every switch over the enum is exhaustive, so the compiler names every site
+/// that needed a new case.
+enum _StepId { personal, credentials, address, vehicle, documents }
 
 extension on _StepId {
   String get label => switch (this) {
         _StepId.personal => 'Personal',
+        _StepId.credentials => 'Account',
         _StepId.address => 'Address',
         _StepId.vehicle => 'Vehicle',
         _StepId.documents => 'Documents',
@@ -118,6 +128,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _streetController = TextEditingController();
   final _plateController = TextEditingController();
 
+  // The password and its confirmation, with a separate reveal flag each: one
+  // shared flag would mean peeking at the first field also reveals the second,
+  // which is the opposite of what someone checking a typo asked for.
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmation = true;
+
   String? _sex;
 
   DateTime? _dob;
@@ -136,8 +154,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _isSubmitting = false;
 
   List<_StepId> get _steps => _role == UserRole.buyer
-      ? const [_StepId.personal, _StepId.address, _StepId.documents]
-      : const [_StepId.personal, _StepId.address, _StepId.vehicle, _StepId.documents];
+      ? const [_StepId.personal, _StepId.credentials, _StepId.address, _StepId.documents]
+      : const [
+          _StepId.personal,
+          _StepId.credentials,
+          _StepId.address,
+          _StepId.vehicle,
+          _StepId.documents,
+        ];
 
   _StepId get _currentStep => _steps[_step];
   bool get _isLastStep => _step == _steps.length - 1;
@@ -152,6 +176,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _phoneController.dispose();
     _streetController.dispose();
     _plateController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -232,46 +258,103 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   // ---- Submit ----------------------------------------------------------
 
-  void _submit() {
+  Future<void> _submit() async {
     // Every step has been validated on the way here, and forward motion
     // is only possible through _next(), so there's no whole-form sweep
     // left to do — and no generic "something is missing" snackbar,
     // because there is no longer a way to arrive here with something
     // missing.
+    //
+    // The artificial 500ms delay that used to wrap this is gone for the reason
+    // the 600ms login one went: it stood in for a repository call that now
+    // actually happens, and it would otherwise add half a second to every real
+    // registration.
     setState(() => _isSubmitting = true);
 
-    // TODO: send registration payload (incl. document files) to the API.
-    // Per the updated spec, BOTH roles now wait for review — Buyer/Seller
-    // by the administrator, Courier by the Logistics/Sorting Center (see
-    // PendingApprovalScreen, which picks the copy based on role).
-    Future.delayed(const Duration(milliseconds: 500), () {
+    final fullName = [
+      _firstNameController.text.trim(),
+      if (_middleInitialController.text.trim().isNotEmpty) '${_middleInitialController.text.trim()}.',
+      _lastNameController.text.trim(),
+    ].where((p) => p.isNotEmpty).join(' ');
+
+    // Narrowed once instead of banged at each use site. Sex, DOB and the address
+    // dropdowns are validated by _validateStep rather than by a FormField, so a
+    // `!` here would claim more certainty than this widget can actually see.
+    // The early return is the honest fallback for a state that cannot happen:
+    // leave the form as it is rather than submit a null-riddled profile.
+    final sex = _sex;
+    final dob = _dob;
+    final province = _province;
+    final municipality = _municipality;
+    final barangay = _barangay;
+    if (sex == null ||
+        dob == null ||
+        province == null ||
+        municipality == null ||
+        barangay == null) {
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    final auth = context.read<AuthState>();
+    try {
+      await auth.submitForApproval(
+        role: _role,
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        name: fullName,
+        profile: RegistrationProfile(
+          lastName: _lastNameController.text,
+          firstName: _firstNameController.text,
+          middleInitial: _middleInitialController.text,
+          sex: sex,
+          phone: _phoneController.text,
+          birthday: dob,
+          province: province,
+          municipality: municipality,
+          barangay: barangay,
+          street: _streetController.text,
+          // Null for a Courier, whose two uploads are a license and an OR/CR —
+          // documents `StoreBuyerRegistrationRequest` has no field for. See the
+          // courier note in registration_payload.dart.
+          govIdPath: _govIdFile?.path,
+        ),
+      );
+    } on ApiException catch (e) {
+      // Reachable in live builds only, where the endpoint does not exist yet.
+      // Handled exactly as login handles it — report it and stay on the form,
+      // rather than appearing to have submitted something the server never
+      // received.
       if (!mounted) return;
       setState(() => _isSubmitting = false);
+      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+      return;
+    }
 
-      final auth = context.read<AuthState>();
-      final fullName = [
-        _firstNameController.text.trim(),
-        if (_middleInitialController.text.trim().isNotEmpty) '${_middleInitialController.text.trim()}.',
-        _lastNameController.text.trim(),
-      ].where((p) => p.isNotEmpty).join(' ');
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
 
-      auth.submitForApproval(role: _role, name: fullName, email: _emailController.text.trim());
-      auth.updateProfile(
-        lastName: _lastNameController.text.trim(),
-        firstName: _firstNameController.text.trim(),
-        middleInitial: _middleInitialController.text.trim(),
-        sex: _sex,
-        phone: _phoneController.text.trim(),
-        province: _province,
-        municipality: _municipality,
-        barangay: _barangay,
-        street: _streetController.text.trim(),
-      );
+    // After the submit rather than before it: the repository's answer already
+    // carried a display name (composed from these same parts when the server
+    // sends none), and this recomposes it from them. Both produce the same
+    // string today, so the order decides nothing yet — it is written down
+    // because the parts are the more specific source, and a future
+    // server-supplied name should lose to what the person typed here.
+    auth.updateProfile(
+      lastName: _lastNameController.text.trim(),
+      firstName: _firstNameController.text.trim(),
+      middleInitial: _middleInitialController.text.trim(),
+      sex: sex,
+      phone: _phoneController.text.trim(),
+      province: province,
+      municipality: municipality,
+      barangay: barangay,
+      street: _streetController.text.trim(),
+    );
 
-      // AuthGate (in main.dart) rebuilds to the right screen once the
-      // state changes above — this just unwinds back to that root route.
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    });
+    // AuthGate (in main.dart) rebuilds to the right screen once the
+    // state changes above — this just unwinds back to that root route.
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   // ---- Build -----------------------------------------------------------
@@ -336,38 +419,39 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
             ),
             Expanded(
-              // Cross-fade the form content when stepping forward/back.
-              // The PageView stays for _KeepAlive to work (off-screen
-              // pages stay mounted so entered text and error states
-              // survive Back); the AnimatedSwitcher key change just
-              // triggers a brief opacity transition over the whole area.
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: child,
-                ),
-                child: KeyedSubtree(
-                  key: ValueKey(_step),
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      for (final id in _steps)
-                        _KeepAlive(
-                          child: Form(
-                            key: _formKeys[id],
-                            child: ListView(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                              children: _fieldsFor(id, theme),
-                            ),
-                          ),
+              // Just the PageView. This was wrapped in an AnimatedSwitcher keyed
+              // on `_step` ("a brief opacity transition over the whole area"),
+              // and that wrapper was a bug rather than a flourish: changing the
+              // key rebuilt the PageView while the outgoing copy was still
+              // fading, so for 200ms two PageViews existed and both built the
+              // same `Form(key: _formKeys[id])` widgets — one set of GlobalKeys,
+              // two subtrees claiming them. The framework resolved that by
+              // reparenting the elements back into the outgoing subtree, which
+              // left the incoming PageView without its children: the step band
+              // advanced while the form content stayed behind, permanently, from
+              // the first Continue onwards. Found by a test that walks the form;
+              // nothing previously did.
+              //
+              // The PageView stays for _KeepAlive to work (off-screen pages stay
+              // mounted so entered text and error states survive Back), and the
+              // motion the switcher was standing in for is the PageView's own:
+              // `_goTo` animates to the page, which slides the content the way
+              // the switcher used to fade it.
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  for (final id in _steps)
+                    _KeepAlive(
+                      child: Form(
+                        key: _formKeys[id],
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                          children: _fieldsFor(id, theme),
                         ),
-                    ],
-                  ),
-                ),
+                      ),
+                    ),
+                ],
               ),
             ),
             _buildStepControls(theme),
@@ -379,30 +463,56 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   // Per-step accent — the rule along the bottom of the step band, so
   // entering Address reads as subtly different from entering Personal.
-  // Blush → sage → blush pink → rose, cycling the palette tokens without
-  // introducing any new colors. Routed through ruleOnGround because a rule
-  // and a fill need opposite treatment per mode: these hues are audible on
-  // a dark band and invisible on a white one until they're darkened.
+  // Five steps, five brand tokens, cycled rather than any new colour
+  // introduced. Routed through ruleOnGround because a rule and a fill need
+  // opposite treatment per mode: these hues are audible on a dark band and
+  // invisible on a white one until they're darkened.
+  //
+  // Keyed by step identity rather than by position, like everything else here:
+  // the Courier's extra Vehicle step takes its colour wherever it falls,
+  // instead of shifting every colour after it.
   Color _stepTint(_StepId id) => AppColors.ruleOnGround(switch (id) {
-        _StepId.personal  => AppColors.secondary,
-        _StepId.address   => AppColors.tertiary,
-        _StepId.vehicle   => AppColors.primary,
-        _StepId.documents => AppColors.primaryDark,
+        _StepId.personal    => AppColors.secondary,
+        _StepId.credentials => AppColors.accent,
+        _StepId.address     => AppColors.tertiary,
+        _StepId.vehicle     => AppColors.primary,
+        _StepId.documents   => AppColors.primaryDark,
       });
 
   // Contextual eyebrow copy — tells the user exactly what this step is
   // for rather than repeating "JOIN ZEFANYA" on every page.
-  String _stepEyebrow(_StepId id) => switch (id) {
-        _StepId.personal  => 'STEP 1 · ABOUT YOU',
-        _StepId.address   => 'STEP 2 · WHERE YOU ARE',
-        _StepId.vehicle   => 'STEP 3 · YOUR VEHICLE',
-        _StepId.documents => 'LAST STEP · VERIFICATION',
+  //
+  // The numeral comes from the step's *position*, not from the caption, because
+  // the position is not fixed: this list is four steps for a Buyer and five for
+  // a Courier, and the digits used to be typed into each caption by hand.
+  // Inserting the credentials step is precisely what that would have broken —
+  // every digit after it would still have rendered, just wrong. The last step
+  // says "LAST STEP" instead of a number: on the step where someone is about to
+  // hand over documents, "nothing comes after this" is worth more than the
+  // count.
+  String _stepEyebrow(_StepId id) {
+    if (id == _StepId.documents) return 'LAST STEP · VERIFICATION';
+    return 'STEP ${_steps.indexOf(id) + 1} · ${_stepCaption(id)}';
+  }
+
+  /// What each step is for, without its number — see [_stepEyebrow].
+  String _stepCaption(_StepId id) => switch (id) {
+        _StepId.personal    => 'ABOUT YOU',
+        _StepId.credentials => 'SET A PASSWORD',
+        _StepId.address     => 'WHERE YOU ARE',
+        _StepId.vehicle     => 'YOUR VEHICLE',
+        // Rendered by _stepEyebrow above; listed so this switch stays
+        // exhaustive and a new step cannot be added without its caption being
+        // decided.
+        _StepId.documents   => 'VERIFICATION',
       };
 
   List<Widget> _fieldsFor(_StepId id, ThemeData theme) {
     switch (id) {
       case _StepId.personal:
         return _personalFields(theme);
+      case _StepId.credentials:
+        return _credentialFields(theme);
       case _StepId.address:
         return _addressFields(theme);
       case _StepId.vehicle:
@@ -475,6 +585,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 16),
       _labeledField(theme, 'Sex', DropdownButtonFormField<String>(
         initialValue: _sex,
+        // isExpanded on every dropdown in this file. Without it the button's
+        // internal Row is as wide as its *hint*, so a long hint ('Select
+        // municipality') or a large text scale pushes the arrow off the field
+        // and overflows it. Found by a test that walks the whole form — the
+        // address step had never been rendered before, because of the stepping
+        // bug the AnimatedSwitcher wrapper was causing.
+        isExpanded: true,
         decoration: const InputDecoration(hintText: 'Select sex'),
         items: const [
           DropdownMenuItem(value: 'Male', child: Text('Male')),
@@ -514,6 +631,69 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     ];
   }
 
+  // The password step, as its own step rather than two more fields on
+  // Personal — the same reason the rewrite exists at all: Personal already
+  // holds seven fields, and "what's wrong?" stays answerable only while each
+  // step's errors are about that step's subject.
+  //
+  // Both rules are the server's (`StoreBuyerRegistrationRequest`), mirrored
+  // here so a 7-character password is refused by the field rather than by a 422
+  // after the whole form has been filled in. The server remains the authority:
+  // this is a copy for the person's benefit, not a validation the app is
+  // entitled to trust.
+  List<Widget> _credentialFields(ThemeData theme) {
+    return [
+      _sectionTitle('Account Password'),
+      const SizedBox(height: 12),
+      _labeledField(theme, 'Password', TextFormField(
+        controller: _passwordController,
+        obscureText: _obscurePassword,
+        decoration: InputDecoration(
+          hintText: 'At least $kMinPasswordLength characters',
+          prefixIcon: const Icon(Icons.lock_outline),
+          suffixIcon: IconButton(
+            icon: Icon(_obscurePassword
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+        validator: (v) {
+          final value = v ?? '';
+          if (value.isEmpty) return 'Choose a password';
+          if (value.length < kMinPasswordLength) {
+            return 'Use at least $kMinPasswordLength characters';
+          }
+          return null;
+        },
+      )),
+      const SizedBox(height: 16),
+      _labeledField(theme, 'Confirm Password', TextFormField(
+        controller: _confirmPasswordController,
+        obscureText: _obscureConfirmation,
+        decoration: InputDecoration(
+          hintText: 'Type it again',
+          prefixIcon: const Icon(Icons.lock_outline),
+          suffixIcon: IconButton(
+            icon: Icon(_obscureConfirmation
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined),
+            onPressed: () =>
+                setState(() => _obscureConfirmation = !_obscureConfirmation),
+          ),
+        ),
+        // Compared against the other controller rather than a stored copy: the
+        // form is already holding the password, and a second copy in this
+        // State would be a second thing that can fall out of step with it.
+        validator: (v) {
+          if (v == null || v.isEmpty) return 'Confirm your password';
+          if (v != _passwordController.text) return "Passwords don't match";
+          return null;
+        },
+      )),
+    ];
+  }
+
   List<Widget> _addressFields(ThemeData theme) {
     return [
       _sectionTitle('Address'),
@@ -540,6 +720,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 12),
       _labeledField(theme, 'Vehicle Type', DropdownButtonFormField<String>(
         initialValue: _vehicleType,
+        isExpanded: true,
         decoration: const InputDecoration(hintText: 'Select vehicle type'),
         items: courierVehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
         onChanged: (v) => setState(() => _vehicleType = v),
@@ -719,12 +900,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _dob == null
-                      ? 'Select date of birth'
-                      : '${_dob!.month.toString().padLeft(2, '0')}/${_dob!.day.toString().padLeft(2, '0')}/${_dob!.year}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: _dob == null ? AppColors.textSecondary : AppColors.textPrimary,
+                // Flexible for the same reason the pending screen's status badge
+                // is: this row holds a date and an age pill side by side, and
+                // only once a date exists does the pill appear beside it. At a
+                // large text scale the pair does not fit, and the date is the
+                // half that has to give. Found by a test that drives the picker
+                // — nothing had rendered this state before.
+                Flexible(
+                  child: Text(
+                    _dob == null
+                        ? 'Select date of birth'
+                        : '${_dob!.month.toString().padLeft(2, '0')}/${_dob!.day.toString().padLeft(2, '0')}/${_dob!.year}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: _dob == null ? AppColors.textSecondary : AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 if (_age != null)
@@ -765,6 +954,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       children: [
         _labeledField(theme, 'Province', DropdownButtonFormField<String>(
           initialValue: _province,
+        isExpanded: true,
           decoration: const InputDecoration(hintText: 'Select province'),
           items: phAddressData.keys.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
           onChanged: (v) => setState(() {
@@ -777,6 +967,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         const SizedBox(height: 16),
         _labeledField(theme, 'Municipality / City', DropdownButtonFormField<String>(
           initialValue: _municipality,
+        isExpanded: true,
           decoration: const InputDecoration(hintText: 'Select municipality'),
           items: municipalities.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
           onChanged: _province == null
@@ -790,6 +981,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         const SizedBox(height: 16),
         _labeledField(theme, 'Barangay', DropdownButtonFormField<String>(
           initialValue: _barangay,
+        isExpanded: true,
           decoration: const InputDecoration(hintText: 'Select barangay'),
           items: barangays.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
           onChanged: _municipality == null ? null : (v) => setState(() => _barangay = v),

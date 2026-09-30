@@ -15,11 +15,11 @@
 // the login form (an already-approved account signing back in);
 // `submitForApproval()` is used by registration for both roles.
 //
-// TODO: this still only reflects local UI actions (login form submit,
-// registration submit, profile edits) rather than a real Laravel API —
-// swap the bodies of login()/submitForApproval()/updateProfile() for
-// real API calls, and consider flutter_secure_storage instead of
-// shared_preferences once there's a real auth token to protect.
+// TODO: profile edits (updateProfile) are still local-only — name, address and
+// avatar have no endpoint yet, which is the line this class holds deliberately
+// (see below). Everything else auth-shaped now goes through AuthRepository:
+// login, registration, and sign-out. The token, when there is one, belongs in
+// SecureTokenStore rather than here.
 
 // ## Where the answer comes from now
 //
@@ -31,8 +31,12 @@
 // itself, so nothing about the flow changes in mock mode, and in live mode the
 // fake is gone.
 //
-// Registration is the one auth action still decided locally, because the form
-// has no password field for `register()` to send — see `submitForApproval`.
+// Registration goes through it as well, now that the form collects a password:
+// `submitForApproval()` hands the repository the form's answers and takes back a
+// status. That is also what makes the two pending gates distinguishable —
+// `pending_verification` (an email the person can go and confirm) and
+// `pending_approval` (a reviewer they can only wait for). Collapsing them would
+// tell someone to wait for a person who was never going to be asked.
 //
 // What deliberately stays here: the profile fields (name, address, avatar) and
 // their prefs storage. Those are display data the app already owns; moving them
@@ -42,6 +46,11 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/dto/registration_payload.dart';
+// Prefixed because this class has a getter of the same name
+// (`awaitsEmailVerification`); the two are the same decision, and the prefix is
+// what keeps the getter delegating to the helper instead of shadowing it.
+import '../data/dto/remote_status.dart' as remote;
 import '../data/repositories/auth_repository.dart';
 
 enum UserRole { buyer, courier }
@@ -70,6 +79,19 @@ class AuthState extends ChangeNotifier {
 
   UserRole? role;
   AccountStatus status = AccountStatus.loggedOut;
+
+  /// The server's own registration value for this session, when it sent one.
+  ///
+  /// Kept *beside* [status] rather than folded into it because both pending
+  /// gates collapse into one [AccountStatus] while the copy still differs — see
+  /// [awaitsEmailVerification]. Nullable, and null is a real answer: it means
+  /// the repository said nothing about a registration gate (which is what a
+  /// plain login of an approved account does).
+  ///
+  /// Assigned on every repository answer rather than merged, so a value left
+  /// over from an earlier session cannot end up describing this one.
+  remote.RemoteRegistrationStatus? registrationStatus;
+
   String? lastName;
   String? firstName;
   String? middleInitial;
@@ -93,6 +115,10 @@ class AuthState extends ChangeNotifier {
 
   static const _roleKey = 'auth_role';
   static const _statusKey = 'auth_status';
+  // Additive: an existing install has no value here, `load()` reads that as
+  // null, and null renders as the admin-gate copy — which is what that build
+  // was already showing. No migration needed and nothing changes on upgrade.
+  static const _registrationStatusKey = 'auth_registration_status';
   static const _lastNameKey = 'auth_last_name';
   static const _firstNameKey = 'auth_first_name';
   static const _middleInitialKey = 'auth_middle_initial';
@@ -109,6 +135,24 @@ class AuthState extends ChangeNotifier {
 
   bool get isLoggedIn => status == AccountStatus.active && role != null;
   bool get isPendingApproval => status == AccountStatus.pendingApproval;
+
+  /// True when the pending gate is the *email* one rather than the admin one.
+  ///
+  /// Delegates to the DTO's helper instead of re-deriving the answer here, so
+  /// the screen that shows the copy cannot drift from the wire values the
+  /// parser accepts.
+  ///
+  /// Null answers false — the admin gate — and that default is the opposite of
+  /// the one `remote_status.dart` picks for an *unrecognised* value, on purpose.
+  /// `unknown` is the server having said something this build doesn't
+  /// understand, which might be a gate with an action in it; null is the server
+  /// having said nothing at all. "Wait for a reviewer" is the safer thing to
+  /// tell someone when nothing is known, because it does not send them to check
+  /// an inbox that may never receive anything.
+  bool get awaitsEmailVerification {
+    final value = registrationStatus;
+    return value != null && remote.awaitsEmailVerification(value);
+  }
 
   /// One-line summary for display — empty if nothing's been filled in yet.
   String get addressSummary {
@@ -134,6 +178,15 @@ class AuthState extends ChangeNotifier {
       final statusStr = prefs.getString(_statusKey);
       role = roleStr == null ? null : UserRole.values.byName(roleStr);
       status = statusStr == null ? AccountStatus.loggedOut : AccountStatus.values.byName(statusStr);
+      // Read through the DTO's forgiving parser rather than `values.byName`,
+      // because this one is the *server's* own string: a build meeting a status
+      // it has never heard of should render "unrecognised" rather than throw on
+      // startup — and the catch below answers a throw by dropping the whole
+      // session, which is a lot to lose to one unknown word.
+      final registrationRaw = prefs.getString(_registrationStatusKey);
+      registrationStatus = registrationRaw == null
+          ? null
+          : remote.RemoteRegistrationStatus.parse(registrationRaw);
       lastName = prefs.getString(_lastNameKey);
       firstName = prefs.getString(_firstNameKey);
       middleInitial = prefs.getString(_middleInitialKey);
@@ -162,6 +215,10 @@ class AuthState extends ChangeNotifier {
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_statusKey, status.name);
+    // Stored as the *wire* string rather than the enum's name, so what sits on
+    // disk is what the server said and a later reorganisation of the enum
+    // cannot turn a saved session into an unreadable one.
+    await _setOrRemove(prefs, _registrationStatusKey, registrationStatus?.wire);
     role == null ? await prefs.remove(_roleKey) : await prefs.setString(_roleKey, role!.name);
     await _setOrRemove(prefs, _lastNameKey, lastName);
     await _setOrRemove(prefs, _firstNameKey, firstName);
@@ -206,31 +263,47 @@ class AuthState extends ChangeNotifier {
   /// Call on registration submit for BOTH Buyer and Courier — every
   /// role now waits on review before becoming active, per the updated
   /// spec. PendingApprovalScreen reads `role` to show the right
-  /// reviewer (administrator vs Logistics/Sorting Center).
+  /// reviewer (administrator vs Logistics/Sorting Center) and
+  /// [registrationStatus] to pick which *gate* it is describing.
   ///
-  /// Still local, and that is a decision rather than an omission:
-  /// [AuthRepository.register] requires a password, and the registration form
-  /// does not collect one yet (the ERP flow adds it with the email OTP). Passing
-  /// an empty string to satisfy the signature would be inventing a credential —
-  /// exactly the fiction a repository is supposed to prevent — so the pending
-  /// status is set here until the form has a password to hand over. The endpoint
-  /// it will call is `POST /auth/{role}/register` (`docs/api-contract.md` §3.2).
-  void submitForApproval({required UserRole role, String? name, String? email}) {
-    this.role = role;
-    status = AccountStatus.pendingApproval;
-    this.name = name;
-    this.email = email;
-    memberSince ??= DateTime.now();
-    notifyListeners();
-    _save();
+  /// The status is the repository's answer, exactly as in [login]. It used to be
+  /// set here, and the reason is worth keeping: [AuthRepository.register]
+  /// requires a password, the form had no password field, and passing an empty
+  /// string to satisfy the signature would have been inventing a credential.
+  /// Now that the form collects one, the invented part is gone — and with it the
+  /// old failure mode where a live build could show a pending screen for a
+  /// registration the server had never received.
+  ///
+  /// A failure propagates rather than being flattened into a local "pending":
+  /// the screen reports it and leaves the person on a form they can still fix.
+  Future<void> submitForApproval({
+    required UserRole role,
+    required String email,
+    required String password,
+    required RegistrationProfile profile,
+    String? name,
+  }) async {
+    final result = await _repository.register(
+      role: role,
+      email: email,
+      password: password,
+      profile: profile,
+    );
+    _applyResult(result, fallbackName: name);
+    await _save();
   }
 
   /// Takes the repository's answer as the session, keeping whatever name the
   /// caller supplied when the server didn't send one (it has no reason to
   /// echo a display name back on a login).
+  ///
+  /// [registrationStatus] is assigned unconditionally, null included: it
+  /// describes the answer just received, so an absent value means "this answer
+  /// says nothing about a registration gate", not "keep the previous one".
   void _applyResult(AuthResult result, {String? fallbackName}) {
     role = result.role;
     status = result.status;
+    registrationStatus = result.registrationStatus;
     name = result.name ?? fallbackName ?? name;
     email = result.email ?? email;
     memberSince ??= DateTime.now();
@@ -291,6 +364,7 @@ class AuthState extends ChangeNotifier {
   Future<void> logout() async {
     role = null;
     status = AccountStatus.loggedOut;
+    registrationStatus = null;
     lastName = null;
     firstName = null;
     middleInitial = null;

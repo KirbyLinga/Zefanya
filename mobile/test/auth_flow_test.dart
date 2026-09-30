@@ -12,6 +12,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/data/dto/registration_payload.dart';
 import 'package:zefanya/data/repositories/auth_repository.dart';
 import 'package:zefanya/state/auth_state.dart';
 
@@ -40,7 +41,7 @@ class _ScriptedAuthRepository implements AuthRepository {
     required UserRole role,
     required String email,
     required String password,
-    required Map<String, Object?> profile,
+    required RegistrationProfile profile,
   }) async =>
       answer(role, email);
 

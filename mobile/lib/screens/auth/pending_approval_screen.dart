@@ -30,6 +30,21 @@
 // button makes it a working (if fake) demo of the real flow. False:
 // swap to copy that promises nothing this build can't deliver, and
 // drop the fabricated "1-2 business days" for an honest one.
+//
+// Second axis (added with the password field): *which* pending gate.
+// Registration has two — an email OTP and an admin review — and they are
+// not interchangeable copy. One has something the person can go and do; the
+// other has only waiting. Until the form collected a password, only the admin
+// gate was reachable here, so this screen could afford to assume it. Now the
+// repository can answer `pending_verification`, and telling someone to wait
+// for a reviewer when their real blocker is an unconfirmed email strands them
+// on a person who was never going to be asked. The gate copy deliberately
+// does *not* offer an in-app code field, because this build has no OTP screen:
+// it names the action (confirm the emailed code) and where the action happens.
+//
+// The two axes are independent: the gate copy is not gated on kShowDevTools,
+// because a repository that answers `pending_verification` is a repository
+// that reached a server which really did send a code.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -47,7 +62,12 @@ class PendingApprovalScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
-    final role = context.watch<AuthState>().role;
+    final auth = context.watch<AuthState>();
+    final role = auth.role;
+    // Which of the two gates this is. Both read as "waiting", but only one has
+    // something the person can do about it — see the header note.
+    final awaitingEmail = auth.awaitsEmailVerification;
+    final email = auth.email;
     // Per the spec: Buyer/Seller applications are reviewed by the
     // administrator; Courier applications are reviewed by the
     // Logistics/Sorting Center instead. Only meaningful in the
@@ -80,7 +100,15 @@ class PendingApprovalScreen extends StatelessWidget {
                     Text('THANKS FOR SIGNING UP', style: AppType.eyebrow, textAlign: TextAlign.center),
                     const SizedBox(height: 10),
                     Text(
-                      kShowDevTools ? 'Under Review' : "You're on the List",
+                      // The email gate takes precedence over the dev-tools split
+                      // and needs no variant of itself: it is only reachable
+                      // when the repository answered `pending_verification`,
+                      // which means a server was reached and really did send a
+                      // code. The kShowDevTools pair below covers the opposite
+                      // case — no backend at all.
+                      awaitingEmail
+                          ? 'Check Your Email'
+                          : (kShowDevTools ? 'Under Review' : "You're on the List"),
                       style: AppType.sectionDisplay,
                       textAlign: TextAlign.center,
                     ),
@@ -92,14 +120,28 @@ class PendingApprovalScreen extends StatelessWidget {
               StaggeredReveal(
                 index: 2,
                 child: Text(
-                  kShowDevTools
-                      ? '$reviewer is verifying your submitted credentials and '
-                          'documents. We\'ll notify you by email the moment your '
-                          'account is approved.'
-                      : "Account review isn't live yet — we're still building the "
-                          "piece that lets $reviewer approve new sign-ups. Your "
-                          "application is saved, and this screen will reflect it "
-                          "the moment that's ready. Thanks for your patience.",
+                  awaitingEmail
+                      // Names the action and where it happens. It does not
+                      // offer an in-app code field, because there isn't one:
+                      // the confirmation happens from the email itself
+                      // (server-side that is
+                      // `register.{buyer,logistics}.verify-otp`), and pointing
+                      // at a field that doesn't exist would be the same class of
+                      // lie as the reviewer ETA this file already removed.
+                      ? 'We emailed a confirmation code to '
+                          '${email ?? 'the address on your application'}. '
+                          'Confirming that code is what moves your application '
+                          'on to review, so check that inbox — including the '
+                          'spam folder, where a code from a new sender often '
+                          'lands.'
+                      : kShowDevTools
+                          ? '$reviewer is verifying your submitted credentials and '
+                              'documents. We\'ll notify you by email the moment your '
+                              'account is approved.'
+                          : "Account review isn't live yet — we're still building the "
+                              "piece that lets $reviewer approve new sign-ups. Your "
+                              "application is saved, and this screen will reflect it "
+                              "the moment that's ready. Thanks for your patience.",
                   style: theme.textTheme.bodyMedium?.copyWith(
                     height: 1.55,
                     color: AppColors.textSecondary,
@@ -117,12 +159,17 @@ class PendingApprovalScreen extends StatelessWidget {
               // build — in the honest build there's no real ETA to
               // give a number to, and a made-up one is exactly the
               // kind of promise this whole rewrite exists to remove.
-              if (kShowDevTools) ...[
+              // Not in the email-gate case: "1-2 business days" is the
+              // reviewer's queue, and someone who hasn't confirmed their email
+              // is not in it yet — they are one confirmation away from joining
+              // it. Printing the reviewer's ETA beside "check your email" would
+              // answer a question they have not reached.
+              if (kShowDevTools && !awaitingEmail) ...[
                 const StaggeredReveal(index: 3, child: _EtaBlock()),
                 const SizedBox(height: 24),
               ],
 
-              StaggeredReveal(index: 4, child: _buildStatusBadge(theme, ext)),
+              StaggeredReveal(index: 4, child: _buildStatusBadge(theme, ext, awaitingEmail)),
               const SizedBox(height: 34),
 
               StaggeredReveal(
@@ -141,10 +188,15 @@ class PendingApprovalScreen extends StatelessWidget {
                           ..showSnackBar(
                             SnackBar(
                               content: Text(
-                                kShowDevTools
-                                    ? 'Still under review — check back soon.'
-                                    : "Approvals aren't live yet — nothing to check "
-                                        "just yet, but thanks for checking in.",
+                                // Third case, first: in the email gate there is
+                                // nothing to "approve" yet, so the reviewer copy
+                                // would describe a queue the person is not in.
+                                awaitingEmail
+                                    ? "We're still waiting on that confirmation code."
+                                    : kShowDevTools
+                                        ? 'Still under review — check back soon.'
+                                        : "Approvals aren't live yet — nothing to check "
+                                            "just yet, but thanks for checking in.",
                               ),
                             ),
                           );
@@ -184,7 +236,7 @@ class PendingApprovalScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(ThemeData theme, AppThemeExtension ext) {
+  Widget _buildStatusBadge(ThemeData theme, AppThemeExtension ext, bool awaitingEmail) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -201,11 +253,24 @@ class PendingApprovalScreen extends StatelessWidget {
             decoration: BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
-          // "Pending Verification" implies verification is underway,
-          // which is only true in the kShowDevTools build.
-          Text(
-            kShowDevTools ? 'Status: Pending Verification' : 'Status: Awaiting Launch',
-            style: theme.textTheme.labelMedium,
+          // "Pending Verification" implies verification is underway, which is
+          // only true in the kShowDevTools build. The email gate is a third
+          // case and the only one where the status is a plain fact the server
+          // itself stated — hence "Awaiting Confirmation" rather than a
+          // hedge.
+          //
+          // Flexible because a status is a server-owned string that this screen
+          // renders at whatever width it arrives in: the row is `min`-sized
+          // inside a padded pill, so without it a long status (or a large text
+          // scale) overflows the pill rather than wrapping inside it. Found by a
+          // test that pumps this screen, since nothing rendered it before.
+          Flexible(
+            child: Text(
+              awaitingEmail
+                  ? 'Status: Awaiting Confirmation'
+                  : (kShowDevTools ? 'Status: Pending Verification' : 'Status: Awaiting Launch'),
+              style: theme.textTheme.labelMedium,
+            ),
           ),
         ],
       ),

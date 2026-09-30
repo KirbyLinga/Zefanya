@@ -31,6 +31,7 @@
 
 import '../../state/auth_state.dart';
 import '../api/api_exception.dart';
+import '../dto/registration_payload.dart';
 import '../dto/remote_status.dart';
 import 'live_stub.dart';
 
@@ -78,11 +79,24 @@ abstract class AuthRepository {
   });
 
   /// Submits a new registration, which always lands pending.
+  ///
+  /// [profile] is a [RegistrationProfile] — this app's vocabulary, not the
+  /// server's. It used to be a `Map<String, Object?>`, which is the same
+  /// mistake one level further out: the map's *keys* would have been the wire
+  /// contract, spelled by whichever screen built it, with nothing checking them
+  /// until a request failed in production. `registration_payload.dart` owns
+  /// that vocabulary instead, and only the live implementation converts it.
+  ///
+  /// There is deliberately no `passwordConfirmation` parameter. The form will
+  /// not submit until the two entries match, so passing both through here would
+  /// create exactly the state the server's `confirmed` rule exists to catch —
+  /// and a state this app has already made unreachable is not worth a parameter
+  /// that implies it is reachable. See [RegistrationProfile.toBuyerFields].
   Future<AuthResult> register({
     required UserRole role,
     required String email,
     required String password,
-    required Map<String, Object?> profile,
+    required RegistrationProfile profile,
   });
 
   /// Signs out, server-side if there is a server.
@@ -118,12 +132,17 @@ class MockAuthRepository implements AuthRepository {
   }) async =>
       AuthResult(role: role, status: AccountStatus.active, email: email);
 
+  /// [password] is ignored here for the same reason the login one is: the mock
+  /// has no accounts to check it against. What changed is that it is now a real
+  /// password arriving from the form rather than an empty string standing in
+  /// for one — and [profile] is the form's actual answers, so the *call path*
+  /// is the real one even though the answer is pre-decided.
   @override
   Future<AuthResult> register({
     required UserRole role,
     required String email,
     required String password,
-    required Map<String, Object?> profile,
+    required RegistrationProfile profile,
   }) async =>
       AuthResult(
         role: role,
@@ -169,9 +188,21 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required UserRole role,
     required String email,
     required String password,
-    required Map<String, Object?> profile,
+    required RegistrationProfile profile,
   }) {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
+    // The *mapping* already exists and is tested
+    // (`RegistrationProfile.toBuyerFields`), so what is missing here is only the
+    // transport: a multipart POST that sends those fields plus the ID image at
+    // `profile.govIdPath`. Left unwritten on purpose — request code that has
+    // never run against the server is not a feature, and this class's job is to
+    // name the endpoint that is missing rather than to guess at its shape.
+    //
+    // A naming note, because the guess would be wrong: this app says `courier`
+    // where the server says `logistics` (`register/logistics`,
+    // `logistics_providers`), and the server's route is `POST /register/buyer` —
+    // not `POST /auth/buyer/register`. The string below is therefore this app's
+    // own vocabulary and is not presented as the server's URL.
     return notWired('POST /auth/${role.name}/register', section: '§3.2');
   }
 

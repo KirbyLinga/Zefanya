@@ -50,20 +50,24 @@
    Still true: no product has more than one real photo
    (`picsum.photos/seed/$id`), so a real catalogue will break the gallery and
    stack-showcase layouts as built.
-3. **`docs/api-contract.md` does not exist in this repo.** 15 references across
+3. **`docs/api-contract.md` does not exist in this repo.** 14 references across
    12 files in `lib/` cite it by section (§0.1/§0.2/§0.4 open questions,
    §3–§9 endpoints), and `docs/` is not tracked by git and not present on disk.
    Every live repository therefore points at a document nobody can read. Either
    it was never committed or it lives outside the repo — **worth resolving with
    the user before more live-mode wiring is written**, because the stubs'
-   endpoint/section names were taken from it.
+   endpoint/section names were taken from it. Note also that the server's own
+   routes disagree with some of them: the real endpoints are `POST
+   /register/buyer` and `POST /register/logistics` (Inertia web controllers, no
+   `routes/api.php`, no Sanctum), which is neither the URL shape nor the
+   vocabulary the mobile stubs assume.
 4. **`Product.rating` / `ratingCount` are catalogue constants.** They are
    server-owned aggregates this app cannot re-derive; see the reviews design
    rule in `systemPatterns.md`.
 
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (141 tests)
+- **`flutter analyze` must be clean** and `flutter test` must pass (160 tests)
   before any change is considered done.
 - **State classes are caches over repositories.** Every state class that touches
   data takes its repository as a *constructor* argument defaulting to the mock
@@ -101,3 +105,25 @@
   widget reads `AppColors` — pass a builder (see `systemPatterns.md`).
 - `google_fonts` cannot fetch in tests; always set
   `GoogleFonts.config.allowRuntimeFetching = false` in test setup.
+- **The test font is roughly one em wide per glyph**, so the same copy is about
+  twice as wide in a widget test as on a device. Two consequences, both learned
+  the hard way this session:
+  - A `RenderFlex overflowed by N pixels` in a test at a *real phone width* is
+    often the test font rather than a device bug — but check it at a realistic
+    text scale before dismissing it, and prefer the canonical remedy anyway:
+    `Flexible` around text that shares a `Row` with something else, and
+    `isExpanded: true` on a `DropdownButtonFormField` (whose internal row is as
+    wide as its *hint*, not its field).
+  - Never assert a text's *position or width* in a widget test; assert presence,
+    step, or which widget owns it.
+- **`pumpAndSettle` never returns on a screen containing `ZefanyaLoader`** — its
+  controller `repeat()`s forever, so "settled" never arrives. Use
+  `pump(Duration)`: `StaggeredReveal` delays by `25ms × index` and then runs
+  `280ms`, so one 600ms advance settles the reveals without waiting on the loader.
+- **`GlobalKey` + `AnimatedSwitcher` + `PageView` is a trap.** Keying an
+  `AnimatedSwitcher` on the current step rebuilds the `PageView` while the
+  outgoing copy is still fading, and both subtrees then claim the same
+  `GlobalKey<FormState>`s; the framework reparents the elements back into the
+  outgoing subtree, so the *new* page renders empty and the form silently stops
+  advancing. See `progress.md` — this was live in `registration_screen.dart` and
+  is why the swept test exists.
