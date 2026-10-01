@@ -271,6 +271,12 @@ class ApiClient {
       if (_looksPendingApproval(decoded)) {
         throw PendingApprovalException(
           registrationStatus: _registrationStatusFrom(decoded),
+          // The email gate's handle, carried rather than dropped on the floor.
+          // A 403 that says "confirm your email" and hands back no handle is a
+          // refusal the app cannot act on at all — the login screen turns this
+          // field into the confirm step, and without it someone who closed the
+          // app before typing their code has no way back in.
+          verificationId: _stringOrNull(decoded?['verification_id']),
           message: message ?? 'Your account is still being reviewed.',
         );
       }
@@ -325,6 +331,18 @@ class ApiClient {
   String? _messageFrom(Map<String, Object?>? body) {
     final message = body?['message'];
     return message is String && message.trim().isNotEmpty ? message.trim() : null;
+  }
+
+  /// A trimmed, non-empty string from a decoded body, or `null`.
+  ///
+  /// Stringified rather than type-checked because `verification_id` is a string
+  /// on the way out of the server's route binding and could arrive as a number
+  /// from anywhere else, and the only thing this app ever does with a handle is
+  /// send it back in a URL segment — where both spellings behave identically.
+  String? _stringOrNull(Object? value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
   }
 
   /// Whether a 403 means "your registration isn't approved yet".

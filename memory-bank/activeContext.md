@@ -12,9 +12,9 @@ config line in `main()`:
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **199 mobile tests pass** (184 before this pass) and
-**29 server tests pass** in `tests/Feature/Api`. The whole loop was also driven
-once over real HTTP against real MySQL — probe row since deleted.
+`flutter analyze` is clean; **204 mobile tests pass** (184 two passes ago) and
+**29 server tests pass** in `tests/Feature/Api`. Every live call has been driven
+at least once over real HTTP against real MySQL — probe rows since deleted.
 
 What this session actually changed:
 
@@ -122,6 +122,9 @@ What this session actually changed:
 | The `AnimatedSwitcher` wrapper was **removed**, not repaired | It could not work with one shared `PageController` plus `GlobalKey` Forms; the PageView already animates page changes, so the wrapper bought a cross-fade at the price of the form being unusable |
 | Live `register()` still throws `notWired(§3.2)` | The *mapping* is written and tested; the *transport* is multipart code that has never run against a server |
 | The password step is its own step, not two more fields on Personal | "What's wrong?" stays answerable only while each step's errors are about that step's subject — Personal already held seven fields |
+| A refused sign-in at the email gate **enters that gate**; every other refusal stays on the form | `PENDING_VERIFICATION` is not a failure to report: the credentials were accepted and a code was already sent, so `PendingApprovalException` carries the server's `verification_id` and the login screen hands it to `AuthState.beginEmailVerification()`. Without it, someone told to confirm their email had nothing to confirm *with* — the OTP screen needs a handle, and re-registering would open a second account |
+| The mapping stays in `ApiClient`, the *decision* stays on the screen | The type's own doc says a screen handling `PendingApprovalException` is making a product decision; the repository's contract is to throw for a shut gate (pinned by a test), so the transition cannot live there |
+| `beginEmailVerification()` goes through the same `_applyResult` path as a real registration | A session entered this way must be indistinguishable from one that never left the form — including `canConfirmEmail`, which then comes out true for the same reason |
 
 ## Decisions taken earlier (still standing)
 
@@ -158,12 +161,6 @@ What this session actually changed:
   `ApiNotImplementedException` before `runApp`. Booting with an empty cache and
   saying so visibly is the honest option, and the "no silent fallback" rule still
   forbids swallowing it.
-- **The server sends a handle the app cannot read.** A sign-in that lands on the
-  email gate answers `403 {code: PENDING_VERIFICATION, verification_id: …}`, but
-  `PendingApprovalException` carries only `registrationStatus`, so an unverified
-  returning account can be *told* to confirm but not handed the screen that does
-  it. Small fix (field on the exception, populated by `ApiClient`, persisted by
-  `AuthState`); not done because nothing asserted it yet.
 - **The courier half has no API.** `LiveAuthRepository` names
   `POST /login/logistics` and `POST /register/logistics` rather than dressing a
   buyer request in courier words. It waits on the form decision below.
@@ -188,10 +185,8 @@ What this session actually changed:
    as the form.
 3. **Whether to fix the web routes' throttles too** (flag above). One word per
    route, but it changes the web app's behaviour.
-4. **Two small app-side gaps the live path exposed**: carry `verification_id`
-   through `PendingApprovalException`, and decide whether `AuthState` calls
-   `refresh()` on boot now that `GET /me` exists — the repository method is
-   implemented and tested, and nothing calls it yet.
+4. **Whether `AuthState` calls `refresh()` on boot** now that `GET /me` exists —
+   the repository method is implemented and tested, and nothing calls it yet.
 5. Tier 2's other half: sort / filter on category grids, then search history.
 
 ## Working notes / preferences

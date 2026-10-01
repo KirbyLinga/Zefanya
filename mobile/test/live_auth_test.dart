@@ -394,7 +394,11 @@ void main() {
       throwsA(
         isA<PendingApprovalException>()
             .having((e) => e.registrationStatus, 'status', 'pending_approval')
-            .having((e) => e.awaitingEmailVerification, 'email gate', isFalse),
+            .having((e) => e.awaitingEmailVerification, 'email gate', isFalse)
+            // The admin gate has no code to confirm, so there is nothing for a
+            // handle to address and nothing the app could offer.
+            .having((e) => e.verificationId, 'handle', isNull)
+            .having((e) => e.canConfirmEmail, 'confirmable', isFalse),
       ),
     );
 
@@ -422,7 +426,46 @@ void main() {
       throwsA(
         isA<PendingApprovalException>()
             .having((e) => e.registrationStatus, 'status', 'pending_verification')
-            .having((e) => e.awaitingEmailVerification, 'email gate', isTrue),
+            .having((e) => e.awaitingEmailVerification, 'email gate', isTrue)
+            // Carried rather than dropped: this is the handle the login screen
+            // turns into the confirm step, and a refusal that lost it would
+            // strand anyone who closed the app before typing their code.
+            .having((e) => e.verificationId, 'handle', '42')
+            .having((e) => e.canConfirmEmail, 'confirmable', isTrue),
+      ),
+    );
+
+    // Still no token. The account may sign in, but it cannot *use* the app, and
+    // a stored credential would be a session that authenticates into a 403.
+    expect(await live.tokens.read(), isNull);
+  });
+
+  test('an email gate with no handle is not offered as a confirmable one',
+      () async {
+    // The gate open with nothing to send against — the shape the OTP screen has
+    // to survive. `canConfirmEmail` is what the pending screen gates its confirm
+    // step on, so this is the line between "we could not offer it" and "we
+    // offered it and the submit had nothing to address".
+    final live = _Live([
+      _json({
+        'ok': false,
+        'code': 'PENDING_VERIFICATION',
+        'registration_status': 'pending_verification',
+        'message': 'Confirm your email address to continue.',
+      }, 403),
+    ]);
+
+    await expectLater(
+      live.repository.login(
+        role: UserRole.buyer,
+        email: 'juan@example.com',
+        password: 'Password1!',
+      ),
+      throwsA(
+        isA<PendingApprovalException>()
+            .having((e) => e.awaitingEmailVerification, 'email gate', isTrue)
+            .having((e) => e.verificationId, 'handle', isNull)
+            .having((e) => e.canConfirmEmail, 'confirmable', isFalse),
       ),
     );
   });

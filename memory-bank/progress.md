@@ -73,6 +73,26 @@
   login 200 with a token → `GET /api/me` 200 → logout 200 → `/api/me` **401**. The
   probe row, its upload and its process were all removed afterwards; the dev
   database is back to the state it was in.
+- **The email gate is reachable from the sign-in form (new).** A sign-in refused
+  with `PENDING_VERIFICATION` used to end in a sentence: the login screen caught
+  every `ApiException`, showed its message and stopped — so someone who closed the
+  app before typing their code was told to confirm an email with no way to do it
+  (the OTP screen needs a handle, and registering again would open a second
+  account). `PendingApprovalException` now carries the server's `verification_id`,
+  `ApiClient` fills it from the 403 body, and the login screen hands it to the new
+  `AuthState.beginEmailVerification()`, which goes through the same `_applyResult`
+  path as a real registration — so the session it produces is indistinguishable
+  from one that never left the form and `canConfirmEmail` comes out true. Every
+  *other* refusal still ends on the form with the server's sentence.
+- **`login_gate_test` pins both halves of that**, and the branch was deliberately
+  broken and re-run to prove the test can fail (`AccountStatus.pendingApproval`
+  expected, `loggedOut` actual) rather than passing for a reason of its own. The
+  login 403 was then re-checked **over real HTTP** against a probe buyer
+  (`status = pending_verification`, since deleted): the body really is
+  `{"ok":false,"code":"PENDING_VERIFICATION","registration_status":"pending_verification","verification_id":"2","message":"Confirm your email address to continue."}`
+  — the exact field the app now reads. The same request also proved the field is
+  only sent for the *email* gate: the approval gate's refusal has no handle, which
+  is why `canConfirmEmail` requires both facts.
 - **The throttle prefix is not decoration.** `ThrottleRequests` keys a guest by
   `domain|ip` with *no route in the key*, so every `throttle:…` route shares one
   counter per address and the limit that applies is whichever route you hit. The

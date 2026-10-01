@@ -112,8 +112,16 @@ guessable from the repository:
 
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (199 tests)
+- **`flutter analyze` must be clean** and `flutter test` must pass (204 tests)
   before any change is considered done.
+- **A widget test's width is not a phone width.** The test binding's default font
+  gives every glyph the width of the font size, so the wordmark
+  (`AppType.masthead`, 54pt) measures ~370pt and overflows the 342pt column a
+  390pt phone leaves after padding — a `RenderFlex` failure caused by font
+  metrics, not by layout, and one the app never has. Harnesses that force 390px
+  therefore only pump screens with no wordmark in them (`otp_flow_test`,
+  `registration_flow_test`); a screen that has one (login, in
+  `login_gate_test`) is pumped at the binding's default size and says why.
 - **State classes are caches over repositories.** Every state class that touches
   data takes its repository as a *constructor* argument defaulting to the mock
   (`CartState({catalog, vouchers})`, `OrderState(repository:)`,

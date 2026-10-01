@@ -13,6 +13,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/dto/registration_payload.dart';
+import 'package:zefanya/data/dto/remote_status.dart';
 import 'package:zefanya/data/repositories/auth_repository.dart';
 import 'package:zefanya/state/auth_state.dart';
 
@@ -165,5 +166,56 @@ void main() {
     // A token left valid after sign-out is the one outcome worse than an
     // error, so the revoke is not optional — see AuthState.logout.
     expect(repository.logoutCalled, isTrue);
+  });
+
+  test('a failed sign-in at the email gate lands on that gate, handle and all',
+      () async {
+    // What the login screen does with the one refusal that is not an end state:
+    // the credentials were accepted, so this is not a failure to report — it is
+    // the state the pending screen exists for, and the handle is what makes its
+    // confirm step live.
+    final auth = AuthState();
+    await auth.beginEmailVerification(
+      role: UserRole.buyer,
+      email: 'juan@example.com',
+      verificationId: '42',
+    );
+
+    expect(auth.status, AccountStatus.pendingApproval);
+    expect(auth.isPendingApproval, isTrue);
+    expect(auth.isLoggedIn, isFalse);
+    expect(auth.role, UserRole.buyer);
+    expect(auth.email, 'juan@example.com');
+    expect(
+      auth.registrationStatus,
+      RemoteRegistrationStatus.pendingVerification,
+    );
+    // Both halves. A session that entered the gate *without* the handle would
+    // render a pending screen whose confirm button goes nowhere.
+    expect(auth.verificationId, '42');
+    expect(auth.canConfirmEmail, isTrue);
+  });
+
+  test('a session entered at the email gate survives a restart', () async {
+    await AuthState().beginEmailVerification(
+      role: UserRole.buyer,
+      email: 'juan@example.com',
+      verificationId: '42',
+    );
+
+    // Persisting this state is the whole point of it: someone who closes the app
+    // between the refusal and typing the code has to come back to a confirm step
+    // that can still be addressed to something, rather than to a sign-in form
+    // that will refuse them again.
+    final restarted = AuthState();
+    await restarted.load();
+
+    expect(restarted.status, AccountStatus.pendingApproval);
+    expect(
+      restarted.registrationStatus,
+      RemoteRegistrationStatus.pendingVerification,
+    );
+    expect(restarted.verificationId, '42');
+    expect(restarted.canConfirmEmail, isTrue);
   });
 }

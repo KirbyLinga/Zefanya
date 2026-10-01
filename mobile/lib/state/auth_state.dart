@@ -380,6 +380,45 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Moves this session onto the email gate after a sign-in the server
+  /// *refused* because the address is not confirmed yet.
+  ///
+  /// This is the one refusal that is not an end state. The credentials were
+  /// accepted — the account exists and the password matched — and the only thing
+  /// between this person and the app is a code that was already sent to them.
+  /// The server says as much, and hands over the handle that code can be
+  /// confirmed against, so refusing the sign-in and merely saying "confirm your
+  /// email" would leave someone with nothing to confirm *with*: the
+  /// registration form would open a second account, and the OTP screen needs a
+  /// handle the app would otherwise have thrown away.
+  ///
+  /// Deliberately not reached from the repository. The repository's contract is
+  /// to *throw* for a shut gate — that is what `ApiClient` maps a 403 to, and a
+  /// test pins it — so the transition belongs to the caller, which is the login
+  /// screen: it is the only layer that both sees the refusal and still has the
+  /// address the person typed.
+  ///
+  /// Going through [_applyResult] rather than assigning fields is what keeps a
+  /// session entered this way indistinguishable from one that never left the
+  /// registration form — including `canConfirmEmail`, which comes out true for
+  /// the same reason it does there.
+  Future<void> beginEmailVerification({
+    required UserRole role,
+    required String email,
+    required String verificationId,
+  }) async {
+    _applyResult(
+      AuthResult(
+        role: role,
+        status: AccountStatus.pendingApproval,
+        email: email,
+        registrationStatus: remote.RemoteRegistrationStatus.pendingVerification,
+        verificationId: verificationId,
+      ),
+    );
+    await _save();
+  }
+
   /// TEST-ONLY helper so the approval loop is verifiable without a
   /// real admin/logistics backend. Remove once that's wired up.
   void debugApprovePendingAccount() {

@@ -78,10 +78,34 @@ class _LoginScreenState extends State<LoginScreen> {
             name: 'Tristan Araneta',
           );
     } on ApiException catch (e) {
-      // Only reachable in a live build, where there is no API to sign in
-      // against yet: say so rather than appearing to have signed someone in.
       if (!mounted) return;
       setState(() => _isSubmitting = false);
+
+      // A refused sign-in normally ends here: say what the server said and leave
+      // the person on a form they can still correct.
+      //
+      // The email gate is the exception, and it is the *server* that says so.
+      // `PENDING_VERIFICATION` means the credentials were accepted and the only
+      // thing missing is the code already sent to that address — and the refusal
+      // arrives carrying the handle that code can be confirmed against. Showing
+      // a sentence here and stopping would strand someone told to confirm an
+      // email with no way to do it.
+      final gate = e is PendingApprovalException && e.canConfirmEmail ? e : null;
+      if (gate != null) {
+        await context.read<AuthState>().beginEmailVerification(
+              role: _loginAsRole,
+              email: _identifierController.text.trim(),
+              verificationId: gate.verificationId!,
+            );
+        if (!mounted) return;
+        // AuthGate rebuilds onto PendingApprovalScreen, whose "Enter Code"
+        // button is live now that the handle arrived with the refusal.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+
+      // Only reachable in a live build, where there is no API to sign in
+      // against yet: say so rather than appearing to have signed someone in.
       showTimedSnackBar(context, SnackBar(content: Text(e.message)));
       return;
     }

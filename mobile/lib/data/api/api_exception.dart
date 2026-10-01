@@ -98,11 +98,26 @@ final class UnauthorizedException extends ApiException {
 final class PendingApprovalException extends ApiException {
   const PendingApprovalException({
     required this.registrationStatus,
+    this.verificationId,
     super.message = 'Your account is still being reviewed.',
     super.cause,
   });
 
   final String registrationStatus;
+
+  /// The server's handle for confirming this registration's email, when the
+  /// refusal carried one, and `null` otherwise.
+  ///
+  /// Only the email gate has one (`PENDING_VERIFICATION`), and the server sends
+  /// it precisely so the app can finish that confirmation: without it, someone
+  /// told to confirm their email has nothing to address a code *to*, and the
+  /// only thing the app could offer is the registration form again — which
+  /// would open a second account rather than confirm the first.
+  ///
+  /// Opaque, exactly like `AuthResult.verificationId`: the route is keyed on
+  /// the server's own row id, so this app never parses one or builds one of its
+  /// own out of what it does know.
+  final String? verificationId;
 
   /// True when the server's own value looks like the email-OTP gate rather
   /// than the admin gate. Tolerant matching, because this string is the
@@ -111,6 +126,17 @@ final class PendingApprovalException extends ApiException {
   /// cost: they wait for a person who was never going to be asked.
   bool get awaitingEmailVerification =>
       registrationStatus.toLowerCase().contains('verification');
+
+  /// Whether this refusal is one the app can actually *act* on.
+  ///
+  /// Both halves, for the same reason `AuthResult.canConfirmEmail` needs both:
+  /// the status says there is a code to enter, and [verificationId] is what an
+  /// entry would be sent against. A screen gating its confirm step on the
+  /// status alone would offer an action whose submit could not be addressed to
+  /// anything — which is worse than not offering it, because it looks like it
+  /// worked.
+  bool get canConfirmEmail =>
+      awaitingEmailVerification && verificationId != null;
 
   @override
   bool get isRetryable => false;
