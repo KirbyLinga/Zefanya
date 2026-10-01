@@ -101,6 +101,56 @@
   prefix (`throttle:3,5,api-otp-resend`), which gives it its own counter — found
   by running the thing, not by reading it. **The web routes still share one
   bucket**; that is a live bug in the other surface and is flagged below.
+### The catalogue (new — products, categories, vouchers)
+
+- **The blocker was 11 unrun migrations, not code.** `products`,
+  `product_images`, `cart_items`, `vouchers`, `logistics_providers`, `orders`,
+  `seller_orders`, `order_items`, `payments` and `inventory_transactions` did not
+  exist in the dev database at all; a `migrate --pretend` dry run checked them
+  first (exit 0, writes nothing) and `migrate --force` then applied all 11.
+  Invisible from the application code: the models, controllers and routes all read
+  as though the tables were there.
+- **Four read-only endpoints, all public, one throttle bucket each**:
+  `GET /api/products` (filters `q` over name+category, `category` by label,
+  `seller` by shop name; newest first; **unpaginated on purpose**, because the
+  app's repository contract has no page in it and a truncated catalogue is not an
+  error), `GET /api/products/{product}`, `GET /api/categories` (the 14 curated
+  rows, in the migration's own order) and `GET /api/vouchers` (active, unexpired,
+  under usage limit).
+- **Visibility is `status = active` *and* an approved seller**, on both the list
+  and the single read — an unapproved seller's product is not browsable, and it
+  answers 404 rather than 403 so the id cannot be probed. A sold-out product is
+  still listed, with `in_stock: false`: hiding it would be an unexplained absence.
+- **`price_minor`, always centavos.** `products.price` is a `DECIMAL(10,2)` in
+  pesos while every other money column is `*_minor`, so the conversion happens in
+  `ProductResource` and the field is named for its scale. Sending `1250.75` would
+  not fail loudly — it would render as ₱125,075.00.
+- **Three fields are absent rather than faked**: `compare_at_price` (no column),
+  ratings (no reviews table) and the maker note (no column). The web buyer page
+  fakes all three — a struck-through price as `price / 0.75`, a hardcoded 4.9 with
+  "284 reviews", placeholder feature copy — and this project's
+  no-invented-content rule is why this side does not. The app also *overwrites*
+  `Product`'s constructor defaults (4.5 stars, the mock's numbers) with 0, and the
+  product page now drops its rating row and its review aggregate when
+  `ratingCount == 0`, so a live product says "No reviews yet" instead of
+  "★ 0.0 average".
+- **A flat voucher is not offered to the app.** `voucherDiscountFor` reads
+  `discountRate <= 0` as a *shipping* rebate, so mapping the server's
+  "₱200 off the goods" would have become ₱200 off the delivery fee — a money bug
+  that looks like working code. Percentage vouchers map exactly (10% → `0.10`),
+  and the server's absent cap maps to `double.infinity` rather than a ceiling
+  nobody set.
+- **`LiveCatalogRepository` and `LiveCartRepository.vouchers()` are real**;
+  `makerNote` and `promoSlides` still name themselves as not wired, because
+  neither has a server-side source at all.
+- **Proven on the wire.** A probe seller, product, two images and two vouchers
+  were created, the four endpoints curled against `artisan serve` and real MySQL,
+  and every row deleted afterwards (verified `products=0`, `sellers=0`,
+  `vouchers=0`). The responses carried `id: "1"` as a **string**,
+  `price_minor: 125075` from a ₱1,250.75 row, `b.jpg` **first** although it was
+  created second (cover-first, end to end), both voucher scales, and the 14
+  categories.
+
 ### Data contracts
 
 - **`Product.images`** — ordered photo list, **cover first**. This is the
@@ -159,7 +209,7 @@
   still answers the **admin** gate: it has no mail to send, and claiming otherwise
   would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 204 passing
+### Tests — 228 passing (mobile) + 65 (server API)
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -216,6 +266,18 @@ phone-shaped size* and assert which of the two outcomes it takes — and it was
 broken on purpose (the gate branch disabled) to watch it fail on exactly that
 assertion before being trusted.
 
+The catalogue pass added **24 more** in `live_catalog_test.dart` (new) and **36
+more** server tests across three new files (`ProductCatalogApiTest`,
+`CategoryApiTest`, `VoucherApiTest`). The mobile half is the first suite here that
+asserts on a *query string* (`category=Home and Garden`, `q=rattan`, `seller=…`),
+and its two load-bearing assertions are absences: a live product carries no sale
+price and no rating, and a flat voucher is not offered at all. Five guards were
+then broken on purpose to prove they fail: the resource's `* 100` (exactly the two
+centavo tests), the cover-first sort (exactly the ordering test), the
+approved-seller filter (exactly the visibility test), the app mapper's
+`type != 'percent'` (exactly the two flat-voucher tests), and the `rating: 0`
+override (the live-product test, failing with `Expected: <0> / Actual: <4.5>`).
+
 Two harness lessons, both found by the suite failing rather than by review: a
 multipart body cannot be decoded with `bytesToString()` (a JPEG is not UTF-8 — the
 recorder decodes Latin-1 instead, so the ASCII parts are still findable and the
@@ -254,26 +316,21 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   become real.
 
 ### Not built (ranked)
-1. **Live mode cannot actually boot** — and the reason has moved. The auth half
-   of the API now exists, works, and is proven over real HTTP (see the API
-   section above), so "no route the app could authenticate to" is no longer the
-   wall. What is left is the other repositories: `main()`'s `Future.wait`
-   includes every state's `load()`, and three of those states fetch from the
-   network immediately after their (no-op) repository `load()` — in live mode
-   `OrderState.load()` → `orders()`, `CartState.load()` → `vouchers()` and
-   `CourierState.load()` → `assignedJobs()` all throw
-   `ApiNotImplementedException` before `runApp`, and the last two do it *outside*
-   their `try` on purpose. So a live build still dies on launch, now because the
-   *catalogue* has no endpoint rather than because nothing does — and "let it
-   boot empty" is a decision about those three call sites, not a patch to one;
-   booting with an empty cache and saying so visibly is still the honest option,
-   and the pinned "no silent fallback" rule still forbids swallowing it.
+1. **Live mode still cannot boot** — and the reason has narrowed to two fetch
+   sites. The catalogue half is now real (products, categories, vouchers all
+   resolve), so what remains is `OrderState.load()` → `orders()` and
+   `CourierState.load()` → `assignedJobs()`, both *state* `load()`s fetching
+   immediately after their (no-op) repository `load()`, and the second of them
+   outside its `try` on purpose. So a live build still dies on launch, now because
+   *orders and courier jobs* have no endpoint rather than because the catalogue
+   has none — and "let it boot empty" is a decision about those two call sites,
+   not a patch to one.
 2. **The courier half of the API does not exist.** The buyer half is real and
    proven end to end; `LiveAuthRepository` names the missing routes
    (`POST /login/logistics`, `POST /register/logistics`, their two OTP paths)
-   rather than sending a buyer's request with a different word in it. It waits on
-   the same product decision as the form (below), plus `logistics_providers`
-   having no rows in this environment's schema.
+   rather than sending a buyer's request with a different word in it. One blocker
+   did fall in this pass: `logistics_providers` now **exists** (it was one of the
+   11 unrun migrations). It still waits on the form decision below.
 3. **The Courier registration form does not match
    `StoreLogisticsRegistrationRequest`.** That request requires `business_name`
    (the form never asks for one) and `dti_permit_upload` (the form collects a

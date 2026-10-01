@@ -56,19 +56,25 @@
    §3–§9 endpoints), and `docs/` is not tracked and not present on disk. Every
    repository still unwired therefore points at a document nobody can read, and
    for those the citation is the *only* record of the endpoint's name.
-   **Narrowed by the API pass, not closed.** The auth endpoints no longer cite it:
-   they are real, and `web/routes/api.php` is the authority for their paths and
-   payloads (the OTP body's field name was read off the frozen web client, not
-   recovered from a §). Its *auth* section, meanwhile, was wrong — the server
-   registers buyers at `POST /register/buyer` through Inertia web controllers,
-   with no `routes/api.php` and no token auth at all until this pass added one —
-   which is the failure mode a §-numbered citation has when the document is
-   neither in the repository nor in step with it. Either it lands corrected, or
-   each remaining stub names its route, or its absence, the way the auth half now
-   does.
-4. **`Product.rating` / `ratingCount` are catalogue constants.** They are
-   server-owned aggregates this app cannot re-derive; see the reviews design
-   rule in `systemPatterns.md`.
+   **Narrowed twice, not closed.** Neither the auth endpoints nor the four
+   catalogue endpoints cite it any more: they are real, and `web/routes/api.php`
+   is the authority for their paths and payloads (the OTP body's field name was
+   read off the frozen web client, not recovered from a §). Its *auth* section,
+   meanwhile, was wrong — the server registers buyers at `POST /register/buyer`
+   through Inertia web controllers, with no `routes/api.php` and no token auth at
+   all until the auth pass added one — which is the failure mode a §-numbered
+   citation has when the document is neither in the repository nor in step with
+   it. What still cites it, and so still has a citation as its only record:
+   `maker_note`, `GET /promotions`, orders, reviews, chat and the courier job
+   routes. Either it lands corrected, or each remaining stub names its route, or
+   its absence, the way the live halves now do.
+4. **`Product.rating` / `ratingCount` have no source on either side.** The mock
+   catalogue's numbers are constants, and the server has no reviews table at all,
+   so a *live* product carries 0 and the product page drops its rating row and its
+   review aggregate rather than printing an average over nothing. The mapper sets
+   that 0 explicitly, because the model's own default (4.5) is the mock's number.
+   When a reviews table lands, the aggregate becomes real in one place — the
+   resource — and no screen has to change.
 
 ## Running the server's tests and the app against it (verified in this checkout)
 
@@ -91,14 +97,30 @@ guessable from the repository:
   With the driver loaded, migrations and bindings work on the in-memory database.
 - **Feature tests that render a Blade view also need a Vite build**
   (`npm run build`); without `public/build/manifest.json` they fail with
-  "Vite manifest not found" and always will here until one is built. This is why
-  4 of `RegistrationStreetTest`'s 19 and 4 of `CartControllerTest`'s 21 fail
-  *before* any change — check the count, do not assume a regression. Nothing in
-  `tests/Feature/Api` renders a view, so that suite is green regardless.
-- **MySQL is up on 127.0.0.1:3306** (`.env` points at a real `Zefanya` database)
-  and `php artisan migrate:status` shows the buyers/categories/sellers tables
-  migrated with the product/order/logistics ones pending. A real HTTP round trip
-  therefore works: `php artisan serve --port=8123`, then `curl` against it.
+  "Vite manifest not found" and always will here until one is built. The real
+  count is **60 of 169 tests in the whole suite**, measured by stashing this
+  pass's changes and re-running — not the "4 of `RegistrationStreetTest`" an
+  earlier note recorded, which had only ever run a subset of files. Establish the
+  count against a stash before attributing a failure to your own change. Nothing
+  in `tests/Feature/Api` renders a view, so that suite is green regardless.
+- **MySQL is up on 127.0.0.1:3306** (`.env` points at a real `Zefanya` database),
+  and every migration has now been applied — the catalogue pass ran the last 11,
+  so products, vouchers, orders, cart and logistics tables all exist. They hold
+  **no rows**, though: `categories` (14, seeded by its own migration) is the only
+  catalogue table with data, so a live build shows an empty shop. A real HTTP
+  round trip works: `php artisan serve --port=8123`, then
+  `curl.exe -s http://127.0.0.1:8123/api/products`.
+- **`php artisan serve` is two processes.** The launcher spawns a child `php -S`
+  that owns the port, so `Stop-Process` on the launcher leaves the server
+  listening (verified by finding the port still in `netstat` while the app was
+  still answering). Kill the pid that owns the port, then check the port is free
+  *and* `Get-Process php` is empty. Note also that PowerShell's `curl` is an alias
+  for `Invoke-WebRequest` — use `curl.exe` when you want curl's own flags.
+- **A migration's existence says nothing about whether it ran.** Probe the schema
+  (`SHOW TABLES`, or a row count that catches "doesn't exist") rather than
+  inferring it from the models and controllers, which read as if every table were
+  there. `php artisan migrate --pretend` prints the SQL and writes nothing, so
+  checking first is free.
 - **`MAIL_MAILER=log`**, so an OTP code is written to
   `web/storage/logs/laravel.log` as `**Verification code: NNNNNN**`. That is how
   the registration → confirm → approve → login loop was driven end to end without
@@ -109,8 +131,15 @@ guessable from the repository:
 
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (204 tests)
+- **`flutter analyze` must be clean** and `flutter test` must pass (228 tests)
   before any change is considered done.
+- **Money is centavos on the wire, in both directions.** The app's `money.dart` is
+  the only file that knows the scale factor, and the server converts on its own
+  side of the boundary: `products.price` is a peso `DECIMAL(10,2)`, so
+  `ProductResource` emits `price_minor` (integer centavos) and names the field for
+  its scale. A money field that crosses without `_minor` in its name is a bug
+  waiting for someone to guess — ₱1,250.75 read as centavos renders as
+  ₱125,075.00, and nothing about the response looks wrong.
 - **A widget test's width is not a phone width.** The test binding's default font
   gives every glyph the width of the font size, so the wordmark
   (`AppType.masthead`, 54pt) measures ~370pt and overflows the 342pt column a

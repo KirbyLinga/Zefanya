@@ -2,21 +2,74 @@
 
 ## Where things stand
 
-**The app can talk to its own server now.** A real API surface exists on the
-Laravel side (`web/routes/api.php` + Sanctum), and the app's live auth repository
-calls it for buyers: register (multipart, ID document and all) → confirm the
-emailed code → sign in → `GET /me` → sign out. The mock/live decision is still one
+**The app can read its server's catalogue, and it can authenticate.** Two passes
+have landed against the real API: the auth half (register → confirm → sign in →
+`GET /me` → sign out) and now the catalogue half (`GET /products`,
+`/products/{id}`, `/categories`, `/vouchers`). The mock/live decision is still one
 config line in `main()`:
 
 ```dart
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **204 mobile tests pass** (184 two passes ago) and
-**29 server tests pass** in `tests/Feature/Api`. Every live call has been driven
-at least once over real HTTP against real MySQL — probe rows since deleted.
+`flutter analyze` is clean; **228 mobile tests pass** and **65 server tests pass**
+in `tests/Feature/Api`. Every live call in both halves has been driven at least
+once over real HTTP against real MySQL — probe rows since deleted.
 
-What this session actually changed:
+This pass, in one line: **the 11 unrun migrations were applied, and the catalogue
+became real** — products, single products, categories and vouchers, each read
+publicly, with the three fields the server cannot fill deliberately absent rather
+than plausibly invented.
+
+## This pass: the catalogue (migrations, then products / categories / vouchers)
+
+**The blocker was the database, not the code.** The dev DB had 14 tables and
+`products`, `product_images`, `cart_items`, `vouchers`, `logistics_providers`,
+`orders`, `seller_orders`, `order_items`, `payments` and `inventory_transactions`
+did not exist at all — 11 migrations were on disk and had never run. A
+`migrate --pretend` dry run (exit 0, no writes) checked them before touching
+anything; `migrate --force` then applied all 11 in ~1.3s. Found by probing the
+schema, not by reading the code: the migrations' *existence* says nothing about
+whether they ran.
+
+What is now real on the server (`routes/api.php`, all public, one throttle bucket
+each):
+
+| Endpoint | Answers |
+|---|---|
+| `GET /api/products` | Every active product from an approved seller, newest first. Filters `q` (name + category), `category` (label), `seller` (shop name). Unpaginated on purpose. |
+| `GET /api/products/{product}` | One product, 404 unless active **and** seller-approved |
+| `GET /api/categories` | The 14 curated rows, in the migration's own order |
+| `GET /api/vouchers` | Active, unexpired, under-usage-limit vouchers |
+
+And on the app side, `LiveCatalogRepository` and `LiveCartRepository.vouchers()`
+are implemented against them.
+
+Decisions, with the reason each one exists:
+
+| Decision | Why |
+|---|---|
+| The catalogue is **public** — no token, and the client is told so (`authenticated: false`) | A catalogue is not per-buyer, and the web's own `/buyer/products` pages sit outside their `auth:buyer` group for the same reason. Sending a bearer token to a route that cannot use it is a habit worth not forming |
+| `price_minor`, always centavos | `products.price` is a `DECIMAL(10,2)` in **pesos** while every other money column is `*_minor`, and the app reads every server amount as centavos (`money.dart`). Converting on the side that owns the column, and naming the field for its scale, is what stops ₱1,250.75 rendering as ₱125,075.00 |
+| A product is visible only when `status = active` **and** its seller is approved | The seller's own dashboard filters by status alone (they may look at their own drafts) and the web buyer page checks status alone; an unapproved seller's product must not be browsable, so both rules apply on both the list and the single read, stated once |
+| An out-of-stock product is **listed**, with `in_stock: false` | Hiding it is an unexplained absence that looks like a bug, and the app has no stock UI to explain one. The flag carries the fact |
+| `compare_at_price`, rating and maker note are **absent, not faked** | No column exists for any of the three. The web buyer page fakes all three (a struck-through price as `price / 0.75`, a hardcoded 4.9 and "284 reviews", placeholder feature copy) — exactly what the app's no-invented-content rule forbids. An absent field renders as no badge and no rating |
+| The app overwrites the model's rating defaults with 0, and the product page **drops** the rating row and the review aggregate when nothing has been rated | `Product`'s constructor defaults (4.5 stars) are the *mock* catalogue's numbers. Left to default, a live product would claim an average over zero ratings — a number about nothing. Gating on `ratingCount > 0` changes nothing in mock mode (all 8 mock products carry one) |
+| A **flat** voucher is not offered to the app at all | ₱200 off the goods has no expression in this app: `voucherDiscountFor` reads `discountRate <= 0` as a *shipping* rebate, so mapping one would silently become ₱200 off the delivery fee. Refusing is visible and arguable; applying the wrong one is neither. A percentage voucher maps exactly (10% → `discountRate: 0.10`), and the server's lack of a cap maps to `double.infinity` — "the server caps nothing" rather than a made-up ceiling |
+| The category chips come from the server, and the app prepends its own `'All'` | The app's mock list is four names ('Fashion', 'Home & Living'…) and the server's 14 do not overlap — this is the answer to OPEN QUESTIONS §0.3. `'All'` is a UI affordance, not a row, so it is never sent as a filter |
+| The product list is **unpaginated** | The app's repository contract is "the catalogue", with no page or `hasMore` in it. A paginated response would hand the app its first page and silently drop the rest — a missing page is not an error, it is a shorter catalogue |
+
+The three guards worth naming, each proven to fail by breaking it on purpose:
+
+- dropping the `* 100` in the resource → exactly the two centavo tests failed;
+- dropping the cover-first sort → exactly the cover-order test failed;
+- dropping the seller-approved filter → exactly the unapproved-seller test failed;
+- dropping `type != 'percent'` in the app's voucher mapper → exactly the two
+  flat-voucher tests failed;
+- dropping the `rating: 0` override → the live-product test failed with
+  `Expected: <0> / Actual: <4.5>` — the invented rating, caught by name.
+
+## What the auth pass changed (the half that was already there)
 
 1. **A pre-existing bug was found and fixed, and it was a blocker.**
    `registration_screen.dart` wrapped its `PageView` in an `AnimatedSwitcher`
@@ -149,59 +202,108 @@ What this session actually changed:
   new API routes each got a per-route prefix (`throttle:3,5,api-otp-resend`); the
   web routes were left alone because changing them changes the web app's
   behaviour, which is your call.
-- **`docs/api-contract.md` is cited 14× in `lib/` and does not exist in this
-  repo** (`docs/` is absent and untracked). Narrowed, not closed: the auth
-  endpoints are now specified by `web/routes/api.php`, which *is* here, and the
-  document's auth section was wrong anyway (Inertia controllers, no
-  `routes/api.php`, no token auth, different URL shapes). Every endpoint that does
-  not exist yet still cites it.
-- **Live mode still cannot boot**, and the reason has narrowed to three call
-  sites — all three are *state* `load()`s, not repository ones. A live
-  repository's own `load()` is a no-op by design (nothing in it touches the
-  network), but three states fetch immediately after it inside their own
-  `load()`: `OrderState.load()` → `orders()` (no `try`, so it propagates),
-  `CartState.load()` → `vouchers()` and `CourierState.load()` → `assignedJobs()`
-  — those two **deliberately outside** their `try`, with a comment saying a live
-  failure belongs to the screen that asked. `main()`'s `Future.wait` has no
-  catch, so the first rejection escapes before `runApp`. That makes "let it boot"
-  a decision rather than a patch: making the repository's `load()` tolerant would
-  change nothing, and two of the three fetches are outside a `try` on purpose.
-  Either boot with empty state and a visible notice (touching those three), or
-  give the catalogue real endpoints so the fetch succeeds.
+- **`docs/api-contract.md` still does not exist in this repo** (`docs/` is absent
+  and untracked), and is now cited only by endpoints that do not exist. Wide, then
+  narrower, now narrowest: the auth endpoints and the four catalogue endpoints are
+  specified by `web/routes/api.php`, which *is* here — and the document's own auth
+  section was wrong anyway (Inertia controllers, no `routes/api.php`, no token
+  auth, different URL shapes). What still cites it, and so still has a citation as
+  its only record: `maker_note`, `GET /promotions`, orders, reviews, chat, and the
+  courier job routes.
+- **Live mode still cannot boot**, and it is down to two fetch sites — both
+  *state* `load()`s, not repository ones. A live repository's own `load()` is a
+  no-op by design, but two states fetch immediately after it inside their own
+  `load()`: `OrderState.load()` → `orders()` (no `try`, so it propagates) and
+  `CourierState.load()` → `assignedJobs()` (**deliberately outside** its `try`,
+  with a comment saying a live failure belongs to the screen that asked).
+  `main()`'s `Future.wait` has no catch, so the first rejection escapes before
+  `runApp`. The catalogue half of this is now fixed rather than dodged —
+  `CartState.load()`'s `vouchers()` and the wishlist/history catalogue reads all
+  resolve against real endpoints, which is what took the three sites down to two.
+  Either boot with empty state and a visible notice (touching those two), or give
+  orders and courier jobs endpoints to succeed against.
 - **The courier half has no API.** `LiveAuthRepository` names
   `POST /login/logistics` and `POST /register/logistics` rather than dressing a
-  buyer request in courier words. It waits on the form decision below.
+  buyer request in courier words. It waits on the form decision below — and one
+  piece of this pass did help it: `logistics_providers` now **exists** (it was one
+  of the 11 unrun migrations), so the courier half is no longer blocked on the
+  schema as well as on the form.
 - **The courier registration form does not match the server's request.** It
   collects a vehicle type and a plate number, which
   `StoreLogisticsRegistrationRequest` has no field for, and omits two fields that
   request *requires* (`business_name`, `dti_permit_upload`). A product decision
   (change the form, or the server) is needed before any code — see
   `progress.md`. The courier cannot actually register until it is settled.
+- **The catalogue has a source but no rows.** Products come from the seller web
+  app — `routes/seller.php` and `Seller\ProductController` are complete (create,
+  edit, images with a primary flag, status toggle, ownership checks) — so nothing
+  needs building to get real data. What the dev DB holds is 0 products and 0
+  sellers, so a live build boots into an empty shop with a correct empty state
+  until someone registers a seller, is approved, and lists something. A decision:
+  go through the real seller flow, or seed demo rows.
+- **`test/failures/` is covered** by the root `.gitignore` (verified with
+  `git check-ignore`), so a failing golden leaves ignored PNGs rather than a dirty
+  tree.
 - **Fonts are still not bundled** (`techContext.md`) — the pubspec comment
   claims otherwise.
-- **A saved wishlist or history can hide a live failure.** `WishlistState.load()`
-  and `RecentlyViewedState.load()` call `_indexCatalog()` (→ `catalog.products()`)
-  *inside* their `try`, whose `catch` was written for corrupt local JSON — so in
-  live mode a network failure silently empties the list instead of surfacing. The
-  opposite of what `CartState`/`CourierState` do deliberately for the same class of
-  failure. Small, and worth a decision rather than a patch.
+- **A saved wishlist or history can still hide a live failure.**
+  `WishlistState.load()` and `RecentlyViewedState.load()` call `_indexCatalog()`
+  (→ `catalog.products()`) *inside* their `try`, whose `catch` was written for
+  corrupt local JSON. The catalogue read is real now, so this only bites when the
+  network fails — which is exactly when it matters: a failed re-index then reads
+  as "your wishlist is empty" rather than as "we could not reach the shop".
 
 ## Next steps
 
-1. **Whether live mode boots with an empty cache.** The auth path is real now;
-   the catalogue has no endpoint, and `main()` awaits it, so a live build still
-   dies before `runApp`. Either boot with empty state and a visible notice, or
-   wire the catalogue endpoints next and make live mode real.
-2. **The courier registration form vs `StoreLogisticsRegistrationRequest`** — a
-   product decision (see the flag). It now blocks the courier's API half as well
-   as the form.
-3. **Whether to fix the web routes' throttles too** (flag above). One word per
+1. **Whether live mode boots with an empty cache.** It is down to two fetch sites
+   now — `OrderState.load()` → `orders()`, `CourierState.load()` → `assignedJobs()`
+   — so the choice is smaller than it was: boot with empty state and a visible
+   notice, or give those two endpoints to succeed against. Either way a live build
+   now has a real catalogue to show, which it did not before this pass.
+2. **Product data for a live build.** The seller web flow exists and is complete
+   (`routes/seller.php`), so nothing needs building — but the dev DB has 0
+   products and 0 sellers, so go through that flow or seed demo rows.
+3. **The courier registration form vs `StoreLogisticsRegistrationRequest`** — a
+   product decision (see the flag). It blocks the courier's API half as well as
+   the form.
+4. **Whether to fix the web routes' throttles too** (flag above). One word per
    route, but it changes the web app's behaviour.
-4. **Whether `AuthState` calls `refresh()` on boot** now that `GET /me` exists —
+5. **Whether `AuthState` calls `refresh()` on boot** now that `GET /me` exists —
    the repository method is implemented and tested, and nothing calls it yet.
-5. Tier 2's other half: sort / filter on category grids, then search history.
+6. **The next slice: orders** (`GET /orders`, `POST /orders`). It is what is left
+   of the boot problem, and it is what the checkout screen will need. Reviews and
+   chat come after it, and both have tables now.
+7. Tier 2's other half: sort / filter on category grids, then search history.
 
 ## Working notes / preferences
+
+- **The migrations on disk are not the schema you have.** The catalogue's blocker
+  was that 11 migrations had never run: `products`, `orders`, `vouchers`,
+  `logistics_providers`, `cart_items` and six more did not exist in the dev
+  database — invisible from the application code, where the models, controllers
+  and routes all read as if the tables were there. Found by probing (count rows,
+  catch "doesn't exist"), then confirmed against the `migrations` ledger. Also
+  found that way: the 14 categories are **seeded by their own migration**, which
+  is why a test can read one without a factory. `migrate --pretend` prints the
+  SQL and writes nothing, so the check costs nothing.
+- **`artisan serve` is two processes.** `php artisan serve` spawns a child
+  `php -S` that owns the port, so stopping the launcher leaves the server
+  listening — caught by checking `netstat` after printing "server stopped", while
+  the app was still answering requests. Kill the pid that owns the port, then
+  verify the port is free *and* that no `php` process is left.
+- **A probe should make the server prove the claim.** The probe product's two
+  images were created deliberately out of display order (`sort_order: 0` unflagged,
+  `sort_order: 1` flagged primary), and the HTTP response returned the primary
+  first — the only way to know the cover-first rule survives `Storage::url()` and
+  the resource's own sort. A test can assert the resource's output; only the wire
+  shows what a client receives.
+- **Establish a baseline before calling something a regression.** The full web
+  suite has **60** pre-existing failures in this checkout — all
+  `Vite manifest not found`, from a frontend that has never been built here — not
+  the 4 an earlier note recorded, because that note had only ever run a subset.
+  Proved by stashing this pass's changes and re-running: `Tests: 169,
+  Failures: 60` before, `Tests: 205, Failures: 60` after. The count is the same;
+  the 36 new tests all pass.
 
 - **Run it, or it is not real.** Three things this pass were *only* visible by
   executing the flow, and all three were wrong before that: the OTP body's field

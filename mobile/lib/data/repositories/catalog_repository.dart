@@ -26,7 +26,9 @@
 // immediately still yields, so the async *shape* is real without a fake
 // spinner flashing for one frame.
 
+import '../api/api_client.dart';
 import '../api/api_exception.dart';
+import '../dto/remote_catalog.dart';
 import '../mock_data.dart';
 import 'live_stub.dart';
 
@@ -143,52 +145,123 @@ class MockCatalogRepository implements CatalogRepository {
 }
 
 // ---------------------------------------------------------------------------
-// Live — specified, not implemented
+// Live — the catalogue, read-only
 // ---------------------------------------------------------------------------
 
-/// Every method throws [ApiNotImplementedException] naming its contract
-/// section.
+/// The app's real catalogue, over `GET /products`, `/products/{id}` and
+/// `/categories`.
 ///
-/// The `isConfigured` guard comes first in each: a live repository with no base
-/// URL is a misconfiguration, and reporting *that* is more useful than
-/// reporting a missing endpoint — the first is fixed by setting a flag, the
+/// ## Two methods still throw, and that is the answer rather than an oversight
+///
+/// [makerNote] and [promoSlides] have no server-side source: `products` has no
+/// maker-note column, and there is no promotions table at all. They keep naming
+/// what is missing instead of returning invented content, so Home's maker section
+/// and its promo carousel stay absent — which is the honest shape of "the server
+/// does not have this yet". (`remote_catalog.dart` does the same for the three
+/// product fields the catalogue cannot fill.)
+///
+/// ## Requests are sent unauthenticated, deliberately
+///
+/// These routes are public, and `authenticated: false` is how the client is told
+/// so: the request does not depend on who the person is, and a bearer token has
+/// no business being attached to an endpoint that cannot use it. The catalogue is
+/// the same for everybody, signed in or not.
+///
+/// The `isConfigured` guard still comes first in each method: a live repository
+/// with no base URL is a *misconfiguration*, and reporting that is more useful
+/// than reporting a missing endpoint — the first is fixed by setting a flag, the
 /// second by building an API.
 class LiveCatalogRepository extends LiveRepository implements CatalogRepository {
   LiveCatalogRepository(super.client);
 
   @override
-  Future<List<Product>> products({CatalogQuery? query}) {
+  Future<List<Product>> products({CatalogQuery? query}) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /products', section: '§5.1');
+
+    final body = await client.getJson(
+      '/products',
+      query: _parameters(query),
+      authenticated: false,
+    );
+
+    return unwrapList(body).map(productFromJson).toList(growable: false);
   }
 
   @override
-  Future<Product?> productById(String id) {
+  Future<Product?> productById(String id) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /products/{id}', section: '§5.2');
+
+    try {
+      final body = await client.getJson('/products/$id', authenticated: false);
+      return productFromJson(unwrapMap(body));
+    } on NotFoundException {
+      // The interface promises null for a product that no longer exists, so the
+      // 404 is answered here rather than at every call site. A draft or delisted
+      // product answers 404 as well, which is the same fact to a buyer: the page
+      // says "no longer available" instead of failing.
+      return null;
+    }
   }
 
   @override
-  Future<List<String>> categories() {
+  Future<List<String>> categories() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /categories', section: '§5.4');
+
+    final body = await client.getJson('/categories', authenticated: false);
+
+    // The leading 'All' is this app's own chip, not a row the server has: the
+    // interface promises it, and the server's list is the curated fourteen. A
+    // row with no label would be a chip with no text, so it is skipped.
+    final labels = <String>['All'];
+    for (final row in unwrapList(body)) {
+      final label = categoryLabelFromJson(row);
+      if (label.isNotEmpty) labels.add(label);
+    }
+    return List.unmodifiable(labels);
   }
 
   @override
-  Future<List<Product>> productsInCategory(String category) {
-    if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /products?category=', section: '§5.1');
-  }
+  Future<List<Product>> productsInCategory(String category) =>
+      products(query: CatalogQuery(category: category));
 
   @override
   Future<String?> makerNote(String sellerName) {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('maker_note on GET /products/{id}', section: '§5.3');
+    return notWired('maker_note on GET /products', section: '§5.3');
   }
 
   @override
   Future<List<PromoSlide>> promoSlides() {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
     return notWired('GET /promotions', section: '§5.5');
+  }
+
+  /// The query string a [CatalogQuery] becomes.
+  ///
+  /// Only the parameters that are actually set are sent, so a request stays
+  /// legible in a log, and `'All'` is dropped: it is the app's own "no filter"
+  /// chip, and sending it would ask the server for a category by that name —
+  /// which is an empty catalogue rather than every product.
+  ///
+  /// The category is sent as its *label* (`'Home and Garden'`), not an id,
+  /// because the chip the person tapped shows a label and the server owns the
+  /// id<->label mapping for its own rows.
+  Map<String, String> _parameters(CatalogQuery? query) {
+    if (query == null) return const {};
+
+    final parameters = <String, String>{};
+
+    final category = query.category?.trim();
+    if (category != null && category.isNotEmpty && category != 'All') {
+      parameters['category'] = category;
+    }
+
+    final search = query.search?.trim();
+    if (search != null && search.isNotEmpty) parameters['q'] = search;
+
+    final seller = query.seller?.trim();
+    if (seller != null && seller.isNotEmpty) parameters['seller'] = seller;
+
+    return parameters;
   }
 }

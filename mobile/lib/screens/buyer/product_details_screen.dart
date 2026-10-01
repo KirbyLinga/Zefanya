@@ -407,6 +407,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildRatingRow(ThemeData theme) {
+    // A rating is an average over ratings, and a sold count is a count of sales:
+    // with none of either there is no number to show. A live product starts
+    // exactly there — the server has no reviews table and no sales counter — so
+    // the row is dropped rather than printed as "0.0 ★ (0 ratings) • 0 sold",
+    // which are numbers about nothing. Every mock product carries both, so this
+    // changes nothing in mock mode.
+    final hasRating = _product.ratingCount > 0;
+    final hasSales = _product.soldCount > 0;
+    if (!hasRating && !hasSales) return const SizedBox.shrink();
+
     final sold = _product.soldCount >= 1000
         ? '${(_product.soldCount / 1000).toStringAsFixed(1)}k sold'
         : '${_product.soldCount} sold';
@@ -417,24 +427,30 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.star_rounded, size: 18, color: AppColors.ratingStar),
-            const SizedBox(width: 4),
-            Text(_product.rating.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
-            const SizedBox(width: 4),
-            Text('(${_product.ratingCount} ratings)', style: theme.textTheme.bodySmall),
-          ],
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('•', style: theme.textTheme.bodySmall),
-            const SizedBox(width: 12),
-            Text(sold, style: theme.textTheme.bodySmall),
-          ],
-        ),
+        if (hasRating)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.star_rounded, size: 18, color: AppColors.ratingStar),
+              const SizedBox(width: 4),
+              Text(_product.rating.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
+              const SizedBox(width: 4),
+              Text('(${_product.ratingCount} ratings)', style: theme.textTheme.bodySmall),
+            ],
+          ),
+        if (hasSales)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The bullet only ever separates two things, so it is not drawn
+              // when it would be leading one.
+              if (hasRating) ...[
+                Text('•', style: theme.textTheme.bodySmall),
+                const SizedBox(width: 12),
+              ],
+              Text(sold, style: theme.textTheme.bodySmall),
+            ],
+          ),
       ],
     );
   }
@@ -691,43 +707,48 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       children: [
         Text('WHAT BUYERS SAY', style: AppType.eyebrow),
         const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: editorialRadius(0, ShapeTier.accent),
+        // The aggregate claims "how everyone rated this". With no ratings it
+        // would read "0 / REVIEWS / ★ 0.0 average" — three claims resting on an
+        // empty set — so it is not drawn at all, and the "No reviews yet" line
+        // below says what is actually true instead.
+        if (_product.ratingCount > 0)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: editorialRadius(0, ShapeTier.accent),
+            ),
+            child: Row(
+              children: [
+                // Display numeral, so the section reads as a genuine feature
+                // rather than a plain form label.
+                Text('${_product.ratingCount}', style: AppType.priceNumeral(34)),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
+                      style: AppType.eyebrow,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.star_rounded,
+                            size: 16, color: AppColors.ratingStar),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_product.rating.toStringAsFixed(1)} average',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          child: Row(
-            children: [
-              // Display numeral, so the section reads as a genuine feature
-              // rather than a plain form label.
-              Text('${_product.ratingCount}', style: AppType.priceNumeral(34)),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
-                    style: AppType.eyebrow,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.star_rounded,
-                          size: 16, color: AppColors.ratingStar),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_product.rating.toStringAsFixed(1)} average',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 14),
         for (final review in myReviews) _ownReviewTile(theme, review),
         if (myReviews.isEmpty && _product.ratingCount == 0)

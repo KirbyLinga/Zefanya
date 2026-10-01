@@ -36,7 +36,9 @@
 // answer to guest-checkout, which nobody has asked yet. Moving them now would
 // be a data migration for a question that is still open.
 
+import '../api/api_client.dart';
 import '../api/api_exception.dart';
+import '../dto/remote_catalog.dart';
 import '../mock_data.dart';
 import 'live_stub.dart';
 
@@ -64,12 +66,34 @@ class MockCartRepository implements CartRepository {
 // Live
 // ---------------------------------------------------------------------------
 
+/// The server's voucher catalogue, over `GET /vouchers`.
+///
+/// Public like the catalogue itself: a voucher list is shop-window content, and
+/// the token is left off (`authenticated: false`) because the answer does not
+/// depend on who is asking.
+///
+/// ## The list is filtered by the *mapper*, not here
+///
+/// `voucherFromJson` returns null for any voucher this app cannot apply
+/// correctly — currently every flat-amount one, because this app's pricing engine
+/// reads a flat voucher as a shipping rebate (`config/pricing.dart`). Dropping it
+/// in the mapper rather than in the response keeps the refusal next to the reason
+/// and testable on its own, and it means a live cart offers a shorter, correct
+/// list instead of a longer, wrong one.
 class LiveCartRepository extends LiveRepository implements CartRepository {
   LiveCartRepository(super.client);
 
   @override
-  Future<List<Voucher>> vouchers() {
+  Future<List<Voucher>> vouchers() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /vouchers', section: '§4.1');
+
+    final body = await client.getJson('/vouchers', authenticated: false);
+
+    final vouchers = <Voucher>[];
+    for (final row in unwrapList(body)) {
+      final voucher = voucherFromJson(row);
+      if (voucher != null) vouchers.add(voucher);
+    }
+    return List.unmodifiable(vouchers);
   }
 }

@@ -32,6 +32,9 @@
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Buyer\RegisterBuyerController;
 use App\Http\Controllers\Api\Buyer\VerifyBuyerOtpController;
+use App\Http\Controllers\Api\Cart\VoucherController;
+use App\Http\Controllers\Api\Catalog\CategoryController;
+use App\Http\Controllers\Api\Catalog\ProductController;
 use Illuminate\Support\Facades\Route;
 
 // ── Registration (public: there is no session to require yet) ───────────────
@@ -59,6 +62,31 @@ Route::post('/register/buyer/verify-otp/{buyer}/resend', [VerifyBuyerOtpControll
 Route::post('/login/buyer', [LoginController::class, 'store'])
     ->name('api.login.buyer')
     ->middleware('throttle:5,1,api-login');
+
+// ── The catalogue (public: browsing needs no account) ───────────────────────
+//
+// Four read-only routes, one bucket each. They are separate buckets for the same
+// reason the auth routes are: `ThrottleRequests` keys a guest by `domain|ip` with
+// no route in the key, so without a prefix all four would share one counter and
+// the limit that applied would be whichever route the app happened to hit first.
+//
+// 60 reads a minute is deliberately far above what a phone does while someone
+// scrolls — it is there to stop a loop, not to meter browsing.
+Route::get('/products', [ProductController::class, 'index'])
+    ->name('api.products.index')
+    ->middleware('throttle:60,1,api-products-index');
+
+Route::get('/products/{product}', [ProductController::class, 'show'])
+    ->name('api.products.show')
+    ->middleware('throttle:60,1,api-products-show');
+
+Route::get('/categories', [CategoryController::class, 'index'])
+    ->name('api.categories.index')
+    ->middleware('throttle:60,1,api-categories');
+
+Route::get('/vouchers', [VoucherController::class, 'index'])
+    ->name('api.vouchers.index')
+    ->middleware('throttle:60,1,api-vouchers');
 
 // ── Authenticated ───────────────────────────────────────────────────────────
 
