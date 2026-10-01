@@ -155,12 +155,19 @@ What this session actually changed:
   document's auth section was wrong anyway (Inertia controllers, no
   `routes/api.php`, no token auth, different URL shapes). Every endpoint that does
   not exist yet still cites it.
-- **Live mode still cannot boot** — for a smaller reason than before. The auth
-  half works end to end now; what kills launch is the catalogue: `main()` awaits
-  `OrderState.load()`, and its live repository throws
-  `ApiNotImplementedException` before `runApp`. Booting with an empty cache and
-  saying so visibly is the honest option, and the "no silent fallback" rule still
-  forbids swallowing it.
+- **Live mode still cannot boot**, and the reason has narrowed to three call
+  sites — all three are *state* `load()`s, not repository ones. A live
+  repository's own `load()` is a no-op by design (nothing in it touches the
+  network), but three states fetch immediately after it inside their own
+  `load()`: `OrderState.load()` → `orders()` (no `try`, so it propagates),
+  `CartState.load()` → `vouchers()` and `CourierState.load()` → `assignedJobs()`
+  — those two **deliberately outside** their `try`, with a comment saying a live
+  failure belongs to the screen that asked. `main()`'s `Future.wait` has no
+  catch, so the first rejection escapes before `runApp`. That makes "let it boot"
+  a decision rather than a patch: making the repository's `load()` tolerant would
+  change nothing, and two of the three fetches are outside a `try` on purpose.
+  Either boot with empty state and a visible notice (touching those three), or
+  give the catalogue real endpoints so the fetch succeeds.
 - **The courier half has no API.** `LiveAuthRepository` names
   `POST /login/logistics` and `POST /register/logistics` rather than dressing a
   buyer request in courier words. It waits on the form decision below.
@@ -172,7 +179,12 @@ What this session actually changed:
   `progress.md`. The courier cannot actually register until it is settled.
 - **Fonts are still not bundled** (`techContext.md`) — the pubspec comment
   claims otherwise.
-- **`test/failures/` is not gitignored** — a failing golden leaves PNGs behind.
+- **A saved wishlist or history can hide a live failure.** `WishlistState.load()`
+  and `RecentlyViewedState.load()` call `_indexCatalog()` (→ `catalog.products()`)
+  *inside* their `try`, whose `catch` was written for corrupt local JSON — so in
+  live mode a network failure silently empties the list instead of surfacing. The
+  opposite of what `CartState`/`CourierState` do deliberately for the same class of
+  failure. Small, and worth a decision rather than a patch.
 
 ## Next steps
 

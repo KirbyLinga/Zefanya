@@ -159,7 +159,7 @@
   still answers the **admin** gate: it has no mail to send, and claiming otherwise
   would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 199 passing
+### Tests — 204 passing
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -207,6 +207,15 @@ scripted, because they are the interesting ones: a shut gate arriving as
 token being malformed rather than a session, a `500` on logout still clearing the
 token, and a `401` on `/me` clearing a dead one.
 
+The gate pass added **5 more** (`login_gate_test` is new, `auth_flow_test` +2,
+`live_auth_test` +3 assertions), all of them about the one refusal the app can act
+on: a `PENDING_VERIFICATION` sign-in now carries the server's `verification_id`
+into `AuthState.beginEmailVerification()` instead of ending on the form as a
+sentence. `login_gate_test` is the first suite here to pump the *login screen at a
+phone-shaped size* and assert which of the two outcomes it takes — and it was
+broken on purpose (the gate branch disabled) to watch it fail on exactly that
+assertion before being trusted.
+
 Two harness lessons, both found by the suite failing rather than by review: a
 multipart body cannot be decoded with `bytesToString()` (a JPEG is not UTF-8 — the
 recorder decodes Latin-1 instead, so the ASCII parts are still findable and the
@@ -249,12 +258,16 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
    of the API now exists, works, and is proven over real HTTP (see the API
    section above), so "no route the app could authenticate to" is no longer the
    wall. What is left is the other repositories: `main()`'s `Future.wait`
-   includes every state's `load()`, and in live mode `OrderState.load()` →
-   `OrderRepository.orders()` throws `ApiNotImplementedException` before
-   `runApp`. So a live build still dies on launch, now because the *catalogue*
-   has no endpoint rather than because nothing does. Booting with an empty cache
-   and saying so visibly is still the honest option, and the pinned "no silent
-   fallback" rule still forbids swallowing it.
+   includes every state's `load()`, and three of those states fetch from the
+   network immediately after their (no-op) repository `load()` — in live mode
+   `OrderState.load()` → `orders()`, `CartState.load()` → `vouchers()` and
+   `CourierState.load()` → `assignedJobs()` all throw
+   `ApiNotImplementedException` before `runApp`, and the last two do it *outside*
+   their `try` on purpose. So a live build still dies on launch, now because the
+   *catalogue* has no endpoint rather than because nothing does — and "let it
+   boot empty" is a decision about those three call sites, not a patch to one;
+   booting with an empty cache and saying so visibly is still the honest option,
+   and the pinned "no silent fallback" rule still forbids swallowing it.
 2. **The courier half of the API does not exist.** The buyer half is real and
    proven end to end; `LiveAuthRepository` names the missing routes
    (`POST /login/logistics`, `POST /register/logistics`, their two OTP paths)

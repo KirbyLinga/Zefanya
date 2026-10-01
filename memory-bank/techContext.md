@@ -109,9 +109,6 @@ guessable from the repository:
 
 ## Conventions that matter when editing
 
-
-## Conventions that matter when editing
-
 - **`flutter analyze` must be clean** and `flutter test` must pass (204 tests)
   before any change is considered done.
 - **A widget test's width is not a phone width.** The test binding's default font
