@@ -11,6 +11,7 @@ import 'state/courier_state.dart';
 import 'state/order_state.dart';
 import 'state/recently_viewed_state.dart';
 import 'state/review_state.dart';
+import 'state/startup_state.dart';
 import 'state/theme_state.dart';
 import 'state/wishlist_state.dart';
 import 'screens/auth/login_screen.dart';
@@ -20,6 +21,7 @@ import 'screens/courier/courier_shell.dart';
 import 'screens/landing_screen.dart';
 import 'utils/motion.dart';
 import 'widgets/app_atmosphere.dart';
+import 'widgets/startup_notice.dart';
 
 void main() async {
   // Needed because we're awaiting async work (state.load()) before
@@ -67,24 +69,34 @@ void main() async {
   // still not block its first frame on a network call that may be slow or
   // unreachable, and every live repository's `load()` is a no-op for exactly
   // that reason — see the note in repositories.dart.
+  // Every load below is wrapped, and that is the whole reason `StartupState`
+  // exists: several of them read over the network, and `main()` awaits them all
+  // before `runApp`, so an unwrapped one that rejects is not an error state — it
+  // is an app that never starts, holding the native splash on screen forever with
+  // nothing the person can do. Live mode did exactly that, through
+  // `ChatState.load()`, whose endpoint the server does not serve yet. A wrapped
+  // failure is recorded by name and shown above the shell instead.
+  final startupState = StartupState();
+
   await Future.wait([
-    authState.load(),
-    cartState.load(),
-    chatState.load(),
-    courierState.load(),
-    orderState.load(),
-    recentlyViewedState.load(),
-    reviewState.load(),
-    wishlistState.load(),
+    startupState.guard('your account', authState.load),
+    startupState.guard('your cart', cartState.load),
+    startupState.guard('your chats', chatState.load),
+    startupState.guard('your delivery jobs', courierState.load),
+    startupState.guard('your orders', orderState.load),
+    startupState.guard('your recently viewed items', recentlyViewedState.load),
+    startupState.guard('your reviews', reviewState.load),
+    startupState.guard('your saved items', wishlistState.load),
     // Restored before the first frame, so someone who chose dark doesn't
     // get a flash of light on every cold start.
-    themeState.load(),
+    startupState.guard('your appearance settings', themeState.load),
   ]);
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: authState),
+        ChangeNotifierProvider.value(value: startupState),
         ChangeNotifierProvider.value(value: cartState),
         ChangeNotifierProvider.value(value: chatState),
         ChangeNotifierProvider.value(value: courierState),
@@ -241,7 +253,18 @@ class _AuthGateState extends State<AuthGate> {
 
     switch (auth.status) {
       case AccountStatus.active:
-        return auth.role == UserRole.courier ? const CourierShell() : const BuyerShell();
+        // The startup notice sits above the shell rather than inside either one:
+        // a single place covers both roles, and it only matters once there is
+        // something to look at — a cart that failed to load says nothing useful
+        // on the login screen, and nothing at all on the landing screen.
+        return Column(
+          children: [
+            const StartupNotice(),
+            Expanded(
+              child: auth.role == UserRole.courier ? const CourierShell() : const BuyerShell(),
+            ),
+          ],
+        );
       case AccountStatus.pendingApproval:
         return const PendingApprovalScreen();
       case AccountStatus.loggedOut:

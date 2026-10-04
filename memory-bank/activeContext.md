@@ -51,13 +51,50 @@ shape of the fix is the part worth remembering:
   nothing else — the tolerance, the retry path, the widget behaviour and the wiring
   rule.
 
-**Still true, and worth saying before anyone claims live mode "just works":** the
-other catalogue-reading states (`CartState`'s vouchers, `WishlistState`,
-`RecentlyViewedState`) *do* fetch at boot and are not tolerant. They succeed
-because their endpoints exist and the server is reachable — but an unreachable
-server would still abort the first frame through them. Applying this pass's rule
-to those three is the next small step, and each needs its own decision about which
-screen explains the failure.
+## This pass: the app that only showed a logo (the boot rule, applied once)
+
+The first real live run on a phone booted to the **native splash and stayed
+there** — the logo, no button, nothing responsive. The console said why:
+
+    ApiNotImplementedException: The live API for this is not built yet
+      LiveChatRepository.threads (chat_repository.dart:161)
+      ChatState.load (chat_state.dart:62)
+      Future.wait (main.dart:70)
+
+`ChatState.load()` fetches its threads, the server has no chat endpoint, and the
+exception left `main()`'s `Future.wait` before `runApp` — so no first frame, so the
+splash never gave way. The order of operations is the trap: `main()` awaits nine
+`load()`s, so *any* one of them rejecting is not an error state, it is an app that
+never starts.
+
+My own record of which loads were dangerous was wrong, and how it was wrong is
+worth keeping: I grepped for a fetch, read the *first* line of each `load()`, saw
+`await _repository.load()` in chat and review, and called them local-only — while
+the fetch was the next line in both. The real list, read properly this time:
+**cart (vouchers), chat (threads), review (all)** fetch and were fatal; orders and
+courier were already fixed; wishlist and recently-viewed re-index the catalogue
+*inside* a local `try`, so a failure there was already swallowed; auth and theme
+read only `shared_preferences`.
+
+So the fix landed in one place rather than nine, because nine is how this recurs:
+
+- **`StartupState.guard(what, load)`** wraps every load in `main()`. A failure is
+  recorded under a human name (`'your chats'`) and never rethrown, so the first
+  frame always arrives; `ApiNotConfiguredException` *is* rethrown, because a live
+  build with no base URL is a build mistake and its owner is a developer.
+- **`StartupNotice`** renders them above the shell (in `AuthGate`, once, for both
+  roles) with a Retry — and no Retry at all when every failure is one the server
+  has not built, because a button that cannot work teaches a person to mash it. It
+  appears only for a signed-in session: a cart that failed to load says nothing
+  useful on the login screen.
+- **`startup_notice_test.dart` (7 tests)** pins the mechanism, the sentence, the
+  retry, and both states of the notice. The retry test caught a real bug on its
+  first run — a retry that failed again appended a second entry for the same thing.
+
+Still true, and named rather than fixed: `WishlistState` and
+`RecentlyViewedState` re-index the catalogue inside a local `try`, so a failure
+there is swallowed as if it were corrupt storage. They now have a notice that could
+carry it; moving that re-index out of the catch is a small, separate change.
 
 **And there is now a way in.** `DemoBuyerSeeder` seeds `buyer@zefanya.test` /
 `password`, approved and verified on the record, because a live build was

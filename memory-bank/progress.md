@@ -339,9 +339,20 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   them and nothing else. `repository_wiring_test.dart`'s "fails loudly" test now
   pins the same rule through the new mechanism (cache empty rather than mock).
 - **The mobile suite is 235 tests** and `flutter analyze` is clean.
-- **Not yet tolerant**: `CartState`'s vouchers, `WishlistState` and
-  `RecentlyViewedState` still fetch at boot — fine against a reachable server
-  (their endpoints exist), fatal against an unreachable one. Recorded, not fixed.
+- **The first real live run found the rest of it.** The app booted to the native
+  splash and stayed there — logo, no button, nothing responsive — because
+  `ChatState.load()` fetches its threads, that endpoint does not exist, and the
+  exception left `main()`'s `Future.wait` before `runApp`. `StartupState.guard()`
+  now wraps all nine loads (recording a failure under a human name, rethrowing only
+  `ApiNotConfiguredException`), and `StartupNotice` shows them above the shell with
+  a Retry that appears only when retrying could work. `startup_notice_test.dart`,
+  7 tests; its retry test caught a real bug — a retry that failed again appended a
+  duplicate line for the same thing.
+- **The states that actually fetched, read properly this time**: cart (vouchers),
+  chat (threads) and review (all), plus orders and courier (fixed earlier).
+  Wishlist and recently-viewed re-index the catalogue *inside* a local `try`, so
+  their failures are swallowed as if the stored list were corrupt — a separate,
+  named gap now that a notice exists that could carry it.
 
 ### The demo catalogue (new — so live mode has something to show)
 

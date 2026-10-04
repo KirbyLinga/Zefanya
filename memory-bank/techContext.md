@@ -159,13 +159,19 @@ guessable from the repository:
 
 - **`flutter analyze` must be clean** and `flutter test` must pass (235 tests)
   before any change is considered done.
-- **A state's `load()` must not make the first frame depend on the network.**
-  `main()` awaits nine of them before `runApp`, so a rejection is not an error
-  state — it is an app that never starts. A state that reads over the wire either
-  tolerates the failure and keeps it (`OrderState.loadFailure`,
-  `CourierState.loadFailure`) for the screen that asked, or does not fetch at all.
-  The one exception is `ApiNotConfiguredException`, which stays fatal on purpose:
-  it is a build mistake and its owner is a developer. See `test/live_boot_test.dart`.
+- **Boot never depends on the network.** `main()` awaits nine `load()`s before
+  `runApp`, so a rejection in any of them is not an error state — it is an app that
+  never starts, with the splash holding the screen and the person seeing a logo
+  forever. That happened on the first real live run, through `ChatState.load()`.
+  Every load is wrapped in `StartupState.guard(what, load)`, which records the
+  failure under a human name and never rethrows; `StartupNotice` shows those above
+  the shell with a Retry, offered only when `isRetryable` says trying again could
+  work. The one exception is `ApiNotConfiguredException`, fatal on purpose: a live
+  build with no base URL is a build mistake whose owner is a developer. A state
+  with a screen able to explain its own failure may also keep it
+  (`OrderState.loadFailure`, `CourierState.loadFailure`) — the Orders tab can say
+  what orders are, which a notice cannot. See `test/live_boot_test.dart` and
+  `test/startup_notice_test.dart`.
 - **Money is centavos on the wire, in both directions.** The app's `money.dart` is
   the only file that knows the scale factor, and the server converts on its own
   side of the boundary: `products.price` is a peso `DECIMAL(10,2)`, so
