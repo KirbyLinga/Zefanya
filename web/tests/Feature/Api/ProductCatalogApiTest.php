@@ -181,6 +181,24 @@ class ProductCatalogApiTest extends TestCase
         $this->assertSame([], $this->getJson(route('api.products.show', $product))->json('data.images'));
     }
 
+    public function test_a_photo_that_is_already_a_url_is_not_run_through_the_disk(): void
+    {
+        [$product] = $this->product();
+
+        // A seeded or externally hosted photo is a whole URL already. Wrapping it
+        // in the disk's URL builder would produce `/storage/https://…`, which is
+        // not a URL anyone can fetch.
+        ProductImage::factory()->create([
+            'product_id' => $product->id,
+            'path' => 'https://picsum.photos/seed/demo-0/1000/1000',
+            'is_primary' => true,
+        ]);
+
+        $images = $this->getJson(route('api.products.show', $product))->json('data.images');
+
+        $this->assertSame(['https://picsum.photos/seed/demo-0/1000/1000'], $images);
+    }
+
     public function test_an_uncategorised_product_still_reads_as_a_category(): void
     {
         [$product] = $this->product(['category_id' => null]);

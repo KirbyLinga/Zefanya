@@ -102,8 +102,29 @@ class ProductResource extends JsonResource
 
         return $images
             ->sortBy(fn (ProductImage $image) => $image->is($cover) ? -1 : $image->sort_order)
-            ->map(fn (ProductImage $image) => Storage::url($image->path))
+            ->map(fn (ProductImage $image) => $this->photoUrl($image->path))
             ->values()
             ->all();
+    }
+
+    /**
+     * A photo's URL, whether the column holds an uploaded path or a whole URL.
+     *
+     * A seller's upload stores a path (`products/abc.jpg`) and the filesystem
+     * turns that into a URL. A seeded or externally hosted photo is *already* a
+     * URL, and running one through the disk's URL builder mangles it —
+     * `/storage/https://…` — so that case passes through untouched. This is the
+     * only branch between the two.
+     *
+     * Worth knowing while reading this: on the `local` disk `Storage::url()`
+     * answers with a *relative* `/storage/…`, which the app's `Image.network`
+     * cannot fetch. That is a separate problem from the one solved here (it
+     * affects uploaded photos), and it is recorded in `progress.md`.
+     */
+    private function photoUrl(string $path): string
+    {
+        return str_starts_with($path, 'http://') || str_starts_with($path, 'https://')
+            ? $path
+            : Storage::url($path);
     }
 }

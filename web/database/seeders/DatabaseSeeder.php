@@ -17,11 +17,21 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // `firstOrCreate`, not `create`: this seeder gets run repeatedly on a dev
+        // database, and a second `db:seed` used to die on the unique email before
+        // it ever reached the catalogues below.
+        User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Test User', 'password' => 'password'],
+        );
 
-        $this->call(VoucherSeeder::class);
+        // The two catalogues a browsable dev database needs: the voucher list the
+        // cart offers, and the shops and goods every catalogue screen reads. Both
+        // are re-runnable, which matters because this is the command a person
+        // repeats after changing a price.
+        $this->call([
+            VoucherSeeder::class,
+            DemoCatalogueSeeder::class,
+        ]);
     }
 }
