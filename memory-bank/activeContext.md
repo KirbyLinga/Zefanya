@@ -12,7 +12,7 @@ config line in `main()`:
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **228 mobile tests pass** and **65 server tests pass**
+`flutter analyze` is clean; **235 mobile tests pass** and **74 server tests pass**
 in `tests/Feature/Api`. Every live call in both halves has been driven at least
 once over real HTTP against real MySQL — probe rows since deleted.
 

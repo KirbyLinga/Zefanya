@@ -157,8 +157,15 @@ guessable from the repository:
 
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (228 tests)
+- **`flutter analyze` must be clean** and `flutter test` must pass (235 tests)
   before any change is considered done.
+- **A state's `load()` must not make the first frame depend on the network.**
+  `main()` awaits nine of them before `runApp`, so a rejection is not an error
+  state — it is an app that never starts. A state that reads over the wire either
+  tolerates the failure and keeps it (`OrderState.loadFailure`,
+  `CourierState.loadFailure`) for the screen that asked, or does not fetch at all.
+  The one exception is `ApiNotConfiguredException`, which stays fatal on purpose:
+  it is a build mistake and its owner is a developer. See `test/live_boot_test.dart`.
 - **Money is centavos on the wire, in both directions.** The app's `money.dart` is
   the only file that knows the scale factor, and the server converts on its own
   side of the boundary: `products.price` is a peso `DECIMAL(10,2)`, so
