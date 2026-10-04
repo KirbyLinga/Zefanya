@@ -2,31 +2,29 @@
 
 namespace App\Http\Controllers\Buyer;
 
-use App\Enums\OrderStatus;
-use App\Enums\PaymentMethod;
-use App\Enums\PaymentStatus;
 use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Controller;
-use App\Models\Buyer\Buyer;
 use App\Models\CartItem;
-use App\Models\InventoryTransaction;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
-use App\Models\SellerOrder;
 use App\Models\Voucher;
 use App\Services\CartSummary;
+use App\Services\OrderPlacer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class CheckoutController extends Controller
 {
     /** Session key holding the ids checkout is allowed to see. */
     public const SESSION_KEY = 'checkout_item_ids';
+
+    /**
+     * The placing rules live in `OrderPlacer`, shared with the app's door on the
+     * same API: what the two doors can share is **lines**, not cart rows, because
+     * this one's cart is server-side and the phone's is on the phone.
+     */
+    public function __construct(private readonly OrderPlacer $orderPlacer) {}
 
     /**
      * Show checkout for the buyer's SELECTED cart items.
@@ -150,11 +148,21 @@ class CheckoutController extends Controller
         $base = new CartSummary($items, null, null);
         $voucher = Voucher::resolveCode(session('cart_voucher'), $base->subtotalCentavos, $notice);
 
-        // Authoritative money for the order — computed from DB rows only.
-        $summary = new CartSummary($items, $voucher, null);
-
         try {
-            $order = $this->placeOrder($buyer, $items, $summary);
+            // Lines rather than cart rows: the service is shared with the API, whose
+            // cart lives on the phone. The voucher is resolved above (a door's own
+            // question) and every amount is computed inside, from the locked rows.
+            $order = $this->orderPlacer->place(
+                $buyer,
+                $items
+                    ->map(fn (CartItem $item): array => [
+                        'product_id' => (int) $item->product_id,
+                        'quantity' => (int) $item->quantity,
+                    ])
+                    ->values()
+                    ->all(),
+                $voucher,
+            );
         } catch (CheckoutException $e) {
             return redirect()->route('buyer.cart.index')->with('error', $e->getMessage());
         }
@@ -173,197 +181,6 @@ class CheckoutController extends Controller
         }
 
         return $redirect;
-    }
-
-    /**
-     * The single transactional unit: order + seller_orders + order_items +
-     * payments + locked stock decrement + inventory ledger. Any failure rolls
-     * everything back — no partial orders, no phantom stock changes.
-     *
-     * @param  Collection<int, CartItem>  $items  The buyer's validated selection
-     */
-    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary): Order
-    {
-        return DB::transaction(function () use ($buyer, $items, $summary): Order {
-            // Lock the product rows in a stable order (id order avoids
-            // deadlocks between concurrent checkouts) and re-validate stock
-            // UNDER THE LOCK — the pre-transaction check is advisory; this is
-            // the authoritative gate.
-            $lockedProducts = Product::query()
-                ->whereIn('id', $items->pluck('product_id')->unique()->values())
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
-
-            foreach ($items as $item) {
-                $product = $lockedProducts->get($item->product_id);
-
-                if ($product === null || $product->trashed()
-                    || $product->status !== 'active'
-                    || $product->stock_quantity < $item->quantity) {
-                    throw new CheckoutException(
-                        'Some items just went out of stock while placing your order. Please review your cart and try again.'
-                    );
-                }
-            }
-
-            $order = new Order;
-            $order->forceFill([
-                'buyer_id' => $buyer->id,
-                'reference' => Order::generateUniqueReference(),
-                'shipping_address' => $this->addressSnapshot($buyer),
-                'subtotal_minor' => $summary->subtotalCentavos,
-                'discount_minor' => $summary->discountCentavos,
-                'total_minor' => $summary->totalCentavos,
-                'status' => OrderStatus::Placed,
-            ])->save();
-
-            // One seller_order per shop; the order-level voucher discount is
-            // allocated proportionally so the per-shop COD payments sum to the
-            // discounted order total (largest-remainder method).
-            $discounts = $this->allocateDiscount(
-                $summary->discountCentavos,
-                $summary->sellerGroups
-                    ->map(fn (array $group): int => (int) $group['items']->sum(
-                        fn (CartItem $item): int => $item->lineTotalCentavos(),
-                    ))
-                    ->all(),
-            );
-
-            $sellerOrderIdsByCartItemId = [];
-
-            foreach ($summary->sellerGroups as $index => $group) {
-                $sellerOrder = new SellerOrder;
-                $sellerOrder->forceFill([
-                    'order_id' => $order->id,
-                    'seller_id' => $group['seller']->id,
-                    'subtotal_minor' => (int) $group['items']->sum(
-                        fn (CartItem $item): int => $item->lineTotalCentavos(),
-                    ),
-                    'status' => OrderStatus::Placed,
-                ])->save();
-
-                foreach ($group['items'] as $item) {
-                    /** @var Product $product */
-                    $product = $item->product;
-
-                    OrderItem::query()->create([
-                        'seller_order_id' => $sellerOrder->id,
-                        'product_id' => $product->id,
-                        'product_name' => $product->name,
-                        'quantity' => $item->quantity,
-                        // Price snapshot at order time (CartSummary uses the
-                        // same source, so totals and lines always agree).
-                        'price_minor' => (int) bcmul((string) $product->price, '100', 0),
-                    ]);
-
-                    $sellerOrderIdsByCartItemId[$item->id] = $sellerOrder->id;
-                }
-
-                $payment = new Payment;
-                $payment->forceFill([
-                    'seller_order_id' => $sellerOrder->id,
-                    'amount_minor' => $sellerOrder->subtotal_minor - $discounts[$index],
-                    'method' => PaymentMethod::Cod,
-                    'status' => PaymentStatus::Pending,
-                ])->save();
-            }
-
-            // Decrement stock + write the append-only ledger, still under the
-            // same row locks, inside the same transaction.
-            foreach ($items as $item) {
-                /** @var Product $product */
-                $product = $lockedProducts->get($item->product_id);
-                $before = (int) $product->stock_quantity;
-
-                $product->stock_quantity = $before - $item->quantity;
-                $product->save();
-
-                InventoryTransaction::query()->create([
-                    'product_id' => $product->id,
-                    'seller_order_id' => $sellerOrderIdsByCartItemId[$item->id],
-                    'quantity_before' => $before,
-                    'quantity_after' => $product->stock_quantity,
-                    'delta' => -$item->quantity,
-                    'reason' => 'checkout',
-                ]);
-            }
-
-            return $order;
-        });
-    }
-
-    /**
-     * Split an order-level voucher discount across seller orders proportionally
-     * to their subtotals (largest-remainder method), so the per-shop COD
-     * payments sum exactly to the discounted order total.
-     *
-     * @param  array<int, int>  $subtotals  Centavos per seller group, insertion order preserved
-     * @return array<int, int> Discount in centavos per seller group, same keys
-     */
-    private function allocateDiscount(int $discount, array $subtotals): array
-    {
-        $total = array_sum($subtotals);
-
-        if ($total <= 0 || $discount <= 0) {
-            return array_map(fn (): int => 0, $subtotals);
-        }
-
-        $allocated = [];
-        $remainders = [];
-
-        foreach ($subtotals as $key => $subtotal) {
-            $exact = ($discount * $subtotal) / $total;
-            $allocated[$key] = (int) floor($exact);
-            $remainders[$key] = $exact - $allocated[$key];
-        }
-
-        // Hand the leftover centavos to the largest fractional remainders
-        // (floor() can leave at most one centavo per group behind).
-        $left = $discount - array_sum($allocated);
-        arsort($remainders);
-
-        foreach (array_keys($remainders) as $key) {
-            if ($left <= 0) {
-                break;
-            }
-
-            $allocated[$key]++;
-            $left--;
-        }
-
-        return $allocated;
-    }
-
-    /**
-     * Immutable snapshot of the buyer's profile address at order time
-     * (orders.shipping_address is JSON, deliberately not a live FK).
-     *
-     * @return array<string, string|null>
-     */
-    private function addressSnapshot(Buyer $buyer): array
-    {
-        $parts = array_filter([
-            $buyer->house_number,
-            $buyer->street,
-            $buyer->barangay_name,
-            $buyer->municipality_name,
-            $buyer->province_name,
-            $buyer->address_detail,
-        ]);
-
-        return [
-            'name' => $buyer->fullName(),
-            'phone' => $buyer->contact_no,
-            'province' => $buyer->province_name,
-            'municipality' => $buyer->municipality_name,
-            'barangay' => $buyer->barangay_name,
-            'street' => $buyer->street,
-            'house_number' => $buyer->house_number,
-            'address_detail' => $buyer->address_detail,
-            'full' => implode(', ', $parts),
-        ];
     }
 
     /**
