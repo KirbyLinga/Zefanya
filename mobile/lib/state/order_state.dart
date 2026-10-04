@@ -33,6 +33,7 @@
 // many orders a cart produces.
 
 import 'package:flutter/foundation.dart';
+import '../data/api/api_exception.dart';
 import '../data/mock_data.dart' show Order, OrderStatus;
 import '../data/repositories/order_repository.dart';
 import 'cart_state.dart';
@@ -108,22 +109,62 @@ class OrderState extends ChangeNotifier {
   }
 
   /// Call once before runApp (see main.dart) to restore placed orders.
+  ///
+  /// **A failure here is recorded, never thrown.** `main()` awaits this before
+  /// `runApp`, so a live build — which has no `GET /orders` yet — would otherwise
+  /// abort the entire app over one unimplemented endpoint instead of opening with
+  /// an empty history. The exception is kept in [loadFailure] so the screen that
+  /// asks for orders can explain it, which is what `LiveOrderRepository.load()`'s
+  /// own comment has always said: an empty Orders tab that reports the error when
+  /// it is actually opened.
   Future<void> load() async {
     await _repository.load();
-    _orders = await _repository.orders();
+
+    try {
+      _orders = await _repository.orders();
+      _loadFailure = null;
+    } on ApiNotConfiguredException {
+      // A live build with no base URL is a *build* mistake rather than a runtime
+      // condition: no screen can do anything sensible with it, and the person who
+      // has to fix it is the developer, not the person holding the phone. It keeps
+      // throwing, and `repository_wiring_test.dart` pins that.
+      rethrow;
+    } on ApiException catch (error) {
+      _orders = const [];
+      _loadFailure = error;
+    }
   }
 
-  /// Re-reads orders from the repository.
+  /// Re-reads orders from the repository, recording how the attempt went.
   ///
-  /// Needed by the async loading states (Tienda/Orders/Tracker) which show a
-  /// loading skeleton, fetch, then render: the fetch is this call. Safe to call
-  /// repeatedly, and a failure propagates rather than being swallowed — the
-  /// screen renders an error-with-retry from the thrown [ApiException], which is
-  /// the whole reason the repositories throw instead of returning empty.
+  /// This is the Retry behind the Orders screen's failure copy, and safe to call
+  /// repeatedly. A failure still propagates — the repositories throw rather than
+  /// answer empty, and callers may want that — *and* it is kept in [loadFailure],
+  /// so a reader that cannot handle a throw (a `notifyListeners`-driven rebuild)
+  /// still has something true to render.
   Future<void> refresh() async {
-    _orders = await _repository.orders();
-    notifyListeners();
+    try {
+      _orders = await _repository.orders();
+      _loadFailure = null;
+    } on ApiException catch (error) {
+      _loadFailure = error;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
   }
+
+  /// Why [orders] is empty, when the reason is a failed request rather than an
+  /// empty history.
+  ///
+  /// Set by [load] and [refresh], cleared by a [refresh] that succeeds. It exists
+  /// so the Orders screen can say *what* happened: without it, a live build with
+  /// no `GET /orders` yet would render its honest "no orders yet" empty state over
+  /// a request that never succeeded — an absence presented as a fact.
+  ApiException? _loadFailure;
+
+  /// The failure behind an empty [orders], or null when nothing failed.
+  ApiException? get loadFailure => _loadFailure;
 
   /// Turns the checked-out cart lines into orders, one per seller, all
   /// starting at "To Ship". Returns the orders it created (empty if [items] is

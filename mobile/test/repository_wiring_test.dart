@@ -209,10 +209,17 @@ void main() {
     // so, not fall back to the mock and look like it worked. A silent fallback
     // is the worst outcome — a build that *appears* functional while serving
     // invented data.
-    await expectLater(
-      orders.load(),
-      throwsA(isA<ApiNotImplementedException>()),
-    );
+    //
+    // Where it says so moved, and this test moved with it: `load()` can no longer
+    // throw, because `main()` awaits it before `runApp` and the app would then
+    // never start at all (see `live_boot_test.dart`). So the live bundle records
+    // the failure, the cache stays **empty rather than mock** — which is the part
+    // that matters here — and the Orders screen renders the failure, with a Retry
+    // only when retrying could work.
+    await orders.load();
+
+    expect(orders.orders, isEmpty, reason: 'a live build must never fall back to mock data');
+    expect(orders.loadFailure, isA<ApiNotImplementedException>());
   });
 
   test('a live bundle with no base URL says that, not "network error"',

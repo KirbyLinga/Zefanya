@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import 'delivery_tracker_screen.dart';
@@ -110,12 +111,41 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
     );
   }
 
+  /// The empty state says which *kind* of empty this is — see the note on
+  /// [CourierState.loadFailure]. "Pull down to refresh" is only honest when
+  /// nothing actually failed.
   Widget _buildEmptyState(BuildContext context) {
+    final courier = context.watch<CourierState>();
+    final failure = courier.loadFailure;
+
+    if (failure != null) {
+      return EmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'Your pickups could not be loaded',
+        subtitle: failure.message,
+        action: failure.isRetryable
+            ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
+            : null,
+        tint: AppColors.tertiary,
+      );
+    }
+
     return EmptyState(
       icon: Icons.inbox_outlined,
       title: 'No pickups assigned right now',
       subtitle: 'Pull down to refresh',
       tint: AppColors.tertiary,
     );
+  }
+
+  /// Re-reads the dispatcher's jobs. The failure is not handled here on purpose:
+  /// the state keeps it and this screen rebuilds from `loadFailure`, so catching
+  /// it again would swallow the same error twice.
+  Future<void> _retry(CourierState courier) async {
+    try {
+      await courier.refreshJobs();
+    } on ApiException {
+      // Rendered above, from the state.
+    }
   }
 }

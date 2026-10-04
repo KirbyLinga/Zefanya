@@ -30,6 +30,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/api/api_exception.dart';
 import '../data/repositories/courier_repository.dart';
 import '../data/mock_data.dart' show DeliveryJob, Order;
 
@@ -238,6 +239,35 @@ class CourierState extends ChangeNotifier {
   /// it. Null is meaningful: an unrated delivery is not a zero-star one.
   int? ratingFor(String jobId) => _ratings[jobId];
 
+  /// Why no jobs were read, when the reason is a failed request rather than an
+  /// empty day.
+  ///
+  /// [CourierRepository.assignedJobs]' doc is the reason this exists: a failure
+  /// must throw "so the dashboard can tell 'no jobs today' apart from 'we
+  /// couldn't ask'". [load] cannot let the throw out (see below), so the failure
+  /// is kept here instead and the dashboards' empty states read it.
+  ApiException? _loadFailure;
+
+  /// The failure behind an empty job list, or null when nothing failed.
+  ApiException? get loadFailure => _loadFailure;
+
+  /// Re-reads the dispatcher's jobs, recording how the attempt went.
+  ///
+  /// The counterpart of `OrderState.refresh()` for this half, and what the
+  /// dashboards' Retry calls. A failure still propagates — the interface promises
+  /// it throws — *and* is kept in [loadFailure] for the reader that cannot catch.
+  Future<void> refreshJobs() async {
+    try {
+      _assigned = List.of(await _repository.assignedJobs());
+      _loadFailure = null;
+    } on ApiException catch (error) {
+      _loadFailure = error;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
   /// How many of this courier's deliveries have been rated.
   int get ratingCount => _ratings.length;
 
@@ -272,15 +302,33 @@ class CourierState extends ChangeNotifier {
   }
 
   Future<void> load() async {
-    // The dispatcher's jobs first, and *outside* the try below: a failure here
-    // is a real "couldn't ask the server" in live mode and must propagate to the
-    // dashboard, whereas everything inside the try is local restore where a
-    // corrupt value should cost one field rather than the whole screen.
+    // The dispatcher's jobs are a *cache warm*, not a requirement: `main()` awaits
+    // this before `runApp`, and a live build has no courier-jobs endpoint yet, so
+    // letting the failure out would stop the app from starting at all rather than
+    // leaving one dashboard empty. What it costs is honest: the dashboard reads
+    // whatever this leaves, and a live courier cannot reach that dashboard anyway
+    // — the auth half refuses courier sign-in with `ApiNotImplementedException`
+    // naming `/register/logistics`, so the failure tolerated here is one no live
+    // user can currently trigger. (The buyer half is different, and is not
+    // tolerated silently: `OrderState.loadFailure` carries it to the screen that
+    // asks. When courier jobs get an endpoint, that is the shape to copy.)
+    //
     // Copied, not aliased: the interface promises a list, not that it is a copy
     // of the caller's — a repository returning its own internal list (or a const
     // seed) must not become this state's mutable field, or the next mutation
     // anywhere would show up here.
-    _assigned = List.of(await _repository.assignedJobs());
+    try {
+      _assigned = List.of(await _repository.assignedJobs());
+      _loadFailure = null;
+    } on ApiNotConfiguredException {
+      // Same rule as `OrderState.load()`: a build mistake stays fatal, a runtime
+      // failure is recorded for the screen.
+      rethrow;
+    } on ApiException catch (error) {
+      _assigned = const [];
+      _loadFailure = error;
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       _milestones.clear();

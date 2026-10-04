@@ -314,6 +314,23 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   in `C:\PHP\php.ini`, so `php artisan test` fails with "could not find driver".
   See `techContext.md` gap 5.
 
+### Live mode boots (new)
+
+- **The two boot fetches stopped being fatal without becoming silent.**
+  `OrderState.loadFailure` / `CourierState.loadFailure` carry the `ApiException`
+  that emptied a cache; the Orders screen and the two courier dashboards render it,
+  offering **Retry only when `isRetryable`** (an unbuilt endpoint answers no).
+  `ApiNotConfiguredException` still throws, deliberately: a live build with no base
+  URL is a build mistake, not a runtime condition.
+- **`live_boot_test.dart`: 7 tests** — boot tolerance for both halves, the retry
+  paths, and the screen behaviour. Mutation-proven: reverting the fix fails 6 of
+  them and nothing else. `repository_wiring_test.dart`'s "fails loudly" test now
+  pins the same rule through the new mechanism (cache empty rather than mock).
+- **The mobile suite is 235 tests** and `flutter analyze` is clean.
+- **Not yet tolerant**: `CartState`'s vouchers, `WishlistState` and
+  `RecentlyViewedState` still fetch at boot — fine against a reachable server
+  (their endpoints exist), fatal against an unreachable one. Recorded, not fixed.
+
 ### The demo catalogue (new — so live mode has something to show)
 
 - **`DemoCatalogueSeeder` fills the dev database** with what a live build needs

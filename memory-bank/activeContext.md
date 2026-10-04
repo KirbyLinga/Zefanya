@@ -21,6 +21,44 @@ became real** — products, single products, categories and vouchers, each read
 publicly, with the three fields the server cannot fill deliberately absent rather
 than plausibly invented.
 
+## This pass: live mode boots (the two boot fetches stopped being fatal)
+
+`main()` awaits nine `load()`s before `runApp`, so a rejection in any one of them
+was never an error state — it was an app that never started. Two of those loads
+ask the network for data the server does not serve yet (orders, courier jobs), so
+a live build could not reach its first frame at all. That is now fixed, and the
+shape of the fix is the part worth remembering:
+
+- **The failure is recorded, not swallowed.** `OrderState.loadFailure` and
+  `CourierState.loadFailure` carry the `ApiException` that left a cache empty. The
+  Orders screen renders it, and so do the two courier dashboards' empty states,
+  with **Retry only when `isRetryable` says retrying could work** — an endpoint
+  that has not been built answers no, and a button that cannot work is worse than
+  no button. So "no orders yet" and "we could not ask" are visibly different,
+  which is the distinction `CourierRepository.assignedJobs()`'s own doc demands.
+- **One exception stays fatal: `ApiNotConfiguredException`.** A live build with no
+  base URL is a build mistake with a developer on the other end, not a runtime
+  condition for the person holding the phone. One of `repository_wiring_test.dart`'s
+  two tests was rewritten this pass: it used to assert that `load()` *throws*, and
+  now asserts that the cache stays **empty rather than mock** and that the failure
+  is named. Same rule, different mechanism — and the rule was the part that
+  mattered, because a silent fallback to mock data is a build that looks
+  functional while serving invented things.
+- **`live_boot_test.dart` (7 tests)** pins all of it, including the widget path: an
+  unbuilt endpoint shows the failure with no Retry, a dropped connection shows it
+  with Retry, and Retry then genuinely re-reads.
+- **Proven by mutation**: reverting `load()`'s try/catch fails 6 of those tests and
+  nothing else — the tolerance, the retry path, the widget behaviour and the wiring
+  rule.
+
+**Still true, and worth saying before anyone claims live mode "just works":** the
+other catalogue-reading states (`CartState`'s vouchers, `WishlistState`,
+`RecentlyViewedState`) *do* fetch at boot and are not tolerant. They succeed
+because their endpoints exist and the server is reachable — but an unreachable
+server would still abort the first frame through them. Applying this pass's rule
+to those three is the next small step, and each needs its own decision about which
+screen explains the failure.
+
 ## This pass: the demo catalogue (the catalogue was real and empty)
 
 `GET /api/products` was correct and returned nothing, because the dev database

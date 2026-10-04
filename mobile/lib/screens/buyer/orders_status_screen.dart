@@ -16,6 +16,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
@@ -42,7 +43,22 @@ class OrdersStatusScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Watches both: OrderState for what was placed, CourierState for how
     // far along each one is.
-    final orders = context.watch<OrderState>().resolvedOrders(context.watch<CourierState>());
+    final orderState = context.watch<OrderState>();
+    final orders = orderState.resolvedOrders(context.watch<CourierState>());
+
+    // An empty history and a request that failed must not look the same. Boot
+    // deliberately does not die on the failure (see `OrderState.load`), so this
+    // is the screen that has to say why the list is empty — and it is the screen
+    // the person opened, which is the whole reason the failure was allowed to
+    // wait this long.
+    final failure = orderState.loadFailure;
+    if (failure != null) {
+      return Scaffold(
+        backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+        body: SafeArea(child: _OrdersLoadFailure(error: failure)),
+      );
+    }
+
     return DefaultTabController(
       length: 4,
       child: Builder(
@@ -74,6 +90,50 @@ class OrdersStatusScreen extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+/// "Your orders could not be loaded" — this screen's half of the bargain
+/// [OrderState.load] makes.
+///
+/// Boot does not die on a failed request, so the failure has to be said out loud
+/// somewhere, and the screen the person actually opened is the only place that
+/// can say it. Without this, an unreachable server would render the honest "no
+/// orders yet" empty state over a request that never succeeded — an absence
+/// presented as a fact.
+///
+/// Retry is offered only when the failure says trying again could work
+/// ([ApiException.isRetryable]). An endpoint the server has not built answers no
+/// to that, and a Retry button there would be a button that cannot work.
+class _OrdersLoadFailure extends StatelessWidget {
+  const _OrdersLoadFailure({required this.error});
+
+  final ApiException error;
+
+  @override
+  Widget build(BuildContext context) {
+    return EmptyState(
+      icon: Icons.cloud_off_outlined,
+      title: 'Your orders could not be loaded',
+      subtitle: error.message,
+      action: error.isRetryable
+          ? TextButton(onPressed: () => _retry(context), child: const Text('Retry'))
+          : null,
+      tint: AppColors.secondary,
+    );
+  }
+
+  /// Re-reads the orders. The failure is not handled here on purpose: the state
+  /// records it and this widget rebuilds from `loadFailure`, so catching it again
+  /// would swallow the same error twice.
+  Future<void> _retry(BuildContext context) async {
+    final orders = context.read<OrderState>();
+
+    try {
+      await orders.refresh();
+    } on ApiException {
+      // Rendered above, from the state.
+    }
   }
 }
 

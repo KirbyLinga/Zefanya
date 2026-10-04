@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import 'delivery_tracker_screen.dart';
@@ -42,7 +43,7 @@ class DeliveryDashboardScreen extends StatelessWidget {
                   trailing: tally,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 ),
-                Expanded(child: _buildEmptyState(theme)),
+                Expanded(child: _buildEmptyState(theme, courier)),
               ],
             )
           : ListView.builder(
@@ -102,12 +103,48 @@ class DeliveryDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  /// The empty board says *which* kind of empty it is: "nothing out for delivery"
+  /// and "we could not ask" are different facts, and only one of them is about the
+  /// courier's day. That distinction is exactly what
+  /// [CourierRepository.assignedJobs] throws for.
+  ///
+  /// Retry appears only when the failure says trying again could work
+  /// (`ApiException.isRetryable`), which an endpoint that has not been built
+  /// answers no to — offering Retry there teaches a person to mash a button that
+  /// cannot work.
+  Widget _buildEmptyState(ThemeData theme, CourierState courier) {
+    final failure = courier.loadFailure;
+
+    if (failure != null) {
+      return EmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'Your deliveries could not be loaded',
+        subtitle: failure.message,
+        action: failure.isRetryable
+            ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
+            : null,
+        tint: AppColors.tertiary,
+      );
+    }
+
     return EmptyState(
       icon: Icons.local_shipping_outlined,
       title: 'Nothing out for delivery yet',
       subtitle: 'Picked-up items will show up here',
       tint: AppColors.tertiary,
     );
+  }
+
+  /// Re-reads the dispatcher's jobs.
+  ///
+  /// The failure is not handled here on purpose: the state keeps it and this
+  /// screen rebuilds from `loadFailure`, so catching it again would swallow the
+  /// same error twice.
+  Future<void> _retry(CourierState courier) async {
+    try {
+      await courier.refreshJobs();
+    } on ApiException {
+      // Rendered above, from the state.
+    }
   }
 }
