@@ -4,11 +4,16 @@
 //
 // ## Why some live methods are still allowed to throw
 //
-// The Laravel API now exists for the buyer half of registration and for sign-in
-// (`web/routes/api.php`), and [LiveAuthRepository] calls it for real — multipart
-// upload and all. Everything else (products, orders, cart, chat, courier jobs)
-// has no endpoint yet, and those methods throw [ApiNotImplementedException]
-// naming the endpoint instead of containing request code that has never run.
+// The Laravel API covers the buyer's whole errand now: registration and sign-in,
+// the catalogue (`GET /products`, `/products/{id}`, `/categories`, `/vouchers`)
+// and the buyer's own orders — `GET /orders` and `POST /orders`. Those live
+// repositories call it for real, multipart upload and all.
+//
+// What is still missing is everything on the other side of the counter: the
+// *seller's* catalogue notes (`maker_note`, promotions), reviews, chat, and the
+// courier's job list — plus courier sign-in, because `logistics_providers` has no
+// API surface at all. Those methods throw [ApiNotImplementedException] naming the
+// endpoint instead of containing request code that has never run.
 //
 // That rule is what this file is for, and it is worth restating now that part of
 // the API is real: request-and-parse code written against an endpoint nobody has

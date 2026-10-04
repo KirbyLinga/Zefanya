@@ -29,11 +29,18 @@ class _FakeServer {
   int _served = 0;
 
   final List<String> paths = [];
+  final List<String> methods = [];
+  final List<String> bodies = [];
   final List<Map<String, String>> headers = [];
 
   late final http.Client client =
       MockClient.streaming((request, bodyStream) async {
     paths.add(request.url.path);
+    methods.add(request.method);
+    // The body is recorded too, not just the path: what a write *sends* is half of
+    // what it can get wrong, and a test that only checks the URL would pass for a
+    // request that posted nothing.
+    bodies.add(await bodyStream.bytesToString());
     headers.add(request.headers);
 
     final response = _script[_served < _script.length ? _served++ : _script.length - 1];
@@ -187,6 +194,134 @@ void main() {
       // The boot guard records this and the Orders screen shows it. What must not
       // happen is `[]`, which reads as "you have never ordered anything".
       await expectLater(live.orders.orders(), throwsA(isA<UnauthorizedException>()));
+    });
+  });
+
+  group('placing an order', () {
+    const lines = [
+      OrderLineRequest(
+        productId: '2',
+        productName: 'Handwoven Rattan Tote',
+        sellerName: 'Loom & Larder',
+        quantity: 2,
+        unitPrice: 1250.75,
+      ),
+    ];
+
+    test('it posts the lines with the token and reads the new parcels back', () async {
+      final live = _Live([
+        http.Response(
+          jsonEncode({
+            'data': [_orderJson(id: '31', shop: 'Loom & Larder')],
+            'meta': {
+              'order_id': '9',
+              'reference': 'ORD-20261004-4F8K2Q',
+              'subtotal_minor': 250150,
+              'discount_minor': 0,
+              'total_minor': 250150,
+            },
+          }),
+          201,
+        ),
+      ]);
+      await live.tokens.write('a-token');
+
+      final placed = await live.orders.place(lines);
+
+      expect(live.server.methods.single, 'POST');
+      expect(live.server.paths.single, endsWith('/orders'));
+      expect(live.server.header('authorization'), 'Bearer a-token');
+
+      // Exactly this, and therefore nothing else: no `buyer_id`, because the buyer
+      // is whoever the token belongs to. The quoted unit price rides along and is
+      // the server's to ignore (it charges the catalogue's price) — it is here so
+      // that what the app showed can be reconciled with what was charged.
+      expect(jsonDecode(live.server.bodies.single), {
+        'items': [
+          {'product_id': '2', 'quantity': 2, 'unit_price': 1250.75},
+        ],
+      });
+
+      // Parsed by the same mapper the history uses, so the newly placed parcels and
+      // the listed ones cannot be read two different ways.
+      expect(placed.single.id, '31');
+      expect(placed.single.shopName, 'Loom & Larder');
+      expect(placed.single.status, OrderStatus.toShip);
+      expect(placed.single.itemSummary, 'Handwoven Rattan Tote ×2, Kamagong Stool');
+      expect(placed.single.productIds, ['2', '4']);
+    });
+
+    test('a two-shop checkout comes back as both parcels', () async {
+      final live = _Live([
+        http.Response(
+          jsonEncode({
+            'data': [
+              _orderJson(id: '31', shop: 'Loom & Larder'),
+              _orderJson(id: '32', shop: 'Tahanan Ceramics'),
+            ],
+            'meta': {
+              'order_id': '9',
+              'reference': 'ORD-20261004-4F8K2Q',
+              'subtotal_minor': 630150,
+              'discount_minor': 0,
+              'total_minor': 630150,
+            },
+          }),
+          201,
+        ),
+      ]);
+      await live.tokens.write('a-token');
+
+      final placed = await live.orders.place(lines);
+
+      // The caller dispatches one courier job per returned parcel, so both must be
+      // there — and in the server's order, which is the order they were placed.
+      expect([for (final order in placed) order.shopName], ['Loom & Larder', 'Tahanan Ceramics']);
+    });
+
+    test('nothing to place is answered locally, without a request', () async {
+      final live = _Live([_list(const [])]);
+      await live.tokens.write('a-token');
+
+      expect(await live.orders.place(const []), isEmpty);
+      // A `POST` with no items is a 422 the app would have to explain; the caller
+      // short-circuits on an empty cart, so this must too.
+      expect(live.server.paths, isEmpty, reason: 'an empty basket must not mint an order');
+    });
+
+    test('a refused basket surfaces the server sentence, not an empty list', () async {
+      final live = _Live([
+        http.Response(
+          '{"message":"Some items just went out of stock while placing your order. '
+          'Please review your cart and try again."}',
+          422,
+        ),
+      ]);
+      await live.tokens.write('a-token');
+
+      // `[]` here would read as "your order was placed but has no parcels", which
+      // is why a refusal has to travel as an error with something to show.
+      await expectLater(
+        live.orders.place(lines),
+        throwsA(
+          isA<ValidationException>().having(
+            (e) => e.message,
+            'message',
+            contains('out of stock'),
+          ),
+        ),
+      );
+    });
+
+    test('a live build with no base URL says so instead of placing anyway', () async {
+      final repository = LiveOrderRepository(
+        ApiClient(baseUrl: '', tokenStore: InMemoryTokenStore()),
+      );
+
+      await expectLater(
+        repository.place(lines),
+        throwsA(isA<ApiNotConfiguredException>()),
+      );
     });
   });
 }

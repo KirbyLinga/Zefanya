@@ -40,11 +40,19 @@ import 'live_stub.dart';
 ///
 /// A DTO, not a `CartItem`: the data layer must not depend on `state/`, and
 /// the server does not want a `Product` object — it wants an id and a quantity
-/// and does its own pricing. `unitPrice` is carried because the app already
-/// shows a total before placing, and a mismatch between what was shown and what
-/// the server charges is exactly the kind of thing that must be reconcilable
-/// later. (Who is authoritative on price is OPEN QUESTIONS §0.1 territory; both
-/// are sent so the difference is visible rather than hidden.)
+/// and does its own pricing.
+///
+/// `productId` is the app's own string id (`'2'`, from the catalogue), which is
+/// why it is sent as one: PHP receives it as a numeric string, validates it as an
+/// integer and casts it, so the app never has to know how the column is typed.
+///
+/// `unitPrice` and `sellerName` ride along and are **ignored** by the server —
+/// deliberately, and the endpoint proves it with a test that posts a price of 1
+/// and is still charged the catalogue's price. They are carried because the app
+/// shows a total before placing, and a difference between what was shown and what
+/// was charged is exactly the kind of thing worth being able to reconcile later.
+/// (Who is authoritative on price was OPEN QUESTIONS §0.1; for orders the answer
+/// is now the server's own, and `POST /orders` returns its answer in `meta`.)
 class OrderLineRequest {
   const OrderLineRequest({
     required this.productId,
@@ -227,8 +235,37 @@ class LiveOrderRepository extends LiveRepository implements OrderRepository {
   }
 
   @override
-  Future<List<Order>> place(List<OrderLineRequest> lines) {
+  Future<List<Order>> place(List<OrderLineRequest> lines) async {
+    // Nothing to place is not a request: the caller short-circuits on an empty
+    // cart, and a `POST /orders` with no items is a 422 the app would have to
+    // explain away. Answered locally, in both modes, like the mock does.
+    if (lines.isEmpty) return const [];
+
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('POST /orders', section: '§7.2');
+
+    // `authenticated: true` for the same reason `orders()` states it: the order
+    // belongs to the token holder. The server reads the buyer from the token and
+    // ignores any body field claiming otherwise, so there is no `buyer_id` here
+    // to be tampered with or to be forgotten.
+    final body = await client.postJson(
+      '/orders',
+      body: {
+        'items': [for (final line in lines) line.toJson()],
+      },
+      authenticated: true,
+    );
+
+    // The same `data` list and the same mapper as `orders()`: `POST /orders`
+    // answers with the new parcels in exactly the shape the history returns, so
+    // placing an order needs no second parser and the two cannot drift. The value
+    // returned here is what the caller dispatches a courier for; `placeOrders`
+    // re-reads the history straight after.
+    //
+    // `meta` — the order's own subtotal, discount and total, in centavos — is
+    // deliberately not read. Nothing in the app shows an order-level total yet
+    // (an order card shows its items), and inventing somewhere to keep it would be
+    // inventing a feature. It is there for the day a card shows one, which is what
+    // `remote_orders.dart` already notes.
+    return unwrapList(body).map(orderFromJson).toList(growable: false);
   }
 }
