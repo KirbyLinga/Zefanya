@@ -12,7 +12,7 @@ config line in `main()`:
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **254 mobile tests pass** and **74 server tests pass**
+`flutter analyze` is clean; **261 mobile tests pass** and **83 server tests pass**
 in `tests/Feature/Api`. Every live call in both halves has been driven at least
 once over real HTTP against real MySQL — probe rows since deleted.
 
@@ -50,6 +50,47 @@ shape of the fix is the part worth remembering:
 - **Proven by mutation**: reverting `load()`'s try/catch fails 6 of those tests and
   nothing else — the tolerance, the retry path, the widget behaviour and the wiring
   rule.
+
+## This pass: the order history is real (and the fork `POST /orders` hits)
+
+`GET /api/orders` exists: the buyer's own parcels, behind `auth:sanctum` — the first
+authenticated *read* on this API, which is also why `/me` exists beside it. The query
+begins at the join (`seller_orders` → `orders`) and is scoped through
+`orders.buyer_id` rather than an id from the request, so a request cannot name
+another buyer's order and there is no ownership check to forget. Newest checkout
+first, ordered by the *parent* order's timestamp, so the two parcels of one checkout
+stay together instead of interleaving by their own ids.
+
+`OrderResource` is keyed on a seller order because that is what the app already
+models — one parcel, one `Order` — and it sends the three things the app needs and
+cannot derive: centavos, the server's own thirteen-value status vocabulary (the app
+chose to show four stages, so the mapping lives app-side in `remote_orders.dart`,
+where an unrecognised status is *not* claimed to have moved), and `product_ids` — the
+join key the wishlist, the recently-viewed rail and the order history itself were
+previously unable to produce at all.
+
+App-side, `LiveOrderRepository.orders()` asks for `/orders` with the token stated
+explicitly, and the Orders screen's "not built yet" failure became a real, possibly
+*empty* history — empty being honest, because the endpoint answers.
+
+**`POST /orders` is deliberately not in this pass, because it is a decision rather
+than a task.** The web's placing logic is private to `CheckoutController` and driven
+by a session-parked selection of **server-side `cart_items` rows**, while the app
+keeps its cart on the device. The two doors therefore cannot share it as it stands,
+and the two ways to share it are a real fork: extract the placing into a service that
+takes plain lines (one spelling of the money rules — but it moves code
+`CheckoutControllerTest` currently guards, inside a transaction that locks stock), or
+have the app's checkout sync its cart to server rows first (no refactor, and a second
+source of truth for a cart the app already owns). Until that is settled,
+`LiveOrderRepository.place()` still throws `ApiNotImplementedException` naming
+`POST /orders`, which is the honest state.
+
+One test changed *mechanism* rather than rule: `repository_wiring_test.dart`'s "a
+live bundle fails loudly instead of quietly using mock data" now asserts through the
+catalogue instead of the order history, because the catalogue is the public read that
+reaches the network without the token store — and in a unit test the secure token
+store has no binding to read. The rule is unchanged: never fall back to mock data,
+and name the failure.
 
 ## This pass: the browsing screens read the catalogue (your "placeholders")
 

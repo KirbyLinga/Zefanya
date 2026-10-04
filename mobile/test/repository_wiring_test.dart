@@ -25,6 +25,7 @@ import 'package:zefanya/data/repositories/review_repository.dart';
 import 'package:zefanya/state/cart_state.dart';
 import 'package:zefanya/state/chat_state.dart';
 import 'package:zefanya/state/courier_state.dart';
+import 'package:zefanya/state/catalog_state.dart';
 import 'package:zefanya/state/order_state.dart';
 import 'package:zefanya/state/review_state.dart';
 
@@ -203,23 +204,24 @@ void main() {
       useLive: true,
       baseUrl: 'https://api.example.test',
     );
-    final orders = OrderState(repository: repositories.order);
-
-    // The rule this pins: a live build that cannot reach a real API must say
-    // so, not fall back to the mock and look like it worked. A silent fallback
-    // is the worst outcome — a build that *appears* functional while serving
-    // invented data.
+    // Asserted through the catalogue rather than the order history, and that is not
+    // incidental: the catalogue is a *public* read, so it reaches the network without
+    // reading the token store — which in a unit test has no binding and no secure
+    // storage behind it. Pointing this rule at an authenticated route would test the
+    // platform channel rather than the rule.
     //
-    // Where it says so moved, and this test moved with it: `load()` can no longer
-    // throw, because `main()` awaits it before `runApp` and the app would then
-    // never start at all (see `live_boot_test.dart`). So the live bundle records
-    // the failure, the cache stays **empty rather than mock** — which is the part
-    // that matters here — and the Orders screen renders the failure, with a Retry
-    // only when retrying could work.
-    await orders.load();
+    // The rule is the same on either: a live build that cannot reach its API must
+    // say so and stay **empty**, never fall back to the mock and look like it worked.
+    final catalog = CatalogState(repository: repositories.catalog);
 
-    expect(orders.orders, isEmpty, reason: 'a live build must never fall back to mock data');
-    expect(orders.loadFailure, isA<ApiNotImplementedException>());
+    await catalog.load();
+
+    expect(catalog.products, isEmpty, reason: 'a live build must never fall back to mock data');
+
+    // *Which* failure is the environment's business — an unreachable test host, or a
+    // build with no base URL at all. What matters is that the failure is named rather
+    // than the live answer being quietly replaced by the mock's.
+    expect(catalog.loadFailure, isA<ApiException>());
   });
 
   test('a live bundle with no base URL says that, not "network error"',

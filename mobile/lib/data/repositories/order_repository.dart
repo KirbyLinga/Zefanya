@@ -30,7 +30,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/api_client.dart';
 import '../api/api_exception.dart';
+import '../dto/remote_orders.dart';
 import '../mock_data.dart';
 import 'live_stub.dart';
 
@@ -212,9 +214,16 @@ class LiveOrderRepository extends LiveRepository implements OrderRepository {
   }
 
   @override
-  Future<List<Order>> orders() {
+  Future<List<Order>> orders() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /orders', section: '§7.1');
+
+    // `authenticated: true` is stated rather than inherited from the default,
+    // because it is the point of the route: this is the buyer's own history, and
+    // the token is what makes it theirs. A history that quietly asked anonymously
+    // would answer 401 and look like a broken server.
+    final body = await client.getJson('/orders', authenticated: true);
+
+    return unwrapList(body).map(orderFromJson).toList(growable: false);
   }
 
   @override

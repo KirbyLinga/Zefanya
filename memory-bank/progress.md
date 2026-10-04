@@ -209,7 +209,7 @@
   still answers the **admin** gate: it has no mail to send, and claiming otherwise
   would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 254 passing (mobile) + 74 (server API)
+### Tests — 261 passing (mobile) + 83 (server API)
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -313,6 +313,27 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 - **Running the web suite at all needs a flag**: `pdo_sqlite` is commented out
   in `C:\PHP\php.ini`, so `php artisan test` fails with "could not find driver".
   See `techContext.md` gap 5.
+
+### The order history is real (new)
+
+- **`GET /api/orders`** — the buyer's own parcels, behind `auth:sanctum`, scoped
+  through `orders.buyer_id` so no request can name another buyer's order. Newest
+  checkout first, by the parent order's timestamp. `OrderResource` is keyed on a
+  *seller order* (what the app already models) and sends centavos, the server's
+  thirteen-value status, and `product_ids`.
+- **App side**: `remote_orders.dart` maps a parcel to `Order` (the 13→4 status table,
+  the card's summary built from the item rows, ids filtered to strings), and
+  `LiveOrderRepository.orders()` asks for it with the token. The Orders tab's "not
+  built yet" failure became a real, possibly empty history.
+- **Tests**: `OrderApiTest` (5) and `live_orders_test` (7). Server API suite **83**,
+  mobile suite **261**.
+- **`POST /orders` is open, and it is a fork rather than a task**: the web's placing
+  logic is private to `CheckoutController` and driven by session-parked, server-side
+  `cart_items` rows, while the app's cart lives on the device. Either extract the
+  placing into a service taking plain lines (one spelling of the money rules; touches
+  the checkout transaction that `CheckoutControllerTest` guards) or sync the app's
+  cart to server rows before checkout (no refactor, two sources of truth). Until then
+  `place()` throws `ApiNotImplementedException` naming the endpoint.
 
 ### The browsing screens read the catalogue (new)
 

@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\Buyer\VerifyBuyerOtpController;
 use App\Http\Controllers\Api\Cart\VoucherController;
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
+use App\Http\Controllers\Api\Order\OrderController;
 use Illuminate\Support\Facades\Route;
 
 // ── Registration (public: there is no session to require yet) ───────────────
@@ -96,6 +97,13 @@ Route::get('/vouchers', [VoucherController::class, 'index'])
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [LoginController::class, 'show'])
         ->name('api.me');
+
+    // The buyer's own parcels, newest checkout first. One throttle bucket, like the
+    // catalogue's reads but lower: a history is opened, not scrolled for minutes,
+    // and a loop on this route is a bug in the app rather than a busy person.
+    Route::get('/orders', [OrderController::class, 'index'])
+        ->name('api.orders.index')
+        ->middleware('throttle:60,1,api-orders-index');
 
     Route::post('/logout', [LoginController::class, 'destroy'])
         ->name('api.logout');
