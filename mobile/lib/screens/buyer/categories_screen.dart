@@ -1,7 +1,8 @@
 // lib/screens/buyer/categories_screen.dart
 //
-// Categories tab: a browsable index of the catalog's categories
-// (data/mock_data.dart), each showing how many products it holds.
+// Categories tab: a browsable index of the catalogue's categories (from
+// `CatalogState`, so a live build lists the server's own), each showing how many
+// products it holds.
 // Tapping one pushes CategoryProductsScreen filtered to it.
 //
 // No page title here — the bottom nav already says "Categories".
@@ -21,14 +22,42 @@ import 'widgets/product_card.dart';
 import '../../state/catalog_state.dart';
 import '../../widgets/app_page_route.dart';
 
+/// The icon each category label renders behind its arch.
+///
+/// Two sets, deliberately. The fourteen are the **server's** curated labels, so a
+/// live build has an icon for every row it can be handed; the three after them are
+/// the mock catalogue's own names, kept so mock mode looks exactly as it always
+/// has. Keyed on the label because the label *is* the contract — it is what the app
+/// sends back as the catalogue filter — rather than on an id the app would have to
+/// learn for the sake of one icon.
+///
+/// A label with no entry renders the neutral fallback (`category_outlined`) rather
+/// than nothing, so a category added server-side is a plain tile rather than a
+/// broken one. Coverage is asserted in `test/catalog_wiring_test.dart`, because the
+/// fourteen arrived with the live catalogue and most of them had no icon at all.
+const Map<String, IconData> categoryIcons = {
+  'Books and Media': Icons.menu_book_outlined,
+  'Health and Beauty': Icons.spa_outlined,
+  'Sports and Outdoors': Icons.hiking_outlined,
+  'Home and Garden': Icons.local_florist_outlined,
+  'Kids and Baby': Icons.child_friendly_outlined,
+  "Men's Apparel": Icons.checkroom_outlined,
+  "Women's Apparel": Icons.dry_cleaning_outlined,
+  'Electronics and Gadgets': Icons.smartphone_outlined,
+  'Pet Supplies': Icons.pets_outlined,
+  'Food and Gourmet': Icons.restaurant_outlined,
+  'Automotive & Motorcycle': Icons.two_wheeler_outlined,
+  'Furniture and Office Equipment': Icons.chair_outlined,
+  'Jewelry and Watches': Icons.diamond_outlined,
+  'Office and School Supplies': Icons.edit_outlined,
+  // The mock catalogue's own three, so mock mode is unchanged.
+  'Fashion': Icons.checkroom_outlined,
+  'Home & Living': Icons.chair_outlined,
+  'Beauty': Icons.spa_outlined,
+};
+
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
-
-  static const _icons = {
-    'Fashion': Icons.checkroom_outlined,
-    'Home & Living': Icons.chair_outlined,
-    'Beauty': Icons.spa_outlined,
-  };
 
   List<(String, int)> _rankedCategories(CatalogState catalog) {
     final categories = catalog.categories.where((c) => c != 'All').toList();
@@ -60,7 +89,7 @@ class CategoriesScreen extends StatelessWidget {
                 child: _FeatureCategoryTile(
                   category: feature.$1,
                   count: feature.$2,
-                  icon: _icons[feature.$1] ?? Icons.category_outlined,
+                  icon: categoryIcons[feature.$1] ?? Icons.category_outlined,
                   onTap: () => Navigator.of(context).push(
                     AppPageRoute(builder: (_) => CategoryProductsScreen(category: feature.$1)),
                   ),
@@ -80,15 +109,30 @@ class CategoriesScreen extends StatelessWidget {
                   builder: (context, sliverConstraints) {
                     // Tile width at 2-column grid with 16px gap and 40px padding.
                     final tileW = (sliverConstraints.crossAxisExtent - 16) / 2;
-                    // Arch icon (52px) + spacer + two text lines (~44px) + 32px padding.
-                    final contentH = 52 + 44 + 32;
-                    final aspectRatio = tileW / contentH.toDouble();
+
+                    // Arch icon (52px) + the two text lines + 32px padding, where the
+                    // label wraps to *two* lines. A category the server owns can be
+                    // "Furniture and Office Equipment", which no one-line tile can
+                    // hold: the mock's three short names fit on one line and hid the
+                    // whole problem. Measured from the theme's own metrics rather than
+                    // a second hardcoded number, so a text-scale change moves this too.
+                    final theme = Theme.of(context);
+                    final titleStyle = theme.textTheme.titleSmall;
+                    final bodyStyle = theme.textTheme.bodySmall;
+                    final titleLine = (titleStyle?.fontSize ?? 14) * (titleStyle?.height ?? 1.4);
+                    final bodyLine = (bodyStyle?.fontSize ?? 12) * (bodyStyle?.height ?? 1.4);
+                    final contentH = 52 + (titleLine * 2) + 2 + bodyLine + 32;
+
+                    final aspectRatio = tileW / contentH;
                     return SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
-                        childAspectRatio: aspectRatio.clamp(0.9, 1.3),
+                        // The floor sits below the common case deliberately: a
+                        // two-line label needs a taller tile, and clamping it back to a
+                        // squarer ratio is exactly what would overflow again.
+                        childAspectRatio: aspectRatio.clamp(0.72, 1.3),
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, i) {
@@ -96,7 +140,7 @@ class CategoriesScreen extends StatelessWidget {
                           return _CategoryTile(
                             category: category,
                             count: count,
-                            icon: _icons[category] ?? Icons.category_outlined,
+                            icon: categoryIcons[category] ?? Icons.category_outlined,
                             index: i,
                             onTap: () => Navigator.of(context).push(
                               AppPageRoute(builder: (_) => CategoryProductsScreen(category: category)),
@@ -158,7 +202,15 @@ class _FeatureCategoryTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(category, style: AppType.sectionDisplay.copyWith(fontSize: 28)),
+                      Text(
+                        category,
+                        style: AppType.sectionDisplay.copyWith(fontSize: 28),
+                        // Bounded for the same reason as the tile's: 28px of
+                        // "Furniture and Office Equipment" is four lines inside a
+                        // 168px panel, and the panel does not grow.
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 8),
                       Text('$count item${count == 1 ? '' : 's'}', style: theme.textTheme.bodyMedium),
                       const SizedBox(height: 10),
@@ -246,7 +298,14 @@ class _CategoryTile extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(category, style: theme.textTheme.titleSmall),
+              // Two lines, then ellipsis. The label belongs to the server, and the
+              // tile's height is computed for exactly this many lines.
+              Text(
+                category,
+                style: theme.textTheme.titleSmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 2),
               Text('$count item${count == 1 ? '' : 's'}', style: theme.textTheme.bodySmall),
             ],

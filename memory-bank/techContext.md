@@ -157,7 +157,7 @@ guessable from the repository:
 
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (251 tests)
+- **`flutter analyze` must be clean** and `flutter test` must pass (254 tests)
   before any change is considered done.
 - **A screen that browses products reads `CatalogState`, never
   `data/mock_data.dart`.** `mockProducts` is reached only through the *mock

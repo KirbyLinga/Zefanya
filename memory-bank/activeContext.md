@@ -12,7 +12,7 @@ config line in `main()`:
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **251 mobile tests pass** and **74 server tests pass**
+`flutter analyze` is clean; **254 mobile tests pass** and **74 server tests pass**
 in `tests/Feature/Api`. Every live call in both halves has been driven at least
 once over real HTTP against real MySQL — probe rows since deleted.
 
@@ -79,9 +79,24 @@ catch this: the tests were asking the same question the screens were answering.
 Proven by mutation: putting the category grid back on `mockProducts` fails
 **exactly that one test** and leaves the other two green.
 
-Named, not fixed: `CategoriesScreen`'s `_icons` map still knows only the three mock
-category names, so most of the server's fourteen labels render without a matching
-icon. Cosmetic, untested, and worth doing in the same pass that curates them.
+**Then the phone showed the other half of the same lesson.** The categories tab
+overflowed — "A RenderFlex overflowed by 20 pixels on the bottom". The tiles' height
+had been computed for a *one-line* label ("two text lines (~44px)") and the feature
+panel drew its label at 28px inside a fixed 168px card: both fine for the mock's
+three short names, both wrong for "Furniture and Office Equipment". Fixed by
+measuring the tile height from the theme's own metrics for the two lines the label
+may now occupy, bounding both labels at two lines with an ellipsis, and lowering the
+aspect-ratio floor so a taller tile is permitted. No existing test could see it —
+every fixture used the mock's three short names — so `catalog_wiring_test.dart` now
+renders the server's real fourteen labels at 390 *and* at 320 wide, and removing the
+bound reproduces it exactly ("overflowed by 20/40/60 pixels").
+
+**And the icons that the label list implied.** `CategoriesScreen`'s private icon map
+knew the mock's three names, so a live build's other eleven labels drew the neutral
+fallback. It is now a top-level `categoryIcons` covering the server's fourteen *and*
+the mock's three, with a test asserting both directions: every label the app can
+receive has an icon, and no entry exists for a label it cannot (a typo that would
+silently never render).
 
 ## This pass: the app that only showed a logo (the boot rule, applied once)
 

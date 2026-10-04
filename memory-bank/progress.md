@@ -209,7 +209,7 @@
   still answers the **admin** gate: it has no mail to send, and claiming otherwise
   would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 251 passing (mobile) + 74 (server API)
+### Tests — 254 passing (mobile) + 74 (server API)
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -331,9 +331,18 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   tell the two apart, which is why a 242-test suite never caught this.
   Mutation-proven: putting the category grid back on `mockProducts` fails exactly
   that one test.
-- **Named, not fixed**: `CategoriesScreen`'s `_icons` map knows only the three mock
-  category names, so the server's fourteen labels mostly render without a matching
-  icon.
+- **The categories tab overflowed once real labels arrived** — the same lesson one
+  layer up. The tile height was computed for a one-line label and the feature panel
+  drew a 28px label inside a fixed 168px card: both fine for the mock's three short
+  names, both wrong for "Furniture and Office Equipment". Fixed by measuring the
+  height from the theme's metrics for two lines, bounding both labels at two lines,
+  and lowering the aspect-ratio floor. `catalog_wiring_test.dart` now renders the
+  server's real fourteen labels at 390 *and* 320 wide; removing the bound reproduces
+  "overflowed by 20/40/60 pixels".
+- **`categoryIcons` covers the server's fourteen labels** (plus the mock's three), so
+  every tile in a live build carries an icon instead of the neutral fallback. The
+  test also refuses an entry for a label the app cannot be handed, since that typo
+  would silently never render.
 
 ### Live mode boots (new)
 
