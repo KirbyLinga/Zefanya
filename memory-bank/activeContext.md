@@ -21,6 +21,37 @@ became real** — products, single products, categories and vouchers, each read
 publicly, with the three fields the server cannot fill deliberately absent rather
 than plausibly invented.
 
+## This pass: the demo catalogue (the catalogue was real and empty)
+
+`GET /api/products` was correct and returned nothing, because the dev database
+held 0 sellers and 0 products — a state indistinguishable from broken. It now
+holds 6 shops, 15 products (13 visible) and 40 photos across the curated
+categories, all re-runnable, with three rows that exist only to be hidden (a
+draft, and one from a seller still awaiting approval) so the visibility rule is
+demonstrable rather than merely asserted.
+
+Verified over real HTTP rather than only in tests: 13 products, first one
+`price_minor=76000` for a ₱760.00 price (the centavos boundary holding), 14
+categories, 2 vouchers, a single read with 3 photos.
+
+Two findings matter more than the data:
+
+1. **An uploaded product photo cannot be loaded by the app.** `Storage::url()`
+   on the `local` disk answers with a *relative* `/storage/…`, `public/storage`
+   was never linked, and the app renders photos with `Image.network`. The branch
+   added here — an already-absolute URL passes through `ProductResource`
+   untouched — is what makes the seeded photos work; the same problem for real
+   uploads is recorded in `techContext.md` gap 6 and still open, because the fix
+   is a decision (`Storage::disk('public')->url()`, or resolving a relative path
+   on the client against the API base).
+2. **Live mode still cannot reach its first frame**, so this pass is visible over
+   HTTP and not yet on a device. `main()`'s `Future.wait` has no catch, and two of
+   its nine loads fetch in live mode: `OrderState.load()` → `orders()` (no `try`,
+   so it propagates) and `CourierState.load()` → `assignedJobs()` (deliberately
+   outside its own `try`). Both were already flagged; this is the first time
+   there is something to *see* behind them, which is why the flag now has an
+   observably wrong consequence rather than a theoretical one.
+
 ## Where the web question landed (this session)
 
 The task was the mobile app, and two commits still touched `web/` (the auth pass

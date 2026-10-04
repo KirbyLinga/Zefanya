@@ -48,9 +48,13 @@ const bool kShowDevTools = bool.fromEnvironment(
 // behaviours to keep in step forever.
 //
 // Default is **off**, which means mock. That default is load-bearing rather
-// than a convenience: the Laravel API does not exist yet (no Sanctum, no
-// routes/api.php — see docs/api-contract.md), so a build that defaulted to
-// live would be a build that cannot run. Turning it on is a deliberate act:
+// than a convenience, though its reason has moved: the API exists now (Sanctum,
+// routes/api.php) for buyers and for the catalogue, so most of the app has a
+// real backend to talk to. What keeps the default at mock is the boot path —
+// two of the nine loads in `main()` fetch over the network (orders, courier
+// jobs) and have no endpoint yet, and `main()` awaits them before `runApp`, so
+// a build that defaulted to live would reach no first frame at all. Turning it
+// on is a deliberate act:
 //
 //   flutter run --dart-define=zefanya.useLiveApi=true \
 //               --dart-define=zefanya.apiBaseUrl=https://api.example.test/api

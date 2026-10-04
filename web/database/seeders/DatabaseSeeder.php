@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -17,13 +16,16 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        // `firstOrCreate`, not `create`: this seeder gets run repeatedly on a dev
-        // database, and a second `db:seed` used to die on the unique email before
-        // it ever reached the catalogues below.
-        User::firstOrCreate(
-            ['email' => 'test@example.com'],
-            ['name' => 'Test User', 'password' => 'password'],
-        );
+        // No test user is created here, and that is a fix rather than an
+        // omission: Laravel's default scaffolding created an `App\Models\User`,
+        // a class this application has never had — it has Buyer, Seller and
+        // Admin — so `php artisan db:seed` died with "Class App\Models\User not
+        // found" before it reached either catalogue below. Inventing a User model
+        // to satisfy a seeder would be building a model nobody authenticates.
+        //
+        // What is still owed is an admin row to sign in with, because the
+        // approval screens are real. That is not seeded here: a demo credential
+        // is a decision, not a fixture.
 
         // The two catalogues a browsable dev database needs: the voucher list the
         // cart offers, and the shops and goods every catalogue screen reads. Both

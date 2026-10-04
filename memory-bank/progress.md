@@ -314,6 +314,46 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   in `C:\PHP\php.ini`, so `php artisan test` fails with "could not find driver".
   See `techContext.md` gap 5.
 
+### The demo catalogue (new — so live mode has something to show)
+
+- **`DemoCatalogueSeeder` fills the dev database** with what a live build needs
+  to look alive: 6 shops, 15 products (**13 visible to the app**), 40 photos,
+  across the 14 curated categories. Re-runnable — sellers keyed by email,
+  products by slug, and only the photos it owns (`https://picsum.photos/%`) are
+  replaced — because this is a tool a person runs again after changing a price.
+  `DatabaseSeeder` calls it now alongside `VoucherSeeder`, after the default
+  scaffolding that created an `App\Models\User` was removed: that class has never
+  existed in this app (it has Buyer, Seller and Admin), so `php artisan db:seed`
+  had always died with "Class App\Models\User not found" before reaching any
+  catalogue. What is still owed is an admin row to sign in with, for the approval
+  screens — a demo credential is a decision, not a fixture.
+- **Three rows exist specifically to be hidden**: a draft, and one belonging to a
+  seller still `pending_approval`. They are there because the visibility rule is
+  the only part of the catalogue with a person on the other side, and a demo
+  database of happy rows cannot tell you the rule works.
+  `DemoCatalogueSeederTest` (8 tests) pins that, plus that nothing lands in
+  `Uncategorised`, that every photo is an absolute URL, that one product carries
+  a gallery, and that the sold-out product is listed with `in_stock: false`.
+- **The photos are Picsum URLs, and the resource now lets one through
+  untouched.** `ProductResource::photoUrl()` returns an already-absolute URL
+  as-is; anything else still goes through `Storage::url()`. Without that branch
+  a seeded URL would arrive as `/storage/https://…`.
+- **Found while doing this, and not fixed: an uploaded photo reaches the app
+  unloadable.** Probed rather than reasoned: on the `local` disk
+  `Storage::url()` answers with the *relative* `/storage/products/x.jpg`,
+  `public/storage` does not exist (`storage:link` has never run), and
+  `product_card.dart` renders photos with `Image.network`, which cannot fetch a
+  relative URL. The demo's photos work because they are absolute; a real seller
+  upload's would not.
+- **Verified over real HTTP against the dev MySQL**, not only in tests:
+  `GET /api/products` → 13, first product `price_minor=76000` for a ₱760.00
+  price, `/api/categories` → 14, `/api/vouchers` → 2, single read → 3 photos.
+  The server suite is **74 API tests** now (was 65) and the full web suite is
+  unchanged at 60 pre-existing failures.
+- **Live mode still cannot reach its first frame**, so the seed is visible over
+  HTTP and not yet on a device: `main()`'s `Future.wait` has no catch and two of
+  its nine loads fetch over the network in live mode. See `activeContext.md`.
+
 ## What's left
 
 ### Blocked on a user decision

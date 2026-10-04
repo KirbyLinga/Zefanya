@@ -144,6 +144,17 @@ guessable from the repository:
    instructions meets this immediately. Either always pass the flag or
    uncomment line 937.
 
+6. **An uploaded product photo is currently unloadable by the app.** Probed, not
+   reasoned: `Storage::url('products/x.jpg')` answers with the *relative*
+   `/storage/products/x.jpg` (the default disk is `local`, rooted at
+   `storage/app/private`, with no `url` key), `public/storage` does not exist
+   because `storage:link` has never been run, and the app renders photos with
+   `Image.network`, which cannot fetch a relative URL. `ProductResource::photoUrl()`
+   now returns an already-absolute URL untouched, which is what makes the demo
+   seeder's Picsum photos work; the upload path itself is still open, and fixing
+   it is a decision between `Storage::disk('public')->url()` and resolving a
+   relative path on the client against the API base.
+
 ## Conventions that matter when editing
 
 - **`flutter analyze` must be clean** and `flutter test` must pass (228 tests)

@@ -27,10 +27,15 @@ void main() async {
   // aren't guaranteed ready yet.
   WidgetsFlutterBinding.ensureInitialized();
 
-  // The one place the mock/real decision is made. Defaults to mock, because
-  // the Laravel API does not exist yet — see config/dev_flags.dart. Everything
-  // below receives interfaces and cannot tell which mode it is in, which is
-  // what keeps the switch a config change rather than a code change.
+  // The one place the mock/real decision is made. It still defaults to mock,
+  // but the reason has moved: the API does exist now — buyers register, confirm,
+  // sign in and read the catalogue from the real server (see
+  // web/routes/api.php). It defaults to mock because two of the loads below
+  // fetch over the network in live mode and have no endpoint to fetch from yet,
+  // so a live build would never reach its first frame. See
+  // config/dev_flags.dart. Everything below receives interfaces and cannot tell
+  // which mode it is in, which is what keeps the switch a config change rather
+  // than a code change.
   final repositories = Repositories.forMode(
     useLive: kUseLiveApi,
     baseUrl: kApiBaseUrl,
