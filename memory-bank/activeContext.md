@@ -21,6 +21,48 @@ became real** — products, single products, categories and vouchers, each read
 publicly, with the three fields the server cannot fill deliberately absent rather
 than plausibly invented.
 
+## Where the web question landed (this session)
+
+The task was the mobile app, and two commits still touched `web/` (the auth pass
+in `21f5712`, the catalogue pass in `a09e97f`) — because a phone cannot
+authenticate against an API that does not exist: there was no `routes/api.php`,
+no token auth and no catalogue endpoint anywhere in `web/`. That is an argument
+for *asking* first, not for proceeding, and `projectbrief.md` line 6 said the
+directory had not been read. The user was asked; the answer was **keep the work
+and split it onto its own branch**, which is done.
+
+Both commits are **mixed** (web *and* mobile in one commit), so they were split
+rather than moved: `web-api` (`c6e640a` auth API, `fceb34b` catalogue API),
+built from `c7a805a`, the last commit where `web/` is pristine. Verified:
+`git diff web-api a09e97f -- web/` is empty, so the branch's web tree is
+byte-identical to what `mobile-dev` carries, and `mobile/` plus `memory-bank/`
+there match the base exactly. `mobile-dev` is untouched, and the duplication is
+deliberate — live mode on `mobile-dev` needs those endpoints.
+
+**The layout assumption was wrong, and it matters.** `master` (and
+`origin/HEAD` → `master`, Sep 23) has **no `web/` directory at all**: the Laravel
+app sits at the repo root there, and `4e60367` "Move project files into web
+folder" (622 files, +33,314/−91) has only ever existed on the `mobile-dev` line.
+`master`'s root copies of the four files this session edited are byte-identical
+to `web/`'s at `c7a805a`, so the move was content-preserving — but a
+`web/`-based branch therefore cannot merge into a `master`-based branch without
+that relocation riding along. Check the target branch's shape before proposing a
+branch.
+
+**The dev database was not damaged, and that is now evidence rather than
+hope.** The `migrations` table holds 19 rows in batches 1/2/4/5 — the 11 applied
+this session are batch 5, the Sanctum one batch 4. `LazilyRefreshDatabase`
+against MySQL would have run `migrate:fresh` and collapsed all 19 into batch 1;
+that never happened. `products`, `vouchers` and `buyers` are all 0, so there was
+no domain data to lose in any case.
+
+Corrections to earlier notes: "phpunit.xml pins tests to SQLite, so the suite
+cannot touch the dev database" was recorded without the mechanism (the
+`-d extension=pdo_sqlite` flag — see `techContext.md` gap 5, and note the suite
+does not run at all without it); `memory-bank/mistakes.md` does not exist, though
+a note cited it; and a stray `web/` edit is not the only footprint — the DB has
+the 11 tables.
+
 ## This pass: the catalogue (migrations, then products / categories / vouchers)
 
 **The blocker was the database, not the code.** The dev DB had 14 tables and

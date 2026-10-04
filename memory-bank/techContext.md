@@ -129,6 +129,21 @@ guessable from the repository:
   `composer.json`, `composer.lock` and new application files only — which is why
   adding Sanctum was a reviewable diff rather than a vendor dump.
 
+5. **The web suite cannot run on this machine without a flag — and this is the
+   other developer's machine too.** `web/phpunit.xml` pins `DB_CONNECTION=sqlite`
+   and `DB_DATABASE=:memory:`, and every test under `web/tests/` uses
+   `LazilyRefreshDatabase`. But `C:\PHP\php.ini` has `;extension=pdo_sqlite`
+   **commented out** (line 937, with `extension=pdo_mysql` live on 934), while
+   `C:\PHP\ext\php_pdo_sqlite.dll` sits right there unused. So `php artisan test`
+   does not silently fall back to MySQL — it dies with 70-odd "could not find
+   driver" errors. Run it as
+   `php -d extension=pdo_sqlite vendor/bin/phpunit --filter=Api` (verified:
+   71 tests, 235 assertions, green). `web/contracts/2026-09-19-buyer-cart-page.md`
+   states "`bcmath`, `pdo_sqlite`, `pdo_mysql` all present" — that claim is
+   **false on this machine**, so anyone following the contracts' test
+   instructions meets this immediately. Either always pass the flag or
+   uncomment line 937.
+
 ## Conventions that matter when editing
 
 - **`flutter analyze` must be clean** and `flutter test` must pass (228 tests)

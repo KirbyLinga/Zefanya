@@ -297,6 +297,23 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 `completion_{light,dark}.png`, `order_confirmation_{light,dark}.png`,
 `courier_tracker_{light,dark}.png`.
 
+### The web side, split onto its own branch (this session)
+
+- **`web-api` exists** (`c6e640a` auth API, `fceb34b` catalogue API), built from
+  `c7a805a` so it carries the web work and nothing else. Its web tree is
+  byte-identical to `mobile-dev`'s (`git diff web-api a09e97f -- web/` is empty)
+  and its `mobile/` + `memory-bank/` match the base. It exists because the two
+  source commits were mixed web+mobile, and so that whoever owns `web/` can
+  review and merge the API without it riding inside a mobile branch.
+- **It passes standing alone**: `php -d extension=pdo_sqlite vendor/bin/phpunit
+  --filter=Api` → OK (71 tests, 235 assertions) on SQLite `:memory:`.
+- **`master` has no `web/` directory** — the Laravel app is at the repo root
+  there, and the move into `web/` (`4e60367`) has never been merged. Merging
+  this into a `master`-based branch brings the relocation with it.
+- **Running the web suite at all needs a flag**: `pdo_sqlite` is commented out
+  in `C:\PHP\php.ini`, so `php artisan test` fails with "could not find driver".
+  See `techContext.md` gap 5.
+
 ## What's left
 
 ### Blocked on a user decision
