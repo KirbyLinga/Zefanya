@@ -325,15 +325,41 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   the card's summary built from the item rows, ids filtered to strings), and
   `LiveOrderRepository.orders()` asks for it with the token. The Orders tab's "not
   built yet" failure became a real, possibly empty history.
-- **Tests**: `OrderApiTest` (5) and `live_orders_test` (7). Server API suite **83**,
-  mobile suite **261**.
-- **`POST /orders` is open, and it is a fork rather than a task**: the web's placing
-  logic is private to `CheckoutController` and driven by session-parked, server-side
-  `cart_items` rows, while the app's cart lives on the device. Either extract the
-  placing into a service taking plain lines (one spelling of the money rules; touches
-  the checkout transaction that `CheckoutControllerTest` guards) or sync the app's
-  cart to server rows before checkout (no refactor, two sources of truth). Until then
-  `place()` throws `ApiNotImplementedException` naming the endpoint.
+- **Tests**: `OrderApiTest` (5) and `live_orders_test` (12), which now also covers
+  placing. Server API suite **95**, mobile suite **266**.
+- **`POST /orders` was the open fork for one pass, and it is closed** — the placing
+  was extracted rather than the cart synced. See "Placing an order" below.
+
+### Placing an order (new)
+
+- **`App\Services\OrderPlacer` owns the placing rules** — the locked stock decrement,
+  the centavos, the proportional discount split across shops, the address snapshot,
+  the append-only ledger — and takes plain **lines** (`[{product_id, quantity}]`).
+  Both doors reach it: the web's `CheckoutController` (which now resolves its session
+  selection and its voucher, then hands over lines) and `POST /api/orders`. Nothing in
+  a request contributes a price, and a test posts `price_minor: 1` to prove it.
+- **The extraction is why the rules are now covered.** The only web test that reached
+  them died rendering the confirmation page (no built frontend here → the Vite
+  manifest), so it never asserted on the rows it had written. `OrderPlacerTest` places
+  with no view in the path: the centavos, a two-shop split summing to exactly the
+  discounted total, a snapshot that ignores a later profile edit, and a sold-out line
+  rolling the whole order back.
+- **`POST /api/orders`** answers `201` with the same parcels `GET /orders` returns
+  plus `meta` (the order's own subtotal/discount/total in centavos — a discount is
+  split *across* parcels, so only the order can report a total honestly). A basket
+  that is no longer placeable is `422` carrying the service's sentence; a voucher that
+  does not apply is **refused rather than dropped**, so a phone showing a discount can
+  never be charged full price. Its own throttle bucket, `10/min`.
+- **App side**: `LiveOrderRepository.place()` posts the lines with the token (never a
+  buyer id) and parses the reply with the *same* mapper as the history, so a placed
+  parcel and a listed one cannot read differently.
+- **Tests**: `OrderPlacerTest` (7), `PlaceOrderApiTest` (8), `live_orders_test`'s
+  placing group (5), `DemoOrderSeederTest` (4).
+- **`DemoOrderSeeder` gives the Orders tab real content**: two orders for
+  `buyer@zefanya.test` placed *through `OrderPlacer`*, one deliberately across two
+  shops. It refuses to run in production (it consumes stock) and is idempotent — and
+  its dependency seeders are called only when their ground is missing, because
+  re-running the catalogue seeder would hand stock back to orders already placed.
 
 ### The browsing screens read the catalogue (new)
 
@@ -439,11 +465,14 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 - **Verified over real HTTP against the dev MySQL**, not only in tests:
   `GET /api/products` → 13, first product `price_minor=76000` for a ₱760.00
   price, `/api/categories` → 14, `/api/vouchers` → 2, single read → 3 photos.
-  The server suite is **74 API tests** now (was 65) and the full web suite is
+  The server suite is **95 API tests** now (was 65) and the full web suite is
   unchanged at 60 pre-existing failures.
-- **Live mode still cannot reach its first frame**, so the seed is visible over
-  HTTP and not yet on a device: `main()`'s `Future.wait` has no catch and two of
-  its nine loads fetch over the network in live mode. See `activeContext.md`.
+- **Live mode reaches its first frame now, and the demo data is visible on a
+  device.** `main()`'s nine awaited loads are wrapped by `StartupState.guard`, so a
+  failed load is recorded rather than aborting `runApp`; the two loads that go to the
+  network in live mode (orders, courier jobs) are real or tolerant; and the seeded
+  catalogue plus two placed orders mean the browsing and Orders screens have live
+  content to render. See `activeContext.md`.
 
 ## What's left
 
@@ -464,22 +493,18 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
   become real.
 
 ### Not built (ranked)
-1. **Live mode still cannot boot** — and the reason has narrowed to two fetch
-   sites. The catalogue half is now real (products, categories, vouchers all
-   resolve), so what remains is `OrderState.load()` → `orders()` and
-   `CourierState.load()` → `assignedJobs()`, both *state* `load()`s fetching
-   immediately after their (no-op) repository `load()`, and the second of them
-   outside its `try` on purpose. So a live build still dies on launch, now because
-   *orders and courier jobs* have no endpoint rather than because the catalogue
-   has none — and "let it boot empty" is a decision about those two call sites,
-   not a patch to one.
-2. **The courier half of the API does not exist.** The buyer half is real and
-   proven end to end; `LiveAuthRepository` names the missing routes
-   (`POST /login/logistics`, `POST /register/logistics`, their two OTP paths)
-   rather than sending a buyer's request with a different word in it. One blocker
-   did fall in this pass: `logistics_providers` now **exists** (it was one of the
-   11 unrun migrations). It still waits on the form decision below.
-3. **The Courier registration form does not match
+*(Two items have left this list across the last two passes: "live mode cannot
+boot" — now guarded, so a failed load is recorded and rendered instead of aborting
+`runApp` — and the order half of the API, which is now read, written and seeded.)*
+
+1. **The courier half of the API does not exist.** The buyer half is real and
+   proven end to end — catalogue, orders, all behind the same token — while
+   `LiveAuthRepository` names the missing routes (`POST /login/logistics`,
+   `POST /register/logistics`, their two OTP paths) rather than sending a buyer's
+   request with a different word in it. One blocker did fall: `logistics_providers`
+   now **exists** (it was one of the 11 unrun migrations). It still waits on the
+   form decision below.
+2. **The Courier registration form does not match
    `StoreLogisticsRegistrationRequest`.** That request requires `business_name`
    (the form never asks for one) and `dti_permit_upload` (the form collects a
    driver's licence and an OR/CR in its place), and it has **no vehicle field at
@@ -488,20 +513,20 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
    written; the courier half deliberately was not, because a mapping that can
    only produce a 422 is worse than none. This needs a product decision (change
    the form, or the server) before the courier can register at all.
-4. **Buyer registration status is a bare string server-side.** `Buyer` has no
+3. **Buyer registration status is a bare string server-side.** `Buyer` has no
    status enum — `RegisterBuyerController` hardcodes `'pending_verification'` and
    `Buyer::isApproved()` compares `=== 'approved'` — whereas
    `LogisticsProviderStatus` *is* an enum whose four values are exactly the ones
    this app maps. The app's typed mapping is therefore ahead of the server for
    buyers, which is a drift risk worth knowing before it bites.
-5. **Sort / filter on category grids** — currently a static slice.
-6. **Search history + saved searches** — only 5 hardcoded popular searches,
+4. **Sort / filter on category grids** — currently a static slice.
+5. **Search history + saved searches** — only 5 hardcoded popular searches,
    despite `RecentlyViewedState` existing.
-7. **Real seller photos + maker quotes** — `Product.photos` and
+6. **Real seller photos + maker quotes** — `Product.photos` and
    `mockMakerNotes` are the placeholders; both are one lookup away from real
    data, and the portrait slot deliberately shows a monogram rather than a
    stock photo of a stranger.
-8. **Font bundling** — see the finding in `techContext.md`; the comment is
+7. **Font bundling** — see the finding in `techContext.md`; the comment is
    currently untrue and the app fetches over HTTP.
 
 ### Known issues

@@ -43,6 +43,35 @@ state classes receive interfaces and cannot tell which side they are talking to.
   ratings, pricing maths. `CourierRepository` is the narrowest on purpose (jobs
   only) — see its header.
 
+## Shared server rules — one service, both doors
+
+The web app and the API are two doors into the same database, and the rule that keeps
+them honest is: **when both need the same logic it becomes a service they both call —
+never a copy, and never a private method one of them cannot reach.**
+
+- `App\Services\CartSummary` — the money, in integer centavos, for a set of lines.
+- `App\Services\OrderPlacer` — placing an order: the locked stock decrement, the
+  proportional discount split across shops, the address snapshot and the append-only
+  ledger, all inside one transaction. It takes **lines** (`[{product_id, quantity}]`)
+  because that is the only shape both doors have: the web's cart is server-side
+  `cart_items` rows parked in a session, and the phone's cart is on the phone. Each
+  door resolves what is genuinely its own question first — which voucher (session vs
+  request) — and hands over nothing but ids and quantities. A request contributes *what*
+  is bought and *how many*, never *how much*.
+- `ProductResource::photoUrl()` — passes an already-absolute URL through untouched, so
+  the seeded photos and a real upload can coexist.
+
+The payoff is not only reuse. Moving the rules out of `CheckoutController` is what made
+them **testable**: the one test that could reach them went through a *rendered*
+confirmation page, and this repo has no built frontend, so it died on the Vite manifest
+before asserting anything about the rows it had just written. Rules in one place, with no
+view in the path, finally get their own tests — and they catch things (`OrderPlacerTest`,
+7 tests, found a seeder bug on its first run).
+
+Corollary for demo data: seed **through the service**, not beside it. `DemoOrderSeeder`
+places real orders, so the demo rows are the rows a checkout writes — the demo is never
+the only code path that has ever exercised a hand-built shape.
+
 ## State layer — 9 `ChangeNotifier`s, one root `MultiProvider`
 
 `AuthState`, `CartState`, `ChatState`, `CourierState`, `OrderState`,

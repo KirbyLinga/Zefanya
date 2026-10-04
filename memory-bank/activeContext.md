@@ -2,24 +2,83 @@
 
 ## Where things stand
 
-**The app can read its server's catalogue, and it can authenticate.** Two passes
-have landed against the real API: the auth half (register → confirm → sign in →
-`GET /me` → sign out) and now the catalogue half (`GET /products`,
-`/products/{id}`, `/categories`, `/vouchers`). The mock/live decision is still one
-config line in `main()`:
+**The app can read its server's catalogue, place an order through it, and get the
+order back.** Three passes have landed against the real API: the auth half
+(register → confirm → sign in → `GET /me` → sign out), the catalogue half
+(`GET /products`, `/products/{id}`, `/categories`, `/vouchers`), and now the orders
+half — `GET /orders` for the buyer's history and `POST /orders` to place one, both
+behind `auth:sanctum` and both served by the web checkout's own money rules. The
+mock/live decision is still one config line in `main()`:
 
 ```dart
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **261 mobile tests pass** and **83 server tests pass**
-in `tests/Feature/Api`. Every live call in both halves has been driven at least
-once over real HTTP against real MySQL — probe rows since deleted.
+`flutter analyze` is clean; **266 mobile tests pass** and **95 server tests pass**
+in `tests/Feature/Api`. Every live call in every half has been driven at least once
+over real HTTP against real MySQL — and the demo database now holds two seeded
+orders, so the Orders tab has something true to list on a device.
 
-This pass, in one line: **the 11 unrun migrations were applied, and the catalogue
-became real** — products, single products, categories and vouchers, each read
-publicly, with the three fields the server cannot fill deliberately absent rather
-than plausibly invented.
+This pass, in one line: **the placing rules stopped being a private method of the
+web's checkout** — they are `App\Services\OrderPlacer`, reached by both doors as
+plain lines, with the app's live repository posting to `POST /orders` and two demo
+orders seeded *through* that service.
+
+## This pass: the app can place an order (and the rules both doors share)
+
+`POST /api/orders` exists, and the interesting part is not the route — it is that the
+money rules are no longer private to one door, or in a place the app cannot reach.
+
+- **The fork the last pass named is settled: extract, not sync.** The web's placing
+  logic was private to `CheckoutController` and driven by a session of server-side
+  `cart_items` rows; the app keeps its cart on the phone. What the two doors *can*
+  share is **lines** — a product id and a quantity each — so `OrderPlacer::place()`
+  takes exactly that, and each door resolves what is its own question first (which
+  voucher: the web reads its session, the API reads the request). Everything
+  authoritative is still computed server-side inside the transaction from the locked
+  rows, so a body chooses *what* is bought and *how many*, never *how much*.
+  `PlaceOrderApiTest` proves it by posting a `price_minor` of 1 and asserting the
+  catalogue's price is what gets charged.
+- **The extraction bought more than reuse: it made the rules testable.** The only web
+  test that reached them was `CheckoutControllerTest`, and it died rendering the
+  confirmation page — no built frontend in this repo, so it failed on the Vite
+  manifest *before asserting anything about the rows it had just written*. The rules
+  were effectively uncovered. `OrderPlacerTest` (7 tests, 40 assertions) places with
+  no view in the path: the centavos, a two-shop discount split summing to exactly the
+  discounted total, the address snapshot not following a later profile edit, and a
+  sold-out line rolling the whole order back — no order, no payment, no phantom stock,
+  no ledger row. It caught a real bug on its first run, too: re-running the catalogue
+  seeder hands stock back to the orders already placed.
+- **A refusal is `422` with the server's own sentence.** A basket that is no longer
+  placeable says so in a sentence the app can show; a stale basket is a thing the
+  person can fix, which an opaque `500` pretends is not true.
+- **A voucher that does not apply is *refused*, not dropped.** The web door can drop
+  one and carry on, because its next page re-renders the totals; a phone showing "₱200
+  off" would otherwise place the order, be charged full price, and display the wrong
+  number. Refusing is what makes a stale basket visible instead of letting it quietly
+  change the price.
+- **The reply is the history's shape, plus order money in `meta`** — because a
+  discount is split *across* parcels, so only the order can report a total honestly.
+  One consequence worth stating: `GET` and `POST` share **one** parser
+  (`remote_orders.dart`), so a freshly placed parcel cannot be read differently from a
+  listed one.
+- **App-side, `LiveOrderRepository.place()` is real.** Lines go up, the token says
+  who (never a body field), parcels come back through the same mapper — and a refusal
+  travels as an error carrying the server's sentence rather than as an empty list,
+  which would read as "placed, but with no parcels".
+- **The payoff that made the seeding obvious: placing an order is now five lines.**
+  The catalogue and buyer were seeded and `GET /orders` answered `[]` — honest, and
+  therefore an unverifiable screen. `DemoOrderSeeder` places two orders for
+  `buyer@zefanya.test` *through `OrderPlacer`*, so the demo data is written by the
+  code that writes orders: real prices, a real stock decrement with its ledger entry,
+  real payments, a real address snapshot, a real `ORD-…` reference. One order spans
+  two shops on purpose — two parcels under one order number is the one thing a
+  single-shop fixture cannot show on a screen.
+- **A seeder that places orders must not re-lay the ground under them.** Calling
+  `DemoCatalogueSeeder` unconditionally looked safe ("it is idempotent") and was not:
+  a second `db:seed` handed stock back to the orders the first pass had placed. The
+  dependency seeders are called only when their ground is missing, which is what
+  "re-runnable" has to mean for this one.
 
 ## This pass: live mode boots (the two boot fetches stopped being fatal)
 
@@ -73,17 +132,11 @@ App-side, `LiveOrderRepository.orders()` asks for `/orders` with the token state
 explicitly, and the Orders screen's "not built yet" failure became a real, possibly
 *empty* history — empty being honest, because the endpoint answers.
 
-**`POST /orders` is deliberately not in this pass, because it is a decision rather
-than a task.** The web's placing logic is private to `CheckoutController` and driven
-by a session-parked selection of **server-side `cart_items` rows**, while the app
-keeps its cart on the device. The two doors therefore cannot share it as it stands,
-and the two ways to share it are a real fork: extract the placing into a service that
-takes plain lines (one spelling of the money rules — but it moves code
-`CheckoutControllerTest` currently guards, inside a transaction that locks stock), or
-have the app's checkout sync its cart to server rows first (no refactor, and a second
-source of truth for a cart the app already owns). Until that is settled,
-`LiveOrderRepository.place()` still throws `ApiNotImplementedException` naming
-`POST /orders`, which is the honest state.
+**`POST /orders` was the decision this pass inherited, and it is now made: extract.**
+The web's placing logic is `App\Services\OrderPlacer`, taking plain lines, so the
+session-driven web door and the cart-on-the-phone door reach the same money rules —
+see the pass above for what that bought, including an `OrderPlacerTest` the web
+controller could never have written.
 
 One test changed *mechanism* rather than rule: `repository_wiring_test.dart`'s "a
 live bundle fails loudly instead of quietly using mock data" now asserts through the
@@ -517,9 +570,9 @@ The three guards worth naming, each proven to fail by breaking it on purpose:
    route, but it changes the web app's behaviour.
 5. **Whether `AuthState` calls `refresh()` on boot** now that `GET /me` exists —
    the repository method is implemented and tested, and nothing calls it yet.
-6. **The next slice: orders** (`GET /orders`, `POST /orders`). It is what is left
-   of the boot problem, and it is what the checkout screen will need. Reviews and
-   chat come after it, and both have tables now.
+6. **Reviews and chat are the next slices** (`GET /reviews/mine`,
+   `POST /conversations/{key}/messages` — both have tables now), then the courier's
+   job list. Orders are done end to end: read, write, and seeded through the service.
 7. Tier 2's other half: sort / filter on category grids, then search history.
 
 ## Working notes / preferences
