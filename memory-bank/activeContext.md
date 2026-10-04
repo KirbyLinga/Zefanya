@@ -59,6 +59,17 @@ server would still abort the first frame through them. Applying this pass's rule
 to those three is the next small step, and each needs its own decision about which
 screen explains the failure.
 
+**And there is now a way in.** `DemoBuyerSeeder` seeds `buyer@zefanya.test` /
+`password`, approved and verified on the record, because a live build was
+otherwise unreachable: a registration made through the app sits at
+`pending_approval` with no admin to approve it, so every screen behind the shell —
+the catalogue above all — could only be checked over HTTP. It refuses to run in
+production, and it is the one fixture in this project that is also a way in, which
+is why that guard exists rather than a comment. Driven over real HTTP against the
+dev MySQL: sign-in returns a token, `/me` answers
+`{ok, role, name, email, registration_status: approved}`, and `/api/products`
+returns 13 with `price_minor=76000`.
+
 ## This pass: the demo catalogue (the catalogue was real and empty)
 
 `GET /api/products` was correct and returned nothing, because the dev database

@@ -316,6 +316,18 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 
 ### Live mode boots (new)
 
+- **`DemoBuyerSeeder` is what makes any of it reachable.** `buyer@zefanya.test` /
+  `password`, approved *and* email-verified on the record, so the API's sign-in
+  gate lets them through and a live build reaches its shell. Without it nothing
+  seeded was visible on a device: a registration made through the app lands at
+  `pending_approval` with no admin to approve it. It **refuses to run in
+  production** (a warning, before writing anything) for the same reason
+  `kShowDevTools` exists — a comment saying "dev only" protects nothing at
+  runtime — is idempotent, and writes the password only for a row that does not
+  exist, so one changed while testing survives re-seeding. `DemoBuyerSeederTest`
+  (4 tests) signs in through the real route and proves the token works against
+  `/me`; verified over real HTTP too (`/me` answers `role`, `name`, `email`,
+  `registration_status: approved`).
 - **The two boot fetches stopped being fatal without becoming silent.**
   `OrderState.loadFailure` / `CourierState.loadFailure` carry the `ApiException`
   that emptied a cache; the Orders screen and the two courier dashboards render it,

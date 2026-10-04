@@ -27,13 +27,14 @@ class DatabaseSeeder extends Seeder
         // approval screens are real. That is not seeded here: a demo credential
         // is a decision, not a fixture.
 
-        // The two catalogues a browsable dev database needs: the voucher list the
-        // cart offers, and the shops and goods every catalogue screen reads. Both
-        // are re-runnable, which matters because this is the command a person
-        // repeats after changing a price.
+        // The catalogues a browsable dev database needs, the voucher list the cart
+        // offers, and the one buyer account a live build can sign in with. All are
+        // re-runnable, which matters because this is the command a person repeats
+        // after changing a price.
         $this->call([
             VoucherSeeder::class,
             DemoCatalogueSeeder::class,
+            DemoBuyerSeeder::class,
         ]);
     }
 }
