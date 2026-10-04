@@ -105,6 +105,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.orders.index')
         ->middleware('throttle:60,1,api-orders-index');
 
+    // Placing one. Its own bucket, and a tighter one than the reads: sixty a
+    // minute is a scroll, ten is a person — and a loop here mints orders rather
+    // than pages. It is also a bucket of its own so that a failed placement
+    // cannot consume the history route's allowance, which is what a single
+    // shared counter per IP would do.
+    Route::post('/orders', [OrderController::class, 'store'])
+        ->name('api.orders.store')
+        ->middleware('throttle:10,1,api-orders-store');
+
     Route::post('/logout', [LoginController::class, 'destroy'])
         ->name('api.logout');
 });
