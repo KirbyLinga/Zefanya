@@ -6,6 +6,7 @@ import 'data/repositories/repositories.dart';
 import 'theme/app_theme.dart';
 import 'state/auth_state.dart';
 import 'state/cart_state.dart';
+import 'state/catalog_state.dart';
 import 'state/chat_state.dart';
 import 'state/courier_state.dart';
 import 'state/order_state.dart';
@@ -50,6 +51,11 @@ void main() async {
     catalog: repositories.catalog,
     vouchers: repositories.cart,
   );
+  // The catalogue the browsing screens read. Before it, they reached into
+  // `data/mock_data.dart` for `mockProducts` directly, which mock mode hid
+  // completely and live mode showed immediately: a live build rendered the eight
+  // mock products while the server held thirteen real ones.
+  final catalogState = CatalogState(repository: repositories.catalog);
   final chatState = ChatState(repository: repositories.chat);
   final courierState = CourierState(repository: repositories.courier);
   final orderState = OrderState(repository: repositories.order);
@@ -80,6 +86,7 @@ void main() async {
 
   await Future.wait([
     startupState.guard('your account', authState.load),
+    startupState.guard('the store catalogue', catalogState.load),
     startupState.guard('your cart', cartState.load),
     startupState.guard('your chats', chatState.load),
     startupState.guard('your delivery jobs', courierState.load),
@@ -98,6 +105,7 @@ void main() async {
         ChangeNotifierProvider.value(value: authState),
         ChangeNotifierProvider.value(value: startupState),
         ChangeNotifierProvider.value(value: cartState),
+        ChangeNotifierProvider.value(value: catalogState),
         ChangeNotifierProvider.value(value: chatState),
         ChangeNotifierProvider.value(value: courierState),
         ChangeNotifierProvider.value(value: orderState),

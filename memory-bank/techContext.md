@@ -157,8 +157,16 @@ guessable from the repository:
 
 ## Conventions that matter when editing
 
-- **`flutter analyze` must be clean** and `flutter test` must pass (235 tests)
+- **`flutter analyze` must be clean** and `flutter test` must pass (251 tests)
   before any change is considered done.
+- **A screen that browses products reads `CatalogState`, never
+  `data/mock_data.dart`.** `mockProducts` is reached only through the *mock
+  repository*. A screen reading it directly works perfectly in mock mode and
+  silently shows the wrong catalogue in a live build — which happened, and is what
+  the browsing screens did until `CatalogState` existed. The tests that guard it
+  build their fixtures with `productFromJson`, so they are foreign to the mock file;
+  a mock-backed fixture proves nothing, because the mock repository returns that
+  same list.
 - **Boot never depends on the network.** `main()` awaits nine `load()`s before
   `runApp`, so a rejection in any of them is not an error state — it is an app that
   never starts, with the splash holding the screen and the person seeing a logo

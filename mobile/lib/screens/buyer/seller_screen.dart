@@ -4,13 +4,15 @@
 // on Product Details — previously tapping the seller name only opened
 // Chat, with no way to see what else they sell.
 //
-// All data comes from mockProducts filtered by sellerName. When real
-// seller profiles exist (avatar, bio, location), slot them in here —
-// the structure is already waiting.
+// The products come from `CatalogState`, so a live build lists what the server
+// holds for that shop rather than a filtered mock list. When real seller profiles
+// exist (avatar, bio, location), slot them in here — the structure is already
+// waiting.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../state/catalog_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -27,9 +29,7 @@ class SellerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts
-        .where((p) => p.sellerName == sellerName)
-        .toList();
+    final products = context.watch<CatalogState>().bySeller(sellerName);
 
     // Average rating across all of this seller's products.
     final avgRating = products.isEmpty

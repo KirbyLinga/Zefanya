@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
 import '../../state/cart_state.dart';
+import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
@@ -124,13 +125,16 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   bool _isLoading = true;
 
   // Which product leads (featured tile) and which pair shows in the
-  // Style Edit stack — picked once per app launch instead of always
-  // being mockProducts[0]/[2]/[3]. With only 8 mock products and a
-  // fixed selection, every screenshot/review during development ends
-  // up showing the exact same "Linen Blend Wrap Dress" as the hero,
-  // every single time, no matter how much the chrome around it
-  // changes — that repetition reads as staleness on its own, separate
-  // from anything actually wrong with the visual design.
+  // Style Edit stack — picked once per app launch instead of always leading with
+  // the same product. A fixed selection made every screenshot and every scroll
+  // during development show the identical hero no matter what else changed, which
+  // reads as staleness on its own, separate from anything actually wrong with the
+  // design.
+  //
+  // Read from `CatalogState`, not `mockProducts`: this is the home grid, and in a
+  // live build the catalogue is the server's. `read` rather than `watch` because
+  // the pick is deliberately frozen for the session — a re-shuffle mid-scroll
+  // would move the hero under the person's thumb.
   late final List<Product> _shuffled;
 
   /// The seller featured in the "From the maker" card. Chosen from a
@@ -141,7 +145,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _shuffled = List<Product>.from(mockProducts)..shuffle();
+    _shuffled = List<Product>.from(context.read<CatalogState>().products)..shuffle();
     _storyProduct = _shuffled.isEmpty
         ? null
         : _shuffled.firstWhere(

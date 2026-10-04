@@ -21,6 +21,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../state/catalog_state.dart';
 
 import '../../../data/mock_data.dart';
 import '../../../state/review_state.dart';
@@ -40,8 +41,12 @@ class ReviewButton extends StatelessWidget {
   Widget build(BuildContext context) {
     // Resolved here rather than passed in: this is the join from an order to
     // the catalogue, and it is the same lookup in both places the button
-    // appears.
-    final products = mockProducts
+    // appears. Read from `CatalogState`, so in a live build the lookup is against
+    // the server's catalogue — a mock-only lookup silently found nothing there,
+    // which made this button vanish for orders that really were reviewable.
+    final products = context
+        .watch<CatalogState>()
+        .products
         .where((product) => order.productIds.contains(product.id))
         .toList(growable: false);
     if (products.isEmpty) return const SizedBox.shrink();

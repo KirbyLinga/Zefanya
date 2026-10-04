@@ -25,6 +25,7 @@ import 'package:zefanya/screens/buyer/product_details_screen.dart';
 import 'package:zefanya/screens/buyer/review_screen.dart';
 import 'package:zefanya/screens/buyer/widgets/review_button.dart';
 import 'package:zefanya/state/cart_state.dart';
+import 'package:zefanya/state/catalog_state.dart';
 import 'package:zefanya/state/courier_state.dart';
 import 'package:zefanya/state/order_state.dart';
 import 'package:zefanya/state/recently_viewed_state.dart';
@@ -64,10 +65,18 @@ Future<void> _pump(
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
+  // The catalogue every browsing screen and the review button now read. Loaded,
+  // because an unloaded `CatalogState` holds nothing: the button's join from an
+  // order to the catalogue would find no products and silently render nothing,
+  // which is the very failure mode this state exists to make visible.
+  final catalog = CatalogState();
+  await catalog.load();
+
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CartState()),
+        ChangeNotifierProvider.value(value: catalog),
         ChangeNotifierProvider(create: (_) => CourierState()),
         ChangeNotifierProvider(create: (_) => OrderState()),
         ChangeNotifierProvider(create: (_) => RecentlyViewedState()),

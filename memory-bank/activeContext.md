@@ -12,7 +12,7 @@ config line in `main()`:
 final repositories = Repositories.forMode(useLive: kUseLiveApi, baseUrl: kApiBaseUrl);
 ```
 
-`flutter analyze` is clean; **235 mobile tests pass** and **74 server tests pass**
+`flutter analyze` is clean; **251 mobile tests pass** and **74 server tests pass**
 in `tests/Feature/Api`. Every live call in both halves has been driven at least
 once over real HTTP against real MySQL — probe rows since deleted.
 
@@ -50,6 +50,38 @@ shape of the fix is the part worth remembering:
 - **Proven by mutation**: reverting `load()`'s try/catch fails 6 of those tests and
   nothing else — the tolerance, the retry path, the widget behaviour and the wiring
   rule.
+
+## This pass: the browsing screens read the catalogue (your "placeholders")
+
+The first live build that booted showed **the eight mock products** while the server
+held thirteen real ones. Half the wiring was missing, and precisely which half:
+`CatalogRepository` existed and both implementations worked, and the states that
+*resolve ids* used it (`CartState`'s cart restore, `WishlistState`,
+`RecentlyViewedState`). The screens that *browse* did not — the home grid, the
+category grid, the category counts, search, the seller screen and the review button
+all read `mockProducts` from `data/mock_data.dart` directly. Mock mode hid it
+perfectly, because the mock repository returns that same list, so no test could tell
+the difference and no one looking at a mock build could either.
+
+`CatalogState` now holds the catalogue once, fetched from the repository in
+`main()` and guarded like every other load, and those six call sites read it:
+`inCategory`, `bySeller`, `search` (name and category — the same two fields the
+server matches, so the two modes agree about a query), `products`, `categories`.
+`mockProducts` is reached only through the mock repository, which is what the
+interface's own doc asked for.
+
+**The test that was missing now exists, and its fixture is the point.** Every
+fixture in `catalog_state_test.dart` (6) and `catalog_wiring_test.dart` (3) is a
+catalogue that shares *nothing* with the mock file — products built through the
+wire mapper, with ids and names `mockProducts` does not contain. A mock-backed
+fixture cannot tell the two apart, which is exactly why a 242-test suite did not
+catch this: the tests were asking the same question the screens were answering.
+Proven by mutation: putting the category grid back on `mockProducts` fails
+**exactly that one test** and leaves the other two green.
+
+Named, not fixed: `CategoriesScreen`'s `_icons` map still knows only the three mock
+category names, so most of the server's fourteen labels render without a matching
+icon. Cosmetic, untested, and worth doing in the same pass that curates them.
 
 ## This pass: the app that only showed a logo (the boot rule, applied once)
 

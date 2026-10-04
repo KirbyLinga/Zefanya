@@ -14,7 +14,9 @@
 // identical chips under a caption.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
+import '../../state/catalog_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
@@ -73,13 +75,13 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  List<Product> get _results {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return const [];
-    return mockProducts
-        .where((p) => p.name.toLowerCase().contains(q) || p.category.toLowerCase().contains(q))
-        .toList();
-  }
+  /// The matches for what has been typed so far.
+  ///
+  /// The filtering itself lives in `CatalogState` — name and category, the same two
+  /// fields the server matches — so a live search and a mock search agree about
+  /// what a query returns, and this screen never reaches past the catalogue
+  /// interface for its data.
+  List<Product> get _results => context.watch<CatalogState>().search(_query);
 
   void _search(String value) => setState(() => _query = value);
 

@@ -209,7 +209,7 @@
   still answers the **admin** gate: it has no mail to send, and claiming otherwise
   would send someone to an inbox nothing will ever arrive in.
 
-### Tests — 235 passing (mobile) + 74 (server API)
+### Tests — 251 passing (mobile) + 74 (server API)
 `theme_contrast_test`, `courier_flow_test`, `personalization_test`,
 `nav_glyphs_golden_test`, `delivery_completion_view_test`, `review_flow_test`,
 `order_confirmation_dialog_test`, `product_image_cache_test` (6),
@@ -313,6 +313,27 @@ Four golden PNG sets are tracked: `nav_glyphs_{light,dark}.png`,
 - **Running the web suite at all needs a flag**: `pdo_sqlite` is commented out
   in `C:\PHP\php.ini`, so `php artisan test` fails with "could not find driver".
   See `techContext.md` gap 5.
+
+### The browsing screens read the catalogue (new)
+
+- **The bug the first live build showed**: the home grid, the category grid, the
+  category counts, search, the seller screen and the review button all read
+  `mockProducts` from `data/mock_data.dart` directly, so a live build rendered the
+  eight mock products while the server held thirteen real ones. Mock mode hid it
+  completely — the mock repository returns that same list.
+- **`CatalogState`** holds the catalogue once (fetched in `main()`, guarded like
+  every other load) and those six call sites read it: `inCategory`, `bySeller`,
+  `search`, `products`, `categories`. `mockProducts` is now reached only through the
+  mock repository.
+- **The missing test exists, and its fixture is the point**: 9 tests across
+  `catalog_state_test.dart` and `catalog_wiring_test.dart`, every one built on a
+  catalogue that shares nothing with `mockProducts` — a mock-backed fixture cannot
+  tell the two apart, which is why a 242-test suite never caught this.
+  Mutation-proven: putting the category grid back on `mockProducts` fails exactly
+  that one test.
+- **Named, not fixed**: `CategoriesScreen`'s `_icons` map knows only the three mock
+  category names, so the server's fourteen labels mostly render without a matching
+  icon.
 
 ### Live mode boots (new)
 

@@ -7,7 +7,8 @@
 // 'category-' prefix (see widgets/product_card.dart for why that matters).
 
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
+import 'package:provider/provider.dart';
+import '../../state/catalog_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/empty_state.dart';
@@ -22,7 +23,7 @@ class CategoryProductsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts.where((p) => p.category == category).toList();
+    final products = context.watch<CatalogState>().inCategory(category);
     // The saturated version of the category's hue, for the band's rule.
     // (The grid below uses productTint — the same hue *leaned onto* the
     // card ground, which is the right treatment for a photo fill and the

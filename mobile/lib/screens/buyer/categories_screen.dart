@@ -12,12 +12,13 @@
 // instead of one uniform grid of equal tiles.
 
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/pressable_scale.dart';
 import 'category_products_screen.dart';
 import 'widgets/product_card.dart';
+import '../../state/catalog_state.dart';
 import '../../widgets/app_page_route.dart';
 
 class CategoriesScreen extends StatelessWidget {
@@ -29,10 +30,13 @@ class CategoriesScreen extends StatelessWidget {
     'Beauty': Icons.spa_outlined,
   };
 
-  List<(String, int)> _rankedCategories() {
-    final categories = mockCategories.where((c) => c != 'All').toList();
+  List<(String, int)> _rankedCategories(CatalogState catalog) {
+    final categories = catalog.categories.where((c) => c != 'All').toList();
+    // Counted from the catalogue the app actually holds, so a live build ranks the
+    // server's fourteen categories by how many of its products each one has —
+    // rather than ranking a mock list and rendering labels that need not match it.
     final ranked = [
-      for (final c in categories) (c, mockProducts.where((p) => p.category == c).length),
+      for (final c in categories) (c, catalog.inCategory(c).length),
     ];
     ranked.sort((a, b) => b.$2.compareTo(a.$2));
     return ranked;
@@ -40,7 +44,7 @@ class CategoriesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ranked = _rankedCategories();
+    final ranked = _rankedCategories(context.watch<CatalogState>());
     if (ranked.isEmpty) return const SizedBox.shrink();
     final feature = ranked.first;
     final rest = ranked.sublist(1);
