@@ -188,7 +188,11 @@
                     <tbody>
                         @foreach ($products as $product)
                             @php
-                                $stock = (int) $product->stock_quantity;
+                                // Stock rollup = SUM of variant stock (the
+                                // products.stock_quantity column is kept in
+                                // sync as the same rollup; prefer the eager-
+                                // loaded sum when present).
+                                $stock = (int) ($product->variants_sum_stock_quantity ?? $product->stock_quantity);
                                 $isOutOfStock = $stock <= 0;
                                 $isLowStock = ! $isOutOfStock && $stock <= $lowStockLimit;
 

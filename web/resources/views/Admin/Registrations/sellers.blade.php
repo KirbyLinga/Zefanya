@@ -100,11 +100,11 @@
                 <h4 class="{{ $regSectionH4 }}">Submitted Documents</h4>
                 {{-- Bare div: `.reg-detail__documents` never had a CSS rule. --}}
                 <div>
-                    <a href="{{ Storage::url($selected->upload_id_path) }}" target="_blank" class="{{ $regIdLink }}">
+                    <a href="{{ route('admin.documents.stream', ['type' => 'seller', 'id' => $selected->id, 'document' => 'id']) }}" target="_blank" class="{{ $regIdLink }}">
                         <i data-lucide="file-text" width="16" height="16"></i>
                         View uploaded ID
                     </a>
-                    <a href="{{ Storage::url($selected->business_permit_path) }}" target="_blank" class="{{ $regIdLink }}">
+                    <a href="{{ route('admin.documents.stream', ['type' => 'seller', 'id' => $selected->id, 'document' => 'business_permit']) }}" target="_blank" class="{{ $regIdLink }}">
                         <i data-lucide="file-text" width="16" height="16"></i>
                         View business permit
                     </a>

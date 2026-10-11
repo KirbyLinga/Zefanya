@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\Seller;
 
+use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
-use Illuminate\Http\Request;
+use App\Models\SellerOrder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -14,15 +15,11 @@ class DashboardController extends Controller
     /**
      * Seller dashboard home.
      *
-     * Product/inventory figures are real (Product model already exists and
-     * is seller-scoped). Sales/order figures are placeholders — the Orders
-     * module isn't built yet (see checklist §Order Management), so those
-     * widgets render an honest empty state instead of fake numbers. Swap the
-     * TODO block below for real queries once an `orders` table + model
-     * exist; keep the same `where('seller_id', $sellerId)` scoping pattern
-     * used for products.
+     * Product/inventory figures are real. Order/sales figures are now derived
+     * from seller_orders (the orders module is live), so the previous null
+     * placeholders are replaced with real counts and a recent-orders table.
      */
-    public function index(Request $request)
+    public function index()
     {
         $seller = Auth::guard('seller')->user();
         $sellerId = $seller->id;
@@ -31,16 +28,25 @@ class DashboardController extends Controller
             ->where('seller_id', $sellerId)
             ->count();
 
+        // Low stock is a per-variant concept: a product is low/out when its
+        // stock rollup (SUM of variant stock) is at/below the threshold.
         $lowStockProducts = Product::query()
             ->where('seller_id', $sellerId)
-            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-            ->orderBy('stock_quantity')
+            ->whereHas('variants', fn ($q) => $q
+                ->select('product_id')
+                ->groupBy('product_id')
+                ->havingRaw('SUM(stock_quantity) <= products.low_stock_threshold'))
+            ->withSum('variants as variants_stock_total', 'stock_quantity')
+            ->orderBy('variants_stock_total')
             ->limit(5)
-            ->get(['id', 'name', 'stock_quantity', 'low_stock_threshold']);
+            ->get(['id', 'name', 'low_stock_threshold']);
 
         $lowStockCount = Product::query()
             ->where('seller_id', $sellerId)
-            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->whereHas('variants', fn ($q) => $q
+                ->select('product_id')
+                ->groupBy('product_id')
+                ->havingRaw('SUM(stock_quantity) <= products.low_stock_threshold'))
             ->count();
 
         $activeProductCount = Product::query()
@@ -48,20 +54,47 @@ class DashboardController extends Controller
             ->where('status', 'active')
             ->count();
 
-        // --- TODO: wire these to the real `orders` table once it exists ---
-        $totalSales = null;
-        $totalOrders = null;
-        $pendingOrders = null;
-        $recentOrders = collect();
-        $salesTrend = collect(range(6, 0))->map(fn ($daysAgo) => [
-            'label' => Carbon::now()->subDays($daysAgo)->format('D'),
-            'value' => 0,
-        ])->values();
-        // --------------------------------------------------------------------
+        // ── Real order/sales figures (orders module is now live) ──────────
+        $baseQuery = SellerOrder::query()
+            ->where('seller_id', $sellerId)
+            ->with(['order' => fn ($q) => $q->with('buyer')]);
 
-        // --- Notifications: only query if the table exists (Notifiable trait
-        //     is present on Seller, but the Laravel notifications table is not
-        //     yet migrated in this project). Empty state is rendered otherwise. ---
+        $totalOrders = (int) $baseQuery->count();
+
+        $pendingOrders = (int) $baseQuery
+            ->whereIn('status', [
+                OrderStatus::Placed->value,
+                OrderStatus::Confirmed->value,
+                OrderStatus::Preparing->value,
+            ])->count();
+
+        // Sales = sum of fully delivered/completed subtotals (centavos → float).
+        $deliveredSalesMinor = (int) $baseQuery
+            ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
+            ->sum('subtotal_minor');
+        $totalSales = $deliveredSalesMinor > 0 ? $deliveredSalesMinor / 100 : null;
+
+        $recentOrders = $baseQuery
+            ->latest('id')
+            ->limit(8)
+            ->get();
+
+        $salesTrend = collect(range(6, 0))->map(function (int $daysAgo) use ($baseQuery): array {
+            $day = Carbon::now()->subDays($daysAgo)->startOfDay();
+            $value = $baseQuery
+                ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
+                ->whereDate('seller_orders.updated_at', $day->toDateString())
+                ->sum('subtotal_minor');
+
+            return [
+                'label' => Carbon::now()->subDays($daysAgo)->format('D'),
+                'value' => $value,
+            ];
+        })->values();
+
+        // ── Notifications: only query if the table exists (Notifiable trait
+        //     is present on Seller, but the Laravel notifications table may not
+        //     be migrated in this project yet). Empty state is rendered otherwise.
         $notificationsTableExists = Schema::hasTable('notifications');
         $notifications = $notificationsTableExists
             ? $seller->notifications()->latest()->limit(8)->get()
@@ -69,7 +102,6 @@ class DashboardController extends Controller
         $unreadCount = $notificationsTableExists
             ? $seller->unreadNotifications()->count()
             : 0;
-        // --------------------------------------------------------------------
 
         return view('Seller.Dashboard.index', [
             'seller' => $seller,
@@ -82,7 +114,7 @@ class DashboardController extends Controller
             'lowStockProducts' => $lowStockProducts,
             'recentOrders' => $recentOrders,
             'salesTrend' => $salesTrend,
-            'ordersModuleReady' => false,
+            'ordersModuleReady' => true,
             'notifications' => $notifications,
             'unreadCount' => $unreadCount,
         ]);

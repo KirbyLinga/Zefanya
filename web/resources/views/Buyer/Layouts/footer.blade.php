@@ -2,11 +2,10 @@
      ============================================================================
      Converted to Tailwind (Buyer phase, chunk a — dev approved).
      Values are 1:1 with the old buyer.css footer rules:
-       footer            → bg-buyer-ink pt-12 pb-[22px] mt-5 (--ink #3A2529, #EADFDC)
+       footer            → bg-buyer-ink pt-12 pb-[22px] (--ink #3A2529, #EADFDC)
        .container        → mx-auto max-w-[1200px] px-8
-       .footer-grid      → grid-cols-[1.6fr_1fr_1fr_1fr] gap-8 mb-8
-                           @≤980px → 2 columns  (buyer's own 980px breakpoint,
-                           NOT Tailwind's lg/1024px)
+       .footer-grid      → grid-cols-[1.6fr_1fr_1fr] gap-8 mb-8
+                           @≤980px → 2 columns
        .foot-logo        → Playfair 21px, white, mb 10px
        .foot-desc        → 12.5px, #C9B9B6, line-height 1.6, max-width 280px
        footer h4         → Playfair (inherited, NOT font-sans), 13px/600,
@@ -16,16 +15,14 @@
        .footer-bottom    → space-between, wrap, gap 10px, 1px #4d3a3e top rule,
                            pt 18px, 11.5px, #C9B9B6
 
-     CAVEAT (see docs/css-migration-notes.md): buyer.css styles this footer
-     partly through ELEMENT selectors (footer / footer h4 / footer ul /
-     footer a). Those cannot be neutralised by dropping class names, so that
-     block is now an inert duplicate with identical values and MUST be removed
-     at buyer wrap-up. The utilities below are deliberately self-sufficient
-     for that moment (they re-state everything those element rules provided).
+     CAVEAT: buyer.css styles this footer partly through ELEMENT selectors
+     (footer / footer h4 / footer ul / footer a). That block is an inert
+     duplicate with identical values and MUST be removed at buyer wrap-up.
+     The utilities below are self-sufficient for that moment.
      ============================================================================ --}}
 
-<footer class="mt-5 bg-buyer-ink pt-12 pb-[22px] text-buyer-footer-text">
-  <div class="mx-auto max-w-[1200px] px-8">
+<footer class="w-full bg-buyer-ink text-buyer-footer-text">
+  <div class="mx-auto max-w-[1200px] px-8 pt-12 pb-[22px]">
     <div class="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-8 mb-8 max-[980px]:grid-cols-2">
       <div>
         <div class="mb-2.5 font-serif text-[21px] text-white">Zefanya</div>
@@ -39,28 +36,24 @@
       <div>
         <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Shop</h4>
         <ul class="m-0 flex list-none flex-col gap-[9px] p-0">
-          <li><a href="{{ route('buyer.categories.index') }}" class="text-[12.5px] text-buyer-footer-muted">All categories</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Flash sale</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">New arrivals</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Best selling stores</a></li>
+          <li><a href="{{ route('buyer.categories.index') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">All categories</a></li>
+          <li><a href="{{ route('buyer.products.index') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">All products</a></li>
+          <li><a href="{{ route('buyer.pages.about') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">About us</a></li>
         </ul>
       </div>
       <div>
-        <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Account</h4>
+        <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Help</h4>
         <ul class="m-0 flex list-none flex-col gap-[9px] p-0">
-          <li><a href="{{ route('buyer.orders.index') }}" class="text-[12.5px] text-buyer-footer-muted">My orders</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Wishlist</a></li>
-          <li><a href="{{ route('buyer.chat.index') }}" class="text-[12.5px] text-buyer-footer-muted">Messages</a></li>
-          <li><a href="{{ route('buyer.account.index') }}" class="text-[12.5px] text-buyer-footer-muted">Account settings</a></li>
+          <li><a href="{{ route('buyer.pages.contact') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Contact us</a></li>
+          <li><a href="{{ route('buyer.pages.shipping-returns') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Shipping & Returns</a></li>
+          <li><a href="{{ route('buyer.help.index') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Help & Support</a></li>
         </ul>
       </div>
       <div>
-        <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Support</h4>
+        <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Legal</h4>
         <ul class="m-0 flex list-none flex-col gap-[9px] p-0">
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Help center</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Shipping info</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Returns</a></li>
-          <li><a href="#" class="text-[12.5px] text-buyer-footer-muted">Contact us</a></li>
+          <li><a href="{{ route('buyer.pages.privacy-policy') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Privacy Policy</a></li>
+          <li><a href="{{ route('buyer.pages.terms-of-service') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Terms of Service</a></li>
         </ul>
       </div>
     </div>

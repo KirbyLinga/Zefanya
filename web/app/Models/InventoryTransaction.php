@@ -18,6 +18,7 @@ class InventoryTransaction extends Model
     protected $fillable = [
         'product_id',
         'seller_order_id',
+        'variant_id',
         'quantity_before',
         'quantity_after',
         'delta',
@@ -38,6 +39,11 @@ class InventoryTransaction extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class);
     }
 
     public function sellerOrder(): BelongsTo

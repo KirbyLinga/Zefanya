@@ -2,8 +2,17 @@
 
 @section('title', 'Dashboard')
 
+@use('App\Enums\OrderStatus')
+
 @push('scripts')
     @vite('resources/js/seller/notification-bell.js')
+<script>
+    function confirmMarkReady(btn) {
+        if (confirm('Mark this order as packed and ready for pickup? A courier will be assigned automatically.')) {
+            btn.closest('form').submit();
+        }
+    }
+</script>
 @endpush
 
 @section('content')
@@ -128,8 +137,8 @@
                                     Threshold: {{ $product->low_stock_threshold }}
                                 </p>
                             </div>
-                            <span class="font-sans text-[11.5px] font-semibold text-[var(--status-warning)] bg-[var(--pill-warning-bg)] rounded-full px-1 px-3 whitespace-nowrap {{ $product->stock_quantity == 0 ? 'text-[var(--status-danger)] bg-[var(--pill-danger-bg)]' : '' }}">
-                                {{ $product->stock_quantity }} left
+                            <span class="font-sans text-[11.5px] font-semibold text-[var(--status-warning)] bg-[var(--pill-warning-bg)] rounded-full px-1 px-3 whitespace-nowrap {{ ($product->variants_stock_total ?? 0) == 0 ? 'text-[var(--status-danger)] bg-[var(--pill-danger-bg)]' : '' }}">
+                                {{ $product->variants_stock_total ?? 0 }} left
                             </span>
                         </li>
                     @endforeach
@@ -165,16 +174,31 @@
                         <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] px-2 px-3 border-b border-neutral-200">Date</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @foreach($recentOrders as $order)
-                        <tr>
-                            <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">#{{ $order->id }}</td>
-                            <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $order->buyer_name }}</td>
-                            <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $order->status }}</td>
-                            <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $order->created_at->format('M d, Y') }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
+                 <tbody>
+                    @foreach($recentOrders as $sellerOrder)
+                         @php($order = $sellerOrder->order ?? null)
+                         <tr>
+                             <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">#{{ $sellerOrder->id }}</td>
+                             <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $order?->buyer?->fullName() ?? '—' }}</td>
+                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->status->label }}</td>
+                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->created_at->format('M d, Y') }}</td>
+                              <td class="px-3 border-b border-neutral-200">
+                                  @if($sellerOrder->status === OrderStatus::Placed)
+                                      <form method="POST" action="{{ route('seller.orders.markReady', $sellerOrder) }}">
+                                          @csrf
+                                          <button type="button"
+                                              class="inline-flex items-center justify-center h-7 px-3 rounded-sm font-sans font-semibold text-[11.5px] tracking-[0.5px] uppercase text-white bg-primary-700 hover:bg-primary-800"
+                                              onclick="confirmMarkReady(this)">
+                                              Mark ready
+                                          </button>
+                                      </form>
+                                  @else
+                                      <a href="{{ route('seller.orders.show', $sellerOrder) }}" class="font-sans text-[12px] font-semibold text-[var(--link)]">View</a>
+                                  @endif
+                              </td>
+                         </tr>
+                     @endforeach
+                 </tbody>
             </table>
         @endif
     </section>

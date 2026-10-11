@@ -12,16 +12,6 @@ use Illuminate\Support\Facades\Log;
 class VerifyBuyerOtpController extends Controller
 {
     /**
-     * GET /register/buyer/verify-otp/{buyer}
-     * Standalone fallback page for deep-links. The modal flow doesn't use this —
-     * the OTP modal lives inside the page that already has the registration modal.
-     */
-    public function show(Buyer $buyer)
-    {
-        return view('Buyer.verify-otp', ['buyer' => $buyer]);
-    }
-
-    /**
      * POST /register/buyer/verify-otp/{buyer}
      * Body: { otp: '123456' }
      * Returns JSON the modal's JS reads directly (no full page reload).

@@ -13,6 +13,13 @@
     <p class="auth-hero__subtitle">Choose an account type that best fits how you want to use Zefanya.</p>
   </div>
 
+  @if ($message = session('auth.status_message'))
+    <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+      {{ $message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  @endif
+
   <div class="role-grid">
 
     <a href="#" data-buyer-register-trigger class="role-card">
@@ -70,7 +77,11 @@
 @endsection
 
 @push('scripts')
-  @vite(['resources/js/buyer/buyer-register-modal.js', 'resources/js/seller/seller-register-modal.js', 'resources/js/logistics/logistics-register-modal.js'])
+  {{-- address-lookup.js (the shared PSGC address module) must be listed
+       BEFORE buyer-register-modal.js: the modal resolves window.zfAddressLookup
+       at init time and silently skips the province/municipality/barangay
+       dropdowns when the module has not loaded yet. --}}
+  @vite(['resources/js/buyer/address-lookup.js', 'resources/js/buyer/buyer-register-modal.js', 'resources/js/seller/seller-register-modal.js', 'resources/js/logistics/logistics-register-modal.js'])
   <script>
     if (window.lucide) { lucide.createIcons(); }
   </script>

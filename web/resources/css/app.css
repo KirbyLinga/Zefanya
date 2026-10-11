@@ -271,6 +271,18 @@
         outline: -webkit-focus-ring-color auto 5px !important;
     }
 
+    /* Admin login submit (Admin/Auth/login.blade.php) — the one page that must be
+       theme-color-only. It lives in @layer base ON PURPOSE: both rules carry
+       !important, and for !important declarations the layer order is REVERSED
+       (theme < base < components < utilities becomes theme > base > components
+       > utilities), so an override in @layer components would LOSE to the rule
+       above. Same layer + higher specificity wins instead.
+       The global blue ring stays untouched for every other button. */
+    .admin-login__submit:focus-visible {
+        outline: 2px solid var(--brand) !important;
+        outline-offset: 2px !important;
+    }
+
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-serif);
         font-weight: 400;
@@ -295,5 +307,113 @@
         outline: 2px solid var(--sidebar-active-bg);
         outline-offset: -2px;
     }
+}
+
+/* ============================================================================
+   Landing + buyer dark mode — same mechanism as the seller/logistics panels:
+     • <head> init in each shell sets html[data-theme] before paint; the
+       localStorage key is PER SHELL, declared on the <html> tag
+       (public.theme here; buyer.theme in Buyer/Layouts/app.blade.php;
+       seller.theme / logistics.theme in Layouts/seller + Layouts/logistics);
+     • the navbar toggle carries [data-theme-toggle] + .zf-theme-toggle (icon
+       swap already defined in theme.css, which this file imports);
+     • behaviour: resources/js/seller/theme-toggle.js (same file for every
+       shell; each shell passes its own key via <html data-theme-key>).
+   theme.css already swaps the shared surface/text tokens under
+   html[data-theme="dark"]; the block below only adds the landing/buyer palette
+   and the hardcoded whites that never went through a token. Everything is
+   scoped to html[data-theme="dark"] + .html-body (the landing/buyer/auth shells
+   only), so light mode and the seller/logistics/admin areas are untouched.
+   ========================================================================== */
+
+/* Page canvas — html/body sit outside .html-body on the landing shell. */
+html[data-theme="dark"] body:has(> .html-body),
+html[data-theme="dark"].html-body body {
+    background-color: #161212;
+    color: #e8d8d6;
+}
+
+html[data-theme="dark"] .html-body {
+    color-scheme: dark;
+    background-color: #161212;
+
+    /* Landing palette (tokens declared in @theme above). */
+    --color-cream: #161212;
+    --color-blush: #201a1b;
+    --color-line: #3a3132;
+    --color-muted-ink: #e8d8d6;
+    --color-price-muted: #b3a9a9;
+    --color-secondary-100: #2a2324;
+    --color-secondary-200: #2e2627;
+    --color-secondary-300: #241e1f;
+
+    /* Buyer palette. --color-buyer-ink is dual-purpose (heading text AND dark
+       chrome: footer, cart drawer, chat header, dark buttons), so it keeps its
+       value and only its TEXT utilities are lifted below. */
+    --color-buyer-cream: #161212;
+    --color-buyer-line: #3a3132;
+    --color-buyer-ink-soft: #b3a9a9;
+    --color-buyer-primary-dark: #e2b4bd;
+    --color-buyer-tertiary-dark: #adc7ad;
+
+    /* Legacy semantic tokens re-exported by app.css's base layer — theme.css's
+       dark block does not cover these. */
+    --bg-page: #161212;
+    --bg-surface: #201a1b;
+    --text-primary: #f4e6e4;
+    --text-secondary: #e8d8d6;
+    --text-muted: #b3a9a9;
+    --text-inverse: #201a1b;
+    --border-light: #3a3132;
+    --border-default: #3a3132;
+    --border-focus: #e2b4bd;
+}
+
+/* Hardcoded whites / dark fills from the landing + buyer markup, mapped to the
+   seller dark palette so both areas read identically. */
+html[data-theme="dark"] .html-body .bg-white,
+html[data-theme="dark"] .html-body .bg-white\/90 {
+    background-color: #201a1b;
+}
+
+html[data-theme="dark"] .html-body .bg-neutral-100,
+html[data-theme="dark"] .html-body .bg-neutral-950 {
+    background-color: #2a2324;
+}
+
+html[data-theme="dark"] .html-body .text-neutral-950,
+html[data-theme="dark"] .html-body .text-neutral-900,
+html[data-theme="dark"] .html-body .text-buyer-ink {
+    color: #f4e6e4;
+}
+
+html[data-theme="dark"] .html-body .text-neutral-800,
+html[data-theme="dark"] .html-body .text-neutral-700 {
+    color: #e8d8d6;
+}
+
+html[data-theme="dark"] .html-body .text-neutral-600,
+html[data-theme="dark"] .html-body .text-neutral-500 {
+    color: #b3a9a9;
+}
+
+html[data-theme="dark"] .html-body .border-neutral-950,
+html[data-theme="dark"] .html-body .border-neutral-300 {
+    border-color: #453a3b;
+}
+
+html[data-theme="dark"] .html-body .border-neutral-200 {
+    border-color: #3a3132;
+}
+
+html[data-theme="dark"] .html-body .border-white {
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Dual-purpose ink token, translucent usage: the buyer product-card meta
+   divider (bg-buyer-ink/25) must read as a light hairline on the now-dark card.
+   The /35, /40 and /75 variants are photo/drawer scrims and stay as they are. */
+html[data-theme="dark"] .html-body .bg-buyer-ink\/25 {
+    background-color: rgba(244, 230, 228, 0.25);
 }
 

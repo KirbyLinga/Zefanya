@@ -7,6 +7,7 @@ use App\Http\Requests\Seller\StoreProductRequest;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\Shared\Category;
+use App\Services\VariantSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -54,7 +55,8 @@ class ProductController extends Controller
         }
 
         $query = Product::forSeller($sellerId)
-            ->with(['images', 'category'])
+            ->with(['images', 'category', 'variants'])
+            ->withSum('variants as variants_sum_stock_quantity', 'stock_quantity')
             ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'));
@@ -129,6 +131,7 @@ class ProductController extends Controller
         ]);
 
         $this->storeImages($product, $request);
+        $this->syncVariants($product, $request);
 
         return redirect()
             ->route('seller.products.index')
@@ -138,7 +141,7 @@ class ProductController extends Controller
     public function edit(Request $request, Product $product)
     {
         $this->authorizeOwnership($product);
-        $product->load('images');
+        $product->load(['images', 'variants.optionValues.option', 'options.values']);
 
         // The products index opens this route through the Edit Product modal.
         if ($request->ajax()) {
@@ -173,6 +176,11 @@ class ProductController extends Controller
 
         if ($request->hasFile('images')) {
             $this->storeImages($product, $request);
+        }
+
+        $this->syncVariants($product, $request);
+        if ($request->hasFile('variant_images')) {
+            $this->storeVariantImages($product, $request);
         }
 
         // Back to the products index (the modal lives there), preserving filters/page.
@@ -239,6 +247,54 @@ class ProductController extends Controller
     private function authorizeOwnership(Product $product): void
     {
         abort_unless($product->seller_id === Auth::guard('seller')->id(), 403);
+    }
+
+    /**
+     * Apply the Variant Options submission (no-op for legacy single-SKU
+     * products). The products.price/stock rollups stay correct either way.
+     */
+    private function syncVariants(Product $product, Request $request): void
+    {
+        $payload = $request->boolean('variants_exist')
+            ? $request->variantPayload()
+            : ['options' => [], 'variants' => []];
+
+        app(VariantSyncService::class)->sync(
+            $product,
+            $payload['options'],
+            $payload['variants'],
+            $request->boolean('variants_exist'),
+        );
+    }
+
+    /**
+     * Attach uploaded photos to specific variants (variant_images[{variantId}]).
+     * Stored under the same products/{id} folder convention; a product-level
+     * image has variant_id = NULL.
+     */
+    private function storeVariantImages(Product $product, Request $request): void
+    {
+        $variantIds = $product->variants()->pluck('id')->flip();
+
+        foreach ($request->file('variant_images', []) as $variantId => $files) {
+            $variantId = (int) $variantId;
+
+            if (! $variantIds->has($variantId)) {
+                continue; // not this product's variant — ignore
+            }
+
+            foreach ((array) $files as $file) {
+                $path = $file->store('products/'.$product->id, 'public');
+
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'variant_id' => $variantId,
+                    'path' => $path,
+                    'is_primary' => false,
+                    'sort_order' => ProductImage::query()->where('product_id', $product->id)->count(),
+                ]);
+            }
+        }
     }
 
     private function storeImages(Product $product, Request $request): void

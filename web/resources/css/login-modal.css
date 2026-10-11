@@ -269,6 +269,37 @@
   color: var(--text-inverse);
 }
 
+/* Google Sign-In — deliberately the same button language as __guest (outlined,
+   reuses the existing tokens only). Sits above "Continue as guest" and is NOT
+   hidden by the modal's hideGuest option: it is a sign-in method. */
+.html-body .login-modal__google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-5);
+  padding: 13px 0;
+  background-color: transparent;
+  color: var(--color-primary-800);
+  border: 1px solid var(--color-primary-800);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1.4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.html-body .login-modal__google:hover {
+  background-color: var(--color-primary-800);
+  color: var(--text-inverse);
+}
+
+.html-body .login-modal__google svg {
+  flex-shrink: 0;
+}
+
 .html-body .login-modal__footer {
   margin-top: var(--space-5);
   text-align: center;

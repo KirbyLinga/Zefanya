@@ -11,7 +11,10 @@
                                 Neutral #7C7676 is ONLY for borders, disabled
                                 states and placeholder icons — it fails
                                 4.5:1 as text on dark surfaces.
-   Set `data-theme` on <html> ("light"/"dark"); localStorage key: zf-theme.
+   Set `data-theme` on <html> ("light"/"dark"). The persisted key is PER SHELL
+   and declared on the <html> tag (data-theme-key): seller.theme, logistics.theme,
+   buyer.theme, public.theme — so toggling one panel never switches another.
+   'zf-theme' is the pre-split shared key, read only as a one-time fallback.
    ====================================================================== */
 
 :root {

@@ -12,6 +12,7 @@
                 route="{{ $item['route'] ?? null }}"
                 icon="{{ $item['icon'] ?? null }}"
                 :label="$item['label'] ?? ''"
+                :badge="$item['badge'] ?? null"
             />
         @endforeach
     </div>

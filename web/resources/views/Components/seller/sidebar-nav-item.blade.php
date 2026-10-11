@@ -1,4 +1,4 @@
-@props(['route' => null, 'icon' => null, 'label' => ''])
+@props(['route' => null, 'icon' => null, 'label' => '', 'badge' => null])
 
 @php
     $hasRoute = $route ? \Illuminate\Support\Facades\Route::has($route) : false;
@@ -29,4 +29,7 @@
     {{-- Visually hidden in collapsed state via sp-sidebar-label class (overflow:hidden + width:0).
          Kept in DOM so aria-label on the <a> is the accessible name; the span is aria-hidden. --}}
     <span class="text-inherit [.is-collapsed_&]:hidden" aria-hidden="true">{{ $label }}</span>
+    @if ($badge)
+        <span class="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 [.is-collapsed_&]:hidden">{{ min($badge, 9) }}</span>
+    @endif
 </a>

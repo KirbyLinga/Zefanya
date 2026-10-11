@@ -12,7 +12,6 @@
             <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(121,84,92,0.5)_0%,rgba(121,84,92,0.34)_45%,rgba(72,50,55,0.62)_100%)] backdrop-blur-[2px]"></div>
 
             <div class="relative z-[1] mx-auto flex w-full max-w-[760px] flex-col items-center justify-center px-6 text-center text-white max-sm:px-4">
-                <p class="mb-[26px] inline-flex items-center rounded-full border border-[rgba(255,248,247,0.35)] bg-[rgba(255,248,247,0.16)] px-[18px] py-[9px] font-sans text-xs font-semibold uppercase tracking-[2.4px] text-cream backdrop-blur-[2px] max-sm:px-3.5 max-sm:py-[7px] max-sm:text-[11px]">New Arrivals Weekly</p>
                 <h1 class="m-0 font-serif font-normal text-[60px] leading-[1.12] text-white [text-wrap:balance] max-lg:text-[46px] max-sm:text-[30px]">Everything you need, all in one place</h1>
                 <p class="mx-auto mb-8 mt-[18px] max-w-[560px] font-sans text-lg leading-[1.6] text-[rgba(255,248,247,0.92)] max-lg:text-base"> From daily essentials to unexpected finds, delivered straight to your door.</p>
                 <button class="inline-flex cursor-pointer items-center justify-center rounded bg-neutral-950 px-[30px] py-[15px] text-sm font-semibold tracking-[1.4px] text-white transition-[background-color,color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-primary-900 hover:shadow-[0_12px_24px_rgba(30,27,27,0.3)] max-sm:w-full" type="button">SHOP NOW</button>

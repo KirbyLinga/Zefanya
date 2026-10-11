@@ -3,7 +3,7 @@
     (resources/views/Components/product-card.blade.php), so the buyer home
     grids and the PDP related-products carousel share the landing look:
     hairline border + 10px radius, hover lift, portrait image with a hover
-    "QUICK VIEW" overlay, SALE badge, price row and a full-width outlined
+    "View Product" overlay, SALE badge, price row and a full-width outlined
     ADD button. Only the data binding and the behaviour hooks differ.
 
     Card content (Shopee-style buyer catalogue tile):
@@ -27,17 +27,12 @@
                         demo value. TODO: nothing in products/sellers feeds this
                         yet, so cards show a demo range derived from the product
                         id (developer-approved) until the delivery phase exists.
-      $url            — string URL to the PDP; when provided the image and title
-                        link to the PDP. The QUICK VIEW button always opens the
-                        quick-view modal. When omitted (skeleton cards) the
-                        image is a plain box.
+      $url            — string URL to the PDP; when provided the hover overlay
+                        links to the PDP. When omitted, falls back to the product
+                        route when $product is set, otherwise the image is a box.
 
-    Behaviour hooks are kept verbatim — buyer.js / home.js bind these:
-      `.js-open-qv`  + data-product-id → quick-view modal
-      `.wish-toggle` (+ `.active`)     → wishlist heart
-
-    Add-to-cart deliberately does NOT live on this card any more; it stays
-    available in the quick-view modal and on the PDP buy-box.
+    Add-to-cart deliberately does NOT live on this card; it is available
+    on the PDP buy-box and via the global cart-add hooks.
 --}}
 @php
     $product       = $product       ?? null;
@@ -97,16 +92,6 @@
             </div>
         @endunless
 
-        {{-- Hover overlay — QUICK VIEW, opens the global quick-view modal (buyer.js).
-             `pointer-events-none` + `group-hover:pointer-events-auto` keeps the
-             invisible overlay from stealing clicks from the PDP link below it. --}}
-        <div class="pointer-events-none absolute bottom-0 left-0 right-0 translate-y-2 bg-[linear-gradient(180deg,rgba(30,27,27,0)_0%,rgba(30,27,27,0.55)_100%)] p-3.5 opacity-0 transition-[opacity,transform] duration-[250ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-            <button type="button"
-                    class="js-open-qv inline-flex h-[42px] w-full cursor-pointer items-center justify-center rounded border-0 bg-white text-xs font-semibold tracking-[1.4px] text-neutral-950 transition-colors duration-200 hover:bg-primary-800 hover:text-white"
-                    @if ($productId) data-product-id="{{ $productId }}" @endif>
-                <div>QUICK VIEW</div>
-            </button>
-        </div>
 
         {{-- Badge — top-left, only when $discountBadge is set (landing SALE colours) --}}
         @if ($discountBadge)
@@ -115,12 +100,17 @@
             </div>
         @endif
 
-        {{-- Wishlist heart — buyer-area affordance kept on top of the landing design --}}
-        <button type="button"
-                class="wish-toggle absolute top-3.5 right-3.5 z-[1] flex h-8 w-8 items-center justify-center rounded-full border-0 bg-white/90 text-[13px] text-neutral-500 transition-colors [&.active]:text-buyer-wish"
-                aria-label="Save {{ $name }} to wishlist">
-            <i class="fa-solid fa-heart"></i>
-        </button>
+        {{-- Wishlist heart button — top-right, only for authenticated buyers --}}
+        @auth('buyer')
+            <button type="button"
+                    class="wishlist-toggle absolute right-3.5 top-3.5 z-[2] inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-neutral-400 transition-all duration-200 hover:bg-white hover:text-primary-800"
+                    data-product-id="{{ $product?->id }}"
+                    data-saved="false"
+                    aria-label="Save to wishlist"
+                    title="Save to wishlist">
+                <i data-lucide="heart" width="20" height="20" class="wishlist-icon"></i>
+            </button>
+        @endauth
     </div>
 
     {{-- Pink body (landing page's placeholder pink, `bg-secondary-300` #f7d6d0):
@@ -182,6 +172,30 @@
                     {{-- Truncated on purpose ("even if it's cut off"); the
                          title attribute still reveals the full location. --}}
                     <span class="min-w-0 truncate text-neutral-950" title="{{ $shopLocation }}">{{ $shopLocation }}</span>
+                @endif
+            </div>
+        @endif
+
+        {{-- Add to Cart button --}}
+        @if ($product)
+            <button type="button"
+                    class="add-to-cart-btn w-full rounded border border-primary-800 bg-white px-4 py-2.5 text-xs font-semibold tracking-[1.4px] text-primary-800 transition-colors duration-200 hover:bg-primary-800 hover:text-white"
+                    data-product-id="{{ $product->id }}"
+                    aria-label="Add {{ $name }} to cart">
+                <i data-lucide="shopping-cart" width="14" height="14" class="mr-2 inline"></i>
+                Add to Cart
+            </button>
+
+            {{-- Stock status indicator --}}
+            <div class="flex items-center justify-between text-xs font-medium">
+                @if ($product->isOutOfStock())
+                    <span class="text-red-600">Out of Stock</span>
+                @elseif ($product->isLowStock())
+                    <span class="text-orange-500">Low Stock</span>
+                    <span class="text-neutral-950">{{ $product->stock_quantity }} left</span>
+                @else
+                    <span class="text-green-600">In Stock</span>
+                    <span class="text-neutral-950">{{ $product->stock_quantity }} available</span>
                 @endif
             </div>
         @endif

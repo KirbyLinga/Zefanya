@@ -140,7 +140,7 @@
                 <div class="mb-6 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
                     <div>
                         <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsContactNo">Contact no. *</label>
-                        <input type="tel" name="contact_no" id="logisticsContactNo" placeholder="09XXXXXXXXX" required value="{{ old('contact_no') }}"
+                        <input type="tel" name="contact_no" id="logisticsContactNo" placeholder="09XXXXXXXXX" required value="{{ old('contact_no') }}" inputmode="numeric" pattern="[0-9]*"
                                class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                         <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                     </div>

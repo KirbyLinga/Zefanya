@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BackfillsDefaultVariant;
+use App\Models\Concerns\SyncsVariantRollups;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,7 +17,7 @@ use Illuminate\Support\Str;
 
 class Product extends Model
 {
-    use HasFactory, SoftDeletes;
+    use BackfillsDefaultVariant, HasFactory, SoftDeletes, SyncsVariantRollups;
 
     protected $fillable = [
         'seller_id',
@@ -27,13 +29,26 @@ class Product extends Model
         'stock_quantity',
         'low_stock_threshold',
         'status',
+        'weight_grams',
+        'dimensions',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'stock_quantity' => 'integer',
         'low_stock_threshold' => 'integer',
+        'weight_grams' => 'integer',
+        'dimensions' => 'array',
     ];
+
+    /**
+     * Total parcel weight in grams for this product (weight_grams × 1, since a
+     * product row is one SKU). Used by the courier-assignment threshold check.
+     */
+    public function weightGrams(): int
+    {
+        return (int) $this->weight_grams;
+    }
 
     public function seller(): BelongsTo
     {
@@ -48,6 +63,26 @@ class Product extends Model
     public function images(): HasMany
     {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function options(): HasMany
+    {
+        return $this->hasMany(ProductOption::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
+     * True when the seller generated option combinations for this product
+     * (i.e. more than the auto "Default" variant). False = legacy single-SKU
+     * behaviour: the Default variant simply mirrors the product's price/stock.
+     */
+    public function hasVariants(): bool
+    {
+        return $this->variants->contains(fn (ProductVariant $variant): bool => $variant->hasOptions());
     }
 
     public function cartItems(): HasMany

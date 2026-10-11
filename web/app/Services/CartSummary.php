@@ -66,7 +66,12 @@ final class CartSummary
         $this->selectedIds = $selectedIds;
 
         // Group available items by seller for the page layout
-        $this->sellerGroups = $this->availableItems
+        // Filter by selectedIds so totals match displayed items
+        $selectedAvailable = $this->selectedIds === null
+            ? $this->availableItems
+            : $this->availableItems->whereIn('id', $this->selectedIds)->values();
+
+        $this->sellerGroups = $selectedAvailable
             ->groupBy(fn (CartItem $i): int => (int) $i->product->seller_id)
             ->map(fn (Collection $group): array => [
                 'seller' => $group->first()->product->seller,

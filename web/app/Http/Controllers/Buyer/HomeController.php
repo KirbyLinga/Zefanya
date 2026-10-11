@@ -23,15 +23,16 @@ class HomeController extends Controller
             ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
             ->with(['images', 'seller'])
             ->latest('id')
-            ->limit(12)
+            ->limit(20)
             ->get();
 
         $flashProducts = $catalog->take(4)->values();
-        $forYouProducts = $catalog->slice(4, 6)->values();
+        $newArrivals = $catalog->slice(4, 4)->values();
+        $forYouProducts = $catalog->slice(8, 6)->values();
         if ($forYouProducts->isEmpty()) {
             $forYouProducts = $catalog->take(6)->values();
         }
-        $heroProducts = $catalog->take(2)->values();
+        $heroProducts = $catalog->take(3)->values();
 
         $stores = Seller::query()
             ->where('status', 'approved')
@@ -64,6 +65,7 @@ class HomeController extends Controller
             'cartCount',
             'categories',
             'flashProducts',
+            'newArrivals',
             'forYouProducts',
             'heroProducts',
             'stores',

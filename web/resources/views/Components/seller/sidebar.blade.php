@@ -10,6 +10,15 @@
     // or a trimmed nav.
     $seller = $seller ?? auth('seller')->user();
 
+    // Calculate unread message count if seller exists
+    $unreadMessagesCount = 0;
+    if ($seller) {
+        $unreadMessagesCount = \App\Models\Message::whereIn('conversation_id', $seller->conversations()->pluck('id'))
+            ->where('sender_role', 'buyer')
+            ->where('read_at', null)
+            ->count();
+    }
+
     $sections ??= [
         [
             'label' => null,
@@ -36,7 +45,7 @@
             'label' => 'Customers',
             'items' => [
                 ['route' => 'seller.feedback.index', 'icon' => 'star', 'label' => 'Feedback'],
-                ['route' => 'seller.chat.index', 'icon' => 'message-circle', 'label' => 'Chat'],
+                ['route' => 'seller.messages.index', 'icon' => 'message-circle', 'label' => 'Messages', 'badge' => $unreadMessagesCount > 0 ? $unreadMessagesCount : null],
             ],
         ],
         [

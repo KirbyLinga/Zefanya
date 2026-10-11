@@ -82,9 +82,13 @@
                class="rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] hover:bg-neutral-50">
                 Continue shopping
             </a>
-            <a href="{{ route('buyer.orders.index') }}"
+            <a href="{{ route('buyer.orders.show', $order) }}"
                class="rounded-full bg-[#0a0a0a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800">
-                View my orders
+                Track this order
+            </a>
+            <a href="{{ route('buyer.orders.index') }}"
+               class="rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] hover:bg-neutral-50">
+                View all orders
             </a>
         </div>
     </div>

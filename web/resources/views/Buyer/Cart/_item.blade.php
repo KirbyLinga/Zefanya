@@ -7,9 +7,10 @@
     $product  = $item->product;
     $imageUrl = $product?->catalogImageUrl();
     $pdpUrl   = $product ? route('buyer.products.show', $product->id) : null;
-    $stock    = (int) ($product?->stock_quantity ?? 0);
+    $stock    = $item->availableQuantity();
     $catLabel = $product?->category?->label;
-    $unit     = (int) bcmul((string) ($product?->price ?? 0), '100', 0);
+    $unit     = $item->unitPriceCentavos();
+    $variantLabel = $item->variant?->label();
 @endphp
 
 <div
@@ -63,11 +64,13 @@
       </span>
     @endif
 
-    {{-- TODO: colour / size belong here once a product_variants table exists.
-         There are no variants yet, so only the multi-quantity hint is shown. --}}
+    {{-- Variant label ("Red / M") for variant lines; legacy lines show the
+         multi-quantity hint only. --}}
     <p class="mt-0.5 text-[11.5px] text-neutral-400">
       @if ($unavailable)
         No longer available
+      @elseif ($variantLabel)
+        {{ $variantLabel }}@if ($item->quantity > 1) · Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)@endif
       @elseif ($item->quantity > 1)
         Set of {{ $item->quantity }} ({{ $product->formattedPrice() }} each)
       @endif

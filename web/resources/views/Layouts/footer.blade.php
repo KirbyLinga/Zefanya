@@ -1,9 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-key="public.theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@yield('title', 'Zefanya — Elevated Shopping, Curated Beautifully')</title>
+
+    {{-- Theme init MUST run before the stylesheet paints: reads the PUBLIC
+         (landing/auth) theme — localStorage 'public.theme', the key declared
+         once on the <html> tag above — and sets data-theme on <html>. The
+         role panels each use their own key; 'zf-theme' is only the pre-split
+         shared key, read as a one-time fallback. Default: light. --}}
+    <script>
+        (function () {
+            try {
+                var key = document.documentElement.dataset.themeKey || 'zf-theme';
+                var theme = localStorage.getItem(key) || localStorage.getItem('zf-theme');
+                document.documentElement.dataset.theme = (theme === 'dark') ? 'dark' : 'light';
+            } catch (e) {
+                document.documentElement.dataset.theme = 'light';
+            }
+        })();
+    </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,11 +32,11 @@
 <div class="html-body min-w-0 overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
     {{-- ===== Top navbar (shared) =====
-         Landing/public shell: always show the public-facing nav (Login / Register)
-         regardless of any session state. Authenticated buyers have their own
-         navbar inside the Buyer layout (Buyer/Layouts/app.blade.php) where
-         variant='buyer' is correct. Using 'landing' here means the marketing
-         pages never expose a logged-in account dropdown.
+         Landing/public shell: PUBLIC ONLY — always variant 'landing', so every
+         visitor gets the public navbar (Login / Register / cart / wishlist /
+         theme toggle). The '/' route redirects a signed-in buyer to buyer.home,
+         where Buyer/Layouts/app.blade.php renders variant 'buyer' with the
+         account dropdown.
          There is NO sidebar in the public/buyer shells — navigation is the top
          navbar only. Do not add one. --}}
     @include('Components.navbar', ['variant' => 'landing'])
@@ -95,6 +112,11 @@
 
 <script src="{{ asset('js/lucide.min.js') }}"></script>
 <script>lucide.createIcons();</script>
+
+{{-- Light/dark toggle behaviour — the same file the seller/logistics panels load
+     (localStorage 'zf-theme'; the navbar button carries [data-theme-toggle]). --}}
+@vite('resources/js/seller/theme-toggle.js')
+
 @stack('scripts')
 </body>
 </html>

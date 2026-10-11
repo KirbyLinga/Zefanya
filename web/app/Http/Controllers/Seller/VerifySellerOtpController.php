@@ -5,75 +5,119 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\Seller\Seller;
 use App\Notifications\Seller\SellerRegistrationOtp;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class VerifySellerOtpController extends Controller
 {
-    public function show(Seller $seller)
+    /**
+     * POST /register/seller/verify-otp
+     * Body: { otp: '123456' }
+     * Finds seller from session, verifies OTP, returns 200 or 422 JSON.
+     * No page view — modal-only flow.
+     */
+    public function verify(Request $request): JsonResponse
     {
-        if ($seller->status !== 'pending_verification') {
-            return redirect()->route('register.seller.pending');
-        }
+        $data = $request->validate([
+            'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
+        ]);
 
-        return view('Seller.register-seller-verify-otp', ['seller' => $seller]);
-    }
+        $sellerId = session('seller_registration_id');
+        Log::warning('OTP verify attempt', [
+            'seller_registration_id_from_session' => $sellerId,
+            'session_keys' => array_keys(session()->all()),
+        ]);
 
-    public function verify(Request $request, Seller $seller)
-    {
-        if ($seller->status !== 'pending_verification') {
-            return $this->respond($request, [
-                'redirect' => route('register.seller.pending'),
-            ]);
-        }
-
-        $otp = (string) $request->input('otp', '');
-
-        if (! preg_match('/^\d{6}$/', $otp)) {
-            return $this->respond($request, ['message' => 'Enter all 6 digits.'], 422);
-        }
-
-        if ($seller->isOtpExpired()) {
-            return $this->respond($request, [
-                'message' => 'This code has expired. Tap "Resend code" for a new one.',
+        if (! $sellerId) {
+            return response()->json([
+                'message' => 'Session expired. Please register again.',
             ], 422);
         }
 
-        if (! $seller->otpMatches($otp)) {
-            return $this->respond($request, [
-                'message' => 'That code is incorrect. Please try again.',
+        $seller = Seller::find($sellerId);
+        if (! $seller) {
+            return response()->json([
+                'message' => 'Invalid registration session.',
+            ], 422);
+        }
+
+        // Only allow OTP verification if seller is in pending_verification status
+        if ($seller->status !== 'pending_verification') {
+            return response()->json([
+                'message' => 'Invalid registration session. Your account is '.$seller->status.'.',
+            ], 422);
+        }
+
+        // Check if OTP has expired before comparing
+        if ($seller->isOtpExpired()) {
+            return response()->json([
+                'message' => 'This code has expired. Please request a new one.',
+                'expired' => true,
+            ], 422);
+        }
+
+        $incoming = hash('sha256', $data['otp']);
+
+        if ($seller->email_verification_code === null
+            || ! hash_equals($seller->email_verification_code, $incoming)) {
+            return response()->json([
+                'message' => 'That code doesn\'t match. Please try again.',
             ], 422);
         }
 
         $seller->markEmailVerified();
+        session()->forget('seller_registration_id');
 
-        return $this->respond($request, [
-            'redirect' => route('register.seller.pending'),
-            'message' => 'Email verified! Your registration is now waiting for admin approval.',
-        ]);
+        return response()->json([
+            'message' => 'Email verified successfully.',
+        ], 200);
     }
 
-    public function resend(Seller $seller)
+    /**
+     * POST /register/seller/verify-otp/resend
+     * Finds seller from session, generates fresh OTP, emails it.
+     * Throttled at route level.
+     */
+    public function resend(Request $request): JsonResponse
     {
+        $sellerId = session('seller_registration_id');
+        if (! $sellerId) {
+            return response()->json([
+                'message' => 'Session expired. Please register again.',
+            ], 422);
+        }
+
+        $seller = Seller::find($sellerId);
+        if (! $seller) {
+            return response()->json([
+                'message' => 'Invalid registration session.',
+            ], 422);
+        }
+
+        // Only allow resend if seller is in pending_verification status
         if ($seller->status !== 'pending_verification') {
-            return response()->json(['message' => 'This registration is already verified.'], 422);
+            return response()->json([
+                'message' => 'Invalid registration session. Your account is '.$seller->status.'.',
+            ], 422);
         }
 
-        $otp = $seller->issueOtp();
-        $seller->notify(new SellerRegistrationOtp($otp));
+        $code = (string) random_int(100000, 999999);
 
-        return response()->json(['message' => 'A new code has been sent to your email.']);
-    }
+        $seller->forceFill([
+            'email_verification_code' => hash('sha256', $code),
+            'email_verification_expires_at' => now()->addMinutes(10),
+        ])->save();
 
-    private function respond(Request $request, array $json, int $status = 200)
-    {
-        if ($request->wantsJson()) {
-            return response()->json($json, $status);
-        }
+        $seller->notify(new SellerRegistrationOtp($code));
 
-        if (isset($json['redirect'])) {
-            return redirect($json['redirect'])->with('success', $json['message'] ?? null);
-        }
+        Log::warning('Seller OTP verification code resent', [
+            'seller_id' => $seller->id,
+            'email' => $seller->email,
+        ]);
 
-        return back()->withErrors(['otp' => $json['message']]);
+        return response()->json([
+            'message' => 'A new code has been sent to your email.',
+        ], 200);
     }
 }

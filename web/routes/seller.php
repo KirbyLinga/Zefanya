@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Seller\AuthController;
 use App\Http\Controllers\Seller\DashboardController;
+use App\Http\Controllers\Seller\MessageController;
+use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,9 +33,10 @@ Route::prefix('seller')->name('seller.')->group(function () {
             return to_route('seller.products.index');
         })->name('inventory.index');
 
-        Route::get('/orders', function () {
-            return view('Seller.Orders.index');
-        })->name('orders.index');
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{sellerOrder}', [OrderController::class, 'show'])->name('orders.show');
+        Route::post('/orders/{sellerOrder}/accept', [OrderController::class, 'acceptOrder'])->name('orders.accept');
+        Route::post('/orders/{sellerOrder}/mark-ready', [OrderController::class, 'markReady'])->name('orders.markReady');
 
         Route::get('/shipments', function () {
             return view('Seller.Shipments.index');
@@ -50,6 +53,12 @@ Route::prefix('seller')->name('seller.')->group(function () {
         Route::get('/feedback', function () {
             return view('Seller.Feedback.index');
         })->name('feedback.index');
+
+        // Messaging routes
+        Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
+        Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
+        Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
+        Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
 
         Route::get('/chat', function () {
             return view('Seller.Chat.index');

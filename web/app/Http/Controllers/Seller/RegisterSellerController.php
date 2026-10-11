@@ -16,6 +16,12 @@ class RegisterSellerController extends Controller
     {
         $data = $request->validated();
 
+        // If there's an existing pending_verification seller with this email,
+        // delete it so we can start fresh with new files
+        Seller::where('email', $data['email'])
+            ->where('status', 'pending_verification')
+            ->delete();
+
         // Private 'local' disk, separate subfolders from buyer uploads.
         $idPath = $request->file('upload_id')->store('seller-ids', 'local');
         $permitPath = $request->file('business_permit')->store('business-permits', 'local');
@@ -45,12 +51,32 @@ class RegisterSellerController extends Controller
             'upload_id_path' => $idPath,
             'business_permit_path' => $permitPath,
             'status' => 'pending_verification',
+            'email_verified_at' => null,
         ]);
 
         $otp = $seller->issueOtp();
-        $seller->notify(new SellerRegistrationOtp($otp));
 
-        Log::warning('Seller registration submitted, OTP sent', [
+        // Store seller_id in session for OTP verification
+        session(['seller_registration_id' => $seller->id]);
+
+        // Log the OTP for development/testing (remove this in production)
+        Log::info('Seller registration OTP code', [
+            'seller_id' => $seller->id,
+            'email' => $seller->email,
+            'otp_code' => $otp,
+        ]);
+
+        try {
+            $seller->notify(new SellerRegistrationOtp($otp));
+        } catch (\Exception $e) {
+            Log::error('Failed to send seller OTP email', [
+                'seller_id' => $seller->id,
+                'email' => $seller->email,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        Log::warning('Seller registration submitted', [
             'seller_id' => $seller->id,
             'email' => $seller->email,
         ]);
@@ -59,10 +85,9 @@ class RegisterSellerController extends Controller
             return response()->json([
                 'seller_id' => $seller->id,
                 'email' => $seller->email,
-                'verify_url' => route('register.seller.verify-otp', $seller),
             ], 201);
         }
 
-        return redirect()->route('register.seller.verify-otp', $seller);
+        return redirect()->route('register.seller.pending');
     }
 }

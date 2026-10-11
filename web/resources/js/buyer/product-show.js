@@ -1,7 +1,7 @@
 // resources/js/buyer/product-show.js
 // PDP-specific behaviour. Uses hooks prefixed js-pdp-* and ids prefixed pdp-
-// to avoid ANY collision with buyer.js (.swatch/.size-opt, #qvQty, etc.).
-// Depends on window.addToCart and window.toggleChat exposed by buyer.js.
+// to avoid ANY collision with buyer.js (.js-cart-toggle, etc.).
+// Depends on window.addToCart and window.buyNow exposed by buyer.js.
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -34,61 +34,107 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ── 2. Colour swatches ───────────────────────────────────────────────────
-  // Uses js-pdp-color, NOT .swatch — no conflict with quick-view buyer.js
-  const colorLabel = document.getElementById('pdp-selected-color');
-  const colorBtns  = document.querySelectorAll('.js-pdp-color');
+  // ── 3. REAL variant picker (seller-configured option combinations) ──────
+  // Server contract: [data-pdp-variants] JSON = [{id, price, stock, available,
+  // values:[...]}] in axis order. A selection must cover every axis before
+  // Add to Cart is allowed; the chosen variant's price/stock update the box.
+  const variantsScript = document.querySelector('[data-pdp-variants]');
+  const variantMode    = variantsScript !== null;
+  const addCartBtn     = document.getElementById('pdp-add-cart');
+  let   variantsData   = [];
+  let   selectedValues = [];
+  let   selectedVariant = null;
+  let   baseStock      = parseInt(addCartBtn?.dataset.stock || '99', 10);
 
-  colorBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      colorBtns.forEach((b) => {
-        b.classList.remove('border-buyer-ink', 'ring-2', 'ring-buyer-ink', 'ring-offset-2');
-        b.classList.add('border-transparent');
-        b.setAttribute('aria-pressed', 'false');
-      });
-      btn.classList.add('border-buyer-ink', 'ring-2', 'ring-buyer-ink', 'ring-offset-2');
-      btn.classList.remove('border-transparent');
-      btn.setAttribute('aria-pressed', 'true');
-      if (colorLabel) colorLabel.textContent = btn.dataset.color || '';
+  if (variantMode) {
+    try { variantsData = JSON.parse(variantsScript.textContent || '[]'); } catch { variantsData = []; }
+    selectedValues = variantsData.length && variantsData[0].values
+      ? variantsData[0].values.map(() => null)
+      : [];
+  }
+
+  function variantFor(selection) {
+    return variantsData.find((v) =>
+      v.values.length === selection.length
+      && v.values.every((value, i) => selection[i] === value)
+    ) || null;
+  }
+
+  function updateVariantUi() {
+    selectedVariant = selectedValues.every((v) => v !== null) ? variantFor(selectedValues) : null;
+
+    // Per-axis labels.
+    selectedValues.forEach((value, i) => {
+      const label = document.querySelector('[data-pdp-axis-label="' + i + '"]');
+      if (label) label.textContent = value || '';
     });
-  });
 
-  // ── 3. Size buttons ──────────────────────────────────────────────────────
-  // Uses js-pdp-size, NOT .size-opt — no conflict with quick-view buyer.js
-  const sizeBtns  = document.querySelectorAll('.js-pdp-size');
-  const sizeError = document.getElementById('pdp-size-error');
-  let   selectedSize = null;
+    // Price + stock follow the selected variant.
+    const priceEl = document.getElementById('pdp-price');
+    if (selectedVariant && priceEl) {
+      priceEl.textContent = '₱' + selectedVariant.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      baseStock = selectedVariant.stock;
+      const hidden = document.getElementById('pdp-variant-id');
+      if (hidden) hidden.value = selectedVariant.available ? String(selectedVariant.id) : '';
+    }
 
-  sizeBtns.forEach((btn) => {
+    // Sold-out styling: a value is sold out when every variant carrying it
+    // (under the CURRENT other-axis selection) is unavailable or empty.
+    document.querySelectorAll('.js-pdp-variant-value').forEach((btn) => {
+      const axis = parseInt(btn.dataset.axisIndex, 10);
+      const value = btn.dataset.value;
+      const probe = selectedValues.map((v, i) => (i === axis ? value : v));
+      const hasStock = variantsData.some((v) =>
+        v.available && v.stock > 0
+        && probe.every((p, i) => p === null || p === v.values[i])
+        && v.values[axis] === value
+      );
+      btn.classList.toggle('soldout', !hasStock);
+    });
+
+    updateQtyDisplay();
+  }
+
+  document.querySelectorAll('.js-pdp-variant-value').forEach((btn) => {
     btn.addEventListener('click', () => {
-      sizeBtns.forEach((b) => {
+      const axis = parseInt(btn.dataset.axisIndex, 10);
+      selectedValues[axis] = btn.dataset.value;
+
+      btn.closest('[role="group"]').querySelectorAll('.js-pdp-variant-value').forEach((b) => {
         b.classList.remove('selected');
         b.setAttribute('aria-pressed', 'false');
       });
       btn.classList.add('selected');
       btn.setAttribute('aria-pressed', 'true');
-      selectedSize = btn.dataset.size;
-      if (sizeError) sizeError.classList.add('hidden');
+
+      const variantError = document.getElementById('pdp-variant-error');
+      if (variantError) variantError.classList.add('hidden');
+
+      updateVariantUi();
     });
   });
+
+  if (variantMode) updateVariantUi();
 
   // ── 4. Quantity stepper ──────────────────────────────────────────────────
   const qtyDisplay = document.getElementById('pdp-qty');
   const qtyUp      = document.getElementById('pdp-qty-up');
   const qtyDown    = document.getElementById('pdp-qty-down');
-  const addCartBtn = document.getElementById('pdp-add-cart');
-  const stock      = parseInt(addCartBtn?.dataset.stock || '99', 10);
   let   pdpQty     = 1;
+
+  function currentStock() {
+    return variantMode && selectedVariant ? selectedVariant.stock : baseStock;
+  }
 
   function updateQtyDisplay() {
     if (qtyDisplay) qtyDisplay.textContent = pdpQty;
     // Dim the down button at min, up button at max
-    if (qtyDown) qtyDown.style.opacity = pdpQty <= 1   ? '0.35' : '1';
-    if (qtyUp)   qtyUp.style.opacity   = pdpQty >= stock ? '0.35' : '1';
+    if (qtyDown) qtyDown.style.opacity = pdpQty <= 1 ? '0.35' : '1';
+    if (qtyUp)   qtyUp.style.opacity   = pdpQty >= currentStock() ? '0.35' : '1';
   }
 
   qtyUp?.addEventListener('click', () => {
-    if (pdpQty < stock) { pdpQty++; updateQtyDisplay(); }
+    if (pdpQty < currentStock()) { pdpQty++; updateQtyDisplay(); }
   });
   qtyDown?.addEventListener('click', () => {
     if (pdpQty > 1) { pdpQty--; updateQtyDisplay(); }
@@ -98,81 +144,221 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 5. Add to Cart ───────────────────────────────────────────────────────
   addCartBtn?.addEventListener('click', () => {
-    // Size must be selected first
-    if (!selectedSize) {
-      if (sizeError) {
-        sizeError.classList.remove('hidden');
-        sizeError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const productId = parseInt(addCartBtn.dataset.productId, 10);
+
+    if (variantMode) {
+      const variantError = document.getElementById('pdp-variant-error');
+
+      if (!selectedVariant) {
+        if (variantError) {
+          variantError.textContent = 'Please choose one option per axis before adding to cart.';
+          variantError.classList.remove('hidden');
+          variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
       }
+
+      if (!selectedVariant.available || selectedVariant.stock <= 0) {
+        if (variantError) {
+          variantError.textContent = 'This combination is sold out — pick another.';
+          variantError.classList.remove('hidden');
+        }
+        return;
+      }
+
+      handleAddToCart(productId, pdpQty, selectedVariant.id, addCartBtn);
       return;
     }
 
-    const productId = parseInt(addCartBtn.dataset.productId, 10);
-    // TODO: pass selectedSize + selectedColor once cart supports variants
-    window.addToCart(productId, pdpQty);
+    handleAddToCart(productId, pdpQty, null, addCartBtn);
   });
 
-  // ── 6. Express Buy Now ───────────────────────────────────────────────────
+  // Helper function to handle add-to-cart with animation
+  function handleAddToCart(productId, quantity, variantId, button) {
+    const ANIMATION_DURATION = 650;
+    const BUTTON_STATE_DURATION = 1500;
+    const DESKTOP_BREAKPOINT = 768;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduce-motion: reduce)').matches;
+
+    // Disable button during animation
+    button.disabled = true;
+    const originalHTML = button.innerHTML;
+    const originalClasses = button.className;
+
+    // Start the add-to-cart request
+    window.addToCart(productId, quantity, variantId)
+      .then(data => {
+        if (!data) {
+          // Error or 401 — revert button state
+          button.disabled = false;
+          return;
+        }
+
+        // Get product image for animation
+        const mainImg = document.getElementById('pdp-main-img');
+        const cartIcon = document.getElementById('cartDropdownToggle');
+
+        if (!mainImg || !cartIcon) {
+          // No animation context, just show button state
+          setAddedState(button, originalHTML, BUTTON_STATE_DURATION, originalClasses);
+          return;
+        }
+
+        const isMobile = window.innerWidth < DESKTOP_BREAKPOINT;
+
+        if (isMobile || prefersReducedMotion) {
+          // Mobile or reduced motion: just button state
+          setAddedState(button, originalHTML, BUTTON_STATE_DURATION, originalClasses);
+        } else {
+          // Desktop: fly animation + button state
+          const imgRect = mainImg.getBoundingClientRect();
+          const cartRect = cartIcon.getBoundingClientRect();
+
+          if (imgRect && cartRect) {
+            flyToCart(mainImg, imgRect, cartRect);
+          }
+
+          // Bounce badge and show button state
+          setTimeout(() => {
+            bounceBadge();
+          }, ANIMATION_DURATION * 0.5);
+
+          setAddedState(button, originalHTML, BUTTON_STATE_DURATION, originalClasses);
+        }
+      })
+      .catch(() => {
+        button.disabled = false;
+      });
+  }
+
+  // Animation helper: fly product image to cart
+  function flyToCart(sourceImg, sourceRect, targetRect) {
+    const clone = document.createElement('div');
+    clone.style.position = 'fixed';
+    clone.style.zIndex = '9999';
+    clone.style.top = sourceRect.top + 'px';
+    clone.style.left = sourceRect.left + 'px';
+    clone.style.width = sourceRect.width + 'px';
+    clone.style.height = sourceRect.height + 'px';
+    clone.style.borderRadius = '8px';
+    clone.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.2)';
+    clone.style.backgroundSize = 'cover';
+    clone.style.backgroundPosition = 'center';
+
+    if (sourceImg instanceof HTMLImageElement) {
+      clone.style.backgroundImage = `url('${sourceImg.src}')`;
+    }
+
+    document.body.appendChild(clone);
+
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+    const targetCenterY = targetRect.top + targetRect.height / 2;
+
+    const animation = clone.animate(
+      [
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        {
+          transform: `translate(${(targetCenterX - sourceRect.left - sourceRect.width / 2) / 2}px, ${(targetCenterY - sourceRect.top - sourceRect.height / 2) / 2 - 60}px) scale(0.6)`,
+          opacity: 0.8,
+        },
+        {
+          transform: `translate(${targetCenterX - sourceRect.left - sourceRect.width / 2}px, ${targetCenterY - sourceRect.top - sourceRect.height / 2}px) scale(0.2)`,
+          opacity: 0,
+        },
+      ],
+      {
+        duration: 650,
+        easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+      }
+    );
+
+    animation.onfinish = () => {
+      clone.remove();
+    };
+  }
+
+  // Animation helper: bounce cart badge
+  function bounceBadge() {
+    const badge = document.getElementById('cartCount');
+    if (!badge) return;
+
+    badge.animate(
+      [
+        { transform: 'scale(1)' },
+        { transform: 'scale(1.3)', offset: 0.5 },
+        { transform: 'scale(1)' },
+      ],
+      {
+        duration: 400,
+        easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      }
+    );
+  }
+
+  // Helper: set button to "Added" state
+  function setAddedState(button, originalHTML, duration, originalClasses) {
+    button.className = originalClasses;
+    button.classList.add('bg-buyer-ink', 'text-white', '!border-buyer-ink');
+    button.classList.remove('border', 'bg-transparent', 'text-buyer-ink', 'hover:bg-buyer-ink', 'hover:text-white');
+
+    button.innerHTML = '<i data-lucide="check" width="15" height="15"></i> Added';
+
+    if (window.lucide) {
+      window.lucide.createIcons({ scope: button });
+    }
+
+    setTimeout(() => {
+      button.className = originalClasses;
+      button.innerHTML = originalHTML;
+      button.disabled = false;
+
+      if (window.lucide) {
+        window.lucide.createIcons({ scope: button });
+      }
+    }, duration);
+  }
+
+  // ── 6. Checkout (Buy Now) — skips the cart, checks out THIS item only ────
   const buyNowBtn = document.getElementById('pdp-buy-now');
 
   buyNowBtn?.addEventListener('click', () => {
-    if (!selectedSize) {
-      if (sizeError) {
-        sizeError.classList.remove('hidden');
-        sizeError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const productId = parseInt(buyNowBtn.dataset.productId, 10);
+    const variantError = document.getElementById('pdp-variant-error');
+    let variantId = null;
+
+    if (variantMode) {
+      if (!selectedVariant || !selectedVariant.available || selectedVariant.stock <= 0) {
+        if (variantError) {
+          variantError.textContent = selectedVariant
+            ? 'This combination is sold out — pick another.'
+            : 'Please choose one option per axis first.';
+          variantError.classList.remove('hidden');
+          variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
       }
-      return;
+      variantId = selectedVariant.id;
     }
 
-    const productId = parseInt(buyNowBtn.dataset.productId, 10);
-    // addToCart now returns its promise (Task 8 — backwards-compatible change).
-    // On success redirect to checkout; on 401 the login modal opens and after
-    // login retryPendingCartAction() runs — the redirect won't fire for guests,
-    // which is correct (we can't redirect before they log in).
-    const promise = window.addToCart(productId, pdpQty);
+    buyNowBtn.disabled = true;
+
+    const promise = window.buyNow(productId, pdpQty, variantId);
+
     if (promise && typeof promise.then === 'function') {
       promise.then((data) => {
-        if (data) {
-          // data is truthy only when the cart add succeeded (not a 401)
-          window.location.href = '/buyer/checkout';
+        if (data && data.error) {
+          if (variantError) {
+            variantError.textContent = data.error;
+            variantError.classList.remove('hidden');
+          }
         }
+      }).finally(() => {
+        buyNowBtn.disabled = false;
       });
     }
   });
 
-  // ── 7. Tabs ──────────────────────────────────────────────────────────────
-  const tabBtns  = document.querySelectorAll('.js-pdp-tab');
-  const panels   = document.querySelectorAll('.pdp-panel');
-
-  function activateTab(btn) {
-    tabBtns.forEach((b) => {
-      b.classList.remove('selected');
-      b.setAttribute('aria-selected', 'false');
-    });
-    panels.forEach((p) => p.classList.add('hidden'));
-
-    btn.classList.add('selected');
-    btn.setAttribute('aria-selected', 'true');
-    const target = document.getElementById(btn.getAttribute('aria-controls'));
-    target?.classList.remove('hidden');
-  }
-
-  tabBtns.forEach((btn) => {
-    btn.addEventListener('click', () => activateTab(btn));
-
-    // Keyboard arrow navigation (ARIA tabs pattern)
-    btn.addEventListener('keydown', (e) => {
-      const all   = Array.from(tabBtns);
-      const idx   = all.indexOf(btn);
-      if (e.key === 'ArrowRight') { all[(idx + 1) % all.length].focus(); }
-      if (e.key === 'ArrowLeft')  { all[(idx - 1 + all.length) % all.length].focus(); }
-    });
-  });
-
-  // Activate first tab on load
-  if (tabBtns[0]) activateTab(tabBtns[0]);
-
-  // ── 8. Related products carousel ─────────────────────────────────────────
+  // ── 7. Related products carousel ─────────────────────────────────────────
   const viewport  = document.getElementById('related-viewport');
   const track     = document.getElementById('related-track');
   const prevBtn   = document.getElementById('related-prev');
@@ -212,10 +398,44 @@ document.addEventListener('DOMContentLoaded', () => {
     slideTo(0);
   }
 
-  // ── 9. Maximize button (simple new-tab open, no lightbox dependency) ─────
+  // ── 8. Maximize button (simple new-tab open, no lightbox dependency) ─────
   document.getElementById('pdp-maximize')?.addEventListener('click', () => {
     const src = mainImg?.src;
     if (src) window.open(src, '_blank', 'noopener');
   });
+
+  // ── 9. Chat with Seller ─────────────────────────────────────────────────
+  const chatBtn = document.getElementById('pdp-chat-seller');
+  if (chatBtn) {
+    chatBtn.addEventListener('click', async () => {
+      const sellerId = chatBtn.dataset.sellerId;
+      const productId = chatBtn.dataset.productId;
+
+      try {
+        const response = await fetch('{{ route("buyer.messages.get-or-create") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            seller_id: sellerId,
+            product_id: productId,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          window.location.href = `/buyer/messages/${data.conversation_id}`;
+        } else {
+          alert('Failed to start conversation');
+        }
+      } catch (error) {
+        console.error('Error starting conversation:', error);
+        alert('Error starting conversation');
+      }
+    });
+  }
 
 });

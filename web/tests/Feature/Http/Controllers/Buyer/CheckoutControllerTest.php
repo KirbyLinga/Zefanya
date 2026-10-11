@@ -324,6 +324,42 @@ class CheckoutControllerTest extends TestCase
         $response->assertSessionHas('voucher_notice');
     }
 
+    // ── Checkout index: invalid / stale selections ───────────────────────
+
+    public function test_a_selection_of_only_invalid_ids_redirects_back_to_the_cart_with_an_error(): void
+    {
+        // No cart items exist for this buyer; every requested id is invalid.
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index', ['items' => [999, 888]]))
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+    }
+
+    public function test_a_selection_of_only_foreign_ids_redirects_back_to_the_cart_with_an_error(): void
+    {
+        $otherBuyer = Buyer::factory()->create();
+        $foreign = CartItem::factory()->create(['buyer_id' => $otherBuyer->id]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index', ['items' => [$foreign->id]]))
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+    }
+
+    public function test_a_partially_invalid_selection_keeps_the_valid_items_without_error(): void
+    {
+        $mine = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index', ['items' => [$mine->id, 424242]]))
+            ->assertOk();
+
+        $this->assertSame([$mine->id], session(CheckoutController::SESSION_KEY));
+    }
+
     // ── Confirmation page ownership ──────────────────────────────────────────
 
     public function test_another_buyer_cannot_open_someone_elses_confirmation(): void

@@ -4,7 +4,7 @@
 //
 // Hook convention: every element this file owns uses a `js-cartpage-*` class or
 // a `cartpage-` id prefix, so nothing here can collide with buyer.js
-// (.js-cart-toggle, .swatch, .size-opt, #qvQty) or product-show.js (js-pdp-*).
+// (.js-cart-toggle) or product-show.js (js-pdp-*).
 //
 // Money is NEVER computed here. Every mutation re-reads the totals from the
 // server (App\Services\CartSummary), so this page can only ever display

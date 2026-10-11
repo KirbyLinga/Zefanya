@@ -1,0 +1,186 @@
+<?php
+
+namespace App\Http\Controllers\Seller;
+
+use App\Enums\OrderActor;
+use App\Enums\OrderStatus;
+use App\Http\Controllers\Controller;
+use App\Models\SellerOrder;
+use App\Services\SellerOrderStatusService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class OrderController extends Controller
+{
+    /**
+     * Seller's order list, filterable by a broad status bucket via ?bucket=.
+     * Buckets: to_ship | ready | shipped | delivered. Falls back to "all".
+     */
+    public function index(Request $request)
+    {
+        $seller = Auth::guard('seller')->user();
+        $bucket = $request->query('bucket');
+
+        $query = SellerOrder::query()
+            ->where('seller_id', $seller->id)
+            ->with([
+                'order' => fn ($q) => $q->with('buyer'),
+                'orderItems.product',
+                'courier',
+                'deliveryCourier',
+            ])
+            ->latest('id');
+
+        if ($bucket !== null && $bucket !== 'all') {
+            $statusValues = collect(OrderStatus::cases())
+                ->filter(fn (OrderStatus $s) => $s->bucket() === $bucket)
+                ->map(fn (OrderStatus $s) => $s->value)
+                ->all();
+
+            if ($statusValues !== []) {
+                $query->whereIn('status', $statusValues);
+            }
+        }
+
+        $sellerOrders = $query->paginate(15)->appends($request->except('page'));
+
+        return view('Seller.Orders.index', [
+            'sellerOrders' => $sellerOrders,
+            'bucket' => $bucket ?: 'all',
+        ]);
+    }
+
+    /**
+     * Order detail with a full status-history timeline and tracking info.
+     */
+    public function show(SellerOrder $sellerOrder)
+    {
+        $this->authorizeForUser(Auth::guard('seller')->user(), 'view', $sellerOrder);
+
+        $sellerOrder->load([
+            'order.buyer',
+            'orderItems.product',
+            'payment',
+            'courier',
+            'deliveryCourier',
+            'statusHistories',
+        ]);
+
+        return view('Seller.Orders.show', ['sellerOrder' => $sellerOrder]);
+    }
+
+    /**
+     * Seller accepts a freshly placed order: Placed → Confirmed → Preparing.
+     * This kicks off the packing pipeline explicitly instead of jumping
+     * straight to "ready for pickup".
+     */
+    public function acceptOrder(Request $request, SellerOrder $sellerOrder): RedirectResponse
+    {
+        $this->authorizeForUser(Auth::guard('seller')->user(), 'markReady', $sellerOrder);
+
+        $service = new SellerOrderStatusService;
+
+        try {
+            DB::transaction(function () use ($sellerOrder, $service): void {
+                $sellerOrder = $sellerOrder->fresh();
+
+                if ($sellerOrder->status !== OrderStatus::Placed) {
+                    throw new \InvalidArgumentException(
+                        'Only newly placed orders can be accepted.'
+                    );
+                }
+
+                $service->transition(
+                    $sellerOrder,
+                    OrderStatus::Confirmed,
+                    note: 'Order accepted by seller.',
+                    changedBy: 'seller',
+                    actor: OrderActor::Seller,
+                    actorId: (int) Auth::guard('seller')->id(),
+                    source: 'web',
+                );
+
+                $service->transition(
+                    $sellerOrder,
+                    OrderStatus::Preparing,
+                    note: 'Preparing for shipment.',
+                    changedBy: 'seller',
+                    actor: OrderActor::Seller,
+                    actorId: (int) Auth::guard('seller')->id(),
+                    source: 'web',
+                );
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('accepted', true);
+    }
+
+    /**
+     * Mark a seller_order as packed / ready for pickup.
+     *
+     * Moves the order to READY_FOR_PICKUP. NO courier is auto-assigned here —
+     * the courier is assigned at pickup time by the rider, and the delivery
+     * courier is assigned at the sorting center.
+     *
+     * Double-click safety: the row is re-read UNDER LOCK inside a transaction
+     * before acting, and an already-ready order returns early.
+     */
+    public function markReady(Request $request, SellerOrder $sellerOrder): RedirectResponse
+    {
+        $this->authorizeForUser(Auth::guard('seller')->user(), 'markReady', $sellerOrder);
+
+        $service = new SellerOrderStatusService;
+
+        $alreadyHandled = false;
+
+        try {
+            $sellerOrder = DB::transaction(function () use ($sellerOrder, $service, &$alreadyHandled): SellerOrder {
+                $current = SellerOrder::query()
+                    ->whereKey($sellerOrder->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($current === null) {
+                    abort(404);
+                }
+
+                $inPackaging = in_array(
+                    $current->status,
+                    [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing],
+                    true
+                );
+
+                if ($current->status === OrderStatus::ReadyForPickup || ! $inPackaging) {
+                    $alreadyHandled = true;
+
+                    return $current;
+                }
+
+                $service->transition(
+                    $current,
+                    OrderStatus::ReadyForPickup,
+                    note: 'Packed by seller.',
+                    changedBy: 'seller',
+                    actor: OrderActor::Seller,
+                    actorId: (int) Auth::guard('seller')->id(),
+                    source: 'web',
+                    expectedFrom: $current->status,
+                );
+
+                return $current->fresh();
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if ($alreadyHandled) {
+            return back()->with('warning', 'This order is already marked ready for pickup — nothing more to do here.');
+        }
+
+        return back()->with('ready', true);
+    }
+}

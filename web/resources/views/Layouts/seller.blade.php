@@ -1,17 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-key="seller.theme">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Seller Panel') — Zefanya</title>
 
-    {{-- Theme init MUST run before the stylesheet paints: reads the persisted
-         seller theme (localStorage 'zf-theme') and sets data-theme on <html>.
-         Default: light. No flash of the wrong theme. --}}
+    {{-- Theme init MUST run before the stylesheet paints: reads THIS panel's own
+         persisted theme (localStorage 'seller.theme' — the key is declared once
+         on the <html> tag above) and sets data-theme on <html>. 'zf-theme' is
+         only the pre-split shared key, read as a one-time fallback so existing
+         preferences survive. Default: light. No flash of the wrong theme. --}}
     <script>
         (function () {
             try {
-                var theme = localStorage.getItem('zf-theme');
+                var key = document.documentElement.dataset.themeKey || 'zf-theme';
+                var theme = localStorage.getItem(key) || localStorage.getItem('zf-theme');
                 document.documentElement.dataset.theme = (theme === 'dark') ? 'dark' : 'light';
             } catch (e) {
                 document.documentElement.dataset.theme = 'light';

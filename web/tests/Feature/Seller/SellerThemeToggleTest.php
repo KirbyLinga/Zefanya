@@ -26,8 +26,10 @@ class SellerThemeToggleTest extends TestCase
         $this->assertStringContainsString('Switch to dark mode', $content);
 
         // The no-flash init script lives in the head, before any stylesheet,
-        // and reads the persisted theme key.
-        $initAt = mb_strpos($content, "localStorage.getItem('zf-theme')");
+        // and reads THIS panel's own persisted key (declared on the <html>
+        // tag) rather than the legacy shared 'zf-theme' used by every shell.
+        $this->assertStringContainsString('data-theme-key="seller.theme"', $content);
+        $initAt = mb_strpos($content, 'document.documentElement.dataset.themeKey');
         $this->assertNotFalse($initAt, 'Theme init script must be present.');
         $firstStylesheet = mb_strpos($content, 'rel="stylesheet"');
         $this->assertNotFalse($firstStylesheet);

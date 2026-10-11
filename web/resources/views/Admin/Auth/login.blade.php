@@ -8,57 +8,157 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
-    {{-- ADMIN-b (scope note: pulled forward from ADMIN-d). This standalone page
-         was the ONLY consumer of design-system.css's `.input` / `.btn--inverted`
-         component classes, so it had to convert in the same chunk that removed
-         the design-system @import from admin.css, or its inputs/buttons would
-         have lost their styling. Now self-sufficient on app.css alone. --}}
+    {{-- Standalone page: app.css only (it imports theme.css). Every color on this
+         page is a theme token — either a @theme utility (primary/secondary/
+         tertiary/neutral) or a theme.css custom property consumed as an arbitrary
+         value (`bg-[var(--bg-surface)]`, the convention Buyer/Orders/* already
+         uses). No raw hex and no color that is absent from the theme. --}}
     @vite(['resources/css/app.css'])
 </head>
-{{-- admin-login-body → utilities (ADMIN-b): margin 0 = preflight,
-     min-height 100vh, centered flex, bg var(--bg-page) = primary-50,
-     padding var(--space-6) = 24px. --}}
-<body class="min-h-screen flex items-center justify-center bg-primary-50 p-6">
+{{-- body: page canvas = --bg-page (theme's light page tint; the dark value lives
+     in theme.css under html[data-theme="dark"], but this shell is light-only). --}}
+<body class="min-h-screen bg-[var(--bg-page)] font-sans text-[var(--text-body)]">
 
-    {{-- admin-login-card → utilities: max-w 400px, bg-surface = #fff,
-         border var(--border-light) = neutral-200, radius-lg = 8px,
-         padding 40px 32px 32px, shadow-lg. --}}
-    <div class="w-full max-w-[400px] bg-white border border-neutral-200 rounded-lg pt-10 px-8 pb-8 shadow-lg">
-        <img class="block w-12 h-12 rounded-full mx-auto mb-5" src="{{ asset('Images/Zefanya-Logo.png') }}" alt="Zefanya logo" />
-        <h1 class="font-serif font-normal text-[24px] text-neutral-950 text-center">Admin Login</h1>
-        <p class="font-sans text-[13.5px] text-neutral-600 text-center mt-2">Restricted access — Zefanya staff only.</p>
+    {{-- Centered canvas — single column on mobile, split card from lg up. --}}
+    <main class="mx-auto flex min-h-screen w-full max-w-[1040px] items-center justify-center p-4 sm:p-6 lg:p-10">
 
-        @if ($errors->any())
-            <div class="mt-4 py-3 px-4 bg-[#fbe9e7] border border-[#e8a49c] rounded-sm font-sans text-[12.5px] text-[#a5333d]">{{ $errors->first() }}</div>
-        @endif
+        {{-- Login card: --bg-surface / --border / theme radius + shadow tokens.
+             Left = brand panel (lg+), right = the form. --}}
+        <div class="grid w-full overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-lg)] lg:grid-cols-[1.05fr_1fr]">
 
-        <form method="POST" action="{{ route('admin.login.post') }}">
-            @csrf>
+            {{-- ===== Brand panel — lg and up only =====
+                 Background is the theme's dashboard-hero gradient; the chips and
+                 icon discs reuse the hero chip/border tokens. --}}
+            <section class="hidden flex-col justify-between gap-10 border-r border-[var(--hero-border)] bg-[image:var(--hero-bg)] p-10 lg:flex">
 
-            {{-- design-system `.admin-login-card__label`: 11px 600 uppercase,
-                 tracking 0.8px, mb 8px mt 16px; :first-of-type mt 24px. --}}
-            <label class="block font-sans font-semibold text-[11px] tracking-[0.8px] uppercase text-neutral-600 mt-4 mb-2 first-of-type:mt-6" for="email">Email address</label>
-            {{-- design-system `.input` → utilities, 1:1: h 44px, px 16px,
-                 border var(--border-default) = neutral-300, radius-sm = 4px,
-                 focus border var(--border-focus) = primary-400,
-                 placeholder var(--text-muted) = neutral-500. --}}
-            <input class="w-full h-11 px-4 bg-white border border-neutral-300 rounded-sm font-sans text-sm text-neutral-950 transition-colors duration-200 placeholder:text-neutral-500 focus:outline-none focus:border-primary-400" type="email" name="email" id="email" value="{{ old('email') }}" required autofocus />
+                <div class="flex flex-col gap-7">
+                    <span class="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--hero-border)] bg-[var(--hero-chip-bg)] px-3.5 py-1.5">
+                        <i data-lucide="lock" width="13" height="13" class="text-[var(--link)]"></i>
+                        <span class="font-sans text-[10.5px] font-semibold uppercase tracking-[1.4px] text-[var(--text-label)]">Admin Console</span>
+                    </span>
 
-            <label class="block font-sans font-semibold text-[11px] tracking-[0.8px] uppercase text-neutral-600 mt-4 mb-2 first-of-type:mt-6" for="password">Password</label>
-            <input class="w-full h-11 px-4 bg-white border border-neutral-300 rounded-sm font-sans text-sm text-neutral-950 transition-colors duration-200 placeholder:text-neutral-500 focus:outline-none focus:border-primary-400" type="password" name="password" id="password" required />
+                    <div class="flex items-center gap-3">
+                        <img class="h-11 w-11 rounded-full" src="{{ asset('Images/Zefanya-Logo.png') }}" alt="" />
+                        <span class="flex flex-col">
+                            <span class="font-serif text-[19px] text-[var(--text-ink)]">Zefanya</span>
+                            <span class="font-sans text-[10.5px] font-semibold uppercase tracking-[1.2px] text-[var(--text-muted)]">Marketplace Administration</span>
+                        </span>
+                    </div>
 
-            <label class="flex items-center gap-2 mt-4 font-sans text-[12.5px] text-neutral-600 cursor-pointer">
-                <input type="checkbox" name="remember" class="accent-primary-700" />
-                <span>Remember me</span>
-            </label>
+                    <h1 class="font-serif text-[34px] leading-[1.15] text-[var(--text-ink)]">Run the marketplace with confidence.</h1>
+                    <p class="max-w-[44ch] font-sans text-[13.5px] leading-relaxed text-[var(--text-body)]">
+                        Review seller and logistics applications, watch orders move, and keep Zefanya
+                        running smoothly — all from one console.
+                    </p>
+                </div>
 
-            {{-- design-system `.btn .btn--inverted` → utilities, 1:1:
-                 h 44px, px 24px, radius-sm, 12.5px 600, tracking 1.4px,
-                 bg neutral-950 → hover neutral-900, color --text-inverse
-                 (#fff8f7 = cream token). --}}
-            <button class="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-sm font-sans font-semibold text-[12.5px] tracking-[1.4px] cursor-pointer bg-neutral-950 text-cream transition-colors duration-200 hover:bg-neutral-900" type="submit">LOG IN</button>
-        </form>
-    </div>
+                {{-- Static capability list (no data, no links). --}}
+                <ul class="flex flex-col gap-5">
+                    @foreach ([
+                        ['shield-check', 'Verify applications', 'Approve or reject sellers, couriers and logistics partners.'],
+                        ['layout-dashboard', 'Oversee operations', 'Orders, payments and delivery health in a single view.'],
+                        ['users', 'Support the community', 'Buyers, sellers and couriers across every region.'],
+                    ] as [$icon, $heading, $copy])
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--hero-border)] bg-[var(--hero-chip-bg)]">
+                                <i data-lucide="{{ $icon }}" width="15" height="15" class="text-[var(--link)]"></i>
+                            </span>
+                            <span class="flex flex-col gap-0.5">
+                                <span class="font-sans text-[12.5px] font-semibold text-[var(--text-ink)]">{{ $heading }}</span>
+                                <span class="font-sans text-[12px] leading-relaxed text-[var(--text-muted)]">{{ $copy }}</span>
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
 
+            {{-- ===== Form panel ===== --}}
+            <section class="flex flex-col justify-center gap-6 p-7 sm:p-10">
+
+                {{-- Compact brand row — stands in for the panel above below lg. --}}
+                <div class="flex items-center gap-3 lg:hidden">
+                    <img class="h-10 w-10 rounded-full" src="{{ asset('Images/Zefanya-Logo.png') }}" alt="Zefanya logo" />
+                    <span class="flex flex-col">
+                        <span class="font-serif text-[17px] text-[var(--text-ink)]">Zefanya</span>
+                        <span class="font-sans text-[10.5px] font-semibold uppercase tracking-[1.2px] text-[var(--text-muted)]">Admin Console</span>
+                    </span>
+                </div>
+
+                <header class="flex flex-col gap-2">
+                    <span class="font-sans text-[10.5px] font-semibold uppercase tracking-[1.4px] text-[var(--link)]">Restricted area</span>
+                    <h2 class="font-serif text-[26px] leading-tight text-[var(--text-ink)]">Admin Login</h2>
+                    <p class="font-sans text-[13px] leading-relaxed text-[var(--text-muted)]">
+                        Zefanya staff only. Sign in with your administrator credentials to continue.
+                    </p>
+                </header>
+
+                @if ($errors->any())
+                    {{-- Danger surface: --bg-error-soft / --border-error-soft / --status-danger
+                         (theme.css tokens, each with a dark value too — no raw hex). --}}
+                    <div id="adminLoginError" role="alert"
+                         class="flex items-start gap-2.5 rounded-[var(--radius-lg)] border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-4 py-3">
+                        <i data-lucide="alert-circle" width="15" height="15" class="mt-px shrink-0 text-[var(--status-danger)]"></i>
+                        <span class="font-sans text-[12.5px] font-medium text-[var(--status-danger)]">{{ $errors->first() }}</span>
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('admin.login.post') }}" class="flex flex-col gap-5">
+                    @csrf
+
+                    <div class="flex flex-col gap-2">
+                        <label for="email" class="font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-[var(--text-label)]">Email address</label>
+                        <div class="relative">
+                            <i data-lucide="mail" width="15" height="15" class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-placeholder)]"></i>
+                            <input id="email" name="email" type="email" value="{{ old('email') }}"
+                                   placeholder="you@zefanya.shop" required autofocus autocomplete="email"
+                                   @if ($errors->any()) aria-describedby="adminLoginError" @endif
+                                   class="h-11 w-full rounded-[var(--radius-lg)] border border-[var(--border-input)] bg-[var(--bg-surface)] pl-10 pr-4 font-sans text-[13.5px] text-[var(--text-ink)] transition-colors duration-150 placeholder:text-[var(--text-placeholder)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]" />
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label for="password" class="font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-[var(--text-label)]">Password</label>
+                        <div class="relative">
+                            <i data-lucide="key-round" width="15" height="15" class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-placeholder)]"></i>
+                            <input id="password" name="password" type="password" required autocomplete="current-password"
+                                   @if ($errors->any()) aria-describedby="adminLoginError" @endif
+                                   class="h-11 w-full rounded-[var(--radius-lg)] border border-[var(--border-input)] bg-[var(--bg-surface)] pl-10 pr-4 font-sans text-[13.5px] text-[var(--text-ink)] transition-colors duration-150 placeholder:text-[var(--text-placeholder)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]" />
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <label for="remember" class="inline-flex w-fit cursor-pointer items-center gap-2.5">
+                            <input id="remember" name="remember" type="checkbox"
+                                   class="h-4 w-4 cursor-pointer rounded-[3px] border border-[var(--border-input)] accent-[var(--brand)]" />
+                            <span class="font-sans text-[12.5px] text-[var(--text-body)]">Keep me signed in</span>
+                        </label>
+                        <span class="font-sans text-[11.5px] text-[var(--text-muted)]">Lost your password? Ask a fellow administrator.</span>
+                    </div>
+
+                    {{-- .admin-login__submit swaps the base layer's hardcoded blue
+                         button focus ring for a --brand one (app.css @layer base —
+                         see the note there for why it cannot live in components). --}}
+                    <button type="submit"
+                            class="admin-login__submit inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-[var(--btn-primary-bg)] px-6 font-sans text-[12.5px] font-semibold uppercase tracking-[1.4px] text-[var(--btn-primary-text)] transition-colors duration-150 hover:bg-[var(--btn-primary-bg-hover)]">
+                        <i data-lucide="log-in" width="15" height="15"></i>
+                        <span class="text-[var(--btn-primary-text)]">Log in</span>
+                    </button>
+                </form>
+
+                <p class="flex items-start gap-2 border-t border-[var(--border)] pt-5">
+                    <i data-lucide="history" width="13" height="13" class="mt-0.5 shrink-0 text-[var(--text-placeholder)]"></i>
+                    <span class="font-sans text-[11.5px] leading-relaxed text-[var(--text-muted)]">
+                        Admin accounts are created by the system owner — there is no self-service signup.
+                    </span>
+                </p>
+            </section>
+        </div>
+    </main>
+
+    {{-- Same lucide bootstrap the admin layout / seller / logistics shells use. --}}
+    <script src="{{ asset('js/lucide.min.js') }}"></script>
+    <script>
+        if (window.lucide) { lucide.createIcons(); }
+    </script>
 </body>
 </html>

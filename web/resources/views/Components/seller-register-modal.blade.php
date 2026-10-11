@@ -8,13 +8,13 @@
     Trigger: <a href="#" data-seller-register-trigger>REGISTER AS SELLER</a>
 
     Backend contract (unchanged):
-      POST {{ route('register.seller.store') }}       -> 201 { seller_id, email, verify_url }
-      POST /register/seller/verify-otp/{seller}        -> { redirect, message } | 422 { message }
-      POST /register/seller/verify-otp/{seller}/resend -> { message }
+      POST {{ route('register.seller.store') }}       -> 201 { seller_id, email }
+      POST /register/seller/verify-otp              -> { message } | 422 { message }
+      POST /register/seller/verify-otp/resend       -> { message } | 422 { message }
 
     Behavior: resources/js/seller/seller-register-modal.js
 --}}
-<div class="buyer-modal-overlay fixed inset-0 z-[999] hidden items-center justify-center bg-black/55 p-4 backdrop-blur-[2px] [&.is-open]:flex" id="sellerModalOverlay" aria-hidden="true">
+<div class="seller-modal-overlay fixed inset-0 z-[999] hidden items-center justify-center bg-black/55 p-4 backdrop-blur-[2px] [&.is-open]:flex" id="sellerModalOverlay" aria-hidden="true">
     <div class="relative max-h-[92vh] w-full max-w-[640px] overflow-y-auto rounded-lg border border-neutral-200 bg-white pb-8 pt-10 px-8 shadow-[0_24px_60px_rgba(15,23,42,0.25)] max-sm:px-6 max-sm:pt-8" role="dialog" aria-modal="true" aria-labelledby="sellerModalTitle">
 
         <button type="button" class="absolute right-4 top-4 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-[#F6DEE2] hover:text-[#7a4550]" id="sellerModalClose" aria-label="Close registration form">
@@ -69,14 +69,14 @@
 
                 <div class="mb-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
                     <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="lastName">Last name *</label>
-                        <input type="text" name="last_name" id="lastName" required value="{{ old('last_name') }}"
+                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerLastName">Last name *</label>
+                        <input type="text" name="last_name" id="sellerLastName" required value="{{ old('last_name') }}"
                                class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                         <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                     </div>
                     <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="firstName">First name *</label>
-                        <input type="text" name="first_name" id="firstName" required value="{{ old('first_name') }}"
+                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerFirstName">First name *</label>
+                        <input type="text" name="first_name" id="sellerFirstName" required value="{{ old('first_name') }}"
                                class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                         <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                     </div>
@@ -84,13 +84,13 @@
 
                 <div class="mb-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
                     <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="middleInitial">Middle initial</label>
-                        <input type="text" name="middle_initial" id="middleInitial" maxlength="2" value="{{ old('middle_initial') }}"
+                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerMiddleInitial">Middle initial</label>
+                        <input type="text" name="middle_initial" id="sellerMiddleInitial" maxlength="2" value="{{ old('middle_initial') }}"
                                class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                     </div>
                     <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sex">Sex *</label>
-                        <select name="sex" id="sex" required
+                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerSex">Sex *</label>
+                        <select name="sex" id="sellerSex" required
                                 class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                             <option value="" disabled {{ old('sex') ? '' : 'selected' }}>Select</option>
                             <option value="male" {{ old('sex') === 'male' ? 'selected' : '' }}>Male</option>
@@ -101,8 +101,8 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="email">E-mail *</label>
-                    <input type="email" name="email" id="email" required value="{{ old('email') }}"
+                    <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerEmail">E-mail *</label>
+                    <input type="email" name="email" id="sellerEmail" required value="{{ old('email') }}"
                            class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                 </div>
@@ -120,9 +120,9 @@
                         <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                     </div>
                     <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="passwordConfirmation">Confirm password *</label>
+                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerPasswordConfirmation">Confirm password *</label>
                         <div class="relative">
-                            <input type="password" name="password_confirmation" id="passwordConfirmation" placeholder="Re-enter your password" required autocomplete="new-password"
+                            <input type="password" name="password_confirmation" id="sellerPasswordConfirmation" placeholder="Re-enter your password" required autocomplete="new-password"
                                    class="h-11 w-full rounded-sm border border-neutral-300 px-4 pr-10 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                             <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors hover:text-[#9c5c68]" data-toggle-visibility="passwordConfirmation" aria-label="Show password">
                                 <i data-lucide="eye" width="16" height="16"></i>
@@ -134,8 +134,8 @@
 
                 <div class="mb-6 grid grid-cols-[1fr_2fr_70px] gap-4 max-sm:grid-cols-1">
                     <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="contactNo">Contact no. *</label>
-                        <input type="tel" name="contact_no" id="contactNo" placeholder="09XXXXXXXXX" required value="{{ old('contact_no') }}"
+                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerContactNo">Contact no. *</label>
+                        <input type="tel" name="contact_no" id="sellerContactNo" placeholder="09XXXXXXXXX" required value="{{ old('contact_no') }}" inputmode="numeric" pattern="[0-9]*"
                                class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                         <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                     </div>
@@ -147,21 +147,21 @@
                         @endphp
 
                         <div class="grid grid-cols-[1.6fr_0.5fr_0.8fr] gap-2">
-                            <select id="birthMonth" aria-label="Birth month"
+                            <select id="sellerBirthMonth" aria-label="Birth month"
                                     class="h-11 w-full min-w-0 rounded-sm border border-neutral-300 px-2 font-sans text-[13px] text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                                 <option value="" disabled selected>Month</option>
                                 @foreach(['January','February','March','April','May','June','July','August','September','October','November','December'] as $monthIndex => $monthName)
                                     <option value="{{ sprintf('%02d', $monthIndex + 1) }}" {{ $oldBirthdayParts[1] === sprintf('%02d', $monthIndex + 1) ? 'selected' : '' }}>{{ $monthName }}</option>
                                 @endforeach
                             </select>
-                            <select id="birthDay" aria-label="Birth day"
+                            <select id="sellerBirthDay" aria-label="Birth day"
                                     class="h-11 w-full min-w-0 rounded-sm border border-neutral-300 px-2 font-sans text-[13px] text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                                 <option value="" disabled selected>Day</option>
                                 @for ($d = 1; $d <= 31; $d++)
                                     <option value="{{ $d }}" {{ (int) ($oldBirthdayParts[2] ?? 0) === $d ? 'selected' : '' }}>{{ $d }}</option>
                                 @endfor
                             </select>
-                            <select id="birthYear" aria-label="Birth year"
+                            <select id="sellerBirthYear" aria-label="Birth year"
                                     class="h-11 w-full min-w-0 rounded-sm border border-neutral-300 px-2 font-sans text-[13px] text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                                 <option value="" disabled selected>Year</option>
                                 @for ($y = (int) date('Y'); $y >= 1900; $y--)
@@ -169,8 +169,8 @@
                                 @endfor
                             </select>
                         </div>
-                        <input type="hidden" name="birthday" id="birthday" value="{{ old('birthday') }}">
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="birthdayError"></span>
+                        <input type="hidden" name="birthday" id="sellerBirthday" value="{{ old('birthday') }}">
+                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="sellerBirthdayError"></span>
                     </div>
                     <div>
                         <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerAge">Age</label>

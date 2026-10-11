@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Buyer;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Voucher;
 use App\Services\CartSummary;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,6 +28,7 @@ class CartController extends Controller
             ->cartItems()
             ->with([
                 'product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category']),
+                'variant',
             ])
             ->orderBy('created_at')
             ->orderBy('id')
@@ -132,34 +134,54 @@ class CartController extends Controller
 
         $validated = $request->validate([
             'product_id' => ['required', 'integer'],
+            'variant_id' => ['nullable', 'integer'],
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
         // `status = active` + the SoftDeletes default scope already excludes
-        // drafts and deleted products; stock must also be positive, otherwise
-        // an out-of-stock product would create a quantity-0 cart line.
+        // drafts and deleted products.
         $product = Product::where('status', 'active')
-            ->where('stock_quantity', '>', 0)
             ->find($validated['product_id']);
 
         if (! $product) {
             return response()->json(['error' => 'This product is not available.'], 422);
         }
 
+        // Resolve the variant: legacy single-SKU products have exactly one
+        // auto Default variant — cart lines still target it so stock is
+        // always checked/written against a variant row.
+        $variant = ProductVariant::query()
+            ->where('product_id', $product->id)
+            ->when(
+                ! empty($validated['variant_id']),
+                fn ($q) => $q->where('id', $validated['variant_id']),
+                fn ($q) => $q->orderBy('id'),
+            )
+            ->first();
+
+        $variantId = $variant?->id;
+        $stockCeiling = $variant?->stock_quantity ?? $product->stock_quantity;
+
+        if (! $variant || ! $variant->is_available || $stockCeiling <= 0) {
+            return response()->json(['error' => 'This product is not available.'], 422);
+        }
+
         $buyer = auth('buyer')->user();
 
         // Read-merge-write inside a transaction with a row lock. This protects
-        // the unique(buyer_id, product_id) constraint from concurrent adds.
-        // NOTE: this never touches products.stock_quantity — a cart is not a
+        // the unique(buyer_id, product_id, variant_id) constraint from
+        // concurrent adds.
+        // NOTE: this never touches variant/product stock — a cart is not a
         // stock reservation, so no inventory_transactions row is written here.
-        $cartCount = DB::transaction(function () use ($buyer, $product, $validated): int {
+        $cartCount = DB::transaction(function () use ($buyer, $product, $variantId, $stockCeiling, $validated): int {
             $existing = CartItem::where('buyer_id', $buyer->id)
                 ->where('product_id', $product->id)
+                ->where('variant_id', $variantId)
                 ->lockForUpdate()
                 ->first();
 
             $requested = (int) $validated['quantity'];
-            $newQty = min(($existing?->quantity ?? 0) + $requested, $product->stock_quantity);
+            $newQty = min(($existing?->quantity ?? 0) + $requested, $stockCeiling);
 
             if ($existing !== null) {
                 $existing->update(['quantity' => $newQty]);
@@ -167,14 +189,24 @@ class CartController extends Controller
                 CartItem::create([
                     'buyer_id' => $buyer->id,
                     'product_id' => $product->id,
-                    'quantity' => min($requested, $product->stock_quantity),
+                    'variant_id' => $variantId,
+                    'quantity' => min($requested, $stockCeiling),
                 ]);
             }
 
             return (int) CartItem::where('buyer_id', $buyer->id)->sum('quantity');
         });
 
-        return response()->json(['success' => true, 'cart_count' => $cartCount]);
+        // Calculate price: use variant price if available, else product price
+        $priceCentavos = $variant?->price_minor ?? $product->price_minor ?? 0;
+        $formattedPrice = '₱'.number_format($priceCentavos / 100, 2);
+
+        return response()->json([
+            'success' => true,
+            'cart_count' => $cartCount,
+            'product_name' => $product->name,
+            'product_price' => $formattedPrice,
+        ]);
     }
 
     // ── update (PATCH /buyer/cart/{id}) ──────────────────────────────────────
@@ -197,12 +229,12 @@ class CartController extends Controller
             return response()->json(['error' => 'This product no longer exists.'], 422);
         }
 
-        if ($product->trashed() || $product->status !== 'active' || $product->stock_quantity <= 0) {
+        if (! $item->isAvailable()) {
             return response()->json(['error' => 'This item is no longer available.'], 422);
         }
 
         $item->update([
-            'quantity' => min((int) $validated['quantity'], $product->stock_quantity),
+            'quantity' => min((int) $validated['quantity'], $item->availableQuantity()),
         ]);
 
         $item->refresh();
@@ -264,6 +296,39 @@ class CartController extends Controller
         return $this->summaryResponse($this->loadItems(), $this->selectedIdsFrom($request));
     }
 
+    // ── miniCart (GET /buyer/cart/mini — for the navbar dropdown) ────────────
+
+    public function miniCart(Request $request): JsonResponse
+    {
+        $items = $this->loadItems();
+        $voucher = $this->resolveVoucher((new CartSummary($items))->subtotalCentavos);
+        $summary = new CartSummary($items, $voucher);
+
+        $itemsData = $items->map(fn (CartItem $item) => [
+            'id' => $item->id,
+            'name' => $item->product?->name ?? '(Deleted)',
+            'price' => $item->product?->formattedPrice() ?? '0.00',
+            'price_centavos' => $item->product?->price * 100 ?? 0,
+            'quantity' => $item->quantity,
+            'variant' => $item->variant?->name ?? null,
+            'image_url' => $item->product?->images?->first()?->path
+                ? asset('storage/'.$item->product->images->first()->path)
+                : null,
+            'is_available' => $item->isAvailable(),
+        ]);
+
+        return response()->json([
+            'items' => $itemsData,
+            'count' => (int) $items->sum('quantity'),
+            'subtotal' => $summary->formattedSubtotal(),
+            'subtotal_centavos' => $summary->subtotalCentavos,
+            'total' => $summary->formattedTotal(),
+            'total_centavos' => $summary->totalCentavos,
+            'has_items' => $items->isNotEmpty(),
+            'checkout_url' => route('buyer.checkout.index'),
+        ]);
+    }
+
     // ── applyVoucher (POST /buyer/cart/voucher) ───────────────────────────────
 
     public function applyVoucher(Request $request): JsonResponse
@@ -306,5 +371,72 @@ class CartController extends Controller
         $summary = new CartSummary($this->loadItems(), null, $this->selectedIdsFrom($request));
 
         return response()->json(array_merge($summary->toJson(), ['removed' => true]));
+    }
+
+    /**
+     * "Buy Now" from the PDP: park exactly ONE cart line for this item and
+     * return the checkout URL scoped to it, so the rest of the cart is never
+     * pulled into the order. Quantity is SET (not added).
+     */
+    public function buyNow(Request $request): JsonResponse
+    {
+        $buyer = auth('buyer')->user();
+
+        $data = $request->validate([
+            'product_id' => ['required', 'integer'],
+            'variant_id' => ['nullable', 'integer'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:99'],
+        ]);
+
+        $product = Product::query()->with('variants')->find($data['product_id']);
+
+        if ($product === null || $product->status !== 'active') {
+            return response()->json(['success' => false, 'message' => 'This product is no longer available.'], 422);
+        }
+
+        if ($product->hasVariants()) {
+            $variant = $product->variants->firstWhere('id', $data['variant_id'] ?? 0);
+
+            if ($variant === null) {
+                return response()->json(['success' => false, 'message' => 'Please choose an option first.'], 422);
+            }
+        } else {
+            $variant = $product->variants->sortBy('id')->first();
+        }
+
+        $item = $buyer->cartItems()
+            ->where('product_id', $product->id)
+            ->when(
+                $variant !== null,
+                fn ($q) => $q->where(fn ($w) => $w
+                    ->where('variant_id', $variant->id)
+                    ->when(! $product->hasVariants(), fn ($w2) => $w2->orWhereNull('variant_id'))),
+                fn ($q) => $q->whereNull('variant_id'),
+            )
+            ->first() ?? new CartItem([
+                'buyer_id' => $buyer->id,
+                'product_id' => $product->id,
+                'quantity' => 1,
+            ]);
+
+        $item->variant_id = $variant?->id;
+        $item->setRelation('product', $product);
+        $item->setRelation('variant', $variant);
+
+        $ceiling = $item->availableQuantity();
+
+        if (! $item->isAvailable() || $ceiling < 1) {
+            return response()->json(['success' => false, 'message' => 'Sorry, this item is out of stock.'], 422);
+        }
+
+        $item->quantity = min($data['quantity'], $ceiling);
+        $item->save();
+
+        return response()->json([
+            'success' => true,
+            'redirect' => route('buyer.checkout.index', ['items' => [$item->id]]),
+            'cart_count' => (int) CartItem::query()->where('buyer_id', $buyer->id)->sum('quantity'),
+            'capped' => $item->quantity < $data['quantity'],
+        ]);
     }
 }

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Buyer\Buyer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 
 class LoginController extends Controller
 {
@@ -26,7 +26,7 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $buyer = \App\Models\Buyer\Buyer::where('email', $credentials['email'])->first();
+        $buyer = Buyer::where('email', $credentials['email'])->first();
 
         // Distinguish "wrong password" from "right password, wrong status"
         // so the person knows what's actually blocking them.

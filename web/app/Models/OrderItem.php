@@ -14,6 +14,7 @@ class OrderItem extends Model
     protected $fillable = [
         'seller_order_id',
         'product_id',
+        'variant_id',
         'product_name',
         'quantity',
         'price_minor',
@@ -44,6 +45,15 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * The variant that was purchased. NULL on legacy order lines — an
+     * immutable snapshot may legitimately predate variants.
+     */
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

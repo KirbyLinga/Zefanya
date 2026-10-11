@@ -25,10 +25,10 @@
             'items' => [
                 ['route' => null, 'icon' => 'users', 'label' => 'Rider Management'],
                 ['route' => null, 'icon' => 'clipboard-check', 'label' => 'Courier Applications'],
-                ['route' => null, 'icon' => 'inbox', 'label' => 'Incoming Parcels'],
-                ['route' => null, 'icon' => 'archive', 'label' => 'Parcel Sorting'],
-                ['route' => null, 'icon' => 'map-pin', 'label' => 'Delivery Assignment'],
-                ['route' => null, 'icon' => 'activity', 'label' => 'Delivery Monitoring'],
+                ['route' => 'logistics.incoming-parcels.index', 'icon' => 'inbox', 'label' => 'Incoming Parcels'],
+                ['route' => 'logistics.parcel-sorting.index', 'icon' => 'archive', 'label' => 'Parcel Sorting'],
+                ['route' => 'logistics.delivery-assignments.index', 'icon' => 'map-pin', 'label' => 'Delivery Assignment'],
+                ['route' => 'logistics.delivery-monitoring.index', 'icon' => 'activity', 'label' => 'Delivery Monitoring'],
             ],
         ],
         [

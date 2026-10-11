@@ -7,7 +7,6 @@ use App\Http\Requests\Buyer\StoreBuyerRegistrationRequest;
 use App\Models\Buyer\Buyer;
 use App\Notifications\Buyer\BuyerVerifyOtp;
 use Carbon\Carbon;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
@@ -65,11 +64,9 @@ class RegisterBuyerController extends Controller
                 'ok' => true,
                 'buyer_id' => $buyer->id,
                 'email' => $buyer->email,
-                'verify_url' => route('register.buyer.verify-otp.form', $buyer),
             ]);
         }
 
-        return redirect()->route('register.buyer.verify-otp.form', $buyer);
+        return redirect()->route('register.buyer.check-email');
     }
 }
-

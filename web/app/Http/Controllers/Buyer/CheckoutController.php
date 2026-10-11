@@ -9,14 +9,17 @@ use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
 use App\Models\CartItem;
+use App\Models\CheckoutToken;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SellerOrder;
 use App\Models\Voucher;
 use App\Services\CartSummary;
+use App\Support\RuntimeSchema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +30,9 @@ class CheckoutController extends Controller
 {
     /** Session key holding the ids checkout is allowed to see. */
     public const SESSION_KEY = 'checkout_item_ids';
+
+    /** Session key for the one-time checkout form token. */
+    public const TOKEN_KEY = 'checkout_form_token';
 
     /**
      * Show checkout for the buyer's SELECTED cart items.
@@ -39,13 +45,13 @@ class CheckoutController extends Controller
      * NOTE: the checkout screen itself is still a stub — this only resolves and
      * parks the selection (query + session) so the UI phase can build on it.
      */
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $buyer = auth('buyer')->user();
 
         /** @var Collection<int, CartItem> $items */
         $items = $buyer->cartItems()
-            ->with(['product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category'])])
+            ->with(['product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category']), 'variant'])
             ->orderBy('created_at')
             ->orderBy('id')
             ->get();
@@ -64,10 +70,25 @@ class CheckoutController extends Controller
             );
 
             $selectedIds = $available->whereIn('id', $requested)->pluck('id')->all();
+
+            // The buyer (or a stale/tampered link) asked for specific items but
+            // NONE of them resolved to this buyer's available cart lines — the
+            // page would otherwise render a dead-end ₱0.00 checkout. Send them
+            // back to the cart with an explanation instead.
+            if ($requested !== [] && $selectedIds === []) {
+                return redirect()->route('buyer.cart.index')
+                    ->with('error', 'The items you selected are no longer in your cart. Please review your cart and try again.');
+            }
         }
 
         // Park the resolved selection for the future checkout.store step.
         session([self::SESSION_KEY => $selectedIds ?? $available->pluck('id')->all()]);
+
+        // One-time form token against double-submits: stored in the session
+        // AND the checkout_tokens table; placeOrder() consumes it inside the
+        // order transaction, so a double-clicked second POST is rejected.
+        $checkoutToken = CheckoutToken::issue($buyer->id);
+        session([self::TOKEN_KEY => $checkoutToken->token]);
 
         $voucherNotice = null;
         $voucher = Voucher::resolveCode(
@@ -79,10 +100,12 @@ class CheckoutController extends Controller
         $summary = new CartSummary($items, $voucher, $selectedIds);
 
         return view('Buyer.Checkout.index', [
+            'buyer' => $buyer,
             'items' => $available,
             'summary' => $summary,
             'voucher' => $voucher,
             'voucherNotice' => $voucherNotice,
+            'checkoutToken' => $checkoutToken->token,
         ]);
     }
 
@@ -105,12 +128,17 @@ class CheckoutController extends Controller
                 ->with('error', 'Your checkout selection is empty. Please select items in your cart first.');
         }
 
+        // The form token from the rendered checkout page. Consumed INSIDE the
+        // order transaction (see placeOrder) so only the first of two racing
+        // requests creates an order.
+        $formToken = (string) $request->input('checkout_token', session(self::TOKEN_KEY, ''));
+
         // Re-resolve from the LIVE cart: a parked id may have been removed in
         // another tab, and ownership is re-asserted by scoping to the buyer's
         // own cart rows (a tampered id can never check out someone else's line).
         /** @var Collection<int, CartItem> $items */
         $items = $buyer->cartItems()
-            ->with(['product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category'])])
+            ->with(['product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category']), 'variant'])
             ->whereIn('id', $parkedIds)
             ->get()
             ->keyBy('id');
@@ -134,8 +162,8 @@ class CheckoutController extends Controller
                 continue;
             }
 
-            if ($item->quantity > $product->stock_quantity) {
-                $problems[] = "{$product->name} (only {$product->stock_quantity} left)";
+            if ($item->quantity > $item->availableQuantity()) {
+                $problems[] = "{$product->name} (only {$item->availableQuantity()} left)";
             }
         }
 
@@ -154,7 +182,7 @@ class CheckoutController extends Controller
         $summary = new CartSummary($items, $voucher, null);
 
         try {
-            $order = $this->placeOrder($buyer, $items, $summary);
+            $order = $this->placeOrder($buyer, $items, $summary, $formToken);
         } catch (CheckoutException $e) {
             return redirect()->route('buyer.cart.index')->with('error', $e->getMessage());
         }
@@ -164,7 +192,7 @@ class CheckoutController extends Controller
         // left in the cart survives for the next checkout.
         $buyer->cartItems()->whereIn('id', $parkedIds)->delete();
 
-        session()->forget([self::SESSION_KEY, 'cart_voucher']);
+        session()->forget([self::SESSION_KEY, 'cart_voucher', self::TOKEN_KEY]);
 
         $redirect = redirect()->route('buyer.checkout.success', $order);
 
@@ -182,13 +210,32 @@ class CheckoutController extends Controller
      *
      * @param  Collection<int, CartItem>  $items  The buyer's validated selection
      */
-    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary): Order
+    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null): Order
     {
-        return DB::transaction(function () use ($buyer, $items, $summary): Order {
-            // Lock the product rows in a stable order (id order avoids
-            // deadlocks between concurrent checkouts) and re-validate stock
-            // UNDER THE LOCK — the pre-transaction check is advisory; this is
-            // the authoritative gate.
+        return DB::transaction(function () use ($buyer, $items, $summary, $formToken): Order {
+            // ONE-TIME TOKEN GUARD (double-submit): claim the token first,
+            // inside this transaction, via a conditional UPDATE. On a
+            // double-click the second request finds used=1 already and gets
+            // bounced — no second order, no double stock decrement.
+            //
+            // Enforced only when a token is PRESENTED (the rendered form always
+            // sends one; the controller also falls back to the session-parked
+            // token). Requests predating the tokens table — or the migration
+            // not yet having been run — pass through unguarded, so the live
+            // site works both before and after 2026_09_28_000001 runs.
+            if ($formToken !== null
+                && $formToken !== ''
+                && RuntimeSchema::hasTable('checkout_tokens')
+                && ! CheckoutToken::claim($buyer->id, $formToken)) {
+                throw new CheckoutException(
+                    'This order was already placed. Please review your cart — your items are no longer pending checkout.'
+                );
+            }
+
+            // Lock the product AND variant rows in a stable order (id order
+            // avoids deadlocks between concurrent checkouts) and re-validate
+            // stock UNDER THE LOCK — the pre-transaction check is advisory;
+            // this is the authoritative gate.
             $lockedProducts = Product::query()
                 ->whereIn('id', $items->pluck('product_id')->unique()->values())
                 ->orderBy('id')
@@ -196,15 +243,39 @@ class CheckoutController extends Controller
                 ->get()
                 ->keyBy('id');
 
+            $lockedVariants = ProductVariant::query()
+                ->whereIn('id', $items->pluck('variant_id')->filter()->unique()->values())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
             foreach ($items as $item) {
                 $product = $lockedProducts->get($item->product_id);
+                $variant = $item->variant_id !== null ? $lockedVariants->get($item->variant_id) : null;
 
-                if ($product === null || $product->trashed()
-                    || $product->status !== 'active'
-                    || $product->stock_quantity < $item->quantity) {
+                if ($product === null || $product->trashed() || $product->status !== 'active'
+                    || ($variant !== null && ! $variant->is_available)
+                    || $item->availableQuantity() < $item->quantity) {
                     throw new CheckoutException(
                         'Some items just went out of stock while placing your order. Please review your cart and try again.'
                     );
+                }
+
+                // Normalization: every cart line must decrement a VARIANT.
+                // Legacy lines (created before variants) target the product's
+                // auto Default variant (lowest id).
+                if ($variant === null) {
+                    $variant = ProductVariant::query()
+                        ->where('product_id', $product->id)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($variant !== null) {
+                        $lockedVariants->put($variant->id, $variant);
+                        $item->setRelation('variant', $variant);
+                    }
                 }
             }
 
@@ -247,15 +318,19 @@ class CheckoutController extends Controller
                 foreach ($group['items'] as $item) {
                     /** @var Product $product */
                     $product = $item->product;
+                    $variant = $item->variant;
 
                     OrderItem::query()->create([
                         'seller_order_id' => $sellerOrder->id,
                         'product_id' => $product->id,
+                        'variant_id' => $variant?->id,
                         'product_name' => $product->name,
                         'quantity' => $item->quantity,
-                        // Price snapshot at order time (CartSummary uses the
-                        // same source, so totals and lines always agree).
-                        'price_minor' => (int) bcmul((string) $product->price, '100', 0),
+                        // Price snapshot at order time — the variant's price
+                        // when the line targets one, otherwise the product
+                        // rollup (CartSummary uses the same source, so totals
+                        // and lines always agree).
+                        'price_minor' => $item->unitPriceCentavos(),
                     ]);
 
                     $sellerOrderIdsByCartItemId[$item->id] = $sellerOrder->id;
@@ -270,25 +345,28 @@ class CheckoutController extends Controller
                 ])->save();
             }
 
-            // Decrement stock + write the append-only ledger, still under the
-            // same row locks, inside the same transaction.
+            // Decrement VARIANT stock + write the append-only ledger, still
+            // under the same row locks, inside the same transaction. The
+            // products.stock rollup is refreshed once per touched product.
             foreach ($items as $item) {
-                /** @var Product $product */
-                $product = $lockedProducts->get($item->product_id);
-                $before = (int) $product->stock_quantity;
+                $variant = $item->variant;
+                $before = (int) $variant->stock_quantity;
 
-                $product->stock_quantity = $before - $item->quantity;
-                $product->save();
+                $variant->stock_quantity = $before - $item->quantity;
+                $variant->save();
 
                 InventoryTransaction::query()->create([
-                    'product_id' => $product->id,
+                    'product_id' => $variant->product_id,
                     'seller_order_id' => $sellerOrderIdsByCartItemId[$item->id],
+                    'variant_id' => $variant->id,
                     'quantity_before' => $before,
-                    'quantity_after' => $product->stock_quantity,
+                    'quantity_after' => $variant->stock_quantity,
                     'delta' => -$item->quantity,
                     'reason' => 'checkout',
                 ]);
             }
+
+            Product::syncRollupsForProducts($items->pluck('product_id'));
 
             return $order;
         });
@@ -334,6 +412,45 @@ class CheckoutController extends Controller
         }
 
         return $allocated;
+    }
+
+    /**
+     * Normalize phone number formats (strip formatting, return consistent format).
+     */
+    private function normalizePhoneNumber(?string $phone): ?string
+    {
+        if (! $phone) {
+            return null;
+        }
+
+        // Remove spaces, hyphens, parentheses
+        $phone = preg_replace('/[\s\-()]/u', '', $phone);
+
+        // If starts with +63, replace with 0
+        if (str_starts_with($phone, '+63')) {
+            return '0'.substr($phone, 3);
+        }
+
+        // If starts with 63 (without +), replace with 0
+        if (str_starts_with($phone, '63')) {
+            return '0'.substr($phone, 2);
+        }
+
+        return $phone;
+    }
+
+    /**
+     * Build a full address string from saved address components.
+     */
+    private function buildAddressString(Buyer $buyer): string
+    {
+        $parts = array_filter([
+            $buyer->house_number,
+            $buyer->street,
+            $buyer->barangay_name,
+        ]);
+
+        return implode(', ', $parts);
     }
 
     /**

@@ -3,8 +3,16 @@
 namespace App\Providers;
 
 use App\Models\CartItem;
+use App\Models\Order;
+use App\Models\SellerOrder;
+use App\Models\Shared\Category;
+use App\Models\Wishlist;
+use App\Policies\BuyerOrderPolicy;
+use App\Policies\SellerOrderFleetPolicy;
+use App\Policies\SellerOrderPolicy;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -26,6 +34,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ── Policies for the order flow (Slice 1) ───────────────────────────
+        // BuyerOrderPolicy / SellerOrderFleetPolicy don't match Laravel's
+        // auto-discovery naming (Order → OrderPolicy), so they are registered
+        // explicitly. The fleet policy is exposed as a named ability because
+        // a model can only carry ONE policy and SellerOrder's is the owner's.
+        Gate::policy(Order::class, BuyerOrderPolicy::class);
+        Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
+        Gate::define('advance-shipment', [SellerOrderFleetPolicy::class, 'advance']);
+
         // In production every generated URL (routes, assets, pagination, password
         // resets) must be https — proxy headers alone are not guaranteed when the
         // app sits behind a load balancer that terminates TLS.
@@ -58,6 +75,9 @@ class AppServiceProvider extends ServiceProvider
         // include's own data. Guests short-circuit before any query runs.
         View::composer('Components.navbar', function (ViewInstance $view): void {
             $view->with('cartCount', $this->buyerCartCount());
+            $view->with('wishlistCount', $this->buyerWishlistCount());
+            $view->with('unreadNotificationCount', $this->buyerUnreadNotificationCount());
+            $view->with('categories', $this->getCategories());
         });
     }
 
@@ -77,5 +97,46 @@ class AppServiceProvider extends ServiceProvider
         return (int) CartItem::query()
             ->where('buyer_id', Auth::guard('buyer')->id())
             ->sum('quantity');
+    }
+
+    /**
+     * Total count of the authenticated buyer's wishlist items.
+     * 0 for guests.
+     */
+    private function buyerWishlistCount(): int
+    {
+        if (! Auth::guard('buyer')->check()) {
+            return 0;
+        }
+
+        return (int) Wishlist::query()
+            ->where('buyer_id', Auth::guard('buyer')->id())
+            ->count();
+    }
+
+    /**
+     * Count of unread database notifications for the authenticated buyer.
+     * 0 for guests.
+     */
+    private function buyerUnreadNotificationCount(): int
+    {
+        if (! Auth::guard('buyer')->check()) {
+            return 0;
+        }
+
+        return (int) Auth::guard('buyer')->user()
+            ->unreadNotifications()
+            ->count();
+    }
+
+    /**
+     * Get all categories for the navbar dropdown.
+     * Returns collection of categories ordered by ID.
+     */
+    private function getCategories()
+    {
+        return Category::query()
+            ->orderBy('id')
+            ->get(['id', 'label']);
     }
 }

@@ -25,6 +25,26 @@
     $regGridValue = 'font-sans font-semibold text-[13.5px] text-neutral-950';
     $regIdLink = 'inline-flex items-center gap-2 font-sans font-semibold text-[13px] text-primary-800 underline';
     $regBtn = 'inline-flex items-center justify-center gap-2 h-11 px-6 rounded-sm font-sans font-semibold text-[12.5px] tracking-[1px] cursor-pointer transition-colors duration-200';
+
+    // Registry filter chips (All / Buyer / Seller / Logistics) + search box.
+    // Active and idle chips get DIFFERENT complete class strings so no two
+    // same-property utilities (e.g. two hover:text-*) ever compete.
+    $regChip = 'inline-flex items-center gap-1.5 rounded-full border px-2 py-1.5 font-sans text-[10.5px] font-semibold uppercase tracking-[0.5px] no-underline transition-colors duration-150';
+    $regChipIdle = 'border-[#e8e2e0] text-muted-ink hover:bg-blush hover:text-primary-800';
+    $regChipActive = 'border-primary-800 bg-primary-800 text-white';
+    $regChipCount = 'inline-flex min-w-[16px] h-4 items-center justify-center rounded-full px-1 font-sans text-[10px] font-bold';
+    $regChipCountIdle = 'bg-blush text-primary-800';
+    $regChipCountActive = 'bg-white/25 text-white';
+
+    // Carried by every link in the left panel so clicking a chip, a search
+    // result or an applicant never drops the admin back to the unfiltered
+    // queue. (Changing filter/search resets the open detail panel on purpose —
+    // you then pick from the list you just asked for.)
+    $listParams = array_filter([
+        'filter' => $filter === 'all' ? null : $filter,
+        'q' => $q !== '' ? $q : null,
+    ]);
+    $total = array_sum($counts);
 @endphp
 
 @if (session('success'))
@@ -44,8 +64,50 @@
             <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 bg-primary-800 text-white font-sans font-bold text-[11.5px] rounded-full">{{ $pending->count() }}</span>
         </div>
 
+        {{-- Search — plain GET form (?q=), no JS. The hidden filter input keeps
+             the active registry when the term is resubmitted. --}}
+        <form method="GET" action="{{ route('admin.registrations.index') }}" class="mb-3">
+            @if ($filter !== 'all')
+                <input type="hidden" name="filter" value="{{ $filter }}">
+            @endif
+
+            <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                    <i data-lucide="search" width="14" height="14" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-ink"></i>
+                    <input type="search" name="q" id="registrationSearch" value="{{ $q }}"
+                           placeholder="Search name, email, contact…"
+                           aria-label="Search pending registrations"
+                           class="h-9 w-full rounded-sm border border-[#e8e2e0] bg-white pl-8 pr-3 font-sans text-[12.5px] text-neutral-950 placeholder:text-muted-ink focus:border-primary-400 focus:outline-none" />
+                </div>
+                <button type="submit" class="h-9 shrink-0 rounded-sm bg-neutral-950 px-3.5 font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-white transition-colors duration-150 hover:bg-primary-800">Search</button>
+            </div>
+
+            @if ($q !== '')
+                <a href="{{ route('admin.registrations.index', array_filter(['filter' => $filter === 'all' ? null : $filter])) }}"
+                   class="mt-2 inline-flex items-center gap-1 font-sans text-[11px] text-primary-800 underline">
+                    <i data-lucide="x" width="12" height="12"></i>
+                    Clear search
+                </a>
+            @endif
+        </form>
+
+        {{-- Registry filter chips (?filter=buyer|seller|logistics) with the
+             match count per registry under the current search. --}}
+        <div class="mb-3 flex flex-wrap gap-1.5">
+            @foreach (['all' => 'All', 'buyer' => 'Buyer', 'seller' => 'Seller', 'logistics' => 'Logistics'] as $chipKey => $chipLabel)
+                <a href="{{ route('admin.registrations.index', array_filter([
+                        'filter' => $chipKey === 'all' ? null : $chipKey,
+                        'q' => $q !== '' ? $q : null,
+                    ])) }}"
+                   class="{{ $filter === $chipKey ? "$regChip $regChipActive" : "$regChip $regChipIdle" }}">
+                    {{ $chipLabel }}
+                    <span class="{{ $regChipCount }} {{ $filter === $chipKey ? $regChipCountActive : $regChipCountIdle }}">{{ $chipKey === 'all' ? $total : $counts[$chipKey] }}</span>
+                </a>
+            @endforeach
+        </div>
+
         @forelse ($pending as $applicant)
-            <a href="{{ route('admin.registrations.index', ['view' => $applicant->id, 'type' => $applicant->type]) }}"
+            <a href="{{ route('admin.registrations.index', array_merge(['view' => $applicant->id, 'type' => $applicant->type], $listParams)) }}"
                class="{{ $regItem }} {{ $selected && $selected->id == $applicant->id && $selectedType === $applicant->type ? $regItemActive : '' }}">
                 <div class="{{ $regAvatar }}">
                     {{ strtoupper(substr($applicant->model->first_name, 0, 1)) }}{{ strtoupper(substr($applicant->model->last_name, 0, 1)) }}
@@ -59,8 +121,16 @@
         @empty
             {{-- my-[13px] re-states the UA `margin: 1em 0` the preflight
                  removes (13px font) — fidelity, not decoration. --}}
-            <p class="px-2 py-6 text-center font-sans text-[13px] text-muted-ink my-[13px]">No pending registrations right now.</p>
-        @endforelse>
+            <p class="px-2 py-6 text-center font-sans text-[13px] text-muted-ink my-[13px]">
+                @if ($q !== '')
+                    No pending registrations match &ldquo;{{ $q }}&rdquo;.
+                @elseif ($filter !== 'all')
+                    No pending {{ $filter }} registrations right now.
+                @else
+                    No pending registrations right now.
+                @endif
+            </p>
+        @endforelse
     </div>
 
     {{-- ===== Right: detail panel ===== --}}
@@ -159,24 +229,24 @@
                 {{-- Bare div: `.reg-detail__documents` never had a CSS rule. --}}
                 @if ($isSeller || $isLogistics)
                     <div>
-                        <a href="{{ Storage::url($selected->upload_id_path) }}" target="_blank" class="{{ $regIdLink }}">
+                        <a href="{{ route('admin.documents.stream', ['type' => $selectedType, 'id' => $selected->id, 'document' => 'id']) }}" target="_blank" class="{{ $regIdLink }}">
                             <i data-lucide="file-text" width="16" height="16"></i>
                             View uploaded ID
                         </a>
                         @if ($isSeller)
-                            <a href="{{ Storage::url($selected->business_permit_path) }}" target="_blank" class="{{ $regIdLink }}">
+                            <a href="{{ route('admin.documents.stream', ['type' => 'seller', 'id' => $selected->id, 'document' => 'business_permit']) }}" target="_blank" class="{{ $regIdLink }}">
                                 <i data-lucide="file-text" width="16" height="16"></i>
                                 View business permit
                             </a>
                         @else
-                            <a href="{{ Storage::url($selected->dti_permit_path) }}" target="_blank" class="{{ $regIdLink }}">
+                            <a href="{{ route('admin.documents.stream', ['type' => 'logistics', 'id' => $selected->id, 'document' => 'dti_permit']) }}" target="_blank" class="{{ $regIdLink }}">
                                 <i data-lucide="file-text" width="16" height="16"></i>
                                 View DTI permit
                             </a>
                         @endif
                     </div>
                 @else
-                    <a href="{{ Storage::url($selected->upload_id_path) }}" target="_blank" class="{{ $regIdLink }}">
+                    <a href="{{ route('admin.documents.stream', ['type' => 'buyer', 'id' => $selected->id, 'document' => 'id']) }}" target="_blank" class="{{ $regIdLink }}">
                         <i data-lucide="file-text" width="16" height="16"></i>
                         View uploaded ID
                     </a>

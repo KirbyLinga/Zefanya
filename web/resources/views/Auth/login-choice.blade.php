@@ -4,7 +4,7 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Login — Zefanya</title>
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/css/login-modal.css'])
     </head>
     <body class="flex items-center justify-center min-h-screen bg-gray-50">
         <div class="w-full max-w-md">

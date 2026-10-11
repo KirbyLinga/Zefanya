@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,4 +30,10 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/registrations/seller/{seller}/reject', [RegistrationController::class, 'rejectSeller'])->name('registrations.seller.reject');
     Route::post('/registrations/logistics/{logistics_provider}/approve', [RegistrationController::class, 'approveLogistics'])->name('registrations.logistics.approve');
     Route::post('/registrations/logistics/{logistics_provider}/reject', [RegistrationController::class, 'rejectLogistics'])->name('registrations.logistics.reject');
+
+    // Admin-only document streaming from private disk
+    Route::get('/documents/{type}/{id}/{document}', [DocumentController::class, 'stream'])
+        ->name('documents.stream')
+        ->where('type', 'seller|logistics|buyer')
+        ->where('document', 'id|business_permit|dti_permit');
 });

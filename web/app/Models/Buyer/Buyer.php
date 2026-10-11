@@ -3,6 +3,8 @@
 namespace App\Models\Buyer;
 
 use App\Models\CartItem;
+use App\Models\Conversation;
+use App\Models\Wishlist;
 use Database\Factories\BuyerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -37,6 +39,7 @@ class Buyer extends Authenticatable
         'email_verification_code',
         'email_verification_expires_at',
         'status',
+        'settings',
     ];
 
     protected $hidden = [
@@ -53,6 +56,7 @@ class Buyer extends Authenticatable
             'email_verification_expires_at' => 'datetime',
             'approved_at' => 'datetime',
             'password' => 'hashed',
+            'settings' => 'json',
         ];
     }
 
@@ -83,6 +87,16 @@ class Buyer extends Authenticatable
     public function cartItems(): HasMany
     {
         return $this->hasMany(CartItem::class);
+    }
+
+    public function wishlist(): HasMany
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
     }
 
     public function isVerificationLinkExpired(): bool

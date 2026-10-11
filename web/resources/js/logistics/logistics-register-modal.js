@@ -313,6 +313,21 @@ document.addEventListener('DOMContentLoaded', function () {
         dtiPermitName.textContent = dtiPermitInput.files.length ? dtiPermitInput.files[0].name : 'Choose a DTI permit';
     });
 
+    // ===== Contact number: numeric input only =====
+    var logisticsContactNo = document.getElementById('logisticsContactNo');
+    if (logisticsContactNo) {
+        logisticsContactNo.addEventListener('input', function () {
+            // Remove any non-digit characters
+            this.value = this.value.replace(/\D/g, '');
+        });
+        logisticsContactNo.addEventListener('keypress', function (e) {
+            // Prevent non-numeric characters from being typed
+            if (!/\d/.test(String.fromCharCode(e.which))) {
+                e.preventDefault();
+            }
+        });
+    }
+
     // ===== Password visibility toggles =====
     document.querySelectorAll('#logisticsRegisterForm [data-toggle-visibility]').forEach(function (btn) {
         btn.addEventListener('click', function () {

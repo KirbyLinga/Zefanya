@@ -24,28 +24,45 @@ class NavbarTest extends TestCase
     }
 
     /**
-     * An authenticated buyer visiting the landing page sees their account
-     * dropdown, not the Login / Register links.
-     * The landing layout uses variant='landing', which now checks the buyer
-     * guard the same way variant='buyer' does.
+     * The landing page is PUBLIC ONLY: an authenticated buyer is sent to their
+     * own home (buyer.home, rendered with navbar variant 'buyer'). The redirect
+     * is plain — the session must survive it, so the buyer is still
+     * authenticated afterwards.
      */
-    public function test_signed_in_buyer_sees_account_dropdown_on_landing_page(): void
+    public function test_authenticated_buyer_is_redirected_from_landing_to_buyer_home(): void
     {
-        $buyer = Buyer::factory()->create(['first_name' => 'Ben', 'last_name' => 'Dela Cruz']);
+        $buyer = Buyer::factory()->create();
 
         $this->actingAs($buyer, 'buyer')
             ->get(route('home'))
-            ->assertOk()
-            ->assertSee('js-account-toggle', false)
-            ->assertSee('accountDropdown', false)
-            ->assertSee('Ben Dela Cruz')
-            ->assertSee('Logout');
+            ->assertRedirect(route('buyer.home'));
+
+        $this->assertAuthenticatedAs($buyer, 'buyer');
     }
 
     /**
-     * A logged-in Seller visiting the landing page must see the guest nav —
-     * the navbar checks the buyer guard only, so a seller session must never
-     * cause the buyer account dropdown to appear.
+     * An unauthenticated request to the landing page must always get the public
+     * navbar (Login / Register): an approved buyer row existing in the database
+     * must never leak into the navbar without a session.
+     */
+    public function test_guest_sees_no_account_dropdown_on_landing_page_when_a_buyer_row_exists(): void
+    {
+        Buyer::factory()->create(['status' => 'approved']);
+
+        $this->assertGuest('buyer');
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('data-login-trigger', false)
+            ->assertSee('Register')
+            ->assertDontSee('js-account-toggle', false)
+            ->assertDontSee('accountDropdown', false);
+    }
+
+    /**
+     * A logged-in Seller visiting the landing page must see the public nav —
+     * the landing shell always renders variant 'landing', which never reads a
+     * guard, so a seller session never shows a buyer account dropdown there.
      */
     public function test_authenticated_seller_sees_guest_nav_on_landing_page(): void
     {
@@ -90,5 +107,21 @@ class NavbarTest extends TestCase
             ->assertSee('accountDropdown', false)
             ->assertSee('Ben Dela Cruz')
             ->assertSee('Logout');
+    }
+
+    /**
+     * The buyer home is the authenticated surface: the navbar renders the
+     * account dropdown and NOT the public Login / Register links — the
+     * data-hide-guest attribute exists only on the guest Login anchor.
+     */
+    public function test_buyer_home_shows_buyer_navbar_and_no_login_links(): void
+    {
+        $buyer = Buyer::factory()->create();
+
+        $this->actingAs($buyer, 'buyer')
+            ->get(route('buyer.home'))
+            ->assertOk()
+            ->assertSee('accountDropdown', false)
+            ->assertDontSee('data-hide-guest="true"', false);
     }
 }

@@ -5,6 +5,15 @@
 @section('content')
 <div class="bg-cream">
 
+{{-- Server-side flash (e.g. bounced here from the not-yet-built chat pages) --}}
+@if (session('info'))
+  <div class="mx-auto mt-4 max-w-[1440px] px-4 sm:px-8 lg:px-16">
+    <div class="rounded-xl border border-buyer-line bg-white px-4 py-3 text-[13px] font-medium text-buyer-ink">
+      {{ session('info') }}
+    </div>
+  </div>
+@endif
+
 {{-- ═══════════════════════════════════════════════════════════════════════
      HERO — three staggered product cards + floating promo pill (right edge)
      ═══════════════════════════════════════════════════════════════════════ --}}
@@ -25,10 +34,6 @@
         <a href="#flash-sale"
            class="inline-flex items-center rounded-md bg-buyer-ink px-6 py-3.5 text-[11.5px] font-semibold tracking-[0.09em] text-white uppercase shadow-[0_10px_22px_-8px_rgba(58,37,41,0.45)] transition-opacity hover:opacity-90">
           Shop Collection
-        </a>
-        <a href="#categories"
-           class="inline-flex items-center rounded-md border border-buyer-ink bg-transparent px-6 py-3.5 text-[11.5px] font-semibold tracking-[0.09em] text-buyer-ink uppercase transition-colors hover:bg-white">
-          Explore Lookbook
         </a>
       </div>
     </div>
@@ -257,7 +262,6 @@
       <aside class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
           <h3 class="font-serif text-[18px] text-buyer-ink">Best Selling Store</h3>
-          <a href="#" class="text-[12px] font-semibold text-neutral-400 transition-colors hover:text-buyer-ink">View All</a>
         </div>
         @forelse ($stores as $store)
           @include('Components.buyer.store-card', ['store' => $store])
@@ -278,8 +282,10 @@
     </div>
   </section>
 
-</div>
-</div>
+  {{-- ═══════════════════════════════════════════════════════════════════════
+       TRUST BADGES — why shop with us
+       ═══════════════════════════════════════════════════════════════════════ --}}
+
 @endsection
 
 @push('scripts')

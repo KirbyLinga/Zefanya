@@ -10,8 +10,10 @@
 //             repointed at the update route. Submission stays a normal multipart
 //             PUT (no AJAX submit).
 //
-// This entry also owns the shared product-form behavior (image file-name preview).
-// It is document-level delegation, so it works on injected HTML too.
+// This entry also owns the shared product-form behavior (image file-name preview)
+// and the 3-step Variant Options flow (Basic Info → Variant Options → Variant
+// Table). All product-form behavior is document/body-level delegation, so it
+// works on injected HTML (edit mode swaps the modal body) too.
 
 document.addEventListener('DOMContentLoaded', function () {
     var overlay = document.getElementById('productModalOverlay');
@@ -26,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     initImageFileNamePreview();
+    initProductFormSteps();
 });
 
 function initProductModal(overlay) {
@@ -223,3 +226,251 @@ function initImageFileNamePreview() {
     });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 3-step product form: Basic Info → Variant Options → Variant Table
+//
+// Server contract (StoreProductRequest):
+//   variants_exist = 1 → options[{name, values}] + variants[{values, sku,
+//   price, stock_quantity, is_available}] payloads are applied by
+//   VariantSyncService; products.price/stock become rollups.
+//   variants_exist = 0 → legacy single-SKU product; product-level
+//   price/stock are mirrored into its auto Default variant.
+// ═══════════════════════════════════════════════════════════════════════
+
+function initProductFormSteps() {
+    var form = document.getElementById('productModalForm');
+    if (!form) return; // page without the product modal
+
+    form.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-pf-next], [data-pf-back], [data-pf-generate]');
+        if (!btn) return;
+
+        if (btn.hasAttribute('data-pf-back')) {
+            showStep(Number(btn.getAttribute('data-pf-back')));
+            return;
+        }
+
+        if (btn.hasAttribute('data-pf-next')) {
+            if (validateStep1()) showStep(2);
+            return;
+        }
+
+        if (btn.hasAttribute('data-pf-generate')) {
+            generateAndReview();
+        }
+    });
+
+    form.addEventListener('change', function (event) {
+        var el = event.target;
+
+        // Second option axis row appears once option 1 has a name + values.
+        if (el.matches('[data-pf-option-name], [data-pf-option-values]')) {
+            syncSecondOptionRow();
+            return;
+        }
+
+        // Selling checkbox on a variant row mirrors its is_available field.
+        if (el.matches('[data-pf-enabled]')) {
+            var flag = el.closest('[data-pf-variant-row]').querySelector('[data-pf-available]');
+            if (flag) flag.value = el.checked ? '1' : '0';
+        }
+    });
+
+    // Rollup hints on step 1 once variants exist.
+    form.addEventListener('input', function (event) {
+        if (event.target.matches('[data-pf-option-name], [data-pf-option-values]')) {
+            updateComboSummary();
+        }
+    });
+
+    // A failed POST re-renders the whole form server-side; if the seller had
+    // variants configured, land them back on the step they were on.
+    if (form.querySelector('[data-pf-variants-exist]')?.value === '1' &&
+        (document.querySelector('[data-pf-error-summary]') || form.querySelector('[data-pf-variant-body] [data-pf-variant-row]'))) {
+        showStep(2);
+    }
+}
+
+function pfStep(index) {
+    return document.querySelector('[data-pf-step="' + index + '"]');
+}
+
+function showStep(index) {
+    document.querySelectorAll('[data-pf-step]').forEach(function (el) {
+        el.hidden = el.getAttribute('data-pf-step') !== String(index);
+    });
+}
+
+function validateStep1() {
+    var form = document.getElementById('productModalForm');
+    var required = form.querySelectorAll('[data-pf-step="1"] input[required], [data-pf-step="1"] select[required]');
+
+    for (var i = 0; i < required.length; i++) {
+        if (!required[i].checkValidity()) {
+            showStep(1);
+            required[i].reportValidity();
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function readOptionAxes() {
+    var axes = [];
+
+
+    document.querySelectorAll('[data-pf-option-row]').forEach(function (row) {
+        var name = (row.querySelector('[data-pf-option-name]')?.value || '').trim();
+        var values = (row.querySelector('[data-pf-option-values]')?.value || '')
+            .split(',')
+            .map(function (v) { return v.trim(); })
+            .filter(Boolean);
+
+        if (name && values.length) {
+            axes.push({ name: name, values: values });
+        }
+    });
+
+    return axes.slice(0, 2);
+}
+
+function updateComboSummary() {
+    var axes = readOptionAxes();
+    var summary = document.querySelector('[data-pf-combo-summary]');
+    if (!summary) return;
+
+
+    var total = axes.reduce(function (acc, axis) { return acc * axis.values.length; }, 1);
+    summary.hidden = total === 0;
+    summary.textContent = total > 0
+        ? total + ' variant combination' + (total === 1 ? '' : 's') + ' will be generated (max 50).'
+        : '';
+}
+
+function syncSecondOptionRow() {
+    var rows = document.querySelectorAll('[data-pf-option-row]');
+    if (rows.length < 2) return;
+
+
+    var first = rows[0];
+    var firstName = (first.querySelector('[data-pf-option-name]')?.value || '').trim();
+    var firstValues = (first.querySelector('[data-pf-option-values]')?.value || '').trim();
+    var second = rows[1];
+
+
+    second.hidden = !(firstName && firstValues);
+
+
+    // Clear the hidden row so empty axes never reach the server.
+    if (second.hidden) {
+        second.querySelector('[data-pf-option-name]').value = '';
+        second.querySelector('[data-pf-option-values]').value = '';
+    }
+}
+
+function generateAndReview() {
+    var form = document.getElementById('productModalForm');
+    var axes = readOptionAxes();
+    var errorEl = document.querySelector('[data-pf-options-error]');
+    var flag = form.querySelector('[data-pf-variants-exist]');
+
+
+    errorEl.hidden = true;
+
+
+    if (axes.length === 0) {
+        // Legacy single-SKU submit — product-level price/stock win.
+        flag.value = '0';
+        form.submit();
+        return;
+    }
+
+
+    var total = axes.reduce(function (acc, axis) { return acc * axis.values.length; }, 1);
+
+
+    if (total > 50) {
+        errorEl.textContent = 'Too many combinations (' + total + '). Use at most 50 — fewer option values per axis.';
+        errorEl.hidden = false;
+        return;
+    }
+
+
+    flag.value = '1';
+    buildVariantTable(axes);
+    showStep(3);
+}
+
+function buildVariantTable(axes) {
+    var body = document.querySelector('[data-pf-variant-body]');
+    if (!body) return;
+
+
+    // Preserve previously entered SKU/price/stock per combination signature.
+    var previous = {};
+    body.querySelectorAll('[data-pf-variant-row]').forEach(function (row) {
+        var sig = row.querySelector('input[name$="[values]"]').value;
+        previous[sig] = {
+            sku: row.querySelector('input[name$="[sku]"]').value,
+            price: row.querySelector('input[name$="[price]"]').value,
+            stock: row.querySelector('input[name$="[stock_quantity]"]').value,
+            available: row.querySelector('[data-pf-enabled]').checked,
+        };
+    });
+
+
+    var combinations = axes.reduce(function (acc, axis) {
+        var next = [];
+        acc.forEach(function (combo) {
+            axis.values.forEach(function (value) {
+                next.push(combo.concat(value));
+            });
+        });
+        return next;
+    }, [[]]);
+
+
+    body.innerHTML = '';
+
+
+    combinations.forEach(function (combo, index) {
+        var valuesStr = combo.join(',');
+        var prior = previous[valuesStr] || {};
+        var available = prior.available !== undefined ? prior.available : true;
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-pf-variant-row', '');
+
+
+        tr.innerHTML =
+            '<input type="hidden" name="variants[' + index + '][values]" value="' + valuesStr + '">' +
+            '<input type="hidden" name="variants[' + index + '][is_available]" data-pf-available value="' + (available ? '1' : '0') + '">' +
+            '<td class="py-2 pr-3 font-semibold text-[var(--text-ink)]" data-pf-combo-label>' + combo.map(escapePfCell).join(' / ') + '</td>' +
+            '<td class="py-2 pr-3"><input type="text" name="variants[' + index + '][sku]" maxlength="64" value="' + escapePfAttr(prior.sku || '') + '" class="w-28 px-2 py-1.5 border border-[var(--border-input)] rounded-sm text-[12.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]"></td>' +
+            '<td class="py-2 pr-3"><input type="number" step="0.01" min="0" name="variants[' + index + '][price]" value="' + escapePfAttr(prior.price || '') + '" required class="w-24 px-2 py-1.5 border border-[var(--border-input)] rounded-sm text-[12.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]"></td>' +
+            '<td class="py-2 pr-3"><input type="number" min="0" name="variants[' + index + '][stock_quantity]" value="' + escapePfAttr(prior.stock || '0') + '" required class="w-20 px-2 py-1.5 border border-[var(--border-input)] rounded-sm text-[12.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]"></td>' +
+            '<td class="py-2"><input type="checkbox" data-pf-enabled ' + (available ? 'checked' : '') + ' class="cursor-pointer" aria-label="Selling this combination"></td>';
+
+
+        body.appendChild(tr);
+    });
+
+
+    // Seed each new row's price with the product-level price for convenience.
+    var productPrice = document.getElementById('price')?.value;
+    if (productPrice) {
+        body.querySelectorAll('input[name$="[price]"]').forEach(function (input) {
+            if (input.value === '') input.value = productPrice;
+        });
+    }
+}
+
+function escapePfCell(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function escapePfAttr(text) {
+    return escapePfCell(String(text)).replace(/"/g, '&quot;');
+}

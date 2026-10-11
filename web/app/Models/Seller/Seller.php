@@ -2,7 +2,9 @@
 
 namespace App\Models\Seller;
 
+use App\Models\Conversation;
 use App\Models\Product;
+use App\Models\SellerOrder;
 use App\Models\Shared\Category;
 use Database\Factories\SellerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -71,6 +73,19 @@ class Seller extends Authenticatable
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Per-shop fulfilment slices of any buyer order this seller is part of.
+     */
+    public function sellerOrders(): HasMany
+    {
+        return $this->hasMany(SellerOrder::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
     }
 
     public function storeInitials(): string

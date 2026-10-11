@@ -42,8 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var provinceNameField = document.getElementById('provinceNameField');
     var municipalityNameField = document.getElementById('municipalityNameField');
     var barangayNameField = document.getElementById('barangayNameField');
-    var provincesLoaded = false;
-    var manualMode = false;
 
     var uploadIdInput = document.getElementById('uploadId');
     var uploadIdName = document.getElementById('uploadIdName');
@@ -117,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
-        if (!provincesLoaded) loadProvinces();
+        if (addressLookup) addressLookup.ensureLoaded();
     };
 
     function closeModal() {
@@ -199,78 +197,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ===== PH address cascading dropdowns (PSGC API) =====
-    var PSGC_BASE = 'https://psgc.gitlab.io/api';
+    // Shared logic lives in resources/js/buyer/address-lookup.js (also used by
+    // the account address page) — the modal just hosts the DOM contract.
+    var addressLookup = window.zfAddressLookup
+        ? window.zfAddressLookup.init(document.getElementById('buyerModalOverlay') || document)
+        : null;
 
-    function populateSelect(select, items, placeholder) {
-        select.innerHTML = '';
-        var ph = document.createElement('option');
-        ph.value = ''; ph.disabled = true; ph.selected = true; ph.textContent = placeholder;
-        select.appendChild(ph);
-        items.forEach(function (item) {
-            var opt = document.createElement('option');
-            opt.value = item.code; opt.textContent = item.name;
-            select.appendChild(opt);
-        });
-    }
-
-    function loadProvinces() {
-        fetch(PSGC_BASE + '/provinces/')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                data.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                populateSelect(provinceSelect, data, 'Select province');
-                provincesLoaded = true;
-            })
-            .catch(function () { provinceSelect.innerHTML = '<option value="" disabled selected>Could not load — try manual entry</option>'; });
-    }
-
-    provinceSelect.addEventListener('change', function () {
-        provinceNameField.value = provinceSelect.selectedOptions[0] ? provinceSelect.selectedOptions[0].textContent : '';
-        municipalityNameField.value = ''; barangayNameField.value = '';
-        municipalitySelect.disabled = true; barangaySelect.disabled = true;
-        municipalitySelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        barangaySelect.innerHTML = '<option value="" disabled selected>Select municipality first</option>';
-        fetch(PSGC_BASE + '/provinces/' + provinceSelect.value + '/cities-municipalities/')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                data.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                populateSelect(municipalitySelect, data, 'Select municipality/city');
-                municipalitySelect.disabled = false;
-            })
-            .catch(function () { municipalitySelect.innerHTML = '<option value="" disabled selected>Could not load</option>'; });
-    });
-
-    municipalitySelect.addEventListener('change', function () {
-        municipalityNameField.value = municipalitySelect.selectedOptions[0] ? municipalitySelect.selectedOptions[0].textContent : '';
-        barangayNameField.value = '';
-        barangaySelect.disabled = true;
-        barangaySelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        fetch(PSGC_BASE + '/cities-municipalities/' + municipalitySelect.value + '/barangays/')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                data.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                populateSelect(barangaySelect, data, 'Select barangay');
-                barangaySelect.disabled = false;
-            })
-            .catch(function () { barangaySelect.innerHTML = '<option value="" disabled selected>Could not load</option>'; });
-    });
-
-    barangaySelect.addEventListener('change', function () {
-        barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
-    });
-
-    toggleManualBtn.addEventListener('click', function () {
-        manualMode = !manualMode;
-        apiFields.classList.toggle('hidden', manualMode);
-        manualFields.classList.toggle('hidden', !manualMode);
-        toggleManualBtn.textContent = manualMode ? 'Use address lookup instead' : 'Enter address manually';
-        addressModeField.value = manualMode ? 'manual' : 'api';
-        // Dropdowns required only in API mode; street is ALWAYS required (handled by HTML required attr).
-        [provinceSelect, municipalitySelect, barangaySelect].forEach(function (el) { el.required = !manualMode; });
-    });
     uploadIdInput.addEventListener('change', function () {
         uploadIdName.textContent = uploadIdInput.files.length ? uploadIdInput.files[0].name : 'Choose a valid ID';
     });
+
+    // ===== Contact number: numeric input only =====
+    var contactNoInput = document.getElementById('contactNo');
+    if (contactNoInput) {
+        contactNoInput.addEventListener('input', function () {
+            // Remove any non-digit characters
+            this.value = this.value.replace(/\D/g, '');
+        });
+        contactNoInput.addEventListener('keypress', function (e) {
+            // Prevent non-numeric characters from being typed
+            if (!/\d/.test(String.fromCharCode(e.which))) {
+                e.preventDefault();
+            }
+        });
+    }
 
     // ===== Password visibility toggles =====
     document.querySelectorAll('[data-toggle-visibility]').forEach(function (btn) {
@@ -323,7 +273,12 @@ document.addEventListener('DOMContentLoaded', function () {
         var valid = true;
         panel.querySelectorAll('[required]').forEach(function (field) {
             if (field.offsetParent === null && field.type !== 'hidden') return;
-            if (!field.value || (field.type === 'file' && field.files.length === 0)) {
+            if (field.type === 'checkbox') {
+                if (!field.checked) {
+                    showFieldError(field, 'You must accept the Terms and Privacy Policy.');
+                    valid = false;
+                }
+            } else if (!field.value || (field.type === 'file' && field.files.length === 0)) {
                 showFieldError(field, 'This field is required.');
                 valid = false;
             } else if (field.id === 'contactNo' && !/^09\d{9}$/.test(field.value)) {
@@ -343,11 +298,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (birthdayError) birthdayError.textContent = 'Select your full birthday.';
                 valid = false;
             }
-            if (passwordInput.value && passwordInput.value.length < 8) {
-                showFieldError(passwordInput, 'Password must be at least 8 characters.'); valid = false;
+            if (passwordInput.value && !/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:'",.:<>?\\/])/.test(passwordInput.value)) {
+                showFieldError(passwordInput, 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.');
+                valid = false;
+            } else if (passwordInput.value && passwordInput.value.length < 8) {
+                showFieldError(passwordInput, 'Password must be at least 8 characters.');
+                valid = false;
             }
             if (confirmInput.value && passwordInput.value !== confirmInput.value) {
-                showFieldError(confirmInput, 'Passwords do not match.'); valid = false;
+                showFieldError(confirmInput, 'Passwords do not match.');
+                valid = false;
             }
         }
         return valid;
@@ -471,12 +431,28 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
             .then(function (res) {
-                resendBtn.disabled = false;
-                resendStatus.textContent = res.body.message || (res.ok ? 'Sent.' : 'Could not resend.');
                 if (res.ok) {
                     otpInputs.forEach(function (i) { i.value = ''; });
                     hiddenOtp.value = '';
                     otpInputs[0].focus();
+
+                    // Start countdown timer (60 seconds)
+                    var secondsLeft = 60;
+                    var timerInterval = setInterval(function () {
+                        secondsLeft--;
+                        resendStatus.textContent = secondsLeft + 's';
+
+                        if (secondsLeft <= 0) {
+                            clearInterval(timerInterval);
+                            resendBtn.disabled = false;
+                            resendStatus.textContent = '';
+                        }
+                    }, 1000);
+
+                    resendStatus.textContent = '60s';
+                } else {
+                    resendBtn.disabled = false;
+                    resendStatus.textContent = res.body.message || 'Could not resend.';
                 }
             })
             .catch(function () { resendBtn.disabled = false; resendStatus.textContent = 'Network error.'; });

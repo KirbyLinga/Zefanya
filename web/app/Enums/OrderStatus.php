@@ -37,4 +37,38 @@ enum OrderStatus: string
     case DeliveryFailed = 'DELIVERY_FAILED';
 
     case Returned = 'RETURNED';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Placed => 'Placed',
+            self::Confirmed => 'Confirmed',
+            self::Preparing => 'Preparing',
+            self::ReadyForPickup => 'Ready for pickup',
+            self::PickedUp => 'Picked up',
+            self::AtSortingCenter => 'At sorting center',
+            self::Sorted => 'Sorted',
+            self::AssignedToRider => 'Courier assigned',
+            self::OutForDelivery => 'Out for delivery',
+            self::Delivered => 'Delivered',
+            self::Completed => 'Completed',
+            self::DeliveryFailed => 'Delivery failed',
+            self::Returned => 'Returned',
+        };
+    }
+
+    /**
+     * Broad bucket used by seller/buyer UIs to group statuses into tabs.
+     */
+    public function bucket(): string
+    {
+        return match ($this) {
+            self::Placed, self::Confirmed, self::Preparing => 'to_ship',
+            self::ReadyForPickup => 'ready',
+            self::AssignedToRider, self::PickedUp, self::AtSortingCenter,
+            self::Sorted, self::OutForDelivery => 'shipped',
+            self::Delivered, self::Completed,
+            self::DeliveryFailed, self::Returned => 'delivered',
+        };
+    }
 }

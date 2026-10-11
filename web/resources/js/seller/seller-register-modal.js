@@ -20,14 +20,14 @@ document.addEventListener('DOMContentLoaded', function () {
     var headerIcon = document.getElementById('sellerModalIcon');
 
     // Panel 1 elements
-    var birthdayInput = document.getElementById('birthday');
+    var birthdayInput = document.getElementById('sellerBirthday');
     var ageInput = document.getElementById('sellerAge');
-    var birthMonthSelect = document.getElementById('birthMonth');
-    var birthDaySelect = document.getElementById('birthDay');
-    var birthYearSelect = document.getElementById('birthYear');
+    var birthMonthSelect = document.getElementById('sellerBirthMonth');
+    var birthDaySelect = document.getElementById('sellerBirthDay');
+    var birthYearSelect = document.getElementById('sellerBirthYear');
 
     var passwordInput = document.getElementById('sellerPassword');
-    var confirmInput = document.getElementById('passwordConfirmation');
+    var confirmInput = document.getElementById('sellerPasswordConfirmation');
     var nextStep1 = document.getElementById('sellerNextStep1');
 
     // Panel 2 elements
@@ -51,6 +51,15 @@ document.addEventListener('DOMContentLoaded', function () {
     var nextStep2 = document.getElementById('sellerNextStep2');
     var backStep3 = document.getElementById('sellerBackStep3');
 
+    // Panel 3 file upload elements
+    var uploadIdInput = document.getElementById('sellerUploadId');
+    var uploadIdName = document.getElementById('sellerUploadIdName');
+    var uploadIdWrapper = uploadIdInput ? uploadIdInput.previousElementSibling : null;
+
+    var businessPermitInput = document.getElementById('sellerBusinessPermit');
+    var businessPermitName = document.getElementById('sellerBusinessPermitName');
+    var businessPermitWrapper = businessPermitInput ? businessPermitInput.previousElementSibling : null;
+
     var provincesLoaded = false;
     var manualMode = addressModeField && addressModeField.value === 'manual';
 
@@ -70,6 +79,44 @@ document.addEventListener('DOMContentLoaded', function () {
     if (missing.length) {
         console.error('[seller-register-modal] missing element(s), aborting init:', missing.join(', '));
         return;
+    }
+
+    // ===== File Upload Handlers =====
+    if (uploadIdInput && uploadIdWrapper) {
+        uploadIdWrapper.addEventListener('click', function () {
+            uploadIdInput.click();
+        });
+        uploadIdInput.addEventListener('change', function () {
+            if (this.files.length > 0) {
+                uploadIdName.textContent = this.files[0].name;
+            }
+        });
+    }
+
+    // ===== Contact number: numeric input only =====
+    var sellerContactNo = document.getElementById('sellerContactNo');
+    if (sellerContactNo) {
+        sellerContactNo.addEventListener('input', function () {
+            // Remove any non-digit characters
+            this.value = this.value.replace(/\D/g, '');
+        });
+        sellerContactNo.addEventListener('keypress', function (e) {
+            // Prevent non-numeric characters from being typed
+            if (!/\d/.test(String.fromCharCode(e.which))) {
+                e.preventDefault();
+            }
+        });
+    }
+
+    if (businessPermitInput && businessPermitWrapper) {
+        businessPermitWrapper.addEventListener('click', function () {
+            businessPermitInput.click();
+        });
+        businessPermitInput.addEventListener('change', function () {
+            if (this.files.length > 0) {
+                businessPermitName.textContent = this.files[0].name;
+            }
+        });
     }
 
     // ===== Stepper / panel switching =====
@@ -397,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (n === 1) {
             if (!(birthMonthSelect.value && birthDaySelect.value && birthYearSelect.value)) {
                 [birthMonthSelect, birthDaySelect, birthYearSelect].forEach(function (s) { s.classList.add('border-[#a5333d]'); });
-                var birthdayError = document.getElementById('birthdayError') || findFieldError(birthdayInput);
+                var birthdayError = document.getElementById('sellerBirthdayError') || findFieldError(birthdayInput);
                 if (birthdayError) birthdayError.textContent = 'Select your full birthday.';
                 valid = false;
             }
@@ -457,6 +504,185 @@ document.addEventListener('DOMContentLoaded', function () {
     if (backStep3) {
         backStep3.addEventListener('click', function () {
             showPanel(2);
+        });
+    }
+
+    // ===== Step 3 "Submit" = actual seller registration submit (fires the OTP email) =====
+    var sellerSubmitRegistration = document.getElementById('submitSellerRegistration');
+    if (sellerSubmitRegistration) {
+        sellerSubmitRegistration.addEventListener('click', function () {
+            if (!validatePanel(3)) return;
+
+            var submitBtn = this;
+            var originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            var formData = new FormData(form);
+            // Multipart: upload_id and business_permit are files.
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin',
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                if (res.ok && res.body && res.body.seller_id) {
+                    document.getElementById('sellerOtpId').value = res.body.seller_id;
+                    document.getElementById('sellerOtpEmail').textContent = res.body.email;
+                    showPanel(4);
+                    setTimeout(function () {
+                        var first = document.querySelector('.seller-otp-input[data-otp-index="0"]');
+                        if (first) first.focus();
+                    }, 50);
+                } else if (res.body && res.body.errors) {
+                    panels.forEach(function (p) { clearPanelErrors(p); });
+                    Object.keys(res.body.errors).forEach(function (name) {
+                        var field = form.querySelector('[name="' + name + '"]');
+                        if (field) showFieldError(field, res.body.errors[name][0]);
+                    });
+                    var step1Fields = ['first_name', 'last_name', 'middle_initial', 'sex', 'email', 'password', 'contact_no', 'birthday'];
+                    var step2Fields = ['province', 'municipality', 'barangay', 'street'];
+                    var step3Fields = ['business_name', 'line_of_business_id', 'upload_id', 'business_permit'];
+                    var errKeys = Object.keys(res.body.errors);
+                    if (errKeys.some(function (k) { return step1Fields.indexOf(k) !== -1; })) showPanel(1);
+                    else if (errKeys.some(function (k) { return step2Fields.indexOf(k) !== -1; })) showPanel(2);
+                    else if (errKeys.some(function (k) { return step3Fields.indexOf(k) !== -1; })) showPanel(3);
+                } else {
+                    alert(res.body && res.body.message ? res.body.message : 'Registration failed. Please try again.');
+                }
+            })
+            .catch(function () {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                alert('Network error. Please try again.');
+            });
+        });
+    }
+
+    // ===== Panel 4: OTP =====
+    var otpForm = document.getElementById('sellerOtpForm');
+    var sellerIdInput = document.getElementById('sellerOtpId');
+    var otpErrorSummary = document.getElementById('sellerOtpErrorSummary');
+    var otpFieldError = document.getElementById('sellerOtpFieldError');
+    var hiddenOtp = document.getElementById('sellerOtpHidden');
+    var otpInputs = Array.prototype.slice.call(document.querySelectorAll('.seller-otp-input'));
+    var resendBtn = document.getElementById('sellerOtpResendBtn');
+    var resendStatus = document.getElementById('sellerOtpResendStatus');
+    var otpSubmitBtn = document.getElementById('sellerOtpSubmit');
+    var csrf = document.querySelector('meta[name="csrf-token"]');
+    csrf = csrf ? csrf.getAttribute('content') : '';
+
+    if (otpForm && sellerIdInput && otpErrorSummary && otpFieldError && hiddenOtp && resendBtn && resendStatus && otpSubmitBtn) {
+        function collectOtp() { return otpInputs.map(function (i) { return i.value; }).join(''); }
+        function clearOtpErrors() {
+            otpErrorSummary.classList.add('hidden'); otpErrorSummary.textContent = '';
+            otpFieldError.textContent = '';
+            otpInputs.forEach(function (i) { i.classList.remove('border-[#a5333d]'); });
+        }
+        function showOtpError(msg) {
+            otpErrorSummary.classList.remove('hidden'); otpErrorSummary.textContent = msg;
+            otpFieldError.textContent = msg;
+            otpInputs.forEach(function (i) { i.classList.add('border-[#a5333d'); });
+        }
+
+        otpInputs.forEach(function (input, idx) {
+            input.addEventListener('input', function () {
+                var v = input.value.replace(/\D/g, '');
+                input.value = v.length > 0 ? v[v.length - 1] : '';
+                if (input.value && idx < otpInputs.length - 1) otpInputs[idx + 1].focus();
+                hiddenOtp.value = collectOtp();
+            });
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Backspace' && !input.value && idx > 0) otpInputs[idx - 1].focus();
+                if (e.key === 'ArrowLeft' && idx > 0) otpInputs[idx - 1].focus();
+                if (e.key === 'ArrowRight' && idx < otpInputs.length - 1) otpInputs[idx + 1].focus();
+            });
+            input.addEventListener('paste', function (e) {
+                var pasted = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                if (!pasted.length) return;
+                e.preventDefault();
+                for (var i = 0; i < 6; i++) otpInputs[i].value = pasted[i] || '';
+                hiddenOtp.value = collectOtp();
+                var lastFilled = Math.min(pasted.length, 6) - 1;
+                otpInputs[lastFilled < 5 ? lastFilled + 1 : 5].focus();
+            });
+        });
+
+        resendBtn.addEventListener('click', function () {
+            resendBtn.disabled = true;
+            resendStatus.textContent = 'Sending...';
+            fetch('/register/seller/verify-otp/resend', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (res.ok) {
+                    otpInputs.forEach(function (i) { i.value = ''; });
+                    hiddenOtp.value = '';
+                    otpInputs[0].focus();
+
+                    // Start countdown timer (60 seconds)
+                    var secondsLeft = 60;
+                    var timerInterval = setInterval(function () {
+                        secondsLeft--;
+                        resendStatus.textContent = secondsLeft + 's';
+
+                        if (secondsLeft <= 0) {
+                            clearInterval(timerInterval);
+                            resendBtn.disabled = false;
+                            resendStatus.textContent = '';
+                        }
+                    }, 1000);
+
+                    resendStatus.textContent = '60s';
+                } else {
+                    resendBtn.disabled = false;
+                    resendStatus.textContent = res.body.message || 'Could not resend.';
+                }
+            })
+            .catch(function () { resendBtn.disabled = false; resendStatus.textContent = 'Network error.'; });
+        });
+
+        otpForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            clearOtpErrors();
+            var code = collectOtp();
+            if (code.length !== 6) { showOtpError('Enter all 6 digits.'); return; }
+            hiddenOtp.value = code;
+
+            otpSubmitBtn.disabled = true;
+            otpSubmitBtn.textContent = 'Verifying...';
+
+            fetch('/register/seller/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ otp: code }),
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+            .then(function (res) {
+                otpSubmitBtn.disabled = false;
+                otpSubmitBtn.textContent = 'Verify';
+                if (res.status === 200) {
+                    // Success: close modal and show message
+                    closeModal();
+                    alert('Your seller registration is complete! Awaiting admin approval.');
+                } else if (res.status === 422) {
+                    // Validation error: show in modal, stay open
+                    showOtpError(res.body.message || 'Invalid or expired code.');
+                } else {
+                    showOtpError(res.body.message || 'Verification failed.');
+                }
+            })
+            .catch(function (err) {
+                otpSubmitBtn.disabled = false;
+                otpSubmitBtn.textContent = 'Verify';
+                showOtpError('Network error. Please try again.');
+            });
         });
     }
 
