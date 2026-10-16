@@ -1,0 +1,34 @@
+Test Case ID,Actual Result,Status,Remarks
+TC-RID-001,Saved as Pending Activation + activation email sent,Pass,test_tc_rid_001_create_rider_all_valid
+TC-RID-002,Blocked with required message on all 11 fields,Pass,test_tc_rid_002_empty_form
+TC-RID-003,Blocked with message on the blank field only,Pass,test_tc_rid_003_one_blank_at_a_time
+TC-RID-004,Blocked with letters-only message on both names,Pass,test_tc_rid_004_names_with_numbers_symbols_rejected
+TC-RID-005,1 and 51 chars rejected; 2 and 50 accepted,Pass,test_tc_rid_005_name_length_limits
+TC-RID-006,17-year-old rejected; exactly-18 and older accepted (Manila),Pass,test_tc_rid_006_age_at_18_limit_manila
+TC-RID-007,Each rejected with valid-email message,Pass,test_tc_rid_007_invalid_emails_rejected
+TC-RID-008,Blocked with email already in use,Pass,test_tc_rid_008_email_used_by_buyer_blocked
+TC-RID-009,Each rejected with valid-mobile message,Pass,test_tc_rid_009_invalid_mobiles_rejected
+TC-RID-010,10 and 12 digits rejected; 11 accepted,Pass,test_tc_rid_010_mobile_length_limits
+TC-RID-011,Both 09 and +639 forms blocked as same number,Pass,test_tc_rid_011_mobile_registered_and_plus63_equivalence
+TC-RID-012,Each rejected with A00-00-000000 format message,Pass,test_tc_rid_012_invalid_license_format_rejected
+TC-RID-013,Blocked with license already registered,Pass,test_tc_rid_013_duplicate_license_blocked
+TC-RID-014,Yesterday rejected; today and tomorrow accepted (Manila),Pass,test_tc_rid_014_license_expiry_boundary_manila
+TC-RID-015,Blocked with plate already registered,Pass,test_tc_rid_015_duplicate_plate_blocked
+TC-RID-016,JPG/PNG/PDF each accepted,Pass,test_tc_rid_016_accepted_file_types
+TC-RID-017,docx/gif/exe each rejected listing JPG PNG PDF,Pass,test_tc_rid_017_rejected_file_types
+TC-RID-018,4.9 and 5.0MB accepted; 5.1MB rejected,Pass,test_tc_rid_018_file_size_boundary
+TC-RID-019,Triple save created exactly one rider,Pass,test_tc_rid_019_rapid_triple_save_creates_one
+TC-RID-020,Activated to Active + login redirect with success,Pass,test_tc_rid_020_activate_with_valid_password
+TC-RID-021,Each rejected with password rule message; stayed Pending,Pass,test_tc_rid_021_password_rule_violations
+TC-RID-022,Blocked with passwords do not match,Pass,test_tc_rid_022_confirm_mismatch
+TC-RID-023,Link expired message; password unset; stayed Pending,Pass,test_tc_rid_023_expired_link
+TC-RID-024,New email sent; first link dead; second works,Pass,test_tc_rid_024_resend_invalidates_first_link
+TC-RID-025,Used link invalid/already-used; unchanged,Pass,test_tc_rid_025_reuse_used_link
+TC-RID-026,Login denied generically; stayed guest,Pass,test_tc_rid_026_login_before_activating_denied
+TC-RID-027,Login succeeded to rider dashboard,Pass,test_tc_rid_027_login_after_activating_dashboard
+TC-RID-028,Listed for A not B; direct ID denied,Pass,test_tc_rid_028_company_isolation
+TC-RID-029,No Rider self-register option; create redirects to login,Pass,test_tc_rid_029_public_has_no_rider_option_and_create_needs_login
+TC-RID-030,Buyer/seller denied incl. direct POST (no row),Pass,test_tc_rid_030_buyer_seller_denied_even_direct_post
+TC-RID-031,Pending logistics denied incl. direct POST (no row),Pass,test_tc_rid_031_pending_logistics_denied_even_direct_post
+TC-RID-032,Denied on logistics/seller/admin panels,Pass,test_tc_rid_032_rider_cannot_open_other_panels
+

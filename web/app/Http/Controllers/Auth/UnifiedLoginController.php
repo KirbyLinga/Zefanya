@@ -50,10 +50,35 @@ class UnifiedLoginController extends Controller
             return redirect()->intended(route('buyer.home'));
         }
 
+        // Fall back to rider guard (active riders only).
+        if ($this->tryRider($email, $password, $remember, $request)) {
+            return redirect()->intended(route('rider.dashboard'));
+        }
+
         // Neither guard could authenticate with these credentials.
         throw ValidationException::withMessages([
             'email' => __('auth.failed'),
         ]);
+    }
+
+    /**
+     * Rider login: credentials must match AND status must be active.
+     * Pending Activation riders are denied without leaking password validity.
+     */
+    private function tryRider(string $email, string $password, bool $remember, Request $request): bool
+    {
+        if (! Auth::guard('rider')->attempt(['email' => $email, 'password' => $password], $remember)) {
+            return false;
+        }
+        $rider = Auth::guard('rider')->user();
+        if (! $rider || $rider->status !== 'active') {
+            Auth::guard('rider')->logout();
+
+            return false;
+        }
+        $request->session()->regenerate();
+
+        return true;
     }
 
     /**
@@ -122,6 +147,7 @@ class UnifiedLoginController extends Controller
         Auth::guard('seller')->logout();
         Auth::guard('logistics')->logout();
         Auth::guard('buyer')->logout();
+        Auth::guard('rider')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

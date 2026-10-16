@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\Admin\EnsureAdminRole;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
+use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
+            'rider.active' => EnsureRiderActive::class,
             'seller.approved' => EnsureSellerApproved::class,
         ]);
 
@@ -38,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
             $path = $request->path();
 
             if (str_starts_with($path, 'logistics/')) {
+                return route('login');
+            }
+
+            if (str_starts_with($path, 'rider/')) {
                 return route('login');
             }
 
@@ -61,6 +67,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
             if (str_starts_with($path, 'logistics/')) {
                 return route('logistics.dashboard');
+            }
+
+            if (str_starts_with($path, 'rider/')) {
+                return route('rider.dashboard');
             }
 
             if (str_starts_with($path, 'seller/')) {

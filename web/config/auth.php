@@ -3,6 +3,7 @@
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\User;
 
@@ -38,6 +39,11 @@ return [
             'driver' => 'session',
             'provider' => 'logistics',
         ],
+
+        'rider' => [
+            'driver' => 'session',
+            'provider' => 'riders',
+        ],
     ],
 
     'providers' => [
@@ -65,6 +71,11 @@ return [
             'driver' => 'eloquent',
             'model' => LogisticsProvider::class,
         ],
+
+        'riders' => [
+            'driver' => 'eloquent',
+            'model' => Rider::class,
+        ],
     ],
 
     'passwords' => [
@@ -91,6 +102,13 @@ return [
 
         'logistics' => [
             'provider' => 'logistics',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'riders' => [
+            'provider' => 'riders',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,
