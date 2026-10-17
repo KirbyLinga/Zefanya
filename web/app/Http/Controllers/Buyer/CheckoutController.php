@@ -250,33 +250,98 @@ class CheckoutController extends Controller
                 ->get()
                 ->keyBy('id');
 
+            // Legacy (variant-less) lines all share ONE locked Default variant
+            // per product, resolved lazily below.
+            /** @var array<int, ProductVariant|null> $legacyVariantByProduct */
+            $legacyVariantByProduct = [];
+
+            // Remaining stock still claimable by later lines in THIS checkout.
+            // Without this, two lines that resolve to the same locked variant
+            // (legacy null + Default, or multiple nulls) each pass
+            // stock >= quantity against the full balance and oversell.
+            /** @var array<int, int> $remainingByVariantId */
+            $remainingByVariantId = [];
+            /** @var array<int, int> $remainingByProductId */
+            $remainingByProductId = [];
+
             foreach ($items as $item) {
                 $product = $lockedProducts->get($item->product_id);
-                $variant = $item->variant_id !== null ? $lockedVariants->get($item->variant_id) : null;
 
+                // Resolve the variant this line will decrement FROM THE LOCKS.
+                // Variant-backed lines use the row locked above; legacy lines
+                // (created before variants) target the product's auto Default
+                // variant (lowest id), locked here so the check below never
+                // reads the pre-lock relation.
+                if ($item->variant_id !== null) {
+                    $variant = $lockedVariants->get($item->variant_id);
+                } else {
+                    if (! array_key_exists($item->product_id, $legacyVariantByProduct)) {
+                        $legacyVariantByProduct[$item->product_id] = $product !== null
+                            ? ProductVariant::query()
+                                ->where('product_id', $product->id)
+                                ->orderBy('id')
+                                ->lockForUpdate()
+                                ->first()
+                            : null;
+
+                        if ($legacyVariantByProduct[$item->product_id] !== null) {
+                            $lockedVariants->put(
+                                $legacyVariantByProduct[$item->product_id]->id,
+                                $legacyVariantByProduct[$item->product_id],
+                            );
+                        }
+                    }
+
+                    $variant = $legacyVariantByProduct[$item->product_id];
+                }
+
+                // Authoritative gate: ONLY the locked rows count. $item->variant
+                // and $item->product still hold the copies loaded before the
+                // lock, and a concurrent checkout can have moved the stock since
+                // — trusting those stale copies is what let two buyers both pass.
+                // Also reject a variant that does not belong to this product, and
+                // subtract each claim from the remaining pool so multi-line
+                // checkouts cannot oversell a shared SKU.
                 if ($product === null || $product->trashed() || $product->status !== 'active'
-                    || ($variant !== null && ! $variant->is_available)
-                    || $item->availableQuantity() < $item->quantity) {
+                    || $variant === null
+                    || (int) $variant->product_id !== (int) $product->id
+                    || ! $variant->is_available) {
                     throw new CheckoutException(
                         'Some items just went out of stock while placing your order. Please review your cart and try again.'
                     );
                 }
 
-                // Normalization: every cart line must decrement a VARIANT.
-                // Legacy lines (created before variants) target the product's
-                // auto Default variant (lowest id).
-                if ($variant === null) {
-                    $variant = ProductVariant::query()
-                        ->where('product_id', $product->id)
-                        ->orderBy('id')
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($variant !== null) {
-                        $lockedVariants->put($variant->id, $variant);
-                        $item->setRelation('variant', $variant);
-                    }
+                $variantId = (int) $variant->id;
+                if (! array_key_exists($variantId, $remainingByVariantId)) {
+                    $remainingByVariantId[$variantId] = (int) $variant->stock_quantity;
                 }
+
+                if ($remainingByVariantId[$variantId] < $item->quantity) {
+                    throw new CheckoutException(
+                        'Some items just went out of stock while placing your order. Please review your cart and try again.'
+                    );
+                }
+
+                if ($item->variant_id === null) {
+                    $productId = (int) $product->id;
+                    if (! array_key_exists($productId, $remainingByProductId)) {
+                        $remainingByProductId[$productId] = (int) $product->stock_quantity;
+                    }
+
+                    if ($remainingByProductId[$productId] < $item->quantity) {
+                        throw new CheckoutException(
+                            'Some items just went out of stock while placing your order. Please review your cart and try again.'
+                        );
+                    }
+
+                    $remainingByProductId[$productId] -= $item->quantity;
+                }
+
+                $remainingByVariantId[$variantId] -= $item->quantity;
+
+                // Bind the locked row onto the line so the decrement, the ledger
+                // and the order snapshots below all read the same instance.
+                $item->setRelation('variant', $variant);
             }
 
             $order = new Order;
@@ -349,6 +414,9 @@ class CheckoutController extends Controller
             // under the same row locks, inside the same transaction. The
             // products.stock rollup is refreshed once per touched product.
             foreach ($items as $item) {
+                // $item->variant was bound to the LOCKED row by the check loop,
+                // so $before is the under-lock current value — never the
+                // pre-lock copy whose stale value caused the overwrite.
                 $variant = $item->variant;
                 $before = (int) $variant->stock_quantity;
 
