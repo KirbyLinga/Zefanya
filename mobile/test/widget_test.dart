@@ -52,6 +52,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('BUY. SELL. DELIVER.'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 3200));
     expect(find.text('BEGIN'), findsOneWidget);
+
+    // Park off-stage: the rail's 6s loop is cancelled, clean teardown.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
   });
 }

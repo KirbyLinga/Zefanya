@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // fix_encoding.dart
 //
 // One-shot: normalize every lib/**/*.dart to UTF-8 without BOM and
