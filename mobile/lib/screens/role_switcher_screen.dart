@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'buyer/buyer_shell.dart';
 import 'courier/courier_shell.dart';
-import '../widgets/app_page_route.dart';
+import '../widgets/motion/cloud_transition.dart';
 
 class RoleSwitcherScreen extends StatelessWidget {
   const RoleSwitcherScreen({super.key});
@@ -53,7 +53,7 @@ class RoleSwitcherScreen extends StatelessWidget {
                 color: AppColors.roseGround,
                 ink: AppColors.textOnDark,
                 onTap: () => Navigator.of(context).push(
-                  AppPageRoute(builder: (_) => const BuyerShell()),
+                  CloudTransition.pageRoute(builder: (_) => const BuyerShell()),
                 ),
               ),
               const SizedBox(height: 16),
@@ -64,7 +64,7 @@ class RoleSwitcherScreen extends StatelessWidget {
                 color: AppColors.tertiary,
                 ink: AppColors.textOnLight,
                 onTap: () => Navigator.of(context).push(
-                  AppPageRoute(builder: (_) => const CourierShell()),
+                  CloudTransition.pageRoute(builder: (_) => const CourierShell()),
                 ),
               ),
             ],

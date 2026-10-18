@@ -53,6 +53,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/landing_backdrop.dart';
+import '../widgets/motion/cloud_transition.dart';
 import '../widgets/zefanya_mark.dart';
 import 'landing_preview_rail.dart';
 
@@ -92,6 +93,12 @@ class _LandingScreenState extends State<LandingScreen>
   /// Hint delay: "tap to continue" fades in ~1.2s into Beat 1.
   static const _hintDelay = Duration(milliseconds: 1200);
 
+  /// Minimum Beat 1 hold so it cannot be missed on device.
+  static const _minBeat1Hold = Duration(milliseconds: 1800);
+
+  /// Reduced motion static Beat 1 display time before advancing.
+  static const _reducedBeat1Hold = Duration(milliseconds: 1200);
+
   /// Beat 1 → Beat 2 hand-off: one 700ms motion, lockup scale +
   /// travel. Rail + BEGIN reveal after it settles.
   static const _handoffLength = Duration(milliseconds: 700);
@@ -125,8 +132,13 @@ class _LandingScreenState extends State<LandingScreen>
   /// Hint visibility: set by the hint timer, reset on dispose path.
   bool _hintVisible = false;
 
+  bool _minHoldElapsed = false;
+  bool _tappedEarly = false;
+
   Timer? _beatTimer;
   Timer? _hintTimer;
+  Timer? _minHoldTimer;
+  Timer? _reducedTimer;
 
   // Guards against a double-tap on Begin firing onDone twice before the
   // parent's setState takes effect. Also disables the button visually
@@ -137,15 +149,28 @@ class _LandingScreenState extends State<LandingScreen>
   void initState() {
     super.initState();
     if (widget.reduceMotion) {
-      _entrance.value = 1;
-      // Straight to the Beat 2 end state, no timers.
-      _beat2 = true;
+      _entrance.value = 1.0;
+      _handoff.value = 0.0;
+      _beat2 = false;
       _hintVisible = true;
-      _handoff.value = 1;
+      _reducedTimer = Timer(_reducedBeat1Hold, () {
+        if (mounted) {
+          setState(() {
+            _beat2 = true;
+            _handoff.value = 1.0;
+          });
+        }
+      });
     } else {
       _entrance.forward();
       _hintTimer = Timer(_hintDelay, () {
         if (mounted) setState(() => _hintVisible = true);
+      });
+      _minHoldTimer = Timer(_minBeat1Hold, () {
+        _minHoldElapsed = true;
+        if (_tappedEarly && mounted) {
+          _advanceToBeat2();
+        }
       });
       _maybeStartBeatTimer();
     }
@@ -165,16 +190,32 @@ class _LandingScreenState extends State<LandingScreen>
     _beatTimer = null;
     if (_beat2 || !widget.isActive || widget.reduceMotion) return;
     _beatTimer = Timer(_beatDelay, () {
-      if (!mounted) return;
-      setState(() => _beat2 = true);
-      _handoff.forward(from: 0);
+      if (mounted) _advanceToBeat2();
     });
+  }
+
+  void _advanceToBeat2() {
+    if (_beat2 || !mounted) return;
+    _beatTimer?.cancel();
+    _beatTimer = null;
+    _minHoldTimer?.cancel();
+    _minHoldTimer = null;
+    _reducedTimer?.cancel();
+    _reducedTimer = null;
+    setState(() => _beat2 = true);
+    if (widget.reduceMotion) {
+      _handoff.value = 1.0;
+    } else {
+      _handoff.forward(from: 0);
+    }
   }
 
   @override
   void dispose() {
     _beatTimer?.cancel();
     _hintTimer?.cancel();
+    _minHoldTimer?.cancel();
+    _reducedTimer?.cancel();
     _entrance.dispose();
     _handoff.dispose();
     super.dispose();
@@ -182,20 +223,24 @@ class _LandingScreenState extends State<LandingScreen>
 
   /// Any tap in Beat 1 advances the show: the hand-off runs, and the
   /// beat flag flips with it so the rail mounts (and its 6s timer
-  /// starts) exactly as the lockup starts moving. BEGIN is still the
-  /// only thing that can call onDone — this just changes beats.
+  /// starts) exactly as the lockup starts moving. Minimum 1.8s hold is enforced.
   void _continue() {
     if (_beat2) return;
-    _beatTimer?.cancel();
-    _beatTimer = null;
-    setState(() => _beat2 = true);
-    _handoff.forward(from: 0);
+    if (widget.reduceMotion) {
+      _advanceToBeat2();
+      return;
+    }
+    if (!_minHoldElapsed) {
+      _tappedEarly = true;
+      return;
+    }
+    _advanceToBeat2();
   }
 
   void _begin() {
     if (_begun) return;
     setState(() => _begun = true);
-    widget.onDone();
+    CloudTransition.run(context, swap: widget.onDone);
   }
 
   @override
@@ -382,7 +427,7 @@ class _Beat2Content extends StatelessWidget {
 
     return Column(
       children: [
-        const Spacer(flex: 1),
+        Spacer(flex: (_lerp(30.0, 10.0)).round()),
         // The continuing lockup: same mark + wordmark widgets as
         // Beat 1, lerped smaller and travelling up. A single
         // Transform (translate + scale about the top centre) — one
@@ -442,7 +487,7 @@ class _Beat2Content extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(flex: 2),
+        Spacer(flex: (_lerp(40.0, 20.0)).round()),
         // BEGIN slot grows the same way (button + 8px gap ≈ 57px).
         // ClipRect: the button paints full-size inside a short box
         // mid-reveal and would stripe without it. Gated until the

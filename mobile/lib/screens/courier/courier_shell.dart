@@ -11,6 +11,7 @@
 
 import 'package:flutter/material.dart';
 import '../../widgets/floating_nav_bar.dart';
+import '../../widgets/motion/fade_through.dart';
 import '../../widgets/nav_icons.dart';
 import '../shared/profile_screen.dart';
 import 'courier_profit_screen.dart';
@@ -45,7 +46,7 @@ class _CourierShellState extends State<CourierShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(index: _index, children: _screens),
+      body: FadeThroughIndexedStack(index: _index, children: _screens),
       bottomNavigationBar: FloatingNavBar(
         items: _items,
         currentIndex: _index,

@@ -44,6 +44,7 @@ import '../buyer/product_details_screen.dart';
 import '../buyer/widgets/product_card.dart' show ProductImage;
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
+import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/theme_toggle.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
@@ -328,10 +329,15 @@ class ProfileScreen extends StatelessWidget {
       },
     );
     if (confirmed != true || !context.mounted) return;
-    context.read<AuthState>().logout();
-    // AuthGate (in main.dart) rebuilds to LoginScreen once the state
-    // changes — this just unwinds back to that root route.
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    await CloudTransition.run(
+      context,
+      swap: () {
+        context.read<AuthState>().logout();
+        // AuthGate (in main.dart) rebuilds to LoginScreen once the state
+        // changes — this just unwinds back to that root route.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      },
+    );
   }
 }
 

@@ -75,6 +75,13 @@ class CloudTransition {
             }
           },
           onComplete: cleanup,
+          onDispose: () {
+            timeoutTimer?.cancel();
+            timeoutTimer = null;
+            if (!completer.isCompleted) {
+              completer.complete();
+            }
+          },
         );
       },
     );
@@ -111,11 +118,13 @@ class _CloudTransitionOverlay extends StatefulWidget {
     required this.isReduced,
     required this.onPeak,
     required this.onComplete,
+    this.onDispose,
   });
 
   final bool isReduced;
   final Future<void> Function() onPeak;
   final VoidCallback onComplete;
+  final VoidCallback? onDispose;
 
   @override
   State<_CloudTransitionOverlay> createState() => _CloudTransitionOverlayState();
@@ -125,6 +134,7 @@ class _CloudTransitionOverlayState extends State<_CloudTransitionOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   bool _swapTriggered = false;
+  Timer? _reducedTimer;
 
   @override
   void initState() {
@@ -136,8 +146,16 @@ class _CloudTransitionOverlayState extends State<_CloudTransitionOverlay>
 
     if (widget.isReduced) {
       // Reduced motion: 120ms simple cross-fade
-      _controller.forward().then((_) => widget.onComplete());
-      Timer(const Duration(milliseconds: 60), () {
+      _controller.forward().then((_) {
+        if (mounted) {
+          if (!_swapTriggered) {
+            _swapTriggered = true;
+            widget.onPeak();
+          }
+          widget.onComplete();
+        }
+      });
+      _reducedTimer = Timer(const Duration(milliseconds: 60), () {
         if (mounted && !_swapTriggered) {
           _swapTriggered = true;
           widget.onPeak();
@@ -147,7 +165,13 @@ class _CloudTransitionOverlayState extends State<_CloudTransitionOverlay>
       // Full cloud transition
       _controller.addListener(_checkApex);
       _controller.forward().then((_) {
-        if (mounted) widget.onComplete();
+        if (mounted) {
+          if (!_swapTriggered) {
+            _swapTriggered = true;
+            widget.onPeak();
+          }
+          widget.onComplete();
+        }
       });
     }
   }
@@ -162,7 +186,10 @@ class _CloudTransitionOverlayState extends State<_CloudTransitionOverlay>
 
   @override
   void dispose() {
+    _reducedTimer?.cancel();
+    _controller.removeListener(_checkApex);
     _controller.dispose();
+    widget.onDispose?.call();
     super.dispose();
   }
 

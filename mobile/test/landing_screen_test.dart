@@ -83,7 +83,8 @@ void main() {
     await _pumpLanding(tester, onDone: () => done = true);
 
     await tester.tap(find.text('Zefanya'));
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.byType(LandingPreviewRail), findsOneWidget);
     expect(find.text('BEGIN'), findsOneWidget);
@@ -130,18 +131,18 @@ void main() {
     await _pumpLanding(tester, onDone: () => calls++);
 
     await tester.tap(find.text('Zefanya'));
-    // Fake-async ticker rule (measured, twice): a ticker started
-    // between frames measures from the NEXT pumped frame, not from
-    // the forward() call. So: one bare pump to plant the start
-    // timestamp, then elapse past the 700ms hand-off — the frame in
-    // that second pump ticks it to completion and enables BEGIN.
+    // Elapse past 1.8s hold so _handoff.forward() is called:
+    await tester.pump(const Duration(milliseconds: 1800));
+    // Bare pump to plant the ticker timestamp:
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 2000));
+    // Elapse past the 700ms hand-off:
+    await tester.pump(const Duration(milliseconds: 800));
+
     await tester.tap(find.text('BEGIN'));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 500));
     // Second tap after the guard latched — still exactly one onDone.
     await tester.tap(find.text('BEGIN'));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 400));
     expect(calls, 1);
     expect(tester.takeException(), isNull);
 
@@ -160,8 +161,8 @@ void main() {
     var done = false;
     await _pumpLanding(tester, onDone: () => done = true);
 
-    // Unmount mid-Beat-1 (both timers pending): dispose must cancel
-    // them — pump past both deadlines, expect silence.
+    // Unmount mid-Beat-1 (timers pending): dispose must cancel
+    // them — pump past deadlines, expect silence.
     await tester.pumpWidget(
       const MediaQuery(
         data: MediaQueryData(),
@@ -178,7 +179,8 @@ void main() {
     await _pumpLanding(tester, onDone: () => done = true);
 
     await tester.tap(find.text('Zefanya'));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.byType(LandingPreviewRail), findsOneWidget);
 
     // Unmount with the rail's 6s loop running: everything cancelled.
@@ -193,14 +195,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('reduced motion lands on the Beat 2 end state',
+  testWidgets('reduced motion shows static Beat 1 then advances to Beat 2',
       (tester) async {
     var done = false;
     await _pumpLanding(tester, onDone: () => done = true, reduceMotion: true);
 
-    // Straight to Beat 2, no timers: rail + BEGIN visible at once.
+    // Static Beat 1 frame visible initially
+    expect(find.text('Zefanya'), findsOneWidget);
+    expect(find.text('BUY. SELL. DELIVER.'), findsOneWidget);
+    expect(find.byType(LandingPreviewRail), findsNothing);
+
+    // After 1.2s static hold, advances to Beat 2
+    await tester.pump(const Duration(milliseconds: 1200));
     expect(find.byType(LandingPreviewRail), findsOneWidget);
     expect(find.text('BEGIN'), findsOneWidget);
+
     // 20s of fake time: nothing advances (no rail auto-advance).
     await tester.pump(const Duration(seconds: 20));
     expect(done, isFalse);
@@ -219,7 +228,8 @@ void main() {
 
     // Beat 2 fits too (rail + BEGIN on a short screen).
     await tester.tap(find.text('Zefanya'));
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.byType(LandingPreviewRail), findsOneWidget);
     expect(find.text('BEGIN'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -307,7 +317,8 @@ void main() {
     expect(find.text('Zefanya'), findsOneWidget);
 
     await tester.tap(find.text('Zefanya'));
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.byType(LandingPreviewRail), findsOneWidget);
     expect(find.text('BEGIN'), findsOneWidget);
     expect(tester.takeException(), isNull);

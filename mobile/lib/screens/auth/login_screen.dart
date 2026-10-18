@@ -26,6 +26,7 @@ import '../../utils/timed_snackbar.dart';
 import 'registration_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
+import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 
@@ -117,8 +118,16 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isSubmitting = false);
 
     // AuthGate (in main.dart) rebuilds to the right shell once the
-    // state changes above — this just unwinds back to that root route.
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // state changes above — this unwinds back to that root route
+    // through our signature CloudTransition screen hand-off.
+    await CloudTransition.run(
+      context,
+      swap: () {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      },
+    );
   }
 
   @override

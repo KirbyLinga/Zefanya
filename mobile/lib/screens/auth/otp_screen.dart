@@ -42,6 +42,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
+import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 
@@ -108,10 +109,15 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() => _isSubmitting = false);
 
     // Unwind rather than push: AuthGate (main.dart) is this app's single route
-    // root and now resolves to whichever gate the account is actually at. That
-    // also makes the confirmation's *absence* visible — if the answer changed
-    // nothing, the person lands back on the screen that still says why.
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // root and now resolves to whichever gate the account is actually at.
+    await CloudTransition.run(
+      context,
+      swap: () {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      },
+    );
   }
 
   Future<void> _resend() async {

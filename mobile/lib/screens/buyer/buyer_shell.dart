@@ -13,6 +13,7 @@ import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/scroll_to_top.dart';
 import '../../widgets/floating_nav_bar.dart';
+import '../../widgets/motion/fade_through.dart';
 import '../../widgets/nav_icons.dart';
 import '../shared/profile_screen.dart';
 import 'cart_screen.dart';
@@ -106,7 +107,7 @@ class _BuyerShellState extends State<BuyerShell> {
 
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
+      body: FadeThroughIndexedStack(
         index: _index,
         children: [
           // isActive: Home stays mounted under the other tabs (IndexedStack),
