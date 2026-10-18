@@ -173,6 +173,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final auth = context.watch<AuthState>();
     final email = auth.email ?? 'the address on your application';

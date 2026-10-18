@@ -40,6 +40,7 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final color = AppColors.hueOnSurface(tint ?? AppColors.secondary);
 

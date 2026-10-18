@@ -33,6 +33,12 @@ class _Flaky {
   }
 }
 
+/// A one-shot retryable failure — a request that could work, without
+/// needing the mutable _Flaky harness.
+Future<void> Function() _flakyLoad(bool recovered) => () async {
+      if (!recovered) throw const NetworkException();
+    };
+
 Future<void> _pump(WidgetTester tester, StartupState startup) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
@@ -76,17 +82,31 @@ void main() {
       expect(startup.hasFailures, isFalse);
     });
 
-    test('the message names what failed, as a sentence', () async {
+    test('the message names only retryable failures', () async {
       final startup = StartupState();
 
-      await startup.guard('your chats', _unwired);
-      expect(startup.message, "We couldn't load your chats.");
+      // A known-unbuilt endpoint is recorded but never named: the notice
+      // must not speak about entries it does not show.
+      await startup.guard('your reviews', _unwired);
+      expect(startup.hasFailures, isTrue);
+      expect(startup.hasActionable, isFalse);
+      expect(startup.message, isEmpty);
 
-      await startup.guard('your cart', _unwired);
-      expect(startup.message, "We couldn't load your chats or your cart.");
+      await startup.guard('your cart', _flakyLoad(false));
+      expect(startup.message, "We couldn't load your cart.");
+
+      await startup.guard('your chats', _flakyLoad(false));
+      expect(startup.message, "We couldn't load your cart or your chats.");
+    });
+
+    test('actionable lists only failures retrying could fix', () async {
+      final startup = StartupState();
 
       await startup.guard('your reviews', _unwired);
-      expect(startup.message, "We couldn't load your chats, your cart or your reviews.");
+      await startup.guard('your cart', _flakyLoad(false));
+
+      expect([for (final f in startup.actionable) f.what], ['your cart']);
+      expect(startup.anyRetryable, isTrue);
     });
 
     test('retry clears what now works and keeps what does not', () async {
@@ -101,6 +121,9 @@ void main() {
       await startup.retry();
 
       expect([for (final failure in startup.failures) failure.what], ['your cart']);
+      // The survivor is non-retryable, so nothing actionable remains —
+      // but the record itself is kept, not hidden.
+      expect(startup.hasActionable, isFalse);
     });
   });
 
@@ -111,15 +134,25 @@ void main() {
       expect(find.byType(Text), findsNothing);
     });
 
-    testWidgets('an endpoint the server has not built gets no Retry', (tester) async {
+    testWidgets('a non-retryable-only set shows nothing at all', (tester) async {
       final startup = StartupState();
-      await startup.guard('your chats', _unwired);
+      await startup.guard('your reviews', _unwired);
+      await _pump(tester, startup);
+
+      // Recorded in state, logged quietly — but never bannered. A bar a
+      // customer cannot act on is noise over every screen.
+      expect(startup.hasFailures, isTrue);
+      expect(find.byType(Text), findsNothing);
+    });
+
+    testWidgets('a mix shows only the retryable names', (tester) async {
+      final startup = StartupState();
+      await startup.guard('your reviews', _unwired);
+      await startup.guard('your chats', _flakyLoad(false));
       await _pump(tester, startup);
 
       expect(find.text("We couldn't load your chats."), findsOneWidget);
-
-      // Nothing to retry: a button that cannot work teaches a person to mash it.
-      expect(find.text('Retry'), findsNothing);
+      expect(find.text('Retry'), findsOneWidget);
     });
 
     testWidgets('a failure that could work gets a Retry, and it clears the notice', (tester) async {

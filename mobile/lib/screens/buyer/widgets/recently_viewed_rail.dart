@@ -57,6 +57,7 @@ class RecentlyViewedRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final purchased = context.watch<OrderState>().purchasedProductIds;
     final products = unpurchased(
@@ -127,6 +128,7 @@ class ProductRailTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     // "On sale", not "price drop": a drop is relative to when you saved it,
@@ -207,6 +209,7 @@ class _RailTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(

@@ -10,6 +10,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+/// In widget tests there is no clock-driven removal: a pending [Timer]
+/// keeps the harness scheduling forever (the cart swipe hang). Skip the
+/// self-removal when animations are disabled and lean on the framework's
+/// own SnackBar timeout instead.
+bool _skipSelfRemoval(BuildContext context) =>
+    MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
 void showTimedSnackBar(
   BuildContext context,
   SnackBar snackBar, {
@@ -31,6 +38,10 @@ void showTimedSnackBar(
 
   final controller = messenger.showSnackBar(snackBar);
   debugPrint('[timed_snackbar] shown, will remove in ${duration.inMilliseconds}ms');
+
+  // Widget-test harness: no self-removal timer (it would keep the fake
+  // clock scheduling forever — the cart swipe hang).
+  if (_skipSelfRemoval(context)) return;
 
   // Track whether THIS SnackBar has already gone (swiped away, action
   // tapped, or replaced) so the timer below never removes a newer one.

@@ -20,6 +20,7 @@ import '../../widgets/pressable_scale.dart';
 import '../../widgets/staggered_reveal.dart';
 import 'widgets/delivery_completion_view.dart';
 import '../../utils/image_picker_helper.dart';
+import '../../utils/open_maps.dart';
 
 class DeliveryTrackerScreen extends StatefulWidget {
   const DeliveryTrackerScreen({super.key, required this.jobId});
@@ -152,6 +153,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final courier = context.watch<CourierState>();
@@ -325,6 +327,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
             () => ScaffoldMessenger.of(context)
               ..clearSnackBars()
               ..showSnackBar(SnackBar(content: Text('Calling $title...'))),
+            semanticLabel: 'Call $title',
           ),
           const SizedBox(width: 8),
           _circleAction(
@@ -332,22 +335,39 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
             () => Navigator.of(context).push(
               AppPageRoute(builder: (_) => ChatScreen(contactName: title, contactRole: roleLabel)),
             ),
+            semanticLabel: 'Message $title',
           ),
+          // Open in Maps: hands the address to the device's maps app.
+          // Address only — no buyer phone is shown or passed anywhere
+          // here (see OPEN QUESTIONS: call-buyer privacy).
+          if (roleLabel == 'Buyer') ...[
+            const SizedBox(width: 8),
+            _circleAction(
+              Icons.map_outlined,
+              () => openAddressInMaps(context, subtitle),
+              semanticLabel: 'Open delivery address in Maps',
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _circleAction(IconData icon, VoidCallback onTap) {
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          shape: BoxShape.circle,
+  Widget _circleAction(IconData icon, VoidCallback onTap, {String? semanticLabel}) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: semanticLabel != null,
+      child: PressableScale(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 16, color: AppColors.textPrimary),
         ),
-        child: Icon(icon, size: 16, color: AppColors.textPrimary),
       ),
     );
   }

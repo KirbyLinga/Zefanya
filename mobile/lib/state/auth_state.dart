@@ -53,6 +53,7 @@ import '../data/dto/registration_payload.dart';
 // what keeps the getter delegating to the helper instead of shadowing it.
 import '../data/dto/remote_status.dart' as remote;
 import '../data/repositories/auth_repository.dart';
+import '../utils/order_tab_memory.dart';
 
 enum UserRole { buyer, courier }
 
@@ -116,6 +117,14 @@ class AuthState extends ChangeNotifier {
   String? street;
   String? avatarPath;
 
+  /// Last few distinct delivery addresses, most-recent-first, capped.
+  /// Recorded on every successful order placement; the checkout
+  /// section offers them as one-tap shortcuts. Display strings only
+  /// (the same summary the section already renders) — not structured
+  /// address parts, so there is nothing new to validate or merge.
+  List<String> recentAddresses = const [];
+  static const int recentAddressesCap = 3;
+
   /// When this account first entered the app (login or registration
   /// submit, whichever came first). Set once and never overwritten —
   /// Profile reads it for the "member since" stat. Cleared on logout
@@ -145,6 +154,7 @@ class AuthState extends ChangeNotifier {
   static const _municipalityKey = 'auth_municipality';
   static const _barangayKey = 'auth_barangay';
   static const _streetKey = 'auth_street';
+  static const _recentAddressesKey = 'auth_recent_addresses';
   static const _avatarPathKey = 'auth_avatar_path';
   static const _memberSinceKey = 'auth_member_since';
 
@@ -223,6 +233,8 @@ class AuthState extends ChangeNotifier {
       municipality = prefs.getString(_municipalityKey);
       barangay = prefs.getString(_barangayKey);
       street = prefs.getString(_streetKey);
+      final recentRaw = prefs.getStringList(_recentAddressesKey);
+      recentAddresses = recentRaw == null ? const [] : List.of(recentRaw);
       avatarPath = prefs.getString(_avatarPathKey);
       final memberSinceRaw = prefs.getString(_memberSinceKey);
       memberSince = memberSinceRaw == null ? null : DateTime.tryParse(memberSinceRaw);
@@ -257,6 +269,10 @@ class AuthState extends ChangeNotifier {
     await _setOrRemove(prefs, _municipalityKey, municipality);
     await _setOrRemove(prefs, _barangayKey, barangay);
     await _setOrRemove(prefs, _streetKey, street);
+    final recent = recentAddresses;
+    recent.isEmpty
+        ? await prefs.remove(_recentAddressesKey)
+        : await prefs.setStringList(_recentAddressesKey, recent);
     await _setOrRemove(prefs, _avatarPathKey, avatarPath);
     await _setOrRemove(prefs, _memberSinceKey, memberSince?.toIso8601String());
   }
@@ -485,8 +501,43 @@ class AuthState extends ChangeNotifier {
     _save();
   }
 
-  /// Signs out: this device's session is cleared, then the repository is told
-  /// to revoke the server session.
+  /// Records the just-used delivery address, most-recent-first,
+  /// deduped, capped. Called on successful order placement; empty
+  /// summaries are ignored, so a profile with no address on file
+  /// never pollutes the list.
+  void recordRecentAddress(String summary) {
+    final trimmed = summary.trim();
+    if (trimmed.isEmpty) return;
+    final next = [trimmed];
+    for (final existing in recentAddresses) {
+      if (existing.toLowerCase() != trimmed.toLowerCase()) next.add(existing);
+      if (next.length >= recentAddressesCap) break;
+    }
+    recentAddresses = next;
+    notifyListeners();
+    _save();
+  }
+
+  /// Re-asks the server what this account's current status is.
+  ///
+  /// Called on resume from `PendingApprovalScreen` and by "Check Status".
+  /// If the account has since been approved, `AuthGate` rebuilds to the
+  /// shell automatically because `_applyResult` calls `notifyListeners`.
+  ///
+  /// Silently returns if there is no role or no configured client — the
+  /// mock repository's `refresh()` is a no-op, so in mock mode this is
+  /// always a no-op and `debugApprovePendingAccount` is the test path.
+  Future<void> refresh() async {
+    final currentRole = role;
+    if (currentRole == null) return;
+    final result = await _repository.refresh(role: currentRole);
+    if (result != null) {
+      _applyResult(result);
+      await _save();
+    }
+  }
+
+  /// Signs out: this device's session is cleared, then the repository is told  /// to revoke the server session.
   ///
   /// In that order on purpose. The person asked to be signed out of *this*
   /// device and that part cannot fail, so it happens first; a revoke that fails
@@ -495,6 +546,12 @@ class AuthState extends ChangeNotifier {
   /// mock mode the repository's `logout()` is a no-op, so nothing about signing
   /// out changes — see `docs/api-contract.md` §3.3.
   Future<void> logout() async {
+    // The role is captured before being cleared: the repository needs it to call
+    // the correct revocation path (/logout for buyers, /logout/courier for
+    // couriers), and `_repository.logout()` is called after the local state is
+    // cleared — so we read it now.
+    final sessionRole = role ?? UserRole.buyer;
+
     role = null;
     status = AccountStatus.loggedOut;
     registrationStatus = null;
@@ -510,10 +567,14 @@ class AuthState extends ChangeNotifier {
     municipality = null;
     barangay = null;
     street = null;
+    recentAddresses = const [];
     avatarPath = null;
     memberSince = null;
+    // Navigation memory belongs to the account, not the device — same
+    // reason recentAddresses clears above.
+    await clearOrdersTab();
     notifyListeners();
     await _save();
-    await _repository.logout();
+    await _repository.logout(role: sessionRole);
   }
 }

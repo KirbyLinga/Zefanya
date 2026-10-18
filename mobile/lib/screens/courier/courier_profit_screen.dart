@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/weekly_buckets.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
@@ -32,6 +33,7 @@ class CourierProfitScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
     final completed = courier.completedJobs;
@@ -55,6 +57,8 @@ class CourierProfitScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
+          const SizedBox(height: 20),
+          _WeeklyChart(completed: completed),
           const SizedBox(height: 20),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -267,6 +271,105 @@ class CourierProfitScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Text('₱${c.payout.toStringAsFixed(0)}', style: AppType.priceNumeral(20)),
         ],
+      ),
+    );
+  }
+}
+
+/// Seven-day earnings bars, drawn from the same [CompletedJob.payout]
+/// records the summary card reads — no new data, just a shape for it.
+///
+/// Plain Containers, no chart dependency: 7 day columns scaled to the
+/// week's max, today in the brand fill. An empty week renders flat
+/// ticks, not zeros pretending to be data.
+class _WeeklyChart extends StatelessWidget {
+  const _WeeklyChart({required this.completed});
+
+  final List<CompletedJob> completed;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final theme = Theme.of(context);
+    // DST-safe calendar-day bucketing (see utils/weekly_buckets.dart):
+    // never today.subtract(Duration) across a DST change.
+    final payouts = [
+      for (final c in completed)
+        DatedPayout(amount: c.payout, when: c.completedAt),
+    ];
+    final amounts = last7DayTotals(payouts);
+    final labels = last7DayLabels();
+    final max = amounts.fold(0.0, (m, a) => a > m ? a : m);
+    final weekTotal = amounts.fold(0.0, (s, a) => s + a);
+
+    return Semantics(
+      // The bars are visual; a screen reader gets the week as one
+      // sentence instead of seven silent rectangles.
+      label: weekTotal <= 0
+          ? 'Last 7 days earnings: no deliveries yet'
+          : 'Last 7 days earnings: ₱${weekTotal.toStringAsFixed(0)} total',
+      excludeSemantics: true,
+      child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: editorialRadius(1, ShapeTier.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Last 7 days', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 116,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (amounts[i] > 0)
+                          Text(
+                            '₱${amounts[i].toStringAsFixed(0)}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 9,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Container(
+                          height: max <= 0
+                              ? 4
+                              : (4 + 72 * (amounts[i] / max)).clamp(4, 76),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: i == 6
+                                ? AppColors.primaryDark
+                                : AppColors.tertiary.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          labels[i],
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: i == 6
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                            fontWeight:
+                                i == 6 ? FontWeight.w700 : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
       ),
     );
   }

@@ -40,6 +40,9 @@ class DatabaseSeeder extends Seeder
             DemoCatalogueSeeder::class,
             DemoBuyerSeeder::class,
             DemoOrderSeeder::class,
+            DemoCourierSeeder::class,
+            DemoPromotionSeeder::class,
+            DemoChatSeeder::class,
         ]);
     }
 }

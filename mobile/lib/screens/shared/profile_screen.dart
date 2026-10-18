@@ -274,7 +274,60 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _logout(BuildContext context) {
+  Future<void> _logout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        AppColors.watch(dialogContext);
+        final dialogTheme = Theme.of(dialogContext);
+        return Dialog(
+          shape: editorialShape(0, ShapeTier.card),
+          backgroundColor: AppColors.surface,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('LOG OUT?', style: AppType.eyebrow),
+                const SizedBox(height: 10),
+                Text('Log out of Zefanya?', style: dialogTheme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  'You will need to sign back in to shop and track orders.',
+                  style: dialogTheme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: const Text('Stay'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.danger,
+                          foregroundColor: AppColors.textOnDark,
+                        ),
+                        child: const Text('Log out'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
     context.read<AuthState>().logout();
     // AuthGate (in main.dart) rebuilds to LoginScreen once the state
     // changes — this just unwinds back to that root route.
@@ -306,6 +359,7 @@ class _StatStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final String primaryValue;
     final String primaryLabel;
     final String secondValue;
@@ -401,6 +455,7 @@ class _RecentlyLookedAt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final products = context.watch<RecentlyViewedState>().items;
+    AppColors.watch(context);
     if (products.isEmpty) return const SizedBox.shrink();
 
     final shown = products.take(8).toList(growable: false);
@@ -466,6 +521,7 @@ class _LedgerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(

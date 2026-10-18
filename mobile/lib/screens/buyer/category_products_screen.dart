@@ -13,22 +13,35 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/staggered_reveal.dart';
+import '../../utils/product_sort.dart';
 import 'product_details_screen.dart';
 import 'widgets/product_card.dart';
+import 'widgets/sort_chips.dart';
 
-class CategoryProductsScreen extends StatelessWidget {
+class CategoryProductsScreen extends StatefulWidget {
   const CategoryProductsScreen({super.key, required this.category});
 
   final String category;
 
   @override
+  State<CategoryProductsScreen> createState() => _CategoryProductsScreenState();
+}
+
+class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
+  ProductSort _sort = ProductSort.featured;
+
+  @override
   Widget build(BuildContext context) {
-    final products = context.watch<CatalogState>().inCategory(category);
+    AppColors.watch(context);
+    final products = sortProducts(
+      context.watch<CatalogState>().inCategory(widget.category),
+      _sort,
+    );
     // The saturated version of the category's hue, for the band's rule.
     // (The grid below uses productTint — the same hue *leaned onto* the
     // card ground, which is the right treatment for a photo fill and the
     // wrong one for a 3px line.)
-    final hue = productHue(category);
+    final hue = productHue(widget.category);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -69,7 +82,7 @@ class CategoryProductsScreen extends StatelessWidget {
                       Text('SHOP THE CATEGORY', style: AppType.eyebrow),
                       const SizedBox(height: 8),
                       Text(
-                        category,
+                        widget.category,
                         style: AppType.sectionDisplay.copyWith(fontSize: 28),
                       ),
                     ],
@@ -98,11 +111,19 @@ class CategoryProductsScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (products.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: ProductSortChips(
+                sort: _sort,
+                onChanged: (sort) => setState(() => _sort = sort),
+              ),
+            ),
           Expanded(
             child: products.isEmpty
                 ? EmptyState(
                     icon: Icons.inventory_2_outlined,
-                    title: 'No products in $category yet',
+                    title: 'No products in ${widget.category} yet',
                   )
                 : GridView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),

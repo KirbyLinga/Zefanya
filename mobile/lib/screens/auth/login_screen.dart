@@ -42,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  final _passwordFocus = FocusNode();
 
   // TEMP: with no backend yet, there's no server response to read a
   // role from, so the tester picks which role this login simulates.
@@ -52,6 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -77,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
             password: _passwordController.text,
             name: 'Tristan Araneta',
           );
+      TextInput.finishAutofillContext();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
@@ -120,6 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -129,6 +133,10 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
           child: Form(
             key: _formKey,
+            // Errors appear after first interaction (focus loss / typing),
+            // not only on submit — the fields already chain focus, so a
+            // person tabbing through sees what's wrong as they go.
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -146,8 +154,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 // gradient the way every other content surface does.
                 StaggeredReveal(
                   index: 1,
-                  child: _Panel(
-                    child: Column(
+                  child: AutofillGroup(
+                    child: _Panel(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text('Email or Phone Number', style: theme.textTheme.labelLarge),
@@ -155,6 +164,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _identifierController,
                           keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [
+                            AutofillHints.email,
+                            AutofillHints.telephoneNumber,
+                          ],
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                           decoration: const InputDecoration(
                             hintText: 'you@example.com or 09XXXXXXXXX',
                             prefixIcon: Icon(Icons.person_outline),
@@ -172,7 +187,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _passwordController,
+                          focusNode: _passwordFocus,
                           obscureText: _obscurePassword,
+                          autofillHints: const [AutofillHints.password],
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!_isSubmitting) _login();
+                          },
                           decoration: InputDecoration(
                             hintText: 'Enter your password',
                             prefixIcon: const Icon(Icons.lock_outline),
@@ -212,14 +233,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: _isSubmitting ? null : _login,
                           child: _isSubmitting
                               ? ZefanyaLoader(
-                                  size: 18, color: AppColors.textOnDark, strokeWidth: 4)
+                                  size: 18,
+                                  color: AppColors.textOnDark,
+                                  strokeWidth: 4)
                               : const Text('Login'),
                         ),
                       ],
                     ),
                   ),
                 ),
-
+                ),
                 const SizedBox(height: 28),
                 const StaggeredReveal(index: 2, child: _OrDivider()),
                 const SizedBox(height: 18),
@@ -285,6 +308,7 @@ class _LoginMasthead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -319,6 +343,7 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
       decoration: BoxDecoration(
@@ -342,6 +367,7 @@ class _OrDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Row(
       children: [
         const Expanded(child: Divider()),

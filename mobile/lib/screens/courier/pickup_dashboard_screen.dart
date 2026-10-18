@@ -43,6 +43,7 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final jobs = context.watch<CourierState>().jobsForPickup;
 
     return Scaffold(

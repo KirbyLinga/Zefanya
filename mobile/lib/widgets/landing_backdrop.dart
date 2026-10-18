@@ -81,6 +81,7 @@ class _LandingBackdropState extends State<LandingBackdrop>
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     // Resolved once per build, not per animation frame: the blob set is
     // mode-dependent and this widget repaints ~60x a second.
     final blobs = _blobsFor(Theme.of(context).brightness);

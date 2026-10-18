@@ -12,21 +12,24 @@
 // server-side source at all, and each has to be answered once rather than
 // differently at each call site.
 //
-// ## The four gaps, and what happens at each
+// ## The gaps, and what happens at each
 //
 //  1. **A sale price.** `products` has no `compare_at_price` column, so
 //     `Product.compareAtPrice` is null and the "ON SALE" badge does not render.
 //     The web buyer page fakes a struck-through price as `price / 0.75`; a
 //     discount that does not exist is the kind of claim this project's
 //     no-invented-content rule forbids, so a live product is simply not on sale.
-//  2. **Ratings.** There is no reviews table, so `rating` and `ratingCount` are
-//     0 and the product page drops the average rather than printing
-//     "0.0 ★ (0 ratings)". The constructor's own defaults are the *mock*
-//     catalogue's numbers (4.5 stars), which is why they are overwritten here
-//     explicitly instead of left to default.
-//  3. **The maker note.** No column, so `CatalogRepository.makerNote()` keeps
-//     naming it as not wired: Home's "FROM THE MAKER" section stays absent rather
-//     than filled with prose about a workshop nobody described.
+//  2. **Ratings.** `rating_count` and `rating_avg` are now real fields in the
+//     server's response, computed from the `reviews` table. A product with no
+//     reviews sends `0` for both, and the product page already handles that by
+//     dropping its rating row rather than printing "0.0 ★ (0 reviews)". The
+//     constructor's own defaults (4.5 stars) are the *mock* catalogue's numbers,
+//     which is why they are overwritten explicitly — an average over no ratings
+//     is not a fact about anything.
+//  3. **The maker note.** Now present as `seller.maker_note` in every product
+//     response. `productFromJson` reads it into `Product.sellerMakerNote`, and
+//     `SellerStoryCard` uses it directly. A seller who has not written one sends
+//     null, and the section hides — same rule as the mock.
 //  4. **Voucher caps and scopes.** See [voucherFromJson] — the one gap here that
 //     can cost money rather than merely look thin, answered by refusing to offer
 //     what cannot be applied correctly.
@@ -45,15 +48,21 @@ Product productFromJson(Map<String, Object?> json) => Product(
       // Centavos on the wire; `pesosFromJsonOr` is the one conversion.
       price: pesosFromJsonOr(json['price_minor'], 0),
       sellerName: _shopName(json['seller']),
+      sellerMakerNote: _makerNote(json['seller']),
       description: _text(json['description']),
       // Cover first — the server orders it, and `Product.photos` falls back to
       // its own labelled placeholder when this is empty, so an empty list here
       // stays empty rather than becoming a stock photo.
       images: _textList(json['images']),
-      // Not sent, so not shown. See gaps 1 and 2 in the header.
+      // Not sent, so not shown. See gap 1 in the header.
       compareAtPrice: null,
-      rating: 0,
-      ratingCount: 0,
+      // Real aggregate from the reviews table, when there are any. The
+      // constructor's own defaults are the *mock* catalogue's numbers (4.5
+      // stars), which is why they are overwritten here explicitly instead of
+      // left to default: an average over no ratings is not a fact about anything,
+      // and a mock number on a live product would be a claim nobody made.
+      rating: _number(json['rating_avg']),
+      ratingCount: _int(json['rating_count']),
       soldCount: 0,
     );
 
@@ -94,6 +103,10 @@ Voucher? voucherFromJson(Map<String, Object?> json) {
     discountLabel: '$percent% off',
     minSpend: pesosFromJsonOr(json['min_spend_minor'], 0),
     expiryLabel: _expiryLabel(json['expires_at']),
+    // Parsed from the raw `expires_at`, never from the label string —
+    // the label is display text ("Valid until Sep 30") and re-parsing
+    // it would couple the countdown to copy.
+    expiresAt: _expiryDate(json['expires_at']),
     discountRate: value / 100,
     // The server caps nothing, and `double.infinity` says exactly that —
     // `voucherDiscountFor` clamps to it, and clamping to infinity is not
@@ -116,6 +129,15 @@ String _expiryLabel(Object? value) {
   return 'Valid until ${_months[local.month - 1]} ${local.day}';
 }
 
+/// The raw expiry moment behind [_expiryLabel], or null when the server
+/// sent nothing parseable. Kept as a separate parse (not derived from
+/// the label) so the countdown never depends on display copy.
+DateTime? _expiryDate(Object? value) {
+  final raw = value?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  return DateTime.tryParse(raw);
+}
+
 /// Spelled here rather than pulled in from `intl`: this is the only server date
 /// the app formats, and it already spells months out locally
 /// (`courier_profit_screen.dart`).
@@ -128,6 +150,17 @@ String _text(Object? value) => value?.toString().trim() ?? '';
 
 /// The shop name out of the nested `seller` object, tolerant of its absence.
 String _shopName(Object? seller) => seller is Map ? _text(seller['name']) : '';
+
+/// The maker note out of the nested `seller` object, or null when absent.
+///
+/// An empty string is treated as null — a seller who saved a blank note
+/// should behave the same as one who never set one: the section hides.
+String? _makerNote(Object? seller) {
+  if (seller is! Map) return null;
+  final raw = seller['maker_note']?.toString().trim();
+  if (raw == null || raw.isEmpty) return null;
+  return raw;
+}
 
 List<String> _textList(Object? value) {
   if (value is! List) return const [];
@@ -145,5 +178,13 @@ List<String> _textList(Object? value) {
 double _number(Object? value) {
   if (value is num) return value.toDouble();
   if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+/// An integer from a JSON value that may arrive as a number or a string.
+int _int(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }

@@ -67,7 +67,7 @@ class DemoCatalogueSeeder extends Seeder
             'barangay' => 'Lahug',
             'street' => 'Sanciangko Street',
             'house_number' => '12-A',
-
+            'maker_note' => 'Every piece leaves this workshop with one rule: it has to be useful the day after you buy it.',
         ],
         [
             'business_name' => 'Tahanan Ceramics',
@@ -81,7 +81,7 @@ class DemoCatalogueSeeder extends Seeder
             'barangay' => 'Molo',
             'street' => 'Avanceña Street',
             'house_number' => '7',
-
+            'maker_note' => 'I fire everything in a kiln I built from second-hand bricks. No two pieces come out the same color.',
         ],
         [
             'business_name' => 'Hiraya Weaves',
@@ -95,7 +95,7 @@ class DemoCatalogueSeeder extends Seeder
             'barangay' => 'Calaba',
             'street' => 'Magallanes Street',
             'house_number' => '45',
-
+            'maker_note' => 'My grandmother taught me the loom when I was nine. I still use her threading pattern.',
         ],
         [
             'business_name' => 'Kape ni Lolo',
@@ -109,7 +109,7 @@ class DemoCatalogueSeeder extends Seeder
             'barangay' => 'Pico',
             'street' => 'Km 5 Halsema Highway',
             'house_number' => '3',
-
+            'maker_note' => 'We pick at 4 AM before the fog lifts. The cold keeps the beans dense and the cup clean.',
         ],
         [
             'business_name' => 'Alon Botanicals',
@@ -123,7 +123,7 @@ class DemoCatalogueSeeder extends Seeder
             'barangay' => 'Biking',
             'street' => 'Purok 4',
             'house_number' => '21',
-
+            'maker_note' => null,
         ],
         // Not approved: exists so the visibility rule has something to hide.
         [
@@ -138,7 +138,7 @@ class DemoCatalogueSeeder extends Seeder
             'barangay' => 'Poblacion',
             'street' => 'Quezon Avenue',
             'house_number' => '88',
-
+            'maker_note' => null,
             'status' => 'pending_approval',
         ],
     ];
@@ -247,6 +247,7 @@ class DemoCatalogueSeeder extends Seeder
                     'street' => $shop['street'],
                     'house_number' => $shop['house_number'],
                     'business_name' => $shop['business_name'],
+                    'maker_note' => $shop['maker_note'] ?? null,
                     'line_of_business_id' => $this->categoryId($shop['category']),
                     // Both paths are NOT NULL. Nothing reads them: they are the
                     // seller's private uploads, and no demo account logs in.

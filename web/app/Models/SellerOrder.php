@@ -23,6 +23,9 @@ class SellerOrder extends Model
         'order_id',
         'seller_id',
         'subtotal_minor',
+        'assigned_courier_id',
+        'delivery_fee_minor',
+        'delivery_area',
     ];
 
     protected function casts(): array
@@ -49,6 +52,14 @@ class SellerOrder extends Model
     public function seller(): BelongsTo
     {
         return $this->belongsTo(Seller::class);
+    }
+
+    /**
+     * The logistics provider assigned to deliver this parcel.
+     */
+    public function assignedCourier(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Logistics\LogisticsProvider::class, 'assigned_courier_id');
     }
 
     public function orderItems(): HasMany

@@ -7,6 +7,7 @@
 // real minimum-spend check) instead of accepting any typed string.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/pricing.dart';
 import '../../data/mock_data.dart' show Voucher;
@@ -20,7 +21,6 @@ import 'vouchers_screen.dart';
 import 'widgets/product_card.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 import '../../utils/timed_snackbar.dart';
 
@@ -210,10 +210,10 @@ class _CartScreenState extends State<CartScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     children: [
                       for (var i = 0; i < items.length; i++)
-                        StaggeredReveal(
-                          index: i,
-                          child: _buildCartTile(context, theme, ext, items[i], i),
-                        ),
+                        // No StaggeredReveal: each tile is a Dismissible
+                        // (its own exit animation) and the delayed
+                        // reveal timers hang widget tests. Static tiles.
+                        _buildCartTile(context, theme, ext, items[i], i),
                       const SizedBox(height: 8),
                       FreeShippingMeter(subtotal: cart.subtotal),
                       const SizedBox(height: 12),
@@ -244,13 +244,35 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildCartTile(BuildContext context, ThemeData theme, AppThemeExtension ext, CartItem item, int index) {
     final cart = context.read<CartState>();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(index, ShapeTier.card),
-      ),
+    // Swipe to remove: end-to-start swipe dismisses the tile with the
+    // danger wash behind it, then the SAME _removeItem path fires —
+    // timed snackbar + Undo, no second code path.
+    // The bottom margin sits OUTSIDE the Dismissible (Padding around
+    // it) so the danger background matches the tile exactly.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Dismissible(
+        key: ValueKey(item),
+        direction: DismissDirection.endToStart,
+        onDismissed: (_) {
+          HapticFeedback.lightImpact();
+          _removeItem(context, item);
+        },
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          decoration: BoxDecoration(
+            color: AppColors.danger.withValues(alpha: 0.12),
+            borderRadius: editorialRadius(index, ShapeTier.card),
+          ),
+          child: Icon(Icons.delete_outline, color: AppColors.danger),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: editorialRadius(index, ShapeTier.card),
+          ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -290,7 +312,10 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => _removeItem(context, item),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        _removeItem(context, item);
+                      },
                       tooltip: 'Remove from cart',
                       padding: EdgeInsets.zero,
                       style: IconButton.styleFrom(
@@ -325,6 +350,8 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

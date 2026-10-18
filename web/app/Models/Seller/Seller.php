@@ -35,6 +35,7 @@ class Seller extends Authenticatable
         'house_number',
         'address_detail',
         'business_name',
+        'maker_note',
         'line_of_business_id',
         'upload_id_path',
         'business_permit_path',

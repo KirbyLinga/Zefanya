@@ -75,6 +75,7 @@ class DeliveryCompletionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -185,6 +186,7 @@ class _ConfirmationMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: 96,
       height: 96,

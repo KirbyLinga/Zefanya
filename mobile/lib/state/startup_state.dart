@@ -58,9 +58,21 @@ class StartupState extends ChangeNotifier {
   /// could not, which is what an endpoint the server has not built answers.
   bool get anyRetryable => _failures.any((failure) => failure.error.isRetryable);
 
+  /// Only the failures a person could act on: retryable ones. Known-unbuilt
+  /// endpoints (reviews, chat, courier jobs in live mode) are recorded in
+  /// [failures] and logged quietly, never bannered — a permanent bar a
+  /// customer cannot act on is noise over every screen.
+  List<StartupFailure> get actionable =>
+      [for (final failure in _failures) if (failure.error.isRetryable) failure];
+
+  bool get hasActionable => actionable.isNotEmpty;
+
   /// The sentence the notice renders: `We couldn't load your chats.`
+  ///
+  /// Names only [actionable] failures — the notice never speaks about
+  /// entries it does not show.
   String get message {
-    final names = [for (final failure in _failures) failure.what];
+    final names = [for (final failure in actionable) failure.what];
 
     return switch (names.length) {
       0 => '',

@@ -37,6 +37,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/dev_flags.dart';
 import '../../state/chat_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/motion.dart';
@@ -92,11 +93,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final chat = context.read<ChatState>();
     chat.addMessage(widget.contactName, ChatMessage(text: text, isMe: true, time: 'Now'));
     _controller.clear();
-    setState(() => _isTyping = true);
     _scrollToBottom();
 
-    // Simulated reply so this reads as a live thread rather than a
-    // dead-end form — remove once a real backend sends real replies.
+    // In live mode the server stores the message and returns real sender
+    // identity on the next fetch — no simulated reply needed, and adding
+    // one locally would show it on the wrong side.
+    if (kUseLiveApi) return;
+
+    // Mock mode: simulate a reply so the thread doesn't look like a dead end.
+    setState(() => _isTyping = true);
     Future.delayed(const Duration(milliseconds: 1100), () {
       if (!mounted) return;
       setState(() => _isTyping = false);
@@ -138,6 +143,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final messages = context.watch<ChatState>().messagesFor(widget.contactName);
     final avatarColor = _avatarColorFor(widget.contactName);
@@ -298,6 +304,7 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final isMe = message.isMe;
 
     final radius = BorderRadius.only(
@@ -388,6 +395,7 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(

@@ -49,7 +49,7 @@ class _ScriptedAuthRepository implements AuthRepository {
       answer(role, email);
 
   @override
-  Future<void> logout() async => logoutCalled = true;
+  Future<void> logout({UserRole role = UserRole.buyer}) async => logoutCalled = true;
 
   /// The OTP half is `otp_flow_test`'s subject, so this fake answers it with the
   /// scripted [answer] and a sample address: enough to satisfy the interface
@@ -71,7 +71,7 @@ class _ScriptedAuthRepository implements AuthRepository {
   }) async => resendCalled = true;
 
   @override
-  Future<AuthResult?> refresh() async => null;
+  Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async => null;
 }
 
 void main() {

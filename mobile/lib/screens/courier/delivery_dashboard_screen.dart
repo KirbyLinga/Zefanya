@@ -20,6 +20,7 @@ class DeliveryDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
     final jobs = courier.jobsForDelivery;

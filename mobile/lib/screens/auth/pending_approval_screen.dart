@@ -63,27 +63,89 @@ import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 import 'otp_screen.dart';
 
-class PendingApprovalScreen extends StatelessWidget {
+class PendingApprovalScreen extends StatefulWidget {
   const PendingApprovalScreen({super.key});
 
   @override
+  State<PendingApprovalScreen> createState() => _PendingApprovalScreenState();
+}
+
+class _PendingApprovalScreenState extends State<PendingApprovalScreen>
+    with WidgetsBindingObserver {
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Called by the OS when the app returns to the foreground.
+  ///
+  /// Only acts while this screen is still mounted and not already
+  /// checking — redundant resume events (some devices fire two) are
+  /// swallowed rather than stacking.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && !_checking) {
+      _checkStatus();
+    }
+  }
+
+  Future<void> _checkStatus() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+
+    final auth = context.read<AuthState>();
+    try {
+      // `AuthState.refresh()` calls GET /me or GET /me/courier and applies
+      // the returned status — if the account is now approved, AuthGate
+      // rebuilds to the shell automatically via notifyListeners.
+      await auth.refresh();
+    } catch (_) {
+      // A network failure is not surfaced here: this is a background check.
+      // Explicit taps get the snackbar in _checkStatusWithFeedback below.
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _checkStatusWithFeedback(BuildContext context, AuthState auth, bool awaitingEmail) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await _checkStatus();
+    if (!mounted) return;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            awaitingEmail
+                ? "We're still waiting on that confirmation code."
+                : kShowDevTools
+                    ? 'Still under review — check back soon.'
+                    : "Approvals aren't live yet — nothing to check "
+                        "just yet, but thanks for checking in.",
+          ),
+        ),
+      );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final auth = context.watch<AuthState>();
     final role = auth.role;
-    // Which of the two gates this is. Both read as "waiting", but only one has
-    // something the person can do about it — see the header note.
     final awaitingEmail = auth.awaitsEmailVerification;
-    // Whether there is a handle to confirm *against*. The gate alone is not
-    // enough to offer a field for — see [AuthState.canConfirmEmail].
     final canConfirmEmail = auth.canConfirmEmail;
     final email = auth.email;
-    // Per the spec: Buyer/Seller applications are reviewed by the
-    // administrator; Courier applications are reviewed by the
-    // Logistics/Sorting Center instead. Only meaningful in the
-    // kShowDevTools-true copy below — the honest copy doesn't name a
-    // reviewer, because naming one implies review is actually happening.
     final reviewer = role == UserRole.courier ? 'the Logistics/Sorting Center' : 'our admin team';
 
     return Scaffold(
@@ -208,30 +270,16 @@ class PendingApprovalScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                     ],
                     ElevatedButton(
-                      onPressed: () {
-                        // TODO: replace with a real status-check API call.
-                        // clearSnackBars() first — same reasoning as the
-                        // other buttons fixed this pass: nothing stops
-                        // repeated taps, so each one queued behind the last.
-                        ScaffoldMessenger.of(context)
-                          ..clearSnackBars()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                // Third case, first: in the email gate there is
-                                // nothing to "approve" yet, so the reviewer copy
-                                // would describe a queue the person is not in.
-                                awaitingEmail
-                                    ? "We're still waiting on that confirmation code."
-                                    : kShowDevTools
-                                        ? 'Still under review — check back soon.'
-                                        : "Approvals aren't live yet — nothing to check "
-                                            "just yet, but thanks for checking in.",
-                              ),
-                            ),
-                          );
-                      },
-                      child: const Text('Check Status'),
+                      onPressed: _checking
+                          ? null
+                          : () => _checkStatusWithFeedback(context, auth, awaitingEmail),
+                      child: _checking
+                          ? ZefanyaLoader(
+                              size: 18,
+                              color: AppColors.textOnDark,
+                              strokeWidth: 4,
+                            )
+                          : const Text('Check Status'),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton(
@@ -330,6 +378,7 @@ class _WaitingArch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Arch(
       footRadius: 16,
       child: Container(
@@ -348,6 +397,7 @@ class _EtaBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Column(
       children: [
         Text('USUALLY TAKES', style: AppType.eyebrow),

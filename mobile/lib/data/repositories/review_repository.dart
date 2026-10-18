@@ -25,7 +25,9 @@
 // change that: the aggregate stays the server's number.
 
 import '../../state/review_state.dart';
+import '../api/api_client.dart';
 import '../api/api_exception.dart';
+import '../dto/remote_review.dart';
 
 import 'dart:convert';
 
@@ -104,14 +106,40 @@ class LiveReviewRepository extends LiveRepository implements ReviewRepository {
   }
 
   @override
-  Future<List<ProductReview>> all() {
+  Future<List<ProductReview>> all() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /reviews/mine', section: '§8.1');
+
+    final body = await client.getJson('/reviews/mine', authenticated: true);
+
+    // Filter nulls: a review for a removed product has no product_id and
+    // cannot be shown on a product page. The mapper returns null for those,
+    // and they are silently dropped rather than crashing the list.
+    return unwrapList(body)
+        .map(reviewFromJson)
+        .whereType<ProductReview>()
+        .toList(growable: false);
   }
 
   @override
-  Future<void> submit(ProductReview review) {
+  Future<void> submit(ProductReview review) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('PUT /orders/{order}/items/{product}/review', section: '§8.2');
+
+    // The route key is the seller_order_id (what the app calls orderId) and the
+    // product_id — the same identity the mock uses for its unique-per-purchase
+    // constraint. The server upserts: first submission is 201, any re-submission
+    // for the same purchase is 200. The app treats both identically.
+    await client.patchJson(
+      '/orders/${review.orderId}/items/${review.productId}/review',
+      body: {
+        'stars': review.stars,
+        if (review.comment.isNotEmpty) 'comment': review.comment,
+        if (review.photoPath != null) 'photo_path': review.photoPath,
+      },
+      authenticated: true,
+    );
+    // The server is now the source of truth. No local storage: `all()` fetches
+    // fresh, and the state's `_reviews` cache is rebuilt from the response on
+    // every `submit()` → `_repository.all()` call. This is different from the
+    // mock, which owns its own list — but both implement the same contract.
   }
 }

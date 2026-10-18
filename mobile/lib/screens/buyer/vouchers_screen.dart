@@ -40,6 +40,7 @@ class VouchersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     // The catalogue is the repository's answer, reached through the cart state
     // that loaded it — not a local constant, so a live build cannot show a
     // wallet of vouchers the server never offered.
@@ -80,6 +81,7 @@ class _VoucherTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final isPercent = voucher.discountRate > 0;
@@ -114,6 +116,26 @@ class _VoucherTile extends StatelessWidget {
                           'Min. spend \u20b1${voucher.minSpend.toStringAsFixed(0)} \u00b7 ${voucher.expiryLabel}',
                           style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
                         ),
+                        if (_expiryCountdown(voucher.expiresAt) != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              _expiryCountdown(voucher.expiresAt)!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                // Expired: muted. Within 3 days: danger.
+                                // Otherwise quiet secondary.
+                                color: _isExpired(voucher.expiresAt)
+                                    ? AppColors.textSecondary.withValues(alpha: 0.6)
+                                    : _isExpiringSoon(voucher.expiresAt)
+                                        ? AppColors.danger
+                                        : AppColors.textSecondary,
+                                fontWeight: _isExpiringSoon(voucher.expiresAt) &&
+                                        !_isExpired(voucher.expiresAt)
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -166,6 +188,7 @@ class _Stub extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final value = isPercent
         ? '${(voucher.discountRate * 100).round()}'
         : voucher.maxDiscount.toStringAsFixed(0);
@@ -222,6 +245,46 @@ class _Stub extends StatelessWidget {
   }
 }
 
+/// Countdown text for a voucher's real expiry date, or null when there
+/// is no computable date (then the card shows only [Voucher.expiryLabel]
+/// with no countdown — never parsed from the label string).
+String? _expiryCountdown(DateTime? expiresAt) {
+  if (expiresAt == null) return null;
+  // Calendar-day difference in local time: 23h left reads "today",
+  // 25h reads "tomorrow". Duration.inDays would get both wrong near
+  // midnight, and expires_at arrives as UTC so .toLocal() first.
+  final local = expiresAt.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  final diff = day.difference(today).inDays;
+  if (diff < 0) return 'Expired';
+  if (diff == 0) return 'Expires today';
+  if (diff == 1) return 'Expires tomorrow';
+  return 'Expires in $diff days';
+}
+
+/// True when [expiresAt] is already past (calendar-day, local).
+bool _isExpired(DateTime? expiresAt) {
+  if (expiresAt == null) return false;
+  final local = expiresAt.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  return day.isBefore(today);
+}
+
+/// True when expiry is within 3 days — the only case that earns the
+/// danger/urgent token. Never true for an already-expired voucher.
+bool _isExpiringSoon(DateTime? expiresAt) {
+  if (expiresAt == null || _isExpired(expiresAt)) return false;
+  final local = expiresAt.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  return day.difference(today).inDays <= 3;
+}
+
 /// Vertical dashed line for the seam between the stub and the voucher
 /// details, running between the two punched notches.
 class _DashedSeam extends StatelessWidget {
@@ -229,6 +292,7 @@ class _DashedSeam extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         const dashHeight = 4.0;

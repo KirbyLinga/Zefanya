@@ -64,6 +64,7 @@ class ZefanyaMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: size,
       height: size,
@@ -135,6 +136,7 @@ class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     if (_reduced) {
       return ZefanyaMark(
         size: widget.size,
@@ -190,6 +192,7 @@ class ZefanyaMarkTrace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: size,
       height: size,

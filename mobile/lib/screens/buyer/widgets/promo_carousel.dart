@@ -138,6 +138,7 @@ class _PromoCarouselState extends State<PromoCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Column(
       children: [
         SizedBox(
@@ -208,6 +209,7 @@ class _SlideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final ext = Theme.of(context).extension<AppThemeExtension>()!;
 
     return ClipRRect(
@@ -234,6 +236,7 @@ class _TextLeftLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Stack(
@@ -354,6 +357,7 @@ class _CenteredHeroLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Stack(
@@ -439,6 +443,7 @@ class _IconSplitLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Stack(

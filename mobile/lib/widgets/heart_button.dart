@@ -60,6 +60,7 @@ class _HeartButtonState extends State<HeartButton> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final saved = context.select<WishlistState, bool>((w) => w.isSaved(widget.product.id));
     final diameter = widget.compact ? 30.0 : 40.0;
 

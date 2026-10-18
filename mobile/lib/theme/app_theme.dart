@@ -314,6 +314,36 @@ class AppPalette {
       brightness == Brightness.dark ? dark : light;
 }
 
+/// An [InheritedWidget] that broadcasts palette changes to every
+/// descendant that calls [AppPaletteScope.of].
+///
+/// Sits above [MaterialApp] in `main.dart`. When [brightness] changes,
+/// Flutter marks every element registered via [of] as dirty — so they
+/// rebuild and re-read `AppColors.*` against the new palette without the
+/// [Navigator] being recreated or the route stack being reset.
+///
+/// Widgets that read `AppColors.*` should call `AppColors.watch(context)`
+/// (which calls [of] internally) once at the top of their `build()`.
+class AppPaletteScope extends InheritedWidget {
+  const AppPaletteScope({
+    super.key,
+    required this.brightness,
+    required super.child,
+  });
+
+  final Brightness brightness;
+
+  /// Registers a rebuild dependency; returns the current brightness.
+  static Brightness of(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<AppPaletteScope>()!
+        .brightness;
+  }
+
+  @override
+  bool updateShouldNotify(AppPaletteScope old) => brightness != old.brightness;
+}
+
 /// The app's live colour tokens.
 ///
 /// Every widget reads colours from here — `AppColors.surface`,
@@ -348,10 +378,39 @@ class AppColors {
 
   static bool get isDark => _active.isDark;
 
-  /// Switches the palette every [AppColors] getter resolves against.
+/// Switches the palette every [AppColors] getter resolves against.
   /// Called from the root build; see the class note above.
   static void apply(Brightness brightness) {
     _active = AppPalette.of(brightness);
+  }
+
+  /// Register a rebuild dependency on the current palette.
+  ///
+  /// Call this once at the top of any `build()` method that reads
+  /// `AppColors.*` directly. It registers the caller as a dependent of
+  /// [AppPaletteScope], so when the brightness changes Flutter marks
+  /// this widget dirty and calls `build()` again — re-reading every
+  /// `AppColors.*` getter against the new palette. Without this call,
+  /// Flutter's reconciler may skip rebuilding the widget because its
+  /// widget configuration hasn't changed.
+  ///
+  /// No-op when [AppPaletteScope] is not in the tree (e.g. in unit/widget
+  /// tests that pump widgets directly). Tests call [apply] in their setUp
+  /// instead.
+  ///
+  /// Example:
+  /// ```dart
+  /// @override
+  /// Widget build(BuildContext context) {
+  ///   AppColors.watch(context); // register palette dependency
+  ///   final theme = Theme.of(context);
+  ///   return Container(color: AppColors.surface, ...);
+  /// }
+  /// ```
+  static void watch(BuildContext context) {
+    context.dependOnInheritedWidgetOfExactType<AppPaletteScope>();
+    // Null is fine here: tests don't mount AppPaletteScope.
+    // The call still registers a dependency when the scope IS present.
   }
 
   // ── Brand hues ───────────────────────────────────────────────────────

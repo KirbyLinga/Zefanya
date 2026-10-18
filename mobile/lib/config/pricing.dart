@@ -35,6 +35,22 @@ double voucherBase(Voucher voucher, Iterable<CartItem> items) {
       .fold(0.0, (sum, i) => sum + i.lineTotal);
 }
 
+/// Whether [voucher] can no longer be used (calendar-day, local).
+///
+/// Null [Voucher.expiresAt] means "no computable date" — treated as
+/// usable, since the voucher never stated an expiry. Checked at apply
+/// time and by the cart's validity sweep, so an expired code can
+/// neither be applied nor linger once its day passes.
+bool isVoucherExpired(Voucher voucher) {
+  final expiresAt = voucher.expiresAt;
+  if (expiresAt == null) return false;
+  final local = expiresAt.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  return day.isBefore(today);
+}
+
 /// How much [voucher] takes off. Percentage vouchers use [base] (see
 /// [voucherBase]) up to their cap. Flat vouchers (discountRate == 0, this
 /// catalog's convention for shipping rebates) are capped at what shipping

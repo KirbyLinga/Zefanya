@@ -32,6 +32,7 @@ class AppAtmosphere extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Stack(
       fit: StackFit.expand,
       children: [

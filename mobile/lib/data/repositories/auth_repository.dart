@@ -163,14 +163,20 @@ abstract class AuthRepository {
   });
 
   /// Signs out, server-side if there is a server.
-  Future<void> logout();
+  ///
+  /// [role] defaults to [UserRole.buyer] for backward compatibility.
+  /// Pass the session's role so the correct revocation endpoint is called.
+  Future<void> logout({UserRole role = UserRole.buyer});
 
   /// Re-asks the server what this account's status is.
   ///
   /// Needed because approval happens *while the person is waiting* on the
   /// pending screen: without a refresh, the only way to discover it is a
   /// reinstall or a re-login. `docs/api-contract.md` §3.4.
-  Future<AuthResult?> refresh();
+  ///
+  /// [role] is optional and defaults to [UserRole.buyer] so existing call
+  /// sites that predate courier auth are unaffected.
+  Future<AuthResult?> refresh({UserRole role = UserRole.buyer});
 }
 
 // ---------------------------------------------------------------------------
@@ -266,10 +272,10 @@ class MockAuthRepository implements AuthRepository {
   }) async {}
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout({UserRole role = UserRole.buyer}) async {}
 
   @override
-  Future<AuthResult?> refresh() async => null;
+  Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async => null;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,18 +291,14 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    // One path per role, because one guard is one provider: buyers and logistics
-    // providers are different tables with different credential rules, and a
-    // single endpoint with a `role` field would have to decide which one it
-    // means *after* accepting a password. The courier half has no route yet, so
-    // it names the one that is missing instead of pointing at the buyer's path
-    // with a different word in it.
-    if (role != UserRole.buyer) return notWired('POST /login/logistics');
-
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
+    // One path per role: buyers authenticate at /login/buyer and couriers at
+    // /login/courier. Both paths are now real — see web/routes/api.php.
+    final path = role == UserRole.buyer ? '/login/buyer' : '/login/courier';
+
     final body = await client.postJson(
-      '/login/buyer',
+      path,
       authenticated: false,
       body: {'email': email.trim(), 'password': password},
     );
@@ -440,29 +442,38 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
   }
 
   @override
-  Future<void> logout() async {
+  Future<void> logout({UserRole role = UserRole.buyer}) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
+    // One path per role: a buyer's token is minted at /login/buyer and revoked
+    // at /logout; a courier's is minted at /login/courier and revoked at
+    // /logout/courier. Using the wrong path gets a 403 (wrong account type)
+    // rather than a 200, meaning the token would not be revoked server-side —
+    // and an unrevoked token is worse than a failed revoke attempt.
+    final path = role == UserRole.buyer ? '/logout' : '/logout/courier';
+
     try {
-      // Revokes *this* token on the server, so "signed out" stops being a claim
-      // only this phone believes. Other sessions on the same account are
-      // untouched — signing out of one device is not signing out of all.
-      await client.postJson('/logout');
+      await client.postJson(path);
     } finally {
-      // Local state is cleared whatever the server answered, and `finally` is
-      // what says so: someone who asked to be signed out while offline must not
-      // be left holding a usable token because the request could not be sent.
+      // Local state is cleared whatever the server answered: someone who asked
+      // to be signed out while offline must not be left holding a usable token.
       await client.forgetToken();
     }
   }
 
   @override
-  Future<AuthResult?> refresh() async {
+  Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
+    // Each role has its own /me endpoint so the controller can enforce that the
+    // token belongs to the right kind of account. Calling the wrong one would
+    // get a 403 rather than a 401, which would look like "account not approved"
+    // rather than "this token is from a different role".
+    final path = role == UserRole.buyer ? '/me' : '/me/courier';
+
     try {
-      final body = await client.getJson('/me');
-      return _resultFrom(body, role: UserRole.buyer);
+      final body = await client.getJson(path);
+      return _resultFrom(body, role: role);
     } on UnauthorizedException {
       // A token the server has rejected is worse than no token — it keeps
       // producing 401s — so the answer is to forget it, and `null` is the

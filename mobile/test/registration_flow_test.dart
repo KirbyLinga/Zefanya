@@ -110,10 +110,10 @@ class _ScriptedAuthRepository implements AuthRepository {
   }) async => resendCalled = true;
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout({UserRole role = UserRole.buyer}) async {}
 
   @override
-  Future<AuthResult?> refresh() async => null;
+  Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async => null;
 }
 
 RegistrationProfile _buyerProfile() => RegistrationProfile(

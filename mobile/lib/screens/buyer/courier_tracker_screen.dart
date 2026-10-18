@@ -4,24 +4,39 @@
 // the "Track Courier" button on order cards (inTransit / outForDelivery)
 // and from the order detail screen.
 //
-// Reuses the milestone data already computed by CourierState — no new
-// state, no polling stub, just a live read of the same milestone map
-// the courier's own tracker writes to.
+// In mock mode the milestone is read directly from CourierState (the
+// courier's own tracker writes it there). In live mode the screen also
+// polls GET /api/orders/{id}/milestone every 30 s so the buyer's view
+// stays in sync across devices — a courier advancing a milestone on
+// their phone surfaces here without the buyer having to leave and
+// re-enter the screen.
+//
+// The poll is fire-and-forget: a transient network error is silently
+// discarded rather than surfaced (the milestone the screen already has
+// is still valid; the next tick will try again). Only
+// UnauthorizedException is forwarded — that means the session is dead
+// and there is no point continuing.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/api/api_client.dart';
+import '../../data/api/api_exception.dart';
+import '../../data/dto/remote_status.dart';
 import '../../data/mock_data.dart';
+import '../../data/repositories/repositories.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/copy_id.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../shared/chat_screen.dart';
 
-class CourierTrackerScreen extends StatelessWidget {
+class CourierTrackerScreen extends StatefulWidget {
   const CourierTrackerScreen({super.key, required this.order});
 
   final Order order;
@@ -40,10 +55,79 @@ class CourierTrackerScreen extends StatelessWidget {
   ];
 
   @override
+  State<CourierTrackerScreen> createState() => _CourierTrackerScreenState();
+}
+
+class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
+  static const _pollInterval = Duration(seconds: 30);
+
+  Timer? _pollTimer;
+
+  // The ApiClient is only present in live mode (Repositories.client is null
+  // in mock mode). When it is null polling is skipped entirely — the
+  // courier's own tracker writes directly to CourierState, which this
+  // screen already watches.
+  ApiClient? _apiClient;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache once — the client doesn't change during a session.
+    _apiClient = context.read<Repositories>().client;
+    if (_apiClient != null) {
+      // First poll immediately, then on the timer.
+      _poll();
+      _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Fetches the current milestone for this order from the server and
+  /// updates CourierState if it has changed.
+  ///
+  /// Errors are silently discarded — the screen keeps showing whatever
+  /// milestone it already has, and the next tick will retry. The one
+  /// exception is [UnauthorizedException]: a dead session means every
+  /// future tick will also fail, so there's no point continuing.
+  Future<void> _poll() async {
+    final client = _apiClient;
+    if (client == null || !mounted) return;
+
+    try {
+      final body = await client.getJson(
+        '/orders/${widget.order.id}/milestone',
+        authenticated: true,
+      );
+      if (!mounted) return;
+
+      final milestone = courierMilestoneForWire(body['milestone']);
+      if (milestone == null) return;
+
+      final job = context.read<CourierState>().jobForOrder(widget.order.id);
+      if (job == null) return;
+
+      context.read<CourierState>().updateMilestoneFromServer(job.id, milestone);
+    } on UnauthorizedException {
+      // Session expired — cancel the timer so we don't spam failed requests.
+      _pollTimer?.cancel();
+    } on ApiException {
+      // Transient error — try again on the next tick.
+    } catch (_) {
+      // Unexpected — swallow so the screen stays usable.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
-    final job = courier.jobForOrder(order.id);
+    final job = courier.jobForOrder(widget.order.id);
     final milestone = job == null
         ? DeliveryMilestone.accepted
         : courier.milestoneFor(job.id);
@@ -67,7 +151,7 @@ class CourierTrackerScreen extends StatelessWidget {
                 milestone: milestone,
                 failed: failed,
                 returning: returning,
-                order: order,
+                order: widget.order,
               ),
             ),
             const SizedBox(height: 20),
@@ -110,7 +194,7 @@ class CourierTrackerScreen extends StatelessWidget {
               const SizedBox(height: 12),
               StaggeredReveal(
                 index: 3,
-                child: _DeliveryDetails(theme: theme, job: job),
+                child: _DeliveryDetails(theme: theme, job: job, order: widget.order),
               ),
             ],
           ],
@@ -160,6 +244,7 @@ class _StatusHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return ClipRRect(
       borderRadius: editorialRadius(0, ShapeTier.card),
       child: Container(
@@ -213,6 +298,7 @@ class _ProgressTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final currentIdx =
         _steps.indexWhere((s) => s.$1 == milestone).clamp(0, _steps.length - 1);
 
@@ -316,6 +402,7 @@ class _FailureNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
@@ -365,13 +452,15 @@ class _FailureNotice extends StatelessWidget {
 /// courier at all. Its header text already said "DELIVERY DETAILS"; the
 /// class name was the only thing still claiming otherwise.
 class _DeliveryDetails extends StatelessWidget {
-  const _DeliveryDetails({required this.theme, required this.job});
+  const _DeliveryDetails({required this.theme, required this.job, required this.order});
 
   final ThemeData theme;
   final DeliveryJob job;
+  final Order order;
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -383,7 +472,9 @@ class _DeliveryDetails extends StatelessWidget {
         children: [
           Text('DELIVERY DETAILS', style: AppType.eyebrow),
           const SizedBox(height: 12),
-          _line(theme, 'Request ID', job.id),
+          _CopyLine(theme: theme, label: 'Order ID', value: order.id),
+          const SizedBox(height: 6),
+          _CopyLine(theme: theme, label: 'Request ID', value: job.id),
           const SizedBox(height: 6),
           _line(theme, 'Package', job.packageSize),
           const SizedBox(height: 6),
@@ -407,6 +498,55 @@ class _DeliveryDetails extends StatelessWidget {
           child: Text(value,
               style: theme.textTheme.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w500)),
+        ),
+      ],
+    );
+  }
+}
+
+/// A copyable ID line — tap copies the value, with the same light
+/// haptic + "Copied" snackbar as the order detail screen.
+class _CopyLine extends StatelessWidget {
+  const _CopyLine({required this.theme, required this.label, required this.value});
+
+  final ThemeData theme;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: AppColors.textSecondary)),
+        ),
+        Expanded(
+          child: InkWell(
+            onTap: () => copyId(context, value),
+            // Announced as a copy button — a bare tappable ID is
+            // silent to a screen reader.
+            child: Semantics(
+              button: true,
+              label: 'Copy $label $value',
+              excludeSemantics: true,
+              child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(value,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w500)),
+                ),
+                const SizedBox(width: 6),
+                Icon(Icons.copy_outlined, size: 13, color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+        ),
         ),
       ],
     );
@@ -469,6 +609,7 @@ class _CourierCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final name = job.courierName;
     final assigned = name != null;
     final photo = job.courierPhotoPath;
@@ -547,6 +688,7 @@ class _CourierAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     if (photoPath != null) {
       return ClipOval(
         child: Image.file(

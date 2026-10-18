@@ -185,6 +185,7 @@ class NavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: size,
       height: size,

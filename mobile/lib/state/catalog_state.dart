@@ -109,4 +109,24 @@ class CatalogState extends ChangeNotifier {
 
     notifyListeners();
   }
+
+  /// Re-fetches the catalogue. Called by pull-to-refresh on Home and Categories.
+  ///
+  /// Unlike [load], a failure here propagates — the RefreshIndicator receives it
+  /// and the screen can show an error message — but [_loadFailure] is also updated
+  /// so a rebuild from state still has something true to render.
+  Future<void> refresh() async {
+    try {
+      final products = await _repository.products();
+      final categories = await _repository.categories();
+      _products = List.unmodifiable(products);
+      _categories = List.unmodifiable(categories);
+      _loadFailure = null;
+    } on ApiException catch (error) {
+      _loadFailure = error;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
 }

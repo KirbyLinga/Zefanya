@@ -24,6 +24,7 @@ import 'package:http/testing.dart';
 import 'package:zefanya/data/api/api_client.dart';
 import 'package:zefanya/data/api/api_exception.dart';
 import 'package:zefanya/data/api/token_store.dart';
+import 'package:zefanya/data/mock_data.dart' show PromoGround, PromoSlideLayout;
 import 'package:zefanya/data/repositories/cart_repository.dart';
 import 'package:zefanya/data/repositories/catalog_repository.dart';
 
@@ -79,6 +80,9 @@ Map<String, Object?> _productJson({
   Object? description = 'Woven from rattan offcuts.',
   List<Object?>? images = const ['https://zefanya.test/storage/products/7/a.jpg'],
   Object? inStock = true,
+  int ratingCount = 0,
+  double ratingAvg = 0.0,
+  Object? makerNote,
 }) =>
     {
       'id': id,
@@ -87,8 +91,10 @@ Map<String, Object?> _productJson({
       'price_minor': priceMinor,
       'description': description,
       'in_stock': inStock,
-      'seller': {'name': sellerName},
+      'seller': {'name': sellerName, 'maker_note': makerNote},
       'images': images,
+      'rating_count': ratingCount,
+      'rating_avg': ratingAvg,
     };
 
 /// The live repositories, their token store, and the transport behind them.
@@ -234,21 +240,32 @@ void main() {
     expect(product.photos, hasLength(1));
   });
 
-  test('a live product states no rating and no sale price', () async {
+  test('a live product states no sale price; rating reflects actual reviews',
+      () async {
+    // A product with no reviews.
     final live = _Live([
       _list([_productJson()]),
     ]);
 
     final product = (await live.catalog.products()).single;
 
-    // The two fields the server cannot fill. The constructor's own defaults are
-    // the *mock* catalogue's numbers (4.5 stars), so the interesting half of this
-    // test is that a live product does not inherit them: an average over no
-    // ratings is not a fact about anything.
+    // No sale badge — there is no compare_at_price column.
+    expect(product.compareAtPrice, isNull);
+    // No reviews yet: zero is the honest answer.
     expect(product.rating, 0);
     expect(product.ratingCount, 0);
     expect(product.soldCount, 0);
-    expect(product.compareAtPrice, isNull);
+  });
+
+  test('a live product with reviews carries the real aggregate', () async {
+    final live = _Live([
+      _list([_productJson(ratingCount: 47, ratingAvg: 4.3)]),
+    ]);
+
+    final product = (await live.catalog.products()).single;
+
+    expect(product.rating, closeTo(4.3, 0.01));
+    expect(product.ratingCount, 47);
   });
 
   test('an empty catalogue is an empty list, not a failure', () async {
@@ -417,29 +434,111 @@ void main() {
 
   // ── What is still not wired, and what a misconfigured build says ─────────
 
-  test('the maker note names itself as not wired instead of inventing prose',
-      () async {
-    final live = _Live([_list(const [])]);
+  test('makerNote fetches the note from the server for a known seller', () async {
+    // The note is now embedded in every product response; makerNote() fetches
+    // the first product for that seller and returns its note.
+    final live = _Live([
+      _list([
+        _productJson(
+          sellerName: 'Loom & Larder',
+          makerNote: 'Every piece leaves this workshop with one rule.',
+        ),
+      ]),
+    ]);
 
-    // There is no maker-note column, so Home's "FROM THE MAKER" section stays
-    // absent. Naming the endpoint is what makes the failure actionable.
-    await expectLater(
-      () async => live.catalog.makerNote('Loom & Larder'),
-      throwsA(
-        isA<ApiNotImplementedException>()
-            .having((e) => e.endpoint, 'endpoint', contains('maker_note')),
-      ),
-    );
+    final note = await live.catalog.makerNote('Loom & Larder');
+
+    expect(note, 'Every piece leaves this workshop with one rule.');
+    expect(live.server.paths.single, endsWith('/products'));
+    expect(live.server.queries.single, containsPair('seller', 'Loom & Larder'));
   });
 
-  test('the promo carousel is not wired to anything either', () async {
+  test('makerNote returns null when the seller has no note', () async {
+    final live = _Live([
+      _list([_productJson(sellerName: 'Quiet Shop', makerNote: null)]),
+    ]);
+
+    final note = await live.catalog.makerNote('Quiet Shop');
+
+    expect(note, isNull);
+  });
+
+  test('makerNote returns null when no products exist for that seller', () async {
     final live = _Live([_list(const [])]);
 
-    // There is no promotions table at all, so the carousel keeps saying so.
-    await expectLater(
-      () async => live.catalog.promoSlides(),
-      throwsA(isA<ApiNotImplementedException>()),
-    );
+    final note = await live.catalog.makerNote('Unknown Shop');
+
+    expect(note, isNull);
+  });
+
+  test('the promo carousel fetches slides from the server', () async {
+    final live = _Live([
+      _list([
+        {
+          'eyebrow'  : 'JUST ARRIVED',
+          'title'    : 'New This\nSeason',
+          'subtitle' : 'Fresh arrivals',
+          'layout'   : 'text_left',
+          'ground'   : 'brand_rose',
+          'icon'     : 'local_florist_outlined',
+          'big_icon' : null,
+        },
+        {
+          'eyebrow'  : 'LIMITED TIME',
+          'title'    : '15% Off\nHome & Living',
+          'subtitle' : 'Code NEWHOME15',
+          'layout'   : 'centered_hero',
+          'ground'   : 'sage',
+          'icon'     : 'local_offer_outlined',
+          'big_icon' : 'cottage_outlined',
+        },
+      ]),
+    ]);
+
+    final slides = await live.catalog.promoSlides();
+
+    expect(live.server.paths.single, endsWith('/promotions'));
+    expect(slides.length, 2);
+    expect(slides[0].eyebrow, 'JUST ARRIVED');
+    expect(slides[0].layout,  PromoSlideLayout.textLeft);
+    expect(slides[0].ground,  PromoGround.brandRose);
+    expect(slides[0].bigIcon, isNull);
+    expect(slides[1].eyebrow, 'LIMITED TIME');
+    expect(slides[1].layout,  PromoSlideLayout.centeredHero);
+    expect(slides[1].bigIcon, isNotNull);
+  });
+
+  test('promo slides with unknown layout/ground fall back to safe defaults',
+      () async {
+    final live = _Live([
+      _list([
+        {
+          'eyebrow'  : 'UNKNOWN',
+          'title'    : 'Test',
+          'subtitle' : '',
+          'layout'   : 'not_a_real_layout',
+          'ground'   : 'not_a_real_ground',
+          'icon'     : 'not_a_real_icon',
+          'big_icon' : null,
+        },
+      ]),
+    ]);
+
+    // Should not throw even with unknown values.
+    final slides = await live.catalog.promoSlides();
+    expect(slides.length, 1);
+    // Falls back to textLeft and brandRose
+    expect(slides[0].layout, PromoSlideLayout.textLeft);
+    expect(slides[0].ground, PromoGround.brandRose);
+    // Falls back to the neutral icon rather than crashing.
+    expect(slides[0].icon, isNotNull);
+  });
+
+  test('empty promotion list returns empty slides', () async {
+    final live = _Live([_list(const [])]);
+
+    final slides = await live.catalog.promoSlides();
+    expect(slides, isEmpty);
   });
 
   test('a live repository with no base URL is a configuration failure',

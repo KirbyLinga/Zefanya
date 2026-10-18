@@ -28,6 +28,7 @@ class ProductStackShowcase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     // Scale both cards proportionally to the available width so the
     // composition holds on narrow phones and wider constrained layouts.
     return LayoutBuilder(
@@ -107,6 +108,7 @@ class _StackCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
 

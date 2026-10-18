@@ -149,6 +149,15 @@ class CartState extends ChangeNotifier {
     await prefs.setString(_storageKey, encoded);
   }
 
+  /// Re-fetches vouchers from the server. Called by pull-to-refresh on CartScreen.
+  ///
+  /// The cart lines themselves come from local storage and don't change on pull —
+  /// only the voucher list comes from the network and is worth re-fetching.
+  Future<void> refresh() async {
+    _offer = List.of(await _vouchers.vouchers());
+    notifyListeners();
+  }
+
   void addItem(Product product, {String variant = '', int quantity = 1}) {
     final index = _items.indexWhere((i) => i.product.id == product.id && i.variant == variant);
     if (index >= 0) {
@@ -185,6 +194,19 @@ class CartState extends ChangeNotifier {
     _save();
   }
 
+  /// Selects/deselects every line from one seller — the per-shop
+  /// checkbox in the grouped cart. Sits next to [setAllSelected];
+  /// selection stays owned here, the screen only groups for display.
+  void setSellerSelected(String sellerName, bool selected) {
+    for (final item in _items) {
+      if (item.product.sellerName == sellerName) {
+        item.selected = selected;
+      }
+    }
+    notifyListeners();
+    _save();
+  }
+
   /// Removes and returns the item so the caller can offer an Undo
   /// action (see cart_screen.dart) without CartState knowing about
   /// SnackBars.
@@ -211,6 +233,25 @@ class CartState extends ChangeNotifier {
   /// Called once an order is successfully placed for the selected items.
   void clearSelected() {
     _items.removeWhere((i) => i.selected);
+    notifyListeners();
+    _save();
+  }
+
+  /// Removes everything and returns the snapshot so the caller can offer
+  /// an Undo action (same pattern as [removeItem], one level up).
+  List<CartItem> clearAll() {
+    final snapshot = List<CartItem>.of(_items);
+    _items.clear();
+    notifyListeners();
+    _save();
+    return snapshot;
+  }
+
+  /// Undo for [clearAll].
+  void restoreAll(List<CartItem> snapshot) {
+    _items
+      ..clear()
+      ..addAll(snapshot);
     notifyListeners();
     _save();
   }

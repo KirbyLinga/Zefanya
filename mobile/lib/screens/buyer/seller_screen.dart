@@ -29,6 +29,7 @@ class SellerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final products = context.watch<CatalogState>().bySeller(sellerName);
 
     // Average rating across all of this seller's products.
@@ -159,6 +160,7 @@ class _SellerHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Stack(

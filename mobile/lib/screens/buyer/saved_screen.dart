@@ -30,6 +30,7 @@ class SavedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -48,7 +49,7 @@ class SavedScreen extends StatelessWidget {
               child: Consumer<WishlistState>(
                 builder: (context, wishlist, _) {
                   final products = wishlist.items;
-                  if (products.isEmpty) return _buildEmpty(theme);
+                  if (products.isEmpty) return _buildEmpty(context, theme);
 
                   return GridView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
@@ -84,11 +85,15 @@ class SavedScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmpty(ThemeData theme) {
-    return const EmptyState(
+  Widget _buildEmpty(BuildContext context, ThemeData theme) {
+    return EmptyState(
       icon: Icons.favorite_border,
       title: 'Nothing saved yet',
       subtitle: 'Tap the heart on any product to add it here.',
+      action: OutlinedButton(
+        onPressed: () => Navigator.of(context).maybePop(),
+        child: const Text('Browse products'),
+      ),
     );
   }
 }
@@ -109,6 +114,7 @@ class _SavedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return PressableScale(

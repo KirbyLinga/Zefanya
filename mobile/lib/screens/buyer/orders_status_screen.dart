@@ -18,14 +18,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart';
+import '../../state/cart_state.dart';
+import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/order_tab_memory.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../shared/chat_screen.dart';
+import 'cart_screen.dart';
 import 'order_detail_screen.dart';
 import 'courier_tracker_screen.dart';
 import 'widgets/review_button.dart';
@@ -36,11 +41,62 @@ import 'widgets/review_button.dart';
 // in this file unchanged.
 typedef _Order = Order;
 
-class OrdersStatusScreen extends StatelessWidget {
+class OrdersStatusScreen extends StatefulWidget {
   const OrdersStatusScreen({super.key});
 
   @override
+  State<OrdersStatusScreen> createState() => _OrdersStatusScreenState();
+}
+
+class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
+  /// Last-viewed stage, restored before first paint so the stepper
+  /// opens where the buyer left it rather than always on To Ship.
+  int _initialTab = 0;
+  bool _tabReady = false;
+
+  TabController? _controller;
+  VoidCallback? _persistListener;
+
+  @override
+  void initState() {
+    super.initState();
+    loadOrdersTab().then((tab) {
+      if (mounted) {
+        setState(() {
+          _initialTab = tab;
+          _tabReady = true;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    if (_controller != null && _persistListener != null) {
+      _controller!.removeListener(_persistListener!);
+    }
+    super.dispose();
+  }
+
+  /// Attaches the persist-on-settle listener once per controller, after
+  /// first paint (the controller only exists below this build).
+  void _watchController(TabController controller) {
+    if (identical(_controller, controller)) return;
+    if (_controller != null && _persistListener != null) {
+      _controller!.removeListener(_persistListener!);
+    }
+    _controller = controller;
+    _persistListener = () {
+      // Persist on settle, not on every animation tick: indexIsChanging
+      // is false once the swipe/tap lands.
+      if (!controller.indexIsChanging) saveOrdersTab(controller.index);
+    };
+    controller.addListener(_persistListener!);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     // Watches both: OrderState for what was placed, CourierState for how
     // far along each one is.
     final orderState = context.watch<OrderState>();
@@ -60,10 +116,14 @@ class OrdersStatusScreen extends StatelessWidget {
     }
 
     return DefaultTabController(
-      length: 4,
+      length: ordersTabCount,
+      initialIndex: _tabReady ? _initialTab : 0,
       child: Builder(
         builder: (context) {
           final controller = DefaultTabController.of(context);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _watchController(controller);
+          });
           return Scaffold(
             backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
             body: SafeArea(
@@ -112,6 +172,7 @@ class _OrdersLoadFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return EmptyState(
       icon: Icons.cloud_off_outlined,
       title: 'Your orders could not be loaded',
@@ -150,6 +211,7 @@ class _OrderStageStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -204,6 +266,7 @@ class _StageNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final filled = isPast || isCurrent;
     final stepLabel = isPast ? '$label, completed' : isCurrent ? '$label, current step' : label;
@@ -278,23 +341,45 @@ class _OrderList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final filtered = orders.where((o) => o.status == status).toList();
 
     if (filtered.isEmpty) {
-      return EmptyState(
-        icon: _emptyIcon(status),
-        title: _emptyTitle(status),
-        subtitle: 'Items in this stage will show up here',
-        tint: AppColors.secondary,
+      // Empty states inside a RefreshIndicator: the indicator needs something
+      // scrollable to attach to, so wrap the empty state in a single-child
+      // CustomScrollView rather than returning it bare.
+      return RefreshIndicator(
+        color: AppColors.primaryDark,
+        onRefresh: () => context.read<OrderState>().refresh(),
+        child: CustomScrollView(
+          slivers: [
+            SliverFillRemaining(
+              child: EmptyState(
+                icon: _emptyIcon(status),
+                title: _emptyTitle(status),
+                subtitle: 'Items in this stage will show up here',
+                tint: AppColors.secondary,
+                action: OutlinedButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('Browse products'),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
-      itemCount: filtered.length,
-      itemBuilder: (context, i) => StaggeredReveal(
-        index: i,
-        child: _OrderCard(order: filtered[i], index: i),
+    return RefreshIndicator(
+      color: AppColors.primaryDark,
+      onRefresh: () => context.read<OrderState>().refresh(),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+        itemCount: filtered.length,
+        itemBuilder: (context, i) => StaggeredReveal(
+          index: i,
+          child: _OrderCard(order: filtered[i], index: i),
+        ),
       ),
     );
   }
@@ -325,6 +410,7 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final statusColor = _statusColors[order.status]!;
     final radius = editorialRadius(index, ShapeTier.card);
@@ -442,6 +528,41 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
+  /// Re-adds every resolvable item from this delivered order to the cart.
+  void _buyAgain(BuildContext context) {
+    final catalog = context.read<CatalogState>();
+    final cart = context.read<CartState>();
+    final byId = {for (final p in catalog.products) p.id: p};
+
+    var added = 0;
+    for (final id in order.productIds) {
+      final product = byId[id];
+      if (product == null) continue;
+      cart.addItem(product);
+      added++;
+    }
+
+    if (added == 0) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('These items are no longer available')),
+      );
+      return;
+    }
+    showTimedSnackBar(
+      context,
+      SnackBar(
+        content: Text('$added item${added == 1 ? '' : 's'} added to cart'),
+        action: SnackBarAction(
+          label: 'View Cart',
+          onPressed: () => Navigator.of(context).push(
+            AppPageRoute(builder: (_) => const CartScreen()),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _actionRow(BuildContext context, ThemeData theme) {
     switch (order.status) {
       case OrderStatus.toShip:
@@ -487,6 +608,14 @@ class _OrderCard extends StatelessWidget {
         return Row(
           children: [
             Expanded(child: ReviewButton(order: order, expanded: false)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _buyAgain(context),
+                icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                label: const Text('Buy Again'),
+              ),
+            ),
           ],
         );
     }
@@ -500,6 +629,7 @@ class _PerforationLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       height: 1,
       child: CustomPaint(

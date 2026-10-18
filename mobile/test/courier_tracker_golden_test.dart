@@ -32,6 +32,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/data/repositories/repositories.dart';
 import 'package:zefanya/screens/buyer/courier_tracker_screen.dart';
 import 'package:zefanya/state/courier_state.dart';
 import 'package:zefanya/theme/app_theme.dart';
@@ -81,8 +82,12 @@ Future<void> _pump(
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    ChangeNotifierProvider<CourierState>.value(
-      value: courier,
+    MultiProvider(
+      providers: [
+        // Mock Repositories: client is null so the screen skips polling.
+        Provider<Repositories>.value(value: Repositories.mock()),
+        ChangeNotifierProvider<CourierState>.value(value: courier),
+      ],
       child: MaterialApp(
         theme: brightness == Brightness.dark ? AppTheme.dark : AppTheme.light,
         home: MediaQuery(

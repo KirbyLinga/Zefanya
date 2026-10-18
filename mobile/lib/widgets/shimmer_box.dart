@@ -53,6 +53,7 @@ class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {

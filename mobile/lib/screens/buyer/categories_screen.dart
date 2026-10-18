@@ -73,6 +73,7 @@ class CategoriesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final ranked = _rankedCategories(context.watch<CatalogState>());
     if (ranked.isEmpty) return const SizedBox.shrink();
     final feature = ranked.first;
@@ -81,7 +82,10 @@ class CategoriesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       body: SafeArea(
-        child: CustomScrollView(
+        child: RefreshIndicator(
+          color: AppColors.primaryDark,
+          onRefresh: () => context.read<CatalogState>().refresh(),
+          child: CustomScrollView(
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -156,6 +160,7 @@ class CategoriesScreen extends StatelessWidget {
             ] else
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
+          ),
         ),
       ),
     );
@@ -181,6 +186,7 @@ class _FeatureCategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final tint = productTint(category);
 
@@ -267,6 +273,7 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     return PressableScale(
       onTap: onTap,

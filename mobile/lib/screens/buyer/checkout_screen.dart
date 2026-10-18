@@ -49,6 +49,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _showTermsError = false;
   bool _isPlacingOrder = false;
 
+  /// Collapses the per-line breakdown to one total row, expanded on
+  /// tap. Starts collapsed: the total is what a checkout screen is
+  /// for; the lines are one tap away, not gone.
+  bool _summaryExpanded = false;
+
   @override
   void dispose() {
     _notesController.dispose();
@@ -137,6 +142,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         fee: kStandardShippingFee / placed.length,
       );
     }
+    // Record the just-used address for the one-tap shortcut next
+    // time — before clearing the cart, while the summary still reads.
+    context
+        .read<AuthState>()
+        .recordRecentAddress(context.read<AuthState>().addressSummary);
+
     context.read<CartState>().clearSelected();
     setState(() => _isPlacingOrder = false);
 
@@ -212,6 +223,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ],
       ),
       bottomNavigationBar: _buildBottomBar(theme, selectedItems, total),
+
+
     );
   }
 
@@ -233,6 +246,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             : null,
       ),
       child: child,
+    );
+  }
+
+  /// Tappable summary header: collapsed is one row with the item
+  /// count; tapping reveals the per-line breakdown below. The bottom
+  /// bar always carries the total, so nothing is lost either way.
+  Widget _summaryHeader(ThemeData theme, double total, int count) {
+    return Semantics(
+      button: true,
+      expanded: _summaryExpanded,
+      label: 'Order summary, $count items, '
+          'total \u20b1${total.toStringAsFixed(0)}',
+      child: InkWell(
+        onTap: () => setState(() => _summaryExpanded = !_summaryExpanded),
+        borderRadius: BorderRadius.circular(8),
+        child: Row(
+          children: [
+            Icon(Icons.receipt_long_outlined,
+                size: 18, color: AppColors.primaryDark),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text('Order Summary',
+                  style: theme.textTheme.titleSmall),
+            ),
+            Text(
+              '$count item${count == 1 ? '' : 's'}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 2),
+            AnimatedRotation(
+              turns: _summaryExpanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                Icons.expand_more,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -280,6 +336,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               color: hasAddress ? null : AppColors.danger,
             ),
           ),
+          // No recent-address chips here (removed per review): a chip
+          // showing an old address that merely opens Edit Profile
+          // misleads — it reads as "tap to apply". Recording stays in
+          // AuthState (recordRecentAddress on placement) so the data is
+          // ready the day checkout owns a structured address it can
+          // actually fill. See OPEN QUESTION 6.
         ],
       ),
     );
@@ -299,8 +361,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(theme, Icons.receipt_long_outlined, 'Order Summary'),
-          const SizedBox(height: 10),
+          _summaryHeader(theme, total, items.length),
+          if (_summaryExpanded) ...[
+            const SizedBox(height: 10),
           if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -329,6 +392,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           const Divider(height: 24),
           _orderLine(theme, 'Total', '₱${total.toStringAsFixed(2)}', isBold: true),
+          ],
         ],
       ),
     );

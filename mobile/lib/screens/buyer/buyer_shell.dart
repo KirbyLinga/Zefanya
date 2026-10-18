@@ -11,6 +11,7 @@ import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/scroll_to_top.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/nav_icons.dart';
 import '../shared/profile_screen.dart';
@@ -22,6 +23,7 @@ import 'product_details_screen.dart';
 import 'search_screen.dart';
 import 'vouchers_screen.dart';
 import 'widgets/product_card.dart';
+import 'widgets/featured_deck.dart';
 import 'widgets/promo_carousel.dart';
 import 'widgets/product_stack_showcase.dart';
 import 'widgets/seller_story_card.dart';
@@ -48,10 +50,32 @@ class _BuyerShellState extends State<BuyerShell> {
   /// Bumped to focus the Search tab's field — see SearchScreen.focusRequests.
   final _searchFocusRequests = ValueNotifier<int>(0);
 
+  /// One key per tab so a re-tap can find that tab's own subtree and
+  /// scroll its live positions to the top — see scroll_to_top.dart.
+  /// A shared controller per tab would multi-attach on the Orders tab,
+  /// whose TabBarView keeps two lists mounted mid-swipe.
+  final _tabKeys = List.generate(5, (_) => GlobalKey());
+
   @override
   void dispose() {
     _searchFocusRequests.dispose();
     super.dispose();
+  }
+
+  void _onTabTap(int i) {
+    // Re-tap the active tab: scroll that tab's own live positions to
+    // the top. A tab switch only changes the index — offsets preserved.
+    if (i == _index) {
+      final context = _tabKeys[i].currentContext;
+      if (context != null) scrollTabToTop(context);
+      return;
+    }
+    setState(() => _index = i);
+    // Deliberate tap on the Search tab: raise the keyboard, Shopee-style.
+    // Returns from pushed routes (e.g. back from a product page) don't
+    // pass through here — IndexedStack just reveals the mounted tab —
+    // so this can't re-raise the keyboard over a half-typed query.
+    if (i == 1) _searchFocusRequests.value++;
   }
 
   /// Home's search bar is a doorway, not a second search UI: jump to the
@@ -63,6 +87,7 @@ class _BuyerShellState extends State<BuyerShell> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     // Count orders that have moved to a new status since last viewed.
     // "In transit" and "out for delivery" are the two stages the buyer
     // actively wants to know about — toShip is expected, toRate is done.
@@ -86,17 +111,38 @@ class _BuyerShellState extends State<BuyerShell> {
         children: [
           // isActive: Home stays mounted under the other tabs (IndexedStack),
           // so it has to be told when it isn't the one on screen.
-          _BuyerHomeScreen(isActive: _index == 0, onSearchTap: _openSearch),
-          SearchScreen(focusRequests: _searchFocusRequests),
-          const CategoriesScreen(),
-          const OrdersStatusScreen(),
-          const ProfileScreen(title: 'Buyer Profile'),
+          // Each tab carries a key so a re-tap can scroll that tab's own
+          // live positions — see scroll_to_top.dart.
+          KeyedSubtree(
+            key: _tabKeys[0],
+            child: _BuyerHomeScreen(
+              isActive: _index == 0,
+              onSearchTap: _openSearch,
+              onBrowseCategories: () => _onTabTap(2),
+            ),
+          ),
+          KeyedSubtree(
+            key: _tabKeys[1],
+            child: SearchScreen(focusRequests: _searchFocusRequests),
+          ),
+          KeyedSubtree(
+            key: _tabKeys[2],
+            child: const CategoriesScreen(),
+          ),
+          KeyedSubtree(
+            key: _tabKeys[3],
+            child: const OrdersStatusScreen(),
+          ),
+          KeyedSubtree(
+            key: _tabKeys[4],
+            child: const ProfileScreen(title: 'Buyer Profile'),
+          ),
         ],
       ),
       bottomNavigationBar: FloatingNavBar(
         items: items,
         currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        onTap: _onTabTap,
       ),
     );
   }
@@ -109,13 +155,16 @@ class _BuyerShellState extends State<BuyerShell> {
 /// have its own category chips, which was two different UIs doing the
 /// same job.
 class _BuyerHomeScreen extends StatefulWidget {
-  const _BuyerHomeScreen({required this.isActive, required this.onSearchTap});
+  const _BuyerHomeScreen({required this.isActive, required this.onSearchTap, required this.onBrowseCategories});
 
   /// False while another tab is showing — pauses the promo banner.
   final bool isActive;
 
   /// Tapping the search bar hands off to the Search tab.
   final VoidCallback onSearchTap;
+
+  /// The deck end card's "Browse categories" — jumps to Categories.
+  final VoidCallback onBrowseCategories;
 
   @override
   State<_BuyerHomeScreen> createState() => _BuyerHomeScreenState();
@@ -136,6 +185,18 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   // the pick is deliberately frozen for the session — a re-shuffle mid-scroll
   // would move the hero under the person's thumb.
   late final List<Product> _shuffled;
+
+  /// Drives "Shop the shelf" from the deck's end card: scrolls Home
+  /// down to The Shelf. Owned here (not in the deck) so the deck stays
+  /// a pure presentational widget — it reports taps, Home scrolls.
+  late final ScrollController _scrollController = ScrollController();
+  final _shelfKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   /// The seller featured in the "From the maker" card. Chosen from a
   /// different shop than the cover story's, so the same seller (and its
@@ -170,6 +231,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final cartCount = context.watch<CartState>().itemCount;
@@ -194,7 +256,11 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       body: SafeArea(
-        child: CustomScrollView(
+        child: RefreshIndicator(
+          color: AppColors.primaryDark,
+          onRefresh: () => context.read<CatalogState>().refresh(),
+          child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             // ---- Masthead ----------------------------------------
             // Was a 20pt headlineSmall wordmark sitting at the same
@@ -350,24 +416,18 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
             else if (_shuffled.isEmpty)
               SliverToBoxAdapter(child: _buildEmptyState(theme))
             else ...[
-              // ---- Cover story -----------------------------------
+              // ---- Featured rail -----------------------------------
+              // Full-bleed: NO horizontal padding here. The rail owns
+              // its own 20px gutters (header row + page insets), which
+              // are the only inset — wrapping padding too would double
+              // it to 40px (Claude alignment round 2).
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                padding: const EdgeInsets.only(top: 8),
                 sliver: SliverToBoxAdapter(
-                  child: StaggeredReveal(
-                    index: 0,
-                    child: CoverStoryTile(
-                      product: _shuffled.first,
-                      heroTag: 'home-${_shuffled.first.id}',
-                      onTap: () => Navigator.of(context).push(
-                        AppPageRoute(
-                          builder: (_) => ProductDetailsScreen(
-                            product: _shuffled.first,
-                            heroTag: 'home-${_shuffled.first.id}',
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: FeaturedDeck(
+                    products: _shuffled.take(5).toList(),
+                    heroTagPrefix: 'home',
+                    isActive: widget.isActive,
                   ),
                 ),
               ),
@@ -456,6 +516,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
                 child: Padding(
+                  key: _shelfKey,
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,6 +532,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ],
+          ),
         ),
       ),
     );

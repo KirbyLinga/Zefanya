@@ -23,6 +23,7 @@ import 'screens/landing_screen.dart';
 import 'utils/motion.dart';
 import 'widgets/app_atmosphere.dart';
 import 'widgets/startup_notice.dart';
+import 'widgets/zefanya_mark.dart';
 
 void main() async {
   // Needed because we're awaiting async work (state.load()) before
@@ -30,31 +31,17 @@ void main() async {
   // aren't guaranteed ready yet.
   WidgetsFlutterBinding.ensureInitialized();
 
-  // The one place the mock/real decision is made. It still defaults to mock,
-  // but the reason has moved: the API does exist now — buyers register, confirm,
-  // sign in and read the catalogue from the real server (see
-  // web/routes/api.php). It defaults to mock because two of the loads below
-  // fetch over the network in live mode and have no endpoint to fetch from yet,
-  // so a live build would never reach its first frame. See
-  // config/dev_flags.dart. Everything below receives interfaces and cannot tell
-  // which mode it is in, which is what keeps the switch a config change rather
-  // than a code change.
+  // The one place the mock/real decision is made.
   final repositories = Repositories.forMode(
     useLive: kUseLiveApi,
     baseUrl: kApiBaseUrl,
   );
 
   final authState = AuthState(repository: repositories.auth);
-  // The state classes that resolve catalogue ids take the repository, so they
-  // no longer reach into `mock_data` themselves.
   final cartState = CartState(
     catalog: repositories.catalog,
     vouchers: repositories.cart,
   );
-  // The catalogue the browsing screens read. Before it, they reached into
-  // `data/mock_data.dart` for `mockProducts` directly, which mock mode hid
-  // completely and live mode showed immediately: a live build rendered the eight
-  // mock products while the server held thirteen real ones.
   final catalogState = CatalogState(repository: repositories.catalog);
   final chatState = ChatState(repository: repositories.chat);
   final courierState = CourierState(repository: repositories.courier);
@@ -63,45 +50,20 @@ void main() async {
   final reviewState = ReviewState(repository: repositories.review);
   final wishlistState = WishlistState(catalog: repositories.catalog);
   final themeState = ThemeState();
-  // Restore any saved session/cart/chat/courier-job state before the
-  // first frame, so nothing flashes empty then jumps to the real state,
-  // and so AuthGate below has a real AccountStatus to gate the landing
-  // screen on rather than a placeholder.
-  //
-  // Each `load()` here is also what pulls its repository's local restore
-  // (placed orders, written reviews, chat threads), which is why the bundle's
-  // own `Repositories.loadLocal()` is deliberately NOT in this list: it would
-  // read the same storage a second time for the same result. A live build must
-  // still not block its first frame on a network call that may be slow or
-  // unreachable, and every live repository's `load()` is a no-op for exactly
-  // that reason — see the note in repositories.dart.
-  // Every load below is wrapped, and that is the whole reason `StartupState`
-  // exists: several of them read over the network, and `main()` awaits them all
-  // before `runApp`, so an unwrapped one that rejects is not an error state — it
-  // is an app that never starts, holding the native splash on screen forever with
-  // nothing the person can do. Live mode did exactly that, through
-  // `ChatState.load()`, whose endpoint the server does not serve yet. A wrapped
-  // failure is recorded by name and shown above the shell instead.
   final startupState = StartupState();
 
-  await Future.wait([
-    startupState.guard('your account', authState.load),
-    startupState.guard('the store catalogue', catalogState.load),
-    startupState.guard('your cart', cartState.load),
-    startupState.guard('your chats', chatState.load),
-    startupState.guard('your delivery jobs', courierState.load),
-    startupState.guard('your orders', orderState.load),
-    startupState.guard('your recently viewed items', recentlyViewedState.load),
-    startupState.guard('your reviews', reviewState.load),
-    startupState.guard('your saved items', wishlistState.load),
-    // Restored before the first frame, so someone who chose dark doesn't
-    // get a flash of light on every cold start.
-    startupState.guard('your appearance settings', themeState.load),
-  ]);
+  // Fire runApp immediately — before the loads finish — so the person
+  // sees the app's own loading state instead of just the native splash.
+  // The ValueNotifier flips once Future.wait resolves, and the
+  // BootSplash widget below swaps itself out for the real app at that
+  // moment. The architecture is unchanged: every state is still loaded
+  // before the shell becomes visible.
+  final booted = ValueNotifier<bool>(false);
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<Repositories>.value(value: repositories),
         ChangeNotifierProvider.value(value: authState),
         ChangeNotifierProvider.value(value: startupState),
         ChangeNotifierProvider.value(value: cartState),
@@ -114,76 +76,136 @@ void main() async {
         ChangeNotifierProvider.value(value: wishlistState),
         ChangeNotifierProvider.value(value: themeState),
       ],
-      child: const MarketplaceApp(),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: booted,
+        builder: (context, ready, child) =>
+          ready ? const MarketplaceApp() : const _BootSplash(),
+      ),
     ),
   );
+
+  await Future.wait([
+    startupState.guard('your account', authState.load),
+    startupState.guard('your appearance settings', themeState.load),
+  ]);
+
+  await Future.wait([
+    startupState.guard('the store catalogue', catalogState.load),
+    startupState.guard('your cart', cartState.load),
+    startupState.guard('your chats', chatState.load),
+    startupState.guard('your delivery jobs', courierState.load),
+    startupState.guard('your orders', orderState.load),
+    startupState.guard('your recently viewed items', recentlyViewedState.load),
+    startupState.guard('your reviews', reviewState.load),
+    startupState.guard('your saved items', wishlistState.load),
+  ]);
+
+  booted.value = true;
 }
+
+
 
 /// Widest the app's content column gets before it stops stretching.
 const double kMaxContentWidth = 560;
+
+/// In-app loading state shown while `main()`'s nine loads run.
+/// so the person sees something in Flutter's own rendering rather than
+/// just the native splash screen. The design deliberately matches the
+/// atmosphere and mark that are already in the app so the transition
+/// from this screen to the real shell is seamless rather than jarring.
+///
+/// Brightness: `ThemeState` hasn't loaded yet, so we initialize the
+/// palette to light mode here. This is the same default the palette
+/// has before any call to `AppColors.apply`, so there is no flicker —
+/// it simply stays at the mode it would have been in anyway.
+class _BootSplash extends StatelessWidget {
+  const _BootSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    // Do NOT call AppColors.watch or AppColors.apply here — _BootSplash is
+    // shown before AppPaletteScope is in the tree (it replaces MarketplaceApp
+    // which wraps that scope). AppColors starts at its light default.
+    return Directionality(
+      // Required by Stack and other widgets below MaterialApp.
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const AppAtmosphere(),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ZefanyaMark(size: 48, strokeWidth: 6),
+                const SizedBox(height: 28),
+                ZefanyaLoader(size: 28, strokeWidth: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class MarketplaceApp extends StatelessWidget {
   const MarketplaceApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // The palette every `AppColors.*` getter resolves against is decided
-    // here, at the root, before anything below builds. MaterialApp
-    // evaluates BOTH `theme` and `darkTheme` on every build (it needs both
-    // for the mode-switch animation), so neither factory can tell us which
-    // one actually won — this line is the single source of truth, and it
-    // runs before the first paint.
+    AppColors.watch(context);
     final themeState = context.watch<ThemeState>();
+    // Apply once here so any widget above the Navigator (e.g. _BootSplash
+    // sibling, AppAtmosphere in builder) already has the right palette.
     AppColors.apply(themeState.brightness);
 
-    return MaterialApp(
-      title: 'Marketplace',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeState.mode,
-      // Widgets read AppColors directly, so the palette flips instantly on
-      // toggle. Material's default theme cross-fade would leave
-      // Material-derived colours (text theme, borders) animating for
-      // 200ms against already-switched surfaces — a half-state on every
-      // flip, which is exactly what this refactor exists to avoid.
-      themeAnimationDuration: Duration.zero,
-      // Paints the app's background once, here, instead of every Scaffold
-      // repeating a flat fill. The stack itself lives in
-      // widgets/app_atmosphere.dart so the landing screen can render the
-      // same thing with the glows drifting, without a second copy of the
-      // gradient existing anywhere.
-      builder: (context, child) {
-        // App-wide responsiveness guards (apply to every screen):
-        //  1. Cap the OS font-size setting. Big system text is the #1 cause
-        //     of "RIGHT OVERFLOWED BY n PIXELS" on real phones. 1.3x still
-        //     honors larger-text users without breaking fixed-size layouts.
-        //  2. Cap content width and center it, so Chrome / tablets / desktop
-        //     windows show a phone-width column instead of stretched layouts.
-        //     MediaQuery.size is overridden to match, so screens that read
-        //     it (e.g. chat bubbles) agree with the constrained width.
-        final mq = MediaQuery.of(context);
-        final width = mq.size.width < kMaxContentWidth ? mq.size.width : kMaxContentWidth;
-        return MediaQuery(
-          data: mq.copyWith(
-            textScaler: mq.textScaler.clamp(minScaleFactor: 0.85, maxScaleFactor: 1.3),
-            size: Size(width, mq.size.height),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              const AppAtmosphere(),
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: kMaxContentWidth),
-                  child: SizedBox.expand(child: child!),
+    // _AppPaletteScope sits above MaterialApp's Navigator. When brightness
+    // changes, Flutter marks every element that called
+    // _AppPaletteScope.of(context) as dirty — including every screen inside
+    // the Navigator — without recreating the Navigator or resetting the
+    // route stack. _PaletteRepaint in the builder registers that dependency
+    // once per frame so every route's subtree repaints with the new palette.
+    return AppPaletteScope(
+      brightness: themeState.brightness,
+      child: MaterialApp(
+        title: 'Marketplace',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeState.mode,
+        themeAnimationDuration: Duration.zero,
+        builder: (context, child) {
+          // Register palette dependency so this builder context rebuilds
+          // when brightness changes — which propagates to child below.
+          AppColors.watch(context);
+          final mq = MediaQuery.of(context);
+          final width = mq.size.width < kMaxContentWidth
+              ? mq.size.width
+              : kMaxContentWidth;
+          return MediaQuery(
+            data: mq.copyWith(
+              textScaler: mq.textScaler
+                  .clamp(minScaleFactor: 0.85, maxScaleFactor: 1.3),
+              size: Size(width, mq.size.height),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const AppAtmosphere(),
+                Center(
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: kMaxContentWidth),
+                    child: SizedBox.expand(child: child!),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-      home: const AuthGate(),
+              ],
+            ),
+          );
+        },
+        home: const AuthGate(),
+      ),
     );
   }
 }
@@ -248,6 +270,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     if (!_introDone) {
       return LandingScreen(
         reduceMotion: reduceMotion(context),

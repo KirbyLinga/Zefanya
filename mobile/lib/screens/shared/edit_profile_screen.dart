@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/dirty_guard.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/zefanya_mark.dart';
 
@@ -40,6 +41,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _barangay;
   bool _isSaving = false;
 
+  /// True once the user changes anything — the back-guard only
+  /// interrupts when there is actually something to lose.
+  bool _dirty = false;
+
+  void _markDirty() {
+    if (!_dirty) setState(() => _dirty = true);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +58,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _middleInitialController = TextEditingController(text: auth.middleInitial ?? '');
     _phoneController = TextEditingController(text: auth.phone ?? '');
     _streetController = TextEditingController(text: auth.street ?? '');
+    for (final c in [
+      _lastNameController,
+      _firstNameController,
+      _middleInitialController,
+      _phoneController,
+      _streetController,
+    ]) {
+      c.addListener(_markDirty);
+    }
     _sex = auth.sex;
     // Only pre-select province/municipality if they're still valid
     // against the current phAddressData sample.
@@ -65,6 +83,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    for (final c in [
+      _lastNameController,
+      _firstNameController,
+      _middleInitialController,
+      _phoneController,
+      _streetController,
+    ]) {
+      c.removeListener(_markDirty);
+    }
     _lastNameController.dispose();
     _firstNameController.dispose();
     _middleInitialController.dispose();
@@ -95,6 +122,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isSaving = false);
     if (!mounted) return;
+    _dirty = false;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(const SnackBar(content: Text('Profile updated')));
@@ -107,11 +135,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final municipalities = _province == null ? <String>[] : phAddressData[_province]!.keys.toList();
     final barangays = (_province == null || _municipality == null) ? <String>[] : phAddressData[_province]![_municipality]!;
 
-    return Scaffold(
+    return DirtyGuard(
+      hasUnsavedInput: () => _dirty,
+      message: 'Your profile changes will be lost.',
+      child: Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(),
       body: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
@@ -208,6 +240,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

@@ -301,12 +301,13 @@ void main() {
     expect(live.server.headers.single.containsKey('authorization'), isFalse);
   });
 
-  // ── The courier half, which the server does not have ──────────────────────
+  // ── The courier half ─────────────────────────────────────────────────────
 
   test('the courier role names the missing endpoint instead of posting',
       () async {
     final live = _Live([_json({'ok': true})]);
 
+    // Registration is still the web route — no API endpoint for courier signup yet.
     await expectLater(
       live.repository.register(
         role: UserRole.courier,
@@ -334,9 +335,7 @@ void main() {
       ),
     );
 
-    // A naming throw rather than a plausible call: nothing was sent, so a live
-    // courier build fails at the first action with a sentence, not somewhere
-    // later with a puzzle.
+    // Only 0 requests sent — registration is not wired, login is separate.
     expect(live.server.calls, 0);
   });
 
@@ -493,7 +492,7 @@ void main() {
     final live = _Live([_json({'ok': true, 'message': 'Signed out.'})]);
     await live.tokens.write('1|plaintext');
 
-    await live.repository.logout();
+    await live.repository.logout(role: UserRole.buyer);
 
     expect(live.server.paths.single, '/logout');
     expect(live.server.headers.single['authorization'], 'Bearer 1|plaintext');
@@ -504,7 +503,8 @@ void main() {
     final live = _Live([_json({'message': 'The server had a problem.'}, 500)]);
     await live.tokens.write('1|plaintext');
 
-    await expectLater(live.repository.logout(), throwsA(isA<ServerException>()));
+    await expectLater(
+        live.repository.logout(role: UserRole.buyer), throwsA(isA<ServerException>()));
 
     // Someone who asked to be signed out and is offline must not be left holding
     // a usable token because the request could not be sent.
@@ -515,7 +515,7 @@ void main() {
     final live = _Live([_json({'message': 'Unauthenticated.'}, 401)]);
     await live.tokens.write('1|stale');
 
-    expect(await live.repository.refresh(), isNull);
+    expect(await live.repository.refresh(role: UserRole.buyer), isNull);
     expect(await live.tokens.read(), isNull);
   });
 
@@ -531,11 +531,66 @@ void main() {
     ]);
     await live.tokens.write('1|good');
 
-    final result = await live.repository.refresh();
+    final result = await live.repository.refresh(role: UserRole.buyer);
 
     expect(live.server.paths.single, '/me');
     expect(live.server.headers.single['authorization'], 'Bearer 1|good');
     expect(result!.status, AccountStatus.active);
     expect(result.email, 'juan@example.com');
+  });
+
+  // ── Courier auth ─────────────────────────────────────────────────────────
+
+  test('courier login posts to /login/courier and stores the token', () async {
+    final live = _Live([
+      _json({
+        'ok': true,
+        'token': '2|courier-token',
+        'role': 'courier',
+        'name': 'Rico R. Reyes',
+        'email': 'rico@example.com',
+        'registration_status': 'approved',
+      }),
+    ]);
+
+    final result = await live.repository.login(
+      role: UserRole.courier,
+      email: 'rico@example.com',
+      password: 'password',
+    );
+
+    expect(live.server.paths.single, '/login/courier');
+    expect(await live.tokens.read(), '2|courier-token');
+    expect(result.status, AccountStatus.active);
+    expect(result.role, UserRole.courier);
+  });
+
+  test('courier refresh calls /me/courier', () async {
+    final live = _Live([
+      _json({
+        'ok': true,
+        'role': 'courier',
+        'name': 'Rico R. Reyes',
+        'email': 'rico@example.com',
+        'registration_status': 'approved',
+      }),
+    ]);
+    await live.tokens.write('2|courier-token');
+
+    final result = await live.repository.refresh(role: UserRole.courier);
+
+    expect(live.server.paths.single, '/me/courier');
+    expect(result!.role, UserRole.courier);
+    expect(result.status, AccountStatus.active);
+  });
+
+  test('courier logout calls /logout/courier', () async {
+    final live = _Live([_json({'ok': true, 'message': 'Signed out.'})]);
+    await live.tokens.write('2|courier-token');
+
+    await live.repository.logout(role: UserRole.courier);
+
+    expect(live.server.paths.single, '/logout/courier');
+    expect(await live.tokens.read(), isNull);
   });
 }

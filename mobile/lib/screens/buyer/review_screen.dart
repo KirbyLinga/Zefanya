@@ -171,6 +171,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(),
@@ -516,6 +517,7 @@ class _StarPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Row(
       children: [
         for (var star = 1; star <= 5; star++)

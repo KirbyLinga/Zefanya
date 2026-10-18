@@ -472,16 +472,25 @@ class CourierState extends ChangeNotifier {
     _save();
   }
 
+  /// Updates the milestone for a job from a server-polled value, without
+  /// triggering another server write. Used by the buyer's tracker to sync
+  /// milestone state across devices.
+  void updateMilestoneFromServer(String jobId, DeliveryMilestone milestone) {
+    if (_milestones[jobId] == milestone) return;
+    _milestones[jobId] = milestone;
+    notifyListeners();
+    // Deliberately not calling _save() here: the server is the authority
+    // for this value, so persisting it would make a stale copy on-device
+    // compete with the live server answer.
+  }
+
   /// Advances a job's milestone, optionally recording who is carrying it.
   ///
-  /// [courierName] matters at [DeliveryMilestone.assignedToRider] — the
-  /// dispatch step, per the ERP spec — because that is the first moment a
-  /// buyer can be told who has their parcel. Earlier steps pass null: on
-  /// the pickup leg the rider who collected it is not the rider who
-  /// delivers it, so naming one would be wrong rather than early.
-  ///
-  /// Only checkout-dispatched jobs are re-assignable; the repository's
-  /// assigned jobs are shared samples this device does not own.
+  /// The local state machine is updated immediately and synchronously (so
+  /// the UI is never blocked on the network). The server is notified in the
+  /// background via the repository — a failure is silently swallowed rather
+  /// than blocking the courier's workflow, because the courier's next action
+  /// is always the right next action regardless of network state.
   void advanceMilestone(
     String jobId,
     DeliveryMilestone next, {
@@ -489,11 +498,6 @@ class CourierState extends ChangeNotifier {
     String? courierPhotoPath,
   }) {
     _milestones[jobId] = next;
-    // The guard lives here rather than at the call site so the invariant
-    // can't be violated by whoever calls this next: identity is only ever
-    // recorded at dispatch. On any other step the rider being named isn't
-    // the one who delivers the parcel, so recording it would be wrong
-    // rather than merely early.
     if (next == DeliveryMilestone.assignedToRider &&
         (courierName != null || courierPhotoPath != null)) {
       final i = _dispatched.indexWhere((j) => j.id == jobId);
@@ -506,7 +510,36 @@ class CourierState extends ChangeNotifier {
     }
     notifyListeners();
     _save();
+
+    // Fire-and-forget to the server. The milestone value maps directly to
+    // the OrderStatus string the server expects (e.g. 'PICKED_UP').
+    // Failure is swallowed: the buyer's tracker will read a stale milestone
+    // until the next successful sync, which is acceptable — the courier's
+    // own screen is always authoritative.
+    final serverValue = _milestoneToServerString(next);
+    if (serverValue != null) {
+      _repository.advanceMilestone(jobId, serverValue).catchError((_) {});
+    }
   }
+
+  /// Translates a [DeliveryMilestone] to the server's `OrderStatus` string.
+  ///
+  /// Returns null for milestones that have no server counterpart (accepted
+  /// is the initial state the server already assigns; returnToSender maps to
+  /// RETURNED once the courier completes it via [completeJob]).
+  static String? _milestoneToServerString(DeliveryMilestone milestone) =>
+      switch (milestone) {
+        DeliveryMilestone.accepted        => 'PLACED',
+        DeliveryMilestone.arrivedAtSeller => 'CONFIRMED',
+        DeliveryMilestone.pickedUp        => 'PICKED_UP',
+        DeliveryMilestone.atSortingCenter => 'AT_SORTING_CENTER',
+        DeliveryMilestone.sorted          => 'SORTED',
+        DeliveryMilestone.assignedToRider => 'ASSIGNED_TO_RIDER',
+        DeliveryMilestone.inTransit       => 'OUT_FOR_DELIVERY',
+        DeliveryMilestone.delivered       => 'DELIVERED',
+        DeliveryMilestone.failedDelivery  => 'DELIVERY_FAILED',
+        DeliveryMilestone.returnToSender  => 'RETURNED',
+      };
 
   /// Called once a specific job is marked delivered — records when and
   /// **what it paid**, so it counts toward real earnings, and removes it from

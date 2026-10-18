@@ -152,6 +152,7 @@ class Arch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return ClipPath(
       clipper: ArchClipper(footRadius: footRadius),
       child: child,
@@ -228,6 +229,7 @@ class Ticket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return ClipPath(
       clipper: TicketClipper(
         notchFromLeft: notchFromLeft,
@@ -264,6 +266,7 @@ class CurvedSectionBreak extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       height: height,
       width: double.infinity,
@@ -333,6 +336,7 @@ class DiagonalSectionBreak extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       height: height,
       width: double.infinity,

@@ -28,20 +28,27 @@
 // importing `mock_data`.
 
 import '../api/api_exception.dart';
+import '../api/api_client.dart';
+import '../dto/remote_courier.dart';
 import '../mock_data.dart';
 import 'live_stub.dart';
 
 abstract class CourierRepository {
   /// Jobs the dispatcher has assigned to the signed-in courier and which are
   /// not finished.
-  ///
-  /// Includes the pickup leg and the delivery leg; `CourierState` splits them
-  /// for the two dashboards, because that split is a UI decision, not a query.
-  ///
-  /// Empty means "nothing assigned", which is a real and common state —
-  /// a courier between shifts. A failure throws, so the dashboard can tell
-  /// "no jobs today" apart from "we couldn't ask".
   Future<List<DeliveryJob>> assignedJobs();
+
+  /// Records a milestone update for a job on the server.
+  ///
+  /// [jobId] is the seller_order id (what the app calls its job id).
+  /// [milestone] is the `DeliveryMilestone` the job is moving to, translated
+  /// to the server's `OrderStatus` string (e.g. `'PICKED_UP'`).
+  ///
+  /// A failure propagates — a milestone that failed to record server-side
+  /// is still applied locally by `CourierState`, because the local state
+  /// machine must not block on the network. The caller logs or shows the
+  /// error if needed.
+  Future<void> advanceMilestone(String jobId, String milestoneValue);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +60,11 @@ class MockCourierRepository implements CourierRepository {
 
   @override
   Future<List<DeliveryJob>> assignedJobs() async => mockDeliveryJobs;
+
+  @override
+  Future<void> advanceMilestone(String jobId, String milestoneValue) async {
+    // Mock: no-op — the local state machine is the source of truth in mock mode.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -63,8 +75,24 @@ class LiveCourierRepository extends LiveRepository implements CourierRepository 
   LiveCourierRepository(super.client);
 
   @override
-  Future<List<DeliveryJob>> assignedJobs() {
+  Future<List<DeliveryJob>> assignedJobs() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /courier/jobs', section: '§6.1');
+    final body = await client.getJson('/courier/jobs', authenticated: true);
+    return unwrapList(body)
+        .map(deliveryJobFromJson)
+        .whereType<DeliveryJob>()
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> advanceMilestone(String jobId, String milestoneValue) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    // PATCH /api/courier/jobs/{sellerOrder}/milestone
+    // jobId is the seller_order id that the server uses as the route key.
+    await client.patchJson(
+      '/courier/jobs/$jobId/milestone',
+      body: {'milestone': milestoneValue},
+      authenticated: true,
+    );
   }
 }

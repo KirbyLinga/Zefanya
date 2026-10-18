@@ -9,6 +9,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../data/mock_data.dart';
@@ -110,6 +111,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
     context.read<CartState>().addItem(_product, variant: _selectedVariant, quantity: _quantity);
 
+    // Light impact on add — the same confirmation weight as copy-ID
+    // and the nav tap, fired with the flight rather than the snackbar.
+    HapticFeedback.lightImpact();
+
     // The signature moment: the product physically flies into the cart
     // icon (see widgets/cart_flight.dart). Fired before the SnackBar so
     // the two don't compete for the same beat.
@@ -154,6 +159,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     return Scaffold(
@@ -275,6 +281,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           : image;
     }
 
+    // Wraps a single page/photo in InteractiveViewer for pinch/double-tap
+    // zoom. Each page gets its own viewer so horizontal swipes (page change)
+    // and zoom are independent — putting InteractiveViewer outside the
+    // PageView would absorb the swipe gesture and break paging.
+    Widget zoomable(Widget child) => InteractiveViewer(
+          minScale: 1.0,
+          maxScale: 4.0,
+          // Allow the zoomed content to extend slightly past the viewport
+          // boundary so the user can pan to see edges.
+          clipBehavior: Clip.none,
+          child: child,
+        );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: ClipRRect(
@@ -296,7 +315,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         controller: _galleryController,
                         itemCount: photos.length,
                         onPageChanged: (i) => setState(() => _photoIndex = i),
-                        itemBuilder: (context, i) => photo(i),
+                        itemBuilder: (context, i) => zoomable(photo(i)),
                       ),
                       Positioned(
                         left: 0,
@@ -306,7 +325,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                     ],
                   )
-                : photo(0),
+                : zoomable(photo(0)),
           ),
         ),
       ),

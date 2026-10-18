@@ -23,6 +23,7 @@ class Product {
     required this.category,
     required this.price,
     required this.sellerName,
+    this.sellerMakerNote,
     this.compareAtPrice,
     this.rating = 4.5,
     this.ratingCount = 0,
@@ -38,6 +39,16 @@ class Product {
   final double price;
   final double? compareAtPrice;
   final String sellerName;
+
+  /// The seller's own words for the "FROM THE MAKER" section, as received from
+  /// the server. Null when the seller hasn't written one (live mode) or when
+  /// the mock's `mockMakerNotes` map has no entry for this shop (mock mode).
+  ///
+  /// Screens read this rather than `makerNoteFor(sellerName)` in live mode, so
+  /// the section is driven by the same data the server sent rather than a
+  /// separate local lookup that can only match mock shop names.
+  final String? sellerMakerNote;
+
   final double rating;
   final int ratingCount;
   final int soldCount;
@@ -85,6 +96,7 @@ class Product {
   /// this before drawing pager chrome, so a single-photo product gets no
   /// dots and no counter rather than a pager over one page.
   bool get hasGallery => photos.length > 1;
+
 }
 
 /// A placeholder photo URL for [seed] at [index].
@@ -185,6 +197,7 @@ class Voucher {
     required this.discountLabel,
     required this.minSpend,
     required this.expiryLabel,
+    this.expiresAt,
     this.discountRate = 0.10,
     this.maxDiscount = 200,
     this.category,
@@ -202,6 +215,15 @@ class Voucher {
   final String discountLabel;
   final double minSpend;
   final String expiryLabel;
+
+  /// The real expiry moment behind [expiryLabel], when known.
+  ///
+  /// Null means "no computable date" — the card then shows only the
+  /// label text with no countdown. Live vouchers map this from the
+  /// server's `expires_at` (see voucherFromJson); mock entries use
+  /// dates relative to "now" (see mockVouchers), so the countdown
+  /// always has something true to say in mock mode.
+  final DateTime? expiresAt;
   final double discountRate;
   final double maxDiscount;
 }
@@ -482,13 +504,17 @@ const List<DeliveryJob> mockDeliveryJobs = [
   ),
 ];
 
-const List<Voucher> mockVouchers = [
+/// Mock voucher catalogue. Dates are relative to "now" (not const) so
+/// the countdown on each card always has something true to say:
+/// one expiring today-ish, one comfortably ahead, one far out.
+final List<Voucher> mockVouchers = [
   Voucher(
     code: 'GRACE10',
     title: '10% Off Storewide',
     discountLabel: '10% off, up to ₱200',
     minSpend: 500,
     expiryLabel: 'Valid until Sep 30',
+    expiresAt: DateTime.now().add(const Duration(days: 2)),
   ),
   Voucher(
     code: 'FREESHIP',
@@ -496,6 +522,7 @@ const List<Voucher> mockVouchers = [
     discountLabel: '₱60 off shipping',
     minSpend: 800,
     expiryLabel: 'Valid until Sep 15',
+    expiresAt: DateTime.now().add(const Duration(days: 12)),
     discountRate: 0,
     maxDiscount: 60,
   ),
@@ -505,6 +532,7 @@ const List<Voucher> mockVouchers = [
     discountLabel: '15% off Home & Living, up to ₱150',
     minSpend: 400,
     expiryLabel: 'Valid until Sep 20',
+    expiresAt: DateTime.now().add(const Duration(hours: 8)),
     discountRate: 0.15,
     maxDiscount: 150,
     category: 'Home & Living',
@@ -569,7 +597,77 @@ class PromoSlide {
 
   /// Optional second, larger icon used as a background motif.
   final IconData? bigIcon;
+
+  /// Creates a [PromoSlide] from a server JSON object.
+  ///
+  /// Unknown `layout` / `ground` / icon name strings fall back to safe defaults
+  /// so a CMS typo does not crash the carousel — it renders a neutral slide
+  /// instead.
+  factory PromoSlide.fromJson(Map<String, Object?> json) {
+    final layout = _layoutFromString(json['layout']?.toString() ?? '');
+    final ground = _groundFromString(json['ground']?.toString() ?? '');
+    final icon = iconForName(json['icon']?.toString() ?? '');
+    final bigIconName = json['big_icon']?.toString();
+    final bigIcon = bigIconName == null || bigIconName.isEmpty
+        ? null
+        : iconForName(bigIconName);
+    return PromoSlide(
+      eyebrow: json['eyebrow']?.toString() ?? '',
+      title: (json['title']?.toString() ?? '').replaceAll(r'\n', '\n'),
+      subtitle: json['subtitle']?.toString() ?? '',
+      layout: layout,
+      ground: ground,
+      icon: icon,
+      bigIcon: bigIcon,
+    );
+  }
+
+  static PromoSlideLayout _layoutFromString(String s) => switch (s) {
+        'text_left'     => PromoSlideLayout.textLeft,
+        'centered_hero' => PromoSlideLayout.centeredHero,
+        'icon_split'    => PromoSlideLayout.iconSplit,
+        _               => PromoSlideLayout.textLeft, // safe fallback
+      };
+
+  static PromoGround _groundFromString(String s) => switch (s) {
+        'brand_rose'  => PromoGround.brandRose,
+        'sage'        => PromoGround.sage,
+        'terracotta'  => PromoGround.terracotta,
+        _             => PromoGround.brandRose, // safe fallback
+      };
 }
+
+/// Resolves a Dart icon name (e.g. `'local_florist_outlined'`) to its
+/// [IconData], falling back to [Icons.campaign_outlined] for unknown names.
+///
+/// The lookup table covers every icon the seeded slides use, plus a handful of
+/// extras likely to appear in future campaigns. It is an explicit allowlist
+/// rather than a reflective lookup because Flutter tree-shakes unused icons in
+/// release builds — a name-based reflection would silently resolve to a broken
+/// codepoint. When a new slide needs an icon that isn't here, add it.
+IconData iconForName(String name) => _iconsByName[name] ?? Icons.campaign_outlined;
+
+const Map<String, IconData> _iconsByName = {
+  // Used by the seeded slides
+  'local_florist_outlined'     : Icons.local_florist_outlined,
+  'local_offer_outlined'       : Icons.local_offer_outlined,
+  'local_shipping_outlined'    : Icons.local_shipping_outlined,
+  'cottage_outlined'           : Icons.cottage_outlined,
+  'directions_bike_outlined'   : Icons.directions_bike_outlined,
+  // Common campaign motifs
+  'campaign_outlined'          : Icons.campaign_outlined,
+  'star_outlined'              : Icons.star_outline,
+  'star_border'                : Icons.star_border,
+  'percent'                    : Icons.percent,
+  'discount_outlined'          : Icons.discount_outlined,
+  'new_releases_outlined'      : Icons.new_releases_outlined,
+  'celebration_outlined'       : Icons.celebration_outlined,
+  'card_giftcard_outlined'     : Icons.card_giftcard_outlined,
+  'storefront_outlined'        : Icons.storefront_outlined,
+  'favorite_border'            : Icons.favorite_border,
+  'bolt_outlined'              : Icons.bolt_outlined,
+  'redeem_outlined'            : Icons.redeem_outlined,
+};
 
 /// The live slides, in the order they advance. `buyer_shell`'s tap
 /// destinations are keyed to this order — see `_onPromoTap`.

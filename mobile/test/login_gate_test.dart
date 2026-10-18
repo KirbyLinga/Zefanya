@@ -66,7 +66,7 @@ class _RefusingAuthRepository implements AuthRepository {
       AuthResult(role: role, status: AccountStatus.pendingApproval, email: email);
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout({UserRole role = UserRole.buyer}) async {}
 
   @override
   Future<AuthResult> verifyOtp({
@@ -83,7 +83,7 @@ class _RefusingAuthRepository implements AuthRepository {
   }) async {}
 
   @override
-  Future<AuthResult?> refresh() async => null;
+  Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async => null;
 }
 
 /// The refusal `Api\Buyer\LoginController` sends for an account whose address is

@@ -23,6 +23,7 @@ class FreeShippingMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final threshold = kFreeShippingThreshold;
     final unlocked = subtotal >= threshold;

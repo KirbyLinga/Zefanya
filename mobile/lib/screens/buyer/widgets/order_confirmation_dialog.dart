@@ -55,6 +55,7 @@ class OrderConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final first = orders.first;
     final extra = orders.length - 1;

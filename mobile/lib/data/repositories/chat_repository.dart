@@ -146,32 +146,76 @@ class LiveChatRepository extends LiveRepository implements ChatRepository {
 
   @override
   Future<void> load() async {
-    // Nothing local to restore; threads live on the server.
+    // Nothing local to restore in live mode; threads live on the server.
   }
 
   @override
-  Future<List<ChatMessage>> messagesFor(String contactKey) {
+  Future<List<ChatMessage>> messagesFor(String contactKey) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /conversations/{key}/messages', section: '§9.1');
+    final body = await client.getJson(
+      '/chat/${Uri.encodeComponent(contactKey)}',
+      authenticated: true,
+    );
+    final list = body['data'] as List<dynamic>? ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(_messageFromJson)
+        .toList(growable: false);
   }
 
   @override
-  Future<Map<String, List<ChatMessage>>> threads() {
+  Future<Map<String, List<ChatMessage>>> threads() async {
+    // The server has no "list all threads" endpoint yet — it requires a
+    // contact name, not a thread id. Returning an empty map means the cache
+    // starts empty and is filled lazily when each thread is opened, which is
+    // the correct behaviour: the app never showed a thread list in live mode
+    // before this landed, so there is no regression.
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /conversations', section: '§9.1');
+    return const {};
   }
 
   @override
-  Future<void> append(String contactKey, ChatMessage message) {
+  Future<void> append(String contactKey, ChatMessage message) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('POST /conversations/{key}/messages', section: '§9.2');
+    await client.postJson(
+      '/chat/${Uri.encodeComponent(contactKey)}',
+      body: {'body': message.text},
+      authenticated: true,
+    );
   }
 
   @override
   Future<void> seedIfEmpty(String contactKey, ChatMessage greeting) async {
-    // Deliberately not a throw: in live mode the opening message is already
-    // stored server-side, so "seed if empty" is legitimately a no-op. Throwing
-    // here would make a live chat screen fail to open at all for a reason that
-    // has nothing to do with the user.
+    // In live mode the opening message is already stored server-side,
+    // so "seed if empty" is a no-op. The server is the authority.
+  }
+
+  static ChatMessage _messageFromJson(Map<String, dynamic> json) {
+    final sentAt = json['sent_at'] as String?;
+    // Format the ISO timestamp to a short local time for display (e.g. "2:05 PM").
+    // If parsing fails, fall back to 'Now' to match the mock's behaviour.
+    final time = _formatSentAt(sentAt);
+    return ChatMessage(
+      text: (json['body'] as String?) ?? '',
+      isMe: (json['is_me'] as bool?) ?? false,
+      time: time,
+    );
+  }
+
+  static String _formatSentAt(String? iso) {
+    if (iso == null || iso.isEmpty) return 'Now';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final hour = dt.hour == 0
+          ? 12
+          : dt.hour > 12
+              ? dt.hour - 12
+              : dt.hour;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour < 12 ? 'AM' : 'PM';
+      return '$hour:$minute $period';
+    } catch (_) {
+      return 'Now';
+    }
   }
 }

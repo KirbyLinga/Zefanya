@@ -2,6 +2,9 @@
 //
 // One line naming what `main()` could not load, and a Retry that re-runs it.
 //
+// Retryable failures only: a known-unbuilt endpoint is logged quietly in
+// state, never bannered (see StartupState.actionable).
+//
 // It sits above the shell (see `AuthGate` in main.dart) rather than inside a
 // screen, because it is the catch-all for everything that has no screen of its own
 // yet — chat threads, the voucher list, reviews. A failure that *does* have a
@@ -20,13 +23,21 @@ class StartupNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final startup = context.watch<StartupState>();
 
-    // Nothing to say — and, just as importantly, no space taken when there is
-    // nothing to say.
-    if (!startup.hasFailures) return const SizedBox.shrink();
+    // Retryable failures only: a known-unbuilt endpoint (reviews, chat,
+    // courier jobs in live mode) is logged quietly in state, never
+    // bannered — a permanent bar a customer cannot act on is noise over
+    // every screen. So when nothing actionable failed, there is nothing
+    // to say and no space taken.
+    if (!startup.hasActionable) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
+
+    // Retry is unconditional here: hasActionable means at least one
+    // failure says retrying could work, and retry() re-runs only what
+    // failed.
 
     return Material(
       color: AppColors.surfaceMuted,
@@ -47,11 +58,10 @@ class StartupNotice extends StatelessWidget {
               // Only when trying again could work: an endpoint the server has not
               // built answers no to that, and a button that cannot work teaches a
               // person to mash it.
-              if (startup.anyRetryable)
-                TextButton(
-                  onPressed: () => startup.retry(),
-                  child: const Text('Retry'),
-                ),
+              TextButton(
+                onPressed: () => startup.retry(),
+                child: const Text('Retry'),
+              ),
             ],
           ),
         ),

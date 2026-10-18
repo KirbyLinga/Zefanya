@@ -17,12 +17,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/mock_data.dart';
+import '../../state/cart_state.dart';
+import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/copy_id.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
 import 'widgets/review_button.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../shared/chat_screen.dart';
+import 'cart_screen.dart';
 import 'courier_tracker_screen.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -49,6 +54,7 @@ class OrderDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final statusColor = _statusColors[order.status]!;
     final textColor = Color.lerp(statusColor, Colors.black, 0.40)!;
@@ -119,7 +125,18 @@ class OrderDetailScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Reference number
-                          Text(order.id, style: AppType.eyebrow),
+                          InkWell(
+                            onTap: () => copyId(context, order.id),
+                            child: Semantics(button: true, label: 'Copy order ID', excludeSemantics: true, child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(order.id, style: AppType.eyebrow),
+                                const SizedBox(width: 6),
+                                Icon(Icons.copy_outlined, size: 13, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
+                          ),
                           const SizedBox(height: 10),
                           // Item summary
                           _receiptLine(theme, 'Items', order.itemSummary),
@@ -207,8 +224,49 @@ class _ActionCard extends StatelessWidget {
 
   final Order order;
 
+  /// Adds every resolvable product from this order back to the cart.
+  ///
+  /// Products that are no longer in the catalogue (id not found) are
+  /// silently skipped — CatalogState.products() only contains active listings,
+  /// so a delisted product is genuinely unavailable, not a bug.
+  void _buyAgain(BuildContext context) {
+    final catalog = context.read<CatalogState>();
+    final cart = context.read<CartState>();
+    final byId = {for (final p in catalog.products) p.id: p};
+
+    var added = 0;
+    for (final id in order.productIds) {
+      final product = byId[id];
+      if (product == null) continue;
+      cart.addItem(product);
+      added++;
+    }
+
+    if (added == 0) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('These items are no longer available')),
+      );
+      return;
+    }
+
+    showTimedSnackBar(
+      context,
+      SnackBar(
+        content: Text('$added item${added == 1 ? '' : 's'} added to cart'),
+        action: SnackBarAction(
+          label: 'View Cart',
+          onPressed: () => Navigator.of(context).push(
+            AppPageRoute(builder: (_) => const CartScreen()),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -228,9 +286,32 @@ class _ActionCard extends StatelessWidget {
             icon: const Icon(Icons.chat_bubble_outline, size: 16),
             label: const Text('Contact Seller'),
           ),
+          const SizedBox(height: 8),
+          // Copies the reference number AND opens the seller thread in
+          // one tap: the thing a buyer pastes first when asking about
+          // an order is its ID, so hand it over with the chat.
+          OutlinedButton.icon(
+            onPressed: () {
+              copyId(context, order.id);
+              Navigator.of(context).push(AppPageRoute(
+                builder: (_) => ChatScreen(
+                    contactName: order.shopName, contactRole: 'Seller'),
+              ));
+            },
+            icon: const Icon(Icons.copy_outlined, size: 16),
+            label: const Text('Copy ID & Chat with Seller'),
+          ),
           if (order.status == OrderStatus.toRate) ...[
             const SizedBox(height: 10),
             ReviewButton(order: order),
+            const SizedBox(height: 10),
+            // "Buy Again" on delivered orders: re-adds items to cart,
+            // resolving product ids through the live catalogue.
+            ElevatedButton.icon(
+              onPressed: () => _buyAgain(context),
+              icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+              label: const Text('Buy Again'),
+            ),
           ],
           if (order.status == OrderStatus.inTransit ||
               order.status == OrderStatus.outForDelivery) ...[
@@ -271,6 +352,7 @@ class _MilestoneTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final currentIdx = _steps.indexWhere((s) => s.$1 == milestone);
 
@@ -370,6 +452,7 @@ class _PerforationLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       height: 1,
       child: CustomPaint(

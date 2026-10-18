@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -24,15 +25,23 @@ use Illuminate\Support\Facades\Storage;
  *
  * ## Three things the app renders that this resource deliberately omits
  *
- * The app's product page has an "ON SALE" badge (`compareAtPrice`), a star
- * average with a review count, and a "FROM THE MAKER" note. None of the three
- * exists server-side: `products` has no `compare_at_price` column, there is no
- * reviews table, and a maker note has no column of its own. The *web* buyer page
- * fakes all three (a struck-through price computed as `price / 0.75`, a hardcoded
- * 4.9 with "284 reviews", placeholder feature copy), which is exactly what this
- * project's no-invented-content rule forbids in an app. So they are absent here
- * rather than plausible: an absent field renders as no badge and no rating, and
- * the day a column exists it is added in one place.
+ * The app's product page has an "ON SALE" badge (`compareAtPrice`) and a
+ * "FROM THE MAKER" note. Neither exists server-side: `products` has no
+ * `compare_at_price` column, and a maker note has no column of its own. The
+ * *web* buyer page fakes both (a struck-through price computed as `price / 0.75`,
+ * placeholder feature copy), which is exactly what this project's
+ * no-invented-content rule forbids in an app. So they are absent here rather than
+ * plausible: an absent field renders as no badge and no rating, and the day a
+ * column exists it is added in one place.
+ *
+ * `rating_count` and `rating_avg` are now computed from the `reviews` table, so
+ * they are present rather than absent when at least one review has been written.
+ * A product with no reviews sends `0` for both — the same values the app already
+ * handles by dropping the rating row entirely (see `Product.ratingCount`).
+ *
+ * `maker_note` is now included under `seller.maker_note`. It is null when the
+ * seller has not written one, and the app hides the "FROM THE MAKER" section
+ * rather than substituting generic copy.
  *
  * @mixin Product
  */
@@ -62,8 +71,28 @@ class ProductResource extends JsonResource
                 // `products.seller_id` is NOT NULL with a cascading foreign key,
                 // so a product without a seller is not a state this can be in.
                 'name' => $this->seller?->business_name ?? '',
+                // The seller's own voice for Home's "FROM THE MAKER" section.
+                // Null when the seller hasn't written one — the app hides the
+                // section rather than inventing copy. An empty string is treated
+                // the same as null by the app's mapper.
+                'maker_note' => $this->seller?->maker_note ?? null,
             ],
             'images' => $this->imagesCoverFirst(),
+            // Integer count and a one-decimal average, both over real reviews.
+            // Zero when no reviews exist — the app already handles that by
+            // dropping the rating row rather than printing "0.0 ★ (0 reviews)".
+            // Computed here rather than on Product so the catalogue resource is
+            // the one place that decides what "the rating" means; the model stays
+            // domain logic-free for this field.
+            'rating_count' => (int) Review::query()
+                ->where('product_id', $this->id)
+                ->count(),
+            'rating_avg' => (float) round(
+                (float) (Review::query()
+                    ->where('product_id', $this->id)
+                    ->avg('stars') ?? 0),
+                1,
+            ),
         ];
     }
 

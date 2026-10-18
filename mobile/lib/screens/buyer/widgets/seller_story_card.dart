@@ -53,10 +53,15 @@ class SellerStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
-    // No note, no section: see the file header.
-    final note = makerNoteFor(product.sellerName);
+    // The server delivers maker notes on the product itself (seller.maker_note).
+    // In mock mode there is no server, so fall back to the local map keyed by
+    // shop name. The fallback is for mock only: a live product from a shop that
+    // has no note will have `sellerMakerNote == null` and the section hides,
+    // which is the correct answer rather than a gap.
+    final note = product.sellerMakerNote ?? makerNoteFor(product.sellerName);
     if (note == null) return const SizedBox.shrink();
 
     return PressableScale(

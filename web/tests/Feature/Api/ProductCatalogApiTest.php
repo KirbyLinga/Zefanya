@@ -257,6 +257,83 @@ class ProductCatalogApiTest extends TestCase
         $this->getJson(route('api.products.show', $product))->assertNotFound();
     }
 
+    public function test_a_product_with_no_reviews_sends_zero_for_both_rating_fields(): void
+    {
+        [$product] = $this->product();
+
+        $response = $this->getJson(route('api.products.show', $product))->assertOk();
+
+        $this->assertSame(0, $response->json('data.rating_count'));
+        $this->assertEqualsWithDelta(0.0, $response->json('data.rating_avg'), 0.001);
+    }
+
+    public function test_a_product_with_reviews_sends_the_real_aggregate(): void
+    {
+        [$product] = $this->product();
+
+        $seller = $product->seller;
+        $buyer1 = \App\Models\Buyer\Buyer::factory()->create();
+        $buyer2 = \App\Models\Buyer\Buyer::factory()->create();
+
+        // Two orders, each with a seller_order under this seller.
+        $mkOrder = function (\App\Models\Buyer\Buyer $buyer) use ($seller, $product): \App\Models\SellerOrder {
+            $order = \App\Models\Order::query()->create([
+                'buyer_id' => $buyer->id,
+                'reference' => \App\Models\Order::generateUniqueReference(),
+                'shipping_address' => ['full' => 'Test'],
+                'subtotal_minor' => 50000,
+                'discount_minor' => 0,
+                'total_minor' => 50000,
+            ]);
+            $so = \App\Models\SellerOrder::query()->create([
+                'order_id' => $order->id,
+                'seller_id' => $seller->id,
+                'subtotal_minor' => 50000,
+            ]);
+            \App\Models\OrderItem::query()->create([
+                'seller_order_id' => $so->id,
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'quantity' => 1,
+                'price_minor' => 50000,
+            ]);
+            return $so;
+        };
+
+        \App\Models\Review::query()->create([
+            'buyer_id' => $buyer1->id,
+            'seller_order_id' => $mkOrder($buyer1)->id,
+            'product_id' => $product->id,
+            'stars' => 4,
+            'comment' => 'Great.',
+        ]);
+        \App\Models\Review::query()->create([
+            'buyer_id' => $buyer2->id,
+            'seller_order_id' => $mkOrder($buyer2)->id,
+            'product_id' => $product->id,
+            'stars' => 5,
+            'comment' => 'Excellent.',
+        ]);
+
+        $response = $this->getJson(route('api.products.show', $product))->assertOk();
+
+        $this->assertSame(2, $response->json('data.rating_count'));
+        // (4 + 5) / 2 = 4.5
+        $this->assertSame(4.5, $response->json('data.rating_avg'));
+    }
+
+    public function test_the_catalogue_list_also_carries_rating_fields(): void
+    {
+        [$product] = $this->product();
+
+        $response = $this->list()->assertOk();
+
+        // Both fields present on list rows, not just the show endpoint.
+        $this->assertArrayHasKey('rating_count', $response->json('data.0'));
+        $this->assertArrayHasKey('rating_avg', $response->json('data.0'));
+        $this->assertSame(0, $response->json('data.0.rating_count'));
+    }
+
     public function test_the_catalogue_needs_no_token(): void
     {
         $this->product();
@@ -366,5 +443,70 @@ class ProductCatalogApiTest extends TestCase
         // An unbounded list still needs a stable order, or two identical requests
         // can render in two different orders.
         $this->assertSame('Second', $response->json('data.0.name'));
+    }
+
+    // ── Maker note ────────────────────────────────────────────────────────────
+
+    public function test_a_product_carries_its_sellers_maker_note(): void
+    {
+        $seller = Seller::factory()->create([
+            'business_name' => 'Loom & Larder',
+            'maker_note' => 'Every piece leaves this workshop with one rule.',
+            'status' => 'approved',
+        ]);
+        Product::factory()->create([
+            'seller_id' => $seller->id,
+            'category_id' => $this->category()->id,
+            'name' => 'Rattan Tote',
+            'status' => 'active',
+        ]);
+
+        $note = $this->list()->assertOk()->json('data.0.seller.maker_note');
+
+        $this->assertSame('Every piece leaves this workshop with one rule.', $note);
+    }
+
+    public function test_a_seller_with_no_maker_note_sends_null(): void
+    {
+        // The field is nullable — a seller who has not written anything sends null,
+        // and the app hides the "FROM THE MAKER" section rather than substituting
+        // generic copy. A missing field or an empty string would both require an
+        // extra guard at every call site.
+        $seller = Seller::factory()->create([
+            'business_name' => 'Quiet Shop',
+            'maker_note' => null,
+            'status' => 'approved',
+        ]);
+        Product::factory()->create([
+            'seller_id' => $seller->id,
+            'category_id' => $this->category()->id,
+            'name' => 'Plain Item',
+            'status' => 'active',
+        ]);
+
+        $note = $this->list()->assertOk()->json('data.0.seller.maker_note');
+
+        $this->assertNull($note);
+    }
+
+    public function test_the_single_product_endpoint_also_carries_the_maker_note(): void
+    {
+        $seller = Seller::factory()->create([
+            'business_name' => 'Tahanan Ceramics',
+            'maker_note' => 'I fire everything in a kiln I built from second-hand bricks.',
+            'status' => 'approved',
+        ]);
+        $product = Product::factory()->create([
+            'seller_id' => $seller->id,
+            'category_id' => $this->category()->id,
+            'name' => 'Terracotta Planter',
+            'status' => 'active',
+        ]);
+
+        $note = $this->getJson(route('api.products.show', $product))
+            ->assertOk()
+            ->json('data.seller.maker_note');
+
+        $this->assertSame('I fire everything in a kiln I built from second-hand bricks.', $note);
     }
 }

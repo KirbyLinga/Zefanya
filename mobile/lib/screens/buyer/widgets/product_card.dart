@@ -16,6 +16,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/mock_data.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/motion.dart';
 import '../../../widgets/editorial_shapes.dart';
 import '../../../widgets/heart_button.dart';
 import '../../../widgets/pressable_scale.dart';
@@ -77,6 +78,7 @@ class ProductImage extends StatelessWidget {
     required this.product,
     this.photoIndex = 0,
     this.iconSize = 40,
+    this.alignment = Alignment.center,
   });
 
   final Product product;
@@ -87,6 +89,11 @@ class ProductImage extends StatelessWidget {
   final int photoIndex;
 
   final double iconSize;
+
+  /// Where the photo sits inside its slot. Center everywhere except the
+  /// featured deck's cover tile, which top-aligns so subjects are not
+  /// cropped from above.
+  final AlignmentGeometry alignment;
 
   /// The source's own edge, in pixels — the ceiling for any decode request,
   /// since asking a 1000px image for more would only enlarge it. Matches the
@@ -130,12 +137,29 @@ class ProductImage extends StatelessWidget {
           // widget needs no change at all.
           _url,
           fit: BoxFit.cover,
+          alignment: alignment,
           width: double.infinity,
           height: double.infinity,
           // ResizeImage's dimensions are in *source* pixels, which is
           // exactly what cacheWidth means to the engine.
           cacheWidth: cachePixels,
           cacheHeight: cachePixels,
+          // Live mode serves photos over the network (4G): cross-fade
+          // each image IN OVER its tinted placeholder when the first
+          // frame arrives, instead of popping. The tint sits UNDER the
+          // fade (ColoredBox behind FadeTransition): the loading
+          // placeholder disappears before the first frame, so without
+          // the underlay the image would fade in over whatever is
+          // behind the tile. Opacity only, ~200ms, skipped under
+          // reduced motion (frameBuilder still fires — returns as-is).
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame == null) return child;
+            if (reduceMotion(context)) return child;
+            return ColoredBox(
+              color: tint,
+              child: _ImageFadeIn(child: child),
+            );
+          },
           loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         // Branded wait instead of Material's default spinner — this is
@@ -167,6 +191,40 @@ class ProductImage extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// A one-shot ~200ms opacity fade for a newly-arrived network image.
+///
+/// Stateful (not an AnimatedSwitcher): the image subtree is large and
+/// this avoids rebuilding it — only the opacity tweens. Controller
+/// disposed with the tile. Reduced motion never reaches here (the
+/// frameBuilder returns the image as-is), so no end-state handling.
+class _ImageFadeIn extends StatefulWidget {
+  const _ImageFadeIn({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ImageFadeIn> createState() => _ImageFadeInState();
+}
+
+class _ImageFadeInState extends State<_ImageFadeIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _controller, child: widget.child);
   }
 }
 
@@ -558,16 +616,24 @@ class ProductCard extends StatelessWidget {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      if (product.soldCount > 0) ...[
-                        Text(
-                          '  ·  ',
-                          style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+                      // One flexible tail (Claude Round A follow-up): the
+                      // rating row must survive a 150dp tile at 1.5x
+                      // text scale. The sold count alone flexing is not
+                      // enough — the ' · ' separator also measures wide
+                      // under fallback fonts (85px in-test), so the
+                      // whole tail shares one Flexible and ellipsizes
+                      // as a unit. On device this never pressures (real
+                      // metrics fit with room); in-test it degrades to
+                      // an ellipsis instead of a stripe.
+                      if (product.soldCount > 0)
+                        Flexible(
+                          child: Text(
+                            '  ·  ${_formatSoldCount(product.soldCount)} sold',
+                            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        Text(
-                          '${_formatSoldCount(product.soldCount)} sold',
-                          style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
-                        ),
-                      ],
                     ],
                   ),
                 ],
@@ -587,4 +653,62 @@ String _formatSoldCount(int count) {
     return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}k';
   }
   return '$count';
+}
+
+/// Home price: a small raised ₱ beside the large Playfair numeral.
+///
+/// One shared widget (grid tile, rail card, anywhere else a price
+/// leads) so the currency treatment can't drift per screen. The ₱ is
+/// a Text at ~55% size, vertically centered against the numeral via
+/// a middle-aligned WidgetSpan — not a superscript offset, which
+/// would float differently per font.
+///
+/// Uses the literal ₱ glyph (never \u20b1 in source — see hard rule 1
+/// in the project brief) so the file stays greppable.
+class PriceLabel extends StatelessWidget {
+  const PriceLabel({
+    super.key,
+    required this.amount,
+    this.numeralSize = 22,
+    this.color,
+    this.semanticLabel,
+  });
+
+  /// Whole-peso amount to render.
+  final double amount;
+
+  /// Playfair numeral size; the ₱ scales proportionally.
+  final double numeralSize;
+
+  /// Defaults to [AppColors.accent] via [AppType.priceNumeral].
+  final Color? color;
+
+  /// Screen-reader label, e.g. 'Price: 349 pesos'. Defaults to the
+  /// visible text, which already reads acceptably.
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final numeral = AppType.priceNumeral(numeralSize, color: color);
+    final mark = numeral.copyWith(fontSize: numeralSize * 0.55);
+    final text = '₱${amount.toStringAsFixed(0)}';
+    return Semantics(
+      label: semanticLabel ?? text,
+      excludeSemantics: true,
+      child: Text.rich(
+        TextSpan(
+          children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Text('₱', style: mark),
+            ),
+            TextSpan(
+              text: amount.toStringAsFixed(0),
+              style: numeral,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

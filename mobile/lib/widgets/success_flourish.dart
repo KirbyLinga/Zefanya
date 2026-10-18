@@ -103,6 +103,7 @@ class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: widget.size * 1.8,
       height: widget.size * 1.8,

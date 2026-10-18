@@ -55,6 +55,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/dto/registration_payload.dart';
@@ -63,6 +64,7 @@ import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../utils/motion.dart';
+import '../../utils/password_strength.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -127,6 +129,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _phoneController = TextEditingController();
   final _streetController = TextEditingController();
   final _plateController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _lastNameFocus = FocusNode();
+  final _firstNameFocus = FocusNode();
+  final _middleInitialFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
+  final _idNumberFocus = FocusNode();
+  final _streetFocus = FocusNode();
+  final _plateFocus = FocusNode();
 
   // The password and its confirmation, with a separate reveal flag each: one
   // shared flag would mean peeking at the first field also reveals the second,
@@ -169,6 +181,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _emailFocus.dispose();
+    _phoneFocus.dispose();
+    _lastNameFocus.dispose();
+    _firstNameFocus.dispose();
+    _middleInitialFocus.dispose();
+    _passwordFocus.dispose();
+    _confirmPasswordFocus.dispose();
+    _idNumberFocus.dispose();
+    _streetFocus.dispose();
+    _plateFocus.dispose();
     _lastNameController.dispose();
     _firstNameController.dispose();
     _middleInitialController.dispose();
@@ -320,6 +342,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           govIdPath: _govIdFile?.path,
         ),
       );
+      if (context.mounted) TextInput.finishAutofillContext();
     } on ApiException catch (e) {
       // Reachable in live builds only, where the endpoint does not exist yet.
       // Handled exactly as login handles it — report it and stay on the form,
@@ -361,6 +384,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return PopScope(
@@ -567,18 +591,32 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 12),
       _labeledField(theme, 'Last Name', TextFormField(
         controller: _lastNameController,
+        focusNode: _lastNameFocus,
+        keyboardType: TextInputType.name,
+        autofillHints: const [AutofillHints.familyName],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _firstNameFocus.requestFocus(),
         decoration: const InputDecoration(hintText: 'Dela Cruz'),
         validator: (v) => (v == null || v.trim().length < 2) ? 'Last name is required' : null,
       )),
       const SizedBox(height: 16),
       _labeledField(theme, 'First Name', TextFormField(
         controller: _firstNameController,
+        focusNode: _firstNameFocus,
+        keyboardType: TextInputType.name,
+        autofillHints: const [AutofillHints.givenName],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _middleInitialFocus.requestFocus(),
         decoration: const InputDecoration(hintText: 'Juan'),
         validator: (v) => (v == null || v.trim().length < 2) ? 'First name is required' : null,
       )),
       const SizedBox(height: 16),
       _labeledField(theme, 'Middle Initial', TextFormField(
         controller: _middleInitialController,
+        focusNode: _middleInitialFocus,
+        keyboardType: TextInputType.name,
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
         maxLength: 2,
         decoration: const InputDecoration(hintText: 'D  (optional)', counterText: ''),
       )),
@@ -604,6 +642,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _labeledField(theme, 'Email', TextFormField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
+        autofillHints: const [AutofillHints.email],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
         decoration: const InputDecoration(hintText: 'you@example.com'),
         validator: (v) {
           final value = v?.trim() ?? '';
@@ -615,7 +656,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 16),
       _labeledField(theme, 'Phone Number', TextFormField(
         controller: _phoneController,
+        focusNode: _phoneFocus,
         keyboardType: TextInputType.phone,
+        autofillHints: const [AutofillHints.telephoneNumber],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _lastNameFocus.requestFocus(),
         decoration: const InputDecoration(hintText: '09XXXXXXXXX'),
         validator: (v) {
           final value = v?.trim().replaceAll(RegExp(r'[\s-]'), '') ?? '';
@@ -647,7 +692,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 12),
       _labeledField(theme, 'Password', TextFormField(
         controller: _passwordController,
+        focusNode: _passwordFocus,
+        autofillHints: const [AutofillHints.newPassword],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _confirmPasswordFocus.requestFocus(),
         obscureText: _obscurePassword,
+        onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           hintText: 'At least $kMinPasswordLength characters',
           prefixIcon: const Icon(Icons.lock_outline),
@@ -667,9 +717,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           return null;
         },
       )),
+      if (_passwordController.text.isNotEmpty)
+        _passwordStrengthHint(theme, _passwordController.text),
       const SizedBox(height: 16),
       _labeledField(theme, 'Confirm Password', TextFormField(
         controller: _confirmPasswordController,
+        focusNode: _confirmPasswordFocus,
+        autofillHints: const [AutofillHints.newPassword],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _idNumberFocus.requestFocus(),
         obscureText: _obscureConfirmation,
         decoration: InputDecoration(
           hintText: 'Type it again',
@@ -694,6 +750,52 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     ];
   }
 
+  /// Inline password-strength hint under the password field.
+  ///
+  /// A hint, never a gate: the validator above stays the authority.
+  /// Caller hides this while the field is empty, so nothing announces
+  /// "Weak" before the person has typed anything.
+  Widget _passwordStrengthHint(ThemeData theme, String password) {
+    final strength = scorePassword(password);
+    final label = passwordStrengthLabel(strength)!;
+    final color = switch (strength) {
+      PasswordStrength.weak => AppColors.danger,
+      PasswordStrength.fair => AppColors.warning,
+      PasswordStrength.strong => AppColors.successText,
+    };
+    final progress = switch (strength) {
+      PasswordStrength.weak => 0.33,
+      PasswordStrength.fair => 0.66,
+      PasswordStrength.strong => 1.0,
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: radiusOf(ShapeTier.pill),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 4,
+                backgroundColor: AppColors.divider,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Password strength: $label',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _addressFields(ThemeData theme) {
     return [
       _sectionTitle('Address'),
@@ -702,6 +804,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 16),
       _labeledField(theme, 'Street / Detailed Address', TextFormField(
         controller: _streetController,
+        focusNode: _streetFocus,
+        keyboardType: TextInputType.streetAddress,
+        autofillHints: const [AutofillHints.streetAddressLine1],
+        textInputAction: TextInputAction.next,
+        onFieldSubmitted: (_) => _plateFocus.requestFocus(),
         maxLines: 2,
         decoration: const InputDecoration(hintText: 'House no., street, subdivision'),
         validator: (v) {
@@ -729,6 +836,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       const SizedBox(height: 16),
       _labeledField(theme, 'Plate Number', TextFormField(
         controller: _plateController,
+        focusNode: _plateFocus,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
         textCapitalization: TextCapitalization.characters,
         decoration: const InputDecoration(hintText: 'ABC 1234'),
         validator: (v) {
@@ -1093,6 +1203,7 @@ class _StepProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1137,6 +1248,7 @@ class _StepNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final filled = isPast || isCurrent;
     final stepLabel = isPast ? '$label, completed' : isCurrent ? '$label, current step' : label;
@@ -1216,6 +1328,7 @@ class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMix
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     super.build(context);
     return widget.child;
   }

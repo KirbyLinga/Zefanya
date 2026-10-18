@@ -57,6 +57,7 @@ class DeliveryJobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final job = assignedJob.job;
     final statusColor = _statusColors[assignedJob.milestone]!;

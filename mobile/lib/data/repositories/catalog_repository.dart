@@ -151,14 +151,19 @@ class MockCatalogRepository implements CatalogRepository {
 /// The app's real catalogue, over `GET /products`, `/products/{id}` and
 /// `/categories`.
 ///
-/// ## Two methods still throw, and that is the answer rather than an oversight
+/// ## [makerNote] is now wired via the product response
 ///
-/// [makerNote] and [promoSlides] have no server-side source: `products` has no
-/// maker-note column, and there is no promotions table at all. They keep naming
-/// what is missing instead of returning invented content, so Home's maker section
-/// and its promo carousel stay absent — which is the honest shape of "the server
-/// does not have this yet". (`remote_catalog.dart` does the same for the three
-/// product fields the catalogue cannot fill.)
+/// The maker note is embedded in every product under `seller.maker_note`, so
+/// [SellerStoryCard] reads it directly from `product.sellerMakerNote` without
+/// calling this method. The method is implemented for completeness — it fetches
+/// the first product for the seller and returns its note — but the main path
+/// is zero extra requests.
+///
+/// ## [promoSlides] is now wired to `GET /promotions`
+///
+/// The server sends slides with string fields; the app resolves icon names
+/// through `iconForName()` in `mock_data.dart`, which falls back to a neutral
+/// icon for unknown names rather than crashing.
 ///
 /// ## Requests are sent unauthenticated, deliberately
 ///
@@ -225,15 +230,39 @@ class LiveCatalogRepository extends LiveRepository implements CatalogRepository 
       products(query: CatalogQuery(category: category));
 
   @override
-  Future<String?> makerNote(String sellerName) {
+  Future<String?> makerNote(String sellerName) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('maker_note on GET /products', section: '§5.3');
+    // The maker note is now embedded in every product response as
+    // `seller.maker_note`, so the SellerStoryCard reads it directly from
+    // `product.sellerMakerNote` rather than calling this method. This
+    // implementation is kept for callers that do not have a product in hand:
+    // it fetches the first product for that seller and returns its note.
+    // An empty list or a seller with no note returns null.
+    try {
+      final body = await client.getJson(
+        '/products',
+        query: {'seller': sellerName},
+        authenticated: false,
+      );
+      final rows = unwrapList(body);
+      if (rows.isEmpty) return null;
+      final seller = rows.first['seller'];
+      if (seller is! Map) return null;
+      final raw = seller['maker_note']?.toString().trim();
+      if (raw == null || raw.isEmpty) return null;
+      return raw;
+    } on ApiException {
+      return null;
+    }
   }
 
   @override
-  Future<List<PromoSlide>> promoSlides() {
+  Future<List<PromoSlide>> promoSlides() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return notWired('GET /promotions', section: '§5.5');
+    final body = await client.getJson('/promotions', authenticated: false);
+    return unwrapList(body)
+        .map((row) => PromoSlide.fromJson(row))
+        .toList(growable: false);
   }
 
   /// The query string a [CatalogQuery] becomes.

@@ -46,6 +46,7 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
@@ -96,6 +97,7 @@ class _NavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Semantics(
       button: true,
       selected: selected,

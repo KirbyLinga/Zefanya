@@ -7,10 +7,11 @@ use Database\Factories\LogisticsProviderFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class LogisticsProvider extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -77,6 +78,24 @@ class LogisticsProvider extends Authenticatable
     public function isEmailVerified(): bool
     {
         return $this->email_verified_at !== null;
+    }
+
+    /**
+     * Whether the email gate is behind this account — mirrors Buyer::isPastEmailVerification().
+     *
+     * The API sign-in gate uses this spelling so the same login controller can
+     * check both models with the same method name, rather than branching on the
+     * two different boolean helpers they used to have.
+     */
+    public function isPastEmailVerification(): bool
+    {
+        return in_array(
+            $this->status instanceof LogisticsProviderStatus
+                ? $this->status->value
+                : (string) $this->status,
+            ['pending_approval', 'approved'],
+            true,
+        );
     }
 
     public function isApproved(): bool
