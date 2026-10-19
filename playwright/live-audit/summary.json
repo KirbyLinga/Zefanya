@@ -1,0 +1,167 @@
+{
+  "totals": {
+    "PASS": 268,
+    "FAIL": 42,
+    "BLOCKED": 69
+  },
+  "categories": {
+    "page": {
+      "PASS": 76,
+      "FAIL": 0,
+      "BLOCKED": 8
+    },
+    "button": {
+      "PASS": 66,
+      "FAIL": 30,
+      "BLOCKED": 30
+    },
+    "link": {
+      "PASS": 18,
+      "FAIL": 8,
+      "BLOCKED": 1
+    },
+    "workflow": {
+      "PASS": 10,
+      "FAIL": 4,
+      "BLOCKED": 30
+    },
+    "guard": {
+      "PASS": 58,
+      "FAIL": 0,
+      "BLOCKED": 0
+    },
+    "layout": {
+      "PASS": 38,
+      "FAIL": 0,
+      "BLOCKED": 0
+    },
+    "content": {
+      "PASS": 2,
+      "FAIL": 0,
+      "BLOCKED": 0
+    }
+  },
+  "groupedFindings": 10,
+  "excluded": [
+    {
+      "id": "desktop-71",
+      "reason": "Initial audit used nonexistent #loginForm; corrected supplemental assertion supersedes it."
+    },
+    {
+      "id": "desktop-94",
+      "reason": "innerHTML comparison could pass on menu dismissal; computed grid comparison in supplemental supersedes it."
+    },
+    {
+      "id": "desktop-125",
+      "reason": "Audit used a nonexistent route; actual dashboard is /logistics and supplemental guest guard supersedes it."
+    },
+    {
+      "id": "mobile-71",
+      "reason": "Initial audit used nonexistent #loginForm; corrected supplemental assertion supersedes it."
+    },
+    {
+      "id": "mobile-94",
+      "reason": "innerHTML comparison could pass on menu dismissal; computed grid comparison in supplemental supersedes it."
+    },
+    {
+      "id": "mobile-125",
+      "reason": "Audit used a nonexistent route; actual dashboard is /logistics and supplemental guest guard supersedes it."
+    },
+    {
+      "id": "desktop-extra-23",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-24",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-25",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-26",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-27",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-33",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-36",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-39",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-42",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "desktop-extra-45",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-23",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-24",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-25",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-26",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-27",
+      "reason": "Initial catalog assertion used local CSS structure absent in deployed markup; stable-attribute verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-33",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-36",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-39",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-42",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "mobile-extra-45",
+      "reason": "Initial image assertion compared relative src with absolute popup URL; normalized URL verification supersedes it."
+    },
+    {
+      "id": "mobile-verify-1",
+      "reason": "Audit extraction ReferenceError; not an application failure. Corrected verification could not complete after repeated navigation timeouts."
+    },
+    {
+      "id": "mobile-verify-2",
+      "reason": "Audit extraction ReferenceError; not an application failure. Corrected verification could not complete after repeated navigation timeouts."
+    },
+    {
+      "id": "mobile-verify-3",
+      "reason": "Audit extraction ReferenceError; not an application failure. Corrected verification could not complete after repeated navigation timeouts."
+    },
+    {
+      "id": "mobile-verify-4",
+      "reason": "Audit extraction ReferenceError; not an application failure. Corrected verification could not complete after repeated navigation timeouts."
+    }
+  ]
+}

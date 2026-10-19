@@ -1,0 +1,66 @@
+{
+  "records": [
+    {
+      "id": "desktop-verify-1",
+      "viewport": "desktop",
+      "kind": "page",
+      "label": "Guest /register/buyer/pending",
+      "status": "FAIL",
+      "actual": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://zefanya.shop/register/buyer/pending\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "url": "https://zefanya.shop/register/buyer/pending",
+      "screenshot": null
+    },
+    {
+      "id": "desktop-verify-2",
+      "viewport": "desktop",
+      "kind": "page",
+      "label": "Guest /register/seller/pending",
+      "status": "FAIL",
+      "actual": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://zefanya.shop/register/seller/pending\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "url": "https://zefanya.shop/register/buyer/pending",
+      "screenshot": null
+    },
+    {
+      "id": "desktop-verify-3",
+      "viewport": "desktop",
+      "kind": "page",
+      "label": "Guest /register/logistics/pending",
+      "status": "FAIL",
+      "actual": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://zefanya.shop/register/logistics/pending\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "url": "https://zefanya.shop/register/logistics/pending",
+      "screenshot": null
+    },
+    {
+      "id": "desktop-verify-4",
+      "viewport": "desktop",
+      "kind": "page",
+      "label": "Guest /seller/login",
+      "status": "FAIL",
+      "actual": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://zefanya.shop/seller/login\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "url": "https://zefanya.shop/register/logistics/pending",
+      "screenshot": null
+    },
+    {
+      "id": "desktop-verify-5",
+      "viewport": "desktop",
+      "kind": "link",
+      "label": "Navbar Sale has a shopping destination",
+      "status": "FAIL",
+      "actual": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://zefanya.shop/buyer/products\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "url": "https://zefanya.shop/buyer/products",
+      "screenshot": "desktop-verify-5.png"
+    },
+    {
+      "id": "desktop-verify-6",
+      "viewport": "desktop",
+      "kind": "workflow",
+      "label": "Verified catalog price_asc result",
+      "status": "FAIL",
+      "actual": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://zefanya.shop/buyer/products\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "url": "https://zefanya.shop/buyer/products",
+      "screenshot": null
+    }
+  ],
+  "events": [],
+  "inventory": []
+}

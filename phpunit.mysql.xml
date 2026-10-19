@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+ bootstrap="tests/MySql/bootstrap.php" colors="true" cacheResult="false">
+ <testsuites>
+  <testsuite name="Isolated MySQL concurrency">
+   <file>tests/MySql/CheckoutConcurrencyTest.php</file>
+  </testsuite>
+ </testsuites>
+ <php>
+  <env name="APP_ENV" value="testing" force="true"/>
+ </php>
+</phpunit>

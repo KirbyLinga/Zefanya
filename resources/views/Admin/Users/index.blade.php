@@ -1,0 +1,108 @@
+@extends('Admin.Layouts.app')
+
+@section('title', 'User Accounts')
+
+@section('content')
+
+@if (session('success'))
+    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+        {{ session('success') }}
+    </div>
+@endif
+@if (session('error'))
+    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        {{ session('error') }}
+    </div>
+@endif
+
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-neutral-950 mb-1">User Accounts</h1>
+    <p class="text-base text-neutral-600">Suspend or reactivate approved buyers, sellers, and logistics providers.</p>
+</div>
+
+<div class="mb-6 bg-white border border-neutral-200 rounded-lg p-5">
+    <form method="GET" action="{{ route('admin.users.index') }}" class="flex flex-col lg:flex-row lg:items-end gap-4">
+        <div class="flex-1">
+            <label for="search" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Search</label>
+            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Name, email, contact…"
+                   class="w-full h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent" />
+        </div>
+        <div>
+            <label for="type" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Account Type</label>
+            <select name="type" id="type" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base">
+                <option value="seller" {{ $type === 'seller' ? 'selected' : '' }}>Seller</option>
+                <option value="logistics" {{ $type === 'logistics' ? 'selected' : '' }}>Logistics</option>
+                <option value="buyer" {{ $type === 'buyer' ? 'selected' : '' }}>Buyer</option>
+            </select>
+        </div>
+        <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
+            Filter
+        </button>
+    </form>
+</div>
+
+<div class="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+    @if ($accounts->count() > 0)
+        <table class="w-full text-base">
+            <thead class="bg-neutral-50 border-b border-neutral-200">
+                <tr>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700">Name</th>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700">Email</th>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700">Status</th>
+                    <th class="px-6 py-4 text-center font-semibold text-neutral-700">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-200">
+                @foreach ($accounts as $account)
+                    @php
+                        $statusValue = $account->status instanceof \BackedEnum ? $account->status->value : $account->status;
+                    @endphp
+                    <tr class="hover:bg-neutral-50">
+                        <td class="px-6 py-4 font-semibold text-neutral-950">
+                            {{ $account->fullName() }}
+                            @if (! empty($account->business_name))
+                                <p class="text-xs text-neutral-500 font-normal">{{ $account->business_name }}</p>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-neutral-700">{{ $account->email }}</td>
+                        <td class="px-6 py-4">
+                            @if ($statusValue === 'suspended')
+                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700">Suspended</span>
+                            @else
+                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">Approved</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            @if ($statusValue === 'approved')
+                                <form method="POST" action="{{ route(match ($type) {
+                                    'buyer' => 'admin.users.buyer.suspend',
+                                    'logistics' => 'admin.users.logistics.suspend',
+                                    default => 'admin.users.seller.suspend',
+                                }, $account) }}" class="inline" onsubmit="return confirm('Suspend this account?');">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100">Suspend</button>
+                                </form>
+                            @else
+                                <form method="POST" action="{{ route(match ($type) {
+                                    'buyer' => 'admin.users.buyer.reactivate',
+                                    'logistics' => 'admin.users.logistics.reactivate',
+                                    default => 'admin.users.seller.reactivate',
+                                }, $account) }}" class="inline" onsubmit="return confirm('Reactivate this account?');">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-green-700 bg-green-50 rounded-lg hover:bg-green-100">Reactivate</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+        <div class="px-6 py-4 border-t border-neutral-200">
+            {{ $accounts->links() }}
+        </div>
+    @else
+        <div class="px-6 py-16 text-center text-neutral-500">No approved or suspended accounts found.</div>
+    @endif
+</div>
+
+@endsection
