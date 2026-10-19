@@ -2,22 +2,28 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
+use App\Support\EmailRegistry;
+use App\Support\SignedOtpLink;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class UnifiedLoginController extends Controller
 {
+    use ClearsOtherGuards;
+
     /**
      * Unified login endpoint.
      *
      * Single entry point for buyer, seller, and logistics provider authentication.
      * The system automatically determines the user's role upon successful
      * authentication and redirects accordingly:
-     *   - Seller    → seller dashboard
-     *   - Logistics → logistics dashboard
-     *   - Buyer     → buyer home
+     *   - Seller    â†’ seller dashboard
+     *   - Logistics â†’ logistics dashboard
+     *   - Buyer     â†’ buyer home
      *
      * Priority: seller guard is tried first because it is the most
      * privileged role. Logistics is tried next, then buyer. If a single
@@ -50,6 +56,10 @@ class UnifiedLoginController extends Controller
             return redirect()->intended(route('buyer.home'));
         }
 
+        if ($this->tryGuard('rider', strtolower(trim($email)), $password, $remember, $request)) {
+            return redirect()->intended(route('rider.dashboard'));
+        }
+
         // Neither guard could authenticate with these credentials.
         throw ValidationException::withMessages([
             'email' => __('auth.failed'),
@@ -66,6 +76,9 @@ class UnifiedLoginController extends Controller
      */
     private function tryGuard(string $guard, string $email, string $password, bool $remember, Request $request): bool
     {
+        if ($guard === 'rider' && ! Schema::hasTable('rider_applications')) {
+            return false;
+        }
         if (! Auth::guard($guard)->attempt(['email' => $email, 'password' => $password], $remember)) {
             return false;
         }
@@ -80,14 +93,24 @@ class UnifiedLoginController extends Controller
             default => '',
         };
 
-        if ($status !== 'approved') {
+        if ($status !== 'approved' || ($guard === 'rider' && ! $user->isApproved())) {
             Auth::guard($guard)->logout();
 
             $request->session()->flash('auth.status_message', $this->statusMessage($guard, $status));
+            if ($guard === 'rider' && $status === 'unverified') {
+                $request->session()->flash('auth.resume_url', SignedOtpLink::showUrl('rider', $user));
+                $request->session()->flash('auth.resume_label', 'Verify your email now');
+            }
 
             return false;
         }
 
+        $roles = EmailRegistry::rolesFor($email);
+        if (count($roles) > 1 && in_array('rider', $roles, true)) {
+            Auth::guard($guard)->logout();
+            throw ValidationException::withMessages(['email' => 'This email belongs to more than one account type. Please contact support.']);
+        }
+        $this->clearOtherGuards($guard);
         $request->session()->regenerate();
 
         return true;
@@ -110,6 +133,10 @@ class UnifiedLoginController extends Controller
             ['buyer', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
             ['buyer', 'pending_approval'] => 'Your buyer registration is still awaiting administrator approval.',
             ['buyer', 'rejected'] => 'Your buyer registration was not approved.',
+            ['rider', 'unverified'] => 'Please verify your Rider email before logging in.',
+            ['rider', 'pending'] => 'Your Rider application is pending Logistics approval.',
+            ['rider', 'rejected'] => 'Your Rider application was rejected by Logistics.',
+            ['rider', 'suspended'] => 'Your Rider account has been suspended.',
             default => 'Your account is not active.',
         };
     }
@@ -119,9 +146,7 @@ class UnifiedLoginController extends Controller
      */
     public function logout(Request $request)
     {
-        Auth::guard('seller')->logout();
-        Auth::guard('logistics')->logout();
-        Auth::guard('buyer')->logout();
+        $this->clearAllGuards();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

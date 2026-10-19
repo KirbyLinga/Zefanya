@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Courier extends Model
 {
+    public const VEHICLE_TYPES = ['bike', 'motorcycle', 'van'];
+
     /** @use HasFactory<CourierFactory> */
     use HasFactory;
 

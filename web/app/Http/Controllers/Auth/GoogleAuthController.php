@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Support\EmailRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,7 @@ use Laravel\Socialite\Two\InvalidStateException;
  *
  * This is a LINK-only flow: the verified Google email is matched against the
  * role table and the Google account id is attached to that row. Accounts are
- * never created here — buyer/seller/logistics registration keeps its existing,
+ * never created here â€” buyer/seller/logistics registration keeps its existing,
  * approval-gated flow, so an unknown email is sent back to the login screen.
  *
  * The role-agnostic entry points power the single "Continue with Google"
@@ -27,12 +29,14 @@ use Laravel\Socialite\Two\InvalidStateException;
  */
 class GoogleAuthController extends Controller
 {
+    use ClearsOtherGuards;
+
     /** Shown when the Google email matches no row in any role table. */
     public const NO_ACCOUNT_MESSAGE = 'No account found for this Google email. Please register first.';
 
     /**
      * Resolution order for the role-agnostic button, most privileged role
-     * first — the same order UnifiedLoginController uses, so one email that
+     * first â€” the same order UnifiedLoginController uses, so one email that
      * exists in several role tables always lands on the same panel no matter
      * which sign-in method was used.
      *
@@ -87,7 +91,7 @@ class GoogleAuthController extends Controller
     private function handleCallback(Request $request, ?string $role): RedirectResponse
     {
         // Google returns ?error=access_denied when the consent screen is
-        // dismissed or denied — treat that as a cancelled attempt.
+        // dismissed or denied â€” treat that as a cancelled attempt.
         if ($request->filled('error')) {
             return $this->failed('Google sign-in was cancelled. Please try again.');
         }
@@ -125,6 +129,10 @@ class GoogleAuthController extends Controller
      */
     private function linkAndLogin(Request $request, string $role, Model $account, string $googleId): RedirectResponse
     {
+        $roles = EmailRegistry::rolesFor($account->email);
+        if (count($roles) > 1 && in_array('rider', $roles, true)) {
+            return $this->failed('This email belongs to more than one account type. Please contact support.');
+        }
         $googleId = trim($googleId);
 
         if ($googleId === '') {
@@ -144,6 +152,7 @@ class GoogleAuthController extends Controller
         }
 
         Auth::guard(self::ROLE_MAP[$role]['guard'])->login($account);
+        $this->clearOtherGuards(self::ROLE_MAP[$role]['guard']);
         $request->session()->regenerate();
 
         return redirect()->intended(route(self::ROLE_MAP[$role]['home']));
@@ -193,7 +202,7 @@ class GoogleAuthController extends Controller
     }
 
     /**
-     * Approval gate — the same rule and wording password sign-in applies in
+     * Approval gate â€” the same rule and wording password sign-in applies in
      * UnifiedLoginController::statusMessage(). Null means the account may log in.
      */
     private function statusMessage(string $role, Model $account): ?string

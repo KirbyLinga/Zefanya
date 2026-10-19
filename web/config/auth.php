@@ -3,6 +3,7 @@
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\RiderApplication;
 use App\Models\Seller\Seller;
 use App\Models\Shared\User;
 
@@ -14,6 +15,7 @@ return [
     ],
 
     'guards' => [
+        'rider' => ['driver' => 'session', 'provider' => 'rider_applications'],
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -41,6 +43,7 @@ return [
     ],
 
     'providers' => [
+        'rider_applications' => ['driver' => 'eloquent', 'model' => RiderApplication::class],
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),

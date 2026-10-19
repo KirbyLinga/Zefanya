@@ -45,26 +45,29 @@
         if (!root || root.dataset.lookupInit === '1') return null;
         root.dataset.lookupInit = '1';
 
-        var provinceSelect = root.querySelector('#province');
-        var municipalitySelect = root.querySelector('#municipality');
-        var barangaySelect = root.querySelector('#barangay');
-        var apiFields = root.querySelector('#apiAddressFields');
+        var prefix = root.dataset.addressPrefix || '';
+        function field(id) { return root.querySelector('#' + (prefix ? prefix + id[0].toUpperCase() + id.slice(1) : id)); }
+        var provinceSelect = field('province');
+        var municipalitySelect = field('municipality');
+        var barangaySelect = field('barangay');
+        var apiFields = field('apiAddressFields');
         var manualFields = root.querySelector('#manualAddressFields');
         var manualProvince = root.querySelector('#manualProvince');
         var manualMunicipality = root.querySelector('#manualMunicipality');
         var manualBarangay = root.querySelector('#manualBarangay');
         var toggleManualBtn = root.querySelector('#toggleManualAddress');
-        var addressModeField = root.querySelector('#addressMode');
-        var provinceNameField = root.querySelector('#provinceNameField');
-        var municipalityNameField = root.querySelector('#municipalityNameField');
-        var barangayNameField = root.querySelector('#barangayNameField');
+        var addressModeField = field('addressMode');
+        var provinceNameField = field('provinceNameField');
+        var municipalityNameField = field('municipalityNameField');
+        var barangayNameField = field('barangayNameField');
 
         var missing = [provinceSelect, municipalitySelect, barangaySelect, apiFields,
-            manualFields, toggleManualBtn, addressModeField,
+            addressModeField,
             provinceNameField, municipalityNameField, barangayNameField,
         ].filter(function (el) { return !el; });
         if (missing.length) return null; // not an address page
 
+        var allowManual = !!(manualFields && toggleManualBtn);
         var provincesLoaded = false;
         var manualMode = false;
         var manualToggles = [];
@@ -139,6 +142,7 @@
         });
 
         function setManualMode(on) {
+            if (!allowManual) { addressModeField.value = "api"; return; }
             manualMode = on;
             apiFields.classList.toggle('hidden', on);
             manualFields.classList.toggle('hidden', !on);
@@ -166,7 +170,7 @@
             manualToggles.forEach(function (fn) { fn(on); });
         }
 
-        toggleManualBtn.addEventListener('click', function () { setManualMode(!manualMode); });
+        if (toggleManualBtn) toggleManualBtn.addEventListener('click', function () { setManualMode(!manualMode); });
 
         var api = {
             provincesLoaded: function () { return provincesLoaded; },

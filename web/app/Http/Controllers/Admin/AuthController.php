@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    use ClearsOtherGuards;
+
     public function showLogin()
     {
         if (Auth::guard('admin')->check()) {
@@ -25,6 +28,7 @@ class AuthController extends Controller
         ]);
 
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
+            $this->clearOtherGuards('admin');
             $request->session()->regenerate();
 
             return redirect()->intended(route('admin.dashboard'));

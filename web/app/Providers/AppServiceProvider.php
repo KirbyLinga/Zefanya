@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\CartItem;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Order;
 use App\Models\SellerOrder;
 use App\Models\Shared\Category;
@@ -10,9 +11,12 @@ use App\Models\Wishlist;
 use App\Policies\BuyerOrderPolicy;
 use App\Policies\SellerOrderFleetPolicy;
 use App\Policies\SellerOrderPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -34,6 +38,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('register', function (Request $request) {
+            return [Limit::perMinute(5)->by('rider-register:'.strtolower(is_string($request->input('email')) ? $request->input('email') : '').'|'.$request->ip()), Limit::perMinute(30)->by('rider-register-ip:'.$request->ip())];
+        });
+        foreach (['otp-show' => 30, 'otp-verify' => 10, 'otp-resend' => 10, 'rider-decisions' => 20] as $name => $max) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($max)->by($name.':'.$request->ip()));
+        }
+        View::composer('Components.rider-register-modal', function (ViewInstance $view): void {
+            $view->with('riderProviders', LogisticsProvider::where('status', 'approved')->orderBy('business_name')->orderBy('id')->get(['id', 'business_name']));
+        });
+
         // ── Policies for the order flow (Slice 1) ───────────────────────────
         // BuyerOrderPolicy / SellerOrderFleetPolicy don't match Laravel's
         // auto-discovery naming (Order → OrderPolicy), so they are registered

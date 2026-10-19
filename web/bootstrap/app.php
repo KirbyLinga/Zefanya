@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Middleware\Admin\EnsureAdminRole;
+use App\Http\Middleware\AuthenticateRoleSession;
+use App\Http\Middleware\EnforceSingleBrowserAccount;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
+use App\Http\Middleware\RedirectIfAuthenticatedRole;
+use App\Http\Middleware\Rider\EnsureRiderApproved;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -32,7 +36,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.role' => EnsureAdminRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
             'seller.approved' => EnsureSellerApproved::class,
+            'rider.approved' => EnsureRiderApproved::class,
+            'guest.role' => RedirectIfAuthenticatedRole::class,
         ]);
+
+        $middleware->web(append: [EnforceSingleBrowserAccount::class, AuthenticateRoleSession::class]);
 
         $middleware->redirectGuestsTo(function (Request $request) {
             $path = $request->path();

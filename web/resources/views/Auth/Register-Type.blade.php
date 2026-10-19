@@ -21,6 +21,7 @@
   @endif
 
   <div class="role-grid">
+    <a href="#" data-rider-register-trigger class="role-card"><div class="role-card__icon"><i data-lucide="bike" width="24" height="24"></i></div><h3 class="role-card__title">Rider</h3><p class="role-card__desc">Apply to ride with an approved Logistics provider.</p><span class="role-card__cta">REGISTER AS RIDER</span></a>
 
     <a href="#" data-buyer-register-trigger class="role-card">
       <div class="role-card__icon">
@@ -73,6 +74,7 @@
 @include('Components.buyer-register-modal')
 @include('Components.seller-register-modal')
 @include('Components.logistics-register-modal')
+@include('Components.rider-register-modal')
 
 @endsection
 
@@ -81,7 +83,7 @@
        BEFORE buyer-register-modal.js: the modal resolves window.zfAddressLookup
        at init time and silently skips the province/municipality/barangay
        dropdowns when the module has not loaded yet. --}}
-  @vite(['resources/js/buyer/address-lookup.js', 'resources/js/buyer/buyer-register-modal.js', 'resources/js/seller/seller-register-modal.js', 'resources/js/logistics/logistics-register-modal.js'])
+  @vite(['resources/js/buyer/address-lookup.js', 'resources/js/buyer/buyer-register-modal.js', 'resources/js/seller/seller-register-modal.js', 'resources/js/logistics/logistics-register-modal.js', 'resources/js/rider/rider-register-modal.js'])
   <script>
     if (window.lucide) { lucide.createIcons(); }
   </script>

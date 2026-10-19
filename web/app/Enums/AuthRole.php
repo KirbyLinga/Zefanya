@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Enums;
+
+use Illuminate\Support\Facades\Auth;
+
+enum AuthRole: string
+{
+    case Admin = 'admin';
+    case Seller = 'seller';
+    case Logistics = 'logistics';
+    case Buyer = 'buyer';
+    case Rider = 'rider';
+
+    public function guard(): string
+    {
+        return $this->value;
+    }
+
+    public function dashboardRoute(): string
+    {
+        return match ($this) {
+            self::Admin => 'admin.dashboard',
+            self::Seller => 'seller.dashboard',
+            self::Logistics => 'logistics.dashboard',
+            self::Buyer => 'buyer.home',
+            self::Rider => 'rider.dashboard',
+        };
+    }
+
+    public function dashboardUrl(): string
+    {
+        return route($this->dashboardRoute());
+    }
+
+    /**
+     * Session detection and ClearsOtherGuards order.
+     *
+     * @return list<self>
+     */
+    public static function detectionOrder(): array
+    {
+        return [self::Admin, self::Seller, self::Logistics, self::Buyer, self::Rider];
+    }
+
+    /**
+     * Public login + Google role resolution order. Admin is never included.
+     *
+     * @return list<self>
+     */
+    public static function publicOrder(): array
+    {
+        return [self::Seller, self::Logistics, self::Buyer];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function publicGuards(): array
+    {
+        return array_map(fn (self $role): string => $role->value, self::publicOrder());
+    }
+
+    /** Read-only: first signed-in role, or null. Never logs anyone out. */
+    public static function current(): ?self
+    {
+        foreach (self::detectionOrder() as $role) {
+            if (Auth::guard($role->guard())->check()) {
+                return $role;
+            }
+        }
+
+        return null;
+    }
+}

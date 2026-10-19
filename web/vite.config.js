@@ -17,6 +17,7 @@ export default defineConfig({
                 'resources/js/buyer/messages.js',
                 'resources/js/seller/seller-register-modal.js',
                 'resources/js/logistics/logistics-register-modal.js',
+                'resources/js/rider/rider-register-modal.js',
                 'resources/js/seller/product-create-modal.js',
                 'resources/js/seller/products-index.js',
                 'resources/js/seller/theme-toggle.js',

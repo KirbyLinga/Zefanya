@@ -8,6 +8,9 @@ use App\Http\Controllers\Buyer\RegisterBuyerController;
 use App\Http\Controllers\Buyer\VerifyBuyerOtpController;
 use App\Http\Controllers\Logistics\RegisterLogisticsController;
 use App\Http\Controllers\Logistics\VerifyLogisticsOtpController;
+use App\Http\Controllers\Rider\DashboardController;
+use App\Http\Controllers\Rider\RegisterRiderController;
+use App\Http\Controllers\Rider\VerifyRiderOtpController;
 use App\Http\Controllers\Seller\RegisterSellerController;
 use App\Http\Controllers\Seller\VerifySellerOtpController;
 use Illuminate\Support\Facades\Auth;
@@ -153,3 +156,15 @@ Route::prefix('auth/google')->name('auth.google.')->middleware('throttle:10,1')-
 Route::post('/logout', [UnifiedLoginController::class, 'logout'])
     ->name('unified.logout')
     ->middleware('throttle:5,1');
+
+// R01: registration only; Logistics approval and operational provisioning belong to R02.
+Route::middleware('guest.role')->prefix('register/rider')->name('register.rider')->group(function (): void {
+    Route::get('/', fn () => redirect()->route('register.type', ['open' => 'rider']));
+    Route::post('/', [RegisterRiderController::class, 'store'])->middleware('throttle:register')->name('.store');
+    Route::view('/pending', 'Rider.pending')->name('.pending');
+    Route::get('/verify-otp/{riderApplication}', [VerifyRiderOtpController::class, 'show'])->middleware(['signed', 'throttle:otp-show'])->name('.verify-otp.show');
+    Route::post('/verify-otp/{riderApplication}', [VerifyRiderOtpController::class, 'verify'])->middleware(['signed', 'throttle:otp-verify'])->name('.verify-otp');
+    Route::post('/verify-otp/{riderApplication}/resend', [VerifyRiderOtpController::class, 'resend'])->middleware(['signed', 'throttle:otp-resend'])->name('.verify-otp.resend');
+});
+
+Route::get('/rider/dashboard', [DashboardController::class, 'index'])->middleware(['auth:rider', 'rider.approved'])->name('rider.dashboard');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Seller;
 
+use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -9,6 +10,8 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    use ClearsOtherGuards;
+
     /**
      * The seller login page has been folded into the unified login entry
      * point (/login). Anything still pointing at /seller/login is forwarded
@@ -47,6 +50,7 @@ class AuthController extends Controller
             ]);
         }
 
+        $this->clearOtherGuards('seller');
         $request->session()->regenerate();
 
         return redirect()->intended(route('seller.dashboard'));

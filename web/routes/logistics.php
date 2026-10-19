@@ -5,6 +5,8 @@ use App\Http\Controllers\Logistics\DeliveryAssignmentsController;
 use App\Http\Controllers\Logistics\DeliveryMonitoringController;
 use App\Http\Controllers\Logistics\IncomingParcelsController;
 use App\Http\Controllers\Logistics\ParcelSortingController;
+use App\Http\Controllers\Logistics\RiderApplicationDocumentController;
+use App\Http\Controllers\Logistics\RiderController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -15,6 +17,10 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('logistics')->name('logistics.')->group(function (): void {
     Route::middleware(['auth:logistics', 'logistics.approved'])->group(function (): void {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/riders', [RiderController::class, 'index'])->name('riders.index');
+        Route::get('/riders/{riderApplication}', [RiderController::class, 'show'])->name('riders.show');
+        Route::post('/riders/{riderApplication}/decision', [RiderController::class, 'decide'])->middleware('throttle:rider-decisions')->name('riders.decide');
+        Route::get('/rider-applications/{riderApplication}/documents/{document}', [RiderApplicationDocumentController::class, 'show'])->whereIn('document', ['id', 'or-cr'])->name('rider-applications.documents.show');
 
         // ── Rider pickup: parcels waiting to be picked up ──────────────────
         Route::get('/incoming-parcels', [IncomingParcelsController::class, 'index'])->name('incoming-parcels.index');

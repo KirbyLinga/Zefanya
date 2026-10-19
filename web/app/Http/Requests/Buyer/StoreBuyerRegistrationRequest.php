@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Buyer;
 
+use App\Support\EmailRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -74,6 +75,16 @@ class StoreBuyerRegistrationRequest extends FormRequest
         }
 
         return $phone;
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $email = $this->input('email');
+            if (is_string($email) && ! $validator->errors()->has('email') && EmailRegistry::otherRolesFor($email, 'buyer') !== []) {
+                $validator->errors()->add('email', 'This email is already registered under another account type.');
+            }
+        }];
     }
 
     public function rules(): array

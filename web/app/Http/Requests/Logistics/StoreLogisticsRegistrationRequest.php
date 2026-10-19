@@ -4,14 +4,26 @@ namespace App\Http\Requests\Logistics;
 
 use App\Models\Buyer\Buyer;
 use App\Models\Seller\Seller;
+use App\Support\EmailRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreLogisticsRegistrationRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $email = $this->input('email');
+            if (is_string($email) && ! $validator->errors()->has('email') && EmailRegistry::otherRolesFor($email, 'logistics') !== []) {
+                $validator->errors()->add('email', 'This email is already registered under another account type.');
+            }
+        }];
     }
 
     public function rules(): array
