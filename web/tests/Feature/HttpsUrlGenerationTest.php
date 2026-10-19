@@ -25,18 +25,25 @@ class HttpsUrlGenerationTest extends TestCase
      */
     public function test_named_routes_start_with_https_in_production(): void
     {
+        $environment = $this->app['env'];
+        $configuredEnvironment = config('app.env');
+        $forcedScheme = (new ReflectionProperty(UrlGenerator::class, 'forceScheme'))
+            ->getValue(app(UrlGenerator::class));
+        $this->app['env'] = 'production';
         config()->set('app.env', 'production');
 
-        (new AppServiceProvider($this->app))->boot();
-
         try {
+            (new AppServiceProvider($this->app))->boot();
+
             $this->assertTrue(
                 str_starts_with(route('seller.products.index'), 'https://'),
                 'Generated URLs must use https in production.'
             );
+            $this->assertStringStartsWith('https://', asset('Images/Zefanya-Logo.png'));
         } finally {
-            URL::forceScheme(null);
-            config()->set('app.env', 'testing');
+            URL::forceScheme($forcedScheme === null ? null : rtrim($forcedScheme, ':/'));
+            $this->app['env'] = $environment;
+            config()->set('app.env', $configuredEnvironment);
         }
     }
 
@@ -47,7 +54,7 @@ class HttpsUrlGenerationTest extends TestCase
      */
     public function test_the_url_generator_is_not_scheme_forced_outside_production(): void
     {
-        config()->set('app.env', 'testing');
+        $this->assertSame('testing', $this->app->environment());
 
         (new AppServiceProvider($this->app))->boot();
 

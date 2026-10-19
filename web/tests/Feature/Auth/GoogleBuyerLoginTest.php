@@ -36,13 +36,13 @@ class GoogleBuyerLoginTest extends TestCase
         $this->assertSame('google-buyer-1', $buyer->fresh()->google_id);
     }
 
-    public function test_unknown_google_email_is_sent_back_to_login_with_an_error(): void
+    public function test_unknown_google_email_is_sent_to_registration_with_an_error(): void
     {
         $this->fakeGoogleUser('nobody@gmail.com', 'google-unknown');
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('register.type'));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('buyer');
         // No auto-registration: the role tables are untouched.
@@ -61,7 +61,7 @@ class GoogleBuyerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'buyer']));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('register.type'));
         $response->assertSessionHas(
             'auth.status_message',
             'Your buyer registration is still awaiting administrator approval.',

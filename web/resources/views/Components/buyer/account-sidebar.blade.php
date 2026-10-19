@@ -42,6 +42,7 @@
         <ul class="space-y-1">
             <li>
                 <a href="{{ route('buyer.orders.index') }}"
+                   @if ($sidebarActive === 'orders') aria-current="page" @endif
                    class="flex items-center justify-between rounded-xl px-4 py-2.5 font-sans text-[13px] transition-colors {{ $sidebarActive === 'orders' ? 'bg-secondary-200 font-semibold text-primary-950' : 'text-[var(--text-muted)] hover:bg-secondary-100 hover:text-[var(--text-ink)]' }}">
                     <span class="flex items-center gap-3">
                         <i data-lucide="package" width="16" height="16" class="{{ $sidebarActive === 'orders' ? 'text-primary-800' : 'text-neutral-400' }}"></i>
@@ -54,6 +55,7 @@
             </li>
             <li>
                 <a href="{{ route('buyer.account.address') }}"
+                   @if ($sidebarActive === 'address') aria-current="page" @endif
                    class="flex items-center justify-between rounded-xl px-4 py-2.5 font-sans text-[13px] transition-colors {{ $sidebarActive === 'address' ? 'bg-secondary-200 font-semibold text-primary-950' : 'text-[var(--text-muted)] hover:bg-secondary-100 hover:text-[var(--text-ink)]' }}">
                     <span class="flex items-center gap-3">
                         <i data-lucide="map-pin" width="16" height="16" class="{{ $sidebarActive === 'address' ? 'text-primary-800' : 'text-neutral-400' }}"></i>
@@ -64,6 +66,7 @@
             </li>
             <li>
                 <a href="{{ route('buyer.account.index') }}"
+                   @if ($sidebarActive === 'profile') aria-current="page" @endif
                    class="flex items-center justify-between rounded-xl px-4 py-2.5 font-sans text-[13px] transition-colors {{ $sidebarActive === 'profile' ? 'bg-secondary-200 font-semibold text-primary-950' : 'text-[var(--text-muted)] hover:bg-secondary-100 hover:text-[var(--text-ink)]' }}">
                     <span class="flex items-center gap-3">
                         <i data-lucide="user" width="16" height="16" class="{{ $sidebarActive === 'profile' ? 'text-primary-800' : 'text-neutral-400' }}"></i>
@@ -73,6 +76,7 @@
             </li>
             <li>
                 <a href="{{ route('buyer.account.password') }}"
+                   @if ($sidebarActive === 'password') aria-current="page" @endif
                    class="flex items-center justify-between rounded-xl px-4 py-2.5 font-sans text-[13px] transition-colors {{ $sidebarActive === 'password' ? 'bg-secondary-200 font-semibold text-primary-950' : 'text-[var(--text-muted)] hover:bg-secondary-100 hover:text-[var(--text-ink)]' }}">
                     <span class="flex items-center gap-3">
                         <i data-lucide="shield-check" width="16" height="16" class="{{ $sidebarActive === 'password' ? 'text-primary-800' : 'text-neutral-400' }}"></i>
@@ -82,6 +86,7 @@
             </li>
             <li>
                 <a href="{{ route('buyer.settings.index') }}"
+                   @if ($sidebarActive === 'settings') aria-current="page" @endif
                    class="flex items-center justify-between rounded-xl px-4 py-2.5 font-sans text-[13px] transition-colors {{ $sidebarActive === 'settings' ? 'bg-secondary-200 font-semibold text-primary-950' : 'text-[var(--text-muted)] hover:bg-secondary-100 hover:text-[var(--text-ink)]' }}">
                     <span class="flex items-center gap-3">
                         <i data-lucide="sliders" width="16" height="16" class="{{ $sidebarActive === 'settings' ? 'text-primary-800' : 'text-neutral-400' }}"></i>

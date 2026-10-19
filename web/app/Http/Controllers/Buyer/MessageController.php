@@ -107,9 +107,9 @@ class MessageController extends Controller
     {
         $buyer = Auth::guard('buyer')->user();
         $validated = $request->validate([
-            'seller_id' => 'required|exists:sellers',
-            'product_id' => 'nullable|exists:products',
-            'order_id' => 'nullable|exists:orders',
+            'seller_id' => 'required|exists:sellers,id',
+            'product_id' => 'nullable|exists:products,id',
+            'order_id' => 'nullable|exists:orders,id',
         ]);
 
         $conversation = Conversation::firstOrCreate(

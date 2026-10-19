@@ -34,13 +34,13 @@ class GoogleSellerLoginTest extends TestCase
         $this->assertSame('google-seller-1', $seller->fresh()->google_id);
     }
 
-    public function test_unknown_google_email_is_sent_back_to_login_with_an_error(): void
+    public function test_unknown_google_email_is_sent_to_registration_with_an_error(): void
     {
         $this->fakeGoogleUser('nobody@gmail.com', 'google-unknown');
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'seller']));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('register.type'));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('seller');
         $this->assertDatabaseCount('sellers', 0);
@@ -57,7 +57,7 @@ class GoogleSellerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'seller']));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('register.type'));
         $response->assertSessionHas(
             'auth.status_message',
             'Your seller account is still pending administrator approval.',

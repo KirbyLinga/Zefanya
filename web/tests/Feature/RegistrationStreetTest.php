@@ -59,6 +59,7 @@ class RegistrationStreetTest extends TestCase
             'barangay_name' => 'Barangay 1',
             'street' => '123 Rizal St., Purok 2',
             'upload_id' => $this->fakeId(),
+            'terms' => '1',
         ], $overrides);
     }
 

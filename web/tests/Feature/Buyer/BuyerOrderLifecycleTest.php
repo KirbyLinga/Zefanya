@@ -86,7 +86,33 @@ class BuyerOrderLifecycleTest extends TestCase
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
             ->assertSee($order->reference)
-            ->assertSee('Placed');
+            ->assertSee('Placed')
+            ->assertSee(route('buyer.messages.getOrCreate'), false);
+    }
+
+    public function test_order_chat_uses_the_existing_authenticated_conversation_endpoint(): void
+    {
+        $order = $this->fullOrder();
+        $sellerOrder = $order->sellerOrders->first();
+        $payload = ['seller_id' => $sellerOrder->seller_id, 'order_id' => $order->id];
+        $url = route('buyer.messages.getOrCreate');
+
+        $this->postJson($url, $payload)->assertUnauthorized();
+        $this->actingAs($this->buyer, 'buyer')->postJson($url, [
+            'seller_id' => -1, 'product_id' => -1, 'order_id' => -1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['seller_id', 'product_id', 'order_id']);
+        $this->assertDatabaseCount('conversations', 0);
+        $response = $this->actingAs($this->buyer, 'buyer')->postJson($url, $payload)
+            ->assertOk()->assertJsonStructure(['conversation_id']);
+        $this->assertDatabaseHas('conversations', [
+            'id' => $response->json('conversation_id'),
+            'buyer_id' => $this->buyer->id,
+            'seller_id' => $sellerOrder->seller_id,
+            'order_id' => $order->id,
+        ]);
+        $this->postJson($url, $payload)->assertOk()
+            ->assertJsonPath('conversation_id', $response->json('conversation_id'));
+        $this->assertDatabaseCount('conversations', 1);
     }
 
     public function test_buyer_cannot_see_other_buyers_orders(): void

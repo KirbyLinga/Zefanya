@@ -26,15 +26,15 @@ class SearchController extends Controller
             $products = Product::query()
                 ->where('status', 'active')
                 ->where(function ($q) use ($query) {
-                    $q->where('name', 'ilike', "%{$query}%")
-                        ->orWhere('description', 'ilike', "%{$query}%");
+                    $q->whereLike('name', "%{$query}%")
+                        ->orWhereLike('description', "%{$query}%");
                 })
                 ->with(['images', 'seller', 'category'])
                 ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
                 ->paginate(12);
 
             $categories = Category::query()
-                ->where('label', 'ilike', "%{$query}%")
+                ->whereLike('label', "%{$query}%")
                 ->get();
         }
 
@@ -58,7 +58,7 @@ class SearchController extends Controller
             $popular = Product::query()
                 ->where('status', 'active')
                 ->where(function ($q) use ($term) {
-                    $q->where('name', 'ilike', "%{$term}%");
+                    $q->whereLike('name', "%{$term}%");
                 })
                 ->with(['images'])
                 ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))

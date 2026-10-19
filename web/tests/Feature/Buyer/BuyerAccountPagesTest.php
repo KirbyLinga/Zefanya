@@ -8,9 +8,8 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Buyer "My Account" pages render the shared tab strip (Profile / Address
- * Book / Password & Security / Order History; Preferences has no route so it
- * is plain non-interactive text) and every color class resolves to a theme
+ * Buyer "My Account" pages render the shared account sidebar with its active
+ * section, real account links and no dead Preferences entry and every color class resolves to a theme
  * custom property — the pages must not reintroduce raw hex palette values.
  *
  * Data behavior (update/password/address flows) is covered by the
@@ -69,7 +68,7 @@ class BuyerAccountPagesTest extends TestCase
 
     /**
      * Guards the four account views (profile/address/password pages plus the
-     * shared tabs include) so later color edits stay inside the
+     * shared sidebar include) so later color edits stay inside the
      * theme custom properties; the account shell owns no color values of its
      * own. This deliberately reads the sources rather than rendered pages,
      * because the shared buyer layout also embeds legacy raw-hex components
@@ -78,7 +77,7 @@ class BuyerAccountPagesTest extends TestCase
     private function assertOnlyThemeColors(): void
     {
         $sources = [
-            base_path('resources/views/Components/buyer/account-tabs.blade.php'),
+            base_path('resources/views/Components/buyer/account-sidebar.blade.php'),
             base_path('resources/views/Buyer/Account/profile.blade.php'),
             base_path('resources/views/Buyer/Account/address.blade.php'),
             base_path('resources/views/Buyer/Account/password.blade.php'),
@@ -104,13 +103,30 @@ class BuyerAccountPagesTest extends TestCase
         }
     }
 
-    public function test_profile_page_renders_shared_header_tabs_and_card(): void
+    private function assertActiveAccountSection(string $html, string $route, string $label): void
+    {
+        $document = new \DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document->loadHTML($html);
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        $xpath = new \DOMXPath($document);
+        $links = $xpath->query('//nav[@aria-label="Buyer account navigation"]//a[@aria-current="page"]');
+        $this->assertCount(1, $links);
+        $this->assertSame(route($route), $links->item(0)->getAttribute('href'));
+        $this->assertStringContainsString($label, $links->item(0)->textContent);
+    }
+
+    public function test_profile_page_renders_shared_header_sidebar_and_card(): void
     {
         $html = $this->signedIn()->get(route('buyer.account.index'))
             ->assertOk()->getContent();
 
         $this->assertStringContainsString('Manage your personal information, contact credentials, and communication preferences.', $html);
-        $this->assertStringContainsString('aria-current="page">Profile</span>', $html);
+        $this->assertActiveAccountSection($html, 'buyer.account.index', 'Profile');
         $this->assertStringContainsString(route('buyer.account.address'), $html);
         $this->assertStringContainsString(route('buyer.account.password'), $html);
         $this->assertStringContainsString(route('buyer.orders.index'), $html);
@@ -128,24 +144,24 @@ class BuyerAccountPagesTest extends TestCase
         $this->assertOnlyThemeColors();
     }
 
-    public function test_address_page_uses_the_shared_tabs_with_active_address_book(): void
+    public function test_address_page_uses_the_shared_sidebar_with_active_address(): void
     {
         $html = $this->signedIn()->get(route('buyer.account.address'))
             ->assertOk()->getContent();
 
-        $this->assertStringContainsString('aria-current="page">Address Book</span>', $html);
+        $this->assertActiveAccountSection($html, 'buyer.account.address', 'Shipping Addresses');
         $this->assertStringContainsString(route('buyer.account.index'), $html);
         $this->assertStringNotContainsString('Personal Profile', $html, 'The address page must not reuse the profile card.');
-        $this->assertStringContainsString('Order History', $html);
+        $this->assertStringContainsString('Orders &amp; History', $html);
         $this->assertStringContainsString('Save address', $html);
     }
 
-    public function test_password_page_uses_the_shared_tabs_with_active_password_security(): void
+    public function test_password_page_uses_the_shared_sidebar_with_active_password_security(): void
     {
         $html = $this->signedIn()->get(route('buyer.account.password'))
             ->assertOk()->getContent();
 
-        $this->assertStringContainsString('aria-current="page">Password &amp; Security</span>', $html);
+        $this->assertActiveAccountSection($html, 'buyer.account.password', 'Password & Security');
         $this->assertStringContainsString(route('buyer.account.index'), $html);
         $this->assertStringContainsString('Update password', $html);
     }

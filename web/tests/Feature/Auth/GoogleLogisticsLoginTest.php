@@ -36,13 +36,13 @@ class GoogleLogisticsLoginTest extends TestCase
         $this->assertSame('google-logistics-1', $provider->fresh()->google_id);
     }
 
-    public function test_unknown_google_email_is_sent_back_to_login_with_an_error(): void
+    public function test_unknown_google_email_is_sent_to_registration_with_an_error(): void
     {
         $this->fakeGoogleUser('nobody@gmail.com', 'google-unknown');
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('register.type'));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('logistics');
         $this->assertDatabaseCount('logistics_providers', 0);
@@ -59,7 +59,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('register.type'));
         $response->assertSessionHas(
             'auth.status_message',
             'Your logistics provider registration is still awaiting administrator approval.',

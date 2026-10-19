@@ -185,7 +185,7 @@
                 const orderId = btn.dataset.orderId;
 
                 try {
-                    const response = await fetch('{{ route("buyer.messages.get-or-create") }}', {
+                    const response = await fetch('{{ route("buyer.messages.getOrCreate") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

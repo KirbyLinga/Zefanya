@@ -195,12 +195,12 @@ class RegistrationController extends Controller
 
     public function approveSeller(Seller $seller)
     {
-        $seller->update([
+        $seller->forceFill([
             'status' => 'approved',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => null,
-        ]);
+        ])->save();
 
         $seller->notify(new SellerRegistrationDecision('approved'));
 
@@ -213,12 +213,12 @@ class RegistrationController extends Controller
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $seller->update([
+        $seller->forceFill([
             'status' => 'rejected',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => $request->rejection_reason,
-        ]);
+        ])->save();
 
         $seller->notify(new SellerRegistrationDecision('rejected', $request->rejection_reason));
 
