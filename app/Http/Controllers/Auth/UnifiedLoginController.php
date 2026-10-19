@@ -51,10 +51,37 @@ class UnifiedLoginController extends Controller
             }
         }
 
+        if ($this->tryRider($email, $password, $remember, $request)) {
+            $request->session()->forget('auth.open_login_modal');
+
+            return redirect()->intended(route('rider.dashboard'));
+        }
+
         // Neither guard could authenticate with these credentials.
         throw ValidationException::withMessages([
             'email' => __('auth.failed'),
         ]);
+    }
+
+    /**
+     * Rider login: credentials must match AND status must be active.
+     * Pending Activation riders are denied without leaking password validity.
+     */
+    private function tryRider(string $email, string $password, bool $remember, Request $request): bool
+    {
+        if (! Auth::guard('rider')->attempt(['email' => $email, 'password' => $password], $remember)) {
+            return false;
+        }
+        $rider = Auth::guard('rider')->user();
+        if (! $rider || $rider->status !== 'active') {
+            Auth::guard('rider')->logout();
+
+            return false;
+        }
+        $this->clearOtherGuards('rider');
+        $request->session()->regenerate();
+
+        return true;
     }
 
     /**

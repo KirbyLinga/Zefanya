@@ -23,7 +23,7 @@
         [
             'label' => 'Operations',
             'items' => [
-                ['route' => null, 'icon' => 'users', 'label' => 'Rider Management'],
+                ['route' => 'logistics.riders.index', 'icon' => 'users', 'label' => 'Rider Management'],
                 ['route' => null, 'icon' => 'clipboard-check', 'label' => 'Courier Applications'],
                 ['route' => 'logistics.incoming-parcels.index', 'icon' => 'inbox', 'label' => 'Incoming Parcels'],
                 ['route' => 'logistics.parcel-sorting.index', 'icon' => 'archive', 'label' => 'Parcel Sorting'],

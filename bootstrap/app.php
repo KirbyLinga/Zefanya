@@ -6,6 +6,7 @@ use App\Http\Middleware\AuthenticateRoleSession;
 use App\Http\Middleware\EnforceSingleBrowserAccount;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
 use App\Http\Middleware\RedirectIfAuthenticatedRole;
+use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.role' => EnsureAdminRole::class,
             'guest.role' => RedirectIfAuthenticatedRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
+            'rider.active' => EnsureRiderActive::class,
             'seller.approved' => EnsureSellerApproved::class,
         ]);
 

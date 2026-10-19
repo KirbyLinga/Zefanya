@@ -9,6 +9,7 @@ enum AuthRole: string
     case Admin = 'admin';
     case Seller = 'seller';
     case Logistics = 'logistics';
+    case Rider = 'rider';
     case Buyer = 'buyer';
 
     public function guard(): string
@@ -22,6 +23,7 @@ enum AuthRole: string
             self::Admin => 'admin.dashboard',
             self::Seller => 'seller.dashboard',
             self::Logistics => 'logistics.dashboard',
+            self::Rider => 'rider.dashboard',
             self::Buyer => 'buyer.home',
         };
     }
@@ -38,6 +40,10 @@ enum AuthRole: string
      */
     public static function detectionOrder(): array
     {
+        if (Auth::guard('rider')->check()) {
+            return [self::Admin, self::Seller, self::Logistics, self::Buyer, self::Rider];
+        }
+
         return [self::Admin, self::Seller, self::Logistics, self::Buyer];
     }
 

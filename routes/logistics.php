@@ -6,6 +6,7 @@ use App\Http\Controllers\Logistics\DeliveryAssignmentsController;
 use App\Http\Controllers\Logistics\DeliveryMonitoringController;
 use App\Http\Controllers\Logistics\IncomingParcelsController;
 use App\Http\Controllers\Logistics\ParcelSortingController;
+use App\Http\Controllers\Logistics\RiderController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -45,5 +46,12 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::patch('/areas/{area}', [AreaController::class, 'update'])->name('areas.update');
         Route::delete('/areas/{area}', [AreaController::class, 'destroy'])->name('areas.destroy');
         Route::post('/areas/{area}/couriers', [AreaController::class, 'assignCourier'])->name('areas.couriers.assign');
+
+        // ── Rider registration (Add Rider, company-scoped) ──────────────
+        Route::get('/riders', [RiderController::class, 'index'])->name('riders.index');
+        Route::get('/riders/create', [RiderController::class, 'create'])->name('riders.create');
+        Route::post('/riders', [RiderController::class, 'store'])->name('riders.store');
+        Route::get('/riders/{rider}', [RiderController::class, 'show'])->name('riders.show');
+        Route::post('/riders/{rider}/resend', [RiderController::class, 'resend'])->name('riders.resend');
     });
 });

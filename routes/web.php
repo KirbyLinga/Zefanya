@@ -10,6 +10,8 @@ use App\Http\Controllers\Logistics\RegisterLogisticsController;
 use App\Http\Controllers\Logistics\VerifyLogisticsOtpController;
 use App\Http\Controllers\Seller\RegisterSellerController;
 use App\Http\Controllers\Seller\VerifySellerOtpController;
+use App\Http\Controllers\Rider\ActivationController;
+use App\Http\Controllers\Rider\DashboardController as RiderDashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingPageController::class, 'index'])->name('home');
@@ -166,3 +168,10 @@ Route::middleware('guest.role')->group(function (): void {
 Route::post('/logout', [UnifiedLoginController::class, 'logout'])
     ->name('unified.logout')
     ->middleware('throttle:logout');
+
+// ── Rider activation (public link, 24h single-use) + dashboard ─────────
+Route::get('/rider/activate/{token}', [ActivationController::class, 'show'])->name('rider.activate.show');
+Route::post('/rider/activate/{token}', [ActivationController::class, 'store'])->name('rider.activate')->middleware('throttle:10,1');
+Route::middleware(['auth:rider', 'rider.active'])->group(function (): void {
+    Route::get('/rider/dashboard', [RiderDashboardController::class, 'index'])->name('rider.dashboard');
+});

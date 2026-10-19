@@ -30,6 +30,11 @@ trait ClearsOtherGuards
             }
         }
 
+        if ($keep !== 'rider') {
+            Auth::guard('rider')->logout();
+            session()->forget('password_hash_rider');
+        }
+
         $this->rememberSession($keep);
     }
 
@@ -38,6 +43,9 @@ trait ClearsOtherGuards
      */
     protected function clearAllGuards(): void
     {
+        Auth::guard('rider')->logout();
+        session()->forget('password_hash_rider');
+
         foreach (AuthRole::detectionOrder() as $role) {
             $guard = $role->guard();
             Auth::guard($guard)->logout();
