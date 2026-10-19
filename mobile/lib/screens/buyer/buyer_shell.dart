@@ -6,11 +6,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
+import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
 import '../../utils/scroll_to_top.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/ease_in_frame.dart';
@@ -236,6 +238,8 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final cartCount = context.watch<CartState>().itemCount;
+    final auth = context.watch<AuthState>();
+    final greeting = Microcopy.greeting(DateTime.now(), name: auth.firstName ?? auth.name).toUpperCase();
 
     // Grid excludes whatever's already shown above it on Home: index 0
     // (the cover story) and, when there are enough products, 2/3 (the
@@ -284,7 +288,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('GOOD THINGS, MADE NEARBY', style: AppType.eyebrow),
+                            Text(greeting, style: AppType.eyebrow),
                             const SizedBox(height: 10),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,

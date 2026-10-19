@@ -23,6 +23,7 @@ import 'widgets/product_card.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/zefanya_mark.dart';
+import '../../utils/microcopy.dart';
 import '../../utils/timed_snackbar.dart';
 
 class CartScreen extends StatefulWidget {
@@ -90,7 +91,7 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     setState(() => _appliedVoucher = voucher);
-    showTimedSnackBar(context, SnackBar(content: Text('Voucher "$code" applied')));
+    showTimedSnackBar(context, SnackBar(content: Text(Microcopy.voucherApplied(code))));
   }
 
   void _removeVoucher() {
@@ -240,8 +241,8 @@ class _CartScreenState extends State<CartScreen> {
   Widget _buildEmptyState(ThemeData theme) {
     return EmptyState(
       icon: Icons.shopping_bag_outlined,
-      title: 'Your cart is empty',
-      subtitle: 'Items you add will show up here',
+      title: Microcopy.cartEmptyTitle,
+      subtitle: Microcopy.cartEmptySubtitle,
       action: OutlinedButton(
         onPressed: () => Navigator.of(context).maybePop(),
         child: const Text('Continue Shopping'),

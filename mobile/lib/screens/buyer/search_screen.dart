@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/mock_data.dart';
 import '../../state/catalog_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
 import '../../utils/product_sort.dart';
 import '../../utils/search_filter.dart';
 import '../../utils/motion.dart';
@@ -181,7 +182,7 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           Expanded(
             child: Text(
-              'Nothing matches these filters.',
+              Microcopy.searchFilterEmpty,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -401,18 +402,25 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           ZefanyaMark(size: 46, color: AppColors.neutral.withValues(alpha: 0.4), strokeWidth: 4),
           const SizedBox(height: 22),
-          Text('NOTHING HERE YET', style: AppType.eyebrow),
+          Text(Microcopy.searchEmptyEyebrow, style: AppType.eyebrow),
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'No results for \u201c$_query\u201d',
+              Microcopy.searchNoResults(_query),
               style: AppType.sectionDisplay.copyWith(fontSize: 26),
               textAlign: TextAlign.center,
             ),
           ),
           const SizedBox(height: 8),
-          Text('Try a shorter or more general term', style: theme.textTheme.bodySmall),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              Microcopy.searchEmptySubtitle,
+              style: theme.textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ),
           // Tappable retries from the existing popular terms (same list
           // as the idle state) — a dead end that offers a way out.
           // Dim-only: authored order is kept (reordering here would

@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
 import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -88,8 +89,8 @@ class SavedScreen extends StatelessWidget {
   Widget _buildEmpty(BuildContext context, ThemeData theme) {
     return EmptyState(
       icon: Icons.favorite_border,
-      title: 'Nothing saved yet',
-      subtitle: 'Tap the heart on any product to add it here.',
+      title: Microcopy.savedEmptyTitle,
+      subtitle: Microcopy.savedEmptySubtitle,
       action: OutlinedButton(
         onPressed: () => Navigator.of(context).maybePop(),
         child: const Text('Browse products'),

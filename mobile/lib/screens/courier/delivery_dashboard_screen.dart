@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
 import '../../widgets/app_page_route.dart';
@@ -122,8 +123,8 @@ class DeliveryDashboardScreen extends StatelessWidget {
     if (failure != null) {
       return EmptyState(
         icon: Icons.cloud_off_outlined,
-        title: 'Your deliveries could not be loaded',
-        subtitle: failure.message,
+        title: 'We couldn\'t load your deliveries',
+        subtitle: Microcopy.calmError(failure.message),
         action: failure.isRetryable
             ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
             : null,
@@ -133,8 +134,8 @@ class DeliveryDashboardScreen extends StatelessWidget {
 
     return EmptyState(
       icon: Icons.local_shipping_outlined,
-      title: 'Nothing out for delivery yet',
-      subtitle: 'Picked-up items will show up here',
+      title: Microcopy.deliveriesEmptyTitle,
+      subtitle: Microcopy.deliveriesEmptySubtitle,
       tint: AppColors.tertiary,
     );
   }

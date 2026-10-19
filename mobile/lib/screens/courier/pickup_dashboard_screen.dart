@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
 import '../../widgets/app_page_route.dart';
@@ -125,8 +126,8 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
     if (failure != null) {
       return EmptyState(
         icon: Icons.cloud_off_outlined,
-        title: 'Your pickups could not be loaded',
-        subtitle: failure.message,
+        title: 'We couldn\'t load your pickups',
+        subtitle: Microcopy.calmError(failure.message),
         action: failure.isRetryable
             ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
             : null,
@@ -136,8 +137,8 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
 
     return EmptyState(
       icon: Icons.inbox_outlined,
-      title: 'No pickups assigned right now',
-      subtitle: 'Pull down to refresh',
+      title: Microcopy.pickupsEmptyTitle,
+      subtitle: Microcopy.pickupsEmptySubtitle,
       tint: AppColors.tertiary,
     );
   }

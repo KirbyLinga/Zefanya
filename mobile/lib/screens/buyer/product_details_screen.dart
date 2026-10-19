@@ -25,6 +25,7 @@ import 'checkout_screen.dart';
 import 'review_screen.dart';
 import 'seller_screen.dart';
 import 'widgets/product_card.dart';
+import '../../utils/microcopy.dart';
 import '../../utils/motion.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
@@ -136,7 +137,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     showTimedSnackBar(
       context,
       SnackBar(
-        content: Text('Added ${_product.name} to cart'),
+        content: Text(Microcopy.addToCart(productName: _product.name, seed: _quantity)),
         persist: false,
         action: SnackBarAction(
           label: 'View Cart',

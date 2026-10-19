@@ -23,6 +23,7 @@ import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
 import '../../utils/order_tab_memory.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
@@ -178,8 +179,8 @@ class _OrdersLoadFailure extends StatelessWidget {
     AppColors.watch(context);
     return EmptyState(
       icon: Icons.cloud_off_outlined,
-      title: 'Your orders could not be loaded',
-      subtitle: error.message,
+      title: 'We couldn\'t load your orders',
+      subtitle: Microcopy.calmError(error.message),
       action: error.isRetryable
           ? TextButton(onPressed: () => _retry(context), child: const Text('Retry'))
           : null,
@@ -360,7 +361,7 @@ class _OrderList extends StatelessWidget {
               child: EmptyState(
                 icon: _emptyIcon(status),
                 title: _emptyTitle(status),
-                subtitle: 'Items in this stage will show up here',
+                subtitle: Microcopy.ordersEmptySubtitle,
                 tint: AppColors.secondary,
                 action: OutlinedButton(
                   onPressed: () => Navigator.of(context).maybePop(),
