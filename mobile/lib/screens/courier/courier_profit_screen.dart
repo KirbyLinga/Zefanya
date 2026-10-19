@@ -16,7 +16,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/weekly_buckets.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
-import '../../widgets/staggered_reveal.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 
 class CourierProfitScreen extends StatelessWidget {
   const CourierProfitScreen({super.key});
@@ -44,42 +44,55 @@ class CourierProfitScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
         children: [
-          const EditorialHeader(
-            eyebrow: 'YOUR MONEY',
-            title: 'Earnings',
-            padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+          const EaseInFrame(
+            index: 0,
+            child: EditorialHeader(
+              eyebrow: 'YOUR MONEY',
+              title: 'Earnings',
+              padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+            ),
           ),
-          _buildSummaryCard(
-            theme,
-            weekEarnings: courier.weekEarnings,
-            todayEarnings: courier.todayEarnings,
-            totalDeliveries: completed.length,
+          EaseInFrame(
+            index: 1,
+            child: Column(
+              children: [
+                _buildSummaryCard(
+                  theme,
+                  weekEarnings: courier.weekEarnings,
+                  todayEarnings: courier.todayEarnings,
+                  totalDeliveries: completed.length,
+                ),
+                const SizedBox(height: 16),
+                _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
+                const SizedBox(height: 20),
+                _WeeklyChart(completed: completed),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
           const SizedBox(height: 20),
-          _WeeklyChart(completed: completed),
-          const SizedBox(height: 20),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('COMPLETED JOBS', style: AppType.eyebrow),
-                  const SizedBox(height: 4),
-                  Text('Recent Transactions', style: theme.textTheme.titleSmall),
-                ],
-              ),
-            ],
+          EaseInFrame(
+            index: 2,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('COMPLETED JOBS', style: AppType.eyebrow),
+                    const SizedBox(height: 4),
+                    Text('Recent Transactions', style: theme.textTheme.titleSmall),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           if (completed.isEmpty)
             _buildEmptyTransactions(theme)
           else
             for (var i = 0; i < completed.length; i++)
-              StaggeredReveal(
-                index: i,
+              EaseInFrame(
+                index: (i + 3).clamp(3, 6),
                 child: _buildTransactionTile(theme, completed[i], i),
               ),
         ],

@@ -16,6 +16,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/free_shipping_meter.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 import 'checkout_screen.dart';
 import 'vouchers_screen.dart';
 import 'widgets/product_card.dart';
@@ -181,28 +182,34 @@ class _CartScreenState extends State<CartScreen> {
           ? _buildEmptyState(theme)
           : Column(
               children: [
-                const EditorialHeader(
-                  eyebrow: 'READY TO GO',
-                  title: 'My Cart',
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                const EaseInFrame(
+                  index: 0,
+                  child: EditorialHeader(
+                    eyebrow: 'READY TO GO',
+                    title: 'My Cart',
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: allSelected,
-                            onChanged: (v) => context.read<CartState>().setAllSelected(v ?? false),
-                          ),
-                          Text('Select all', style: theme.textTheme.bodyMedium),
-                          const Spacer(),
-                          Text('${items.length} item(s)', style: theme.textTheme.bodySmall),
-                        ],
-                      ),
-                      const Divider(height: 1),
-                    ],
+                EaseInFrame(
+                  index: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: allSelected,
+                              onChanged: (v) => context.read<CartState>().setAllSelected(v ?? false),
+                            ),
+                            Text('Select all', style: theme.textTheme.bodyMedium),
+                            const Spacer(),
+                            Text('${items.length} item(s)', style: theme.textTheme.bodySmall),
+                          ],
+                        ),
+                        const Divider(height: 1),
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -210,10 +217,10 @@ class _CartScreenState extends State<CartScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     children: [
                       for (var i = 0; i < items.length; i++)
-                        // No StaggeredReveal: each tile is a Dismissible
-                        // (its own exit animation) and the delayed
-                        // reveal timers hang widget tests. Static tiles.
-                        _buildCartTile(context, theme, ext, items[i], i),
+                        EaseInFrame(
+                          index: (i + 2).clamp(2, 6),
+                          child: _buildCartTile(context, theme, ext, items[i], i),
+                        ),
                       const SizedBox(height: 8),
                       FreeShippingMeter(subtotal: cart.subtotal),
                       const SizedBox(height: 12),
@@ -391,7 +398,19 @@ class _CartScreenState extends State<CartScreen> {
           ),
           SizedBox(
             width: 24,
-            child: Text('${item.quantity}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              transitionBuilder: (child, animation) => ScaleTransition(
+                scale: animation,
+                child: FadeTransition(opacity: animation, child: child),
+              ),
+              child: Text(
+                '${item.quantity}',
+                key: ValueKey(item.quantity),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
           ),
           button(Icons.add, 'Increase quantity', () => cart.updateQuantity(item, 1)),
         ],
@@ -503,7 +522,18 @@ class _CartScreenState extends State<CartScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('Total ($selectedCount item${selectedCount == 1 ? '' : 's'})', style: theme.textTheme.bodySmall),
-                  Text('₱${total.toStringAsFixed(0)}', style: AppType.priceNumeral(26)),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                    child: Text(
+                      '₱${total.toStringAsFixed(0)}',
+                      key: ValueKey(total),
+                      style: AppType.priceNumeral(26),
+                    ),
+                  ),
                 ],
               ),
             ),

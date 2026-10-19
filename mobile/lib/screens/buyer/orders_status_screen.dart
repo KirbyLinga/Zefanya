@@ -28,7 +28,7 @@ import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/staggered_reveal.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 import '../shared/chat_screen.dart';
 import 'cart_screen.dart';
 import 'order_detail_screen.dart';
@@ -129,9 +129,12 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
             body: SafeArea(
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                    child: _OrderStageStepper(controller: controller),
+                  EaseInFrame(
+                    index: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                      child: _OrderStageStepper(controller: controller),
+                    ),
                   ),
                   Expanded(
                     child: TabBarView(
@@ -376,8 +379,8 @@ class _OrderList extends StatelessWidget {
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
         itemCount: filtered.length,
-        itemBuilder: (context, i) => StaggeredReveal(
-          index: i,
+        itemBuilder: (context, i) => EaseInFrame(
+          index: i.clamp(0, 5),
           child: _OrderCard(order: filtered[i], index: i),
         ),
       ),

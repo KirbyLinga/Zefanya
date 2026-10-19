@@ -31,7 +31,7 @@ import '../../utils/product_sort.dart';
 import '../../utils/search_filter.dart';
 import '../../utils/motion.dart';
 import '../../widgets/editorial_shapes.dart';
-import '../../widgets/staggered_reveal.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/zefanya_mark.dart';
 import 'product_details_screen.dart';
 import 'widgets/product_card.dart';
@@ -259,12 +259,20 @@ class _SearchScreenState extends State<SearchScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                             _buildResultsHeader(),
-                            ProductSortChips(
-                              sort: _sort,
-                              onChanged: (sort) => setState(() => _sort = sort),
+                            EaseInFrame(
+                              index: 0,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ProductSortChips(
+                                    sort: _sort,
+                                    onChanged: (sort) => setState(() => _sort = sort),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildFilterChips(),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            _buildFilterChips(),
                             const SizedBox(height: 4),
                             // Filters hid everything the query matched: say so
                             // and offer the way out, instead of a dead end
@@ -494,8 +502,8 @@ class _SearchScreenState extends State<SearchScreen> {
       itemCount: _results.length,
       itemBuilder: (context, i) {
         final product = _results[i];
-        return StaggeredReveal(
-          index: i,
+        return EaseInFrame(
+          index: i.clamp(0, 5),
           child: ProductCard(
             product: product,
             index: i,

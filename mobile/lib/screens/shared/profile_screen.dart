@@ -45,6 +45,7 @@ import '../buyer/widgets/product_card.dart' show ProductImage;
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/motion/cloud_transition.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/theme_toggle.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
@@ -69,10 +70,16 @@ class ProfileScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
           children: [
-            _buildHeroCard(context, theme, ext, auth, isCourier),
+            EaseInFrame(
+              index: 0,
+              child: _buildHeroCard(context, theme, ext, auth, isCourier),
+            ),
             const SizedBox(height: 26),
             if (!isCourier) ...[
-              const _RecentlyLookedAt(),
+              const EaseInFrame(
+                index: 1,
+                child: _RecentlyLookedAt(),
+              ),
             ],
             // Curve transitions from the hero into the record zone —
             // without it the drop from the gradient card to the plain
@@ -83,26 +90,45 @@ class ProfileScreen extends StatelessWidget {
               height: 36,
             ),
             const SizedBox(height: 8),
-            Text('ACCOUNT DETAILS', style: AppType.eyebrow),
-            const SizedBox(height: 12),
-            _LedgerCard(
-              rows: [
-                _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
-                _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
-                _LedgerRow(Icons.location_on_outlined, 'Address', auth.addressSummary),
-              ],
+            EaseInFrame(
+              index: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ACCOUNT DETAILS', style: AppType.eyebrow),
+                  const SizedBox(height: 12),
+                  _LedgerCard(
+                    rows: [
+                      _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
+                      _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
+                      _LedgerRow(Icons.location_on_outlined, 'Address', auth.addressSummary),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 26),
-            Text('APPEARANCE', style: AppType.eyebrow),
-            const SizedBox(height: 12),
-            const ThemeToggle(),
+            EaseInFrame(
+              index: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('APPEARANCE', style: AppType.eyebrow),
+                  const SizedBox(height: 12),
+                  const ThemeToggle(),
+                ],
+              ),
+            ),
             const SizedBox(height: 26),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _logout(context),
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Log Out'),
+            EaseInFrame(
+              index: 4,
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _logout(context),
+                  icon: const Icon(Icons.logout, size: 18),
+                  label: const Text('Log Out'),
+                ),
               ),
             ),
           ],

@@ -31,6 +31,7 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/cart_flight.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/heart_button.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   const ProductDetailsScreen({super.key, required this.product, this.heroTag});
@@ -167,7 +168,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       // The action bar lives in bottomNavigationBar (not as the last child
       // of body's Column) so Scaffold knows about it and lifts floating
       // SnackBars ABOVE it instead of letting them cover the buttons.
-      bottomNavigationBar: _buildBottomActionBar(context, theme),
+      bottomNavigationBar: EaseInFrame(
+        index: 1,
+        child: _buildBottomActionBar(context, theme),
+      ),
       body: SafeArea(
         bottom: false, // the bottom bar handles its own bottom inset
         child: Column(
@@ -185,21 +189,45 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTitleAndPrice(theme),
-                          const SizedBox(height: 6),
-                          _buildRatingRow(theme),
+                          EaseInFrame(
+                            index: 0,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildTitleAndPrice(theme),
+                                const SizedBox(height: 6),
+                                _buildRatingRow(theme),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 20),
-                          _buildSellerRow(theme, ext),
+                          EaseInFrame(
+                            index: 1,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildSellerRow(theme, ext),
+                                const SizedBox(height: 24),
+                                if (_product.variants.isNotEmpty) ...[
+                                  _buildVariantPicker(theme, ext),
+                                  const SizedBox(height: 24),
+                                ],
+                                _buildQuantityStepper(theme, ext),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 24),
-                          if (_product.variants.isNotEmpty) ...[
-                            _buildVariantPicker(theme, ext),
-                            const SizedBox(height: 24),
-                          ],
-                          _buildQuantityStepper(theme, ext),
-                          const SizedBox(height: 24),
-                          _buildDescription(theme),
-                          const SizedBox(height: 24),
-                          _buildReviewsSection(theme),
+                          EaseInFrame(
+                            index: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildDescription(theme),
+                                const SizedBox(height: 24),
+                                _buildReviewsSection(theme),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),

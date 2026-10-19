@@ -13,6 +13,7 @@ import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/scroll_to_top.dart';
 import '../../widgets/floating_nav_bar.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/motion/fade_through.dart';
 import '../../widgets/nav_icons.dart';
 import '../shared/profile_screen.dart';
@@ -30,7 +31,6 @@ import 'widgets/product_stack_showcase.dart';
 import 'widgets/seller_story_card.dart';
 import 'widgets/recently_viewed_rail.dart';
 import 'widgets/saved_rail.dart';
-import '../../widgets/staggered_reveal.dart';
 import '../../widgets/shimmer_box.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/cart_flight.dart';
@@ -273,84 +273,87 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
             // the only place it appears *inside* the app rather than in
             // the pre-auth flow.
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 12, 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('GOOD THINGS, MADE NEARBY', style: AppType.eyebrow),
-                          const SizedBox(height: 10),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text('Zefanya', style: AppType.masthead),
-                              const SizedBox(width: 10),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: ZefanyaMark(
-                                  size: 20,
-                                  // Brand rose at 60% — reads as a quiet
-                                  // mark next to the wordmark in both
-                                  // modes, since primaryDark is itself
-                                  // mode-tuned (deep mauve → lifted rose).
-                                  color: AppColors.primaryDark.withValues(alpha: 0.6),
+              child: EaseInFrame(
+                index: 0,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('GOOD THINGS, MADE NEARBY', style: AppType.eyebrow),
+                            const SizedBox(height: 10),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text('Zefanya', style: AppType.masthead),
+                                const SizedBox(width: 10),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: ZefanyaMark(
+                                    size: 20,
+                                    // Brand rose at 60% — reads as a quiet
+                                    // mark next to the wordmark in both
+                                    // modes, since primaryDark is itself
+                                    // mode-tuned (deep mauve → lifted rose).
+                                    color: AppColors.primaryDark.withValues(alpha: 0.6),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // CartAnchor makes this the landing point for the
-                    // add-to-cart flight (see widgets/cart_flight.dart)
-                    // and plays the catch pop when an item arrives.
-                    CartAnchor(
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          IconButton(
-                            onPressed: () => Navigator.of(context).push(
-                              AppPageRoute(builder: (_) => const CartScreen()),
+                              ],
                             ),
-                            icon: const Icon(Icons.shopping_bag_outlined),
-                            color: AppColors.textPrimary,
-                          ),
-                          Positioned(
-                            right: 2,
-                            top: 2,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, animation) => ScaleTransition(
-                                scale: animation,
-                                child: FadeTransition(opacity: animation, child: child),
+                          ],
+                        ),
+                      ),
+                      // CartAnchor makes this the landing point for the
+                      // add-to-cart flight (see widgets/cart_flight.dart)
+                      // and plays the catch pop when an item arrives.
+                      CartAnchor(
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.of(context).push(
+                                AppPageRoute(builder: (_) => const CartScreen()),
                               ),
-                              child: cartCount > 0
-                                  ? Container(
-                                      key: ValueKey(cartCount),
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryDark,
-                                        borderRadius: radiusOf(ShapeTier.pill),
-                                      ),
-                                      child: Text(
-                                        cartCount > 9 ? '9+' : '$cartCount',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: AppColors.textOnDark,
-                                          fontWeight: FontWeight.w700,
+                              icon: const Icon(Icons.shopping_bag_outlined),
+                              color: AppColors.textPrimary,
+                            ),
+                            Positioned(
+                              right: 2,
+                              top: 2,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                transitionBuilder: (child, animation) => ScaleTransition(
+                                  scale: animation,
+                                  child: FadeTransition(opacity: animation, child: child),
+                                ),
+                                child: cartCount > 0
+                                    ? Container(
+                                        key: ValueKey(cartCount),
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryDark,
+                                          borderRadius: radiusOf(ShapeTier.pill),
                                         ),
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(key: ValueKey('no-badge')),
+                                        child: Text(
+                                          cartCount > 9 ? '9+' : '$cartCount',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: AppColors.textOnDark,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(key: ValueKey('no-badge')),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -360,31 +363,37 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
             // shopping app opens with. It still works, it just isn't
             // the headline any more.
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                child: TextField(
-                  // Read-only: this is a doorway to the Search tab, so
-                  // tapping must not raise the keyboard on Home first.
-                  readOnly: true,
-                  onTap: widget.onSearchTap,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Search products, brands...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(ext.pillRadius),
-                      borderSide: BorderSide.none,
+              child: EaseInFrame(
+                index: 1,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                  child: TextField(
+                    // Read-only: this is a doorway to the Search tab, so
+                    // tapping must not raise the keyboard on Home first.
+                    readOnly: true,
+                    onTap: widget.onSearchTap,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Search products, brands...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(ext.pillRadius),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
-                child: PromoCarousel(
-                  autoAdvance: widget.isActive,
-                  onTapSlide: _onPromoTap,
+              child: EaseInFrame(
+                index: 2,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+                  child: PromoCarousel(
+                    autoAdvance: widget.isActive,
+                    onTapSlide: _onPromoTap,
+                  ),
                 ),
               ),
             ),
@@ -425,10 +434,13 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               SliverPadding(
                 padding: const EdgeInsets.only(top: 8),
                 sliver: SliverToBoxAdapter(
-                  child: FeaturedDeck(
-                    products: _shuffled.take(5).toList(),
-                    heroTagPrefix: 'home',
-                    isActive: widget.isActive,
+                  child: EaseInFrame(
+                    index: 3,
+                    child: FeaturedDeck(
+                      products: _shuffled.take(5).toList(),
+                      heroTagPrefix: 'home',
+                      isActive: widget.isActive,
+                    ),
                   ),
                 ),
               ),
@@ -614,8 +626,8 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           sliver: SliverToBoxAdapter(
-            child: StaggeredReveal(
-              index: gridIndex + 1,
+            child: EaseInFrame(
+              index: (gridIndex + 1).clamp(0, 5),
               child: WideProductTile(
                 product: interrupt,
                 heroTag: 'home-${interrupt.id}',
@@ -641,8 +653,8 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   }
 
   Widget _gridTile(Product product, int index) {
-    return StaggeredReveal(
-      index: index + 1,
+    return EaseInFrame(
+      index: (index + 1).clamp(0, 5),
       child: ProductCard(
         product: product,
         index: index,

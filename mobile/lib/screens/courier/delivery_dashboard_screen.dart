@@ -13,7 +13,7 @@ import 'widgets/delivery_job_card.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/staggered_reveal.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 
 class DeliveryDashboardScreen extends StatelessWidget {
   const DeliveryDashboardScreen({super.key});
@@ -52,16 +52,19 @@ class DeliveryDashboardScreen extends StatelessWidget {
               itemCount: jobs.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  return EditorialHeader(
-                    eyebrow: 'FOR DELIVERY',
-                    title: 'Out for Delivery',
-                    trailing: tally,
-                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                  return EaseInFrame(
+                    index: 0,
+                    child: EditorialHeader(
+                      eyebrow: 'FOR DELIVERY',
+                      title: 'Out for Delivery',
+                      trailing: tally,
+                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                    ),
                   );
                 }
                 final job = jobs[i - 1];
-                return StaggeredReveal(
-                  index: i - 1,
+                return EaseInFrame(
+                  index: (i - 1).clamp(0, 5),
                   child: DeliveryJobCard(
                     assignedJob: job,
                     index: i - 1,
