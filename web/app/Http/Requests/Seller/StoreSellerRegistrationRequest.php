@@ -55,9 +55,9 @@ class StoreSellerRegistrationRequest extends FormRequest
                 'max:255',
                 function ($attribute, $value, $fail) {
                     // Check if email exists as a seller (case-insensitive)
-                    // Only enforce uniqueness for sellers with verified status (not pending_verification)
+                    // Only enforce uniqueness for sellers with verified status (not unverified)
                     if (Seller::whereRaw('LOWER(email) = ?', [strtolower($value)])
-                        ->whereIn('status', ['pending_approval', 'approved', 'rejected'])
+                        ->whereIn('status', ['pending', 'approved', 'rejected', 'suspended'])
                         ->exists()
                     ) {
                         $fail('This email is already registered. Use a different email.');
@@ -82,7 +82,7 @@ class StoreSellerRegistrationRequest extends FormRequest
                 'regex:/^09\d{9}$/',
                 Rule::unique('sellers', 'contact_no')->where(function ($query) {
                     // Only enforce uniqueness for sellers with completed registration
-                    $query->whereIn('status', ['pending_approval', 'approved', 'rejected']);
+                    $query->whereIn('status', ['pending', 'approved', 'rejected', 'suspended']);
                 }),
             ],
             'birthday' => ['required', 'date', 'before:today'],

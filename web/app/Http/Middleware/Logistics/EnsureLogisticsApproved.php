@@ -34,6 +34,7 @@ class EnsureLogisticsApproved
             return redirect()->route('login')->with('auth.status_message', match ($provider->status) {
                 LogisticsProviderStatus::PendingVerification => 'Your email has not been verified yet. Please check your email for the verification code.',
                 LogisticsProviderStatus::PendingApproval => 'Your account is still pending administrator approval.',
+                LogisticsProviderStatus::Suspended => 'Your account has been suspended. Please contact support.',
                 LogisticsProviderStatus::Rejected => 'Your registration was not approved. Please contact support or submit a new registration.',
                 default => 'Your account is not active.',
             });

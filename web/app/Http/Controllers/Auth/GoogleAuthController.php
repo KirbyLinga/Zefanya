@@ -218,14 +218,17 @@ class GoogleAuthController extends Controller
         }
 
         return match ([$role, $status]) {
-            ['seller', 'pending_verification'] => 'Your email has not been verified yet. Please check your email for the verification code.',
-            ['seller', 'pending_approval'] => 'Your seller account is still pending administrator approval.',
+            ['seller', 'suspended'] => 'Your account has been suspended. Please contact support.',
+            ['seller', 'unverified'] => 'Your email has not been verified yet. Please check your email for the verification code.',
+            ['seller', 'pending'] => 'Your seller account is still pending administrator approval.',
             ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.',
-            ['logistics', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
-            ['logistics', 'pending_approval'] => 'Your logistics provider registration is still awaiting administrator approval.',
+            ['logistics', 'suspended'] => 'Your account has been suspended. Please contact support.',
+            ['logistics', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
+            ['logistics', 'pending'] => 'Your logistics provider registration is still awaiting administrator approval.',
             ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.',
-            ['buyer', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
-            ['buyer', 'pending_approval'] => 'Your buyer registration is still awaiting administrator approval.',
+            ['buyer', 'suspended'] => 'Your account has been suspended. Please contact support.',
+            ['buyer', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
+            ['buyer', 'pending'] => 'Your buyer registration is still awaiting administrator approval.',
             ['buyer', 'rejected'] => 'Your buyer registration was not approved.',
             default => 'Your account is not active.',
         };

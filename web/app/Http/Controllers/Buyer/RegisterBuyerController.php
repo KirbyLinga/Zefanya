@@ -49,7 +49,7 @@ class RegisterBuyerController extends Controller
             'upload_id_path' => $path,
             'email_verification_code' => hash('sha256', $code),
             'email_verification_expires_at' => now()->addMinutes(10),
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $buyer->notify(new BuyerVerifyOtp($code));

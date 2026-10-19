@@ -41,7 +41,7 @@ class SellerFactory extends Factory
     public function pendingApproval(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'status' => 'pending_approval',
+            'status' => 'pending',
             'approved_at' => null,
         ]);
     }

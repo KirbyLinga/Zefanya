@@ -22,7 +22,7 @@ class SellerRegistrationController extends Controller
             abort(404, 'The sellers table hasn\'t been created yet — this feature isn\'t available.');
         }
 
-        $pending = Seller::where('status', 'pending_approval')
+        $pending = Seller::where('status', 'pending')
             ->orderBy('created_at')
             ->get();
 

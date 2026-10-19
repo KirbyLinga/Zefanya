@@ -56,7 +56,7 @@ class StoreLogisticsRegistrationRequest extends FormRequest
             ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
 
-            'contact_no' => ['required', 'regex:/^09\d{9}$/'],
+            'contact_no' => ['required', 'regex:/^09\d{9}$/', Rule::unique('logistics_providers', 'contact_no')],
             'birthday' => ['required', 'date', 'before:today'],
 
             'business_name' => ['required', 'string', 'max:255'],
@@ -82,6 +82,7 @@ class StoreLogisticsRegistrationRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'contact_no.unique' => 'This mobile number is already registered.',
             'contact_no.regex' => 'Enter a valid PH mobile number (09XXXXXXXXX).',
             'upload_id.mimes' => 'Upload ID must be a JPG, PNG, or PDF.',
             'upload_id.max' => 'Upload ID must be smaller than 5MB.',

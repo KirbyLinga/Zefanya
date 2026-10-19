@@ -22,12 +22,16 @@ class VerifyBuyerOtpController extends Controller
             'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
         ]);
 
-        if ($buyer->status === 'pending_approval' || $buyer->status === 'approved') {
+        if ($buyer->status === 'pending' || $buyer->status === 'approved') {
             return response()->json([
                 'ok' => true,
                 'already_verified' => true,
                 'redirect' => route('register.buyer.pending'),
             ]);
+        }
+
+        if ($buyer->status !== 'unverified') {
+            return response()->json(['ok' => false, 'message' => 'This account cannot verify its email.'], 422);
         }
 
         $incoming = hash('sha256', $data['otp']);
@@ -63,11 +67,15 @@ class VerifyBuyerOtpController extends Controller
      */
     public function resend(Buyer $buyer): JsonResponse
     {
-        if ($buyer->status === 'pending_approval' || $buyer->status === 'approved') {
+        if ($buyer->status === 'pending' || $buyer->status === 'approved') {
             return response()->json([
                 'ok' => false,
                 'message' => 'This account is already verified.',
             ], 422);
+        }
+
+        if ($buyer->status !== 'unverified') {
+            return response()->json(['ok' => false, 'message' => 'This account cannot verify its email.'], 422);
         }
 
         $code = (string) random_int(100000, 999999);

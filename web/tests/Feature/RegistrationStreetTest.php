@@ -318,7 +318,7 @@ class RegistrationStreetTest extends TestCase
             'municipality_name' => 'Calamba',
             'province_name' => 'Laguna',
             'address_detail' => 'Near the church',
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ]);
 
         $admin = Admin::create([
@@ -343,7 +343,7 @@ class RegistrationStreetTest extends TestCase
             'barangay_name' => 'Brgy. Dos',
             'municipality_name' => 'Batangas City',
             'province_name' => 'Batangas',
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ]);
 
         $admin = Admin::create([

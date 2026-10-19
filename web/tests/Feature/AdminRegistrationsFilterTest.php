@@ -44,7 +44,7 @@ class AdminRegistrationsFilterTest extends TestCase
             'last_name' => 'Queuewalker',
             'email' => 'zelda.'.uniqid().'@example.com',
             'contact_no' => '09170000001',
-            'status' => 'pending_approval',
+            'status' => 'pending',
             'approved_at' => null,
         ]);
 

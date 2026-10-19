@@ -133,7 +133,7 @@ class SellerRegistrationTest extends TestCase
             'upload_id_path' => 'ids/test.jpg',
             'business_permit_path' => 'permits/test.pdf',
             'email_verified_at' => now(),
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ], $overrides));
     }
 
@@ -160,9 +160,9 @@ class SellerRegistrationTest extends TestCase
         $response->assertStatus(201)
             ->assertJsonPath('email', $seller->email);
 
-        // App now correctly sets status to 'pending_verification' with email_verified_at = null
+        // App now correctly sets status to 'unverified' with email_verified_at = null
         // until OTP verification is complete
-        $this->assertSame('pending_verification', $seller->status);
+        $this->assertSame('unverified', $seller->status);
         $this->assertNull($seller->email_verified_at);
 
         Notification::assertSentTo($seller, SellerRegistrationOtp::class);
@@ -778,9 +778,6 @@ class SellerRegistrationTest extends TestCase
             return true;
         });
 
-        // The VerifySellerOtpController checks for status === 'pending_verification'
-        // But RegisterSellerController sets status = 'pending_approval'
-        // This means OTP verification will fail because the status check fails
         $verifyResponse = $this->verifyOtpWithSession($seller, $otp);
         $verifyResponse->assertOk()->assertJsonPath('message', 'Email verified successfully.');
     }
@@ -932,7 +929,7 @@ class SellerRegistrationTest extends TestCase
             'upload_id_path' => 'ids/test.jpg',
             'business_permit_path' => 'permits/test.pdf',
             'email_verified_at' => null,
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $response = $this->post(route('unified.login'), [
@@ -962,7 +959,7 @@ class SellerRegistrationTest extends TestCase
             'upload_id_path' => 'ids/test.jpg',
             'business_permit_path' => 'permits/test.pdf',
             'email_verified_at' => now(),
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ]);
 
         $this->actingAs($seller, 'seller');
@@ -979,7 +976,7 @@ class SellerRegistrationTest extends TestCase
         $seller = $this->createSeller([
             'business_name' => 'Maria Clara Handicrafts',
             'email' => 'mariaclara.santos@example.com',
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ]);
 
         $admin = $this->createAdmin();
@@ -1081,7 +1078,7 @@ class SellerRegistrationTest extends TestCase
             'barangay_name' => 'Test',
             'street' => 'Test St.',
             'upload_id_path' => 'ids/test.pdf',
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $this->actingAs($buyer, 'buyer');

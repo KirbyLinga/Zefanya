@@ -53,7 +53,7 @@ class GoogleBuyerLoginTest extends TestCase
     {
         $buyer = Buyer::factory()->create([
             'email' => 'pending@gmail.com',
-            'status' => 'pending_approval',
+            'status' => 'pending',
             'google_id' => null,
         ]);
 

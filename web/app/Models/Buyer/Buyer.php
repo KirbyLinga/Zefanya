@@ -115,7 +115,7 @@ class Buyer extends Authenticatable
             'email_verified_at' => now(),
             'email_verification_code' => null,
             'email_verification_expires_at' => null,
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ])->save();
     }
 }

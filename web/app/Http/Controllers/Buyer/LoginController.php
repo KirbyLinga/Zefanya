@@ -38,8 +38,9 @@ class LoginController extends Controller
             Auth::guard('buyer')->logout();
 
             $message = match ($buyer->status) {
-                'pending_verification' => 'Please verify your email before logging in. Check your inbox for the code.',
-                'pending_approval' => 'Your registration is still awaiting admin approval.',
+                'suspended' => 'Your account has been suspended. Please contact support.',
+                'unverified' => 'Please verify your email before logging in. Check your inbox for the code.',
+                'pending' => 'Your registration is still awaiting admin approval.',
                 'rejected' => 'Your registration was not approved.'
                     .($buyer->rejection_reason ? " Reason: {$buyer->rejection_reason}" : ''),
                 default => 'Your account isn\'t active yet.',

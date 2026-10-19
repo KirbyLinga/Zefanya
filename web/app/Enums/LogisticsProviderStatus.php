@@ -5,21 +5,21 @@ namespace App\Enums;
 /**
  * Logistics provider application lifecycle.
  *
- * Stored as VARCHAR in `logistics_providers.status` and cast by the model, so
- * the permitted values live in application code rather than in a native MySQL
- * ENUM (project rule #6).
+ * Backing values match the existing MySQL registration status enum.
  */
 enum LogisticsProviderStatus: string
 {
     /** Just registered, the emailed OTP has not been confirmed yet. */
-    case PendingVerification = 'pending_verification';
+    case PendingVerification = 'unverified';
 
     /** Email confirmed, waiting on an administrator's decision. */
-    case PendingApproval = 'pending_approval';
+    case PendingApproval = 'pending';
 
     case Approved = 'approved';
 
     case Rejected = 'rejected';
+
+    case Suspended = 'suspended';
 
     public function label(): string
     {
@@ -28,6 +28,7 @@ enum LogisticsProviderStatus: string
             self::PendingApproval => 'Pending approval',
             self::Approved => 'Approved',
             self::Rejected => 'Rejected',
+            self::Suspended => 'Suspended',
         };
     }
 

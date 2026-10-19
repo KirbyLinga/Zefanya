@@ -47,14 +47,14 @@ class RegistrationController extends Controller
         // Cap the term so a pasted novel can't build a huge LIKE clause.
         $search = mb_substr(trim((string) $request->query('q')), 0, 100);
 
-        $buyersQuery = Buyer::query()->where('status', 'pending_approval');
-        $sellersQuery = Seller::query()->where('status', 'pending_approval');
+        $buyersQuery = Buyer::query()->where('status', 'pending');
+        $sellersQuery = Seller::query()->where('status', 'pending');
 
         // Logistics providers live in their own table that ships with this
         // feature — skip the query entirely on installs that haven't migrated
         // it yet instead of breaking the whole queue.
         $logisticsQuery = Schema::hasTable('logistics_providers')
-            ? LogisticsProvider::query()->where('status', 'pending_approval')
+            ? LogisticsProvider::query()->where('status', 'pending')
             : null;
 
         $this->applySearch($buyersQuery, $search);
@@ -124,7 +124,7 @@ class RegistrationController extends Controller
      * Narrow a pending-registration query with the free-text search. The term
      * matches first/last name, email, contact number and — where the table has
      * one — the business name. Wrapped in a single where() closure so the ORs
-     * can never escape the `status = pending_approval` condition.
+     * can never escape the `status = pending` condition.
      */
     private function applySearch(Builder $query, string $search, bool $withBusinessName = false): void
     {

@@ -134,3 +134,80 @@ The 23 baseline failures comprise 17 Seller registration/authorization expectati
 - `web/tests/Feature/Rider/RiderRegistrationTest.php`
 
 No merge, push, deployment, stash mutation, or application database migration was performed. Stopped after implementation and verification.
+
+
+## 2026-10-19 ? Local runtime and registration status compatibility
+
+- Branch: `integration/groupmate-rider`; starting commit `bbd05332`. No commit, merge, push, reset, stash application or stash deletion.
+- Created ignored `web/.env` from the existing root environment after checking APP_ENV=local, MySQL connection, loopback DB host and no DB_URL override. Existing APP_KEY was copied unchanged and equality verified without displaying it or credentials. Root `.env` unchanged. No production configuration or `phpunit.xml` changes; password-reset brokers unchanged.
+- Restored the 13 historical migrations below byte-for-byte from `stash@{0}` (untracked stash parent used where necessary). Verified all 13 bytes against their source after formatting. Stash object remains `81454d886eba96831df7f490539f2af09f6bd8bc`.
+- Aligned Buyer/Seller registration creation, OTP transitions, Admin queues/counts, authentication messages, middleware, factories and status fixtures with `unverified`, `pending`, `approved`, `rejected`, `suspended`. Retained Logistics enum case identifiers for compatibility while changing backing values and adding Suspended. Rider identity, approval service, Courier relationships, one-account policy and cross-role email registry remain intact.
+- Seller email/contact uniqueness now includes canonical pending and suspended accounts. Logistics contact validation now matches the per-table database unique constraint and returns a field validation error before upload/registration work.
+- Buyer OTP verify/resend now refuses rejected/suspended accounts; a stale valid OTP cannot reopen these accounts. Added canonical login-status matrix, all five Logistics enum casts/labels, suspended-session restrictions, blocked Buyer OTP, pending/suspended Seller uniqueness and duplicate Logistics contact endpoint coverage. Existing assertions were retained, with legacy status expectations updated.
+
+### Verification
+
+- Local Laravel boot successful; effective APP_ENV local, MySQL loopback, original key matches, config cache absent. Read-only MySQL connection succeeded. No application database writes, migrations or schema changes were performed.
+- Migration repository comparison: zero applied migration names missing; all 13 restored files already applied. Exactly two pending: `2026_10_19_110858_create_rider_applications_table` and `2026_10_19_113958_create_rider_application_decisions_table`. Rider tables remain absent.
+- Safe HTTP kernel checks with process-only array sessions/cache/mail: `/up` 200, `/register` 200, `/register/rider` 302 to registration, guest `/rider/dashboard` 302. No MySQL session/cache writes. Full live Rider registration/dashboard verification remains blocked by unapplied Rider migrations; no migration execution requested or performed.
+- All tests used process-only SQLite `:memory:`, array cache/session/mail and a public dummy testing key; the actual application database/key were not used for test writes. PHPUnit builds disposable test schemas only.
+- Focused compatibility + Logistics registration + Rider: **122 passed, 666 assertions** (includes existing 76 Rider cases).
+- Exact baseline selection plus one new duplicate-contact case: **194 tests, 170 passed, 23 failed, 1 skipped, 599 assertions**. Baseline was 193 tests, 169 passed, 23 failed, 1 skipped. The same 23 failure names and messages match the recorded baseline after normalizing the local URL hostname/port; no newly failing baseline cases. The new case passed. The 23 consist of 17 Seller validation/authorization/audit expectation mismatches and six Google redirect expectations (`/login` expected, `/register` actual). Those assertions were not weakened.
+- Expanded Logistics, Admin queues/counts, street registration, Buyer variant/cart selection: **114 tests, 109 passed, 5 failed, 467 assertions**. Five additional failures are outside the 23-case baseline: Buyer street happy-path fixtures omit the already-required Terms acceptance. Both the absence in the fixture and requirement exist at baseline `bbd05332`; status edits did not change that contract. Left these failures visible rather than changing unrelated assertions.
+- `php vendor/bin/pint --dirty --format agent` completed successfully. No frontend assets changed; no build needed. Checkout controller/concurrency test files, `phpunit.xml` and auth broker configuration unchanged.
+- Requested numbered four documentation files are absent in this checkout; available `docs/Context.md`, `docs/folder-structure.md`, current code and local Laravel/testing skills were consulted. Old documentation claims were not treated as verified schema facts.
+
+### Modified tracked files
+
+- `web/app/Enums/LogisticsProviderStatus.php`
+- `web/app/Http/Controllers/Admin/DashboardController.php`
+- `web/app/Http/Controllers/Admin/RegistrationController.php`
+- `web/app/Http/Controllers/Admin/SellerRegistrationController.php`
+- `web/app/Http/Controllers/Auth/GoogleAuthController.php`
+- `web/app/Http/Controllers/Auth/UnifiedLoginController.php`
+- `web/app/Http/Controllers/Buyer/LoginController.php`
+- `web/app/Http/Controllers/Buyer/RegisterBuyerController.php`
+- `web/app/Http/Controllers/Buyer/VerifyBuyerOtpController.php`
+- `web/app/Http/Controllers/Seller/AuthController.php`
+- `web/app/Http/Controllers/Seller/RegisterSellerController.php`
+- `web/app/Http/Controllers/Seller/VerifySellerOtpController.php`
+- `web/app/Http/Middleware/Logistics/EnsureLogisticsApproved.php`
+- `web/app/Http/Middleware/Seller/EnsureSellerApproved.php`
+- `web/app/Http/Requests/Logistics/StoreLogisticsRegistrationRequest.php`
+- `web/app/Http/Requests/Seller/StoreSellerRegistrationRequest.php`
+- `web/app/Models/Buyer/Buyer.php`
+- `web/app/Models/Seller/Seller.php`
+- `web/database/factories/LogisticsProviderFactory.php`
+- `web/database/factories/SellerFactory.php`
+- `web/tests/Feature/AdminDashboardStatsTest.php`
+- `web/tests/Feature/AdminRegistrationsFilterTest.php`
+- `web/tests/Feature/Auth/GoogleBuyerLoginTest.php`
+- `web/tests/Feature/BuyerRegistration/BuyerRegistrationTest.php`
+- `web/tests/Feature/LogisticsRegistrationTest.php`
+- `web/tests/Feature/RegistrationStreetTest.php`
+- `web/tests/Feature/SellerRegistration/SellerRegistrationTest.php`
+- `web/activity-log.md`
+
+### New focused test
+
+- `web/tests/Feature/RegistrationStatusCompatibilityTest.php`
+
+### Restored historical migrations (not executed against MySQL)
+
+- `web/database/migrations/2026_10_12_000001_standardize_registration_status_and_add_otp_attempts.php`
+- `web/database/migrations/2026_10_14_000001_make_seller_order_id_nullable_on_inventory_transactions.php`
+- `web/database/migrations/2026_10_16_000001_add_postal_code_to_address_tables.php`
+- `web/database/migrations/2026_10_16_000002_add_handover_at_to_seller_orders.php`
+- `web/database/migrations/2026_10_16_000003_add_delivery_attempts_to_seller_orders.php`
+- `web/database/migrations/2026_10_16_000004_create_areas_and_parcel_area.php`
+- `web/database/migrations/2026_10_16_000005_create_delivery_assignments_table.php`
+- `web/database/migrations/2026_10_16_000006_add_registration_archive_to_role_tables.php`
+- `web/database/migrations/2026_10_16_000007_create_role_password_reset_tokens_tables.php`
+- `web/database/migrations/2026_10_17_000001_unique_contact_no_and_align_logistics_sex.php`
+- `web/database/migrations/2026_10_17_030510_add_suspended_status_to_role_tables.php`
+- `web/database/migrations/2026_10_17_200000_create_reviews_table.php`
+- `web/database/migrations/2026_10_18_042755_add_variant_options_to_order_items_table.php`
+
+### Remaining constraints
+
+No status data conversion is required for the inspected MySQL schema. Applying the two pending Rider migrations requires a separate approval; until then live Rider submissions cannot persist. Historical migrations remain immutable; their potentially destructive down methods must not be used for a blanket rollback. Live browser/mobile and SMTP checks were not performed in this task.

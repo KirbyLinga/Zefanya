@@ -42,8 +42,9 @@ class AuthController extends Controller
 
             throw ValidationException::withMessages([
                 'email' => match ($seller->status) {
-                    'pending_verification' => 'Your email has not been verified yet. Please check your email for the verification code.',
-                    'pending_approval' => 'Your account is still pending administrator approval.',
+                    'suspended' => 'Your account has been suspended. Please contact support.',
+                    'unverified' => 'Your email has not been verified yet. Please check your email for the verification code.',
+                    'pending' => 'Your account is still pending administrator approval.',
                     'rejected' => 'Your registration has been rejected. Please contact support or submit a new registration.',
                     default => 'Your account is not active.',
                 },

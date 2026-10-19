@@ -42,8 +42,8 @@ class VerifySellerOtpController extends Controller
             ], 422);
         }
 
-        // Only allow OTP verification if seller is in pending_verification status
-        if ($seller->status !== 'pending_verification') {
+        // Only allow OTP verification if seller is in unverified status
+        if ($seller->status !== 'unverified') {
             return response()->json([
                 'message' => 'Invalid registration session. Your account is '.$seller->status.'.',
             ], 422);
@@ -95,8 +95,8 @@ class VerifySellerOtpController extends Controller
             ], 422);
         }
 
-        // Only allow resend if seller is in pending_verification status
-        if ($seller->status !== 'pending_verification') {
+        // Only allow resend if seller is in unverified status
+        if ($seller->status !== 'unverified') {
             return response()->json([
                 'message' => 'Invalid registration session. Your account is '.$seller->status.'.',
             ], 422);

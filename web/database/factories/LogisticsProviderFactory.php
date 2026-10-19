@@ -43,7 +43,7 @@ class LogisticsProviderFactory extends Factory
     public function pendingVerification(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'status' => 'pending_verification',
+            'status' => 'unverified',
             'email_verified_at' => null,
             'approved_at' => null,
         ]);
@@ -52,7 +52,7 @@ class LogisticsProviderFactory extends Factory
     public function pendingApproval(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'status' => 'pending_approval',
+            'status' => 'pending',
             'email_verified_at' => now(),
             'approved_at' => null,
         ]);

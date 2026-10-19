@@ -13,10 +13,8 @@ use Tests\TestCase;
 /**
  * Admin dashboard summary strip.
  *
- * The stats must come from real queries — the dashboard previously showed a
- * broken `status = 'pending'` count (always 0, because the real statuses are
- * pending_verification / pending_approval / approved / rejected) plus two
- * hardcoded figures ("128" and "₱12,450") that had no backing table at all.
+ * The pending count includes email-verified applications awaiting an admin
+ * decision across all three roles, excluding unverified and decided accounts.
  */
 class AdminDashboardStatsTest extends TestCase
 {
@@ -50,9 +48,9 @@ class AdminDashboardStatsTest extends TestCase
     private function seedKnownAccounts(): void
     {
         foreach (range(1, 5) as $i) {
-            Buyer::factory()->create(['status' => 'pending_approval', 'approved_at' => null]);
+            Buyer::factory()->create(['status' => 'pending', 'approved_at' => null]);
         }
-        Buyer::factory()->create(['status' => 'pending_verification', 'email_verified_at' => null, 'approved_at' => null]);
+        Buyer::factory()->create(['status' => 'unverified', 'email_verified_at' => null, 'approved_at' => null]);
         foreach (range(1, 3) as $i) {
             Buyer::factory()->create(['status' => 'approved']);
         }
@@ -71,11 +69,11 @@ class AdminDashboardStatsTest extends TestCase
         LogisticsProvider::factory()->create(['status' => 'approved']);
     }
 
-    public function test_pending_registrations_counts_pending_approval_across_every_role(): void
+    public function test_pending_registrations_counts_pending_across_every_role(): void
     {
         $this->seedKnownAccounts();
 
-        // 8, not 9: the pending_verification buyer and the two rejected buyers
+        // 8, not 9: the unverified buyer and the two rejected buyers
         // are NOT awaiting an admin decision, so they must not be counted.
         $this->dashboard()
             ->assertOk()

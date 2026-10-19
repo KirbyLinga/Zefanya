@@ -16,10 +16,10 @@ class RegisterSellerController extends Controller
     {
         $data = $request->validated();
 
-        // If there's an existing pending_verification seller with this email,
+        // If there's an existing unverified seller with this email,
         // delete it so we can start fresh with new files
         Seller::where('email', $data['email'])
-            ->where('status', 'pending_verification')
+            ->where('status', 'unverified')
             ->delete();
 
         // Private 'local' disk, separate subfolders from buyer uploads.
@@ -50,7 +50,7 @@ class RegisterSellerController extends Controller
             'line_of_business_id' => $data['line_of_business_id'],
             'upload_id_path' => $idPath,
             'business_permit_path' => $permitPath,
-            'status' => 'pending_verification',
+            'status' => 'unverified',
             'email_verified_at' => null,
         ]);
 

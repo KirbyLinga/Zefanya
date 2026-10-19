@@ -61,6 +61,20 @@ class LogisticsRegistrationTest extends TestCase
         ], $overrides);
     }
 
+    public function test_duplicate_contact_is_rejected_before_registration_or_notification(): void
+    {
+        Notification::fake();
+        LogisticsProvider::factory()->create(['contact_no' => '09171234567']);
+
+        $this->postJson(route('register.logistics.store'), $this->logisticsPayload())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('contact_no')
+            ->assertJsonPath('errors.contact_no.0', 'This mobile number is already registered.');
+
+        $this->assertDatabaseCount('logistics_providers', 1);
+        Notification::assertNothingSent();
+    }
+
     private function admin(): Admin
     {
         return Admin::create([
@@ -242,7 +256,7 @@ class LogisticsRegistrationTest extends TestCase
 
     // ── OTP ───────────────────────────────────────────────────────────────
 
-    public function test_otp_verification_moves_the_provider_to_pending_approval(): void
+    public function test_otp_verification_moves_the_provider_to_pending(): void
     {
         Notification::fake();
 

@@ -41,14 +41,14 @@ class DashboardController extends Controller
      * registration queue (Admin\RegistrationController@index) exactly, so the
      * dashboard figure and the queue can never disagree.
      *
-     * `pending_verification` (email not confirmed yet) is deliberately excluded:
+     * `unverified` (email not confirmed yet) is deliberately excluded:
      * those applicants are not yet awaiting an admin decision.
      */
     private function pendingRegistrationCount(): int
     {
-        return $this->countByStatus(Buyer::class, 'buyers', 'pending_approval')
-            + $this->countByStatus(Seller::class, 'sellers', 'pending_approval')
-            + $this->countByStatus(LogisticsProvider::class, 'logistics_providers', 'pending_approval');
+        return $this->countByStatus(Buyer::class, 'buyers', 'pending')
+            + $this->countByStatus(Seller::class, 'sellers', 'pending')
+            + $this->countByStatus(LogisticsProvider::class, 'logistics_providers', 'pending');
     }
 
     /**
