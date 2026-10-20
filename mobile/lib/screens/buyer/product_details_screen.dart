@@ -431,9 +431,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             // Was headlineSmall (24pt) — close enough to the product
             // name above it that neither won, so the page had no focal
             // point at all.
-            Text(
-              '₱${_product.price.toStringAsFixed(0)}',
-              style: AppType.priceNumeral(52),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  '₱${_product.price.toStringAsFixed(0)}',
+                  style: AppType.priceNumeral(52),
+                ),
+              ),
             ),
             if (_product.compareAtPrice != null) ...[
               const SizedBox(width: 12),

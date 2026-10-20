@@ -293,7 +293,13 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Text('Zefanya', style: AppType.masthead),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text('Zefanya', style: AppType.masthead),
+                                  ),
+                                ),
                                 const SizedBox(width: 10),
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6),

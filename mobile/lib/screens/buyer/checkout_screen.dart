@@ -260,7 +260,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'total \u20b1${total.toStringAsFixed(0)}',
       child: InkWell(
         onTap: () => setState(() => _summaryExpanded = !_summaryExpanded),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: radiusOf(ShapeTier.control),
         child: Row(
           children: [
             Icon(Icons.receipt_long_outlined,
