@@ -484,9 +484,35 @@ class WideProductTile extends StatelessWidget {
               ),
               SizedBox(
                 width: 120,
-                child: Hero(
-                  tag: heroTag,
-                  child: ProductImage(product: product),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Hero(
+                      tag: heroTag,
+                      child: ProductImage(product: product),
+                    ),
+                    if (product.stock == 0)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface.withValues(alpha: 0.94),
+                            borderRadius: radiusOf(ShapeTier.pill),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Text(
+                            'Sold out',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -581,6 +607,35 @@ class ProductCard extends StatelessWidget {
                     top: 0,
                     child: HeartButton(product: product, compact: true),
                   ),
+                  if (product.stock == 0)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface.withValues(alpha: 0.94),
+                            borderRadius: radiusOf(ShapeTier.pill),
+                            border: Border.all(color: AppColors.divider),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            'Sold out',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

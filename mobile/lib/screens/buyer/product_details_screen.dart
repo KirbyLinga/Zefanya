@@ -53,7 +53,6 @@ class ProductDetailsScreen extends StatefulWidget {
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   int _quantity = 1;
   int _selectedVariantIndex = 0;
-  static const int _stock = 24;
 
   /// Origin of the add-to-cart flight — the gallery image is what the
   /// user is looking at when they tap Add to Cart, so that's the thing
@@ -79,6 +78,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    _quantity = _product.stock == 0 ? 0 : 1;
     // Deferred to post-frame: this notifies RecentlyViewedState, and
     // calling that during this screen's own initial build (rather than
     // after it) would trigger a rebuild of whatever's listening — Home,
@@ -95,10 +95,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _incrementQty() {
-    if (_quantity < _stock) setState(() => _quantity++);
+    if (_product.stock <= 0) return;
+    if (_quantity < _product.stock) setState(() => _quantity++);
   }
 
   void _decrementQty() {
+    if (_product.stock <= 0) return;
     if (_quantity > 1) setState(() => _quantity--);
   }
 
@@ -106,6 +108,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   /// its cooldown, so callers can skip whatever they were going to do
   /// next (e.g. Buy Now's navigation to Checkout).
   bool _addToCart({required bool showSnackBar}) {
+    if (_product.stock <= 0) return false;
     if (_addCooldown) return false;
     setState(() => _addCooldown = true);
     Future.delayed(const Duration(milliseconds: 700), () {
@@ -670,53 +673,79 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildQuantityStepper(ThemeData theme, AppThemeExtension ext) {
+    final stock = _product.stock;
+    final String stockLabel;
+    final Color? stockColor;
+    if (stock == 0) {
+      stockLabel = 'Out of stock';
+      stockColor = AppColors.danger;
+    } else if (stock <= 5) {
+      stockLabel = 'Only $stock left';
+      stockColor = AppColors.danger;
+    } else {
+      stockLabel = '$stock available';
+      stockColor = AppColors.textSecondary;
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text('Quantity', style: theme.textTheme.titleSmall),
         Flexible(
           child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text('$_stock available', style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(ext.pillRadius),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _stepperButton(Icons.remove, _decrementQty),
-                  SizedBox(
-                    width: 32,
-                    child: Text(
-                      '$_quantity',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  stockLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: stockColor,
+                    fontWeight: stock <= 5 ? FontWeight.w600 : null,
                   ),
-                  _stepperButton(Icons.add, _incrementQty),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(ext.pillRadius),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _stepperButton(Icons.remove, (stock > 0 && _quantity > 1) ? _decrementQty : null),
+                    SizedBox(
+                      width: 32,
+                      child: Text(
+                        '$_quantity',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    _stepperButton(Icons.add, (stock > 0 && _quantity < stock) ? _incrementQty : null),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _stepperButton(IconData icon, VoidCallback onTap) {
+  Widget _stepperButton(IconData icon, VoidCallback? onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: radiusOf(ShapeTier.pill),
       child: Padding(
         padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 16, color: AppColors.textPrimary),
+        child: Icon(
+          icon,
+          size: 16,
+          color: onTap != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.35),
+        ),
       ),
     );
   }
@@ -970,6 +999,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildBottomActionBar(BuildContext context, ThemeData theme) {
+    final isOutOfStock = _product.stock == 0;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       decoration: BoxDecoration(
@@ -988,35 +1019,68 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _circleIconButton(
-              Icons.chat_bubble_outline,
-              () => Navigator.of(context).push(
-                AppPageRoute(
-                  builder: (_) => ChatScreen(contactName: _product.sellerName, contactRole: 'Seller'),
+            if (isOutOfStock)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.12),
+                    borderRadius: radiusOf(ShapeTier.control),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: AppColors.danger),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Out of stock',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _addToCart(showSnackBar: true),
-                icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
-                label: const Text('Add to Cart'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () {
-                  if (!_addToCart(showSnackBar: false)) return;
-                  Navigator.of(context).push(
-                    AppPageRoute(builder: (_) => const CheckoutScreen()),
-                  );
-                },
-                child: const Text('Buy Now'),
-              ),
+            Row(
+              children: [
+                _circleIconButton(
+                  Icons.chat_bubble_outline,
+                  () => Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) => ChatScreen(contactName: _product.sellerName, contactRole: 'Seller'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isOutOfStock ? null : () => _addToCart(showSnackBar: true),
+                    icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
+                    label: const Text('Add to Cart'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isOutOfStock
+                        ? null
+                        : () {
+                            if (!_addToCart(showSnackBar: false)) return;
+                            Navigator.of(context).push(
+                              AppPageRoute(builder: (_) => const CheckoutScreen()),
+                            );
+                          },
+                    child: Text(isOutOfStock ? 'Out of Stock' : 'Buy Now'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

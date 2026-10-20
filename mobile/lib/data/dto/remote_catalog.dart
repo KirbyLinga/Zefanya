@@ -64,6 +64,7 @@ Product productFromJson(Map<String, Object?> json) => Product(
       rating: _number(json['rating_avg']),
       ratingCount: _int(json['rating_count']),
       soldCount: 0,
+      stock: json['stock'] == null ? 24 : _int(json['stock']),
     );
 
 /// One category from `GET /api/categories`, as the label a chip renders.

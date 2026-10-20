@@ -31,6 +31,7 @@ class Product {
     this.variants = const [],
     this.description = '',
     this.images = const [],
+    this.stock = 24,
   });
 
   final String id;
@@ -97,6 +98,8 @@ class Product {
   /// dots and no counter rather than a pager over one page.
   bool get hasGallery => photos.length > 1;
 
+  /// Quantity available in inventory.
+  final int stock;
 }
 
 /// A placeholder photo URL for [seed] at [index].
@@ -352,6 +355,7 @@ final List<Product> mockProducts = [
     rating: 4.8,
     ratingCount: 212,
     soldCount: 1100,
+    stock: 12,
     variants: ['Small', 'Medium', 'Large', 'X-Large'],
     // Counts differ per product on purpose: a real catalogue has sellers who
     // upload one photo and sellers who upload eight, and the layouts have to
@@ -370,6 +374,7 @@ final List<Product> mockProducts = [
     rating: 4.7,
     ratingCount: 86,
     soldCount: 340,
+    stock: 3,
     variants: ['Natural', 'Natural (Large)'],
     description: 'Hand-woven rattan tote with a soft cotton lining and reinforced handles. '
         'Lightweight enough for everyday errands, sturdy enough for market runs.',
@@ -384,6 +389,7 @@ final List<Product> mockProducts = [
     rating: 4.9,
     ratingCount: 154,
     soldCount: 610,
+    stock: 0,
     variants: ['Set of 2', 'Set of 4'],
     description: 'Hand-thrown ceramic mugs in a muted sage glaze. Microwave and '
         'dishwasher safe, each piece kiln-finished with slight natural variation.',
@@ -398,6 +404,7 @@ final List<Product> mockProducts = [
     rating: 4.6,
     ratingCount: 58,
     soldCount: 220,
+    stock: 24,
     variants: ['Blush', 'Sage', 'Neutral'],
     description: 'Lightweight double-gauze scarf that softens with every wash. '
         'Works as a light wrap, a hair scarf, or a bag accent.',
@@ -414,6 +421,7 @@ final List<Product> mockProducts = [
     rating: 4.8,
     ratingCount: 41,
     soldCount: 175,
+    stock: 1,
     description: 'A hand-tied bundle of dried pampas, bunny tail grass, and native '
         'foliage. Arrives ready to display, no water needed.',
     images: mockPhotos('p5', 3),
@@ -428,6 +436,7 @@ final List<Product> mockProducts = [
     rating: 4.5,
     ratingCount: 63,
     soldCount: 290,
+    stock: 0,
     variants: ['16x16', '18x18', '20x20'],
     description: 'Stonewashed linen cover with a hidden zip closure. Pairs well '
         'with the ceramic mug set for a matching shelf styling moment.',
@@ -442,6 +451,7 @@ final List<Product> mockProducts = [
     rating: 4.4,
     ratingCount: 29,
     soldCount: 98,
+    stock: 18,
     variants: ['One Size'],
     description: 'Wide-brim straw hat woven from natural raffia, with a soft '
         'cotton drawstring for a secure, adjustable fit.',
@@ -458,6 +468,7 @@ final List<Product> mockProducts = [
     rating: 4.7,
     ratingCount: 74,
     soldCount: 260,
+    stock: 4,
     variants: ['Set of 3'],
     description: 'Three cold-processed bar soaps scented with rosemary, '
         'chamomile, and sweet orange. Free from sulfates and parabens.',
