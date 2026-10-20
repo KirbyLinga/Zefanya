@@ -46,8 +46,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _notesController = TextEditingController();
   static const int _notesMaxLength = 140;
 
+  final _addressKey = GlobalKey();
+  final _itemsKey = GlobalKey();
+  final _noteKey = GlobalKey();
+  final _termsKey = GlobalKey();
+
+  String? _addressError;
+  String? _itemsError;
+  String? _noteError;
+  String? _termsError;
   bool _agreedToTerms = false;
-  bool _showTermsError = false;
   bool _isPlacingOrder = false;
 
   /// Collapses the per-line breakdown to one total row, expanded on
@@ -62,34 +70,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(List<CartItem> selectedItems, double total) async {
-    // clearSnackBars() at every early-return below: these are four
-    // separate validation checks a person can trip in sequence (fix
-    // one, tap Place Order again, hit the next) — without clearing
-    // first, each retry queued its error behind whichever one was
-    // still showing instead of replacing it.
-    if (selectedItems.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Your cart has no selected items to check out.')));
-      return;
-    }
-    if (context.read<AuthState>().addressSummary.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Add a delivery address before placing your order.')));
-      return;
-    }
-    if (_notesController.text.length > _notesMaxLength) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text('Delivery note must be $_notesMaxLength characters or fewer.')));
-      return;
-    }
-    if (!_agreedToTerms) {
-      setState(() => _showTermsError = true);
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Please agree to the Terms & Return Policy to continue.')));
+    final hasNoAddress = context.read<AuthState>().addressSummary.isEmpty;
+    final hasNoItems = selectedItems.isEmpty;
+    final noteTooLong = _notesController.text.length > _notesMaxLength;
+    final termsNotAccepted = !_agreedToTerms;
+
+    setState(() {
+      _addressError = hasNoAddress ? 'Add a delivery address before placing your order.' : null;
+      _itemsError = hasNoItems ? 'Your cart has no selected items to check out.' : null;
+      _noteError = noteTooLong ? 'Delivery note must be $_notesMaxLength characters or fewer.' : null;
+      _termsError = termsNotAccepted ? 'Please agree to the Terms & Return Policy to continue.' : null;
+    });
+
+    if (hasNoAddress || hasNoItems || noteTooLong || termsNotAccepted) {
+      GlobalKey? firstInvalidKey;
+      if (hasNoAddress) {
+        firstInvalidKey = _addressKey;
+      } else if (hasNoItems) {
+        firstInvalidKey = _itemsKey;
+      } else if (noteTooLong) {
+        firstInvalidKey = _noteKey;
+      } else if (termsNotAccepted) {
+        firstInvalidKey = _termsKey;
+      }
+
+      if (firstInvalidKey?.currentContext != null) {
+        Scrollable.ensureVisible(
+          firstInvalidKey!.currentContext!,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          alignment: 0.1,
+        );
+      }
       return;
     }
 
@@ -212,26 +224,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: 'Checkout',
             padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
           ),
-          StaggeredReveal(index: 0, child: _buildAddressSection(context, theme, ext)),
+          StaggeredReveal(
+            index: 0,
+            child: KeyedSubtree(
+              key: _addressKey,
+              child: _buildAddressSection(context, theme, ext),
+            ),
+          ),
           const SizedBox(height: 20),
-          StaggeredReveal(index: 1, child: _buildOrderSummarySection(theme, ext, selectedItems, subtotal, shippingFee, total)),
+          StaggeredReveal(
+            index: 1,
+            child: KeyedSubtree(
+              key: _itemsKey,
+              child: _buildOrderSummarySection(theme, ext, selectedItems, subtotal, shippingFee, total),
+            ),
+          ),
           const SizedBox(height: 20),
-          StaggeredReveal(index: 2, child: _buildNotesSection(theme, ext)),
+          StaggeredReveal(
+            index: 2,
+            child: KeyedSubtree(
+              key: _noteKey,
+              child: _buildNotesSection(theme, ext),
+            ),
+          ),
           const SizedBox(height: 20),
           StaggeredReveal(index: 3, child: _buildPaymentSection(theme, ext)),
           const SizedBox(height: 16),
-          StaggeredReveal(index: 4, child: _buildTermsCheckbox(theme)),
+          StaggeredReveal(
+            index: 4,
+            child: KeyedSubtree(
+              key: _termsKey,
+              child: _buildTermsCheckbox(theme),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomBar(theme, selectedItems, total),
-
-
     );
   }
 
   // ---------------------------------------------------------------------
 
-  Widget _sectionCard(AppThemeExtension ext, {required Widget child, Color? accentColor, int index = 0}) {
+  Widget _sectionCard(
+    AppThemeExtension ext, {
+    required Widget child,
+    Color? accentColor,
+    int index = 0,
+    bool hasError = false,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -242,9 +282,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // uniform-radius surfaces stacked vertically reads as a flat
         // block, not four individual cards.
         borderRadius: editorialRadius(index, ShapeTier.card),
-        border: accentColor != null
-            ? Border(left: BorderSide(color: accentColor, width: 3))
-            : null,
+        border: hasError
+            ? Border.all(color: AppColors.danger, width: 1.5)
+            : accentColor != null
+                ? Border(left: BorderSide(color: accentColor, width: 3))
+                : null,
       ),
       child: child,
     );
@@ -308,11 +350,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildAddressSection(BuildContext context, ThemeData theme, AppThemeExtension ext) {
     final auth = context.watch<AuthState>();
     final hasAddress = auth.addressSummary.isNotEmpty;
+    if (hasAddress && _addressError != null) {
+      _addressError = null;
+    }
+    final hasError = _addressError != null;
 
     return _sectionCard(
       ext,
       index: 0,
       accentColor: AppColors.primaryDark,
+      hasError: hasError,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -320,29 +367,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             theme,
             Icons.location_on_outlined,
             'Delivery Address',
-            onEdit: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => const EditProfileScreen()),
-            ),
+            onEdit: hasAddress
+                ? () => Navigator.of(context).push(
+                    AppPageRoute(builder: (_) => const EditProfileScreen()),
+                  )
+                : null,
           ),
           const SizedBox(height: 10),
-          Text(
-            [auth.name, auth.phone].where((v) => v != null && v.isNotEmpty).join('  •  '),
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            hasAddress ? auth.addressSummary : 'No delivery address on file — tap Change to add one.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              height: 1.5,
-              color: hasAddress ? null : AppColors.danger,
+          if (hasAddress) ...[
+            Text(
+              [auth.name, auth.phone].where((v) => v != null && v.isNotEmpty).join('  •  '),
+              style: theme.textTheme.bodyMedium,
             ),
-          ),
-          // No recent-address chips here (removed per review): a chip
-          // showing an old address that merely opens Edit Profile
-          // misleads — it reads as "tap to apply". Recording stays in
-          // AuthState (recordRecentAddress on placement) so the data is
-          // ready the day checkout owns a structured address it can
-          // actually fill. See OPEN QUESTION 6.
+            const SizedBox(height: 4),
+            Text(
+              auth.addressSummary,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+            ),
+          ] else ...[
+            Text(
+              'No delivery address on file.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                AppPageRoute(builder: (_) => const EditProfileScreen()),
+              ),
+              icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+              label: const Text('Add delivery address'),
+            ),
+          ],
+          if (hasError) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.error_outline, size: 16, color: AppColors.danger),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _addressError!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -356,13 +432,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     double shippingFee,
     double total,
   ) {
+    if (items.isNotEmpty && _itemsError != null) {
+      _itemsError = null;
+    }
+    final hasError = _itemsError != null;
+
     return _sectionCard(
       ext,
       index: 1,
+      hasError: hasError,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _summaryHeader(theme, total, items.length),
+          if (hasError) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.error_outline, size: 16, color: AppColors.danger),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _itemsError!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (_summaryExpanded) ...[
             const SizedBox(height: 10),
           if (items.isEmpty)
@@ -428,9 +528,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildNotesSection(ThemeData theme, AppThemeExtension ext) {
+    final hasError = _noteError != null;
     return _sectionCard(
       ext,
       index: 2,
+      hasError: hasError,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -440,8 +542,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             controller: _notesController,
             maxLines: 2,
             maxLength: _notesMaxLength,
-            decoration: const InputDecoration(hintText: 'e.g. "Leave with the guard if I\'m out"'),
-            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'e.g. "Leave with the guard if I\'m out"',
+              errorText: _noteError,
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ext.utilityRadius),
+                borderSide: BorderSide(color: AppColors.danger, width: 1.5),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ext.utilityRadius),
+                borderSide: BorderSide(color: AppColors.danger, width: 2),
+              ),
+            ),
+            onChanged: (text) {
+              if (_noteError != null && text.length <= _notesMaxLength) {
+                setState(() => _noteError = null);
+              } else {
+                setState(() {});
+              }
+            },
           ),
         ],
       ),
@@ -529,33 +648,72 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildTermsCheckbox(ThemeData theme) {
     final ext = theme.extension<AppThemeExtension>()!;
-    return InkWell(
-      onTap: () => setState(() {
-        _agreedToTerms = !_agreedToTerms;
-        if (_agreedToTerms) _showTermsError = false;
-      }),
-      borderRadius: BorderRadius.circular(ext.utilityRadius),
-      child: Row(
+    final hasError = _termsError != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: hasError ? AppColors.danger.withValues(alpha: 0.08) : Colors.transparent,
+        borderRadius: BorderRadius.circular(ext.utilityRadius),
+        border: Border.all(
+          color: hasError ? AppColors.danger : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
+      padding: hasError ? const EdgeInsets.all(8) : EdgeInsets.zero,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Checkbox(
-            value: _agreedToTerms,
-            onChanged: (v) => setState(() {
-              _agreedToTerms = v ?? false;
-              if (_agreedToTerms) _showTermsError = false;
+          InkWell(
+            onTap: () => setState(() {
+              _agreedToTerms = !_agreedToTerms;
+              if (_agreedToTerms) _termsError = null;
             }),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: Text(
-                'I agree to the Terms of Service and Return Policy.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: _showTermsError ? AppColors.danger : AppColors.textSecondary,
+            borderRadius: BorderRadius.circular(ext.utilityRadius),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: _agreedToTerms,
+                  onChanged: (v) => setState(() {
+                    _agreedToTerms = v ?? false;
+                    if (_agreedToTerms) _termsError = null;
+                  }),
                 ),
-              ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Text(
+                      'I agree to the Terms of Service and Return Policy.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: hasError ? AppColors.danger : AppColors.textSecondary,
+                        fontWeight: hasError ? FontWeight.w600 : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+          if (hasError) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 6, top: 2),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 14, color: AppColors.danger),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _termsError!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
