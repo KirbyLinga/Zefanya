@@ -450,7 +450,7 @@ class _StatStrip extends StatelessWidget {
           label,
           style: AppType.eyebrow.copyWith(
             color: AppColors.textOnDark.withValues(alpha: 0.65),
-            letterSpacing: 2.0,
+            letterSpacing: 1.2,
           ),
         ),
         const SizedBox(height: 6),

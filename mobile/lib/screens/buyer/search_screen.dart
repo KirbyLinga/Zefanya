@@ -326,6 +326,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           if (_query.isNotEmpty)
             IconButton(
+              tooltip: 'Clear search',
               icon: Icon(Icons.close, size: 18, color: AppColors.primaryDark),
               onPressed: () {
                 _controller.clear();

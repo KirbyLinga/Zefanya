@@ -188,7 +188,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   // thing itself".
                   Text(
                     widget.contactRole.toUpperCase(),
-                    style: AppType.eyebrow.copyWith(fontSize: 9, letterSpacing: 2.0),
+                    style: AppType.eyebrow.copyWith(fontSize: 11, letterSpacing: 1.2),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
@@ -204,6 +204,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Call ${widget.contactName}',
             onPressed: () {
               // clearSnackBars() first — this icon has no cooldown, so
               // mashing it queued a fresh 4s "Calling..." behind each
@@ -345,7 +346,7 @@ class _Bubble extends StatelessWidget {
               padding: const EdgeInsets.only(top: 5, left: 4, right: 4),
               child: Text(
                 message.time.toUpperCase(),
-                style: AppType.eyebrow.copyWith(fontSize: 9, letterSpacing: 1.6),
+                style: AppType.eyebrow.copyWith(fontSize: 11, letterSpacing: 1.2),
               ),
             ),
         ],

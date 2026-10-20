@@ -188,7 +188,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
           children: [
             Text(
               'DELIVERY',
-              style: AppType.eyebrow.copyWith(fontSize: 9, letterSpacing: 2.0),
+              style: AppType.eyebrow.copyWith(fontSize: 11, letterSpacing: 1.2),
             ),
             Text(job.id, style: Theme.of(context).textTheme.titleSmall),
           ],

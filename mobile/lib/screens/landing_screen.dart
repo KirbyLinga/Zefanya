@@ -298,7 +298,7 @@ class _LandingScreenState extends State<LandingScreen>
                   _beat2 ? 'BEAT 2' : 'BEAT 1',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.0,
                   ),
@@ -506,7 +506,7 @@ class _Beat2Content extends StatelessWidget {
                     shape: const StadiumBorder(),
                     textStyle: AppType.eyebrow.copyWith(
                       fontSize: 13,
-                      letterSpacing: 3.0,
+                      letterSpacing: 1.2,
                       color: AppColors.textOnDark,
                     ),
                   ),

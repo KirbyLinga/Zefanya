@@ -70,14 +70,16 @@ class _HeartButtonState extends State<HeartButton> with SingleTickerProviderStat
       label: saved ? 'Remove ${widget.product.name} from saved' : 'Save ${widget.product.name}',
       onTap: _toggle,
       excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: _toggle,
-          child: SizedBox(
-            width: 44,
-            height: 44,
+      child: Tooltip(
+        message: saved ? 'Remove from saved' : 'Save item',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: _toggle,
+            child: SizedBox(
+              width: 44,
+              height: 44,
             child: Center(
               child: Container(
                 width: diameter,
@@ -107,6 +109,7 @@ class _HeartButtonState extends State<HeartButton> with SingleTickerProviderStat
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

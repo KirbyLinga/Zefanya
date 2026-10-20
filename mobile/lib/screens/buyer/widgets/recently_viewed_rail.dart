@@ -220,7 +220,7 @@ class _RailTag extends StatelessWidget {
       child: Text(
         label,
         style: AppType.eyebrow.copyWith(
-          fontSize: 8,
+          fontSize: 11,
           letterSpacing: 1.1,
           color: AppColors.textOnDark,
         ),

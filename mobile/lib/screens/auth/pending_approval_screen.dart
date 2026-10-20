@@ -411,7 +411,7 @@ class _EtaBlock extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               'business\ndays',
-              style: AppType.eyebrow.copyWith(height: 1.5, letterSpacing: 1.8),
+              style: AppType.eyebrow.copyWith(height: 1.5, letterSpacing: 1.2),
             ),
           ],
         ),

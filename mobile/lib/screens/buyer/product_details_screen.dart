@@ -255,11 +255,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Row(
         children: [
-          _circleIconButton(Icons.arrow_back, () => Navigator.of(context).maybePop()),
+          _circleIconButton(Icons.arrow_back, () => Navigator.of(context).maybePop(), tooltip: 'Go back'),
           const Spacer(),
           HeartButton(product: _product),
           const SizedBox(width: 8),
-          _circleIconButton(Icons.share_outlined, _shareProduct),
+          _circleIconButton(Icons.share_outlined, _shareProduct, tooltip: 'Share product'),
           const SizedBox(width: 8),
           // Gives the flight somewhere to land on this route. Home's
           // anchor is still mounted underneath, but an item arcing off
@@ -271,6 +271,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               () => Navigator.of(context).push(
                 AppPageRoute(builder: (_) => const CartScreen()),
               ),
+              tooltip: 'Open cart',
             ),
           ),
         ],
@@ -278,8 +279,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _circleIconButton(IconData icon, VoidCallback onTap) {
-    return Material(
+  Widget _circleIconButton(IconData icon, VoidCallback onTap, {String? tooltip}) {
+    Widget button = Material(
       color: AppColors.surface,
       shape: const CircleBorder(),
       elevation: 1,
@@ -292,6 +293,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
       ),
     );
+    if (tooltip != null) {
+      button = Tooltip(
+        message: tooltip,
+        child: button,
+      );
+    }
+    return button;
   }
 
   Widget _buildGallery(AppThemeExtension ext) {
@@ -643,6 +651,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           ),
                         ],
                       ),
+                      child: selected
+                          ? Icon(
+                              Icons.check,
+                              size: 16,
+                              color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black87,
+                            )
+                          : null,
                     ),
                   ),
                   ),
@@ -1057,6 +1074,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       builder: (_) => ChatScreen(contactName: _product.sellerName, contactRole: 'Seller'),
                     ),
                   ),
+                  tooltip: 'Chat with seller',
                 ),
                 const SizedBox(width: 10),
                 Expanded(

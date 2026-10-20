@@ -189,6 +189,7 @@ class _OtpScreenState extends State<OtpScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
+          tooltip: 'Go back',
           icon: const Icon(Icons.arrow_back),
           // Back goes to the pending screen, which is where this was opened from
           // and which has lost nothing: the six digits are the only thing here,

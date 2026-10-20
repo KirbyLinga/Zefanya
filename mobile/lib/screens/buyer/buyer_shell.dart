@@ -325,6 +325,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           clipBehavior: Clip.none,
                           children: [
                             IconButton(
+                              tooltip: 'Open cart',
                               onPressed: () => Navigator.of(context).push(
                                 AppPageRoute(builder: (_) => const CartScreen()),
                               ),

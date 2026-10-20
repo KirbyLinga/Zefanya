@@ -674,9 +674,9 @@ class AppType {
   /// Tiny all-caps kicker. The small end of the contrast — always
   /// pairs with one of the display sizes above, never used alone.
   static TextStyle get eyebrow => GoogleFonts.montserrat(
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: FontWeight.w700,
-        letterSpacing: 2.6,
+        letterSpacing: 1.2,
         color: AppColors.textSecondary,
       );
 }

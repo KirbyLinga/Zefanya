@@ -186,6 +186,7 @@ class _SellerHero extends StatelessWidget {
               children: [
                 // Back button
                 IconButton(
+                  tooltip: 'Go back',
                   icon: Icon(Icons.arrow_back, color: AppColors.textOnDark),
                   onPressed: () => Navigator.of(context).maybePop(),
                   padding: EdgeInsets.zero,
@@ -257,7 +258,7 @@ class _SellerHero extends StatelessWidget {
               label,
               style: AppType.eyebrow.copyWith(
                 color: AppColors.textOnDark.withValues(alpha: 0.65),
-                letterSpacing: 1.8,
+                letterSpacing: 1.2,
               ),
             ),
           ],

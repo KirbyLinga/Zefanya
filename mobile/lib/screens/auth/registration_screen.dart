@@ -398,6 +398,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
         appBar: AppBar(
           leading: IconButton(
+            tooltip: 'Go back',
             icon: const Icon(Icons.arrow_back),
             onPressed: _back,
           ),
@@ -702,6 +703,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           hintText: 'At least $kMinPasswordLength characters',
           prefixIcon: const Icon(Icons.lock_outline),
           suffixIcon: IconButton(
+            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
             icon: Icon(_obscurePassword
                 ? Icons.visibility_outlined
                 : Icons.visibility_off_outlined),
@@ -731,6 +733,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           hintText: 'Type it again',
           prefixIcon: const Icon(Icons.lock_outline),
           suffixIcon: IconButton(
+            tooltip: _obscureConfirmation ? 'Show password' : 'Hide password',
             icon: Icon(_obscureConfirmation
                 ? Icons.visibility_outlined
                 : Icons.visibility_off_outlined),

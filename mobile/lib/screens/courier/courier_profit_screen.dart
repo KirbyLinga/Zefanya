@@ -348,7 +348,7 @@ class _WeeklyChart extends StatelessWidget {
                           Text(
                             formatPeso(amounts[i]),
                             style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 9,
+                              fontSize: 11,
                               color: AppColors.textSecondary,
                             ),
                           ),
