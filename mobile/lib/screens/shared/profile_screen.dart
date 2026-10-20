@@ -39,6 +39,7 @@ import '../../state/order_state.dart';
 import '../../state/recently_viewed_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
+import '../../utils/money_format.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
 import '../buyer/widgets/product_card.dart' show ProductImage;
@@ -401,7 +402,7 @@ class _StatStrip extends StatelessWidget {
       final courier = context.watch<CourierState>();
       primaryValue = '${courier.completedJobs.length}';
       primaryLabel = 'DELIVERIES DONE';
-      secondValue = '\u20b1${courier.totalEarnings.toStringAsFixed(0)}';
+      secondValue = formatPeso(courier.totalEarnings);
       secondLabel = 'EARNED';
     } else {
       final viewed = context.watch<RecentlyViewedState>().items.length;

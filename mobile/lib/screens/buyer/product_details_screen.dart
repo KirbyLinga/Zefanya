@@ -26,6 +26,7 @@ import 'review_screen.dart';
 import 'seller_screen.dart';
 import 'widgets/product_card.dart';
 import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import '../../utils/motion.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
@@ -154,7 +155,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     // Deep links aren't wired yet, so share a plain text summary.
     // Swap the text for a real URL once product pages have permalinks.
     Share.share(
-      '${_product.name} — ₱${_product.price.toStringAsFixed(0)}\n'
+      '${_product.name} — ${formatPeso(_product.price)}\n'
       'Sold by ${_product.sellerName} on Zefanya.',
     );
   }
@@ -436,7 +437,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.bottomLeft,
                 child: Text(
-                  '₱${_product.price.toStringAsFixed(0)}',
+                  formatPeso(_product.price),
                   style: AppType.priceNumeral(52),
                 ),
               ),
@@ -446,7 +447,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  '₱${_product.compareAtPrice!.toStringAsFixed(0)}',
+                  formatPeso(_product.compareAtPrice!),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                     decoration: TextDecoration.lineThrough,

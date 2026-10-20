@@ -28,6 +28,7 @@ import 'package:provider/provider.dart';
 import '../../state/cart_state.dart';
 import '../../data/mock_data.dart' show Voucher;
 import '../../theme/app_theme.dart';
+import '../../utils/money_format.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
@@ -113,7 +114,7 @@ class _VoucherTile extends StatelessWidget {
                         Text(voucher.discountLabel, style: theme.textTheme.bodySmall),
                         const SizedBox(height: 8),
                         Text(
-                          'Min. spend \u20b1${voucher.minSpend.toStringAsFixed(0)} \u00b7 ${voucher.expiryLabel}',
+                          'Min. spend ${formatPeso(voucher.minSpend)} \u00b7 ${voucher.expiryLabel}',
                           style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
                         ),
                         if (_expiryCountdown(voucher.expiresAt) != null)
@@ -191,7 +192,7 @@ class _Stub extends StatelessWidget {
     AppColors.watch(context);
     final value = isPercent
         ? '${(voucher.discountRate * 100).round()}'
-        : voucher.maxDiscount.toStringAsFixed(0);
+        : formatPeso(voucher.maxDiscount).replaceFirst('₱', '').trim();
 
     return Container(
       width: _stubWidth,
@@ -218,7 +219,7 @@ class _Stub extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 6, right: 1),
                     child: Text(
-                      '\u20b1',
+                      '₱',
                       style: AppType.priceNumeral(18, color: AppColors.textOnDark),
                     ),
                   ),

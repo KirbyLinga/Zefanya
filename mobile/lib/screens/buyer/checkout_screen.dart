@@ -14,6 +14,7 @@ import '../../state/cart_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
 import '../shared/edit_profile_screen.dart';
 import 'courier_tracker_screen.dart';
@@ -257,7 +258,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       button: true,
       expanded: _summaryExpanded,
       label: 'Order summary, $count items, '
-          'total \u20b1${total.toStringAsFixed(0)}',
+          'total ${formatPeso(total)}',
       child: InkWell(
         onTap: () => setState(() => _summaryExpanded = !_summaryExpanded),
         borderRadius: radiusOf(ShapeTier.control),
@@ -373,25 +374,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ...items.map((i) => _orderLine(
                   theme,
                   '${i.product.name}${i.variant.isNotEmpty ? ' (${i.variant})' : ''}  x${i.quantity}',
-                  '₱${i.lineTotal.toStringAsFixed(2)}',
+                  formatPeso(i.lineTotal),
                 )),
           const Divider(height: 24),
-          _orderLine(theme, 'Subtotal', '₱${subtotal.toStringAsFixed(2)}'),
+          _orderLine(theme, 'Subtotal', formatPeso(subtotal)),
           if (widget.voucherDiscount > 0)
             _orderLine(
               theme,
               widget.voucherCode == null ? 'Voucher discount' : 'Voucher (${widget.voucherCode})',
-              '- ₱${widget.voucherDiscount.toStringAsFixed(2)}',
+              '- ${formatPeso(widget.voucherDiscount)}',
               valueColor: AppColors.successText,
             ),
           _orderLine(
             theme,
             'Shipping fee',
-            shippingFee == 0 ? 'Free' : '₱${shippingFee.toStringAsFixed(2)}',
+            shippingFee == 0 ? 'Free' : formatPeso(shippingFee),
             valueColor: shippingFee == 0 ? AppColors.successText : null,
           ),
           const Divider(height: 24),
-          _orderLine(theme, 'Total', '₱${total.toStringAsFixed(2)}', isBold: true),
+          _orderLine(theme, 'Total', formatPeso(total), isBold: true),
           ],
         ],
       ),
@@ -579,7 +580,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('Total Payment', style: theme.textTheme.bodySmall),
-                  Text('₱${total.toStringAsFixed(0)}', style: AppType.priceNumeral(32)),
+                  Text(formatPeso(total), style: AppType.priceNumeral(32)),
                 ],
               ),
             ),

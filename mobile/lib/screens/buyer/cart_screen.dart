@@ -24,6 +24,7 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/zefanya_mark.dart';
 import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
 
 class CartScreen extends StatefulWidget {
@@ -85,7 +86,7 @@ class _CartScreenState extends State<CartScreen> {
       final scope = voucher.category == null ? '' : ' of ${voucher.category}';
       showTimedSnackBar(
         context,
-        SnackBar(content: Text('Spend at least ₱${voucher.minSpend.toStringAsFixed(0)}$scope to use "$code"')),
+        SnackBar(content: Text('Spend at least ${formatPeso(voucher.minSpend)}$scope to use "$code"')),
       );
       return;
     }
@@ -118,7 +119,7 @@ class _CartScreenState extends State<CartScreen> {
           SnackBar(
             content: Text(
               'Voucher removed — cart dropped below '
-              '₱${minSpend.toStringAsFixed(0)}$scope minimum',
+              '${formatPeso(minSpend)}$scope minimum',
             ),
           ),
         );
@@ -345,7 +346,7 @@ class _CartScreenState extends State<CartScreen> {
                   spacing: 8,
                   children: [
                     Text(
-                      '₱${item.product.price.toStringAsFixed(2)}',
+                      formatPeso(item.product.price),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppColors.accent,
@@ -530,7 +531,7 @@ class _CartScreenState extends State<CartScreen> {
                       child: child,
                     ),
                     child: Text(
-                      '₱${total.toStringAsFixed(0)}',
+                      formatPeso(total),
                       key: ValueKey(total),
                       style: AppType.priceNumeral(26),
                     ),

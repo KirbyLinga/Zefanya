@@ -16,6 +16,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/mock_data.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../utils/motion.dart';
 import '../../../widgets/editorial_shapes.dart';
 import '../../../widgets/heart_button.dart';
@@ -277,7 +278,7 @@ class CoverStoryTile extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
-      semanticLabel: '${product.name}, ${product.price.toStringAsFixed(0)} pesos. $eyebrow.',
+      semanticLabel: '${product.name}, ${formatPeso(product.price)}. $eyebrow.',
       child: Padding(
         // Reserves room for the foot's bottom bleed so Clip.none
         // doesn't spill into whatever sliver comes next.
@@ -334,11 +335,11 @@ class CoverStoryTile extends StatelessWidget {
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
-                                  child: Text('\u20b1', style: AppType.priceNumeral(20)),
+                                  child: Text('₱', style: AppType.priceNumeral(20)),
                                 ),
                                 const SizedBox(width: 2),
                                 Text(
-                                  product.price.toStringAsFixed(0),
+                                  formatPeso(product.price).replaceFirst('₱', '').trim(),
                                   style: AppType.priceNumeral(46),
                                 ),
                               ],
@@ -474,7 +475,7 @@ class WideProductTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '\u20b1${product.price.toStringAsFixed(0)}',
+                        formatPeso(product.price),
                         style: AppType.priceNumeral(22),
                       ),
                     ],
@@ -598,7 +599,7 @@ class ProductCard extends StatelessWidget {
                   // Price is now the loudest thing on the tile, not a
                   // slightly-bolder sibling of the product name.
                   Text(
-                    '₱${product.price.toStringAsFixed(0)}',
+                    formatPeso(product.price),
                     style: AppType.priceNumeral(22),
                   ),
                   const SizedBox(height: 3),
@@ -691,7 +692,8 @@ class PriceLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final numeral = AppType.priceNumeral(numeralSize, color: color);
     final mark = numeral.copyWith(fontSize: numeralSize * 0.55);
-    final text = '₱${amount.toStringAsFixed(0)}';
+    final text = formatPeso(amount);
+    final numeralString = text.replaceFirst('₱', '').trim();
     return Semantics(
       label: semanticLabel ?? text,
       excludeSemantics: true,
@@ -703,7 +705,7 @@ class PriceLabel extends StatelessWidget {
               child: Text('₱', style: mark),
             ),
             TextSpan(
-              text: amount.toStringAsFixed(0),
+              text: numeralString,
               style: numeral,
             ),
           ],

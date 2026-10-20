@@ -103,7 +103,7 @@ void main() {
       expect(formatMinor(12050), '₱120.50');
       expect(formatMinor(0), '₱0.00');
       expect(formatMinor(5), '₱0.05');
-      expect(formatMinor(100000), '₱1000.00');
+      expect(formatMinor(100000), '₱1,000.00');
     });
   });
 

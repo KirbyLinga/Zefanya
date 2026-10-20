@@ -9,6 +9,7 @@ import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
 import '../../widgets/app_page_route.dart';
@@ -98,7 +99,7 @@ class DeliveryDashboardScreen extends StatelessWidget {
       children: [
         Text('TODAY', style: AppType.eyebrow),
         const SizedBox(height: 4),
-        Text('₱${courier.todayEarnings.toStringAsFixed(0)}', style: AppType.priceNumeral(24)),
+        Text(formatPeso(courier.todayEarnings), style: AppType.priceNumeral(24)),
         const SizedBox(height: 2),
         Text(
           '$count delivered',

@@ -13,6 +13,7 @@
 import 'package:flutter/material.dart';
 import '../../../state/courier_state.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
 
 class DeliveryJobCard extends StatelessWidget {
@@ -110,7 +111,7 @@ class DeliveryJobCard extends StatelessWidget {
                 // treatment, applied to whatever number matters most on
                 // this screen. Was titleSmall/w700, same weight as the
                 // shop name above it.
-                Text('\u20b1${job.fee.toStringAsFixed(0)}', style: AppType.priceNumeral(26)),
+                Text(formatPeso(job.fee), style: AppType.priceNumeral(26)),
               ],
             ),
           ],

@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/money_format.dart';
 import '../../utils/weekly_buckets.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -176,14 +177,14 @@ class CourierProfitScreen extends StatelessWidget {
                 // oversized-numeral treatment buyer prices got — this is
                 // the one figure a courier actually opens this tab to see.
                 Text(
-                  '₱${weekEarnings.toStringAsFixed(0)}',
+                  formatPeso(weekEarnings),
                   style: AppType.priceNumeral(40, color: AppColors.textOnDark),
                 ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
-                      child: _summaryStat(theme, 'Today', '₱${todayEarnings.toStringAsFixed(2)}'),
+                      child: _summaryStat(theme, 'Today', formatPeso(todayEarnings)),
                     ),
                     Container(width: 1, height: 32, color: AppColors.secondary.withValues(alpha: 0.4)),
                     Expanded(
@@ -229,7 +230,7 @@ class CourierProfitScreen extends StatelessWidget {
             children: [
               Text('Total', style: theme.textTheme.titleSmall),
               Text(
-                '₱${feesEarned.toStringAsFixed(2)}',
+                formatPeso(feesEarned),
                 style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: AppColors.primaryDark),
               ),
             ],
@@ -245,7 +246,7 @@ class CourierProfitScreen extends StatelessWidget {
         Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
         const SizedBox(width: 8),
         Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
-        Text('₱${value.toStringAsFixed(2)}', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text(formatPeso(value), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -282,7 +283,7 @@ class CourierProfitScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text('₱${c.payout.toStringAsFixed(0)}', style: AppType.priceNumeral(20)),
+          Text(formatPeso(c.payout), style: AppType.priceNumeral(20)),
         ],
       ),
     );
@@ -320,7 +321,7 @@ class _WeeklyChart extends StatelessWidget {
       // sentence instead of seven silent rectangles.
       label: weekTotal <= 0
           ? 'Last 7 days earnings: no deliveries yet'
-          : 'Last 7 days earnings: ₱${weekTotal.toStringAsFixed(0)} total',
+          : 'Last 7 days earnings: ${formatPeso(weekTotal)} total',
       excludeSemantics: true,
       child: Container(
       padding: const EdgeInsets.all(16),
@@ -345,7 +346,7 @@ class _WeeklyChart extends StatelessWidget {
                       children: [
                         if (amounts[i] > 0)
                           Text(
-                            '₱${amounts[i].toStringAsFixed(0)}',
+                            formatPeso(amounts[i]),
                             style: theme.textTheme.labelSmall?.copyWith(
                               fontSize: 9,
                               color: AppColors.textSecondary,

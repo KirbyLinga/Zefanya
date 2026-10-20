@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../config/pricing.dart';
 import '../theme/app_theme.dart';
+import '../utils/money_format.dart';
 import '../utils/motion.dart';
 import 'editorial_shapes.dart';
 
@@ -34,9 +35,9 @@ class FreeShippingMeter extends StatelessWidget {
     if (unlocked) {
       message = 'Free shipping unlocked';
     } else if (subtotal <= 0) {
-      message = 'Free shipping on orders over \u20b1${threshold.toStringAsFixed(0)}';
+      message = 'Free shipping on orders over ${formatPeso(threshold)}';
     } else {
-      message = 'Add \u20b1${remaining.toStringAsFixed(0)} more for free shipping';
+      message = 'Add ${formatPeso(remaining)} more for free shipping';
     }
 
     return Semantics(

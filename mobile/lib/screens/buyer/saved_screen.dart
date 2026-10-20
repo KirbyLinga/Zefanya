@@ -16,6 +16,7 @@ import '../../data/mock_data.dart';
 import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -120,7 +121,7 @@ class _SavedCard extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
-      semanticLabel: '${product.name}, ₱${product.price.toStringAsFixed(0)}',
+      semanticLabel: '${product.name}, ${formatPeso(product.price)}',
       child: Card(
         clipBehavior: Clip.antiAlias,
         shape: editorialShape(index, ShapeTier.card),
@@ -159,7 +160,7 @@ class _SavedCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text('₱${product.price.toStringAsFixed(0)}', style: AppType.priceNumeral(22)),
+                  Text(formatPeso(product.price), style: AppType.priceNumeral(22)),
                   const SizedBox(height: 3),
                   Row(
                     children: [

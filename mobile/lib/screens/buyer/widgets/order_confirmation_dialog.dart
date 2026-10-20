@@ -28,6 +28,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/mock_data.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
 import '../../../widgets/success_flourish.dart';
 
@@ -83,7 +84,7 @@ class OrderConfirmationDialog extends StatelessWidget {
             const SizedBox(height: 4),
             // Same oversized-numeral treatment as every price elsewhere —
             // the total is the number this dialog exists to confirm.
-            Text('\u20b1${total.toStringAsFixed(0)}', style: AppType.priceNumeral(40)),
+            Text(formatPeso(total), style: AppType.priceNumeral(40)),
             const SizedBox(height: 18),
             Container(
               width: double.infinity,

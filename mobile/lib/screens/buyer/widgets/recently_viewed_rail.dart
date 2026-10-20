@@ -20,6 +20,7 @@ import '../../../data/mock_data.dart';
 import '../../../state/order_state.dart';
 import '../../../state/recently_viewed_state.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
 import '../../../widgets/heart_button.dart';
 import '../../../widgets/pressable_scale.dart';
@@ -139,7 +140,7 @@ class ProductRailTile extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       semanticLabel: [
-        '${product.name}, ${product.price.toStringAsFixed(0)} pesos',
+        '${product.name}, ${formatPeso(product.price)}',
         if (onSale) 'on sale',
         if (inCart) 'already in your cart',
       ].join(', '),
@@ -186,7 +187,7 @@ class ProductRailTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
-            Text('\u20b1${product.price.toStringAsFixed(0)}', style: AppType.priceNumeral(16)),
+            Text(formatPeso(product.price), style: AppType.priceNumeral(16)),
           ],
         ),
       ),

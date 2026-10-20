@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/money_format.dart';
 import '../shared/chat_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -396,7 +397,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
               // The fee is what the courier is actually here for on this
               // screen — same numeral treatment as the job card and the
               // earnings summary, so the three places a fee appears agree.
-              Text('₱${job.fee.toStringAsFixed(0)}', style: AppType.priceNumeral(28)),
+              Text(formatPeso(job.fee), style: AppType.priceNumeral(28)),
             ],
           ),
         ],

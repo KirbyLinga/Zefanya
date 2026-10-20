@@ -22,6 +22,7 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
+import '../utils/money_format.dart';
 import '../widgets/editorial_shapes.dart';
 import 'buyer/widgets/product_card.dart' show productTint;
 
@@ -138,7 +139,7 @@ class ShopPreview extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '\u20b1${products[i].price.toStringAsFixed(0)}',
+                    formatPeso(products[i].price),
                     style: AppType.priceNumeral(16),
                   ),
                 ],

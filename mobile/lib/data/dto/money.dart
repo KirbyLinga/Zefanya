@@ -35,6 +35,8 @@
 // lines. Whether the server agrees is a contract question — see the note in
 // docs/api-contract.md about who computes the total (OPEN QUESTIONS).
 
+import '../../utils/money_format.dart';
+
 /// How many minor units make one peso. Fixed by the currency, not by app
 /// config: PHP has 100 centavos and that is not a tunable.
 const int kMinorUnitsPerPeso = 100;
@@ -51,7 +53,7 @@ int minorFromPesos(double pesos) => (pesos * kMinorUnitsPerPeso).round();
 ///
 /// Provided so a screen showing a server value never has to reach for the
 /// arithmetic itself: it can go straight from the DTO to the string.
-String formatMinor(int minor) => '₱${pesosFromMinor(minor).toStringAsFixed(2)}';
+String formatMinor(int minor) => formatPeso(pesosFromMinor(minor), showDecimals: true);
 
 /// Reads a money field out of decoded JSON, in **minor units**.
 ///

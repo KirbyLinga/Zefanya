@@ -28,6 +28,7 @@ import '../../data/mock_data.dart';
 import '../../state/catalog_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import '../../utils/product_sort.dart';
 import '../../utils/search_filter.dart';
 import '../../utils/motion.dart';
@@ -454,7 +455,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilterChip(
-                label: Text('Under ₱${bound.toStringAsFixed(0)}'),
+                label: Text('Under ${formatPeso(bound)}'),
                 selected: _maxPrice == bound,
                 onSelected: (_) => setState(
                   () => _maxPrice = _maxPrice == bound ? null : bound,

@@ -42,6 +42,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
 import '../../../widgets/success_flourish.dart';
 
@@ -121,7 +122,7 @@ class DeliveryCompletionView extends StatelessWidget {
                     Text(
                       returned
                           ? 'This parcel is on its way back to the seller.'
-                          : '₱${fee.toStringAsFixed(2)} added to your earnings',
+                          : '${formatPeso(fee)} added to your earnings',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(color: AppColors.textSecondary),
@@ -136,7 +137,7 @@ class DeliveryCompletionView extends StatelessWidget {
                     if (returned) ...[
                       const SizedBox(height: 6),
                       Text(
-                        '₱${fee.toStringAsFixed(2)} trip fee credited for this one',
+                        '${formatPeso(fee)} trip fee credited for this one',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: AppColors.textSecondary),
@@ -145,7 +146,7 @@ class DeliveryCompletionView extends StatelessWidget {
                     const SizedBox(height: 20),
                     Center(
                       child: Text(
-                        'TODAY  ₱${todayTotal.toStringAsFixed(0)}  ·  $todayCount closed',
+                        'TODAY  ${formatPeso(todayTotal)}  ·  $todayCount closed',
                         style: AppType.eyebrow.copyWith(color: AppColors.accent),
                       ),
                     ),

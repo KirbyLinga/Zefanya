@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/mock_data.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
 import '../product_details_screen.dart';
 import '../../../widgets/app_page_route.dart';
@@ -174,7 +175,7 @@ class _StackCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '₱${product.price.toStringAsFixed(0)}',
+                        formatPeso(product.price),
                         style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.accent),
                       ),
                     ],
