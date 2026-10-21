@@ -204,10 +204,20 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   /// product) doesn't headline two adjacent sections of one scroll.
   late final Product? _storyProduct;
 
+  static List<Product> _sortDeterministic(List<Product> products) {
+    final list = List<Product>.from(products);
+    list.sort((a, b) {
+      final cmp = b.rating.compareTo(a.rating);
+      if (cmp != 0) return cmp;
+      return a.id.compareTo(b.id);
+    });
+    return list;
+  }
+
   @override
   void initState() {
     super.initState();
-    _shuffled = List<Product>.from(context.read<CatalogState>().products)..shuffle();
+    _shuffled = _sortDeterministic(context.read<CatalogState>().products);
     _storyProduct = _shuffled.isEmpty
         ? null
         : _shuffled.firstWhere(
@@ -230,6 +240,82 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   /// active on the first build.
   Color get _bandColor => AppColors.surface;
 
+  Widget _buildCategoryQuickLinks(BuildContext context, ThemeData theme, AppThemeExtension ext) {
+    final catalog = context.watch<CatalogState>();
+    final categories = catalog.categories.where((c) => c != 'All').toList();
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('CATEGORIES', style: AppType.eyebrow),
+                GestureDetector(
+                  onTap: widget.onBrowseCategories,
+                  child: Text(
+                    'See all',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: categories.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final cat = categories[i];
+                final icon = categoryIcons[cat] ?? Icons.category_outlined;
+                return Material(
+                  color: AppColors.surface,
+                  borderRadius: radiusOf(ShapeTier.pill),
+                  elevation: 0.5,
+                  child: InkWell(
+                    borderRadius: radiusOf(ShapeTier.pill),
+                    onTap: () => Navigator.of(context).push(
+                      AppPageRoute(builder: (_) => CategoryProductsScreen(category: cat)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 18, color: AppColors.primaryDark),
+                          const SizedBox(width: 8),
+                          Text(
+                            cat,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
@@ -238,22 +324,17 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     final auth = context.watch<AuthState>();
     final greeting = Microcopy.greeting(DateTime.now(), name: auth.firstName ?? auth.name).toUpperCase();
 
-    // Grid excludes whatever's already shown above it on Home: index 0
-    // (the cover story) and, when there are enough products, 2/3 (the
-    // Style Edit stack showcase) — so nothing repeats twice on one screen.
-    final excludedFromGrid = _shuffled.length > 3 ? const {0, 2, 3} : const {0};
-    final gridProducts = [
-      for (var j = 0; j < _shuffled.length; j++)
-        if (!excludedFromGrid.contains(j)) _shuffled[j],
-    ];
-
-    // The feed is split so full-width tiles interrupt it periodically:
-    // 2-up, 2-up, WIDE, 2-up, 2-up, 2-up, 2-up, WIDE, ... A single
-    // one-time break only fixed the rhythm near the top — with a real
-    // catalog behind this instead of 8 mock products, everything past
-    // the first break was still one long uninterrupted grid. Now it
-    // repeats every _shelfBreakInterval items for as long as the feed
-    // does, so it doesn't degrade with more products.
+    final catalogProducts = _shuffled.isNotEmpty
+        ? _shuffled
+        : _sortDeterministic(context.watch<CatalogState>().products);
+    final gridProducts = catalogProducts;
+    final storyProduct = _storyProduct ??
+        (catalogProducts.isEmpty
+            ? null
+            : catalogProducts.firstWhere(
+                (p) => p.sellerName != catalogProducts.first.sellerName,
+                orElse: () => catalogProducts.first,
+              ));
 
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
@@ -265,14 +346,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
           controller: _scrollController,
           slivers: [
             // ---- Masthead ----------------------------------------
-            // Was a 20pt headlineSmall wordmark sitting at the same
-            // visual weight as everything under it. Nothing on the
-            // screen was dramatically bigger than anything else, so
-            // the eye had nowhere to land first. Login and Landing use
-            // this same masthead treatment for their own wordmark — on
-            // purpose, see AppType.masthead's doc comment — but this is
-            // the only place it appears *inside* the app rather than in
-            // the pre-auth flow.
             SliverToBoxAdapter(
               child: EaseInFrame(
                 index: 0,
@@ -302,10 +375,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                                   padding: const EdgeInsets.only(top: 6),
                                   child: ZefanyaMark(
                                     size: 20,
-                                    // Brand rose at 60% — reads as a quiet
-                                    // mark next to the wordmark in both
-                                    // modes, since primaryDark is itself
-                                    // mode-tuned (deep mauve → lifted rose).
                                     color: AppColors.primaryDark.withValues(alpha: 0.6),
                                   ),
                                 ),
@@ -320,44 +389,59 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                 ),
               ),
             ),
-            // ---- Search ------------------------------------------
-            // Deliberately demoted: it used to be the first thing on
-            // the page at full width, which is the layout every
-            // shopping app opens with. It still works, it just isn't
-            // the headline any more.
+            // ---- Search (under masthead, visible filled ground, 48dp min height) ----
             SliverToBoxAdapter(
               child: EaseInFrame(
                 index: 1,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                  child: TextField(
-                    // Read-only: this is a doorway to the Search tab, so
-                    // tapping must not raise the keyboard on Home first.
-                    readOnly: true,
-                    onTap: widget.onSearchTap,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Search products, brands...',
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      border: OutlineInputBorder(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(ext.pillRadius),
-                        borderSide: BorderSide.none,
+                      ),
+                      child: TextField(
+                        readOnly: true,
+                        onTap: widget.onSearchTap,
+                        style: theme.textTheme.bodyMedium,
+                        decoration: InputDecoration(
+                          filled: false,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          hintText: 'Search products, brands...',
+                          hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          prefixIcon: Icon(Icons.search, size: 20, color: AppColors.primaryDark),
+                          border: InputBorder.none,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
+            // ---- Promo carousel ----------------------------------
             SliverToBoxAdapter(
               child: EaseInFrame(
                 index: 2,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
                   child: PromoCarousel(
                     autoAdvance: widget.isActive,
                     onTapSlide: _onPromoTap,
                   ),
                 ),
+              ),
+            ),
+            // ---- Category quick links ----------------------------
+            SliverToBoxAdapter(
+              child: EaseInFrame(
+                index: 3,
+                child: _buildCategoryQuickLinks(context, theme, ext),
               ),
             ),
             if (_isLoading)
@@ -375,9 +459,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.surfaceMuted,
-                          // Skeletons match the real tiles' asymmetric
-                          // corners, so the shape doesn't visibly
-                          // change when content arrives.
                           borderRadius: editorialRadius(i, ShapeTier.card),
                         ),
                       ),
@@ -386,41 +467,31 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                   ),
                 ),
               )
-            else if (_shuffled.isEmpty)
+            else if (catalogProducts.isEmpty)
               SliverToBoxAdapter(child: _buildEmptyState(theme))
             else ...[
-              // ---- Featured rail -----------------------------------
-              // Full-bleed: NO horizontal padding here. The rail owns
-              // its own 20px gutters (header row + page insets), which
-              // are the only inset — wrapping padding too would double
-              // it to 40px (Claude alignment round 2).
-              SliverPadding(
-                padding: const EdgeInsets.only(top: 8),
-                sliver: SliverToBoxAdapter(
-                  child: EaseInFrame(
-                    index: 3,
-                    child: FeaturedDeck(
-                      products: _shuffled.take(5).toList(),
-                      heroTagPrefix: 'home',
-                      isActive: widget.isActive,
-                    ),
-                  ),
+              // ---- "The Shelf" product grid (renamed "Just for you") ----
+              SliverToBoxAdapter(
+                child: Padding(
+                  key: _shelfKey,
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+                  child: Text('Just for you', style: AppType.sectionDisplay),
                 ),
               ),
-              // ---- Welcome back --------------------------------------
+              ..._buildShelfSlivers(gridProducts),
+              // ---- Recently viewed ---------------------------------
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 22),
                   child: RecentlyViewedRail(
-                    excludeProductId: _shuffled.first.id,
+                    excludeProductId: catalogProducts.first.id,
                     onTapProduct: (product) => Navigator.of(context).push(
                       AppPageRoute(builder: (_) => ProductDetailsScreen(product: product)),
                     ),
                   ),
                 ),
               ),
-              // ---- Saved for later -----------------------------------
-              // Renders nothing (and no spacing) until something is hearted.
+              // ---- Saved for later ---------------------------------
               SliverToBoxAdapter(
                 child: SavedRail(
                   onTapProduct: (product) => Navigator.of(context).push(
@@ -428,7 +499,18 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                   ),
                 ),
               ),
-              // ---- Style Edit, on its own ground -----------------
+              // ---- Featured rail / deck ----------------------------
+              SliverPadding(
+                padding: const EdgeInsets.only(top: 16),
+                sliver: SliverToBoxAdapter(
+                  child: FeaturedDeck(
+                    products: catalogProducts.take(5).toList(),
+                    heroTagPrefix: 'home',
+                    isActive: widget.isActive,
+                  ),
+                ),
+              ),
+              // ---- Style Edit, on its own ground -------------------
               SliverToBoxAdapter(
                 child: CurvedSectionBreak(color: _bandColor, height: 54),
               ),
@@ -441,14 +523,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                     children: [
                       Text('PAIRED THIS WEEK', style: AppType.eyebrow),
                       const SizedBox(height: 10),
-                      // Not AppType.sectionDisplay: Home already spends
-                      // that scale on "The Shelf" below, and AppType's
-                      // own doc comment is explicit that these display
-                      // styles are one-per-screen — two competing 34pt
-                      // headings in the same scroll undoes the hierarchy
-                      // they exist to create. titleLarge is still Playfair
-                      // (see _buildTextTheme) so the face doesn't change,
-                      // just the scale.
                       Text('Style Edit', style: theme.textTheme.titleLarge),
                       const SizedBox(height: 8),
                       Text(
@@ -456,10 +530,10 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                         style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 16),
-                      if (_shuffled.length > 3)
+                      if (catalogProducts.length > 3)
                         ProductStackShowcase(
-                          back: _shuffled[2],
-                          front: _shuffled[3],
+                          back: catalogProducts[2],
+                          front: catalogProducts[3],
                           heroTagPrefix: 'home-stack',
                         ),
                     ],
@@ -469,42 +543,20 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               SliverToBoxAdapter(
                 child: CurvedSectionBreak(color: _bandColor, height: 46, fillTop: true),
               ),
-              // ---- Seller voice ----------------------------------
+              // ---- Seller story ------------------------------------
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 sliver: SliverToBoxAdapter(
                   child: SellerStoryCard(
-                    product: _storyProduct ?? _shuffled.first,
+                    product: storyProduct ?? catalogProducts.first,
                     onTap: () => Navigator.of(context).push(
                       AppPageRoute(
-                        builder: (_) => ProductDetailsScreen(product: _storyProduct ?? _shuffled.first),
+                        builder: (_) => ProductDetailsScreen(product: storyProduct ?? catalogProducts.first),
                       ),
                     ),
                   ),
                 ),
               ),
-              // ---- The feed --------------------------------------
-              // 28px of plain air. A woven LinenDivider used to sit here —
-              // a crosshatch measuring ~1.1:1 in both modes, i.e. invisible,
-              // so it was only ever doing the spacing. Deleted rather than
-              // tuned: the editorial/grid boundary is already carried by
-              // the section band above and the eyebrow below.
-              const SliverToBoxAdapter(child: SizedBox(height: 28)),
-              SliverToBoxAdapter(
-                child: Padding(
-                  key: _shelfKey,
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('EVERYTHING ELSE', style: AppType.eyebrow),
-                      const SizedBox(height: 10),
-                      Text('The Shelf', style: AppType.sectionDisplay),
-                    ],
-                  ),
-                ),
-              ),
-              ..._buildShelfSlivers(gridProducts),
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ],
