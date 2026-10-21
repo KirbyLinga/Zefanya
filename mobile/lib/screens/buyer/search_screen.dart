@@ -40,6 +40,7 @@ import 'widgets/product_card.dart';
 import 'widgets/sort_chips.dart';
 import 'widgets/try_looking_for.dart';
 import '../../widgets/app_page_route.dart';
+import '../../widgets/cart_button.dart';
 
 // ---------------------------------------------------------------------------
 // Search history persistence
@@ -293,46 +294,56 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchField(ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.24),
-        borderRadius: editorialRadius(0, ShapeTier.card),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
       child: Row(
         children: [
-          Icon(Icons.search, size: 22, color: AppColors.primaryDark),
-          const SizedBox(width: 10),
           Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              // No autofocus: the shell requests focus explicitly when
-              // arriving via Home's search bar (focusRequests). Autofocus
-              // here would raise the keyboard on every return to the tab
-              // — including back from a product page — over a query the
-              // person may only have been half done typing.
-              onChanged: _search,
-              onSubmitted: _onSubmitted,
-              textInputAction: TextInputAction.search,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: 'What are you looking for?',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.24),
+                borderRadius: editorialRadius(0, ShapeTier.card),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 22, color: AppColors.primaryDark),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      // No autofocus: the shell requests focus explicitly when
+                      // arriving via Home's search bar (focusRequests). Autofocus
+                      // here would raise the keyboard on every return to the tab
+                      // — including back from a product page — over a query the
+                      // person may only have been half done typing.
+                      onChanged: _search,
+                      onSubmitted: _onSubmitted,
+                      textInputAction: TextInputAction.search,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: 'What are you looking for?',
+                      ),
+                    ),
+                  ),
+                  if (_query.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Clear search',
+                      icon: Icon(Icons.close, size: 18, color: AppColors.primaryDark),
+                      onPressed: () {
+                        _controller.clear();
+                        _search('');
+                      },
+                    ),
+                ],
               ),
             ),
           ),
-          if (_query.isNotEmpty)
-            IconButton(
-              tooltip: 'Clear search',
-              icon: Icon(Icons.close, size: 18, color: AppColors.primaryDark),
-              onPressed: () {
-                _controller.clear();
-                _search('');
-              },
-            ),
+          const SizedBox(width: 8),
+          const CartButton(),
         ],
       ),
     );

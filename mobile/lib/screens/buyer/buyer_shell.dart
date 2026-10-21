@@ -7,19 +7,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
 import '../../state/auth_state.dart';
-import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/scroll_to_top.dart';
+import '../../widgets/cart_button.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/motion/fade_through.dart';
 import '../../widgets/nav_icons.dart';
 import '../shared/profile_screen.dart';
-import 'cart_screen.dart';
 import 'categories_screen.dart';
 import 'category_products_screen.dart';
 import 'orders_status_screen.dart';
@@ -35,7 +34,6 @@ import 'widgets/recently_viewed_rail.dart';
 import 'widgets/saved_rail.dart';
 import '../../widgets/shimmer_box.dart';
 import '../../widgets/app_page_route.dart';
-import '../../widgets/cart_flight.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/zefanya_mark.dart';
@@ -237,7 +235,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
-    final cartCount = context.watch<CartState>().itemCount;
     final auth = context.watch<AuthState>();
     final greeting = Microcopy.greeting(DateTime.now(), name: auth.firstName ?? auth.name).toUpperCase();
 
@@ -317,52 +314,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           ],
                         ),
                       ),
-                      // CartAnchor makes this the landing point for the
-                      // add-to-cart flight (see widgets/cart_flight.dart)
-                      // and plays the catch pop when an item arrives.
-                      CartAnchor(
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            IconButton(
-                              tooltip: 'Open cart',
-                              onPressed: () => Navigator.of(context).push(
-                                AppPageRoute(builder: (_) => const CartScreen()),
-                              ),
-                              icon: const Icon(Icons.shopping_bag_outlined),
-                              color: AppColors.textPrimary,
-                            ),
-                            Positioned(
-                              right: 2,
-                              top: 2,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                transitionBuilder: (child, animation) => ScaleTransition(
-                                  scale: animation,
-                                  child: FadeTransition(opacity: animation, child: child),
-                                ),
-                                child: cartCount > 0
-                                    ? Container(
-                                        key: ValueKey(cartCount),
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primaryDark,
-                                          borderRadius: radiusOf(ShapeTier.pill),
-                                        ),
-                                        child: Text(
-                                          cartCount > 9 ? '9+' : '$cartCount',
-                                          style: theme.textTheme.labelSmall?.copyWith(
-                                            color: AppColors.textOnDark,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(key: ValueKey('no-badge')),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      const CartButton(),
                     ],
                   ),
                 ),

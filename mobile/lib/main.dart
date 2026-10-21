@@ -169,7 +169,7 @@ class MarketplaceApp extends StatelessWidget {
     return AppPaletteScope(
       brightness: themeState.brightness,
       child: MaterialApp(
-        title: 'Marketplace',
+        title: 'Zefanya',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,

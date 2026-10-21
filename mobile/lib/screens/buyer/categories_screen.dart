@@ -21,6 +21,8 @@ import 'category_products_screen.dart';
 import 'widgets/product_card.dart';
 import '../../state/catalog_state.dart';
 import '../../widgets/app_page_route.dart';
+import '../../widgets/cart_button.dart';
+import '../../widgets/editorial_header.dart';
 
 /// The icon each category label renders behind its arch.
 ///
@@ -87,8 +89,16 @@ class CategoriesScreen extends StatelessWidget {
           onRefresh: () => context.read<CatalogState>().refresh(),
           child: CustomScrollView(
           slivers: [
+            SliverToBoxAdapter(
+              child: EditorialHeader(
+                eyebrow: 'CATALOGUE',
+                title: 'Categories',
+                trailing: const CartButton(),
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+              ),
+            ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
               sliver: SliverToBoxAdapter(
                 child: _FeatureCategoryTile(
                   category: feature.$1,
