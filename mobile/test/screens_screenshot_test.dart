@@ -29,6 +29,7 @@ import 'package:zefanya/state/cart_state.dart';
 import 'package:zefanya/state/catalog_state.dart';
 import 'package:zefanya/state/chat_state.dart';
 import 'package:zefanya/state/courier_state.dart';
+import 'package:zefanya/state/notification_state.dart';
 import 'package:zefanya/state/order_state.dart';
 import 'package:zefanya/state/recently_viewed_state.dart';
 import 'package:zefanya/state/review_state.dart';
@@ -87,6 +88,7 @@ Future<void> _renderAndCapture(
   }
   final catalogState = CatalogState(repository: repositories.catalog);
   final courierState = _dispatchedCourier();
+  final notificationState = NotificationState();
   final orderState = OrderState(repository: repositories.order);
   final chatState = ChatState(repository: repositories.chat);
   final reviewState = ReviewState(repository: repositories.review);
@@ -105,6 +107,7 @@ Future<void> _renderAndCapture(
         ChangeNotifierProvider<CartState>.value(value: cartState),
         ChangeNotifierProvider<CatalogState>.value(value: catalogState),
         ChangeNotifierProvider<CourierState>.value(value: courierState),
+        ChangeNotifierProvider<NotificationState>.value(value: notificationState),
         ChangeNotifierProvider<OrderState>.value(value: orderState),
         ChangeNotifierProvider<ChatState>.value(value: chatState),
         ChangeNotifierProvider<ReviewState>.value(value: reviewState),

@@ -1,4 +1,7 @@
 // lib/main.dart
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/dev_flags.dart';
@@ -9,8 +12,10 @@ import 'state/cart_state.dart';
 import 'state/catalog_state.dart';
 import 'state/chat_state.dart';
 import 'state/courier_state.dart';
+import 'state/notification_state.dart';
 import 'state/order_state.dart';
 import 'state/recently_viewed_state.dart';
+import 'state/return_state.dart';
 import 'state/review_state.dart';
 import 'state/startup_state.dart';
 import 'state/theme_state.dart';
@@ -18,10 +23,13 @@ import 'state/wishlist_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/pending_approval_screen.dart';
 import 'screens/buyer/buyer_shell.dart';
+import 'screens/buyer/product_link_screen.dart';
 import 'screens/courier/courier_shell.dart';
 import 'screens/landing_screen.dart';
 import 'utils/motion.dart';
+import 'utils/product_link.dart';
 import 'widgets/app_atmosphere.dart';
+import 'widgets/app_page_route.dart';
 import 'widgets/startup_notice.dart';
 import 'widgets/zefanya_mark.dart';
 
@@ -45,7 +53,12 @@ void main() async {
   final catalogState = CatalogState(repository: repositories.catalog);
   final chatState = ChatState(repository: repositories.chat);
   final courierState = CourierState(repository: repositories.courier);
-  final orderState = OrderState(repository: repositories.order);
+  final notificationState = NotificationState();
+  final returnState = ReturnState(repository: repositories.returns);
+  final orderState = OrderState(
+    repository: repositories.order,
+    returns: returnState,
+  );
   final recentlyViewedState = RecentlyViewedState(catalog: repositories.catalog);
   final reviewState = ReviewState(repository: repositories.review);
   final wishlistState = WishlistState(catalog: repositories.catalog);
@@ -70,6 +83,7 @@ void main() async {
         ChangeNotifierProvider.value(value: catalogState),
         ChangeNotifierProvider.value(value: chatState),
         ChangeNotifierProvider.value(value: courierState),
+        ChangeNotifierProvider.value(value: notificationState),
         ChangeNotifierProvider.value(value: orderState),
         ChangeNotifierProvider.value(value: recentlyViewedState),
         ChangeNotifierProvider.value(value: reviewState),
@@ -94,6 +108,7 @@ void main() async {
     startupState.guard('your cart', cartState.load),
     startupState.guard('your chats', chatState.load),
     startupState.guard('your delivery jobs', courierState.load),
+    startupState.guard('your notifications', notificationState.load),
     startupState.guard('your orders', orderState.load),
     startupState.guard('your recently viewed items', recentlyViewedState.load),
     startupState.guard('your reviews', reviewState.load),
@@ -149,8 +164,91 @@ class _BootSplash extends StatelessWidget {
   }
 }
 
-class MarketplaceApp extends StatelessWidget {
+class MarketplaceApp extends StatefulWidget {
   const MarketplaceApp({super.key});
+
+  @override
+  State<MarketplaceApp> createState() => _MarketplaceAppState();
+}
+
+class _MarketplaceAppState extends State<MarketplaceApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<Uri>? _linkSubscription;
+  AuthState? _auth;
+  Uri? _pendingLink;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenForAppLinks();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.read<AuthState>();
+    if (!identical(auth, _auth)) {
+      _auth?.removeListener(_onAuthChanged);
+      _auth = auth;
+      _auth!.addListener(_onAuthChanged);
+    }
+    _tryOpenPendingLink();
+  }
+
+  @override
+  void dispose() {
+    _auth?.removeListener(_onAuthChanged);
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _onAuthChanged() => _tryOpenPendingLink();
+
+  Future<void> _listenForAppLinks() async {
+    try {
+      final appLinks = AppLinks();
+      final initial = await appLinks.getInitialLink();
+      if (initial != null) _queueLink(initial);
+      _linkSubscription = appLinks.uriLinkStream.listen(
+        _queueLink,
+        onError: (_) {
+          // A malformed link must not take down the app. It is simply ignored;
+          // the web page remains the fallback for whatever sent it.
+        },
+      );
+    } catch (_) {
+      // No app-links implementation (unit tests, unsupported platform). The
+      // rest of the app must boot normally.
+    }
+  }
+
+  void _queueLink(Uri uri) {
+    if (productIdFromLink(uri) == null) return;
+    _pendingLink = uri;
+    _tryOpenPendingLink();
+  }
+
+  void _tryOpenPendingLink() {
+    final uri = _pendingLink;
+    if (uri == null || !mounted) return;
+    final auth = _auth;
+    // The buyer shell is the only place a product route makes sense. If the
+    // person is logged out, keep the link pending until auth becomes active
+    // rather than dropping them on an empty route.
+    if (auth == null || !auth.isLoggedIn || auth.role != UserRole.buyer) return;
+    final productId = productIdFromLink(uri);
+    if (productId == null) {
+      _pendingLink = null;
+      return;
+    }
+    _pendingLink = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navigatorKey.currentState?.push(
+        AppPageRoute(builder: (_) => ProductLinkScreen(productId: productId)),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +267,7 @@ class MarketplaceApp extends StatelessWidget {
     return AppPaletteScope(
       brightness: themeState.brightness,
       child: MaterialApp(
+        navigatorKey: _navigatorKey,
         title: 'Zefanya',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,

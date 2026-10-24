@@ -8,6 +8,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/state/catalog_state.dart';
 import 'package:zefanya/utils/search_filter.dart';
 import 'package:zefanya/utils/weekly_buckets.dart';
 
@@ -58,6 +59,63 @@ void main() {
           products, const SearchFilter(maxPrice: 50));
       expect(out, isEmpty);
       expect(products.map((p) => p.id), ['a', 'b', 'c']);
+    });
+
+    test('minimum and maximum are both inclusive', () {
+      final out = filterProducts(
+        products,
+        const SearchFilter(minPrice: 500, maxPrice: 899),
+      );
+      expect(out.map((p) => p.id), ['b', 'c']);
+    });
+
+    test('a minimum above every price returns empty', () {
+      final out = filterProducts(
+        products,
+        const SearchFilter(minPrice: 5000),
+      );
+      expect(out, isEmpty);
+    });
+  });
+
+  group('price range validation', () {
+    test('blank means no bound', () {
+      expect(parsePriceBound('  '), isNull);
+      expect(priceRangeError('', ''), isNull);
+    });
+
+    test('minimum greater than maximum is rejected', () {
+      expect(
+        priceRangeError('900', '500'),
+        'Minimum price cannot be greater than maximum.',
+      );
+    });
+
+    test('equal bounds are a valid one-price range', () {
+      expect(priceRangeError('500', '500'), isNull);
+    });
+
+    test('negative and malformed amounts are rejected', () {
+      expect(priceRangeError('-1', ''), 'Price cannot be negative.');
+      expect(priceRangeError('', 'abc'), 'Enter a valid maximum price.');
+    });
+  });
+
+  group('search suggestion', () {
+    test('a one-letter typo suggests a catalogue word', () async {
+      final catalog = CatalogState();
+      await catalog.load();
+
+      expect(catalog.suggestSearch('linenn'), 'linen');
+      expect(catalog.suggestSearch('ceramik'), 'ceramic');
+    });
+
+    test('a real query or an unrelated dead end gets no suggestion', () async {
+      final catalog = CatalogState();
+      await catalog.load();
+
+      expect(catalog.suggestSearch('Linen'), isNull);
+      expect(catalog.suggestSearch('zzqxw'), isNull);
     });
   });
 

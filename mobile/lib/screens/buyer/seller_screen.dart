@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../state/catalog_state.dart';
+import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -31,6 +32,7 @@ class SellerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final products = context.watch<CatalogState>().bySeller(sellerName);
+    final wishlist = context.watch<WishlistState>();
 
     // Average rating across all of this seller's products.
     final avgRating = products.isEmpty
@@ -51,6 +53,8 @@ class SellerScreen extends StatelessWidget {
                 productCount: products.length,
                 avgRating: avgRating,
                 totalSold: totalSold,
+                isFollowing: wishlist.isFollowing(sellerName),
+                onFollow: () => wishlist.toggleFollow(sellerName),
                 onChat: () => Navigator.of(context).push(
                   AppPageRoute(
                     builder: (_) => ChatScreen(
@@ -149,6 +153,8 @@ class _SellerHero extends StatelessWidget {
     required this.productCount,
     required this.avgRating,
     required this.totalSold,
+    required this.isFollowing,
+    required this.onFollow,
     required this.onChat,
   });
 
@@ -156,6 +162,8 @@ class _SellerHero extends StatelessWidget {
   final int productCount;
   final double avgRating;
   final int totalSold;
+  final bool isFollowing;
+  final VoidCallback onFollow;
   final VoidCallback onChat;
 
   @override
@@ -222,17 +230,35 @@ class _SellerHero extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
-                OutlinedButton.icon(
-                  onPressed: onChat,
-                  icon: Icon(Icons.chat_bubble_outline, size: 16,
-                      color: AppColors.textOnDark),
-                  label: Text('Chat with Seller',
-                      style: TextStyle(color: AppColors.textOnDark)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: AppColors.textOnDark.withValues(alpha: 0.45),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onChat,
+                        icon: Icon(Icons.chat_bubble_outline, size: 16,
+                            color: AppColors.textOnDark),
+                        label: Text('Chat',
+                            style: TextStyle(color: AppColors.textOnDark)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: AppColors.textOnDark.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const ValueKey('follow-seller'),
+                        onPressed: onFollow,
+                        icon: Icon(
+                          isFollowing ? Icons.check : Icons.add,
+                          size: 16,
+                        ),
+                        label: Text(isFollowing ? 'Following' : 'Follow'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

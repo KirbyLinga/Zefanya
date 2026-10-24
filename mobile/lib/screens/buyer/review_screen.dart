@@ -75,7 +75,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   /// Draft state per product id.
   final Map<String, int> _stars = {};
   final Map<String, TextEditingController> _comments = {};
-  final Map<String, String> _photoPaths = {};
+  final Map<String, List<String>> _photoPaths = {};
 
   /// The buyer's rating of whoever carried this order, 0 = not rated.
   ///
@@ -86,6 +86,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
   int _courierStars = 0;
 
   bool _submitted = false;
+  bool _submitting = false;
+  String? _error;
+
+  /// The workbook's ceiling is enforced by the form and the shared model
+  /// constants.
+  static const int maxPhotos = reviewPhotoLimit;
+  static const int maxCommentLength = reviewCommentLimit;
 
   @override
   void initState() {
@@ -99,7 +106,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       final review = existing.forOrderProduct(widget.order.id, product.id);
       _stars[product.id] = review?.stars ?? 0;
       _comments[product.id] = TextEditingController(text: review?.comment ?? '');
-      if (review?.photoPath != null) _photoPaths[product.id] = review!.photoPath!;
+      _photoPaths[product.id] = [...?review?.photos];
     }
 
     // Pre-fill the courier rating too, so re-opening a review to change a
@@ -138,35 +145,67 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     final reviews = context.read<ReviewState>();
     // Both read before the awaits below: BuildContext must not be used after
     // an async gap, and the courier score is written after the loop.
     final courier = context.read<CourierState>();
     final job = courier.jobForOrder(widget.order.id);
     final now = DateTime.now();
+
+    // Check every item before writing any: submitting three products and
+    // failing on the third would leave a half-edited order behind.
     for (final product in widget.products) {
-      await reviews.submit(
-        ProductReview(
-          productId: product.id,
-          orderId: widget.order.id,
-          stars: _stars[product.id]!,
-          comment: _comments[product.id]!.text.trim(),
-          photoPath: _photoPaths[product.id],
-          // Stamped once for the whole submission rather than per item, so
-          // the items in one review can't drift apart by a timestamp.
-          createdAt: now,
-        ),
-      );
+      final refusal =
+          reviews.editRefusal(widget.order.id, product.id, now: now);
+      if (refusal != null) {
+        setState(() => _error = refusal);
+        return;
+      }
     }
-    // The courier score rides along with the review rather than being its own
-    // screen: this is already the app's post-delivery moment, and a second
-    // "rate your rider" prompt a day later is the kind of thing people learn
-    // to dismiss.
-    if (_courierStars > 0 && job != null) {
-      courier.rateJob(job.id, _courierStars);
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      for (final product in widget.products) {
+        final paths = List<String>.unmodifiable(
+          _photoPaths[product.id] ?? const [],
+        );
+        await reviews.submit(
+          ProductReview(
+            productId: product.id,
+            orderId: widget.order.id,
+            stars: _stars[product.id]!,
+            comment: _comments[product.id]!.text.trim(),
+            photoPath: paths.isEmpty ? null : paths.first,
+            photoPaths: paths,
+            // Stamped once for the whole submission rather than per item, so
+            // the items in one review can't drift apart by a timestamp.
+            createdAt: now,
+          ),
+        );
+      }
+      // The courier score rides along with the review rather than being its own
+      // screen: this is already the app's post-delivery moment, and a second
+      // "rate your rider" prompt a day later is the kind of thing people learn
+      // to dismiss.
+      if (_courierStars > 0 && job != null) {
+        courier.rateJob(job.id, _courierStars);
+      }
+      if (!mounted) return;
+      setState(() => _submitted = true);
+    } on ReviewEditException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Your review could not be saved. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-    if (!mounted) return;
-    setState(() => _submitted = true);
   }
 
   @override
@@ -202,15 +241,16 @@ class _ReviewScreenState extends State<ReviewScreen> {
         for (var i = 0; i < widget.products.length; i++)
           _productForm(theme, widget.products[i], i),
         if (_canRateCourier) _courierForm(theme),
-        const SizedBox(height: 4),
-        ElevatedButton(
-          // Disabled rather than silently refusing on tap: the hint below
-          // says exactly what's missing, so the state is never a mystery.
-          onPressed: _canSubmit ? _submit : null,
-          child: const Text('Submit Review'),
-        ),
+        if (_error != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _error!,
+            key: const ValueKey('review-error'),
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+          ),
+        ],
         if (!_canSubmit) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           Center(
             child: Text(
               widget.products.length == 1
@@ -219,7 +259,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
               style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
           ),
+          const SizedBox(height: 10),
         ],
+        const SizedBox(height: 4),
+        ElevatedButton(
+          // Disabled rather than silently refusing on tap: the hint above
+          // says exactly what's missing, so the state is never a mystery.
+          onPressed: _canSubmit && !_submitting ? _submit : null,
+          child: Text(_submitting ? 'Submitting…' : 'Submit Review'),
+        ),
       ],
     );
   }
@@ -272,7 +320,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   Widget _productForm(ThemeData theme, Product product, int index) {
     final stars = _stars[product.id] ?? 0;
-    final photoPath = _photoPaths[product.id];
+    final photoPaths = _photoPaths[product.id] ?? const <String>[];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -335,14 +383,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
           TextField(
             controller: _comments[product.id],
             maxLines: 4,
-            maxLength: 400,
+            maxLength: maxCommentLength,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
               hintText: 'What should other buyers know? (optional)',
             ),
           ),
           const SizedBox(height: 4),
-          _photoBox(theme, product, photoPath),
+          _photoPicker(theme, product, photoPaths),
         ],
       ),
     );
@@ -351,71 +399,127 @@ class _ReviewScreenState extends State<ReviewScreen> {
   /// Attach a photo of what actually arrived — the same picker the courier's
   /// proof-of-delivery and the profile avatar already use, so this is one
   /// proven flow rather than a second one built beside it.
+  ///
+  /// The cap is checked before the picker opens, not after: asking someone to
+  /// take a sixth photo and then discarding it is worse than not offering the
+  /// button.
   Future<void> _attachPhoto(Product product) async {
+    final current = _photoPaths[product.id] ?? const <String>[];
+    if (current.length >= maxPhotos) return;
     final picked = await pickAndSaveImage(
       context,
       filenamePrefix: 'review_${product.id}',
     );
     if (picked == null || !mounted) return;
-    setState(() => _photoPaths[product.id] = picked.path);
+    setState(() {
+      _photoPaths.putIfAbsent(product.id, () => []).add(picked.path);
+    });
   }
 
-  Widget _photoBox(ThemeData theme, Product product, String? photoPath) {
-    final attached = photoPath != null;
-    return InkWell(
-      onTap: () => _attachPhoto(product),
-      borderRadius: editorialRadius(0, ShapeTier.accent),
-      child: Container(
-        height: 64,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceMuted,
-          borderRadius: editorialRadius(0, ShapeTier.accent),
-          border: Border.all(
-            color: attached ? AppColors.tertiary : AppColors.divider,
-            width: attached ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            if (attached) ...[
-              ClipRRect(
-                borderRadius: editorialRadius(0, ShapeTier.accent),
-                child: Image.file(
-                  File(photoPath),
-                  width: 64,
-                  height: 64,
-                  fit: BoxFit.cover,
-                  // The file is gone (cleared storage) — say so rather than
-                  // rendering a broken-image glyph.
-                  errorBuilder: (context, error, stack) => const SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: Icon(Icons.image_not_supported_outlined),
-                  ),
+  void _removePhoto(Product product, String path) {
+    setState(() {
+      _photoPaths[product.id]?.remove(path);
+    });
+  }
+
+  Widget _photoPicker(
+    ThemeData theme,
+    Product product,
+    List<String> photoPaths,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final path in photoPaths)
+          _photoThumb(theme, product, path),
+        if (photoPaths.length < maxPhotos)
+          Semantics(
+            button: true,
+            label:
+                'Add photo (${photoPaths.length} of $maxPhotos attached)',
+            child: InkWell(
+              key: ValueKey('review-photo-add-${product.id}'),
+              onTap: () => _attachPhoto(product),
+              borderRadius: editorialRadius(0, ShapeTier.accent),
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: editorialRadius(0, ShapeTier.accent),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo_outlined,
+                      color: AppColors.primaryDark.withValues(alpha: 0.55),
+                      size: 20,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${photoPaths.length}/$maxPhotos',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Photo attached', style: theme.textTheme.bodySmall),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _photoThumb(ThemeData theme, Product product, String path) {
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipRRect(
+            borderRadius: editorialRadius(0, ShapeTier.accent),
+            child: Image.file(
+              File(path),
+              width: 64,
+              height: 64,
+              fit: BoxFit.cover,
+              // The file is gone (cleared storage) — say so rather than
+              // rendering a broken-image glyph.
+              errorBuilder: (context, error, stack) => Container(
+                width: 64,
+                height: 64,
+                color: AppColors.surfaceMuted,
+                child: const Icon(Icons.image_not_supported_outlined),
               ),
-              Text('Change',
-                  style:
-                      theme.textTheme.labelMedium?.copyWith(color: AppColors.accent)),
-              const SizedBox(width: 12),
-            ] else ...[
-              const SizedBox(width: 12),
-              Icon(Icons.add_a_photo_outlined,
-                  color: AppColors.primaryDark.withValues(alpha: 0.55), size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text('Add a photo (optional)',
-                    style: theme.textTheme.bodySmall),
+            ),
+          ),
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Semantics(
+              button: true,
+              label: 'Remove photo',
+              child: InkWell(
+                onTap: () => _removePhoto(product, path),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: const Icon(Icons.close, size: 14),
+                ),
               ),
-              const SizedBox(width: 12),
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -477,7 +581,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
         const SizedBox(height: 8),
         Text(
-          'You can edit it from this order any time.',
+          'You can edit it once within 30 days.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),

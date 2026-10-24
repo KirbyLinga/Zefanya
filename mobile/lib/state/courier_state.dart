@@ -128,7 +128,7 @@ class CourierState extends ChangeNotifier {
   /// Only the *jobs* come from here — see courier_repository.dart for why the
   /// milestone machine, the payouts and the ratings deliberately stay local.
   CourierState({CourierRepository? repository})
-      : _repository = repository ?? const MockCourierRepository();
+    : _repository = repository ?? const MockCourierRepository();
 
   final CourierRepository _repository;
 
@@ -141,6 +141,12 @@ class CourierState extends ChangeNotifier {
 
   final Map<String, DeliveryMilestone> _milestones = {};
   final Map<String, DateTime> _completedAt = {};
+
+  /// Failed-delivery attempt count and reason, keyed by job id. In memory:
+  /// the server owns the durable copy, and the app only needs to keep the
+  /// tracker's own copy honest while the courier is on the screen.
+  final Map<String, int> _attempts = {};
+  final Map<String, String> _failureReasons = {};
 
   /// What each completed job actually paid, keyed by job id.
   ///
@@ -159,7 +165,8 @@ class CourierState extends ChangeNotifier {
   /// Jobs created by real checkouts, oldest first.
   final List<DeliveryJob> _dispatched = [];
 
-  static const _milestonesKey = 'courier_milestones'; // "jobId:milestoneName" per entry
+  static const _milestonesKey =
+      'courier_milestones'; // "jobId:milestoneName" per entry
   // "jobId|iso8601|payout" per entry. Deliberately pipe-delimited rather than
   // colon-delimited: an ISO timestamp contains colons of its own, and the
   // first version of this parsed with indexOf(':')/lastIndexOf(':'), which
@@ -167,7 +174,8 @@ class CourierState extends ChangeNotifier {
   // "02.123") as a payout. The pipe can't appear in either field.
   static const _completedKey = 'courier_completed';
   static const _ratingsKey = 'courier_ratings'; // "jobId|stars" per entry
-  static const _dispatchedKey = 'courier_dispatched'; // JSON list of dispatched jobs
+  static const _dispatchedKey =
+      'courier_dispatched'; // JSON list of dispatched jobs
 
   /// Seeded sample jobs use REQ-55xx numbers; dispatched ones start well
   /// clear of them so an id never collides.
@@ -181,26 +189,32 @@ class CourierState extends ChangeNotifier {
   /// (defaulting to "accepted" — i.e. assigned, not yet actioned).
   List<AssignedJob> get assignedJobs => allJobs
       .where((j) => !_completedAt.containsKey(j.id))
-      .map((j) => AssignedJob(j, _milestones[j.id] ?? DeliveryMilestone.accepted))
+      .map(
+        (j) => AssignedJob(j, _milestones[j.id] ?? DeliveryMilestone.accepted),
+      )
       .toList();
 
   /// "Items for Pickup" — assigned but not yet at the sorting center.
   List<AssignedJob> get jobsForPickup => assignedJobs
-      .where((a) =>
-          a.milestone == DeliveryMilestone.accepted ||
-          a.milestone == DeliveryMilestone.arrivedAtSeller ||
-          a.milestone == DeliveryMilestone.pickedUp ||
-          a.milestone == DeliveryMilestone.atSortingCenter ||
-          a.milestone == DeliveryMilestone.sorted)
+      .where(
+        (a) =>
+            a.milestone == DeliveryMilestone.accepted ||
+            a.milestone == DeliveryMilestone.arrivedAtSeller ||
+            a.milestone == DeliveryMilestone.pickedUp ||
+            a.milestone == DeliveryMilestone.atSortingCenter ||
+            a.milestone == DeliveryMilestone.sorted,
+      )
       .toList();
 
   /// "Items for Delivery" — sorted/assigned to rider, en route or failed.
   List<AssignedJob> get jobsForDelivery => assignedJobs
-      .where((a) =>
-          a.milestone == DeliveryMilestone.assignedToRider ||
-          a.milestone == DeliveryMilestone.inTransit ||
-          a.milestone == DeliveryMilestone.failedDelivery ||
-          a.milestone == DeliveryMilestone.returnToSender)
+      .where(
+        (a) =>
+            a.milestone == DeliveryMilestone.assignedToRider ||
+            a.milestone == DeliveryMilestone.inTransit ||
+            a.milestone == DeliveryMilestone.failedDelivery ||
+            a.milestone == DeliveryMilestone.returnToSender,
+      )
       .toList();
 
   /// Completed jobs, most recent first — this is what CourierProfitScreen
@@ -224,16 +238,24 @@ class CourierState extends ChangeNotifier {
   double get todayEarnings {
     final now = DateTime.now();
     return completedJobs
-        .where((c) => c.completedAt.year == now.year && c.completedAt.month == now.month && c.completedAt.day == now.day)
+        .where(
+          (c) =>
+              c.completedAt.year == now.year &&
+              c.completedAt.month == now.month &&
+              c.completedAt.day == now.day,
+        )
         .fold(0.0, (sum, c) => sum + c.payout);
   }
 
   double get weekEarnings {
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
-    return completedJobs.where((c) => c.completedAt.isAfter(weekAgo)).fold(0.0, (sum, c) => sum + c.payout);
+    return completedJobs
+        .where((c) => c.completedAt.isAfter(weekAgo))
+        .fold(0.0, (sum, c) => sum + c.payout);
   }
 
-  double get totalEarnings => completedJobs.fold(0.0, (sum, c) => sum + c.payout);
+  double get totalEarnings =>
+      completedJobs.fold(0.0, (sum, c) => sum + c.payout);
 
   /// The buyer's rating of this job's delivery, or null if they haven't rated
   /// it. Null is meaningful: an unrated delivery is not a zero-star one.
@@ -294,7 +316,14 @@ class CourierState extends ChangeNotifier {
     _save();
   }
 
-  DeliveryMilestone milestoneFor(String jobId) => _milestones[jobId] ?? DeliveryMilestone.accepted;
+  DeliveryMilestone milestoneFor(String jobId) =>
+      _milestones[jobId] ?? DeliveryMilestone.accepted;
+
+  /// Failed attempts recorded for this job, 0 before the first failure.
+  int attemptsFor(String jobId) => _attempts[jobId] ?? 0;
+
+  /// The reason chosen on the most recent failure, if any.
+  String? failureReasonFor(String jobId) => _failureReasons[jobId];
 
   DeliveryJob? jobById(String jobId) {
     final matches = allJobs.where((j) => j.id == jobId);
@@ -343,18 +372,20 @@ class CourierState extends ChangeNotifier {
       if (dispatchedRaw != null) {
         for (final entry in jsonDecode(dispatchedRaw) as List<dynamic>) {
           final m = entry as Map<String, dynamic>;
-          _dispatched.add(DeliveryJob(
-            id: m['id'] as String,
-            shopName: m['shopName'] as String,
-            pickupAddress: m['pickupAddress'] as String,
-            buyerName: m['buyerName'] as String,
-            deliveryArea: m['deliveryArea'] as String,
-            packageSize: m['packageSize'] as String,
-            fee: (m['fee'] as num).toDouble(),
-            orderId: m['orderId'] as String?,
-            courierName: m['courierName'] as String?,
-            courierPhotoPath: m['courierPhotoPath'] as String?,
-          ));
+          _dispatched.add(
+            DeliveryJob(
+              id: m['id'] as String,
+              shopName: m['shopName'] as String,
+              pickupAddress: m['pickupAddress'] as String,
+              buyerName: m['buyerName'] as String,
+              deliveryArea: m['deliveryArea'] as String,
+              packageSize: m['packageSize'] as String,
+              fee: (m['fee'] as num).toDouble(),
+              orderId: m['orderId'] as String?,
+              courierName: m['courierName'] as String?,
+              courierPhotoPath: m['courierPhotoPath'] as String?,
+            ),
+          );
         }
       }
 
@@ -402,11 +433,23 @@ class CourierState extends ChangeNotifier {
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_milestonesKey, _milestones.entries.map((e) => '${e.key}:${e.value.name}').toList());
-    await prefs.setStringList(_completedKey, _completedAt.entries
-        .map((e) => '${e.key}|${e.value.toIso8601String()}|${_payouts[e.key] ?? jobById(e.key)?.fee ?? 0}')
-        .toList());
-    await prefs.setStringList(_ratingsKey, _ratings.entries.map((e) => '${e.key}|${e.value}').toList());
+    await prefs.setStringList(
+      _milestonesKey,
+      _milestones.entries.map((e) => '${e.key}:${e.value.name}').toList(),
+    );
+    await prefs.setStringList(
+      _completedKey,
+      _completedAt.entries
+          .map(
+            (e) =>
+                '${e.key}|${e.value.toIso8601String()}|${_payouts[e.key] ?? jobById(e.key)?.fee ?? 0}',
+          )
+          .toList(),
+    );
+    await prefs.setStringList(
+      _ratingsKey,
+      _ratings.entries.map((e) => '${e.key}|${e.value}').toList(),
+    );
     await prefs.setString(
       _dispatchedKey,
       jsonEncode([
@@ -445,6 +488,19 @@ class CourierState extends ChangeNotifier {
 
   bool isCompleted(String jobId) => _completedAt.containsKey(jobId);
 
+  /// When [jobId] completed, or null while it is still assigned.
+  ///
+  /// The buyer's return window is measured from delivery, so `OrderState`
+  /// needs this timestamp; the map used to be private with `completedJobs` as
+  /// the only reader.
+  DateTime? completedAtFor(String jobId) => _completedAt[jobId];
+
+  /// The completion timestamp for the job carrying [orderId], if one exists.
+  DateTime? completedAtForOrder(String orderId) {
+    final job = jobForOrder(orderId);
+    return job == null ? null : _completedAt[job.id];
+  }
+
   /// Creates the delivery job for a freshly placed order, landing it on
   /// the courier's Pickup tab as "Assigned". Called from Checkout.
   ///
@@ -456,18 +512,30 @@ class CourierState extends ChangeNotifier {
     required String buyerName,
     required String deliveryArea,
     required double fee,
+    String? buyerPhone,
+    String? sellerPhone,
+    String? trackingNumber,
   }) {
     final sameShop = _assigned.where((j) => j.shopName == order.shopName);
-    _dispatched.add(DeliveryJob(
-      id: 'REQ-${_firstDispatchedNumber + _dispatched.length}',
-      shopName: order.shopName,
-      pickupAddress: sameShop.isEmpty ? 'Pickup address shared once the seller confirms' : sameShop.first.pickupAddress,
-      buyerName: buyerName,
-      deliveryArea: deliveryArea,
-      packageSize: 'Parcel',
-      fee: fee,
-      orderId: order.id,
-    ));
+    _dispatched.add(
+      DeliveryJob(
+        id: 'REQ-${_firstDispatchedNumber + _dispatched.length}',
+        shopName: order.shopName,
+        pickupAddress: sameShop.isEmpty
+            ? 'Pickup address shared once the seller confirms'
+            : sameShop.first.pickupAddress,
+        buyerName: buyerName,
+        deliveryArea: deliveryArea,
+        packageSize: 'Parcel',
+        fee: fee,
+        orderId: order.id,
+        buyerPhone: buyerPhone,
+        sellerPhone:
+            sellerPhone ??
+            (sameShop.isEmpty ? null : sameShop.first.sellerPhone),
+        trackingNumber: trackingNumber ?? order.id,
+      ),
+    );
     notifyListeners();
     _save();
   }
@@ -496,9 +564,22 @@ class CourierState extends ChangeNotifier {
     DeliveryMilestone next, {
     String? courierName,
     String? courierPhotoPath,
+    String? failureReason,
   }) {
-    _milestones[jobId] = next;
-    if (next == DeliveryMilestone.assignedToRider &&
+    var target = next;
+    if (next == DeliveryMilestone.failedDelivery) {
+      final attempt = attemptsFor(jobId) + 1;
+      _attempts[jobId] = attempt;
+      if (failureReason != null && failureReason.isNotEmpty) {
+        _failureReasons[jobId] = failureReason;
+      }
+      // Third failure ends the attempts: the parcel goes back to the
+      // seller. The server must enforce the same limit independently.
+      if (attempt >= 3) target = DeliveryMilestone.returnToSender;
+    }
+
+    _milestones[jobId] = target;
+    if (target == DeliveryMilestone.assignedToRider &&
         (courierName != null || courierPhotoPath != null)) {
       final i = _dispatched.indexWhere((j) => j.id == jobId);
       if (i >= 0) {
@@ -516,7 +597,7 @@ class CourierState extends ChangeNotifier {
     // Failure is swallowed: the buyer's tracker will read a stale milestone
     // until the next successful sync, which is acceptable — the courier's
     // own screen is always authoritative.
-    final serverValue = _milestoneToServerString(next);
+    final serverValue = _milestoneToServerString(target);
     if (serverValue != null) {
       _repository.advanceMilestone(jobId, serverValue).catchError((_) {});
     }
@@ -529,16 +610,16 @@ class CourierState extends ChangeNotifier {
   /// RETURNED once the courier completes it via [completeJob]).
   static String? _milestoneToServerString(DeliveryMilestone milestone) =>
       switch (milestone) {
-        DeliveryMilestone.accepted        => 'PLACED',
+        DeliveryMilestone.accepted => 'PLACED',
         DeliveryMilestone.arrivedAtSeller => 'CONFIRMED',
-        DeliveryMilestone.pickedUp        => 'PICKED_UP',
+        DeliveryMilestone.pickedUp => 'PICKED_UP',
         DeliveryMilestone.atSortingCenter => 'AT_SORTING_CENTER',
-        DeliveryMilestone.sorted          => 'SORTED',
+        DeliveryMilestone.sorted => 'SORTED',
         DeliveryMilestone.assignedToRider => 'ASSIGNED_TO_RIDER',
-        DeliveryMilestone.inTransit       => 'OUT_FOR_DELIVERY',
-        DeliveryMilestone.delivered       => 'DELIVERED',
-        DeliveryMilestone.failedDelivery  => 'DELIVERY_FAILED',
-        DeliveryMilestone.returnToSender  => 'RETURNED',
+        DeliveryMilestone.inTransit => 'OUT_FOR_DELIVERY',
+        DeliveryMilestone.delivered => 'DELIVERED',
+        DeliveryMilestone.failedDelivery => 'DELIVERY_FAILED',
+        DeliveryMilestone.returnToSender => 'RETURNED',
       };
 
   /// Called once a specific job is marked delivered — records when and

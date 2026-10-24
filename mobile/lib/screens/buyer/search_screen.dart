@@ -69,7 +69,8 @@ Future<List<String>> _pushHistory(String term) async {
   final history = List<String>.from(await _loadHistory());
   history.removeWhere((t) => t.toLowerCase() == trimmed.toLowerCase());
   history.insert(0, trimmed);
-  if (history.length > _kHistoryCap) history.removeRange(_kHistoryCap, history.length);
+  if (history.length > _kHistoryCap)
+    history.removeRange(_kHistoryCap, history.length);
 
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_kHistoryKey, jsonEncode(history));
@@ -95,6 +96,13 @@ Future<void> _clearHistory() async {
 // Screen
 // ---------------------------------------------------------------------------
 
+class _PriceRange {
+  const _PriceRange(this.min, this.max);
+
+  final double? min;
+  final double? max;
+}
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, this.focusRequests});
 
@@ -115,16 +123,26 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Extra client-side filters — all from data the catalogue already
   /// carries (price, rating). See utils/search_filter.dart.
+  double? _minPrice;
   double? _maxPrice;
   double _minRating = 0;
 
-  SearchFilter get _filter =>
-      SearchFilter(maxPrice: _maxPrice, minRating: _minRating);
+  SearchFilter get _filter => SearchFilter(
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
+        minRating: _minRating,
+      );
 
   static const _priceBounds = [300.0, 500.0, 1000.0];
   List<String> _history = const [];
 
-  static const _popularSearches = ['Linen', 'Ceramic', 'Tote Bag', 'Scarf', 'Home & Living'];
+  static const _popularSearches = [
+    'Linen',
+    'Ceramic',
+    'Tote Bag',
+    'Scarf',
+    'Home & Living',
+  ];
 
   @override
   void initState() {
@@ -164,17 +182,130 @@ class _SearchScreenState extends State<SearchScreen> {
   /// found" and the branch condition. Filtering happens separately in
   /// [_results] so a filter that hides everything can't also hide the
   /// chips that would clear it (the dead-end Claude caught).
-  List<Product> get _matches => sortProducts(
-      context.watch<CatalogState>().search(_query), _sort);
+  List<Product> get _matches =>
+      sortProducts(context.watch<CatalogState>().search(_query), _sort);
 
   /// The matches for what has been typed so far — sorted, then
   /// price/rating filtered, all client-side from catalogue data.
   List<Product> get _results => filterProducts(_matches, _filter);
 
   void _clearFilters() => setState(() {
-        _maxPrice = null;
-        _minRating = 0;
-      });
+    _minPrice = null;
+    _maxPrice = null;
+    _minRating = 0;
+  });
+
+  bool get _customPriceActive =>
+      _minPrice != null ||
+      (_maxPrice != null && !_priceBounds.contains(_maxPrice));
+
+  String get _customPriceLabel {
+    if (_minPrice == null && _maxPrice == null) return 'Price range';
+    if (_minPrice != null && _maxPrice != null) {
+      return '${formatPeso(_minPrice!)}–${formatPeso(_maxPrice!)}';
+    }
+    if (_minPrice != null) return 'From ${formatPeso(_minPrice!)}';
+    return 'Up to ${formatPeso(_maxPrice!)}';
+  }
+
+  Future<void> _openPriceRange() async {
+    final minController = TextEditingController(
+      text: _minPrice == null ? '' : _minPrice!.toStringAsFixed(0),
+    );
+    final maxController = TextEditingController(
+      text: _maxPrice == null ? '' : _maxPrice!.toStringAsFixed(0),
+    );
+    String? errorText;
+
+    final result = await showDialog<_PriceRange>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Price range'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const ValueKey('min-price'),
+                controller: minController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Minimum',
+                  prefixText: '₱ ',
+                  hintText: 'No minimum',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const ValueKey('max-price'),
+                controller: maxController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Maximum',
+                  prefixText: '₱ ',
+                  hintText: 'No maximum',
+                ),
+              ),
+              if (errorText != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  errorText!,
+                  style: TextStyle(
+                    color: Theme.of(dialogContext).colorScheme.error,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                minController.clear();
+                maxController.clear();
+                setDialogState(() => errorText = null);
+              },
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final error = priceRangeError(
+                  minController.text,
+                  maxController.text,
+                );
+                if (error != null) {
+                  setDialogState(() => errorText = error);
+                  return;
+                }
+                Navigator.of(dialogContext).pop(
+                  _PriceRange(
+                    parsePriceBound(minController.text),
+                    parsePriceBound(maxController.text),
+                  ),
+                );
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    minController.dispose();
+    maxController.dispose();
+    if (result == null || !mounted) return;
+    setState(() {
+      _minPrice = result.min;
+      _maxPrice = result.max;
+    });
+  }
 
   /// "Matches exist but filters hide them" — with the way out.
   Widget _buildFilterEmpty(ThemeData theme) {
@@ -254,37 +385,43 @@ class _SearchScreenState extends State<SearchScreen> {
                     ? Duration.zero
                     : const Duration(milliseconds: 220),
                 child: _query.isEmpty
-                    ? _buildSuggestions(theme, key: const ValueKey('search-suggestions'))
+                    ? _buildSuggestions(
+                        theme,
+                        key: const ValueKey('search-suggestions'),
+                      )
                     : _matches.isEmpty
-                        ? _buildNoResults(theme, key: const ValueKey('search-no-results'))
-                        : Column(
-                            key: const ValueKey('search-results'),
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                            _buildResultsHeader(),
-                            EaseInFrame(
-                              index: 0,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ProductSortChips(
-                                    sort: _sort,
-                                    onChanged: (sort) => setState(() => _sort = sort),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _buildFilterChips(),
-                                ],
-                              ),
+                    ? _buildNoResults(
+                        theme,
+                        key: const ValueKey('search-no-results'),
+                      )
+                    : Column(
+                        key: const ValueKey('search-results'),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildResultsHeader(),
+                          EaseInFrame(
+                            index: 0,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ProductSortChips(
+                                  sort: _sort,
+                                  onChanged: (sort) =>
+                                      setState(() => _sort = sort),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildFilterChips(),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            // Filters hid everything the query matched: say so
-                            // and offer the way out, instead of a dead end
-                            // with no visible way to clear.
-                            if (_results.isEmpty)
-                              _buildFilterEmpty(theme),
-                            Expanded(child: _buildResultsGrid(context)),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Filters hid everything the query matched: say so
+                          // and offer the way out, instead of a dead end
+                          // with no visible way to clear.
+                          if (_results.isEmpty) _buildFilterEmpty(theme),
+                          Expanded(child: _buildResultsGrid(context)),
+                        ],
+                      ),
               ),
             ),
           ],
@@ -321,7 +458,9 @@ class _SearchScreenState extends State<SearchScreen> {
                       onChanged: _search,
                       onSubmitted: _onSubmitted,
                       textInputAction: TextInputAction.search,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: const InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
@@ -332,7 +471,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   if (_query.isNotEmpty)
                     IconButton(
                       tooltip: 'Clear search',
-                      icon: Icon(Icons.close, size: 18, color: AppColors.primaryDark),
+                      icon: Icon(
+                        Icons.close,
+                        size: 18,
+                        color: AppColors.primaryDark,
+                      ),
                       onPressed: () {
                         _controller.clear();
                         _search('');
@@ -381,7 +524,11 @@ class _SearchScreenState extends State<SearchScreen> {
               for (final term in _history)
                 InputChip(
                   label: Text(term),
-                  avatar: Icon(Icons.history, size: 16, color: AppColors.textSecondary),
+                  avatar: Icon(
+                    Icons.history,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
                   onPressed: () => _applyTerm(term),
                   onDeleted: () => _removeItem(term),
                   deleteIconColor: AppColors.textSecondary,
@@ -398,22 +545,23 @@ class _SearchScreenState extends State<SearchScreen> {
         // swaps to results), so the row shows the authored order.
         Text('TRY LOOKING FOR', style: AppType.eyebrow),
         const SizedBox(height: 20),
-        TryLookingFor(
-          terms: _popularSearches,
-          query: '',
-          onSelect: _applyTerm,
-        ),
+        TryLookingFor(terms: _popularSearches, query: '', onSelect: _applyTerm),
       ],
     );
   }
 
   Widget _buildNoResults(ThemeData theme, {Key? key}) {
+    final suggestion = context.watch<CatalogState>().suggestSearch(_query);
     return Center(
       key: key,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ZefanyaMark(size: 46, color: AppColors.neutral.withValues(alpha: 0.4), strokeWidth: 4),
+          ZefanyaMark(
+            size: 46,
+            color: AppColors.neutral.withValues(alpha: 0.4),
+            strokeWidth: 4,
+          ),
           const SizedBox(height: 22),
           Text(Microcopy.searchEmptyEyebrow, style: AppType.eyebrow),
           const SizedBox(height: 10),
@@ -434,6 +582,15 @@ class _SearchScreenState extends State<SearchScreen> {
               textAlign: TextAlign.center,
             ),
           ),
+          if (suggestion != null) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              key: const ValueKey('search-suggestion'),
+              onPressed: () => _applyTerm(suggestion),
+              icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
+              label: Text('Did you mean “$suggestion”?'),
+            ),
+          ],
           // Tappable retries from the existing popular terms (same list
           // as the idle state) — a dead end that offers a way out.
           // Dim-only: authored order is kept (reordering here would
@@ -463,24 +620,33 @@ class _SearchScreenState extends State<SearchScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              avatar: const Icon(Icons.tune, size: 16),
+              label: Text(_customPriceLabel),
+              selected: _customPriceActive,
+              onSelected: (_) => _openPriceRange(),
+            ),
+          ),
           for (final bound in _priceBounds) ...[
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilterChip(
                 label: Text('Under ${formatPeso(bound)}'),
-                selected: _maxPrice == bound,
-                onSelected: (_) => setState(
-                  () => _maxPrice = _maxPrice == bound ? null : bound,
-                ),
+                selected: _minPrice == null && _maxPrice == bound,
+                onSelected: (_) => setState(() {
+                  _minPrice = null;
+                  _maxPrice = _maxPrice == bound ? null : bound;
+                }),
               ),
             ),
           ],
           FilterChip(
             label: const Text('4.5★ & up'),
             selected: _minRating >= 4.5,
-            onSelected: (_) => setState(
-              () => _minRating = _minRating >= 4.5 ? 0 : 4.5,
-            ),
+            onSelected: (_) =>
+                setState(() => _minRating = _minRating >= 4.5 ? 0 : 4.5),
           ),
         ],
       ),
@@ -512,34 +678,42 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildResultsGrid(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.68,
+    return RefreshIndicator(
+      color: AppColors.primaryDark,
+      onRefresh: () => context.read<CatalogState>().refresh(),
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        physics: const AlwaysScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 0.68,
+        ),
+        itemCount: _results.length,
+        itemBuilder: (context, i) {
+          final product = _results[i];
+          return EaseInFrame(
+            index: i.clamp(0, 5),
+            child: ProductCard(
+              product: product,
+              index: i,
+              heroTag: 'search-${product.id}',
+              onTap: () {
+                _onSubmitted(_query); // save to history when tapping a result
+                Navigator.of(context).push(
+                  AppPageRoute(
+                    builder: (_) => ProductDetailsScreen(
+                      product: product,
+                      heroTag: 'search-${product.id}',
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
       ),
-      itemCount: _results.length,
-      itemBuilder: (context, i) {
-        final product = _results[i];
-        return EaseInFrame(
-          index: i.clamp(0, 5),
-          child: ProductCard(
-            product: product,
-            index: i,
-            heroTag: 'search-${product.id}',
-            onTap: () {
-              _onSubmitted(_query); // save to history when tapping a result
-              Navigator.of(context).push(
-                AppPageRoute(
-                  builder: (_) => ProductDetailsScreen(product: product, heroTag: 'search-${product.id}'),
-                ),
-              );
-            },
-          ),
-        );
-      },
     );
   }
 }

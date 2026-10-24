@@ -36,6 +36,7 @@ Order orderFromJson(Map<String, Object?> json) {
     eta: _etaFor(status),
     itemSummary: _summary(json['items']),
     productIds: _productIds(json['product_ids']),
+    productQuantities: _productQuantities(json['items']),
   );
 }
 
@@ -102,6 +103,27 @@ List<String> _productIds(Object? value) {
     for (final id in value)
       if (id is String && id.isNotEmpty) id,
   ];
+}
+
+/// Units per product id, read from the same `items` array the summary uses.
+///
+/// `OrderResource` already sends `quantity` and `product_id` on each line, so
+/// purchase limits can use the server's own numbers instead of assuming one
+/// unit per id. A line whose product was removed has a null id and is skipped.
+Map<String, int> _productQuantities(Object? items) {
+  if (items is! List) return const {};
+
+  final quantities = <String, int>{};
+  for (final entry in items) {
+    if (entry is! Map) continue;
+    final id = _text(entry['product_id']);
+    if (id.isEmpty) continue;
+    final quantity = entry['quantity'];
+    final count = quantity is num ? quantity.toInt() : 0;
+    if (count <= 0) continue;
+    quantities.update(id, (value) => value + count, ifAbsent: () => count);
+  }
+  return quantities;
 }
 
 /// The same tolerant reader `remote_catalog.dart` carries, deliberately local

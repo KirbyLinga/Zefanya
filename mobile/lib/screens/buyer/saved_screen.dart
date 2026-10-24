@@ -25,6 +25,7 @@ import '../../widgets/heart_button.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/staggered_reveal.dart';
 import 'product_details_screen.dart';
+import 'seller_screen.dart';
 import 'widgets/product_card.dart';
 
 class SavedScreen extends StatelessWidget {
@@ -51,32 +52,50 @@ class SavedScreen extends StatelessWidget {
               child: Consumer<WishlistState>(
                 builder: (context, wishlist, _) {
                   final products = wishlist.items;
-                  if (products.isEmpty) return _buildEmpty(context, theme);
+                  final followed = wishlist.followedSellers;
+                  if (products.isEmpty && followed.isEmpty) {
+                    return _buildEmpty(context, theme);
+                  }
 
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.68,
-                    ),
-                    itemCount: products.length,
-                    itemBuilder: (context, i) {
-                      final product = products[i];
-                      return StaggeredReveal(
-                        index: i,
-                        child: _SavedCard(
-                          product: product,
-                          index: i,
-                          onTap: () => Navigator.of(context).push(
-                            AppPageRoute(
-                              builder: (_) => ProductDetailsScreen(product: product),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (followed.isNotEmpty)
+                        _FollowingStrip(sellers: followed),
+                      Expanded(
+                        child: products.isEmpty
+                            ? _buildEmpty(context, theme)
+                            : GridView.builder(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 0.68,
+                                ),
+                                itemCount: products.length,
+                                itemBuilder: (context, i) {
+                                  final product = products[i];
+                                  return StaggeredReveal(
+                                    index: i,
+                                    child: _SavedCard(
+                                      product: product,
+                                      index: i,
+                                      onTap: () => Navigator.of(context).push(
+                                        AppPageRoute(
+                                          builder: (_) => ProductDetailsScreen(
+                                            product: product,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -99,6 +118,85 @@ class SavedScreen extends StatelessWidget {
     );
   }
 }
+
+/// The shops this buyer follows, above the saved products.
+///
+/// It lives here rather than in a separate "Following" tab because following a
+/// store and saving a piece are both shortlists; splitting them would mean the
+/// buyer has to remember which pile a shop is in. The count is explicit so
+/// "did the follow save?" does not depend on counting tiles.
+class _FollowingStrip extends StatelessWidget {
+  const _FollowingStrip({required this.sellers});
+
+  final List<String> sellers;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'STORES YOU FOLLOW · ${sellers.length}',
+            style: AppType.eyebrow,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 58,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: sellers.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final seller = sellers[i];
+                return InkWell(
+                  borderRadius: editorialRadius(i, ShapeTier.accent),
+                  onTap: () => Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) => SellerScreen(sellerName: seller),
+                    ),
+                  ),
+                  child: Container(
+                    width: 190,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: editorialRadius(i, ShapeTier.accent),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.storefront_outlined,
+                          size: 20,
+                          color: AppColors.primaryDark,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            seller,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge,
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, size: 18),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 /// ProductCard wrapper that always shows the heart — on a Saved screen
 /// every tile is hearted, so the heart is an affordance to unsave rather

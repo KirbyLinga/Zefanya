@@ -25,10 +25,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/pricing.dart';
 import '../../state/cart_state.dart';
 import '../../data/mock_data.dart' show Voucher;
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
@@ -85,7 +87,14 @@ class _VoucherTile extends StatelessWidget {
     AppColors.watch(context);
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
-    final isPercent = voucher.discountRate > 0;
+    final cart = context.watch<CartState>();
+    final claimed = cart.isClaimed(voucher.code);
+    final unavailable = isVoucherExpired(voucher) ||
+        isVoucherNotStarted(voucher) ||
+        isVoucherUsageExhausted(
+          voucher,
+          buyerUses: cart.buyerUsesFor(voucher.code),
+        );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -99,7 +108,7 @@ class _VoucherTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _Stub(voucher: voucher, isPercent: isPercent),
+                _Stub(voucher: voucher),
                 // The seam sits ON the perforation line, between the two
                 // punched holes.
                 const SizedBox(width: 1, child: _DashedSeam()),
@@ -111,6 +120,11 @@ class _VoucherTile extends StatelessWidget {
                       children: [
                         Text(voucher.title, style: theme.textTheme.titleSmall),
                         const SizedBox(height: 3),
+                        Text(voucher.scopeLabel, style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w600,
+                        )),
+                        const SizedBox(height: 2),
                         Text(voucher.discountLabel, style: theme.textTheme.bodySmall),
                         const SizedBox(height: 8),
                         Text(
@@ -156,12 +170,49 @@ class _VoucherTile extends StatelessWidget {
                               ),
                             ),
                             const Spacer(),
-                            ElevatedButton(
-                              onPressed: () => Navigator.of(context).pop(voucher.code),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            if (claimed && !unavailable) ...[
+                              OutlinedButton(
+                                key: ValueKey('use-${voucher.code}'),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(voucher.code),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: const Text('Use'),
                               ),
-                              child: const Text('Use'),
+                              const SizedBox(width: 8),
+                            ],
+                            ElevatedButton(
+                              key: ValueKey('claim-${voucher.code}'),
+                              onPressed: claimed || unavailable
+                                  ? null
+                                  : () async {
+                                      final error = await context
+                                          .read<CartState>()
+                                          .claimVoucher(voucher.code);
+                                      if (!context.mounted) return;
+                                      showTimedSnackBar(
+                                        context,
+                                        SnackBar(
+                                          content: Text(
+                                            error ??
+                                                'Voucher "${voucher.code}" claimed.',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 8,
+                                ),
+                              ),
+                              child: Text(
+                                claimed ? 'Claimed' : 'Claim',
+                              ),
                             ),
                           ],
                         ),
@@ -182,17 +233,17 @@ class _VoucherTile extends StatelessWidget {
 /// so it gets display scale and the words around it shrink to eyebrow —
 /// the same big/tiny pairing the rest of the app uses.
 class _Stub extends StatelessWidget {
-  const _Stub({required this.voucher, required this.isPercent});
+  const _Stub({required this.voucher});
 
   final Voucher voucher;
-  final bool isPercent;
 
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
+    final isPercent = voucher.isPercentage;
     final value = isPercent
         ? '${(voucher.discountRate * 100).round()}'
-        : formatPeso(voucher.maxDiscount).replaceFirst('₱', '').trim();
+        : formatPeso(voucher.flatValue).replaceFirst('₱', '').trim();
 
     return Container(
       width: _stubWidth,
@@ -237,7 +288,7 @@ class _Stub extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'OFF',
+            voucher.isShipping ? 'SHIP' : 'OFF',
             style: AppType.eyebrow.copyWith(color: AppColors.secondary),
           ),
         ],

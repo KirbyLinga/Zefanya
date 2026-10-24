@@ -37,6 +37,7 @@ import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../state/recently_viewed_state.dart';
+import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../utils/money_format.dart';
@@ -48,6 +49,7 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/theme_toggle.dart';
+import '../buyer/address_book_screen.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
 /// name/email/phone/address from the shared AuthState and edits them
@@ -102,9 +104,29 @@ class ProfileScreen extends StatelessWidget {
                     rows: [
                       _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
                       _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
-                      _LedgerRow(Icons.location_on_outlined, 'Address', auth.addressSummary),
+                      _LedgerRow(
+                        Icons.location_on_outlined,
+                        'Address',
+                        auth.defaultAddress?.summary ?? auth.addressSummary,
+                      ),
                     ],
                   ),
+                  if (!isCourier) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('manage-addresses'),
+                        onPressed: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => const AddressBookScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.location_city_outlined, size: 18),
+                        label: const Text('Manage Addresses'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -397,6 +419,7 @@ class _StatStrip extends StatelessWidget {
     final String primaryLabel;
     final String secondValue;
     final String secondLabel;
+    String? followingCount;
 
     if (isCourier) {
       final courier = context.watch<CourierState>();
@@ -406,10 +429,12 @@ class _StatStrip extends StatelessWidget {
       secondLabel = 'EARNED';
     } else {
       final viewed = context.watch<RecentlyViewedState>().items.length;
+      final following = context.watch<WishlistState>().followedSellers.length;
       primaryValue = '${context.watch<OrderState>().orders.length}';
       primaryLabel = 'ORDERS PLACED';
       secondValue = '$viewed';
       secondLabel = 'PIECES VIEWED';
+      followingCount = '$following';
     }
 
     return Row(
@@ -434,6 +459,10 @@ class _StatStrip extends StatelessWidget {
                 _stat(secondLabel, secondValue, 20),
                 const SizedBox(height: 12),
                 _stat('MEMBER SINCE', _memberSinceLabel(auth.memberSince), 20),
+                if (followingCount != null) ...[
+                  const SizedBox(height: 12),
+                  _stat('FOLLOWING', followingCount, 20),
+                ],
               ],
             ),
           ),

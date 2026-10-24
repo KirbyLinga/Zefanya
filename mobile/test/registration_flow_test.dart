@@ -117,18 +117,18 @@ class _ScriptedAuthRepository implements AuthRepository {
 }
 
 RegistrationProfile _buyerProfile() => RegistrationProfile(
-      lastName: 'Dela Cruz',
-      firstName: 'Juan',
-      middleInitial: 'D',
-      sex: 'Male',
-      phone: '09171234567',
-      birthday: DateTime(1998, 4, 7),
-      province: 'Cebu',
-      municipality: 'Cebu City',
-      barangay: 'Lahug',
-      street: '12 Mabini Street',
-      govIdPath: '/data/user/0/ph.zefanya/files/gov_id_01.jpg',
-    );
+  lastName: 'Dela Cruz',
+  firstName: 'Juan',
+  middleInitial: 'D',
+  sex: 'Male',
+  phone: '09171234567',
+  birthday: DateTime(1998, 4, 7),
+  province: 'Cebu',
+  municipality: 'Cebu City',
+  barangay: 'Lahug',
+  street: '12 Mabini Street',
+  govIdPath: '/data/user/0/ph.zefanya/files/gov_id_01.jpg',
+);
 
 /// Wraps [child] in the providers and theme the auth screens read, at a phone
 /// size — the stepped form's step band has to fit a real width, not the test
@@ -211,8 +211,11 @@ Future<void> _reachCredentialsStep(WidgetTester tester) async {
   await _completePersonalStep(tester);
   await tester.tap(find.text('Continue'));
   await tester.pumpAndSettle();
-  expect(find.text('STEP 2 · SET A PASSWORD'), findsOneWidget,
-      reason: 'the password step should be the second one');
+  expect(
+    find.text('STEP 2 · SET A PASSWORD'),
+    findsOneWidget,
+    reason: 'the password step should be the second one',
+  );
 }
 
 /// The two hints, named once — they are how the tests find the fields.
@@ -244,8 +247,10 @@ void main() {
       // The refusal is specific and it sits next to the field that caused it,
       // which is the entire reason this form was stepped rather than left as one
       // long scroll with a generic toast at the end.
-      expect(find.text('Use at least $kMinPasswordLength characters'),
-          findsOneWidget);
+      expect(
+        find.text('Use at least $kMinPasswordLength characters'),
+        findsOneWidget,
+      );
       // The weight of this test is *here*: the step did not advance. Asserting
       // "the repository was not asked" would prove nothing on its own, because
       // Submit is unreachable in a widget test — see the file header.
@@ -263,8 +268,8 @@ void main() {
       );
       await _reachCredentialsStep(tester);
 
-      await _enterField(tester, hint: _passwordHint, value: 'longenough1');
-      await _enterField(tester, hint: _confirmHint, value: 'longenough2');
+      await _enterField(tester, hint: _passwordHint, value: 'Longenough1!');
+      await _enterField(tester, hint: _confirmHint, value: 'Longenough2!');
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
@@ -287,8 +292,10 @@ void main() {
       );
       await _reachCredentialsStep(tester);
 
-      await _enterField(tester, hint: _passwordHint, value: 'longenough1');
-      await _enterField(tester, hint: _confirmHint, value: 'longenough1');
+      await _enterField(tester, hint: _passwordHint, value: 'Longenough1!');
+      await _enterField(tester, hint: _confirmHint, value: 'Longenough1!');
+      await tester.tap(find.byKey(const ValueKey('registration-terms')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
@@ -302,22 +309,35 @@ void main() {
   });
 
   group('the step list', () {
-    testWidgets('a Courier gets five steps, with the password step named in the '
-        'progress row', (tester) async {
-      await _pump(
-        tester,
-        const RegistrationScreen(initialRole: UserRole.courier),
-        auth: AuthState(repository: _ScriptedAuthRepository()),
-      );
+    testWidgets(
+      'a Courier gets five steps, with the password step named in the '
+      'progress row',
+      (tester) async {
+        await _pump(
+          tester,
+          const RegistrationScreen(initialRole: UserRole.courier),
+          auth: AuthState(repository: _ScriptedAuthRepository()),
+        );
 
-      // All of these are in the progress row on step one, which is the point:
-      // the row is derived from the same list the pages are, so a step that
-      // exists in one and not the other is not representable.
-      for (final label in ['Personal', 'Account', 'Address', 'Vehicle', 'Documents']) {
-        expect(find.text(label), findsOneWidget, reason: 'missing node "$label"');
-      }
-      expect(find.text('STEP 1 · ABOUT YOU'), findsOneWidget);
-    });
+        // All of these are in the progress row on step one, which is the point:
+        // the row is derived from the same list the pages are, so a step that
+        // exists in one and not the other is not representable.
+        for (final label in [
+          'Personal',
+          'Account',
+          'Address',
+          'Vehicle',
+          'Documents',
+        ]) {
+          expect(
+            find.text(label),
+            findsOneWidget,
+            reason: 'missing node "$label"',
+          );
+        }
+        expect(find.text('STEP 1 · ABOUT YOU'), findsOneWidget);
+      },
+    );
   });
 
   group('submitForApproval', () {
@@ -348,39 +368,44 @@ void main() {
       expect(auth.isLoggedIn, isFalse);
     });
 
-    test('mock mode registers exactly as it always did, profile and all',
-        () async {
-      final auth = AuthState(); // MockAuthRepository
+    test(
+      'mock mode registers exactly as it always did, profile and all',
+      () async {
+        final auth = AuthState(); // MockAuthRepository
 
-      await auth.submitForApproval(
-        role: UserRole.buyer,
-        email: 'tristan@example.ph',
-        password: 'anything1',
-        name: 'Tristan Araneta',
-        profile: _buyerProfile(),
-      );
-      // The screen's second call, in the order the screen makes it. This pair is
-      // what "registration submitted" means to the rest of the app, so if the
-      // repository work had changed either half, an upgrade would notice.
-      auth.updateProfile(
-        lastName: 'Araneta',
-        firstName: 'Tristan',
-        middleInitial: 'D',
-        sex: 'Male',
-        phone: '09171234567',
-        province: 'Cebu',
-        municipality: 'Cebu City',
-        barangay: 'Lahug',
-        street: '12 Mabini Street',
-      );
+        await auth.submitForApproval(
+          role: UserRole.buyer,
+          email: 'tristan@example.ph',
+          password: 'anything1',
+          name: 'Tristan Araneta',
+          profile: _buyerProfile(),
+        );
+        // The screen's second call, in the order the screen makes it. This pair is
+        // what "registration submitted" means to the rest of the app, so if the
+        // repository work had changed either half, an upgrade would notice.
+        auth.updateProfile(
+          lastName: 'Araneta',
+          firstName: 'Tristan',
+          middleInitial: 'D',
+          sex: 'Male',
+          phone: '09171234567',
+          province: 'Cebu',
+          municipality: 'Cebu City',
+          barangay: 'Lahug',
+          street: '12 Mabini Street',
+        );
 
-      expect(auth.status, AccountStatus.pendingApproval);
-      expect(auth.registrationStatus, RemoteRegistrationStatus.pendingApproval);
-      expect(auth.email, 'tristan@example.ph');
-      expect(auth.name, 'Tristan D. Araneta');
-      expect(auth.memberSince, isNotNull);
-      expect(auth.addressSummary, '12 Mabini Street, Lahug, Cebu City, Cebu');
-    });
+        expect(auth.status, AccountStatus.pendingApproval);
+        expect(
+          auth.registrationStatus,
+          RemoteRegistrationStatus.pendingApproval,
+        );
+        expect(auth.email, 'tristan@example.ph');
+        expect(auth.name, 'Tristan D. Araneta');
+        expect(auth.memberSince, isNotNull);
+        expect(auth.addressSummary, '12 Mabini Street, Lahug, Cebu City, Cebu');
+      },
+    );
 
     test('the pending gate survives a cold start, as the same gate', () async {
       final repository = _ScriptedAuthRepository(
@@ -399,8 +424,10 @@ void main() {
       await restarted.load();
 
       expect(restarted.status, AccountStatus.pendingApproval);
-      expect(restarted.registrationStatus,
-          RemoteRegistrationStatus.pendingVerification);
+      expect(
+        restarted.registrationStatus,
+        RemoteRegistrationStatus.pendingVerification,
+      );
       // Persisting the *gate* rather than just "pending" is the point: without
       // it, a restart would tell someone who hasn't confirmed their email to
       // wait for a reviewer.

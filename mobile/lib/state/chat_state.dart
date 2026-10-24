@@ -14,21 +14,42 @@
 
 import 'package:flutter/foundation.dart';
 import '../data/repositories/chat_repository.dart';
+import '../utils/chat_validation.dart';
 
 class ChatMessage {
-  const ChatMessage({required this.text, required this.isMe, required this.time});
+  const ChatMessage({
+    required this.text,
+    required this.isMe,
+    required this.time,
+    this.attachment,
+  });
 
   final String text;
   final bool isMe;
   final String time;
 
-  Map<String, dynamic> toJson() => {'text': text, 'isMe': isMe, 'time': time};
+  /// A locally chosen file, if this message carries one. Null on every old
+  /// saved message, which is why the JSON reader stays null-safe.
+  final ChatAttachment? attachment;
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
-        text: json['text'] as String,
-        isMe: json['isMe'] as bool,
-        time: json['time'] as String,
-      );
+  Map<String, dynamic> toJson() => {
+    'text': text,
+    'isMe': isMe,
+    'time': time,
+    if (attachment != null) 'attachment': attachment!.toJson(),
+  };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final rawAttachment = json['attachment'];
+    return ChatMessage(
+      text: json['text'] as String? ?? '',
+      isMe: json['isMe'] as bool? ?? false,
+      time: json['time'] as String? ?? '',
+      attachment: rawAttachment is Map<String, dynamic>
+          ? ChatAttachment.fromJson(rawAttachment)
+          : null,
+    );
+  }
 }
 
 class ChatState extends ChangeNotifier {

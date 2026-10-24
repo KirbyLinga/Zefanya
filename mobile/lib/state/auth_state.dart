@@ -44,16 +44,21 @@
 // changes Edit Profile's behaviour. See auth_repository.dart for the same
 // boundary stated from the other side.
 
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/dev_flags.dart';
+import '../data/address_entry.dart';
 import '../data/dto/registration_payload.dart';
 // Prefixed because this class has a getter of the same name
 // (`awaitsEmailVerification`); the two are the same decision, and the prefix is
 // what keeps the getter delegating to the helper instead of shadowing it.
 import '../data/dto/remote_status.dart' as remote;
+import '../data/ph_regions.dart';
 import '../data/repositories/auth_repository.dart';
 import '../utils/order_tab_memory.dart';
+import '../utils/validators.dart';
 
 enum UserRole { buyer, courier }
 
@@ -75,7 +80,7 @@ class AuthState extends ChangeNotifier {
   /// (and tests) keep working unchanged; `main.dart` passes the resolved
   /// bundle's, which is what makes the live switch possible.
   AuthState({AuthRepository? repository})
-      : _repository = repository ?? const MockAuthRepository();
+    : _repository = repository ?? const MockAuthRepository();
 
   final AuthRepository _repository;
 
@@ -104,6 +109,16 @@ class AuthState extends ChangeNotifier {
   /// not, because there would be nothing to address the code *to*.
   String? verificationId;
 
+  /// When the current email code was last sent, for the OTP screen's
+  /// expiry countdown. Persisted with the rest of the pending session so
+  /// switching to the mail app and back (or a cold start) does not reset
+  /// the clock to five minutes.
+  ///
+  /// The server still decides whether a code is valid; this is the app's
+  /// copy of the lifetime it tells the buyer, not a replacement for the
+  /// server's expiry check.
+  DateTime? otpSentAt;
+
   String? lastName;
   String? firstName;
   String? middleInitial;
@@ -125,6 +140,13 @@ class AuthState extends ChangeNotifier {
   List<String> recentAddresses = const [];
   static const int recentAddressesCap = 3;
 
+  /// Structured saved addresses. Unlike [recentAddresses] these have a
+  /// recipient, their own phone number and a default marker, so checkout can
+  /// name the person receiving the parcel rather than the account holder every
+  /// time. Persisted with the rest of the profile.
+  List<AddressEntry> addresses = const [];
+  static const int addressBookLimit = 10;
+
   /// When this account first entered the app (login or registration
   /// submit, whichever came first). Set once and never overwritten —
   /// Profile reads it for the "member since" stat. Cleared on logout
@@ -143,6 +165,7 @@ class AuthState extends ChangeNotifier {
   // screen has no value here, `load()` reads that as null, and null means "no
   // registration to confirm" — which is what that build was already showing.
   static const _verificationIdKey = 'auth_verification_id';
+  static const _otpSentAtKey = 'auth_otp_sent_at';
   static const _lastNameKey = 'auth_last_name';
   static const _firstNameKey = 'auth_first_name';
   static const _middleInitialKey = 'auth_middle_initial';
@@ -155,6 +178,7 @@ class AuthState extends ChangeNotifier {
   static const _barangayKey = 'auth_barangay';
   static const _streetKey = 'auth_street';
   static const _recentAddressesKey = 'auth_recent_addresses';
+  static const _addressesKey = 'auth_addresses';
   static const _avatarPathKey = 'auth_avatar_path';
   static const _memberSinceKey = 'auth_member_since';
 
@@ -190,8 +214,24 @@ class AuthState extends ChangeNotifier {
 
   /// One-line summary for display — empty if nothing's been filled in yet.
   String get addressSummary {
-    final parts = [street, barangay, municipality, province].where((p) => p != null && p.isNotEmpty);
+    final parts = [
+      street,
+      barangay,
+      municipality,
+      province,
+    ].where((p) => p != null && p.isNotEmpty);
     return parts.join(', ');
+  }
+
+  /// The address checkout pre-selects. Falls back to the first saved row when
+  /// an older/corrupt prefs payload has no default marker, so the book never
+  /// renders without an answer while it is non-empty.
+  AddressEntry? get defaultAddress {
+    if (addresses.isEmpty) return null;
+    for (final address in addresses) {
+      if (address.isDefault) return address;
+    }
+    return addresses.first;
   }
 
   /// PH naming convention: "First MI. Last". Falls back to whatever
@@ -200,7 +240,11 @@ class AuthState extends ChangeNotifier {
   String? _composeName() {
     if (firstName == null && lastName == null) return name;
     final mi = (middleInitial ?? '').trim();
-    return [firstName, if (mi.isNotEmpty) '$mi.', lastName].where((p) => p != null && p.isNotEmpty).join(' ');
+    return [
+      firstName,
+      if (mi.isNotEmpty) '$mi.',
+      lastName,
+    ].where((p) => p != null && p.isNotEmpty).join(' ');
   }
 
   /// Call once before runApp (see main.dart) to restore the last
@@ -211,7 +255,9 @@ class AuthState extends ChangeNotifier {
       final roleStr = prefs.getString(_roleKey);
       final statusStr = prefs.getString(_statusKey);
       role = roleStr == null ? null : UserRole.values.byName(roleStr);
-      status = statusStr == null ? AccountStatus.loggedOut : AccountStatus.values.byName(statusStr);
+      status = statusStr == null
+          ? AccountStatus.loggedOut
+          : AccountStatus.values.byName(statusStr);
       // Read through the DTO's forgiving parser rather than `values.byName`,
       // because this one is the *server's* own string: a build meeting a status
       // it has never heard of should render "unrecognised" rather than throw on
@@ -222,6 +268,8 @@ class AuthState extends ChangeNotifier {
           ? null
           : remote.RemoteRegistrationStatus.parse(registrationRaw);
       verificationId = prefs.getString(_verificationIdKey);
+      final otpSentAtRaw = prefs.getString(_otpSentAtKey);
+      otpSentAt = otpSentAtRaw == null ? null : DateTime.tryParse(otpSentAtRaw);
       lastName = prefs.getString(_lastNameKey);
       firstName = prefs.getString(_firstNameKey);
       middleInitial = prefs.getString(_middleInitialKey);
@@ -235,9 +283,13 @@ class AuthState extends ChangeNotifier {
       street = prefs.getString(_streetKey);
       final recentRaw = prefs.getStringList(_recentAddressesKey);
       recentAddresses = recentRaw == null ? const [] : List.of(recentRaw);
+      final addressesRaw = prefs.getString(_addressesKey);
+      addresses = _decodeAddresses(addressesRaw);
       avatarPath = prefs.getString(_avatarPathKey);
       final memberSinceRaw = prefs.getString(_memberSinceKey);
-      memberSince = memberSinceRaw == null ? null : DateTime.tryParse(memberSinceRaw);
+      memberSince = memberSinceRaw == null
+          ? null
+          : DateTime.tryParse(memberSinceRaw);
     } catch (_) {
       // Corrupt/old prefs shape — fall back to logged-out rather than crash.
       role = null;
@@ -245,8 +297,40 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  Future<void> _setOrRemove(SharedPreferences prefs, String key, String? value) async {
-    value == null || value.isEmpty ? await prefs.remove(key) : await prefs.setString(key, value);
+  List<AddressEntry> _decodeAddresses(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      final entries = <AddressEntry>[];
+      for (final row in decoded) {
+        if (row is! Map) continue;
+        final entry = AddressEntry.fromJson(
+          row.map((key, value) => MapEntry(key.toString(), value)),
+        );
+        if (entry != null) entries.add(entry);
+      }
+      if (entries.isNotEmpty && !entries.any((a) => a.isDefault)) {
+        entries[0] = entries[0].copyWith(isDefault: true);
+      }
+      if (entries.length > addressBookLimit) {
+        return entries.sublist(0, addressBookLimit);
+      }
+      return entries;
+    } catch (_) {
+      // A malformed book costs the book, not the whole signed-in profile.
+      return const [];
+    }
+  }
+
+  Future<void> _setOrRemove(
+    SharedPreferences prefs,
+    String key,
+    String? value,
+  ) async {
+    value == null || value.isEmpty
+        ? await prefs.remove(key)
+        : await prefs.setString(key, value);
   }
 
   Future<void> _save() async {
@@ -256,8 +340,11 @@ class AuthState extends ChangeNotifier {
     // disk is what the server said and a later reorganisation of the enum
     // cannot turn a saved session into an unreadable one.
     await _setOrRemove(prefs, _registrationStatusKey, registrationStatus?.wire);
-    role == null ? await prefs.remove(_roleKey) : await prefs.setString(_roleKey, role!.name);
+    role == null
+        ? await prefs.remove(_roleKey)
+        : await prefs.setString(_roleKey, role!.name);
     await _setOrRemove(prefs, _verificationIdKey, verificationId);
+    await _setOrRemove(prefs, _otpSentAtKey, otpSentAt?.toIso8601String());
     await _setOrRemove(prefs, _lastNameKey, lastName);
     await _setOrRemove(prefs, _firstNameKey, firstName);
     await _setOrRemove(prefs, _middleInitialKey, middleInitial);
@@ -273,6 +360,13 @@ class AuthState extends ChangeNotifier {
     recent.isEmpty
         ? await prefs.remove(_recentAddressesKey)
         : await prefs.setStringList(_recentAddressesKey, recent);
+    final savedAddresses = addresses;
+    savedAddresses.isEmpty
+        ? await prefs.remove(_addressesKey)
+        : await prefs.setString(
+            _addressesKey,
+            jsonEncode([for (final address in savedAddresses) address.toJson()]),
+          );
     await _setOrRemove(prefs, _avatarPathKey, avatarPath);
     await _setOrRemove(prefs, _memberSinceKey, memberSince?.toIso8601String());
   }
@@ -372,6 +466,9 @@ class AuthState extends ChangeNotifier {
     if (id == null || currentRole == null) return;
 
     await _repository.resendOtp(role: currentRole, verificationId: id);
+    otpSentAt = DateTime.now();
+    notifyListeners();
+    await _save();
   }
 
   /// Takes the repository's answer as the session, keeping whatever name the
@@ -390,6 +487,11 @@ class AuthState extends ChangeNotifier {
     // nothing left to confirm), so the id clears itself the moment the email gate
     // closes. Nothing has to remember to tidy it up.
     verificationId = result.verificationId;
+    // A fresh pending-verification answer means a fresh code. A confirmed
+    // answer carries no handle, so the timestamp clears with it.
+    otpSentAt = result.verificationId != null && awaitsEmailVerification
+        ? DateTime.now()
+        : null;
     name = result.name ?? fallbackName ?? name;
     email = result.email ?? email;
     memberSince ??= DateTime.now();
@@ -465,6 +567,7 @@ class AuthState extends ChangeNotifier {
     if (status != AccountStatus.pendingApproval || role == null) return;
     registrationStatus = remote.RemoteRegistrationStatus.pendingVerification;
     verificationId = kMockVerificationId;
+    otpSentAt = DateTime.now();
     notifyListeners();
     _save();
   }
@@ -518,6 +621,162 @@ class AuthState extends ChangeNotifier {
     _save();
   }
 
+  /// Seeds the book from the profile address the first time the address book is
+  /// opened for an account made before the book existed. This is why a buyer
+  /// who never adds anything still has one default and checkout keeps working.
+  ///
+  /// The seeded phone is not re-validated here: it came from the profile, and
+  /// dropping the only address because an old profile number is in a format the
+  /// new form would reject is worse than showing it so the buyer can correct it.
+  void ensureAddressBookSeeded() {
+    if (addresses.isNotEmpty || addressSummary.trim().isEmpty) return;
+    final seeded = AddressEntry(
+      id: 'ADDR-1',
+      recipient: (name ?? '').trim().isEmpty ? 'Buyer' : name!.trim(),
+      phone: (phone ?? '').trim(),
+      region: regionForProvince(province),
+      city: (municipality ?? '').trim(),
+      barangay: (barangay ?? '').trim(),
+      street: (street ?? '').trim(),
+      isDefault: true,
+    );
+    addresses = [seeded];
+    notifyListeners();
+    _save();
+  }
+
+  /// Adds [draft], assigning it the next stable `ADDR-n` id. Returns a
+  /// user-facing error, or null on success.
+  ///
+  /// The first address is always the default; later ones default only when the
+  /// form asked for it. When it does, every other row loses the marker in the
+  /// same write, so there is never more than one.
+  String? addAddress(AddressEntry draft) {
+    if (addresses.length >= addressBookLimit) {
+      return 'You can save up to $addressBookLimit addresses.';
+    }
+    final error = _validateAddress(draft);
+    if (error != null) return error;
+
+    final makeDefault = draft.isDefault || addresses.isEmpty;
+    if (makeDefault) {
+      addresses = [
+        for (final address in addresses) address.copyWith(isDefault: false),
+      ];
+    }
+    addresses = [
+      ...addresses,
+      AddressEntry(
+        id: _nextAddressId(),
+        recipient: draft.recipient.trim(),
+        phone: draft.phone.trim(),
+        region: draft.region.trim(),
+        city: draft.city.trim(),
+        barangay: draft.barangay.trim(),
+        street: draft.street.trim(),
+        isDefault: makeDefault,
+      ),
+    ];
+    notifyListeners();
+    _save();
+    return null;
+  }
+
+  /// Replaces the row with the same id. Returns a user-facing error or null.
+  String? updateAddress(AddressEntry draft) {
+    final index = addresses.indexWhere((address) => address.id == draft.id);
+    if (index < 0) return 'That address no longer exists.';
+    final error = _validateAddress(draft);
+    if (error != null) return error;
+
+    final existing = addresses[index];
+    if (existing.isDefault &&
+        !draft.isDefault &&
+        addresses.length > 1) {
+      return 'Choose another default address first.';
+    }
+
+    final next = [
+      for (final address in addresses) address.copyWith(isDefault: false),
+    ];
+    final makeDefault = draft.isDefault || existing.isDefault || addresses.length == 1;
+    next[index] = AddressEntry(
+      id: draft.id,
+      recipient: draft.recipient.trim(),
+      phone: draft.phone.trim(),
+      region: draft.region.trim(),
+      city: draft.city.trim(),
+      barangay: draft.barangay.trim(),
+      street: draft.street.trim(),
+      isDefault: makeDefault,
+    );
+    addresses = next;
+    notifyListeners();
+    _save();
+    return null;
+  }
+
+  /// Deletes one address. The default is protected while alternatives exist,
+  /// because checkout and the address book both rely on there being one.
+  String? deleteAddress(String id) {
+    final matches = addresses.where((address) => address.id == id);
+    if (matches.isEmpty) return 'That address no longer exists.';
+    final target = matches.first;
+    if (target.isDefault && addresses.length > 1) {
+      return 'Choose another default address first.';
+    }
+    final next = [
+      for (final address in addresses)
+        if (address.id != id) address,
+    ];
+    if (next.isNotEmpty && !next.any((address) => address.isDefault)) {
+      next[0] = next[0].copyWith(isDefault: true);
+    }
+    addresses = next;
+    notifyListeners();
+    _save();
+    return null;
+  }
+
+  /// Moves the default marker to [id]. Returns false when the address is gone.
+  bool setDefaultAddress(String id) {
+    if (!addresses.any((address) => address.id == id)) return false;
+    addresses = [
+      for (final address in addresses)
+        address.copyWith(isDefault: address.id == id),
+    ];
+    notifyListeners();
+    _save();
+    return true;
+  }
+
+  String? _validateAddress(AddressEntry address) {
+    final recipient = address.recipient.trim();
+    if (recipient.isEmpty) return 'Recipient name is required.';
+    if (recipient.length < 2) {
+      return 'Recipient name must be at least 2 characters.';
+    }
+    final phoneError = validatePhMobile(address.phone);
+    if (phoneError != null) return '$phoneError.';
+    if (address.region.trim().isEmpty) return 'Select a region.';
+    if (address.city.trim().isEmpty) return 'Select a city.';
+    if (address.barangay.trim().isEmpty) return 'Select a barangay.';
+    if (address.street.trim().isEmpty) return 'Street address is required.';
+    return null;
+  }
+
+  String _nextAddressId() {
+    var highest = 0;
+    final pattern = RegExp(r'^ADDR-(\d+)$');
+    for (final address in addresses) {
+      final match = pattern.firstMatch(address.id);
+      if (match == null) continue;
+      final number = int.tryParse(match.group(1)!) ?? 0;
+      if (number > highest) highest = number;
+    }
+    return 'ADDR-${highest + 1}';
+  }
+
   /// Re-asks the server what this account's current status is.
   ///
   /// Called on resume from `PendingApprovalScreen` and by "Check Status".
@@ -556,6 +815,7 @@ class AuthState extends ChangeNotifier {
     status = AccountStatus.loggedOut;
     registrationStatus = null;
     verificationId = null;
+    otpSentAt = null;
     lastName = null;
     firstName = null;
     middleInitial = null;
@@ -568,6 +828,7 @@ class AuthState extends ChangeNotifier {
     barangay = null;
     street = null;
     recentAddresses = const [];
+    addresses = const [];
     avatarPath = null;
     memberSince = null;
     // Navigation memory belongs to the account, not the device — same

@@ -22,6 +22,7 @@ import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
+import '../../state/return_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/order_tab_memory.dart';
@@ -179,7 +180,7 @@ class _OrdersLoadFailure extends StatelessWidget {
     AppColors.watch(context);
     return EmptyState(
       icon: Icons.cloud_off_outlined,
-      title: 'We couldn\'t load your orders',
+      title: 'Your orders could not be loaded',
       subtitle: Microcopy.calmError(error.message),
       action: error.isRetryable
           ? TextButton(onPressed: () => _retry(context), child: const Text('Retry'))
@@ -412,11 +413,32 @@ class _OrderCard extends StatelessWidget {
         OrderStatus.toRate: AppColors.tertiary,
       };
 
+  String _statusLabel(ReturnRequest? request) => order.cancelled
+      ? 'Cancelled'
+      : order.buyerConfirmed
+          ? 'Completed'
+          : request?.orderLabel ?? _statusLabels[order.status]!;
+
+  Color _statusColor(ReturnRequest? request) => order.cancelled
+      ? AppColors.danger
+      : request != null
+          ? _returnStatusColor(request.status)
+          : _statusColors[order.status]!;
+
+  static Color _returnStatusColor(ReturnStatus status) => switch (status) {
+        ReturnStatus.submitted => AppColors.warning,
+        ReturnStatus.rejected => AppColors.danger,
+        ReturnStatus.escalated => AppColors.primaryDark,
+        ReturnStatus.refunded => AppColors.tertiary,
+      };
+
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final statusColor = _statusColors[order.status]!;
+    final returnRequest =
+        context.watch<OrderState>().returns.latestForOrder(order.id);
+    final statusColor = _statusColor(returnRequest);
     final radius = editorialRadius(index, ShapeTier.card);
 
     return InkWell(
@@ -454,7 +476,7 @@ class _OrderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _statusBadge(theme, statusColor),
+                _statusBadge(theme, statusColor, _statusLabel(returnRequest)),
               ],
             ),
           ),
@@ -481,21 +503,23 @@ class _OrderCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        order.eta,
+                        order.cancelled
+                            ? 'Cancelled${order.cancellationReason == null ? '' : ' — ${order.cancellationReason}'}'
+                            : order.eta,
                         // ETA is the number/phrase the buyer is actually
                         // here to read — bumped from bodySmall to
                         // titleSmall so it has enough weight to be found
                         // at a glance.
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
+                          color: order.cancelled ? AppColors.danger : AppColors.accent,
                         ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                _actionRow(context, theme),
+                _actionRow(context, theme, returnRequest),
               ],
             ),
           ),
@@ -505,7 +529,7 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  Widget _statusBadge(ThemeData theme, Color color) {
+  Widget _statusBadge(ThemeData theme, Color color, String label) {
     // Darken the raw status color before using it as text — the pale
     // tokens (tertiary sage, warning amber) fail AA contrast on their
     // own tinted background. Same pattern as delivery_job_card.dart's
@@ -518,7 +542,7 @@ class _OrderCard extends StatelessWidget {
         borderRadius: radiusOf(ShapeTier.pill),
       ),
       child: Text(
-        _statusLabels[order.status]!,
+        label,
         style: theme.textTheme.labelSmall?.copyWith(color: textColor, fontWeight: FontWeight.w700),
       ),
     );
@@ -567,7 +591,135 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  Widget _actionRow(BuildContext context, ThemeData theme) {
+  Future<void> _cancelOrder(BuildContext context) async {
+    final state = context.read<OrderState>();
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
+      builder: (sheetContext) {
+        String? selected;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final theme = Theme.of(sheetContext);
+            return SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                    child: Text(
+                      'Cancel ${order.id}?',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text(
+                      'The seller is notified and the item returns to stock. '
+                      'This cannot be undone.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  for (final option in OrderState.cancellationReasons)
+                    RadioListTile<String>(
+                      value: option,
+                      groupValue: selected,
+                      title: Text(option),
+                      onChanged: (value) =>
+                          setSheetState(() => selected = value),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    child: ElevatedButton(
+                      onPressed: selected == null
+                          ? null
+                          : () => Navigator.of(sheetContext).pop(selected),
+                      child: const Text('Cancel order'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (reason == null || !context.mounted) return;
+
+    try {
+      final error = await state.cancelOrder(order, reason);
+      if (!context.mounted) return;
+      if (error != null) {
+        showTimedSnackBar(context, SnackBar(content: Text(error)));
+      } else {
+        showTimedSnackBar(
+          context,
+          const SnackBar(content: Text('Order cancelled.')),
+        );
+      }
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      showTimedSnackBar(context, SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _confirmReceived(BuildContext context) async {
+    final state = context.read<OrderState>();
+    try {
+      final error = await state.confirmOrderReceived(order);
+      if (!context.mounted) return;
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            error ?? 'Order marked as received. You can rate it now.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      showTimedSnackBar(context, SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Widget _actionRow(
+    BuildContext context,
+    ThemeData theme,
+    ReturnRequest? request,
+  ) {
+    if (request?.isOpen == true) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Return/Refund in progress. Order Received is unavailable until '
+            'this request is resolved.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => _contactSeller(context),
+            icon: const Icon(Icons.chat_bubble_outline, size: 16),
+            label: const Text('Contact Seller'),
+          ),
+        ],
+      );
+    }
+    if (order.cancelled) {
+      return Text(
+        'This order was cancelled.',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      );
+    }
     switch (order.status) {
       case OrderStatus.toShip:
         return Row(
@@ -577,6 +729,18 @@ class _OrderCard extends StatelessWidget {
                 onPressed: () => _contactSeller(context),
                 icon: const Icon(Icons.chat_bubble_outline, size: 16),
                 label: const Text('Contact Seller'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _cancelOrder(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: BorderSide(color: AppColors.danger),
+                ),
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text('Cancel'),
               ),
             ),
           ],
@@ -609,6 +773,39 @@ class _OrderCard extends StatelessWidget {
       case OrderStatus.toRate:
         // Row+Expanded like the cases above rather than a bare button, so the
         // delivered tab's action lines up with the other three.
+        if (!order.buyerConfirmed && request == null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _confirmReceived(context),
+                icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                label: const Text('Order Received'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: ReviewButton(order: order, expanded: false)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _buyAgain(context),
+                      icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                      label: const Text('Buy Again'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
+        if (!order.buyerConfirmed && request != null) {
+          return OutlinedButton.icon(
+            onPressed: () => _buyAgain(context),
+            icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+            label: const Text('Buy Again'),
+          );
+        }
         return Row(
           children: [
             Expanded(child: ReviewButton(order: order, expanded: false)),

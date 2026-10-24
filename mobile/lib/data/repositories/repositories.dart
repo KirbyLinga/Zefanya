@@ -4,7 +4,7 @@
 //
 // ## How to read this file
 //
-// `Repositories` is a plain bundle of the seven interfaces. `Repositories.forMode`
+// `Repositories` is a plain bundle of the eight interfaces. `Repositories.forMode`
 // picks an implementation for each, from `config/dev_flags.dart`. Nothing else
 // in the app branches on the backend mode, and nothing else constructs a
 // repository.
@@ -40,6 +40,7 @@ import 'catalog_repository.dart';
 import 'chat_repository.dart';
 import 'courier_repository.dart';
 import 'order_repository.dart';
+import 'return_repository.dart';
 import 'review_repository.dart';
 
 /// Re-exported so a caller needs one import to name an exception it has to
@@ -56,6 +57,7 @@ class Repositories {
     required this.review,
     required this.chat,
     required this.courier,
+    required this.returns,
     this.client,
   });
 
@@ -66,6 +68,7 @@ class Repositories {
   final ReviewRepository review;
   final ChatRepository chat;
   final CourierRepository courier;
+  final ReturnRepository returns;
 
   /// The network client, present only in live mode.
   ///
@@ -90,6 +93,7 @@ class Repositories {
         // That is the shape a real data source has.
         order: MockOrderRepository(),
         review: MockReviewRepository(),
+        returns: MockReturnRepository(),
         chat: MockChatRepository(),
         courier: const MockCourierRepository(),
       );
@@ -105,6 +109,7 @@ class Repositories {
         cart: LiveCartRepository(client),
         order: LiveOrderRepository(client),
         review: LiveReviewRepository(client),
+        returns: LiveReturnRepository(client),
         chat: LiveChatRepository(client),
         courier: LiveCourierRepository(client),
         client: client,
@@ -155,6 +160,7 @@ class Repositories {
   Future<void> loadLocal() => Future.wait([
         order.load(),
         review.load(),
+        returns.load(),
         chat.load(),
       ]);
 }

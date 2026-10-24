@@ -42,49 +42,63 @@ void main() {
   test('mock vouchers all carry a computable expiry date', () {
     expect(mockVouchers, isNotEmpty);
     for (final voucher in mockVouchers) {
-      expect(voucher.expiresAt, isNotNull, reason: '${voucher.code} has no expiresAt');
+      expect(
+        voucher.expiresAt,
+        isNotNull,
+        reason: '${voucher.code} has no expiresAt',
+      );
     }
   });
 
   test('isVoucherExpired: yesterday expired, today and tomorrow usable', () {
     final now = DateTime.now();
     Voucher at(DateTime day) => Voucher(
-          code: 'X',
-          title: 'X',
-          discountLabel: 'X',
-          minSpend: 0,
-          expiryLabel: 'X',
-          expiresAt: day,
-        );
+      code: 'X',
+      title: 'X',
+      discountLabel: 'X',
+      minSpend: 0,
+      expiryLabel: 'X',
+      expiresAt: day,
+    );
 
     expect(isVoucherExpired(at(now.subtract(const Duration(days: 1)))), isTrue);
     expect(isVoucherExpired(at(now)), isFalse);
     expect(isVoucherExpired(at(now.add(const Duration(days: 1)))), isFalse);
   });
 
-  test('isVoucherExpired: null date is usable, UTC instant lands on its local day', () {
-    const noDate = Voucher(
-      code: 'X',
-      title: 'X',
-      discountLabel: 'X',
-      minSpend: 0,
-      expiryLabel: 'No expiry',
-    );
-    expect(isVoucherExpired(noDate), isFalse);
+  test(
+    'isVoucherExpired: null date is usable, UTC instant lands on its local day',
+    () {
+      const noDate = Voucher(
+        code: 'X',
+        title: 'X',
+        discountLabel: 'X',
+        minSpend: 0,
+        expiryLabel: 'No expiry',
+      );
+      expect(isVoucherExpired(noDate), isFalse);
 
-    // A UTC midnight instant is still "today" in PH time, not yesterday.
-    final now2 = DateTime.now().toUtc();
-    final utcMidnight = DateTime.utc(now2.year, now2.month, now2.day);
-    final voucher = Voucher(
-      code: 'X',
-      title: 'X',
-      discountLabel: 'X',
-      minSpend: 0,
-      expiryLabel: 'X',
-      expiresAt: utcMidnight,
-    );
-    expect(isVoucherExpired(voucher), isFalse);
-  });
+      // A UTC instant that lands on today's LOCAL calendar day is still usable.
+      // Deriving it from local midnight (rather than UTC midnight) keeps the
+      // fixture true in every timezone and at every hour: in UTC+8, UTC midnight
+      // is yesterday until 8am local, which made the old version flaky.
+      final localNow = DateTime.now();
+      final localMidnightUtc = DateTime(
+        localNow.year,
+        localNow.month,
+        localNow.day,
+      ).toUtc();
+      final voucher = Voucher(
+        code: 'X',
+        title: 'X',
+        discountLabel: 'X',
+        minSpend: 0,
+        expiryLabel: 'X',
+        expiresAt: localMidnightUtc,
+      );
+      expect(isVoucherExpired(voucher), isFalse);
+    },
+  );
 
   test('Product still carries no created/updated timestamp', () {
     // Locks in the "no Newest sort" decision. NOTE: this test does not

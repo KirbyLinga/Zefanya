@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/pricing.dart';
 import '../../data/api/api_exception.dart';
-import '../../data/mock_data.dart' show Order;
+import '../../data/mock_data.dart' show Order, Voucher;
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
 import '../../state/courier_state.dart';
@@ -16,7 +16,7 @@ import '../../state/order_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
-import '../shared/edit_profile_screen.dart';
+import 'address_book_screen.dart';
 import 'courier_tracker_screen.dart';
 import 'widgets/order_confirmation_dialog.dart';
 import '../../widgets/app_page_route.dart';
@@ -29,12 +29,12 @@ import '../../widgets/editorial_shapes.dart';
 enum PaymentMethod { cod, eWallet }
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key, this.voucherCode, this.voucherDiscount = 0});
+  const CheckoutScreen({super.key, this.checkoutItems});
 
-  /// Carried over from Cart's applied voucher, if any — see
-  /// cart_screen.dart's "Proceed to Checkout" button.
-  final String? voucherCode;
-  final double voucherDiscount;
+  /// Buy Now's isolated line(s). When non-null, checkout reads these
+  /// instead of the cart's selected lines and does not clear the cart
+  /// afterwards — the cart was never part of this purchase.
+  final List<CartItem>? checkoutItems;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -44,7 +44,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentMethod _selectedMethod = PaymentMethod.cod;
 
   final _notesController = TextEditingController();
-  static const int _notesMaxLength = 140;
+  static const int _notesMaxLength = 200;
 
   final _addressKey = GlobalKey();
   final _itemsKey = GlobalKey();
@@ -70,23 +70,100 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(List<CartItem> selectedItems, double total) async {
-    final hasNoAddress = context.read<AuthState>().addressSummary.isEmpty;
+    final auth = context.read<AuthState>();
+    final deliveryAddress = auth.defaultAddress?.summary ?? auth.addressSummary;
+    final hasNoAddress = deliveryAddress.isEmpty;
     final hasNoItems = selectedItems.isEmpty;
     final noteTooLong = _notesController.text.length > _notesMaxLength;
     final termsNotAccepted = !_agreedToTerms;
 
+    // A voucher can expire or disappear between Cart and Place Order. The
+    // server still re-checks this (it owns usage limits and the clock); this
+    // local check stops an obviously dead code from being sent.
+    final cart = context.read<CartState>();
+    final appliedVouchers = widget.checkoutItems == null
+        ? cart.appliedVouchers
+        : const <Voucher>[];
+    String? voucherProblem;
+    for (final voucher in appliedVouchers) {
+      if (isVoucherExpired(voucher)) {
+        voucherProblem = 'Voucher "${voucher.code}" has expired.';
+      } else if (isVoucherNotStarted(voucher)) {
+        voucherProblem = 'Voucher "${voucher.code}" is not active yet.';
+      } else if (isVoucherUsageExhausted(
+        voucher,
+        buyerUses: cart.buyerUsesFor(voucher.code),
+      )) {
+        voucherProblem =
+            'Voucher "${voucher.code}" has reached its usage limit.';
+      } else if (voucherBase(voucher, selectedItems) < voucher.minSpend) {
+        voucherProblem =
+            'Voucher "${voucher.code}" no longer meets its '
+            '${formatPeso(voucher.minSpend)} minimum.';
+      }
+      if (voucherProblem != null) break;
+    }
+
+    // Stock is a server value; this is the last local copy the app checked.
+    // The server must refuse the order if its copy changed in the meantime.
+    final unavailable = selectedItems
+        .where((i) => i.availableStock <= 0 || i.quantity > i.availableStock)
+        .toList();
+    final stockProblem = unavailable.isEmpty
+        ? null
+        : '${unavailable.first.product.name} is no longer available in that quantity.';
+
+    // Purchase limits are per buyer across all orders, so this check needs
+    // order history as well as the selected line. Product Details blocks the
+    // obvious case; this is the last line of defence for Buy Now and for a
+    // cart that sat open while another order was placed.
+    final orders = context.read<OrderState>();
+    String? limitProblem;
+    for (final line in selectedItems) {
+      final limit = line.product.purchaseLimit;
+      if (limit == null) continue;
+      final bought = orders.purchasedQuantity(line.product.id);
+      if (bought + line.quantity > limit) {
+        limitProblem =
+            '${line.product.name} is limited to $limit per buyer. '
+            'You have already bought $bought.';
+        break;
+      }
+    }
+
     setState(() {
-      _addressError = hasNoAddress ? 'Add a delivery address before placing your order.' : null;
-      _itemsError = hasNoItems ? 'Your cart has no selected items to check out.' : null;
-      _noteError = noteTooLong ? 'Delivery note must be $_notesMaxLength characters or fewer.' : null;
-      _termsError = termsNotAccepted ? 'Please agree to the Terms & Return Policy to continue.' : null;
+      _addressError = hasNoAddress
+          ? 'Add a delivery address before placing your order.'
+          : null;
+      _itemsError = hasNoItems
+          ? 'Your cart has no selected items to check out.'
+          : stockProblem ?? limitProblem;
+      _noteError = noteTooLong
+          ? 'Delivery note must be $_notesMaxLength characters or fewer.'
+          : null;
+      _termsError = termsNotAccepted
+          ? 'Please agree to the Terms & Return Policy to continue.'
+          : null;
     });
 
-    if (hasNoAddress || hasNoItems || noteTooLong || termsNotAccepted) {
+    if (voucherProblem != null) {
+      for (final voucher in appliedVouchers) {
+        cart.removeVoucher(voucher.code);
+      }
+      showTimedSnackBar(context, SnackBar(content: Text(voucherProblem)));
+      return;
+    }
+
+    if (hasNoAddress ||
+        hasNoItems ||
+        noteTooLong ||
+        termsNotAccepted ||
+        stockProblem != null ||
+        limitProblem != null) {
       GlobalKey? firstInvalidKey;
       if (hasNoAddress) {
         firstInvalidKey = _addressKey;
-      } else if (hasNoItems) {
+      } else if (hasNoItems || stockProblem != null || limitProblem != null) {
         firstInvalidKey = _itemsKey;
       } else if (noteTooLong) {
         firstInvalidKey = _noteKey;
@@ -145,23 +222,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // The courier is paid the standard fee whether or not the buyer's
     // shipping was free (the platform absorbs it). One fee per checkout,
     // split across the orders when a cart spans several sellers.
-    final auth = context.read<AuthState>();
     final courier = context.read<CourierState>();
     for (final order in placed) {
       courier.dispatchForOrder(
         order: order,
-        buyerName: (auth.name == null || auth.name!.isEmpty) ? 'Buyer' : auth.name!,
-        deliveryArea: auth.addressSummary,
+        buyerName: (auth.name == null || auth.name!.isEmpty)
+            ? 'Buyer'
+            : auth.name!,
+        deliveryArea: deliveryAddress,
         fee: kStandardShippingFee / placed.length,
+        buyerPhone: auth.phone,
+        trackingNumber: order.id,
       );
     }
     // Record the just-used address for the one-tap shortcut next
     // time — before clearing the cart, while the summary still reads.
-    context
-        .read<AuthState>()
-        .recordRecentAddress(context.read<AuthState>().addressSummary);
+    auth.recordRecentAddress(deliveryAddress);
 
-    context.read<CartState>().clearSelected();
+    if (widget.checkoutItems == null) {
+      // Record usage before removing the lines: the counters are per buyer and
+      // have to survive into the next cart for per-buyer limits to mean
+      // anything. This is also what clears the applied slots.
+      await cart.recordAppliedVouchersUsed();
+      cart.clearSelected();
+    }
+    if (!mounted) return;
     setState(() => _isPlacingOrder = false);
 
     if (!mounted) return;
@@ -192,7 +277,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           navigator.pop(); // close the dialog
           navigator.popUntil((route) => route.isFirst);
           navigator.push(
-            AppPageRoute(builder: (_) => CourierTrackerScreen(order: placed.first)),
+            AppPageRoute(
+              builder: (_) => CourierTrackerScreen(order: placed.first),
+            ),
           );
         },
         onDone: () {
@@ -208,13 +295,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final cart = context.watch<CartState>();
-    final selectedItems = cart.items.where((i) => i.selected).toList();
-    final subtotal = selectedItems.fold(0.0, (sum, i) => sum + i.lineTotal);
-    final shippingFee = shippingFeeFor(subtotal);
-    final total = (subtotal - widget.voucherDiscount + shippingFee).clamp(0, double.infinity).toDouble();
+    final selectedItems =
+        widget.checkoutItems ??
+        cart.items.where((i) => i.selected && i.isAvailable).toList();
+    final quote = quoteCart(
+      selectedItems,
+      widget.checkoutItems == null ? cart.appliedVouchers : const <Voucher>[],
+      buyerUsesFor: (voucher) => cart.buyerUsesFor(voucher.code),
+    );
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+      backgroundColor: Colors
+          .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
@@ -236,7 +328,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             index: 1,
             child: KeyedSubtree(
               key: _itemsKey,
-              child: _buildOrderSummarySection(theme, ext, selectedItems, subtotal, shippingFee, total),
+              child: _buildOrderSummarySection(
+                theme,
+                ext,
+                selectedItems,
+                quote,
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -259,7 +356,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(theme, selectedItems, total),
+      bottomNavigationBar: _buildBottomBar(theme, selectedItems, quote.total),
     );
   }
 
@@ -285,8 +382,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         border: hasError
             ? Border.all(color: AppColors.danger, width: 1.5)
             : accentColor != null
-                ? Border(left: BorderSide(color: accentColor, width: 3))
-                : null,
+            ? Border(left: BorderSide(color: accentColor, width: 3))
+            : null,
       ),
       child: child,
     );
@@ -299,19 +396,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Semantics(
       button: true,
       expanded: _summaryExpanded,
-      label: 'Order summary, $count items, '
+      label:
+          'Order summary, $count items, '
           'total ${formatPeso(total)}',
       child: InkWell(
         onTap: () => setState(() => _summaryExpanded = !_summaryExpanded),
         borderRadius: radiusOf(ShapeTier.control),
         child: Row(
           children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 18, color: AppColors.primaryDark),
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 18,
+              color: AppColors.primaryDark,
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text('Order Summary',
-                  style: theme.textTheme.titleSmall),
+              child: Text('Order Summary', style: theme.textTheme.titleSmall),
             ),
             Text(
               '$count item${count == 1 ? '' : 's'}',
@@ -335,7 +435,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _sectionHeader(ThemeData theme, IconData icon, String title, {VoidCallback? onEdit}) {
+  Widget _sectionHeader(
+    ThemeData theme,
+    IconData icon,
+    String title, {
+    VoidCallback? onEdit,
+  }) {
     return Row(
       children: [
         Icon(icon, size: 18, color: AppColors.primaryDark),
@@ -347,9 +452,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildAddressSection(BuildContext context, ThemeData theme, AppThemeExtension ext) {
+  Widget _buildAddressSection(
+    BuildContext context,
+    ThemeData theme,
+    AppThemeExtension ext,
+  ) {
     final auth = context.watch<AuthState>();
-    final hasAddress = auth.addressSummary.isNotEmpty;
+    final saved = auth.defaultAddress;
+    final summary = saved?.summary ?? auth.addressSummary;
+    final hasAddress = summary.isNotEmpty;
     if (hasAddress && _addressError != null) {
       _addressError = null;
     }
@@ -369,21 +480,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'Delivery Address',
             onEdit: hasAddress
                 ? () => Navigator.of(context).push(
-                    AppPageRoute(builder: (_) => const EditProfileScreen()),
+                    AppPageRoute(builder: (_) => const AddressBookScreen()),
                   )
                 : null,
           ),
           const SizedBox(height: 10),
           if (hasAddress) ...[
             Text(
-              [auth.name, auth.phone].where((v) => v != null && v.isNotEmpty).join('  •  '),
+              [
+                saved?.recipient ?? auth.name,
+                saved?.phone ?? auth.phone,
+              ].where((v) => v != null && v.isNotEmpty).join('  •  '),
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 4),
             Text(
-              auth.addressSummary,
+              summary,
               style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
             ),
+            if (saved != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Default address \u00b7 tap Change to use another',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
           ] else ...[
             Text(
               'No delivery address on file.',
@@ -394,9 +518,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => const EditProfileScreen()),
-              ),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(AppPageRoute(builder: (_) => const AddressBookScreen())),
               icon: const Icon(Icons.add_location_alt_outlined, size: 18),
               label: const Text('Add delivery address'),
             ),
@@ -428,9 +552,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ThemeData theme,
     AppThemeExtension ext,
     List<CartItem> items,
-    double subtotal,
-    double shippingFee,
-    double total,
+    CartQuote quote,
   ) {
     if (items.isNotEmpty && _itemsError != null) {
       _itemsError = null;
@@ -444,7 +566,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _summaryHeader(theme, total, items.length),
+          _summaryHeader(theme, quote.total, items.length),
           if (hasError) ...[
             const SizedBox(height: 10),
             Row(
@@ -465,41 +587,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
           if (_summaryExpanded) ...[
             const SizedBox(height: 10),
-          if (items.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('No items selected for checkout.', style: theme.textTheme.bodySmall),
-            )
-          else
-            ...items.map((i) => _orderLine(
+            if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'No items selected for checkout.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              )
+            else
+              ...items.map(
+                (i) => _orderLine(
                   theme,
                   '${i.product.name}${i.variant.isNotEmpty ? ' (${i.variant})' : ''}  x${i.quantity}',
                   formatPeso(i.lineTotal),
-                )),
-          const Divider(height: 24),
-          _orderLine(theme, 'Subtotal', formatPeso(subtotal)),
-          if (widget.voucherDiscount > 0)
+                ),
+              ),
+            const Divider(height: 24),
+            _orderLine(theme, 'Subtotal', formatPeso(quote.merchandise)),
+            for (final discount in quote.voucherDiscounts)
+              _orderLine(
+                theme,
+                discount.voucher.isShipping
+                    ? 'Shipping voucher (${discount.voucher.code})'
+                    : 'Voucher (${discount.voucher.code})',
+                '- ${formatPeso(discount.amount)}',
+                valueColor: AppColors.successText,
+              ),
             _orderLine(
               theme,
-              widget.voucherCode == null ? 'Voucher discount' : 'Voucher (${widget.voucherCode})',
-              '- ${formatPeso(widget.voucherDiscount)}',
-              valueColor: AppColors.successText,
+              'Shipping fee',
+              quote.shipping == 0 ? 'Free' : formatPeso(quote.shipping),
+              valueColor: quote.shipping == 0
+                  ? AppColors.successText
+                  : null,
             ),
-          _orderLine(
-            theme,
-            'Shipping fee',
-            shippingFee == 0 ? 'Free' : formatPeso(shippingFee),
-            valueColor: shippingFee == 0 ? AppColors.successText : null,
-          ),
-          const Divider(height: 24),
-          _orderLine(theme, 'Total', formatPeso(total), isBold: true),
+            const Divider(height: 24),
+            _orderLine(
+              theme,
+              'Total',
+              formatPeso(quote.total),
+              isBold: true,
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _orderLine(ThemeData theme, String label, String value, {bool isBold = false, Color? valueColor}) {
+  Widget _orderLine(
+    ThemeData theme,
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? valueColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -508,7 +650,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Expanded(
             child: Text(
               label,
-              style: isBold ? theme.textTheme.titleSmall : theme.textTheme.bodyMedium,
+              style: isBold
+                  ? theme.textTheme.titleSmall
+                  : theme.textTheme.bodyMedium,
             ),
           ),
           // Bold total line uses priceNumeral so the number has real
@@ -536,7 +680,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(theme, Icons.edit_note_outlined, 'Delivery Note (optional)'),
+          _sectionHeader(
+            theme,
+            Icons.edit_note_outlined,
+            'Delivery Note (optional)',
+          ),
           const SizedBox(height: 10),
           TextField(
             controller: _notesController,
@@ -621,7 +769,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(ext.utilityRadius),
-          border: Border.all(color: selected ? AppColors.primaryDark : AppColors.divider, width: selected ? 1.5 : 1),
+          border: Border.all(
+            color: selected ? AppColors.primaryDark : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
         ),
         child: Row(
           children: [
@@ -631,7 +782,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   Text(subtitle, style: theme.textTheme.bodySmall),
                 ],
               ),
@@ -652,7 +808,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: hasError ? AppColors.danger.withValues(alpha: 0.08) : Colors.transparent,
+        color: hasError
+            ? AppColors.danger.withValues(alpha: 0.08)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(ext.utilityRadius),
         border: Border.all(
           color: hasError ? AppColors.danger : Colors.transparent,
@@ -685,7 +843,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: Text(
                       'I agree to the Terms of Service and Return Policy.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: hasError ? AppColors.danger : AppColors.textSecondary,
+                        color: hasError
+                            ? AppColors.danger
+                            : AppColors.textSecondary,
                         fontWeight: hasError ? FontWeight.w600 : null,
                       ),
                     ),
@@ -719,13 +879,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildBottomBar(ThemeData theme, List<CartItem> selectedItems, double total) {
+  Widget _buildBottomBar(
+    ThemeData theme,
+    List<CartItem> selectedItems,
+    double total,
+  ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         boxShadow: [
-          BoxShadow(color: AppColors.neutral.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, -4)),
+          BoxShadow(
+            color: AppColors.neutral.withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
         ],
       ),
       child: SafeArea(
@@ -743,9 +911,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: _isPlacingOrder ? null : () => _placeOrder(selectedItems, total),
+              onPressed: _isPlacingOrder
+                  ? null
+                  : () => _placeOrder(selectedItems, total),
               child: _isPlacingOrder
-                  ? ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
+                  ? ZefanyaLoader(
+                      size: 18,
+                      color: AppColors.textOnDark,
+                      strokeWidth: 4,
+                    )
                   : const Text('Place Order'),
             ),
           ],

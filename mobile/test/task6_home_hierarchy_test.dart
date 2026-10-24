@@ -9,6 +9,7 @@ import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
 import 'package:zefanya/state/catalog_state.dart';
 import 'package:zefanya/state/courier_state.dart';
+import 'package:zefanya/state/notification_state.dart';
 import 'package:zefanya/state/order_state.dart';
 import 'package:zefanya/state/recently_viewed_state.dart';
 import 'package:zefanya/state/review_state.dart';
@@ -41,6 +42,7 @@ void main() {
             ChangeNotifierProvider(create: (_) => AuthState()),
             ChangeNotifierProvider(create: (_) => CartState()),
             ChangeNotifierProvider(create: (_) => CourierState()),
+            ChangeNotifierProvider(create: (_) => NotificationState()),
             ChangeNotifierProvider(create: (_) => OrderState()),
             ChangeNotifierProvider(create: (_) => RecentlyViewedState()),
             ChangeNotifierProvider(create: (_) => ReviewState()),

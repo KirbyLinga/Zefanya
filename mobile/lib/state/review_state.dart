@@ -35,6 +35,11 @@
 import 'package:flutter/foundation.dart';
 import '../data/repositories/review_repository.dart';
 
+/// The workbook's limits, kept beside the review model so the form, the mapper
+/// and tests cannot drift apart.
+const int reviewPhotoLimit = 5;
+const int reviewCommentLimit = 500;
+
 /// One review, for one product, from one order.
 ///
 /// Order id is part of the identity, not decoration: the same buyer can buy
@@ -49,6 +54,8 @@ class ProductReview {
     required this.createdAt,
     this.comment = '',
     this.photoPath,
+    this.photoPaths = const [],
+    this.editCount = 0,
   });
 
   final String productId;
@@ -65,9 +72,46 @@ class ProductReview {
   /// Local file path from pickAndSaveImage (see utils/image_picker_helper.dart),
   /// already copied into app storage before being stored here — the picker's
   /// own path can point at a temp location the OS may clear.
+  ///
+  /// Kept as the first entry of [photoPaths] for older stored reviews and the
+  /// live API's single-photo field. New writes populate [photoPaths].
   final String? photoPath;
 
+  /// Up to five local photos, in the order the buyer attached them.
+  final List<String> photoPaths;
+
+  /// How many times this review has been edited. The first write is 0; the
+  /// workbook's rule is one edit inside the 30-day window, so a stored 1 means
+  /// the edit action exists but can no longer save.
+  final int editCount;
+
+  /// Every attached photo, including a legacy single [photoPath].
+  List<String> get photos {
+    if (photoPaths.isNotEmpty) return List.unmodifiable(photoPaths);
+    final single = photoPath;
+    return single == null ? const [] : List.unmodifiable([single]);
+  }
+
   final DateTime createdAt;
+
+  ProductReview copyWith({
+    int? stars,
+    String? comment,
+    String? photoPath,
+    List<String>? photoPaths,
+    DateTime? createdAt,
+    int? editCount,
+  }) =>
+      ProductReview(
+        productId: productId,
+        orderId: orderId,
+        stars: stars ?? this.stars,
+        comment: comment ?? this.comment,
+        photoPath: photoPath ?? this.photoPath,
+        photoPaths: photoPaths ?? this.photoPaths,
+        createdAt: createdAt ?? this.createdAt,
+        editCount: editCount ?? this.editCount,
+      );
 
   Map<String, dynamic> toJson() => {
         'productId': productId,
@@ -75,7 +119,9 @@ class ProductReview {
         'stars': stars,
         'comment': comment,
         'photoPath': photoPath,
+        'photoPaths': photoPaths,
         'createdAt': createdAt.toIso8601String(),
+        'editCount': editCount,
       };
 
   /// Returns null for anything unreadable rather than throwing — a single
@@ -88,15 +134,35 @@ class ProductReview {
     if (productId is! String || orderId is! String || stars is! int || createdAt == null) {
       return null;
     }
+    final photoPath = map['photoPath'] as String?;
+    final rawPhotos = map['photoPaths'];
+    final photoPaths = rawPhotos is List
+        ? rawPhotos.whereType<String>().toList(growable: false)
+        : const <String>[];
     return ProductReview(
       productId: productId,
       orderId: orderId,
       stars: stars,
       comment: map['comment'] as String? ?? '',
-      photoPath: map['photoPath'] as String?,
+      photoPath: photoPath,
+      photoPaths: photoPaths,
+      editCount: map['editCount'] as int? ?? 0,
       createdAt: createdAt,
     );
   }
+}
+
+/// The edit window/one-edit rule refused a submission.
+///
+/// A typed exception rather than a bool so the screen can show the exact
+/// sentence, and so a future server 409 can be mapped to the same UI.
+class ReviewEditException implements Exception {
+  const ReviewEditException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class ReviewState extends ChangeNotifier {
@@ -152,6 +218,28 @@ class ReviewState extends ChangeNotifier {
     _reviews = await _repository.all();
   }
 
+  /// Why this existing review can no longer be edited, or null when it can.
+  ///
+  /// [now] is injectable so the 30-day boundary is testable without waiting a
+  /// month. New reviews return null: "edit" only has a meaning when there is
+  /// already a first write.
+  String? editRefusal(
+    String orderId,
+    String productId, {
+    DateTime? now,
+  }) {
+    final existing = forOrderProduct(orderId, productId);
+    if (existing == null) return null;
+    if (existing.editCount >= 1) {
+      return 'This review has already been edited once.';
+    }
+    final elapsed = (now ?? DateTime.now()).difference(existing.createdAt);
+    if (elapsed.inDays >= 30) {
+      return 'Reviews can only be edited within 30 days.';
+    }
+    return null;
+  }
+
   /// Adds a review, or replaces the existing one for the same purchase.
   ///
   /// Replacing rather than appending is what makes "Edit Your Review" an edit
@@ -159,10 +247,26 @@ class ReviewState extends ChangeNotifier {
   /// repository is required to implement too (see `ReviewRepository.submit`),
   /// because in live mode the replacement happens on the server.
   ///
+  /// The one-edit / 30-day rule is enforced here, at the write seam, rather
+  /// than only in the form: a hidden button is not a rule, and a direct call
+  /// from another screen must be refused too. The original [ProductReview.createdAt]
+  /// is preserved across an edit so the window does not restart every time.
+  ///
   /// A failure propagates: the review form renders the error rather than
   /// appearing to save something that was not saved.
   Future<void> submit(ProductReview review) async {
-    await _repository.submit(review);
+    final existing = forOrderProduct(review.orderId, review.productId);
+    final refusal = editRefusal(review.orderId, review.productId);
+    if (refusal != null) throw ReviewEditException(refusal);
+
+    final toSave = existing == null
+        ? review
+        : review.copyWith(
+            createdAt: existing.createdAt,
+            editCount: existing.editCount + 1,
+          );
+
+    await _repository.submit(toSave);
     _reviews = await _repository.all();
     notifyListeners();
   }

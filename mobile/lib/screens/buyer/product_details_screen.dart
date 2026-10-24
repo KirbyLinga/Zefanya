@@ -7,6 +7,7 @@
 // the shared CartState so Cart/Checkout reflect the same data.
 
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +29,7 @@ import 'widgets/product_card.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/money_format.dart';
 import '../../utils/motion.dart';
+import '../../utils/product_link.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/cart_flight.dart';
@@ -52,7 +54,11 @@ class ProductDetailsScreen extends StatefulWidget {
 
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   int _quantity = 1;
-  int _selectedVariantIndex = 0;
+
+  /// Chosen value per [VariationType.name]. Rich products start empty (both
+  /// controls must be answered); legacy one-dimensional products preselect
+  /// their first value to keep the old chip/colour behaviour.
+  final Map<String, String> _selectedOptions = {};
 
   /// Origin of the add-to-cart flight — the gallery image is what the
   /// user is looking at when they tap Add to Cart, so that's the thing
@@ -72,13 +78,123 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   bool _addCooldown = false;
 
   Product get _product => widget.product;
-  String get _selectedVariant =>
-      _product.variants.isEmpty ? '' : _product.variants[_selectedVariantIndex];
+
+  List<VariationType> get _groups => _product.optionGroups;
+
+  bool get _hasAllSelections =>
+      _groups.every((group) => _selectedOptions[group.name] != null);
+
+  /// The chosen SKU, once every variation type has a value and the product
+  /// actually carries per-combination data.
+  ProductVariant? get _selectedSku {
+    if (!_product.hasVariationMatrix || !_hasAllSelections) return null;
+    return _product.variantForSelections(_selectedOptions);
+  }
+
+  /// The cart line's human-readable variant label. Empty for products with no
+  /// variation controls; otherwise "Black / M" in the product's own order.
+  String get _selectedVariant {
+    if (_groups.isEmpty) return '';
+    return [
+      for (final group in _groups)
+        if (_selectedOptions[group.name] != null) _selectedOptions[group.name]!,
+    ].join(' / ');
+  }
+
+  double get _currentPrice => _selectedSku?.price ?? _product.price;
+
+  int get _currentStock {
+    if (_product.hasVariationMatrix && _hasAllSelections) {
+      return _selectedSku?.stock ?? 0;
+    }
+    return _product.stock;
+  }
+
+  /// A rich product with no selection yet is not out of stock — the buyer has
+  /// simply not told us which combination they want. Keeping the actions
+  /// enabled is what lets the missing-selection message explain that.
+  bool get _isOutOfStock {
+    if (_product.hasVariationMatrix && !_hasAllSelections) return false;
+    return _currentStock <= 0;
+  }
+
+  int get _purchasedQuantity =>
+      context.read<OrderState>().purchasedQuantity(_product.id);
+
+  int get _inCartQuantity =>
+      context.read<CartState>().quantityInCart(_product.id);
+
+  /// Units this buyer may still add to the cart.
+  ///
+  /// The limit is per product across all orders, so both order history and the
+  /// current cart count. Buy Now only consults history — the cart line is not
+  /// part of that purchase and is not cleared by it.
+  int? _remainingForAdd() {
+    final limit = _product.purchaseLimit;
+    if (limit == null) return null;
+    return math.max(0, limit - _purchasedQuantity - _inCartQuantity);
+  }
+
+  int? _remainingForBuyNow() {
+    final limit = _product.purchaseLimit;
+    if (limit == null) return null;
+    return math.max(0, limit - _purchasedQuantity);
+  }
+
+  bool _checkPurchaseLimit({required bool forBuyNow}) {
+    final limit = _product.purchaseLimit;
+    if (limit == null) return true;
+    final remaining = forBuyNow ? _remainingForBuyNow()! : _remainingForAdd()!;
+    if (remaining <= 0) {
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            'You can buy at most $limit of this item per buyer. '
+            'You have reached that limit.',
+          ),
+        ),
+      );
+      return false;
+    }
+    if (_quantity > remaining) {
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            'You can buy at most $limit of this item per buyer. '
+            'Only $remaining more can be added.',
+          ),
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /// The selected SKU's colour image leads the gallery; the product's own
+  /// photos follow, de-duplicated so a variant image that is also a catalogue
+  /// photo does not appear twice.
+  List<String> get _galleryPhotos {
+    final variantImage = _selectedSku?.image;
+    if (variantImage == null || variantImage.isEmpty) return _product.photos;
+    return [
+      variantImage,
+      for (final photo in _product.photos)
+        if (photo != variantImage) photo,
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
-    _quantity = _product.stock == 0 ? 0 : 1;
+    final groups = _groups;
+    if (!_product.hasVariationMatrix &&
+        groups.length == 1 &&
+        groups.first.values.isNotEmpty) {
+      _selectedOptions[groups.first.name] = groups.first.values.first;
+    }
+    _quantity = _currentStock == 0 ? 0 : 1;
     // Deferred to post-frame: this notifies RecentlyViewedState, and
     // calling that during this screen's own initial build (rather than
     // after it) would trigger a rebuild of whatever's listening — Home,
@@ -95,27 +211,171 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _incrementQty() {
-    if (_product.stock <= 0) return;
-    if (_quantity < _product.stock) setState(() => _quantity++);
+    final stock = _currentStock;
+    if (stock <= 0) return;
+    final remaining = _remainingForAdd();
+    if (remaining != null && remaining <= 0) {
+      _checkPurchaseLimit(forBuyNow: false);
+      return;
+    }
+    final cap = math.min(
+      CartState.maxQuantityPerLine,
+      math.min(stock, remaining ?? CartState.maxQuantityPerLine),
+    );
+    if (_quantity >= cap) {
+      showTimedSnackBar(
+        context,
+        SnackBar(content: Text('Only $cap available per order.')),
+      );
+      return;
+    }
+    setState(() => _quantity++);
   }
 
   void _decrementQty() {
-    if (_product.stock <= 0) return;
+    if (_currentStock <= 0) return;
     if (_quantity > 1) setState(() => _quantity--);
+  }
+
+  /// Whether choosing [value] in [groupName] can still lead to an in-stock
+  /// combination, given the controls *before* it. This is what makes Black/M
+  /// disabled while Black/S, Black/L and White/M all stay available.
+  ///
+  /// Earlier groups are not constrained by later ones: with M already chosen,
+  /// Black remains selectable and [_selectOption] clears M because Black/M is
+  /// gone. That is the usual "pick colour, then size" flow and avoids trapping
+  /// the buyer on a later control.
+  bool _isOptionAvailable(String groupName, String value) {
+    if (!_product.hasVariationMatrix) return true;
+    final groupIndex = _groups.indexWhere((group) => group.name == groupName);
+    for (final variant in _product.variantSkus) {
+      if (variant.stock <= 0) continue;
+      if (variant.selections[groupName] != value) continue;
+      var matches = true;
+      for (var i = 0; i < groupIndex; i++) {
+        final group = _groups[i];
+        final selected = _selectedOptions[group.name];
+        if (selected == null) continue;
+        if (variant.selections[group.name] != selected) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) return true;
+    }
+    return false;
+  }
+
+  ProductVariant? _skuForSelections(Map<String, String> selections) {
+    if (!_product.hasVariationMatrix) return null;
+    if (!_groups.every((group) => selections[group.name] != null)) return null;
+    return _product.variantForSelections(selections);
+  }
+
+  void _selectOption(String groupName, String value) {
+    if (!_isOptionAvailable(groupName, value)) return;
+
+    final next = Map<String, String>.of(_selectedOptions)..[groupName] = value;
+
+    // Choosing one value can make another already-chosen value impossible
+    // (e.g. M was selected, then the buyer chooses Black, which has no M in
+    // stock). Drop the impossible side rather than leaving the screen on a
+    // combination the buyer cannot add.
+    if (_product.hasVariationMatrix) {
+      for (final group in _groups) {
+        if (group.name == groupName) continue;
+        final other = next[group.name];
+        if (other == null) continue;
+        final canKeep = _product.variantSkus.any(
+          (sku) =>
+              sku.stock > 0 &&
+              sku.selections[groupName] == value &&
+              sku.selections[group.name] == other,
+        );
+        if (!canKeep) next.remove(group.name);
+      }
+    }
+
+    final complete = _groups.every((group) => next[group.name] != null);
+    final sku = _skuForSelections(next);
+    final stock = _product.hasVariationMatrix
+        ? (complete ? (sku?.stock ?? 0) : _product.stock)
+        : _product.stock;
+
+    setState(() {
+      _selectedOptions
+        ..clear()
+        ..addAll(next);
+      _photoIndex = 0;
+      if (stock <= 0) {
+        _quantity = 0;
+      } else if (_quantity <= 0) {
+        _quantity = 1;
+      } else if (_quantity > stock) {
+        _quantity = stock;
+      }
+    });
+
+    // The selected colour's image is page one of the gallery; put the buyer
+    // back on it instead of leaving them on a product photo for the old colour.
+    if (_galleryController.hasClients) {
+      _galleryController.jumpToPage(0);
+    }
+  }
+
+  /// Shows the missing-variation message and returns false when the buyer has
+  /// not answered every control. Called before either bottom action, so the
+  /// requirement is identical for Add to Cart and Buy Now.
+  bool _validateSelection() {
+    if (_groups.isEmpty) return true;
+    if (!_hasAllSelections) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Please select a variation')),
+      );
+      return false;
+    }
+    if (_product.hasVariationMatrix && _selectedSku == null) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('This variation is unavailable')),
+      );
+      return false;
+    }
+    return true;
   }
 
   /// Returns false (and does nothing) if a previous tap is still inside
   /// its cooldown, so callers can skip whatever they were going to do
   /// next (e.g. Buy Now's navigation to Checkout).
   bool _addToCart({required bool showSnackBar}) {
-    if (_product.stock <= 0) return false;
+    if (!_validateSelection()) return false;
+    if (_product.sellerOnVacation) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text('This store is on vacation and is not taking orders.'),
+        ),
+      );
+      return false;
+    }
+    if (_isOutOfStock) return false;
+    if (!_checkPurchaseLimit(forBuyNow: false)) return false;
     if (_addCooldown) return false;
     setState(() => _addCooldown = true);
     Future.delayed(const Duration(milliseconds: 700), () {
       if (mounted) setState(() => _addCooldown = false);
     });
 
-    context.read<CartState>().addItem(_product, variant: _selectedVariant, quantity: _quantity);
+    final sku = _selectedSku;
+    context.read<CartState>().addItem(
+      _product,
+      variant: _selectedVariant,
+      quantity: _quantity,
+      unitPrice: sku?.price,
+      variantStock: sku?.stock,
+      variantImage: sku?.image,
+    );
 
     // Light impact on add — the same confirmation weight as copy-ID
     // and the nav tap, fired with the flight rather than the snackbar.
@@ -129,7 +389,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       originKey: _galleryKey,
       thumbnail: ClipRRect(
         borderRadius: radiusOf(ShapeTier.card),
-        child: ProductImage(product: _product, iconSize: 28),
+        child: ProductImage(
+          product: _product,
+          imageUrl: sku?.image,
+          iconSize: 28,
+        ),
       ),
     );
 
@@ -141,35 +405,79 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     showTimedSnackBar(
       context,
       SnackBar(
-        content: Text(Microcopy.addToCart(productName: _product.name, seed: _quantity)),
+        content: Text(
+          Microcopy.addToCart(productName: _product.name, seed: _quantity),
+        ),
         persist: false,
         action: SnackBarAction(
           label: 'View Cart',
-          onPressed: () => Navigator.of(context).push(
-            AppPageRoute(builder: (_) => const CartScreen()),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(AppPageRoute(builder: (_) => const CartScreen())),
         ),
       ),
     );
     return true;
   }
 
+  /// Checks out this line only. It does not add to the cart or change any
+  /// existing cart selection; the checkout screen receives a detached line.
+  void _buyNow() {
+    if (!_validateSelection()) return;
+    if (_product.sellerOnVacation) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text('This store is on vacation and is not taking orders.'),
+        ),
+      );
+      return;
+    }
+    if (_isOutOfStock || _addCooldown) return;
+    if (!_checkPurchaseLimit(forBuyNow: true)) return;
+    setState(() => _addCooldown = true);
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _addCooldown = false);
+    });
+
+    final sku = _selectedSku;
+    Navigator.of(context).push(
+      AppPageRoute(
+        builder: (_) => CheckoutScreen(
+          checkoutItems: [
+            CartItem(
+              product: _product,
+              variant: _selectedVariant,
+              quantity: _quantity,
+              unitPrice: sku?.price,
+              variantStock: sku?.stock,
+              variantImage: sku?.image,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _shareProduct() {
-    // Deep links aren't wired yet, so share a plain text summary.
-    // Swap the text for a real URL once product pages have permalinks.
     Share.share(
-      '${_product.name} — ${formatPeso(_product.price)}\n'
-      'Sold by ${_product.sellerName} on Zefanya.',
+      productShareMessage(_product, price: formatPeso(_currentPrice)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
+    // Both are read by the purchase-limit note and the quantity cap; watching
+    // them here means placing an order elsewhere updates this screen instead of
+    // leaving a stale "1 left" label.
+    context.watch<CartState>();
+    context.watch<OrderState>();
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     return Scaffold(
-      backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+      backgroundColor: Colors
+          .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       // The action bar lives in bottomNavigationBar (not as the last child
       // of body's Column) so Scaffold knows about it and lifts floating
       // SnackBars ABOVE it instead of letting them cover the buttons.
@@ -213,7 +521,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               children: [
                                 _buildSellerRow(theme, ext),
                                 const SizedBox(height: 24),
-                                if (_product.variants.isNotEmpty) ...[
+                                if (_product.optionGroups.isNotEmpty) ...[
                                   _buildVariantPicker(theme, ext),
                                   const SizedBox(height: 24),
                                 ],
@@ -255,11 +563,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Row(
         children: [
-          _circleIconButton(Icons.arrow_back, () => Navigator.of(context).maybePop(), tooltip: 'Go back'),
+          _circleIconButton(
+            Icons.arrow_back,
+            () => Navigator.of(context).maybePop(),
+            tooltip: 'Go back',
+          ),
           const Spacer(),
           HeartButton(product: _product),
           const SizedBox(width: 8),
-          _circleIconButton(Icons.share_outlined, _shareProduct, tooltip: 'Share product'),
+          _circleIconButton(
+            Icons.share_outlined,
+            _shareProduct,
+            tooltip: 'Share product',
+          ),
           const SizedBox(width: 8),
           // Gives the flight somewhere to land on this route. Home's
           // anchor is still mounted underneath, but an item arcing off
@@ -268,9 +584,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           CartAnchor(
             child: _circleIconButton(
               Icons.shopping_bag_outlined,
-              () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => const CartScreen()),
-              ),
+              () => Navigator.of(
+                context,
+              ).push(AppPageRoute(builder: (_) => const CartScreen())),
               tooltip: 'Open cart',
             ),
           ),
@@ -279,7 +595,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _circleIconButton(IconData icon, VoidCallback onTap, {String? tooltip}) {
+  Widget _circleIconButton(
+    IconData icon,
+    VoidCallback onTap, {
+    String? tooltip,
+  }) {
     Widget button = Material(
       color: AppColors.surface,
       shape: const CircleBorder(),
@@ -294,16 +614,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
     );
     if (tooltip != null) {
-      button = Tooltip(
-        message: tooltip,
-        child: button,
-      );
+      button = Tooltip(message: tooltip, child: button);
     }
     return button;
   }
 
   Widget _buildGallery(AppThemeExtension ext) {
-    final photos = _product.photos;
+    final photos = _galleryPhotos;
 
     Widget photo(int index) {
       // Same ProductImage as ProductCard, so the Hero flight between grid
@@ -312,6 +629,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       final image = ProductImage(
         product: _product,
         photoIndex: index,
+        imageUrl: photos[index],
         iconSize: 64,
       );
       // The Hero wraps the cover *only*. Two pages carrying the same tag
@@ -327,13 +645,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     // and zoom are independent — putting InteractiveViewer outside the
     // PageView would absorb the swipe gesture and break paging.
     Widget zoomable(Widget child) => InteractiveViewer(
-          minScale: 1.0,
-          maxScale: 4.0,
-          // Allow the zoomed content to extend slightly past the viewport
-          // boundary so the user can pan to see edges.
-          clipBehavior: Clip.none,
-          child: child,
-        );
+      minScale: 1.0,
+      maxScale: 4.0,
+      // Allow the zoomed content to extend slightly past the viewport
+      // boundary so the user can pan to see edges.
+      clipBehavior: Clip.none,
+      child: child,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -348,7 +666,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             // A product with one photo gets no pager at all: a swipeable
             // page that cannot be swiped, and a single dot, are both
             // worse than nothing (see Product.hasGallery).
-            child: _product.hasGallery
+            child: photos.length > 1
                 ? Stack(
                     fit: StackFit.expand,
                     children: [
@@ -448,7 +766,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.bottomLeft,
                 child: Text(
-                  formatPeso(_product.price),
+                  formatPeso(_currentPrice),
                   style: AppType.priceNumeral(52),
                 ),
               ),
@@ -499,9 +817,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             children: [
               Icon(Icons.star_rounded, size: 18, color: AppColors.ratingStar),
               const SizedBox(width: 4),
-              Text(_product.rating.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
+              Text(
+                _product.rating.toStringAsFixed(1),
+                style: theme.textTheme.bodyMedium,
+              ),
               const SizedBox(width: 4),
-              Text('(${_product.ratingCount} ratings)', style: theme.textTheme.bodySmall),
+              Text(
+                '(${_product.ratingCount} ratings)',
+                style: theme.textTheme.bodySmall,
+              ),
             ],
           ),
         if (hasSales)
@@ -533,7 +857,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           CircleAvatar(
             radius: 20,
             backgroundColor: AppColors.tertiary,
-            child: Icon(Icons.storefront_outlined, color: AppColors.textOnLight, size: 20),
+            child: Icon(
+              Icons.storefront_outlined,
+              color: AppColors.textOnLight,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -544,7 +872,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     AppPageRoute(
-                      builder: (_) => SellerScreen(sellerName: _product.sellerName),
+                      builder: (_) =>
+                          SellerScreen(sellerName: _product.sellerName),
                     ),
                   ),
                   child: Text(
@@ -552,18 +881,35 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: AppColors.primaryDark,
                       decoration: TextDecoration.underline,
-                      decorationColor: AppColors.primaryDark.withValues(alpha: 0.4),
+                      decorationColor: AppColors.primaryDark.withValues(
+                        alpha: 0.4,
+                      ),
                     ),
                   ),
                 ),
-                Text('Usually replies within an hour', style: theme.textTheme.bodySmall),
+                Text(
+                  _product.sellerOnVacation
+                      ? 'On vacation · not accepting orders'
+                      : 'Usually replies within an hour',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: _product.sellerOnVacation
+                        ? AppColors.danger
+                        : null,
+                    fontWeight: _product.sellerOnVacation
+                        ? FontWeight.w600
+                        : null,
+                  ),
+                ),
               ],
             ),
           ),
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(
               AppPageRoute(
-                builder: (_) => ChatScreen(contactName: _product.sellerName, contactRole: 'Seller'),
+                builder: (_) => ChatScreen(
+                  contactName: _product.sellerName,
+                  contactRole: 'Seller',
+                ),
               ),
             ),
             icon: const Icon(Icons.chat_bubble_outline, size: 16),
@@ -603,94 +949,133 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     'pink': Color(0xFFE2B4BD),
   };
 
-  bool get _variantsAreColors =>
-      _product.variants.isNotEmpty && _product.variants.every((v) => _colorNames.containsKey(v.toLowerCase()));
+  bool _isColorGroup(VariationType group) =>
+      group.values.isNotEmpty &&
+      group.values.every(
+        (value) => _colorNames.containsKey(value.toLowerCase()),
+      );
 
   Widget _buildVariantPicker(ThemeData theme, AppThemeExtension ext) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_variantsAreColors ? 'Color' : 'Options', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 10),
-        if (_variantsAreColors)
-          Row(
-            children: List.generate(_product.variants.length, (i) {
-              final name = _product.variants[i];
-              final color = _colorNames[name.toLowerCase()]!;
-              final selected = i == _selectedVariantIndex;
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: Semantics(
-                  button: true,
-                  selected: selected,
-                  label: selected ? '$name color, selected' : '$name color',
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedVariantIndex = i),
-                    child: Tooltip(
-                    message: name,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      width: selected ? 34 : 28,
-                      height: selected ? 34 : 28,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selected ? AppColors.primaryDark : AppColors.divider,
-                          width: selected ? 2.5 : 1,
-                        ),
-                        // Always present — null vs list can't lerp, so
-                        // the shadow would snap instead of easing in.
-                        // alpha: 0 when unselected gives a smooth fade.
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: selected ? 0.15 : 0.0),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: selected
-                          ? Icon(
-                              Icons.check,
-                              size: 16,
-                              color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-                                  ? Colors.white
-                                  : Colors.black87,
-                            )
-                          : null,
-                    ),
-                  ),
-                  ),
-                ),
-              );
-            }),
-          )
-        else
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: List.generate(_product.variants.length, (i) {
-              final selected = i == _selectedVariantIndex;
-              return ChoiceChip(
-                label: Text(_product.variants[i]),
-                selected: selected,
-                onSelected: (_) => setState(() => _selectedVariantIndex = i),
-                shape: StadiumBorder(
-                  side: BorderSide(
-                    color: selected ? AppColors.primaryDark : AppColors.divider,
-                  ),
-                ),
-              );
-            }),
-          ),
+        for (var i = 0; i < _groups.length; i++) ...[
+          _buildVariationGroup(theme, _groups[i]),
+          if (i < _groups.length - 1) const SizedBox(height: 18),
+        ],
       ],
     );
   }
 
+  Widget _buildVariationGroup(ThemeData theme, VariationType group) {
+    final isColor = _isColorGroup(group);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(isColor ? 'Color' : group.name, style: theme.textTheme.titleSmall),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: isColor ? 14 : 10,
+          runSpacing: 10,
+          children: [
+            for (final value in group.values)
+              isColor
+                  ? _buildColorSwatch(group.name, value)
+                  : _buildOptionChip(theme, group.name, value),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColorSwatch(String groupName, String name) {
+    final color = _colorNames[name.toLowerCase()] ?? AppColors.divider;
+    final selected = _selectedOptions[groupName] == name;
+    final available = _isOptionAvailable(groupName, name);
+    return Semantics(
+      button: true,
+      enabled: available,
+      selected: selected,
+      label: available
+          ? (selected ? '$name color, selected' : '$name color')
+          : '$name color, out of stock',
+      child: GestureDetector(
+        key: ValueKey('variant-$groupName-$name'),
+        onTap: available ? () => _selectOption(groupName, name) : null,
+        child: Tooltip(
+          message: available ? name : '$name — out of stock',
+          child: Opacity(
+            opacity: available ? 1 : 0.35,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              width: selected ? 34 : 28,
+              height: selected ? 34 : 28,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? AppColors.primaryDark : AppColors.divider,
+                  width: selected ? 2.5 : 1,
+                ),
+                // Always present — null vs list can't lerp, so
+                // the shadow would snap instead of easing in.
+                // alpha: 0 when unselected gives a smooth fade.
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: selected ? 0.15 : 0.0,
+                    ),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: selected
+                  ? Icon(
+                      Icons.check,
+                      size: 16,
+                      color:
+                          ThemeData.estimateBrightnessForColor(color) ==
+                              Brightness.dark
+                          ? Colors.white
+                          : Colors.black87,
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionChip(ThemeData theme, String groupName, String value) {
+    final selected = _selectedOptions[groupName] == value;
+    final available = _isOptionAvailable(groupName, value);
+    return Tooltip(
+      message: available ? value : '$value — out of stock',
+      child: ChoiceChip(
+        key: ValueKey('variant-$groupName-$value'),
+        label: Text(value),
+        selected: selected,
+        onSelected: available ? (_) => _selectOption(groupName, value) : null,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? AppColors.primaryDark : AppColors.divider,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuantityStepper(ThemeData theme, AppThemeExtension ext) {
-    final stock = _product.stock;
+    final stock = _currentStock;
+    final remaining = _remainingForAdd();
+    final cap = math.min(
+      CartState.maxQuantityPerLine,
+      math.min(stock, remaining ?? CartState.maxQuantityPerLine),
+    );
+    final limit = _product.purchaseLimit;
     final String stockLabel;
     final Color? stockColor;
     if (stock == 0) {
@@ -704,50 +1089,94 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       stockColor = AppColors.textSecondary;
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Quantity', style: theme.textTheme.titleSmall),
-        Flexible(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  stockLabel,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: stockColor,
-                    fontWeight: stock <= 5 ? FontWeight.w600 : null,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.divider),
-                  borderRadius: BorderRadius.circular(ext.pillRadius),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _stepperButton(Icons.remove, (stock > 0 && _quantity > 1) ? _decrementQty : null),
-                    SizedBox(
-                      width: 32,
-                      child: Text(
-                        '$_quantity',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Quantity', style: theme.textTheme.titleSmall),
+            Flexible(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      stockLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: stockColor,
+                        fontWeight: stock <= 5 ? FontWeight.w600 : null,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    _stepperButton(Icons.add, (stock > 0 && _quantity < stock) ? _incrementQty : null),
-                  ],
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: BorderRadius.circular(ext.pillRadius),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _stepperButton(
+                          Icons.remove,
+                          (stock > 0 && _quantity > 1) ? _decrementQty : null,
+                        ),
+                        SizedBox(
+                          width: 32,
+                          child: Text(
+                            '$_quantity',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        _stepperButton(
+                          Icons.add,
+                          (stock > 0 && _quantity < cap) ? _incrementQty : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (limit != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.shopping_basket_outlined,
+                size: 15,
+                color: remaining == 0
+                    ? AppColors.danger
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  remaining == 0
+                      ? 'Purchase limit reached · $limit per buyer'
+                      : 'Purchase limit: $limit per buyer · '
+                            '${remaining ?? 0} more available to you',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: remaining == 0
+                        ? AppColors.danger
+                        : AppColors.textSecondary,
+                    fontWeight: remaining == 0
+                        ? FontWeight.w600
+                        : null,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ],
     );
   }
@@ -761,7 +1190,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         child: Icon(
           icon,
           size: 16,
-          color: onTap != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.35),
+          color: onTap != null
+              ? AppColors.textPrimary
+              : AppColors.textSecondary.withValues(alpha: 0.35),
         ),
       ),
     );
@@ -774,7 +1205,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         Text('Description', style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
         Text(
-          _product.description.isEmpty ? 'No description provided yet.' : _product.description,
+          _product.description.isEmpty
+              ? 'No description provided yet.'
+              : _product.description,
           style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
         ),
       ],
@@ -800,8 +1233,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   /// version is a real aggregate plus your own words.
   Widget _buildReviewsSection(ThemeData theme) {
     final myReviews = context.watch<ReviewState>().forProduct(_product.id);
-    final purchased =
-        context.watch<OrderState>().purchasedProductIds.contains(_product.id);
+    final purchased = context.watch<OrderState>().purchasedProductIds.contains(
+      _product.id,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -824,7 +1258,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               children: [
                 // Display numeral, so the section reads as a genuine feature
                 // rather than a plain form label.
-                Text('${_product.ratingCount}', style: AppType.priceNumeral(34)),
+                Text(
+                  '${_product.ratingCount}',
+                  style: AppType.priceNumeral(34),
+                ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -836,8 +1273,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.star_rounded,
-                            size: 16, color: AppColors.ratingStar),
+                        Icon(
+                          Icons.star_rounded,
+                          size: 16,
+                          color: AppColors.ratingStar,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${_product.rating.toStringAsFixed(1)} average',
@@ -855,8 +1295,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         if (myReviews.isEmpty && _product.ratingCount == 0)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text('No reviews yet — be the first to leave one.',
-                style: theme.textTheme.bodySmall),
+            child: Text(
+              'No reviews yet — be the first to leave one.',
+              style: theme.textTheme.bodySmall,
+            ),
           ),
         // Only offered when there's something to review: you can't rate a
         // product you never received, and the button would have no order to
@@ -884,9 +1326,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   /// order: a review is attached to a real purchase, and inventing one would
   /// put words in someone's mouth about a parcel they never got.
   void _openReview(BuildContext context) {
-    final orders = context
-        .read<OrderState>()
-        .resolvedOrders(context.read<CourierState>());
+    final orders = context.read<OrderState>().resolvedOrders(
+      context.read<CourierState>(),
+    );
     for (final order in orders) {
       if (order.productIds.contains(_product.id)) {
         _pushReview(context, order);
@@ -947,27 +1389,38 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ),
           if (review.comment.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(review.comment,
-                style: theme.textTheme.bodySmall?.copyWith(height: 1.4)),
+            Text(
+              review.comment,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
+            ),
           ],
-          if (review.photoPath != null) ...[
+          if (review.photos.isNotEmpty) ...[
             const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: editorialRadius(0, ShapeTier.accent),
-              child: Image.file(
-                File(review.photoPath!),
-                width: 88,
-                height: 88,
-                fit: BoxFit.cover,
-                // The file is gone (cleared storage) — a label, not a broken
-                // glyph.
-                errorBuilder: (context, error, stack) => SizedBox(
-                  width: 88,
-                  height: 88,
-                  child: Icon(Icons.image_not_supported_outlined,
-                      color: AppColors.textSecondary),
-                ),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final photo in review.photos)
+                  ClipRRect(
+                    borderRadius: editorialRadius(0, ShapeTier.accent),
+                    child: Image.file(
+                      File(photo),
+                      width: 88,
+                      height: 88,
+                      fit: BoxFit.cover,
+                      // The file is gone (cleared storage) — a label, not a
+                      // broken glyph.
+                      errorBuilder: (context, error, stack) => SizedBox(
+                        width: 88,
+                        height: 88,
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
           const SizedBox(height: 6),
@@ -975,8 +1428,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             children: [
               Text(
                 '${written.day}/${written.month}/${written.year}',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               const Spacer(),
               TextButton(
@@ -1016,7 +1470,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildBottomActionBar(BuildContext context, ThemeData theme) {
-    final isOutOfStock = _product.stock == 0;
+    final isOutOfStock = _isOutOfStock;
+    final onVacation = _product.sellerOnVacation;
+    final actionsDisabled = isOutOfStock || onVacation;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
@@ -1040,11 +1496,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (isOutOfStock)
+            if (onVacation || isOutOfStock)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 6,
+                    horizontal: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.12),
                     borderRadius: radiusOf(ShapeTier.control),
@@ -1052,10 +1511,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: AppColors.danger),
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: AppColors.danger,
+                      ),
                       const SizedBox(width: 6),
                       Text(
-                        'Out of stock',
+                        onVacation ? 'Store on vacation' : 'Out of stock',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: AppColors.danger,
                           fontWeight: FontWeight.w700,
@@ -1071,7 +1534,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Icons.chat_bubble_outline,
                   () => Navigator.of(context).push(
                     AppPageRoute(
-                      builder: (_) => ChatScreen(contactName: _product.sellerName, contactRole: 'Seller'),
+                      builder: (_) => ChatScreen(
+                        contactName: _product.sellerName,
+                        contactRole: 'Seller',
+                      ),
                     ),
                   ),
                   tooltip: 'Chat with seller',
@@ -1079,23 +1545,27 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: isOutOfStock ? null : () => _addToCart(showSnackBar: true),
-                    icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
+                    onPressed: actionsDisabled
+                        ? null
+                        : () => _addToCart(showSnackBar: true),
+                    icon: const Icon(
+                      Icons.add_shopping_cart_outlined,
+                      size: 18,
+                    ),
                     label: const Text('Add to Cart'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: isOutOfStock
-                        ? null
-                        : () {
-                            if (!_addToCart(showSnackBar: false)) return;
-                            Navigator.of(context).push(
-                              AppPageRoute(builder: (_) => const CheckoutScreen()),
-                            );
-                          },
-                    child: Text(isOutOfStock ? 'Out of Stock' : 'Buy Now'),
+                    onPressed: actionsDisabled ? null : _buyNow,
+                    child: Text(
+                      onVacation
+                          ? 'On Vacation'
+                          : isOutOfStock
+                          ? 'Out of Stock'
+                          : 'Buy Now',
+                    ),
                   ),
                 ),
               ],

@@ -45,10 +45,10 @@ import '../../../widgets/zefanya_mark.dart';
 /// two different ways: the fill is a lean on the card ground, while the
 /// rule is a saturated line (see [AppColors.ruleOnGround]).
 Color productHue(String category) => switch (category) {
-      'Fashion' => AppColors.secondary,
-      'Beauty' => AppColors.tertiary,
-      _ => AppColors.accent,
-    };
+  'Fashion' => AppColors.secondary,
+  'Beauty' => AppColors.tertiary,
+  _ => AppColors.accent,
+};
 
 Color productTint(String category) {
   // Fashion is the hero category, so its lean is the strongest of the
@@ -78,11 +78,19 @@ class ProductImage extends StatelessWidget {
     super.key,
     required this.product,
     this.photoIndex = 0,
+    this.imageUrl,
     this.iconSize = 40,
     this.alignment = Alignment.center,
   });
 
   final Product product;
+
+  /// An optional URL that overrides [Product.photos] for this render.
+  ///
+  /// Used by the product gallery to show the selected SKU's colour image while
+  /// keeping the same widget (and therefore the same loading/error treatment)
+  /// as every other product photo. Null keeps the normal cover/gallery path.
+  final String? imageUrl;
 
   /// Which of the product's photos to show. Out-of-range values clamp to the
   /// cover rather than throwing: this is driven by a page index, and an image
@@ -102,6 +110,8 @@ class ProductImage extends StatelessWidget {
   static const int _sourcePixels = 1000;
 
   String get _url {
+    final override = imageUrl;
+    if (override != null && override.isNotEmpty) return override;
     final photos = product.photos;
     // Out-of-range falls back to the *cover*, in both directions. The
     // obvious `clamp(0, length - 1)` is asymmetric: an index of 99 would
@@ -109,8 +119,9 @@ class ProductImage extends StatelessWidget {
     // which is a worse outcome than repeating the cover — and it
     // contradicted what this getter promised. Pinned by
     // test/product_image_cache_test.dart.
-    final index =
-        (photoIndex >= 0 && photoIndex < photos.length) ? photoIndex : 0;
+    final index = (photoIndex >= 0 && photoIndex < photos.length)
+        ? photoIndex
+        : 0;
     return photos[index];
   }
 
@@ -123,10 +134,12 @@ class ProductImage extends StatelessWidget {
       builder: (context, constraints) {
         // Unbounded (a row that will size to its child) — nothing to measure,
         // so decode natively rather than guess.
-        final slotWidth =
-            constraints.maxWidth.isFinite ? constraints.maxWidth : null;
-        final requested =
-            slotWidth == null ? _sourcePixels : (slotWidth * ratio).round();
+        final slotWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : null;
+        final requested = slotWidth == null
+            ? _sourcePixels
+            : (slotWidth * ratio).round();
         final decode = requested.clamp(1, _sourcePixels);
         // Never hand an unchanged size to ResizeImage: it would add a second
         // cache entry for the same bitmap.
@@ -162,32 +175,36 @@ class ProductImage extends StatelessWidget {
             );
           },
           loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        // Branded wait instead of Material's default spinner — this is
-        // the most frequently-seen loading state in the whole app
-        // (every tile, every grid, every time), so it's the highest
-        // leverage place for the monogram to show up.
-        return Container(
-          color: tint,
-          alignment: Alignment.center,
-          child: ZefanyaLoader(
-            size: iconSize * 0.8,
-            // tintInk, not a fixed brand token: the tint this sits on is a
-            // pale wash in light mode and a dark lean in dark mode, so the
-            // mark has to invert with it. A fixed light token disappears
-            // into the light wash; a fixed dark one disappears into the
-            // dark lean.
-            color: AppColors.tintInk.withValues(alpha: 0.75),
-          ),
-        );
-      },
-      // No internet, or picsum unreachable — fall back to the original
-      // tint + icon placeholder rather than a broken-image glyph. Icon is
-      // tintInk for the same reason as the loader above.
-      errorBuilder: (context, error, stackTrace) => Container(
+            if (progress == null) return child;
+            // Branded wait instead of Material's default spinner — this is
+            // the most frequently-seen loading state in the whole app
+            // (every tile, every grid, every time), so it's the highest
+            // leverage place for the monogram to show up.
+            return Container(
+              color: tint,
+              alignment: Alignment.center,
+              child: ZefanyaLoader(
+                size: iconSize * 0.8,
+                // tintInk, not a fixed brand token: the tint this sits on is a
+                // pale wash in light mode and a dark lean in dark mode, so the
+                // mark has to invert with it. A fixed light token disappears
+                // into the light wash; a fixed dark one disappears into the
+                // dark lean.
+                color: AppColors.tintInk.withValues(alpha: 0.75),
+              ),
+            );
+          },
+          // No internet, or picsum unreachable — fall back to the original
+          // tint + icon placeholder rather than a broken-image glyph. Icon is
+          // tintInk for the same reason as the loader above.
+          errorBuilder: (context, error, stackTrace) => Container(
             color: tint,
             alignment: Alignment.center,
-            child: Icon(Icons.image_outlined, size: iconSize, color: AppColors.tintInk),
+            child: Icon(
+              Icons.image_outlined,
+              size: iconSize,
+              color: AppColors.tintInk,
+            ),
           ),
         );
       },
@@ -268,9 +285,12 @@ class CoverStoryTile extends StatelessWidget {
   final String eyebrow;
 
   static const double _imageWidth = 172;
-  static const double _imageRightBleed = 6; // how far the arch pokes past the tile's own right edge
-  static const double _textImageGap = 16; // enforced empty space between title text and image — never crossed
-  static const double _bottomBleed = 24; // how far the arch's foot pokes below the tile's nominal bottom
+  static const double _imageRightBleed =
+      6; // how far the arch pokes past the tile's own right edge
+  static const double _textImageGap =
+      16; // enforced empty space between title text and image — never crossed
+  static const double _bottomBleed =
+      24; // how far the arch's foot pokes below the tile's nominal bottom
 
   @override
   Widget build(BuildContext context) {
@@ -289,10 +309,14 @@ class CoverStoryTile extends StatelessWidget {
             // title before it starts looking cramped) — below that,
             // shrink the image instead of squeezing the text further,
             // so very narrow screens degrade the photo, not the copy.
-            final rawTextWidth = constraints.maxWidth - _imageWidth - _textImageGap;
+            final rawTextWidth =
+                constraints.maxWidth - _imageWidth - _textImageGap;
             final textWidth = rawTextWidth.clamp(110.0, 220.0);
             final imageWidth = rawTextWidth < 110
-                ? (constraints.maxWidth - 110 - _textImageGap).clamp(90.0, _imageWidth)
+                ? (constraints.maxWidth - 110 - _textImageGap).clamp(
+                    90.0,
+                    _imageWidth,
+                  )
                 : _imageWidth;
 
             return SizedBox(
@@ -305,7 +329,8 @@ class CoverStoryTile extends StatelessWidget {
                   // past its right edge — this text is never crossed.
                   Positioned(
                     left: 0,
-                    bottom: _bottomBleed, // sits above the arch's foot-bleed zone, not inside it
+                    bottom:
+                        _bottomBleed, // sits above the arch's foot-bleed zone, not inside it
                     child: SizedBox(
                       width: textWidth,
                       child: Column(
@@ -316,7 +341,10 @@ class CoverStoryTile extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             product.name,
-                            style: theme.textTheme.titleLarge?.copyWith(fontSize: 19, height: 1.15),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 19,
+                              height: 1.15,
+                            ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -335,11 +363,16 @@ class CoverStoryTile extends StatelessWidget {
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
-                                  child: Text('₱', style: AppType.priceNumeral(20)),
+                                  child: Text(
+                                    '₱',
+                                    style: AppType.priceNumeral(20),
+                                  ),
                                 ),
                                 const SizedBox(width: 2),
                                 Text(
-                                  formatPeso(product.price).replaceFirst('₱', '').trim(),
+                                  formatPeso(
+                                    product.price,
+                                  ).replaceFirst('₱', '').trim(),
                                   style: AppType.priceNumeral(46),
                                 ),
                               ],
@@ -366,7 +399,9 @@ class CoverStoryTile extends StatelessWidget {
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.neutral.withValues(alpha: 0.28),
+                                color: AppColors.neutral.withValues(
+                                  alpha: 0.28,
+                                ),
                                 blurRadius: 24,
                                 offset: const Offset(0, 10),
                               ),
@@ -390,7 +425,10 @@ class CoverStoryTile extends StatelessWidget {
                     child: Transform.rotate(
                       angle: -0.14,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.tertiary,
                           borderRadius: radiusOf(ShapeTier.pill),
@@ -469,7 +507,10 @@ class WideProductTile extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         product.name,
-                        style: theme.textTheme.titleLarge?.copyWith(fontSize: 15, height: 1.15),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 15,
+                          height: 1.15,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -496,7 +537,10 @@ class WideProductTile extends StatelessWidget {
                         color: Colors.black.withValues(alpha: 0.45),
                         alignment: Alignment.center,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.surface.withValues(alpha: 0.94),
                             borderRadius: radiusOf(ShapeTier.pill),
@@ -577,7 +621,10 @@ class ProductCard extends StatelessWidget {
                       child: Transform.rotate(
                         angle: -0.09,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             // roseGround, not primaryDark: this tag carries
                             // 10pt text, and dark mode's lifted rose caps out
@@ -586,7 +633,11 @@ class ProductCard extends StatelessWidget {
                             color: AppColors.roseGround,
                             borderRadius: radiusOf(ShapeTier.pill),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6, offset: const Offset(0, 2)),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
                             ],
                           ),
                           child: Text(
@@ -607,13 +658,39 @@ class ProductCard extends StatelessWidget {
                     top: 0,
                     child: HeartButton(product: product, compact: true),
                   ),
-                  if (product.stock == 0)
+                  if (product.sellerOnVacation)
+                    Positioned(
+                      left: 6,
+                      bottom: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface.withValues(alpha: 0.94),
+                          borderRadius: radiusOf(ShapeTier.pill),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Text(
+                          'On vacation',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (product.stock == 0 && !product.sellerOnVacation)
                     Positioned.fill(
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.45),
                         alignment: Alignment.center,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.surface.withValues(alpha: 0.94),
                             borderRadius: radiusOf(ShapeTier.pill),
@@ -646,7 +723,10 @@ class ProductCard extends StatelessWidget {
                 children: [
                   Text(
                     product.name,
-                    style: theme.textTheme.titleLarge?.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -663,7 +743,11 @@ class ProductCard extends StatelessWidget {
                   // card from being just a name and a price.
                   Row(
                     children: [
-                      Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
+                      Icon(
+                        Icons.star_rounded,
+                        size: 13,
+                        color: AppColors.sageIcon,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         product.rating.toStringAsFixed(1),
@@ -685,7 +769,9 @@ class ProductCard extends StatelessWidget {
                         Flexible(
                           child: Text(
                             '  ·  ${_formatSoldCount(product.soldCount)} sold',
-                            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -759,10 +845,7 @@ class PriceLabel extends StatelessWidget {
               alignment: PlaceholderAlignment.middle,
               child: Text('₱', style: mark),
             ),
-            TextSpan(
-              text: numeralString,
-              style: numeral,
-            ),
+            TextSpan(text: numeralString, style: numeral),
           ],
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/data/address_entry.dart';
 import 'package:zefanya/screens/buyer/checkout_screen.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
@@ -103,5 +104,48 @@ void main() {
     // Scrolled directly to terms error, now visible on screen
     expect(find.text('Please agree to the Terms & Return Policy to continue.'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('checkout pre-selects the address-book default', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final auth = AuthState();
+    auth.updateProfile(
+      firstName: 'Maria',
+      lastName: 'Santos',
+      phone: '09171234567',
+      street: '1 Profile Street',
+      barangay: 'Poblacion',
+      municipality: 'Makati',
+      province: 'Metro Manila',
+    );
+    auth.ensureAddressBookSeeded();
+    auth.addAddress(
+      const AddressEntry(
+        id: '',
+        recipient: 'Ana Reyes',
+        phone: '09987654321',
+        region: 'National Capital Region (NCR)',
+        city: 'Quezon City',
+        barangay: 'Commonwealth',
+        street: '88 Sampaguita St',
+      ),
+    );
+    auth.setDefaultAddress('ADDR-2');
+
+    final cart = CartState();
+    await cart.load();
+    cart.addItem(mockProducts.first);
+    await _pumpCheckout(tester, auth: auth, cart: cart);
+
+    expect(find.textContaining('Ana Reyes'), findsOneWidget);
+    expect(
+      find.text(
+        '88 Sampaguita St, Commonwealth, Quezon City, '
+        'National Capital Region (NCR)',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('1 Profile Street'), findsNothing);
+    expect(find.textContaining('Default address'), findsOneWidget);
   });
 }

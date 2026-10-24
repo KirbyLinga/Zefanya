@@ -1,0 +1,4 @@
+C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider G현 dark
+C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider G현 light
+C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen G현 dark
+C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen G현 light

@@ -596,6 +596,28 @@ The three guards worth naming, each proven to fail by breaking it on purpose:
   `sort_order: 1` flagged primary), and the HTTP response returned the primary
   first — the only way to know the cover-first rule survives `Storage::url()` and
   the resource's own sort. A test can assert the resource's output; only the wire
+
+## October 2026 pass — buyer-side features, triaged and tested
+
+This pass added four buyer-facing feature areas, all behind the mock/live repository switch, plus shared validation and a QA triage:
+
+- **Returns / refunds** (`ReturnScreen`, `ReturnState`, `MockReturnRepository`, `LiveReturnRepository`): request a return for a delivered order within a 7-day window, 1–5 ordered photos, ≥10-char description, escalation of rejections, and `Order Received` blocked while a request is open. Live mode names the three missing endpoints (`GET /returns`, `POST /orders/{sellerOrder}/returns`, `POST /returns/{return}/escalate`) rather than guessing. Tested in `test/returns_test.dart`.
+- **Saved addresses** (`AddressBookScreen`, `AddressFormScreen`, `AddressEntry`, `ph_regions`, `AuthState` addresses): Region → City → Barangay cascade for Philippine addresses, default-address management, delete with confirmation, seeding from an existing profile. Tested in `test/address_book_test.dart`.
+- **Notifications** (`NotificationsScreen`, `NotificationState`, `notification_bell`): local inbox with seed fixtures, read/unread tracking persisted to shared_preferences, "Mark all as read", bell badge on the buyer shell.
+- **Product links** (`ProductLinkScreen`, `product_link`): resolves an inbound product id against the loaded catalogue, opening `ProductDetailsScreen` or an honest unavailable state — never a blank route.
+- **Validators** (`validators.dart`): person names (A2), password (A5), PH mobile, age 18+ (A6). Tested in `test/validators_test.dart`.
+- **Chat validation** (`chat_validation.dart`): message length, attachment size/extension rules.
+
+QA: `qa/QA_REPORT.md`, `qa/build_triage.py`, `qa/triage.csv` — a 377-case workbook triaged A–E; 20 app-defect fixes and 27 missing-feature cases now have app code and tests; 10 partial cases are app-side done but need server/device. Full run: **516 passed / 41 failed**, all 41 pre-existing golden/screenshot/device cases (no regressions).
+
+Status: **nothing committed or pushed** — `qa/QA_REPORT.md` §1 states "No commit or push has been made." The 37 local commits on `mobile-dev` are also unpushed relative to `origin/mobile-dev`.
+
+Next steps:
+1. Commit the `lib/` + `test/` + `qa/` changes (this pass's work).
+2. Push `mobile-dev` to origin.
+3. Re-run the workbook triage against the committed tree to confirm the 91-case projection.
+4. Courier registration vs `StoreLogisticsRegistrationRequest` (blocks courier API half).
+5. Reviews (`GET /reviews/mine`) and chat (`POST /conversations/{key}/messages`) — both have tables now.
   shows what a client receives.
 - **Establish a baseline before calling something a regression.** The full web
   suite has **60** pre-existing failures in this checkout — all

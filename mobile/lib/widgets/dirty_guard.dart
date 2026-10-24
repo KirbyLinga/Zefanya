@@ -25,7 +25,15 @@ class DirtyGuard extends StatelessWidget {
   final Widget child;
   final String message;
 
-  Future<bool> _confirm(BuildContext context) async {
+  Future<bool> _confirm(BuildContext context) =>
+      confirmDiscard(context, message: message);
+
+  /// The same dialog [DirtyGuard] shows, available to a screen whose back
+  /// handling is step-aware and therefore cannot simply be wrapped.
+  static Future<bool> confirmDiscard(
+    BuildContext context, {
+    String message = 'You have unsaved changes.',
+  }) async {
     // Editorial dialog, matching the logout confirm — same shape,
     // same quiet-Stay / clear-Discard pair.
     final discard = await showDialog<bool>(
@@ -44,8 +52,10 @@ class DirtyGuard extends StatelessWidget {
               children: [
                 Text('UNSAVED CHANGES', style: AppType.eyebrow),
                 const SizedBox(height: 10),
-                Text('Discard changes?',
-                    style: dialogTheme.textTheme.titleMedium),
+                Text(
+                  'Discard changes?',
+                  style: dialogTheme.textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   message,
@@ -58,16 +68,14 @@ class DirtyGuard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: TextButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(false),
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
                         child: const Text('Stay'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(true),
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.danger,
                           foregroundColor: AppColors.textOnDark,

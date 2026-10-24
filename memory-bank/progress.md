@@ -580,6 +580,29 @@ boot" — now guarded, so a failed load is recorded and rendered instead of abor
   `PageView` mid-fade, two subtrees claimed the same `GlobalKey<FormState>`s, and
   the framework resolved it by leaving the incoming page empty. The new password
   step would have been unreachable, so it was fixed rather than worked around.
+
+## October 2026 pass — what was added
+
+### Buyer: returns / refunds
+`ReturnScreen` + `ReturnState` + `MockReturnRepository` + `LiveReturnRepository` (`test/returns_test.dart`). A buyer can request a return for a delivered order within a 7-day window, attach 1–5 ordered photos (removable before submission), write a ≥10-char description, and escalate a rejection. `Order Received` is blocked while a request is open. Live mode names the three missing endpoints instead of guessing them.
+
+### Buyer: saved addresses
+`AddressBookScreen` + `AddressFormScreen` + `AddressEntry` + `ph_regions` + `AuthState` address book (`test/address_book_test.dart`). Region → City → Barangay cascade for Philippine addresses, default-address management, delete with confirmation, profile-based seeding.
+
+### Buyer: notifications
+`NotificationsScreen` + `NotificationState` + `notification_bell`. Local seed-fixture inbox, read/unread tracking persisted to shared_preferences, "Mark all as read", bell badge on the buyer shell.
+
+### Buyer: product links
+`ProductLinkScreen` + `product_link`. Resolves an inbound product id against the loaded catalogue; opens `ProductDetailsScreen` or an honest unavailable state — never a blank route.
+
+### Shared: validators + chat validation
+`validators.dart` (`test/validators_test.dart`): person names (A2), password (A5), PH mobile, age 18+ (A6). `chat_validation.dart`: message length (1000 chars), attachment size (5 MB), extensions (jpg/jpeg/png/pdf).
+
+### QA
+`qa/QA_REPORT.md`, `qa/build_triage.py`, `qa/triage.csv`, `qa/full_test_run.txt`, `qa/failing_tests_all.txt`, `qa/implemented_fixes.diff`. 377-case workbook triaged A–E: 20 app-defect fixes + 27 missing-feature cases now have app code and tests; 10 partial cases are app-side done but need server/device. Full run: **516 passed / 41 failed**, all 41 pre-existing golden/screenshot/device cases (no regressions). Projection: 91/377 (24.1%) after fixes; 91/248 (36.7%) once the 129 C cases are approved out of scope.
+
+### Status
+**Nothing committed or pushed.** `qa/QA_REPORT.md` §1: "No commit or push has been made." The 37 local commits on `mobile-dev` are also unpushed relative to `origin/mobile-dev`.
   Proved pre-existing by stashing the session's `lib/` changes and reproducing it
   on committed code — the claim "I broke this" and "this was already broken" are
   different claims and only one of them is worth reporting.

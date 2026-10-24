@@ -25,7 +25,6 @@ import 'package:flutter/foundation.dart';
 import '../data/api/api_exception.dart';
 import '../data/mock_data.dart' show Product;
 import '../data/repositories/catalog_repository.dart';
-
 class CatalogState extends ChangeNotifier {
   /// [repository] defaults to the mock so existing call sites and tests are
   /// unaffected; `main()` passes the resolved bundle's.
@@ -48,6 +47,16 @@ class CatalogState extends ChangeNotifier {
 
   /// Every product the catalogue lists, in the server's order.
   List<Product> get products => List.unmodifiable(_products);
+
+  /// Resolves a product id for a deep link, or null when the catalogue does
+  /// not contain it. Null is the honest answer for a stale link — the screen
+  /// shows an unavailable state rather than inventing a product.
+  Product? productById(String id) {
+    for (final product in _products) {
+      if (product.id == id) return product;
+    }
+    return null;
+  }
 
   /// Category labels in display order, including the leading `'All'` the chips
   /// render (that entry is the app's own no-filter chip, not a server row).
@@ -83,6 +92,79 @@ class CatalogState extends ChangeNotifier {
             product.category.toLowerCase().contains(needle))
           product,
     ];
+  }
+
+  /// A catalogue word close to a query that matched nothing, or null.
+  ///
+  /// Search is a single exact substring today, so one transposed letter turns a
+  /// real product into a dead end. This deliberately suggests a *word that is
+  /// in the catalogue* rather than guessing the whole product name: tapping
+  /// "linen" runs a search that returns results, while suggesting "Linen Blend
+  /// Wrap Dress" from "linenn" would be a much larger claim than the data can
+  /// support. It only fires when the original query found nothing, and only
+  /// for words of four characters or more, so "zzqxw" stays an honest empty
+  /// state.
+  String? suggestSearch(String query) {
+    final trimmed = query.trim().toLowerCase();
+    if (trimmed.length < 4 || search(trimmed).isNotEmpty) return null;
+
+    final queryWords = trimmed
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((word) => word.length >= 4)
+        .toList(growable: false);
+    if (queryWords.isEmpty) return null;
+
+    const stopWords = {'with', 'from', 'that', 'this', 'your', 'shop'};
+    final candidates = <String>{};
+    for (final product in _products) {
+      for (final word in '${product.name} ${product.category}'
+          .toLowerCase()
+          .split(RegExp(r'[^a-z0-9]+'))) {
+        if (word.length >= 4 && !stopWords.contains(word)) {
+          candidates.add(word);
+        }
+      }
+    }
+
+    String? best;
+    var bestDistance = 3;
+    for (final candidate in candidates) {
+      for (final word in queryWords) {
+        final distance = _editDistance(word, candidate);
+        // One typo is enough for short words; allow two on longer ones, where
+        // "someting" vs "something" is still obviously the same word.
+        final allowed = word.length >= 8 ? 2 : 1;
+        if (distance >= 1 &&
+            distance <= allowed &&
+            distance < bestDistance &&
+            search(candidate).isNotEmpty) {
+          best = candidate;
+          bestDistance = distance;
+        }
+      }
+    }
+    return best;
+  }
+
+  /// Levenshtein distance, capped by the tiny words this is used on.
+  static int _editDistance(String a, String b) {
+    if (a == b) return 0;
+    var previous = List<int>.generate(b.length + 1, (i) => i);
+    for (var i = 0; i < a.length; i++) {
+      final current = <int>[i + 1];
+      for (var j = 0; j < b.length; j++) {
+        final insertion = current[j] + 1;
+        final deletion = previous[j + 1] + 1;
+        final substitution = previous[j] + (a[i] == b[j] ? 0 : 1);
+        current.add(
+          insertion < deletion
+              ? (insertion < substitution ? insertion : substitution)
+              : (deletion < substitution ? deletion : substitution),
+        );
+      }
+      previous = current;
+    }
+    return previous.last;
   }
 
   /// Call once before runApp (see main.dart) to fetch the catalogue.

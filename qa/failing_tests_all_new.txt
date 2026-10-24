@@ -1,0 +1,42 @@
+﻿courier_tracker_golden_test.dart: courier tracker with a named rider — light
+delivery_completion_view_test.dart: completion screen — light
+courier_tracker_golden_test.dart: courier tracker with a named rider — dark
+delivery_completion_view_test.dart: completion screen — dark
+delivery_completion_view_test.dart: the fee and the day total are both stated
+featured_deck_test.dart: the rail widget (animations disabled) home composition (real sliver stack) rail, search and promo share one left edge (360dp)
+featured_deck_test.dart: the rail widget (animations disabled) home composition (real sliver stack) second card peeks past the right edge, unclipped
+live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+order_confirmation_dialog_test.dart: confirmation — light
+order_confirmation_dialog_test.dart: confirmation — dark
+screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+screens_screenshot_test.dart: Buyer Home — 360x740_light
+screens_screenshot_test.dart: Search — 360x740_light
+screens_screenshot_test.dart: Cart — 360x740_light
+screens_screenshot_test.dart: Profile — 360x740_light
+screens_screenshot_test.dart: Product Detail — 360x740_light
+screens_screenshot_test.dart: Courier Home — 360x740_light
+screens_screenshot_test.dart: Landing Beat 1 — 360x740_dark
+screens_screenshot_test.dart: Landing Beat 2 — 360x740_dark
+screens_screenshot_test.dart: Buyer Home — 360x740_dark
+screens_screenshot_test.dart: Search — 360x740_dark
+screens_screenshot_test.dart: Cart — 360x740_dark
+screens_screenshot_test.dart: Profile — 360x740_dark
+screens_screenshot_test.dart: Product Detail — 360x740_dark
+screens_screenshot_test.dart: Courier Home — 360x740_dark
+screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+screens_screenshot_test.dart: Buyer Home — 411x890_light
+screens_screenshot_test.dart: Search — 411x890_light
+screens_screenshot_test.dart: Cart — 411x890_light
+screens_screenshot_test.dart: Profile — 411x890_light
+screens_screenshot_test.dart: Product Detail — 411x890_light
+screens_screenshot_test.dart: Courier Home — 411x890_light
+screens_screenshot_test.dart: Landing Beat 1 — 411x890_dark
+screens_screenshot_test.dart: Landing Beat 2 — 411x890_dark
+screens_screenshot_test.dart: Buyer Home — 411x890_dark
+screens_screenshot_test.dart: Search — 411x890_dark
+screens_screenshot_test.dart: Cart — 411x890_dark
+screens_screenshot_test.dart: Profile — 411x890_dark
+screens_screenshot_test.dart: Product Detail — 411x890_dark
+screens_screenshot_test.dart: Courier Home — 411x890_dark

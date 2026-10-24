@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/scroll_to_top.dart';
 import '../../widgets/cart_button.dart';
+import '../../widgets/notification_bell.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/motion/fade_through.dart';
@@ -383,6 +384,8 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           ],
                         ),
                       ),
+                      const NotificationBell(),
+                      const SizedBox(width: 4),
                       const CartButton(),
                     ],
                   ),

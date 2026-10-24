@@ -52,6 +52,10 @@ import '../../widgets/zefanya_mark.dart';
 /// someone who genuinely received nothing is not stuck watching a timer.
 const Duration kResendCooldown = Duration(seconds: 30);
 
+/// How long a confirmation code stays valid. Mirrors the server's lifetime;
+/// the countdown is display only, the server still decides.
+const Duration kOtpLifetime = Duration(minutes: 5);
+
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key});
 
@@ -73,15 +77,65 @@ class _OtpScreenState extends State<OtpScreen> {
   int _cooldownSeconds = 0;
   Timer? _cooldownTimer;
 
+  int _secondsLeft = kOtpLifetime.inSeconds;
+  Timer? _otpTimer;
+
+  bool get _isExpired => _secondsLeft <= 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // The state is not readable in initState (no inherited widgets yet), so
+    // the first tick waits one frame. The timer itself is wall-clock based:
+    // returning from the mail app recomputes from `otpSentAt`, it does not
+    // resume a paused counter at 5:00.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _startOtpCountdown();
+    });
+  }
+
   @override
   void dispose() {
     _cooldownTimer?.cancel();
+    _otpTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
 
+  void _startOtpCountdown() {
+    _otpTimer?.cancel();
+    final sentAt = context.read<AuthState>().otpSentAt ?? DateTime.now();
+
+    void tick() {
+      final remaining = sentAt
+          .add(kOtpLifetime)
+          .difference(DateTime.now())
+          .inSeconds
+          .clamp(0, kOtpLifetime.inSeconds)
+          .toInt();
+      if (!mounted) return;
+      if (remaining != _secondsLeft) {
+        setState(() => _secondsLeft = remaining);
+      }
+      if (remaining <= 0) _otpTimer?.cancel();
+    }
+
+    tick();
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+  }
+
+  String get _remainingLabel {
+    final minutes = _secondsLeft ~/ 60;
+    final seconds = _secondsLeft % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _submit() async {
     if (_isSubmitting) return;
+    if (_isExpired) {
+      setState(() => _error = 'That code has expired. Send a new code.');
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -145,6 +199,7 @@ class _OtpScreenState extends State<OtpScreen> {
     if (!mounted) return;
     setState(() => _isResending = false);
     _startCooldown();
+    _startOtpCountdown();
     // The server's own sentence, not one composed here: "a new code has been
     // sent" is a claim only the party that sent the mail is in a position to make.
     showTimedSnackBar(
@@ -233,6 +288,24 @@ class _OtpScreenState extends State<OtpScreen> {
             index: 1,
             child: _buildCodeField(theme),
           ),
+          StaggeredReveal(
+            key: const ValueKey('otp-expiry'),
+            index: 2,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              child: Text(
+                _isExpired
+                    ? 'This code has expired. Send a new code.'
+                    : 'Code expires in $_remainingLabel',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _isExpired
+                      ? AppColors.danger
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
           if (_error != null)
             StaggeredReveal(
               key: const ValueKey('otp-error'),
@@ -292,7 +365,10 @@ class _OtpScreenState extends State<OtpScreen> {
             letterSpacing: 10,
             fontWeight: FontWeight.w600,
           ),
-          decoration: const InputDecoration(hintText: '000000', counterText: ''),
+          decoration: const InputDecoration(
+            hintText: '000000',
+            counterText: '',
+          ),
           validator: _validateCode,
           onChanged: (_) {
             // The error is about the code that was submitted, so it stops being
@@ -329,7 +405,11 @@ class _OtpScreenState extends State<OtpScreen> {
         child: _isSubmitting
             // The same spinner the registration form's own submit button uses,
             // so "this is being sent" looks the same in both halves of one flow.
-            ? ZefanyaLoader(size: 18, color: AppColors.textOnDark, strokeWidth: 4)
+            ? ZefanyaLoader(
+                size: 18,
+                color: AppColors.textOnDark,
+                strokeWidth: 4,
+              )
             : const Text('Confirm Code'),
       ),
     );
@@ -342,7 +422,9 @@ class _OtpScreenState extends State<OtpScreen> {
       children: [
         Text(
           'Nothing arrived?',
-          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(width: 6),
         // Flexible because this row is a sentence plus a control, and the test
@@ -355,7 +437,9 @@ class _OtpScreenState extends State<OtpScreen> {
               // The countdown is a fact rather than a scold: it says how long
               // until the server will consider another request at all, which is
               // what someone pressing the button a second time wants to know.
-              waiting ? 'Send another in ${_cooldownSeconds}s' : 'Send a new code',
+              waiting
+                  ? 'Send another in ${_cooldownSeconds}s'
+                  : 'Send a new code',
             ),
           ),
         ),
@@ -371,7 +455,9 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget _buildDevHint(ThemeData theme) {
     return Text(
       'Test build: mock registrations accept $kMockOtpCode.',
-      style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: AppColors.textSecondary,
+      ),
       textAlign: TextAlign.center,
     );
   }
