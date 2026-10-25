@@ -44,6 +44,7 @@ import '../../utils/money_format.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
 import '../buyer/widgets/product_card.dart' show ProductImage;
+import 'account_security_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/motion/cloud_transition.dart';
@@ -124,6 +125,20 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         icon: const Icon(Icons.location_city_outlined, size: 18),
                         label: const Text('Manage Addresses'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('account-security'),
+                        onPressed: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => const AccountSecurityScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.shield_outlined, size: 18),
+                        label: const Text('Account & Security'),
                       ),
                     ),
                   ],

@@ -50,12 +50,14 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/dev_flags.dart';
 import '../data/address_entry.dart';
+import '../data/api/api_exception.dart';
 import '../data/dto/registration_payload.dart';
 // Prefixed because this class has a getter of the same name
 // (`awaitsEmailVerification`); the two are the same decision, and the prefix is
 // what keeps the getter delegating to the helper instead of shadowing it.
 import '../data/dto/remote_status.dart' as remote;
 import '../data/ph_regions.dart';
+import '../data/repositories/account_security_repository.dart';
 import '../data/repositories/auth_repository.dart';
 import '../utils/order_tab_memory.dart';
 import '../utils/validators.dart';
@@ -79,10 +81,12 @@ class AuthState extends ChangeNotifier {
   /// [repository] defaults to the mock implementation so existing call sites
   /// (and tests) keep working unchanged; `main.dart` passes the resolved
   /// bundle's, which is what makes the live switch possible.
-  AuthState({AuthRepository? repository})
-    : _repository = repository ?? const MockAuthRepository();
+  AuthState({AuthRepository? repository, AccountSecurityRepository? accountSecurity})
+    : _repository = repository ?? const MockAuthRepository(),
+      _accountSecurity = accountSecurity ?? MockAccountSecurityRepository();
 
   final AuthRepository _repository;
+  final AccountSecurityRepository _accountSecurity;
 
   UserRole? role;
   AccountStatus status = AccountStatus.loggedOut;
@@ -393,6 +397,70 @@ class AuthState extends ChangeNotifier {
       password: password,
     );
     _applyResult(result, fallbackName: name);
+    await _save();
+  }
+
+  /// Changes the password after re-proving the current one.
+  ///
+  /// The repository/server does the checking; this method exists so screens do
+  /// not reach into a data source directly and so a successful change can notify
+  /// anything watching the session. Other phones are signed out by the server.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _accountSecurity.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    notifyListeners();
+  }
+
+  /// Asks for a code at the new address. Deliberately does not touch [email]:
+  /// until the code comes back, the account still belongs to the old address,
+  /// and a profile that showed the pending one would claim a change that has
+  /// not happened.
+  Future<void> requestEmailChange(String newEmail) async {
+    final value = newEmail.trim();
+    if (email != null && value.toLowerCase() == email!.toLowerCase()) {
+      throw const ValidationException(
+        fieldErrors: {'email': 'This is already your email address.'},
+      );
+    }
+
+    await _accountSecurity.requestEmailChange(value);
+  }
+
+  /// Confirms the emailed code and moves the session onto the new address.
+  Future<void> confirmEmailChange(String code) async {
+    final changed = await _accountSecurity.confirmEmailChange(code);
+    email = changed;
+    notifyListeners();
+    await _save();
+  }
+
+  /// Same two-step shape as email. The number is validated and normalized here
+  /// as well as server-side: an invalid number should be answered at the field
+  /// without spending an OTP request, and the server still re-checks.
+  Future<void> requestPhoneChange(String newPhone) async {
+    final value = normalizePhMobile(newPhone);
+    final problem = validatePhMobile(value);
+    if (problem != null) {
+      throw ValidationException(fieldErrors: {'contact_no': problem});
+    }
+    if (phone != null && value == normalizePhMobile(phone)) {
+      throw const ValidationException(
+        fieldErrors: {'contact_no': 'This is already your phone number.'},
+      );
+    }
+
+    await _accountSecurity.requestPhoneChange(value);
+  }
+
+  Future<void> confirmPhoneChange(String code) async {
+    final changed = await _accountSecurity.confirmPhoneChange(code);
+    phone = changed;
+    notifyListeners();
     await _save();
   }
 

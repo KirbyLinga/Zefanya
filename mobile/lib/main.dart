@@ -45,7 +45,10 @@ void main() async {
     baseUrl: kApiBaseUrl,
   );
 
-  final authState = AuthState(repository: repositories.auth);
+  final authState = AuthState(
+    repository: repositories.auth,
+    accountSecurity: repositories.accountSecurity,
+  );
   final cartState = CartState(
     catalog: repositories.catalog,
     vouchers: repositories.cart,

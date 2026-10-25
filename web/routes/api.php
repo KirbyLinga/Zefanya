@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Chat\ChatController;
 use App\Http\Controllers\Api\Courier\CourierJobController;
 use App\Http\Controllers\Api\Courier\CourierMilestoneController;
+use App\Http\Controllers\Api\Buyer\AccountSecurityController;
 use App\Http\Controllers\Api\Buyer\RegisterBuyerController;
 use App\Http\Controllers\Api\Buyer\VerifyBuyerOtpController;
 use App\Http\Controllers\Api\Cart\VoucherController;
@@ -115,6 +116,32 @@ Route::get('/promotions', [PromotionController::class, 'index'])
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [LoginController::class, 'show'])
         ->name('api.me');
+
+    // ?? Account & security ?????????????????????????????????????????????????
+    //
+    // Credential changes are authenticated: the token says which row to change,
+    // and the password route additionally asks for the current password. Each
+    // route has its own bucket because these are writes and a loop here mutates
+    // an account rather than reading a page.
+    Route::post('/account/password', [AccountSecurityController::class, 'changePassword'])
+        ->name('api.account.password')
+        ->middleware('throttle:5,1,api-account-password');
+
+    Route::post('/account/email', [AccountSecurityController::class, 'requestEmailChange'])
+        ->name('api.account.email.request')
+        ->middleware('throttle:5,1,api-account-email-request');
+
+    Route::post('/account/email/verify', [AccountSecurityController::class, 'confirmEmailChange'])
+        ->name('api.account.email.verify')
+        ->middleware('throttle:10,1,api-account-email-verify');
+
+    Route::post('/account/phone', [AccountSecurityController::class, 'requestPhoneChange'])
+        ->name('api.account.phone.request')
+        ->middleware('throttle:5,1,api-account-phone-request');
+
+    Route::post('/account/phone/verify', [AccountSecurityController::class, 'confirmPhoneChange'])
+        ->name('api.account.phone.verify')
+        ->middleware('throttle:10,1,api-account-phone-verify');
 
     // The courier's equivalent — a separate path because the token holder may be
     // either a Buyer or a LogisticsProvider, and the controller checks which.

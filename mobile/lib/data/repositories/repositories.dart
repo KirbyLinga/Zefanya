@@ -34,6 +34,7 @@
 
 import '../api/api_client.dart';
 import '../api/token_store.dart';
+import 'account_security_repository.dart';
 import 'auth_repository.dart';
 import 'cart_repository.dart';
 import 'catalog_repository.dart';
@@ -51,6 +52,7 @@ export '../api/api_exception.dart' show ApiException, PendingApprovalException;
 class Repositories {
   const Repositories({
     required this.auth,
+    required this.accountSecurity,
     required this.catalog,
     required this.cart,
     required this.order,
@@ -62,6 +64,7 @@ class Repositories {
   });
 
   final AuthRepository auth;
+  final AccountSecurityRepository accountSecurity;
   final CatalogRepository catalog;
   final CartRepository cart;
   final OrderRepository order;
@@ -85,6 +88,7 @@ class Repositories {
   /// production is how a build ships pointing at nothing.
   factory Repositories.mock() => Repositories(
         auth: const MockAuthRepository(),
+        accountSecurity: MockAccountSecurityRepository(),
         catalog: const MockCatalogRepository(),
         cart: const MockCartRepository(),
         // These two are not `const`, and can't be: each holds the mutable,
@@ -105,6 +109,7 @@ class Repositories {
   /// what lets a test build a live bundle against a fake HTTP client.
   factory Repositories.live(ApiClient client) => Repositories(
         auth: LiveAuthRepository(client),
+        accountSecurity: LiveAccountSecurityRepository(client),
         catalog: LiveCatalogRepository(client),
         cart: LiveCartRepository(client),
         order: LiveOrderRepository(client),

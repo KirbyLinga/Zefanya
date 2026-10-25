@@ -62,9 +62,10 @@ String? validatePassword(String? value) {
   final hasUpper = _uppercase.hasMatch(password);
   final hasDigit = _digit.hasMatch(password);
   final hasSpecial = _special.hasMatch(password);
-  if (!hasLower || !hasUpper || !hasDigit || !hasSpecial) {
-    return 'Use $kPasswordMinLength+ characters with uppercase, lowercase, number and symbol';
-  }
+  if (!hasLower) return 'Add a lowercase letter';
+  if (!hasUpper) return 'Add an uppercase letter';
+  if (!hasDigit) return 'Add a number';
+  if (!hasSpecial) return 'Add a symbol';
   return null;
 }
 
@@ -92,6 +93,20 @@ String? validatePhMobile(String? value) {
     return 'Use 09XXXXXXXXX or +639XXXXXXXXX';
   }
   return null;
+}
+
+/// The form the server stores: eleven digits starting `09`.
+///
+/// The address book accepts `+639XXXXXXXXX` because people type what their SIM
+/// shows. The buyer table's `contact_no` is eleven characters wide and its
+/// uniqueness check compares the stored form, so the two spellings have to
+/// collapse to one before the request leaves the phone.
+String normalizePhMobile(String? value) {
+  final raw = (value ?? '').trim().replaceAll(RegExp(r'[\s-]'), '');
+  if (raw.startsWith('+639') && raw.length == 13) {
+    return '0${raw.substring(3)}';
+  }
+  return raw;
 }
 
 /// Whether [birthday] makes someone at least [years] old on [today].
