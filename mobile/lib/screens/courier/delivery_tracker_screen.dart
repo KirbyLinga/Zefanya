@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
+import '../../data/mock_data.dart' show DeliveryJob;
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
@@ -73,13 +74,17 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   int _currentIndex(DeliveryMilestone milestone) =>
       _steps.indexWhere((s) => s.$1 == milestone);
 
-  void _advance(CourierState courier, DeliveryMilestone current) {
+  void _advance(
+    CourierState courier,
+    DeliveryMilestone current, {
+    String? trackingNumber,
+  }) {
     final next = _currentIndex(current) + 1;
     if (next >= _steps.length) return;
     final upcoming = _steps[next].$1;
     // The dispatch step is the first moment the buyer's tracker can answer
     // "who is bringing this", so that's where identity is recorded (and why
-    // it's null on every earlier step — the rider who collects a parcel
+    // it's null on every earlier step - the rider who collects a parcel
     // isn't the rider who delivers it).
     final dispatch = upcoming == DeliveryMilestone.assignedToRider;
     final auth = context.read<AuthState>();
@@ -88,10 +93,14 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       upcoming,
       courierName: dispatch ? auth.name : null,
       // The rider's own profile photo, if they've set one. Passed from the
-      // courier's session rather than looked up by the buyer — so the buyer's
+      // courier's session rather than looked up by the buyer - so the buyer's
       // app never has access to a rider's account, only to this one value
       // handed over with the assignment.
       courierPhotoPath: dispatch ? auth.avatarPath : null,
+      // The typed waybill is forwarded on pickup so the server can compare
+      // it with the number it issued. The local dialog already matched it;
+      // this is the second, authoritative check.
+      trackingNumber: trackingNumber,
     );
   }
 
@@ -177,6 +186,151 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     courier.advanceMilestone(widget.jobId, DeliveryMilestone.inTransit);
   }
 
+  /// The handover check before a delivery can be completed.
+  ///
+  /// Two independent facts are verified at the door: the code the buyer reads
+  /// out, and — for a COD parcel — the exact cash amount. The sheet stays open
+  /// on a wrong value so the rider can correct it without losing the photo or
+  /// the typed code. After five wrong codes [CourierState] locks entry for 15
+  /// minutes; the sheet says so rather than letting the button look broken.
+  Future<void> _confirmDelivery(CourierState courier) async {
+    final job = courier.jobById(widget.jobId);
+    if (job == null) return;
+
+    final otpController = TextEditingController();
+    final amountController = TextEditingController();
+    String? error;
+
+    final confirmed = await showModalBottomSheet<({String otp, double? cash})>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final sheetTheme = Theme.of(context);
+            final locked = courier.otpLockRemaining(widget.jobId);
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                20 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('CONFIRM HANDOVER', style: AppType.eyebrow),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ask the buyer for the 6-digit delivery code.',
+                    style: sheetTheme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    key: const ValueKey('delivery-otp-field'),
+                    controller: otpController,
+                    enabled: locked == null,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Delivery OTP',
+                      hintText: '6 digits',
+                      counterText: '',
+                    ),
+                  ),
+                  if (job.hasCod) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const ValueKey('cod-amount-field'),
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Cash collected',
+                        hintText: formatPeso(job.codAmount),
+                        prefixText: '₱ ',
+                      ),
+                    ),
+                  ],
+                  if (locked != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Entry is locked. Try again in '
+                      '${(locked.inSeconds / 60).ceil()} minutes.',
+                      style: sheetTheme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.danger,
+                      ),
+                    ),
+                  ],
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      error!,
+                      key: const ValueKey('handover-error'),
+                      style: sheetTheme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.danger,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    key: const ValueKey('confirm-delivery-submit'),
+                    onPressed: () {
+                      final otpProblem = courier.validateDeliveryOtp(
+                        widget.jobId,
+                        otpController.text,
+                      );
+                      final codProblem = otpProblem != null
+                          ? null
+                          : courier.validateCodAmount(
+                              widget.jobId,
+                              amountController.text,
+                            );
+                      final problem = otpProblem ?? codProblem;
+                      if (problem != null) {
+                        setSheetState(() => error = problem);
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop((
+                        otp: otpController.text.trim(),
+                        cash: job.hasCod ? _parseCash(amountController.text) : null,
+                      ));
+                    },
+                    child: const Text('Complete Delivery'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    otpController.dispose();
+    amountController.dispose();
+    if (confirmed == null || !mounted) return;
+    _completeDelivery(
+      courier,
+      outcome: DeliveryMilestone.delivered,
+      deliveryOtp: confirmed.otp,
+      codAmount: confirmed.cash,
+    );
+  }
+
+  /// The cash figure typed at the door, as a number.
+  ///
+  /// The field is numeric but a rider may paste "₱700.00" or "700,00"; the
+  /// validation in [CourierState] already rejected anything that is not the
+  /// exact amount, so this only needs to recover the number it accepted.
+  double? _parseCash(String input) {
+    final normalized = input.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(normalized);
+  }
+
   bool _isToday(DateTime when) {
     final now = DateTime.now();
     return when.year == now.year &&
@@ -212,8 +366,24 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   void _completeDelivery(
     CourierState courier, {
     required DeliveryMilestone outcome,
+    String? deliveryOtp,
+    double? codAmount,
   }) {
     final returned = outcome == DeliveryMilestone.returnToSender;
+
+    // Write the handover to the server before the local job disappears.
+    // DELIVERED carries the code and cash the rider just checked; a RETURNED
+    // outcome already reached this state through _markFailed, whose terminal
+    // guard makes this call a no-op. Without the write, the courier's screen
+    // would say "delivered" while the buyer's tracker stayed at Out for
+    // Delivery.
+    courier.advanceMilestone(
+      widget.jobId,
+      outcome,
+      deliveryOtp: deliveryOtp,
+      codAmount: codAmount,
+    );
+
     final firstToday = !courier.completedJobs.any(
       (c) => _isToday(c.completedAt),
     );
@@ -517,7 +687,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     );
   }
 
-  Widget _buildOrderSummary(ThemeData theme, job) {
+  Widget _buildOrderSummary(ThemeData theme, DeliveryJob job) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -541,7 +711,12 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
             _summaryLine(theme, 'Seller contact', job.sellerPhone!),
           if (job.buyerPhone != null && job.buyerPhone!.isNotEmpty)
             _summaryLine(theme, 'Buyer contact', job.buyerPhone!),
-          _summaryLine(theme, 'Payment Method', 'Cash on Delivery'),
+          _summaryLine(theme, 'Payment method', job.paymentLabel),
+          _summaryLine(
+            theme,
+            'COD amount',
+            job.prepaid ? '₱0.00 · Paid' : formatPeso(job.codAmount),
+          ),
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -777,7 +952,11 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    _advance(courier, DeliveryMilestone.arrivedAtSeller);
+    _advance(
+      courier,
+      DeliveryMilestone.arrivedAtSeller,
+      trackingNumber: enteredText.trim(),
+    );
   }
 
   Widget _buildActionBar(
@@ -884,7 +1063,9 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
               onPressed: !enabled
                   ? null
                   : isFinalStep
-                  ? () => _completeDelivery(courier, outcome: milestone)
+                  ? milestone == DeliveryMilestone.inTransit
+                        ? () => _confirmDelivery(courier)
+                        : () => _completeDelivery(courier, outcome: milestone)
                   : milestone == DeliveryMilestone.arrivedAtSeller
                   ? () => _confirmPickup(courier)
                   : milestone == DeliveryMilestone.failedDelivery

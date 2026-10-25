@@ -65,6 +65,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../utils/motion.dart';
 import '../../utils/password_strength.dart';
+import '../../utils/rider_validators.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../utils/validators.dart';
 import '../../widgets/dirty_guard.dart';
@@ -75,7 +76,6 @@ import '../../widgets/zefanya_mark.dart';
 // Shared validation patterns — used by the form fields below.
 final RegExp _emailRegex = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
 final RegExp _phPhoneRegex = RegExp(r'^(09\d{9}|\+639\d{9})$');
-final RegExp _plateRegex = RegExp(r'^[A-Z]{2,3}[\s-]?\d{3,4}$');
 
 /// Stable identity for a step, independent of its position. Buyer skips
 /// [vehicle], so position 2 means Documents for a Buyer and Vehicle for
@@ -131,6 +131,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _phoneController = TextEditingController();
   final _streetController = TextEditingController();
   final _plateController = TextEditingController();
+  final _companyController = TextEditingController();
+  final _licenseNumberController = TextEditingController();
   final _emailFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _lastNameFocus = FocusNode();
@@ -163,6 +165,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String? _barangay;
 
   String? _vehicleType;
+  DateTime? _licenseExpiry;
+  String? _licenseExpiryError;
 
   File? _govIdFile;
   File? _licenseFile;
@@ -198,6 +202,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _phoneController.text.trim().isNotEmpty ||
       _streetController.text.trim().isNotEmpty ||
       _plateController.text.trim().isNotEmpty ||
+      _companyController.text.trim().isNotEmpty ||
+      _licenseNumberController.text.trim().isNotEmpty ||
       _passwordController.text.isNotEmpty ||
       _confirmPasswordController.text.isNotEmpty ||
       _sex != null ||
@@ -206,6 +212,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _municipality != null ||
       _barangay != null ||
       _vehicleType != null ||
+      _licenseExpiry != null ||
       _govIdFile != null ||
       _licenseFile != null ||
       _orCrFile != null;
@@ -230,6 +237,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _phoneController.dispose();
     _streetController.dispose();
     _plateController.dispose();
+    _companyController.dispose();
+    _licenseNumberController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -255,6 +264,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
   }
 
+  Future<void> _pickLicenseExpiry() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _licenseExpiry ?? DateTime(now.year + 1, now.month, now.day),
+      firstDate: DateTime(now.year - 10),
+      lastDate: DateTime(now.year + 30),
+    );
+    if (picked == null) return;
+    setState(() {
+      _licenseExpiry = picked;
+      _licenseExpiryError = validateLicenseExpiry(picked);
+    });
+  }
+
   // ---- Navigation ------------------------------------------------------
 
   /// Validates [id]'s own fields and nothing else. This is the whole
@@ -270,6 +294,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       extraOk = _dob != null && _dobError == null;
     } else if (id == _StepId.credentials) {
       extraOk = _acceptedTerms;
+    } else if (id == _StepId.vehicle) {
+      extraOk = _licenseExpiry != null &&
+          _licenseExpiryError == null &&
+          !isPlateRegisteredElsewhere(
+            _plateController.text,
+            currentPlate: null,
+          );
     } else if (id == _StepId.documents) {
       extraOk = _role == UserRole.buyer
           ? _govIdFile != null
@@ -374,6 +405,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           // documents `StoreBuyerRegistrationRequest` has no field for. See the
           // courier note in registration_payload.dart.
           govIdPath: _govIdFile?.path,
+          riderCompany: _companyController.text,
+          riderVehicleType: _vehicleType,
+          riderPlate: _plateController.text,
+          riderLicenseNumber: _licenseNumberController.text,
+          riderLicenseExpiry: _licenseExpiry,
+          riderLicensePath: _licenseFile?.path,
+          riderOrCrPath: _orCrFile?.path,
         ),
       );
       if (context.mounted) TextInput.finishAutofillContext();
@@ -944,8 +982,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   List<Widget> _vehicleFields(ThemeData theme) {
     return [
-      _sectionTitle('Vehicle'),
+      _sectionTitle('Rider & Vehicle'),
       const SizedBox(height: 12),
+      _labeledField(
+        theme,
+        'Company',
+        TextFormField(
+          controller: _companyController,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            hintText: 'e.g. Bilis Hatid Express Inc.',
+          ),
+          validator: (v) {
+            final value = v?.trim() ?? '';
+            if (value.isEmpty) return 'Company name is required';
+            return null;
+          },
+        ),
+      ),
+      const SizedBox(height: 16),
       _labeledField(
         theme,
         'Vehicle Type',
@@ -967,20 +1023,89 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         TextFormField(
           controller: _plateController,
           focusNode: _plateFocus,
-          textInputAction: TextInputAction.done,
+          textInputAction: TextInputAction.next,
           onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
           textCapitalization: TextCapitalization.characters,
           decoration: const InputDecoration(hintText: 'ABC 1234'),
           validator: (v) {
-            final value = v?.trim().toUpperCase() ?? '';
-            if (value.isEmpty) return 'Plate number is required';
-            if (!_plateRegex.hasMatch(value))
-              return 'Enter a valid plate number (e.g. ABC 1234)';
+            final problem = validatePlateNumber(v);
+            if (problem != null) return problem;
+            if (isPlateRegisteredElsewhere(v, currentPlate: null)) {
+              return 'That plate number is already registered.';
+            }
             return null;
           },
         ),
       ),
+      const SizedBox(height: 16),
+      _labeledField(
+        theme,
+        'Licence Number',
+        TextFormField(
+          controller: _licenseNumberController,
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(hintText: 'N01-23-456789'),
+          validator: validateLicenseNumber,
+        ),
+      ),
+      const SizedBox(height: 16),
+      _labeledField(
+        theme,
+        'Licence Expiry',
+        _buildLicenseExpiryPicker(theme),
+      ),
     ];
+  }
+
+  Widget _buildLicenseExpiryPicker(ThemeData theme) {
+    final ext = theme.extension<AppThemeExtension>()!;
+    final attempted = _attempted.contains(_StepId.vehicle);
+    final showError = (attempted && _licenseExpiry == null) ||
+        _licenseExpiryError != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          key: const ValueKey('license-expiry-picker'),
+          onTap: _pickLicenseExpiry,
+          borderRadius: BorderRadius.circular(ext.utilityRadius),
+          child: InputDecorator(
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.badge_outlined),
+              enabledBorder: showError
+                  ? OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(ext.utilityRadius),
+                      borderSide: BorderSide(color: AppColors.danger),
+                    )
+                  : null,
+            ),
+            child: Text(
+              _licenseExpiry == null
+                  ? 'Select licence expiry'
+                  : '${_licenseExpiry!.month.toString().padLeft(2, '0')}/'
+                        '${_licenseExpiry!.day.toString().padLeft(2, '0')}/'
+                        '${_licenseExpiry!.year}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: _licenseExpiry == null
+                    ? AppColors.textSecondary
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+        if (showError)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(
+              _licenseExpiryError ?? 'Licence expiry is required',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.danger,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   List<Widget> _documentFields(ThemeData theme) {
@@ -1018,7 +1143,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               context,
               filenamePrefix: 'license',
             );
-            if (picked != null) setState(() => _licenseFile = picked);
+            if (picked != null && _riderDocumentOk(picked)) {
+              setState(() => _licenseFile = picked);
+            }
           },
         ),
         const SizedBox(height: 16),
@@ -1034,11 +1161,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               context,
               filenamePrefix: 'or_cr',
             );
-            if (picked != null) setState(() => _orCrFile = picked);
+            if (picked != null && _riderDocumentOk(picked)) {
+              setState(() => _orCrFile = picked);
+            }
           },
         ),
       ],
     ];
+  }
+
+  /// Rejects a rider document that the server would reject too, and keeps the
+  /// previous file on screen. The picker copies the file into app storage
+  /// first, which is why the check reads the saved path rather than the
+  /// original camera/gallery temp file.
+  bool _riderDocumentOk(File picked) {
+    final problem = validateRiderDocumentPath(picked.path);
+    if (problem == null) return true;
+    showTimedSnackBar(context, SnackBar(content: Text(problem)));
+    return false;
   }
 
   // ---------------------------------------------------------------------

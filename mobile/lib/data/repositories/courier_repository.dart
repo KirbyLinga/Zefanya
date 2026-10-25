@@ -44,11 +44,24 @@ abstract class CourierRepository {
   /// [milestone] is the `DeliveryMilestone` the job is moving to, translated
   /// to the server's `OrderStatus` string (e.g. `'PICKED_UP'`).
   ///
+  /// The optional fields are the handover checks the server re-runs:
+  /// [trackingNumber] at pickup, [failureReason] on a failed attempt,
+  /// [deliveryOtp] and [codAmount] at the door. The app validates them first
+  /// so the rider hears about a mistake immediately; the server validates
+  /// them again because none of these values can be trusted from a client.
+  ///
   /// A failure propagates — a milestone that failed to record server-side
   /// is still applied locally by `CourierState`, because the local state
   /// machine must not block on the network. The caller logs or shows the
   /// error if needed.
-  Future<void> advanceMilestone(String jobId, String milestoneValue);
+  Future<void> advanceMilestone(
+    String jobId,
+    String milestoneValue, {
+    String? trackingNumber,
+    String? failureReason,
+    String? deliveryOtp,
+    double? codAmount,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +75,14 @@ class MockCourierRepository implements CourierRepository {
   Future<List<DeliveryJob>> assignedJobs() async => mockDeliveryJobs;
 
   @override
-  Future<void> advanceMilestone(String jobId, String milestoneValue) async {
+  Future<void> advanceMilestone(
+    String jobId,
+    String milestoneValue, {
+    String? trackingNumber,
+    String? failureReason,
+    String? deliveryOtp,
+    double? codAmount,
+  }) async {
     // Mock: no-op — the local state machine is the source of truth in mock mode.
   }
 }
@@ -85,13 +105,32 @@ class LiveCourierRepository extends LiveRepository implements CourierRepository 
   }
 
   @override
-  Future<void> advanceMilestone(String jobId, String milestoneValue) async {
+  Future<void> advanceMilestone(
+    String jobId,
+    String milestoneValue, {
+    String? trackingNumber,
+    String? failureReason,
+    String? deliveryOtp,
+    double? codAmount,
+  }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
     // PATCH /api/courier/jobs/{sellerOrder}/milestone
     // jobId is the seller_order id that the server uses as the route key.
+    // Omitted fields stay omitted rather than being sent as null: the
+    // server distinguishes "nothing to check" from "a blank value that
+    // failed a check".
     await client.patchJson(
       '/courier/jobs/$jobId/milestone',
-      body: {'milestone': milestoneValue},
+      body: {
+        'milestone': milestoneValue,
+        if (trackingNumber != null && trackingNumber.trim().isNotEmpty)
+          'tracking_number': trackingNumber.trim(),
+        if (failureReason != null && failureReason.trim().isNotEmpty)
+          'failure_reason': failureReason.trim(),
+        if (deliveryOtp != null && deliveryOtp.trim().isNotEmpty)
+          'delivery_otp': deliveryOtp.trim(),
+        if (codAmount != null) 'cod_amount': codAmount,
+      },
       authenticated: true,
     );
   }

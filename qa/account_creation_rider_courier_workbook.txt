@@ -1,0 +1,593 @@
+=== TC-COU-001 [Courier] Blocked
+Scenario: Create a courier with all valid data
+Expected: The courier is saved with no validation errors and appears in the courier list of Bilis Hatid Express Inc. with status Pending Activation, home hub HUB-QC, 4-Wheeler Closed Van Truck and 3,000 kg. An activation email is sent to ernesto.villareal@example.com.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-002 [Courier] Blocked
+Scenario: Submit a completely empty form
+Expected: Saving is blocked. A required-field message is shown for every mandatory field. No courier is created and no email is sent.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-003 [Courier] Blocked
+Scenario: Leave one required field blank at a time
+Expected: Each time, saving is blocked and a required-field message is shown on the blank field only. Other entered values (except uploads) are kept. No courier is created.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-004 [Courier] Blocked
+Scenario: Name with numbers or symbols
+Expected: Saving is blocked. A message on each name field says only letters are allowed.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-005 [Courier] Blocked
+Scenario: Name length at the limits
+Expected: 1 and 51 characters are rejected with a length message. 2 and 50 characters are accepted.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-006 [Courier] Blocked
+Scenario: Age at the 18-year limit
+Expected: The 17-year-old date is rejected with a message that the person must be at least 18. The other two dates are accepted. A future date cannot be picked.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-007 [Courier] Blocked
+Scenario: Email in an invalid format
+Expected: Each value is rejected with a message asking for a valid email address. No courier is created.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-008 [Courier] Blocked
+Scenario: Email already used by a rider or a buyer
+Expected: Both are blocked with a message that the email is already in use. The same person cannot be both a rider and a courier with one email. No courier is created.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-009 [Courier] Blocked
+Scenario: Mobile number in an invalid format
+Expected: Each value is rejected with a message asking for a valid mobile number.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-010 [Courier] Blocked
+Scenario: Mobile number length at the limits
+Expected: 10 and 12 digits are rejected with a length message. 11 digits is accepted.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-011 [Courier] Blocked
+Scenario: Mobile number already used by a rider
+Expected: Both are blocked with a message that the mobile number is already in use (the +63 form is the same number).
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-012 [Courier] Blocked
+Scenario: Driver's license number in an invalid format
+Expected: Each value is rejected with a message showing the format A00-00-000000.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-013 [Courier] Blocked
+Scenario: License number already used by a courier or a rider
+Expected: Both are blocked with a message that the license number is already registered.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-014 [Courier] Blocked
+Scenario: License expiry date at the limit
+Expected: Yesterday's date is rejected with a message that the license is expired. Today's and tomorrow's dates are accepted.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-015 [Courier] Blocked
+Scenario: Only a professional license is accepted
+Expected: Only Professional is accepted. The others are rejected with a message that couriers need a professional license.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-016 [Courier] Blocked
+Scenario: DL codes must cover the vehicle type
+Expected: Only the 'accept' combinations save. Each 'reject' shows a message naming the DL code the vehicle needs.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-017 [Courier] Blocked
+Scenario: Load capacity at the limits for each vehicle type
+Expected: Only the 'accept' values save, exactly as typed. Each 'reject' shows a message with the allowed range for the chosen vehicle type.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-018 [Courier] Blocked
+Scenario: Changing the vehicle type re-checks capacity and DL codes
+Expected: After the change, Load Capacity shows an error (Van maximum 1,000 kg) and the DL codes are checked again (Van needs B or B2). Saving is blocked until both are fixed.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-019 [Courier] Blocked
+Scenario: Plate number already used by a courier or a rider
+Expected: All three are blocked with a message that the plate number is already registered.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-020 [Courier] Blocked
+Scenario: Home hub list shows only the company's own hubs
+Expected: The picker lists only HUB-QC, HUB-PSG and HUB-STR. The request with HUB-DVO is rejected and no courier is created.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-021 [Courier] Blocked
+Scenario: Upload documents in each accepted file type
+Expected: Each file is accepted and its name or preview is shown. The courier is saved.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-022 [Courier] Blocked
+Scenario: Upload a file type that is not accepted
+Expected: Each file is rejected with a message listing the accepted types (JPG, PNG, PDF). No courier is created.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-023 [Courier] Blocked
+Scenario: File size at the limit
+Expected: The 4.9 MB and 5.0 MB files are accepted. The 5.1 MB file is rejected with a maximum-size message.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-024 [Courier] Blocked
+Scenario: Tap Save several times quickly
+Expected: Only one courier is created and only one activation email is sent.
+Actual: The Add Courier form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-025 [Courier] Fail
+Scenario: Courier activates the account with a valid password
+Expected: The password is saved. The courier's status changes from Pending Activation to Active, and the login screen opens with a success message.
+Actual: No activation link or Set Password screen. A courier sets the password at sign-up.
+Remarks: A17/A18 assume Logistics creates couriers and emails an activation link. The app does not.
+
+=== TC-COU-026 [Courier] Fail
+Scenario: Set a password that breaks the password rule
+Expected: Each password is rejected with a message stating the password rule. The courier stays Pending Activation.
+Actual: No activation link or Set Password screen. A courier sets the password at sign-up.
+Remarks: A17/A18 assume Logistics creates couriers and emails an activation link. The app does not.
+
+=== TC-COU-027 [Courier] Fail
+Scenario: Confirm Password does not match
+Expected: Activation is blocked. A message says the passwords do not match.
+Actual: No activation link or Set Password screen. A courier sets the password at sign-up.
+Remarks: A17/A18 assume Logistics creates couriers and emails an activation link. The app does not.
+
+=== TC-COU-028 [Courier] Fail
+Scenario: Open an expired activation link
+Expected: A message says the link has expired. No password can be set and the courier stays Pending Activation.
+Actual: No activation link or Set Password screen. A courier sets the password at sign-up.
+Remarks: A17/A18 assume Logistics creates couriers and emails an activation link. The app does not.
+
+=== TC-COU-029 [Courier] Fail
+Scenario: Logistics resends the activation email
+Expected: A new activation email is sent. The first link no longer works. The second link opens the Set Password screen.
+Actual: No activation link or Set Password screen. A courier sets the password at sign-up.
+Remarks: A17/A18 assume Logistics creates couriers and emails an activation link. The app does not.
+
+=== TC-COU-030 [Courier] Fail
+Scenario: Reuse the activation link after activating
+Expected: A message says the link is invalid or already used. The password cannot be changed through this link.
+Actual: No activation link or Set Password screen. A courier sets the password at sign-up.
+Remarks: A17/A18 assume Logistics creates couriers and emails an activation link. The app does not.
+
+=== TC-COU-031 [Courier] Blocked
+Scenario: Courier logs in before activating
+Expected: Login is denied. The courier is not given access to any screen.
+Actual: No Pending Activation state in the app.
+Remarks: See TC-COU-025.
+
+=== TC-COU-032 [Courier] Blocked
+Scenario: Courier logs in after activating
+Expected: Login succeeds. The courier home screen opens and shows Ernesto Villareal, Bilis Hatid Express Inc., home hub HUB-QC, the truck NAB4521 and the status Off Duty. No rider job offers or rider screens are shown.
+Actual: Courier screens show no company, home hub or truck.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-COU-033 [Courier] Blocked
+Scenario: Courier is visible only to the company that created it
+Expected: Ernesto Villareal appears in the courier list of Bilis Hatid Express Inc. and does not appear in the courier list of Agila Cargo Movers Corp.
+Actual: Company ownership is a server rule.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-COU-034 [Courier] Fail
+Scenario: No public courier registration
+Expected: Courier is not offered as a self-registration role. The Add Courier deep link opens the login screen.
+Actual: The registration screen offers Courier as a self-registration role.
+Remarks: A17 says couriers cannot register themselves.
+
+=== TC-COU-035 [Courier] Blocked
+Scenario: Buyer, seller or rider opens the Add Courier form
+Expected: Add Courier is not shown. The deep link and the request are refused each time (401/403, access-denied screen or redirect). No courier can be created.
+Actual: Logistics/Add Courier screens are not in the app; refusal is a server rule.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-COU-036 [Courier] Blocked
+Scenario: Pending logistics account tries to add a courier
+Expected: The Add Courier option is not available. The deep link or request is denied or shows the under-review notice. No courier can be created.
+Actual: No Logistics role in the app.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-COU-037 [Courier] Blocked
+Scenario: Open another role's screens, including rider jobs
+Expected: No other role's menus are shown. Each deep link shows an access-denied message or returns to the courier home screen. The accept-job request is refused (401/403); a courier cannot take rider jobs. No data from the other roles is shown.
+Actual: No deep links in the app; the 401/403 part is server-side.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true). Also needs a proxy tool (M11).
+
+=== TC-COU-038 [Courier] Blocked
+Scenario: [Mobile] Each field opens the right keyboard
+Expected: Each field opens the keyboard listed in the test data. Password fields show no autocorrect or word suggestions. No field opens a keyboard that cannot type its valid value.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-039 [Courier] Blocked
+Scenario: [Mobile] Keyboard never hides the active field or Save
+Expected: The focused field always scrolls into view above the keyboard, with its error message visible. Save can be reached and tapped. The keyboard closes when Done or the background is tapped.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-040 [Courier] Blocked
+Scenario: [Mobile] App sent to the background while filling the form
+Expected: Each time, the app returns to the same form with every typed value still there (passwords may be cleared). The app does not restart, crash or jump to the login screen. No courier is created until Save is tapped.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-041 [Courier] Blocked
+Scenario: [Mobile] Rotate the phone while the form has data
+Expected: Either the app stays in portrait, or the layout switches to landscape and back keeping every value and the error message. Nothing is cleared and the app does not crash.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-042 [Courier] Blocked
+Scenario: [Mobile] Save with no internet connection
+Expected: Step 3: a clear no-internet message is shown, the typed data stays on the form, the app does not crash, and no courier is created. Step 4: the courier is saved once: exactly one courier and one activation email.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-043 [Courier] Blocked
+Scenario: [Mobile] Connection drops right after tapping Save
+Expected: The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one courier exists with this email. If the first attempt was saved, the app continues normally (or says the courier already exists and lets the user continue); the courier is never left in a state the user cannot reach.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-044 [Courier] Blocked
+Scenario: [Mobile] System Back on the Add Courier form
+Expected: Leaving the form with typed data asks first, and Cancel keeps every value. After confirming, no courier is created and the courier list is unchanged.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-045 [Courier] Blocked
+Scenario: [Mobile] Upload with the camera, the Files app and the gallery
+Expected: Each source (camera, Files, gallery) is offered and works. The camera photo shows a preview and is accepted (compressed to 5 MB or less if needed). The PDF and the gallery image show their names or previews. Save continues normally.
+Actual: The app offers Camera and Gallery only; no Files/PDF source. Permission-denied messaging is not in the picker.
+Remarks: Add a Files source if PDFs are required (A10/M7).
+
+=== TC-COU-046 [Courier] Blocked
+Scenario: [Mobile] Camera or photo access denied
+Expected: No crash. A message explains why the permission is needed and offers a link to the phone's Settings. Files still works and the file is accepted. Asking again shows the system prompt again or the Settings message.
+Actual: image_picker_helper.dart has no permission-denied message or Settings link.
+Remarks: Needs a phone or emulator; code review only.
+
+=== TC-COU-047 [Courier] Blocked
+Scenario: [Mobile] Full-resolution camera photo bigger than 5 MB
+Expected: The app either compresses the photo to 5 MB or less and accepts it (the saved image is still readable), or rejects it with the maximum-size message. It never uploads a file over 5 MB and never fails without a message. Write your rule in Assumption M7, column D.
+Actual: No size check or compression step in the picker code.
+Remarks: Needs a phone or emulator; code review only.
+
+=== TC-COU-048 [Courier] Blocked
+Scenario: [Mobile] Large system font on a small screen
+Expected: All labels, placeholders, error messages and buttons can be read in full; none are cut off or overlapping. The screen scrolls to every field and Save can be tapped.
+Actual: Tests the Add Courier form, which is not in the app.
+Remarks: Out of scope for the mobile app: Add Courier is a Logistics (web) form. The app has a public courier sign-up instead.
+
+=== TC-COU-049 [Courier] Fail
+Scenario: [Mobile] Activation link opened on the courier's phone with the app installed
+Expected: The link opens the app's Set Password screen (or a mobile web page that leads back to the app). Activation succeeds, the status becomes Active, and the courier logs in to the courier home screen showing Rogelio Dimaculangan.
+Actual: The app has no deep-link or app-link handling, so the activation link cannot open Set Password.
+Remarks: None
+
+=== TC-COU-050 [Courier] Fail
+Scenario: [Mobile] Activation link opened on a phone without the app
+Expected: The link opens a mobile web page to set the password, or the app's store page with clear instructions. No blank or error page.
+Actual: No activation web page or store fallback exists in the app.
+Remarks: Needs the web side.
+
+=== TC-COU-051 [Courier] Pass
+Scenario: [Mobile] Stay logged in after closing the app or restarting the phone
+Expected: Each time the app opens on the courier home screen still logged in, showing Ernesto Villareal. It does not ask to log in again and shows no other user's data.
+Actual: Courier session is saved and restored at startup (same code path as buyer).
+Remarks: Courier home does not show company/hub/truck.
+
+=== TC-COU-052 [Courier] Pass
+Scenario: [Mobile] Back after logging out
+Expected: The login screen stays. No screen with account data appears again, and the app does not log back in by itself.
+Actual: Logout clears the session and returns to the root login screen.
+Remarks: None
+
+=== TC-RID-001 [Rider] Blocked
+Scenario: Create a rider with all valid data
+Expected: The rider is saved with no validation errors and appears in the rider list of Bilis Hatid Express Inc. with status Pending Activation. An activation email is sent to pedrojose.garcia@example.com.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-002 [Rider] Blocked
+Scenario: Submit a completely empty form
+Expected: Saving is blocked. A required-field message is shown for every mandatory field. No rider is created and no email is sent.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-003 [Rider] Blocked
+Scenario: Leave one required field blank at a time
+Expected: Each time, saving is blocked and a required-field message is shown on the blank field only. Other entered values (except uploads) are kept. No rider is created.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-004 [Rider] Blocked
+Scenario: Name with numbers or symbols
+Expected: Saving is blocked. A message on each name field says only letters are allowed.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-005 [Rider] Blocked
+Scenario: Name length at the limits
+Expected: 1 and 51 characters are rejected with a length message. 2 and 50 characters are accepted.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-006 [Rider] Blocked
+Scenario: Age at the 18-year limit
+Expected: The 17-year-old date is rejected with a message that the person must be at least 18. The other two dates are accepted.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-007 [Rider] Blocked
+Scenario: Email in an invalid format
+Expected: Each value is rejected with a message asking for a valid email address. No rider is created.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-008 [Rider] Blocked
+Scenario: Email already used by an account of another role
+Expected: Saving is blocked. A message says the email is already in use. No rider is created.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-009 [Rider] Blocked
+Scenario: Mobile number in an invalid format
+Expected: Each value is rejected with a message asking for a valid mobile number.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-010 [Rider] Blocked
+Scenario: Mobile number length at the limits
+Expected: 10 and 12 digits are rejected with a length message. 11 digits is accepted.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-011 [Rider] Blocked
+Scenario: Mobile number that is already registered
+Expected: Saving is blocked. A message says the mobile number is already in use.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-012 [Rider] Blocked
+Scenario: Driver's license number in an invalid format
+Expected: Each value is rejected with a message showing the format A00-00-000000.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-013 [Rider] Blocked
+Scenario: Driver's license number already registered
+Expected: Saving is blocked. A message says the license number is already registered.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-014 [Rider] Blocked
+Scenario: License expiry date at the limit
+Expected: Yesterday's date is rejected with a message that the license is expired. Today's and tomorrow's dates are accepted.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-015 [Rider] Blocked
+Scenario: Plate number already registered
+Expected: Saving is blocked. A message says the plate number is already registered.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-016 [Rider] Blocked
+Scenario: Upload documents in each accepted file type
+Expected: Each file is accepted and its name or preview is shown. The rider is saved.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-017 [Rider] Blocked
+Scenario: Upload a file type that is not accepted
+Expected: Each file is rejected with a message listing the accepted types (JPG, PNG, PDF). No rider is created.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-018 [Rider] Blocked
+Scenario: File size at the limit
+Expected: The 4.9 MB and 5.0 MB files are accepted. The 5.1 MB file is rejected with a maximum-size message.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-019 [Rider] Blocked
+Scenario: Tap Save several times quickly
+Expected: Only one rider is created and only one activation email is sent.
+Actual: The Add Rider form is not in the Flutter app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-020 [Rider] Fail
+Scenario: Rider activates the account with a valid password
+Expected: The password is saved. The rider's status changes from Pending Activation to Active, and the login screen opens with a success message.
+Actual: No activation link or Set Password screen in the app.
+Remarks: A13 assumes Logistics creates riders and emails an activation link.
+
+=== TC-RID-021 [Rider] Fail
+Scenario: Set a password that breaks the password rule
+Expected: Each password is rejected with a message stating the password rule. The rider stays Pending Activation.
+Actual: No activation link or Set Password screen in the app.
+Remarks: A13 assumes Logistics creates riders and emails an activation link.
+
+=== TC-RID-022 [Rider] Fail
+Scenario: Confirm Password does not match
+Expected: Activation is blocked. A message says the passwords do not match.
+Actual: No activation link or Set Password screen in the app.
+Remarks: A13 assumes Logistics creates riders and emails an activation link.
+
+=== TC-RID-023 [Rider] Fail
+Scenario: Open an expired activation link
+Expected: A message says the link has expired. No password can be set and the rider stays Pending Activation.
+Actual: No activation link or Set Password screen in the app.
+Remarks: A13 assumes Logistics creates riders and emails an activation link.
+
+=== TC-RID-024 [Rider] Fail
+Scenario: Logistics resends the activation email
+Expected: A new activation email is sent. The first link no longer works. The second link opens the set-password screen.
+Actual: No activation link or Set Password screen in the app.
+Remarks: A13 assumes Logistics creates riders and emails an activation link.
+
+=== TC-RID-025 [Rider] Fail
+Scenario: Reuse the activation link after activating
+Expected: A message says the link is invalid or already used. The password cannot be changed through this link.
+Actual: No activation link or Set Password screen in the app.
+Remarks: A13 assumes Logistics creates riders and emails an activation link.
+
+=== TC-RID-026 [Rider] Blocked
+Scenario: Rider logs in before activating
+Expected: Login is denied. The rider is not given access to any screen.
+Actual: No Pending Activation state or Rider role in the app.
+Remarks: See TC-RID-020.
+
+=== TC-RID-027 [Rider] Blocked
+Scenario: Rider logs in after activating
+Expected: Login succeeds. The rider dashboard opens and shows Pedro Jose Garcia and Bilis Hatid Express Inc.
+Actual: No Rider dashboard in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-028 [Rider] Blocked
+Scenario: Rider is visible only to the company that created it
+Expected: Pedro Jose Garcia appears in the rider list of Bilis Hatid Express Inc. and does not appear in the rider list of Agila Cargo Movers Corp.
+Actual: Company ownership is a server rule.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-RID-029 [Rider] Pass
+Scenario: No public rider registration
+Expected: Rider is not offered as a self-registration role. The Add Rider deep link opens the login screen.
+Actual: Registration offers only Buyer and Courier. Rider is not a self-registration role. There are no deep links.
+Remarks: None
+
+=== TC-RID-030 [Rider] Blocked
+Scenario: Buyer or seller opens the Add Rider form
+Expected: Add Rider is not shown. The deep link and the request are refused each time (401/403, access-denied screen or redirect). No rider can be created.
+Actual: Add Rider is not in the app; refusal is a server rule.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-RID-031 [Rider] Blocked
+Scenario: Pending logistics account tries to add a rider
+Expected: The Add Rider option is not available. The deep link or request is denied or shows the under-review notice. No rider can be created.
+Actual: No Logistics role in the app.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-RID-032 [Rider] Blocked
+Scenario: Open another role's screens
+Expected: No other role's menus are shown. Each deep link shows an access-denied message or returns to the rider home screen. The API request is refused (401/403). No data from the other role is shown.
+Actual: No deep links; the 401/403 part is server-side.
+Remarks: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true). Also needs a proxy tool (M11).
+
+=== TC-RID-033 [Rider] Blocked
+Scenario: [Mobile] Each field opens the right keyboard
+Expected: Each field opens the keyboard listed in the test data. Password fields show no autocorrect or word suggestions. No field opens a keyboard that cannot type its valid value.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-034 [Rider] Blocked
+Scenario: [Mobile] Keyboard never hides the active field or Save
+Expected: The focused field always scrolls into view above the keyboard, with its error message visible. Save can be reached and tapped. The keyboard closes when Done or the background is tapped.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-035 [Rider] Blocked
+Scenario: [Mobile] App sent to the background while filling the form
+Expected: Each time, the app returns to the same form with every typed value still there (passwords may be cleared). The app does not restart, crash or jump to the login screen. No rider is created until Save is tapped.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-036 [Rider] Blocked
+Scenario: [Mobile] Rotate the phone while the form has data
+Expected: Either the app stays in portrait, or the layout switches to landscape and back keeping every value and the error message. Nothing is cleared and the app does not crash.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-037 [Rider] Blocked
+Scenario: [Mobile] Save with no internet connection
+Expected: Step 3: a clear no-internet message is shown, the typed data stays on the form, the app does not crash, and no rider is created. Step 4: the rider is saved once: exactly one rider and one activation email.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-038 [Rider] Blocked
+Scenario: [Mobile] Connection drops right after tapping Save
+Expected: The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one rider exists with this email. If the first attempt was saved, the app continues normally (or says the rider already exists and lets the user continue); the rider is never left in a state the user cannot reach.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-039 [Rider] Blocked
+Scenario: [Mobile] System Back on the Add Rider form
+Expected: Leaving the form with typed data asks first, and Cancel keeps every value. After confirming, no rider is created and the rider list is unchanged.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-040 [Rider] Blocked
+Scenario: [Mobile] Upload with the camera, the Files app and the gallery
+Expected: Each source (camera, Files, gallery) is offered and works. The camera photo shows a preview and is accepted (compressed to 5 MB or less if needed). The PDF and the gallery image show their names or previews. Save continues normally.
+Actual: Camera and Gallery only; no Files/PDF source in the picker.
+Remarks: See TC-COU-045.
+
+=== TC-RID-041 [Rider] Blocked
+Scenario: [Mobile] Camera or photo access denied
+Expected: No crash. A message explains why the permission is needed and offers a link to the phone's Settings. Files still works and the file is accepted. Asking again shows the system prompt again or the Settings message.
+Actual: No permission-denied message in the picker code.
+Remarks: Needs a phone or emulator; code review only.
+
+=== TC-RID-042 [Rider] Blocked
+Scenario: [Mobile] Full-resolution camera photo bigger than 5 MB
+Expected: The app either compresses the photo to 5 MB or less and accepts it (the saved image is still readable), or rejects it with the maximum-size message. It never uploads a file over 5 MB and never fails without a message. Write your rule in Assumption M7, column D.
+Actual: No size check or compression in the picker code.
+Remarks: Needs a phone or emulator; code review only.
+
+=== TC-RID-043 [Rider] Blocked
+Scenario: [Mobile] Large system font on a small screen
+Expected: All labels, placeholders, error messages and buttons can be read in full; none are cut off or overlapping. The screen scrolls to every field and Save can be tapped.
+Actual: Tests the Add Rider form, which is not in the app.
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-044 [Rider] Fail
+Scenario: [Mobile] Activation link opened on the rider's phone with the app installed
+Expected: The link opens the app's Set Password screen (or a mobile web page that leads back to the app). Activation succeeds, the status becomes Active, and the rider logs in to the rider home screen showing Mark Anthony Bautista.
+Actual: No deep-link or app-link handling in the app.
+Remarks: None
+
+=== TC-RID-045 [Rider] Fail
+Scenario: [Mobile] Activation link opened on a phone without the app
+Expected: The link opens a mobile web page to set the password, or the app's store page with clear instructions. No blank or error page.
+Actual: No activation web page or store fallback in the app.
+Remarks: Needs the web side.
+
+=== TC-RID-046 [Rider] Blocked
+Scenario: [Mobile] Stay logged in after closing the app or restarting the phone
+Expected: Each time the app opens on the rider home screen still logged in, showing Pedro Jose Garcia. It does not ask to log in again and shows no other user's data.
+Actual: No Rider home screen. The courier session does persist (see TC-COU-051).
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).
+
+=== TC-RID-047 [Rider] Blocked
+Scenario: [Mobile] Back after logging out
+Expected: The login screen stays. No screen with account data appears again, and the app does not log back in by itself.
+Actual: No Rider role. Logout works for the courier role (see TC-COU-052).
+Remarks: Out of scope for the mobile app: the app has no Rider role or Add Rider form (Logistics function, web).

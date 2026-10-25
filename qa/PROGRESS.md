@@ -12,8 +12,8 @@ Source of truth: `qa/Mobile_App_Combined_Test_Results.xlsx` (377 cases).
 | 1. Foundation | Done | See below. Full suite now **573 passed / 0 failed**. `flutter analyze`: 0 errors, 9 pre-existing info lints. |
 | 2. Buyer account/profile | Done (003-009, 011 app half) | Password/email/phone change end to end: server endpoints + token revocation, mock/live repository, screens, 13 case-named app tests and 9 PHP tests. ACCT-001/010 still need live profile/device. |
 | 3. Buyer commerce gaps | Done for this pass (18 new case tests + 19 re-tagged) | Address book, reviews, vouchers, checkout, search, variants and store follow now have case-named evidence. Full suite **609 passed / 0 failed**. Device/API-only rows are listed under “Phase 3 honest limits”. |
-| 4. Courier/rider app | Partly built | Pickup verification, job lifecycle, completion view. Online toggle, offers, profile documents, COD/remittance still to audit. |
-| 5. Laravel server | Not started in this pass | Laravel app found in `web/`; PHP 8.5 and Composer available. D cases still blocked. |
+| 4. Courier/rider app | Done for this pass (Phase 4 scope) | Rider profile/vehicle/documents, online/offline + suspension, pickup verification, failure attempts, delivery OTP/COD handover, COD ledger and earnings history. 16 case-named Flutter tests + 7 handover-wiring tests + 21 PHP tests. Full suite **638 passed / 0 failed**; PHP **340 passed / 1472 assertions**. |
+| 5. Laravel server | In progress | Account-security endpoints landed in Phase 2; courier handover endpoint and migration landed in Phase 4. Live payment-gateway and ownership cases still need a running API. |
 | 6. Traceability/report | Not started in this pass | `qa/final_results.csv` and rebuilt `qa/static_review.csv` still to do. |
 
 ## Phase 1 details
@@ -207,8 +207,135 @@ following count going N → N+1 → N with the list.
 - `BUY-TRK-002/005/006/007`, `BUY-CHAT-001/003/004/006/007`,
   `BUY-VOU-012` remain Needs device/API.
 
+## Phase 4 details
+
+### 4a. Rider profile and registration
+
+- `lib/utils/rider_validators.dart` owns the shared rules: plate numbers
+  accept letters-first (`ABC1234`) and digits-first (`123ABC`) forms, licence
+  numbers are required, and expiry is date-only — yesterday is expired, today
+  is valid. Documents must be JPG/JPEG and at most 5 MB
+  (`kRiderDocumentMaxBytes`). The mock registry seeds `123ABC` and `ABC1234`
+  and exempts the rider's own current plate.
+- `AuthState` now persists company, hub, vehicle type, plate, licence number
+  and expiry, licence/OR-CR paths, and a re-verification flag. Logout clears
+  them. `saveRiderRegistration` and `updateRiderVehicle` reject invalid data
+  without replacing the previous valid value.
+- `RegistrationProfile` and the registration screen collect the rider fields
+  after the account form. The document picker validates the chosen file after
+  selection, so a rejected replacement leaves the previous document in place.
+- `RiderProfileSection` shows the rider record and both document previews on
+  the shared Profile screen. `RiderVehicleScreen` edits the vehicle and
+  documents and sets the re-verification flag.
+- Cases: `RID-PROF-001`–`006`, including the suspended-account message.
+
+### 4b. Availability, pickup and failure handling
+
+- The Pickup Dashboard has an Online/Offline switch backed by `CourierState`
+  (`RID-AVAIL-003`). Going offline never removes an already-assigned job;
+  going online is refused with the reason when the account is suspended
+  (`RID-PROF-006`). Availability is deliberately not persisted across a
+  force-close.
+- Pickup shows seller, address, contact, tracking number and parcel count
+  (`RID-PICK-001`). The rider types the waybill number rather than scanning:
+  the dialog compares it before advancing, and the repository forwards it for
+  the server's own check (`RID-PICK-003/004`).
+- A failed delivery requires a reason; a missing reason changes nothing
+  (`RID-FAIL-002`). Attempts persist. The third failure returns the parcel and
+  a fourth attempt is impossible (`RID-FAIL-005`). “Buyer refused” ends the
+  chain immediately (`RID-FAIL-003`).
+
+### 4c. Handover, COD and earnings
+
+- `DeliveryJob` carries `codAmount`, `prepaid`, `deliveryOtp` and a
+  `paymentLabel` (`Prepaid · Paid`, `Cash on Delivery`, or `Paid`). Mock
+  fixtures seed both COD and prepaid jobs; checkout dispatch writes the real
+  payment state.
+- Handover requires a six-digit buyer code (`RID-DLV-004`). Five wrong codes
+  lock entry for 15 minutes; the boundary is exact, so the correct code works
+  again at 15:00. Live jobs arrive without the code by design: the app checks
+  the shape and lets the server verify the hash and enforce its own lock.
+- COD must match the amount owed to the centavo (`RID-DLV-005`). A prepaid
+  job asks for no cash and adds nothing to the COD ledger (`RID-DLV-006`).
+- The tracker records success/return outcomes, tracking number, result and pay
+  in earnings history (`RID-EARN-001`). Today/week totals sum the completed
+  payouts (`RID-EARN-002`). COD collections sum outstanding cash
+  (`RID-EARN-003`); a pending remittance does not reduce the balance until
+  Logistics confirms it (`RID-EARN-004`), and a short remittance leaves the
+  shortfall outstanding (`RID-EARN-005`).
+
+### 4d. Server handover rules
+
+- Migration `2026_10_25_154410_add_delivery_handover_to_seller_orders.php`
+  adds `tracking_number` (unique), `delivery_attempts`, `failure_reason`,
+  `delivery_otp_hash`, `delivery_otp_attempts`,
+  `delivery_otp_locked_until` and `delivered_at`.
+- `SellerOrder` hides `delivery_otp_hash` from serialization.
+  `DeliveryJobResource` exposes the handover facts (`tracking_number`,
+  `payment_method`, `payment_status`, `cod_amount`,
+  `delivery_otp_required`, `delivery_attempts`, `failure_reason`) but never
+  the OTP hash or code.
+- `CourierMilestoneController` locks the row, enforces the transition graph,
+  checks the pickup waybill, requires a failure reason, increments attempts,
+  returns after three failures, honours immediate buyer refusal, verifies the
+  delivery OTP with five attempts/15 minutes, checks COD to the centavo, marks
+  the payment paid, and writes delivery timestamps.
+- `web/tests/Feature/CourierHandoverApiTest.php`: **21 passed / 90
+  assertions** (`qa/phase4_php_test.txt`). It covers resource secrecy, pickup,
+  failure/return rules, lock expiry, exact COD, and combined OTP+COD.
+- The pre-existing `HttpsUrlGenerationTest` was red because it changed only
+  `config('app.env')`, while `AppServiceProvider` reads the application
+  environment. The test now flips and restores both; the assertion itself is
+  unchanged. Full PHP suite: **340 passed / 1472 assertions**.
+
+### 4e. Test and visual evidence
+
+- `mobile/test/workbook_rider_phase4_test.dart`: **16 passed**.
+- `mobile/test/courier_failure_flow_test.dart`: **6 passed**.
+- `mobile/test/pickup_verification_test.dart`: **2 passed**.
+- `mobile/test/courier_handover_wiring_test.dart`: **7 passed**.
+- `mobile/test/live_courier_test.dart`: **11 passed** (including the new
+  handover/payment mapping and PATCH-body assertions).
+- Courier flow/golden/completion/repository wiring: **22 passed**.
+- Full Flutter suite: **638 passed / 0 failed** (`qa/phase4_full_test.txt`).
+- `flutter analyze --no-pub`: **0 errors**, 8 info lints, all pre-existing
+  (`qa/phase4_analyze.txt`).
+- Four Courier Home screenshot goldens were refreshed because the intended
+  Online/Offline control changes the header. The Buyer Home golden was not
+  refreshed with the wall clock: `BuyerShell` now accepts a fixed `now` for
+  screenshot tests, so the greeting no longer makes the golden pass before
+  noon and fail after 6 PM.
+
+### 4f. Honest limits in this phase
+
+- `RID-JOB-001`–`008`: offers, declines, timeouts, concurrent limits and
+  push assignment are still absent or need the live dispatcher.
+- `RID-PICK-002` barcode scanning and `RID-PICK-006` camera-denied scan flow
+  are absent; `RID-PICK-005` still needs device proof of a rapid double tap;
+  `RID-PICK-007` needs offline API fixtures.
+- `RID-DLV-001` needs a phone run; `RID-DLV-007` ownership needs the live API;
+  `RID-DLV-008` needs the live camera; `RID-DLV-009` needs an offline queue;
+  `RID-DLV-010` dialer/chat needs a device (buttons exist); `RID-DLV-011` needs
+  GPS/device permission.
+- `RID-PROF-007` ownership needs the API. `RID-PROF-008` needs a Files-app
+  picker (`file_picker` is not a dependency) and Logistics-side verification
+  visibility.
+- `RID-AVAIL-001/002/004/005/006/007` need server presence, location/GPS,
+  session timeout or another device. `RID-EARN-006` server confirmation and
+  live OTP issuance/remittance APIs remain unimplemented.
+- The rider document endpoints are local/mock only; the server has no
+  LogisticsProvider vehicle/licence/document columns yet.
+
 ## Current test counts
 
+- Full suite after Phase 4: **638 passed / 0 failed**
+  (`qa/phase4_full_test.txt`).
+- `flutter analyze --no-pub`: **0 errors**, 8 pre-existing info lints
+  (`qa/phase4_analyze.txt`).
+- Full PHP suite after Phase 4: **340 passed / 1472 assertions**
+  (`qa/phase4_php_test.txt`).
+- Phase 4 workbook tests: **16 passed** (`workbook_rider_phase4_test.dart`),
+  plus 7 handover-wiring, 6 failure-flow and 2 pickup tests.
 - Full suite after Phase 3: **609 passed / 0 failed**
   (`qa/phase3_full_test.txt`).
 - `flutter analyze --no-pub`: **0 errors**, the same 9 pre-existing info lints
@@ -228,9 +355,8 @@ following count going N → N+1 → N with the list.
 
 ## Next
 
-1. Audit Phases 3-4 against the workbook and mark only tested/code-proven
-   cases.
-2. Implement remaining high-value B clusters, then re-run full suite.
-3. Wire/verify Laravel D cases and add PHP feature tests.
-4. Build `qa/final_results.csv` for all 377 cases and the device/API manual
-   script.
+1. Build `qa/final_results.csv` for all 377 workbook rows, using named tests
+   and `file:line` evidence only; leave unrunnable rows as “Needs device/API.”
+2. Rebuild `qa/static_review.csv` and write the per-workbook counts plus the
+   device/API manual script.
+3. Push only `qa/workbook-pass` when the report is complete.

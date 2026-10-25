@@ -60,6 +60,16 @@ DeliveryJob? deliveryJobFromJson(Map<String, Object?> json) {
     // Identity fields — only set by the dispatcher step, not this endpoint.
     courierName: null,
     courierPhotoPath: null,
+    trackingNumber: json['tracking_number']?.toString().trim(),
+    codAmount: _double(json['cod_amount']),
+    prepaid:
+        json['payment_method']?.toString() != 'cod' ||
+        json['payment_status']?.toString() == 'paid',
+    // The server is the authority on the code; it only appears here when a
+    // build explicitly includes it (the mock fixtures/test server). An absent
+    // code is empty, not the mock value — guessing a live OTP would be worse
+    // than the handover failing closed.
+    deliveryOtp: json['delivery_otp']?.toString() ?? '',
   );
 }
 

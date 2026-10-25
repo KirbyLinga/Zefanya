@@ -1,0 +1,421 @@
+=== RID-PROF-001 [R1 Profile & Vehicle] Fail
+Scenario: View profile, vehicle and verification status
+Expected: Shows Pedro Jose Garcia, license N01-23-456789, expiry 03/22/2030, Motorcycle, plate 123ABC, company Bilis Hatid Express Inc., status Active. Both documents open.
+Actual: Profile shows name, contact and address. Vehicle, plate, license, expiry and verification status are collected at sign-up but not shown.
+Remarks: The app's Courier role does pickup and delivery, so it is the closest match to this Rider plan.
+
+
+
+=== RID-PROF-002 [R1 Profile & Vehicle] Fail
+Scenario: Update vehicle details
+Expected: The change is saved and shown to Logistics 1 with the new OR/CR, flagged for re-verification. The old plate is no longer shown.
+Actual: No vehicle edit and no re-verification flag.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PROF-003 [R1 Profile & Vehicle] Fail
+Scenario: Plate number already used
+Expected: Both are blocked as already registered. The plate stays 123ABC.
+Actual: No plate editing.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PROF-004 [R1 Profile & Vehicle] Fail
+Scenario: License expiry boundary
+Expected: Yesterday is rejected with an expiry message. Today is accepted.
+Actual: No license expiry field.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PROF-005 [R1 Profile & Vehicle] Fail
+Scenario: Document upload rules
+Expected: Only the 5.0 MB JPG is accepted; the others are rejected and the previous document is kept.
+Actual: Uploads are photos from camera or gallery. No 5 MB or file-type check.
+Remarks: None
+
+
+
+=== RID-PROF-006 [R1 Profile & Vehicle] Fail
+Scenario: Suspended rider cannot work
+Expected: Rider 3 cannot go Online and sees a suspension message. Rider 3 receives no offer and is not selectable for manual assignment.
+Actual: No suspension state.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PROF-007 [R1 Profile & Vehicle] Blocked
+Scenario: Rider cannot see another rider's profile
+Expected: Denied. No Rider 2 data is shown.
+Actual: Profile ownership is a server rule.
+Remarks: Needs live Laravel API.
+
+
+
+=== RID-PROF-008 [R1 Profile & Vehicle] Fail
+Scenario: [Mobile] Update documents with the camera and the Files app
+Expected: Both are accepted with previews, and Logistics 1 sees the new documents flagged for re-verification, as in RID-PROF-002.
+Actual: No Files source and no re-verification flag.
+Remarks: None
+
+
+
+=== RID-AVAIL-001 [R2 Availability] Fail
+Scenario: Go Online
+Expected: Logistics 1 sees Rider 1 as Online within a few seconds. Rider 1 receives the offer.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-AVAIL-002 [R2 Availability] Fail
+Scenario: Go Offline
+Expected: Rider 1 receives no offer, and is not listed in Manual Assign. The job goes to Rider 2.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-AVAIL-003 [R2 Availability] Fail
+Scenario: Go Offline with an active job
+Expected: Offline is allowed. The Picked Up job stays with Rider 1 and can still be delivered. No new offers arrive.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-AVAIL-004 [R2 Availability] Fail
+Scenario: Offline after logout or session timeout
+Expected: Rider 1 shows Offline and gets no offer.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-AVAIL-005 [R2 Availability] Fail
+Scenario: [Mobile] Location permission needed to go Online
+Expected: Step 1: Online is blocked with a message that location is needed and a link to Settings; no crash. Step 2: Rider 1 goes Online. Logistics 1 sees Rider 1 Online with a current location.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-AVAIL-006 [R2 Availability] Fail
+Scenario: [Mobile] Location turned off while Online
+Expected: The app warns that location is off. Rider 1 gets no new offer while location is off. After turning it back on, the rider can receive offers again.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-AVAIL-007 [R2 Availability] Fail
+Scenario: [Mobile] App force-closed while Online
+Expected: Within 5 minutes Rider 1 shows Offline and gets no new offer. The Assigned job stays with Rider 1 and is shown again when the app is reopened.
+Actual: No Online/Offline toggle, location permission or presence tracking.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-JOB-001 [R3 Job Assignment] Fail
+Scenario: View and accept a job
+Expected: The offer shows pickup (Seller 1, Commonwealth, QC), drop-off area (Brgy. Central, QC), COD ₱500.00 and pay ₱30.00 pickup. After Accept, the job is Assigned to Rider 1 and Logistics 1 sees Rider 1 as the assignee.
+Actual: Jobs list pickup, drop-off area and package. No COD amount; jobs are not timed offers.
+Remarks: None
+
+
+
+=== RID-JOB-002 [R3 Job Assignment] Fail
+Scenario: Decline a job
+Expected: The offer disappears for Rider 1 and is offered to Rider 2. Rider 1 is not assigned.
+Actual: No decline/offer flow.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-JOB-003 [R3 Job Assignment] Fail
+Scenario: Offer timeout
+Expected: The first Accept succeeds. After 60 seconds the second offer is expired; Accept is disabled or rejected and the job goes to the next rider.
+Actual: No 60-second offer timeout.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-JOB-004 [R3 Job Assignment] Fail
+Scenario: Job goes to Unassigned after 3 declines
+Expected: After the 3rd decline the job is in the Unassigned queue and no longer offered automatically.
+Actual: No Unassigned queue or 3-decline rule.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-JOB-005 [R3 Job Assignment] Blocked
+Scenario: Accept and manual assignment at the same moment
+Expected: Exactly one rider has the job, and Logistics 1 shows that same rider. The other side gets a clear 'already assigned' message. No duplicate job exists.
+Actual: Concurrent accept vs manual assign needs the backend.
+Remarks: Needs live Laravel API.
+
+
+
+=== RID-JOB-006 [R3 Job Assignment] Fail
+Scenario: Concurrent job limit
+Expected: The 3rd is accepted. Rider 1 gets no 4th offer, and manual assign of a 4th is blocked.
+Actual: No concurrent job limit.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-JOB-007 [R3 Job Assignment] Blocked
+Scenario: Cannot accept another company's job
+Expected: Rejected (403 or not found). The job is unchanged.
+Actual: Company ownership is a server rule.
+Remarks: Needs live Laravel API.
+
+
+
+=== RID-JOB-008 [R3 Job Assignment] Fail
+Scenario: [Mobile] Job offer while the phone is locked
+Expected: A push notification with sound arrives while the phone is locked. The offer shows about 40 seconds left (counted from when it was sent, not restarted at 60). Accept works within the 60 seconds.
+Actual: No push notifications.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-JOB-009 [R3 Job Assignment] Blocked
+Scenario: [Mobile] Navigate to the pickup address
+Expected: The map app opens with Seller 1's pickup location (Commonwealth, Quezon City). Switching back shows the same job.
+Actual: open_maps.dart launches the maps app. Confirm on a phone.
+Remarks: Needs a phone or emulator; code review only.
+
+
+
+=== RID-PICK-001 [R4 Pickup] Fail
+Scenario: Pickup details shown
+Expected: Shows Seller 1's name, pickup address, contact number, tracking number and 1 parcel.
+Actual: Shows seller and pickup address. No contact number or tracking number.
+Remarks: None
+
+
+
+=== RID-PICK-002 [R4 Pickup] Fail
+Scenario: Confirm pickup by scanning
+Expected: Status is Picked Up with the scan time in all three views. Buyer 1's order moves to To Receive. Seller 1 can no longer cancel. Rider 1 earns ₱30.00.
+Actual: Pickup is confirmed with the "Confirm Pickup from Seller" button. No waybill scan.
+Remarks: None
+
+
+
+=== RID-PICK-003 [R4 Pickup] Fail
+Scenario: Confirm pickup by typing the tracking number
+Expected: Status becomes Picked Up exactly as with a scan.
+Actual: No tracking-number entry.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PICK-004 [R4 Pickup] Fail
+Scenario: Wrong tracking number
+Expected: Both are rejected with 'tracking number does not match this job'. Status stays Assigned.
+Actual: No tracking-number check.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PICK-005 [R4 Pickup] Blocked
+Scenario: Double scan at pickup
+Expected: One Picked Up event only; the second scan shows 'already picked up'. Pay counted once.
+Actual: Whether a fast double tap advances two steps needs a run.
+Remarks: Needs a phone or emulator; code review only.
+
+
+
+=== RID-PICK-006 [R4 Pickup] Fail
+Scenario: [Mobile] Camera access denied for the waybill scan
+Expected: No crash. A message explains that camera access is needed and links to Settings. Typing the tracking number gives Picked Up, as in RID-PICK-003.
+Actual: No scan, so no camera-denied flow.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-PICK-007 [R4 Pickup] Blocked
+Scenario: [Mobile] Pickup with no internet
+Expected: The scan is either blocked with a no-internet message, or saved as pending and sent once online with the original scan time. In the end there is one Picked Up event, and pickup pay is counted once.
+Actual: State is local in mock mode; offline queueing is not in the code.
+Remarks: Needs live Laravel API.
+
+
+
+=== RID-DLV-001 [R5 Delivery] Blocked
+Scenario: Deliver with proof in sequence
+Expected: Each status is shown in all views with times. After Delivered: Buyer 1 sees Delivered with the photo, Rider 1's COD balance rises by ₱500.00 and pay by ₱50.00.
+Actual: Steps run in order and each updates the buyer's order status. Buyer-side proof photo, times and rider totals need a run.
+Remarks: Needs a phone or emulator; code review only.
+
+
+
+=== RID-DLV-002 [R5 Delivery] Pass
+Scenario: Skipping a status
+Expected: Delivered is not available and a direct request is rejected. Status unchanged.
+Actual: Confirm Order Delivered only appears after Start Delivery Transit; steps cannot be skipped.
+Remarks: None
+
+
+
+=== RID-DLV-003 [R5 Delivery] Pass
+Scenario: Photo is required
+Expected: Both are blocked with a message. The status stays Out for Delivery.
+Actual: Confirm Order Delivered stays disabled until a proof photo is attached.
+Remarks: Disabled button only; no message explains why.
+
+
+
+=== RID-DLV-004 [R5 Delivery] Fail
+Scenario: OTP checks
+Expected: 5 digits is rejected. Each wrong OTP is rejected. After the 5th wrong entry, entry is locked for 15 minutes (the correct OTP is also refused). After 15 minutes the correct OTP works.
+Actual: No delivery OTP.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-DLV-005 [R5 Delivery] Fail
+Scenario: COD amount must match
+Expected: ₱499.99 and ₱500.01 are rejected with a mismatch message. Only ₱500.00 completes delivery.
+Actual: No COD amount entry or check.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-DLV-006 [R5 Delivery] Fail
+Scenario: Prepaid order has no COD
+Expected: COD shows ₱0.00 / Paid; no amount is asked for, and the COD balance does not change.
+Actual: The tracker always shows Cash on Delivery; no prepaid case.
+Remarks: None
+
+
+
+=== RID-DLV-007 [R5 Delivery] Blocked
+Scenario: Cannot update another rider's job
+Expected: Rejected. Rider 2's job is unchanged.
+Actual: Job ownership is a server rule.
+Remarks: Needs live Laravel API.
+
+
+
+=== RID-DLV-008 [R5 Delivery] Fail
+Scenario: [Mobile] Proof-of-delivery photo must be taken live
+Expected: The gallery is not offered, or the gallery photo is refused. The live photo is accepted and Buyer 1 sees it with the delivery time.
+Actual: The picker offers Gallery as well as Camera, so a live photo is not enforced.
+Remarks: None
+
+
+
+=== RID-DLV-009 [R5 Delivery] Blocked
+Scenario: [Mobile] Mark Delivered with no internet
+Expected: Step 1: the app clearly shows the delivery is not yet sent (or blocks it with a message) and keeps the photo, OTP and amount. Step 3: Delivered is recorded once with the photo; the COD balance rises by ₱500.00 and pay by ₱50.00 once. Nothing is lost when the app is reopened.
+Actual: No offline queue in the code; mock mode never uses the network.
+Remarks: Needs live Laravel API.
+
+
+
+=== RID-DLV-010 [R5 Delivery] Fail
+Scenario: [Mobile] Call or message the buyer from the job
+Expected: The phone dialer opens with Buyer 1's number (or a masked relay number). Messaging opens a conversation with Buyer 1. No other buyer's number is shown.
+Actual: No call or message to the buyer from the job.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-DLV-011 [R5 Delivery] Fail
+Scenario: [Mobile] Delivery location is recorded
+Expected: The record shows the GPS location and time of the delivery, close to ADDR-1.
+Actual: No GPS location recorded.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-FAIL-001 [R6 Failed Delivery] Fail
+Scenario: Mark failed with a reason
+Expected: Status Failed Delivery, attempt 1 of 3, with the reason. Buyer 1 and Logistics 1 are notified. No COD is collected and pay is ₱0.00 for the attempt.
+Actual: Mark Delivery Failed has no reason, attempt counter or buyer/Logistics notification.
+Remarks: None
+
+
+
+=== RID-FAIL-002 [R6 Failed Delivery] Fail
+Scenario: Reason required
+Expected: Blocked; status unchanged.
+Actual: No reason is asked for.
+Remarks: None
+
+
+
+=== RID-FAIL-003 [R6 Failed Delivery] Fail
+Scenario: Refused goes straight to Return to Sender
+Expected: Status Return to Sender immediately; no further attempt is scheduled.
+Actual: No "Refused" reason. Return to Sender exists only as a step.
+Remarks: None
+
+
+
+=== RID-FAIL-004 [R6 Failed Delivery] Fail
+Scenario: Attempt counter and reschedule
+Expected: The job shows attempt 2 of 3 and completes normally on success.
+Actual: No attempt counter. Retry Delivery returns the job to In Transit.
+Remarks: None
+
+
+
+=== RID-FAIL-005 [R6 Failed Delivery] Fail
+Scenario: Return to Sender after the 3rd failed attempt
+Expected: Status Return to Sender. No 4th attempt is possible. Buyer 1 and Seller 1 are notified.
+Actual: No 3-attempt rule.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-EARN-001 [R7 Earnings & COD] Blocked
+Scenario: Delivery history
+Expected: Every job is listed once with date, tracking number, result and pay.
+Actual: The Earnings tab lists completed jobs with pay. Tracking number and result columns need a phone check.
+Remarks: Needs a phone or emulator; code review only.
+
+
+
+=== RID-EARN-002 [R7 Earnings & COD] Blocked
+Scenario: Pay per job and daily total
+Expected: Today's total is exactly ₱210.00 (2 × ₱30 + 3 × ₱50 + 1 × ₱0). The weekly total includes it.
+Actual: Pay per job and today's total are calculated in the app. The P30/P50 amounts in the plan are not confirmed.
+Remarks: Needs a phone or emulator; code review only.
+
+
+
+=== RID-EARN-003 [R7 Earnings & COD] Fail
+Scenario: COD balance to remit
+Expected: Balance shows ₱1,800.00 with both orders listed.
+Actual: No COD balance.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-EARN-004 [R7 Earnings & COD] Fail
+Scenario: Remit COD and confirmation
+Expected: Before confirmation the remittance is Pending and the balance still shows ₱1,800.00 pending. After confirmation the balance is ₱0.00.
+Actual: No remittance flow.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-EARN-005 [R7 Earnings & COD] Fail
+Scenario: Short remittance
+Expected: Logistics 1 sees a ₱50.00 shortfall flag; Rider 1's balance shows ₱50.00 outstanding after confirmation.
+Actual: No remittance flow.
+Remarks: Feature is not in the app.
+
+
+
+=== RID-EARN-006 [R7 Earnings & COD] Blocked
+Scenario: Rider cannot confirm own remittance
+Expected: Rejected (403).
+Actual: No remittance in the app; confirmation rules are a server concern.
+Remarks: Needs live Laravel API.

@@ -60,6 +60,7 @@ import '../data/ph_regions.dart';
 import '../data/repositories/account_security_repository.dart';
 import '../data/repositories/auth_repository.dart';
 import '../utils/order_tab_memory.dart';
+import '../utils/rider_validators.dart';
 import '../utils/validators.dart';
 
 enum UserRole { buyer, courier }
@@ -136,6 +137,31 @@ class AuthState extends ChangeNotifier {
   String? street;
   String? avatarPath;
 
+  /// ── Rider record ───────────────────────────────────────────────────────
+  ///
+  /// The workbook's Rider plan (RID-PROF) treats the courier account as a
+  /// rider record: a company, a hub, a vehicle, a licence and the two
+  /// documents Logistics reviews. Registration already collects the vehicle
+  /// type and plate; these fields extend that record so the profile screen can
+  /// show what was submitted and "Edit vehicle" can update it.
+  ///
+  /// Kept here rather than in CourierState because this is *account* data —
+  /// it survives having no jobs, and it is what re-verification is about.
+  /// CourierState owns the operational side (online/offline, jobs, COD).
+  String? riderCompany;
+  String? riderHub;
+  String? riderVehicleType;
+  String? riderPlate;
+  String? riderLicenseNumber;
+  DateTime? riderLicenseExpiry;
+  String? riderLicensePath;
+  String? riderOrCrPath;
+
+  /// True after a vehicle/document change until Logistics reviews it. The old
+  /// plate is still replaced immediately — the rider is driving the new one —
+  /// but the account carries a "for re-verification" marker.
+  bool riderReverificationRequired = false;
+
   /// Last few distinct delivery addresses, most-recent-first, capped.
   /// Recorded on every successful order placement; the checkout
   /// section offers them as one-tap shortcuts. Display strings only
@@ -185,6 +211,15 @@ class AuthState extends ChangeNotifier {
   static const _addressesKey = 'auth_addresses';
   static const _avatarPathKey = 'auth_avatar_path';
   static const _memberSinceKey = 'auth_member_since';
+  static const _riderCompanyKey = 'auth_rider_company';
+  static const _riderHubKey = 'auth_rider_hub';
+  static const _riderVehicleTypeKey = 'auth_rider_vehicle_type';
+  static const _riderPlateKey = 'auth_rider_plate';
+  static const _riderLicenseNumberKey = 'auth_rider_license_number';
+  static const _riderLicenseExpiryKey = 'auth_rider_license_expiry';
+  static const _riderLicensePathKey = 'auth_rider_license_path';
+  static const _riderOrCrPathKey = 'auth_rider_or_cr_path';
+  static const _riderReverificationKey = 'auth_rider_reverification';
 
   bool get isLoggedIn => status == AccountStatus.active && role != null;
   bool get isPendingApproval => status == AccountStatus.pendingApproval;
@@ -294,6 +329,19 @@ class AuthState extends ChangeNotifier {
       memberSince = memberSinceRaw == null
           ? null
           : DateTime.tryParse(memberSinceRaw);
+      riderCompany = prefs.getString(_riderCompanyKey);
+      riderHub = prefs.getString(_riderHubKey);
+      riderVehicleType = prefs.getString(_riderVehicleTypeKey);
+      riderPlate = prefs.getString(_riderPlateKey);
+      riderLicenseNumber = prefs.getString(_riderLicenseNumberKey);
+      final licenseExpiryRaw = prefs.getString(_riderLicenseExpiryKey);
+      riderLicenseExpiry = licenseExpiryRaw == null
+          ? null
+          : DateTime.tryParse(licenseExpiryRaw);
+      riderLicensePath = prefs.getString(_riderLicensePathKey);
+      riderOrCrPath = prefs.getString(_riderOrCrPathKey);
+      riderReverificationRequired =
+          prefs.getBool(_riderReverificationKey) ?? false;
     } catch (_) {
       // Corrupt/old prefs shape — fall back to logged-out rather than crash.
       role = null;
@@ -373,6 +421,22 @@ class AuthState extends ChangeNotifier {
           );
     await _setOrRemove(prefs, _avatarPathKey, avatarPath);
     await _setOrRemove(prefs, _memberSinceKey, memberSince?.toIso8601String());
+    await _setOrRemove(prefs, _riderCompanyKey, riderCompany);
+    await _setOrRemove(prefs, _riderHubKey, riderHub);
+    await _setOrRemove(prefs, _riderVehicleTypeKey, riderVehicleType);
+    await _setOrRemove(prefs, _riderPlateKey, riderPlate);
+    await _setOrRemove(prefs, _riderLicenseNumberKey, riderLicenseNumber);
+    await _setOrRemove(
+      prefs,
+      _riderLicenseExpiryKey,
+      riderLicenseExpiry?.toIso8601String(),
+    );
+    await _setOrRemove(prefs, _riderLicensePathKey, riderLicensePath);
+    await _setOrRemove(prefs, _riderOrCrPathKey, riderOrCrPath);
+    await prefs.setBool(
+      _riderReverificationKey,
+      riderReverificationRequired,
+    );
   }
 
   /// Call after a successful login of an already-approved account.
@@ -493,6 +557,18 @@ class AuthState extends ChangeNotifier {
       password: password,
       profile: profile,
     );
+    if (role == UserRole.courier) {
+      saveRiderRegistration(
+        company: profile.riderCompany,
+        hub: profile.riderHub,
+        vehicleType: profile.riderVehicleType,
+        plate: profile.riderPlate,
+        licenseNumber: profile.riderLicenseNumber,
+        licenseExpiry: profile.riderLicenseExpiry,
+        licensePath: profile.riderLicensePath ?? profile.govIdPath,
+        orCrPath: profile.riderOrCrPath,
+      );
+    }
     _applyResult(result, fallbackName: name);
     await _save();
   }
@@ -670,6 +746,121 @@ class AuthState extends ChangeNotifier {
     if (avatarPath != null) this.avatarPath = avatarPath;
     notifyListeners();
     _save();
+  }
+
+  /// Records the rider half of a courier registration.
+  ///
+  /// Called once, by [submitForApproval], from the same [RegistrationProfile]
+  /// the repository received. Keeping it out of [updateProfile] matters: that
+  /// method is shared with the buyer's Edit Profile, whose fields have nothing
+  /// to do with a vehicle.
+  void saveRiderRegistration({
+    String? company,
+    String? hub,
+    String? vehicleType,
+    String? plate,
+    String? licenseNumber,
+    DateTime? licenseExpiry,
+    String? licensePath,
+    String? orCrPath,
+  }) {
+    riderCompany = _clean(company);
+    riderHub = _clean(hub);
+    riderVehicleType = _clean(vehicleType);
+    riderPlate = _clean(plate)?.toUpperCase();
+    riderLicenseNumber = _clean(licenseNumber)?.toUpperCase();
+    riderLicenseExpiry = licenseExpiry;
+    riderLicensePath = _clean(licensePath);
+    riderOrCrPath = _clean(orCrPath);
+    notifyListeners();
+    _save();
+  }
+
+  /// Updates the vehicle and/or documents, returning a user-facing error or
+  /// null. The server re-checks every rule; these copies answer at the field.
+  ///
+  /// A successful change sets [riderReverificationRequired] because Logistics
+  /// approved the *old* plate and documents. The old plate is replaced in the
+  /// same write — the rider is already driving the new one, and showing a plate
+  /// they no longer use would be the wrong kind of caution.
+  ///
+  /// Rejected documents do not reach this method (the screen validates after
+  /// picking and keeps the previous path on failure), and a rejected call here
+  /// leaves every field untouched for the same reason.
+  String? updateRiderVehicle({
+    required String vehicleType,
+    required String plate,
+    required String licenseNumber,
+    required DateTime? licenseExpiry,
+    String? company,
+    String? licensePath,
+    String? orCrPath,
+    DateTime? today,
+  }) {
+    final plateProblem = validatePlateNumber(plate);
+    if (plateProblem != null) return plateProblem;
+    if (isPlateRegisteredElsewhere(plate, currentPlate: riderPlate)) {
+      return 'That plate number is already registered to another rider.';
+    }
+    final licenseProblem = validateLicenseNumber(licenseNumber);
+    if (licenseProblem != null) return licenseProblem;
+    final expiryProblem = validateLicenseExpiry(licenseExpiry, today: today);
+    if (expiryProblem != null) return expiryProblem;
+
+    if (licensePath != null) {
+      final documentProblem = validateRiderDocumentPath(licensePath);
+      if (documentProblem != null) return documentProblem;
+    }
+    if (orCrPath != null) {
+      final documentProblem = validateRiderDocumentPath(orCrPath);
+      if (documentProblem != null) return documentProblem;
+    }
+
+    final nextVehicleType = vehicleType.trim();
+    final nextPlate = plate.trim().toUpperCase();
+    final nextLicense = licenseNumber.trim().toUpperCase();
+    final nextCompany = company?.trim();
+    final changed =
+        nextVehicleType != (riderVehicleType ?? '') ||
+        nextPlate != (riderPlate ?? '') ||
+        nextLicense != (riderLicenseNumber ?? '') ||
+        (nextCompany != null && nextCompany != (riderCompany ?? '')) ||
+        !_sameDay(licenseExpiry, riderLicenseExpiry) ||
+        (licensePath != null && licensePath != riderLicensePath) ||
+        (orCrPath != null && orCrPath != riderOrCrPath);
+
+    riderVehicleType = nextVehicleType;
+    riderPlate = nextPlate;
+    riderLicenseNumber = nextLicense;
+    if (nextCompany != null && nextCompany.isNotEmpty) {
+      riderCompany = nextCompany;
+    }
+    riderLicenseExpiry = licenseExpiry;
+    if (licensePath != null) riderLicensePath = licensePath;
+    if (orCrPath != null) riderOrCrPath = orCrPath;
+    if (changed) riderReverificationRequired = true;
+
+    notifyListeners();
+    _save();
+    return null;
+  }
+
+  /// True once both documents are on file. The profile's "both documents open"
+  /// affordance is gated on this rather than on the paths being non-null in a
+  /// template, because a path to a deleted file would otherwise render a tile
+  /// that opens nothing.
+  bool get hasRiderDocuments =>
+      (riderLicensePath?.trim().isNotEmpty ?? false) &&
+      (riderOrCrPath?.trim().isNotEmpty ?? false);
+
+  static String? _clean(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  static bool _sameDay(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return a == b;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   /// Records the just-used delivery address, most-recent-first,
@@ -899,6 +1090,15 @@ class AuthState extends ChangeNotifier {
     addresses = const [];
     avatarPath = null;
     memberSince = null;
+    riderCompany = null;
+    riderHub = null;
+    riderVehicleType = null;
+    riderPlate = null;
+    riderLicenseNumber = null;
+    riderLicenseExpiry = null;
+    riderLicensePath = null;
+    riderOrCrPath = null;
+    riderReverificationRequired = false;
     // Navigation memory belongs to the account, not the device — same
     // reason recentAddresses clears above.
     await clearOrdersTab();

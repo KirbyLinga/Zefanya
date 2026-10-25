@@ -40,7 +40,15 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/zefanya_mark.dart';
 
 class BuyerShell extends StatefulWidget {
-  const BuyerShell({super.key});
+  const BuyerShell({super.key, this.now});
+
+  /// Pins the greeting's time of day for deterministic screenshots.
+  ///
+  /// The greeting is real clock copy in production; a golden that renders
+  /// "GOOD MORNING" before noon and "GOOD EVENING" after 6 PM is a test
+  /// that passes or fails with the wall clock. Tests pass a fixed moment;
+  /// the app leaves this null.
+  final DateTime? now;
 
   @override
   State<BuyerShell> createState() => _BuyerShellState();
@@ -121,6 +129,7 @@ class _BuyerShellState extends State<BuyerShell> {
               isActive: _index == 0,
               onSearchTap: _openSearch,
               onBrowseCategories: () => _onTabTap(2),
+              now: widget.now,
             ),
           ),
           KeyedSubtree(
@@ -157,7 +166,12 @@ class _BuyerShellState extends State<BuyerShell> {
 /// have its own category chips, which was two different UIs doing the
 /// same job.
 class _BuyerHomeScreen extends StatefulWidget {
-  const _BuyerHomeScreen({required this.isActive, required this.onSearchTap, required this.onBrowseCategories});
+  const _BuyerHomeScreen({
+    required this.isActive,
+    required this.onSearchTap,
+    required this.onBrowseCategories,
+    this.now,
+  });
 
   /// False while another tab is showing — pauses the promo banner.
   final bool isActive;
@@ -167,6 +181,9 @@ class _BuyerHomeScreen extends StatefulWidget {
 
   /// The deck end card's "Browse categories" — jumps to Categories.
   final VoidCallback onBrowseCategories;
+
+  /// Fixed moment for the greeting in golden tests; null uses the clock.
+  final DateTime? now;
 
   @override
   State<_BuyerHomeScreen> createState() => _BuyerHomeScreenState();
@@ -323,7 +340,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>()!;
     final auth = context.watch<AuthState>();
-    final greeting = Microcopy.greeting(DateTime.now(), name: auth.firstName ?? auth.name).toUpperCase();
+    final greeting = Microcopy.greeting(widget.now ?? DateTime.now(), name: auth.firstName ?? auth.name).toUpperCase();
 
     final catalogProducts = _shuffled.isNotEmpty
         ? _shuffled

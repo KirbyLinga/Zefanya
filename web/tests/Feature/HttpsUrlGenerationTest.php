@@ -25,6 +25,12 @@ class HttpsUrlGenerationTest extends TestCase
      */
     public function test_named_routes_start_with_https_in_production(): void
     {
+        $previousEnvironment = $this->app->environment();
+
+        // AppServiceProvider::boot() reads the application environment, not
+        // config('app.env'). Both must be flipped: setting only the config
+        // value left this test permanently red in the testing environment.
+        $this->app['env'] = 'production';
         config()->set('app.env', 'production');
 
         (new AppServiceProvider($this->app))->boot();
@@ -36,7 +42,8 @@ class HttpsUrlGenerationTest extends TestCase
             );
         } finally {
             URL::forceScheme(null);
-            config()->set('app.env', 'testing');
+            $this->app['env'] = $previousEnvironment;
+            config()->set('app.env', $previousEnvironment);
         }
     }
 

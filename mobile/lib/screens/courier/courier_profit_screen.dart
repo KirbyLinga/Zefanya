@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../utils/weekly_buckets.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -65,6 +66,8 @@ class CourierProfitScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
+                const SizedBox(height: 16),
+                _buildCodCard(context, theme, courier),
                 const SizedBox(height: 20),
                 _WeeklyChart(completed: completed),
               ],
@@ -251,6 +254,174 @@ class CourierProfitScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildCodCard(
+    BuildContext context,
+    ThemeData theme,
+    CourierState courier,
+  ) {
+    final collected = courier.codCollections;
+    return Container(
+      key: const ValueKey('cod-balance-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: editorialRadius(0, ShapeTier.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'COD BALANCE TO REMIT',
+                  style: AppType.eyebrow,
+                ),
+              ),
+              Text(
+                formatPeso(courier.codOutstanding),
+                key: const ValueKey('cod-outstanding'),
+                style: AppType.priceNumeral(24),
+              ),
+            ],
+          ),
+          if (courier.pendingRemittanceTotal > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${formatPeso(courier.pendingRemittanceTotal)} remittance pending confirmation',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.warning,
+              ),
+            ),
+          ],
+          if (collected.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            for (final entry in collected.take(4))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        entry.trackingNumber,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                    Text(
+                      formatPeso(entry.amount),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ] else ...[
+            const SizedBox(height: 6),
+            Text(
+              'Cash you collect at the door appears here until Logistics confirms your remittance.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+          if (courier.codOutstanding > 0) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                key: const ValueKey('cod-remit-button'),
+                onPressed: () => _openRemittance(context, courier),
+                child: const Text('Remit COD'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openRemittance(
+    BuildContext context,
+    CourierState courier,
+  ) async {
+    final controller = TextEditingController(
+      text: courier.codOutstanding.toStringAsFixed(2),
+    );
+    String? error;
+    final requested = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('REMIT CASH', style: AppType.eyebrow),
+              const SizedBox(height: 8),
+              Text(
+                'Logistics confirms the handover. Your balance stays '
+                '${formatPeso(courier.codOutstanding)} until then.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                key: const ValueKey('cod-remit-amount'),
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Amount to remit',
+                  prefixText: '₱ ',
+                  errorText: error,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                key: const ValueKey('cod-remit-submit'),
+                onPressed: () {
+                  final value = double.tryParse(
+                    controller.text.replaceAll(',', '').trim(),
+                  );
+                  if (value == null) {
+                    setSheetState(() => error = 'Enter an amount.');
+                    return;
+                  }
+                  final problem = courier.requestRemittance(value);
+                  if (problem != null) {
+                    setSheetState(() => error = problem);
+                    return;
+                  }
+                  Navigator.of(sheetContext).pop(true);
+                },
+                child: const Text('Request Remittance'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+    if (requested == true && context.mounted) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text('Remittance requested. Waiting for Logistics.'),
+        ),
+      );
+    }
+  }
+
   Widget _buildTransactionTile(ThemeData theme, CompletedJob c, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -278,6 +449,13 @@ class CourierProfitScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(c.job.id, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  '${c.resultLabel} · ${c.trackingNumber}',
+                  key: ValueKey('transaction-result-${c.job.id}'),
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text('${c.job.shopName} · ${_formatWhen(c.completedAt)}', style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
@@ -335,7 +513,11 @@ class _WeeklyChart extends StatelessWidget {
           Text('Last 7 days', style: theme.textTheme.titleSmall),
           const SizedBox(height: 12),
           SizedBox(
-            height: 116,
+            // 120, not 116: a day with earnings stacks amount text + 4 +
+            // bar (up to 76) + 6 + weekday label, which measured 118. The
+            // bars themselves are unchanged; the old height clipped the top
+            // of the tallest day by 2px.
+            height: 120,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [

@@ -88,56 +88,60 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('blank and wrong tracking numbers leave the job at seller',
-      (tester) async {
-    final (courier, jobId) = await _atSeller();
-    await _pump(tester, courier, jobId);
-    await _openPickupDialog(tester);
+  group('RID-PICK-004', () {
+    testWidgets('blank and wrong tracking numbers leave the job at seller',
+        (tester) async {
+      final (courier, jobId) = await _atSeller();
+      await _pump(tester, courier, jobId);
+      await _openPickupDialog(tester);
 
-    // Blank: the confirm button explains what is missing rather than closing.
-    await tester.tap(find.widgetWithText(FilledButton, 'Confirm Pickup'));
-    await tester.pump();
-    expect(find.text('Enter the tracking number first.'), findsOneWidget);
-    expect(courier.milestoneFor(jobId), DeliveryMilestone.arrivedAtSeller);
+      // Blank: the confirm button explains what is missing rather than closing.
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm Pickup'));
+      await tester.pump();
+      expect(find.text('Enter the tracking number first.'), findsOneWidget);
+      expect(courier.milestoneFor(jobId), DeliveryMilestone.arrivedAtSeller);
 
-    // Wrong: a specific mismatch message, still at the seller.
-    await tester.enterText(
-      find.byKey(const ValueKey('pickup-tracking')),
-      'ZEF-WRONG-99',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Confirm Pickup'));
-    await tester.pump();
-    expect(
-      find.text('That tracking number does not match this parcel.'),
-      findsOneWidget,
-    );
-    expect(courier.milestoneFor(jobId), DeliveryMilestone.arrivedAtSeller);
+      // Wrong: a specific mismatch message, still at the seller.
+      await tester.enterText(
+        find.byKey(const ValueKey('pickup-tracking')),
+        'ZEF-WRONG-99',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm Pickup'));
+      await tester.pump();
+      expect(
+        find.text('That tracking number does not match this parcel.'),
+        findsOneWidget,
+      );
+      expect(courier.milestoneFor(jobId), DeliveryMilestone.arrivedAtSeller);
+    });
   });
 
-  testWidgets('the matching number advances pickup exactly once',
-      (tester) async {
-    final (courier, jobId) = await _atSeller();
-    await _pump(tester, courier, jobId);
-    await _openPickupDialog(tester);
+  group('RID-PICK-003', () {
+    testWidgets('the matching number advances pickup exactly once',
+        (tester) async {
+      final (courier, jobId) = await _atSeller();
+      await _pump(tester, courier, jobId);
+      await _openPickupDialog(tester);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('pickup-tracking')),
-      ' zef-pick-01 ',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Confirm Pickup'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('pickup-tracking')),
+        ' zef-pick-01 ',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm Pickup'));
+      await tester.pumpAndSettle();
 
-    expect(courier.milestoneFor(jobId), DeliveryMilestone.pickedUp);
-    expect(find.text('Verify the parcel'), findsNothing);
-    expect(
-      find.widgetWithText(ElevatedButton, 'Drop at Sorting Center'),
-      findsOneWidget,
-    );
+      expect(courier.milestoneFor(jobId), DeliveryMilestone.pickedUp);
+      expect(find.text('Verify the parcel'), findsNothing);
+      expect(
+        find.widgetWithText(ElevatedButton, 'Drop at Sorting Center'),
+        findsOneWidget,
+      );
 
-    // The pickup action is gone, so it cannot be confirmed twice.
-    expect(
-      find.widgetWithText(ElevatedButton, 'Confirm Pickup from Seller'),
-      findsNothing,
-    );
+      // The pickup action is gone, so it cannot be confirmed twice.
+      expect(
+        find.widgetWithText(ElevatedButton, 'Confirm Pickup from Seller'),
+        findsNothing,
+      );
+    });
   });
 }

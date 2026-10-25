@@ -223,6 +223,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // shipping was free (the platform absorbs it). One fee per checkout,
     // split across the orders when a cart spans several sellers.
     final courier = context.read<CourierState>();
+    final codPerOrder = _selectedMethod == PaymentMethod.cod
+        ? total / placed.length
+        : 0.0;
     for (final order in placed) {
       courier.dispatchForOrder(
         order: order,
@@ -233,6 +236,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         fee: kStandardShippingFee / placed.length,
         buyerPhone: auth.phone,
         trackingNumber: order.id,
+        codAmount: codPerOrder,
+        prepaid: _selectedMethod == PaymentMethod.eWallet,
       );
     }
     // Record the just-used address for the one-tap shortcut next

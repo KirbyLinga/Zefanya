@@ -66,6 +66,11 @@ Map<String, Object?> _jobJson({
   String deliveryArea = 'Quezon City (8.4 km)',
   String packageSize = '1 item · ₱1,299.00',
   double fee = 85.0,
+  String? trackingNumber,
+  String paymentMethod = 'cod',
+  String paymentStatus = 'pending',
+  double codAmount = 0,
+  String? deliveryOtp,
 }) =>
     {
       'id': id,
@@ -76,6 +81,12 @@ Map<String, Object?> _jobJson({
       'delivery_area': deliveryArea,
       'package_size': packageSize,
       'fee': fee,
+      'tracking_number': trackingNumber,
+      'payment_method': paymentMethod,
+      'payment_status': paymentStatus,
+      'cod_amount': codAmount,
+      'delivery_otp_required': deliveryOtp != null,
+      if (deliveryOtp != null) 'delivery_otp': deliveryOtp,
     };
 
 class _Live {
@@ -130,6 +141,34 @@ void main() {
     expect(jobs[1].id, '13');
     expect(jobs[1].shopName, 'Tahanan Ceramics');
     expect(jobs[1].fee, 120.0);
+  });
+
+  test('maps the handover and payment fields into the job', () async {
+    final live = _Live([
+      _list([
+        _jobJson(
+          trackingNumber: 'ZEF-RID-777',
+          codAmount: 700.0,
+        ),
+        _jobJson(
+          id: '13',
+          orderId: '8',
+          paymentStatus: 'paid',
+          codAmount: 0,
+        ),
+        _jobJson(id: '14', orderId: '9', deliveryOtp: '482913'),
+      ]),
+    ]);
+    await live.tokens.write('t');
+
+    final jobs = await live.repo.assignedJobs();
+
+    expect(jobs[0].trackingNumber, 'ZEF-RID-777');
+    expect(jobs[0].codAmount, 700.0);
+    expect(jobs[0].prepaid, isFalse);
+    expect(jobs[0].deliveryOtp, isEmpty);
+    expect(jobs[1].prepaid, isTrue);
+    expect(jobs[2].deliveryOtp, '482913');
   });
 
   test('returns an empty list when no jobs assigned', () async {
@@ -210,6 +249,63 @@ void main() {
 
     expect(body.single, contains('"milestone"'));
     expect(body.single, contains('OUT_FOR_DELIVERY'));
+  });
+
+  test('advanceMilestone sends the handover fields it was given', () async {
+    final body = <String>[];
+    final server = _FakeServer([http.Response('{}', 200)]);
+    final bodyCaptureClient = MockClient.streaming((request, bodyStream) async {
+      final bytes = await bodyStream.toBytes();
+      body.add(utf8.decode(bytes));
+      server.methods.add(request.method);
+      server.paths.add(request.url.path);
+      return http.StreamedResponse(
+        Stream.value(utf8.encode('{}')),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+
+    final tokens = InMemoryTokenStore();
+    await tokens.write('t');
+    final repo = LiveCourierRepository(
+      ApiClient(
+        baseUrl: 'https://api.zefanya.test',
+        tokenStore: tokens,
+        httpClient: bodyCaptureClient,
+      ),
+    );
+
+    await repo.advanceMilestone(
+      '99',
+      'DELIVERED',
+      deliveryOtp: ' 482913 ',
+      codAmount: 700.0,
+    );
+    await repo.advanceMilestone(
+      '100',
+      'PICKED_UP',
+      trackingNumber: ' ZEF-RID-777 ',
+    );
+    await repo.advanceMilestone(
+      '101',
+      'DELIVERY_FAILED',
+      failureReason: 'Buyer not available ',
+    );
+
+    final delivered = jsonDecode(body[0]) as Map<String, Object?>;
+    expect(delivered['milestone'], 'DELIVERED');
+    expect(delivered['delivery_otp'], '482913');
+    expect(delivered['cod_amount'], 700.0);
+
+    final pickedUp = jsonDecode(body[1]) as Map<String, Object?>;
+    expect(pickedUp['tracking_number'], 'ZEF-RID-777');
+    expect(pickedUp.containsKey('delivery_otp'), isFalse);
+    expect(pickedUp.containsKey('cod_amount'), isFalse);
+
+    final failed = jsonDecode(body[2]) as Map<String, Object?>;
+    expect(failed['failure_reason'], 'Buyer not available');
+    expect(failed.containsKey('tracking_number'), isFalse);
   });
 
   test('advanceMilestone throws on 422', () async {

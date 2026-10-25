@@ -77,6 +77,14 @@ class RegistrationProfile {
     required this.street,
     this.middleInitial,
     this.govIdPath,
+    this.riderCompany,
+    this.riderHub,
+    this.riderVehicleType,
+    this.riderPlate,
+    this.riderLicenseNumber,
+    this.riderLicenseExpiry,
+    this.riderLicensePath,
+    this.riderOrCrPath,
   });
 
   final String lastName;
@@ -108,6 +116,24 @@ class RegistrationProfile {
   /// A path, not a value: this is the multipart part described in the file
   /// header, and it is kept out of [toBuyerFields] on purpose.
   final String? govIdPath;
+
+  /// The courier's rider record. Optional because the same profile class
+  /// carries buyer registrations, where every one of these is null.
+  ///
+  /// These are not in [toBuyerFields] and have no live wire mapping yet:
+  /// `StoreLogisticsRegistrationRequest` still describes the Logistics web
+  /// form (business name + DTI permit), not this app's rider sign-up. The
+  /// fields are carried here so `AuthState.submitForApproval` can record what
+  /// was actually submitted, and so the eventual courier mapping has one
+  /// object to read rather than reaching into a disposed screen.
+  final String? riderCompany;
+  final String? riderHub;
+  final String? riderVehicleType;
+  final String? riderPlate;
+  final String? riderLicenseNumber;
+  final DateTime? riderLicenseExpiry;
+  final String? riderLicensePath;
+  final String? riderOrCrPath;
 
   /// The wire value for sex: the form's `'Male'` is the server's `'male'`.
   ///

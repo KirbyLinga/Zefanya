@@ -100,6 +100,13 @@ class DeliveryJobCard extends StatelessWidget {
             _iconLine(theme, Icons.location_on_outlined, 'Deliver to', '${job.buyerName} — ${job.deliveryArea}'),
             const SizedBox(height: 6),
             _iconLine(theme, Icons.inventory_2_outlined, 'Package', job.packageSize),
+            const SizedBox(height: 6),
+            _iconLine(
+              theme,
+              job.hasCod ? Icons.payments_outlined : Icons.verified_outlined,
+              job.hasCod ? 'Collect COD' : 'Payment',
+              job.hasCod ? formatPeso(job.codAmount) : job.paymentLabel,
+            ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

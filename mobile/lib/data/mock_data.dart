@@ -239,6 +239,11 @@ String placeholderPhoto(String seed, int index) =>
 List<String> mockPhotos(String seed, int count) =>
     List<String>.generate(count, (index) => placeholderPhoto(seed, index));
 
+/// The OTP a mock buyer would read from their app. Live mode never receives
+/// the code from the server — the buyer shows it and the rider types it — so
+/// this constant exists only for seeded demo jobs and widget tests.
+const String kMockDeliveryOtp = '482913';
+
 class DeliveryJob {
   const DeliveryJob({
     required this.id,
@@ -255,6 +260,9 @@ class DeliveryJob {
     this.buyerPhone,
     this.trackingNumber,
     this.parcelCount = 1,
+    this.codAmount = 0,
+    this.prepaid = false,
+    this.deliveryOtp = kMockDeliveryOtp,
   });
 
   final String id;
@@ -318,6 +326,29 @@ class DeliveryJob {
   /// How many parcels this job covers. One is the common case.
   final int parcelCount;
 
+  /// Cash the rider must collect at the door, in pesos. Zero for a prepaid
+  /// order — and zero is deliberately not the same thing as [prepaid], because
+  /// a ₱0 COD total and a paid order both show ₱0.00 while only one of them
+  /// must skip the amount prompt.
+  final double codAmount;
+
+  /// True when the buyer already paid online. The tracker must not ask for a
+  /// COD amount, and the COD ledger must not grow by this delivery.
+  final bool prepaid;
+
+  /// The code the buyer reads out at the door. Carried on the job in mock
+  /// mode; in live mode the server keeps it and checks the typed value.
+  final String deliveryOtp;
+
+  bool get hasCod => !prepaid && codAmount > 0;
+
+  /// One-line payment label for the tracker and the job card.
+  String get paymentLabel => prepaid
+      ? 'Prepaid · Paid'
+      : codAmount > 0
+      ? 'Cash on Delivery'
+      : 'Paid';
+
   /// Only identity can change after dispatch — a job's route, buyer
   /// and fee are fixed when the seller confirms it. (Seeded sample jobs are
   /// const and are never re-assigned; only checkout-dispatched ones are.)
@@ -337,6 +368,9 @@ class DeliveryJob {
         buyerPhone: buyerPhone,
         trackingNumber: trackingNumber,
         parcelCount: parcelCount,
+        codAmount: codAmount,
+        prepaid: prepaid,
+        deliveryOtp: deliveryOtp,
       );
 }
 
@@ -884,6 +918,7 @@ const List<DeliveryJob> mockDeliveryJobs = [
     sellerPhone: '0917 555 0101',
     buyerPhone: '0917 555 0201',
     trackingNumber: 'ZEF-5521-01',
+    codAmount: 500,
   ),
   DeliveryJob(
     id: 'REQ-5519',
@@ -896,6 +931,7 @@ const List<DeliveryJob> mockDeliveryJobs = [
     sellerPhone: '0917 555 0102',
     buyerPhone: '0917 555 0202',
     trackingNumber: 'ZEF-5519-01',
+    codAmount: 500,
   ),
   DeliveryJob(
     id: 'REQ-5516',
@@ -908,6 +944,7 @@ const List<DeliveryJob> mockDeliveryJobs = [
     sellerPhone: '0917 555 0103',
     buyerPhone: '0917 555 0203',
     trackingNumber: 'ZEF-5516-01',
+    prepaid: true,
   ),
   DeliveryJob(
     id: 'REQ-5508',
@@ -920,6 +957,7 @@ const List<DeliveryJob> mockDeliveryJobs = [
     sellerPhone: '0917 555 0104',
     buyerPhone: '0917 555 0204',
     trackingNumber: 'ZEF-5508-01',
+    codAmount: 800,
   ),
 ];
 

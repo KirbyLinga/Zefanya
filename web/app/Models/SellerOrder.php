@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrderStatus;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,13 +27,24 @@ class SellerOrder extends Model
         'assigned_courier_id',
         'delivery_fee_minor',
         'delivery_area',
+        'tracking_number',
     ];
+
+    /**
+     * The delivery OTP is a bearer secret until the handover. It is never
+     * serialized, even by accident: only the fact that one exists is exposed.
+     */
+    protected $hidden = ['delivery_otp_hash'];
 
     protected function casts(): array
     {
         return [
             'subtotal_minor' => 'integer',
             'status' => OrderStatus::class,
+            'delivery_attempts' => 'integer',
+            'delivery_otp_attempts' => 'integer',
+            'delivery_otp_locked_until' => 'datetime',
+            'delivered_at' => 'datetime',
         ];
     }
 
@@ -59,7 +71,7 @@ class SellerOrder extends Model
      */
     public function assignedCourier(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Logistics\LogisticsProvider::class, 'assigned_courier_id');
+        return $this->belongsTo(LogisticsProvider::class, 'assigned_courier_id');
     }
 
     public function orderItems(): HasMany

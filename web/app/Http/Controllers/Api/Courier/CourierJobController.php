@@ -68,7 +68,7 @@ class CourierJobController extends Controller
         $jobs = SellerOrder::query()
             ->where('assigned_courier_id', $courier->id)
             ->whereIn('status', $activeStatuses)
-            ->with(['seller', 'order', 'orderItems'])
+            ->with(['seller', 'order', 'orderItems', 'payment'])
             ->orderBy('id')
             ->get();
 

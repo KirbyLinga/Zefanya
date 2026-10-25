@@ -39,7 +39,14 @@ class _OneJobCourierRepository implements CourierRepository {
   Future<List<DeliveryJob>> assignedJobs() async => [job];
 
   @override
-  Future<void> advanceMilestone(String jobId, String milestoneValue) async {}
+  Future<void> advanceMilestone(
+    String jobId,
+    String milestoneValue, {
+    String? trackingNumber,
+    String? failureReason,
+    String? deliveryOtp,
+    double? codAmount,
+  }) async {}
 }
 
 /// A voucher catalogue of one, so a screen reading `mockVouchers` would fail.

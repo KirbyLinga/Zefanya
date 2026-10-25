@@ -32,7 +32,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/api/api_exception.dart';
 import '../data/repositories/courier_repository.dart';
-import '../data/mock_data.dart' show DeliveryJob, Order;
+import '../data/mock_data.dart'
+    show DeliveryJob, Order, kMockDeliveryOtp;
+import '../utils/money_format.dart';
 
 // Courier-side delivery lifecycle. The full sequence per the ERP spec:
 //
@@ -74,7 +76,12 @@ class AssignedJob {
 }
 
 class CompletedJob {
-  const CompletedJob(this.job, this.completedAt, this.payout);
+  const CompletedJob(
+    this.job,
+    this.completedAt,
+    this.payout, {
+    this.returned = false,
+  });
 
   final DeliveryJob job;
   final DateTime completedAt;
@@ -87,6 +94,18 @@ class CompletedJob {
   /// share of the fee ([kReturnFeeShare]), so anything summing earnings has to
   /// read this and not the posted fee. Every earnings total in this class does.
   final double payout;
+
+  /// Whether this job closed as a return rather than a successful delivery.
+  ///
+  /// Stored rather than inferred from `payout < fee`: a zero-fee return and a
+  /// zero-fee delivery would otherwise be indistinguishable, and the earnings
+  /// history has to say which one happened (RID-EARN-001).
+  final bool returned;
+
+  String get resultLabel => returned ? 'Returned' : 'Delivered';
+
+  /// The waybill/reference the workbook's history column shows.
+  String get trackingNumber => job.trackingNumber ?? job.id;
 }
 
 /// What a delivery that ends in `returnToSender` pays, as a share of the
@@ -120,6 +139,121 @@ class CompletedJob {
 /// encodes the rate, and the earnings maths reads [CompletedJob.payout].
 const double kReturnFeeShare = 0.5;
 
+/// Whether the rider may take work. A suspended account can still sign in and
+/// see its history — suspension is a work restriction, not a ban — but cannot
+/// go online or be offered a job.
+enum RiderWorkStatus { active, suspended }
+
+/// One cash amount the rider collected at a door and still owes Logistics.
+class CodCollection {
+  const CodCollection({
+    required this.jobId,
+    required this.trackingNumber,
+    required this.amount,
+    required this.collectedAt,
+  });
+
+  final String jobId;
+  final String trackingNumber;
+  final double amount;
+  final DateTime collectedAt;
+
+  Map<String, Object?> toJson() => {
+    'jobId': jobId,
+    'trackingNumber': trackingNumber,
+    'amount': amount,
+    'collectedAt': collectedAt.toIso8601String(),
+  };
+
+  static CodCollection? fromJson(Map<String, Object?> json) {
+    final jobId = json['jobId']?.toString();
+    final trackingNumber = json['trackingNumber']?.toString();
+    final amount = (json['amount'] as num?)?.toDouble();
+    final collectedAt = DateTime.tryParse(
+      json['collectedAt']?.toString() ?? '',
+    );
+    if (jobId == null ||
+        trackingNumber == null ||
+        amount == null ||
+        collectedAt == null) {
+      return null;
+    }
+    return CodCollection(
+      jobId: jobId,
+      trackingNumber: trackingNumber,
+      amount: amount,
+      collectedAt: collectedAt,
+    );
+  }
+}
+
+enum RemittanceStatus { pending, confirmed }
+
+/// A cash handover request. The rider *requests*; only Logistics confirms, so
+/// [status] changes exclusively through [CourierState.confirmRemittance], which
+/// is the mock stand-in for the Logistics action — there is deliberately no
+/// rider-facing button that calls it (RID-EARN-006).
+class CodRemittance {
+  const CodRemittance({
+    required this.id,
+    required this.amount,
+    required this.requestedAt,
+    this.status = RemittanceStatus.pending,
+    this.confirmedAt,
+  });
+
+  final String id;
+  final double amount;
+  final DateTime requestedAt;
+  final RemittanceStatus status;
+  final DateTime? confirmedAt;
+
+  bool get isPending => status == RemittanceStatus.pending;
+
+  CodRemittance copyWith({
+    RemittanceStatus? status,
+    DateTime? confirmedAt,
+  }) => CodRemittance(
+    id: id,
+    amount: amount,
+    requestedAt: requestedAt,
+    status: status ?? this.status,
+    confirmedAt: confirmedAt ?? this.confirmedAt,
+  );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'amount': amount,
+    'requestedAt': requestedAt.toIso8601String(),
+    'status': status.name,
+    'confirmedAt': confirmedAt?.toIso8601String(),
+  };
+
+  static CodRemittance? fromJson(Map<String, Object?> json) {
+    final id = json['id']?.toString();
+    final amount = (json['amount'] as num?)?.toDouble();
+    final requestedAt = DateTime.tryParse(
+      json['requestedAt']?.toString() ?? '',
+    );
+    if (id == null || amount == null || requestedAt == null) return null;
+    final statusName = json['status']?.toString();
+    RemittanceStatus status = RemittanceStatus.pending;
+    for (final value in RemittanceStatus.values) {
+      if (value.name == statusName) {
+        status = value;
+        break;
+      }
+    }
+    return CodRemittance(
+      id: id,
+      amount: amount,
+      requestedAt: requestedAt,
+      status: status,
+      confirmedAt: DateTime.tryParse(json['confirmedAt']?.toString() ?? ''),
+    );
+  }
+}
+
 class CourierState extends ChangeNotifier {
   /// [repository] defaults to the mock implementation so existing call sites
   /// (and tests) keep working unchanged; `main.dart` passes the resolved
@@ -127,10 +261,45 @@ class CourierState extends ChangeNotifier {
   ///
   /// Only the *jobs* come from here — see courier_repository.dart for why the
   /// milestone machine, the payouts and the ratings deliberately stay local.
-  CourierState({CourierRepository? repository})
-    : _repository = repository ?? const MockCourierRepository();
+  CourierState({CourierRepository? repository, DateTime Function()? clock})
+    : _repository = repository ?? const MockCourierRepository(),
+      _clock = clock ?? DateTime.now;
 
   final CourierRepository _repository;
+
+  /// Injectable clock for the OTP lockout boundary. Production uses
+  /// [DateTime.now]; a test can move time forward by 15 minutes without
+  /// sleeping, which is the only way to prove the boundary rather than the
+  /// message around it.
+  final DateTime Function() _clock;
+
+  /// Operational availability. Deliberately NOT persisted: a force-closed app
+  /// must come back Offline (RID-AVAIL-007), and an on-device "Online" flag
+  /// surviving a process death would claim presence the server never saw.
+  bool _online = false;
+
+  RiderWorkStatus _workStatus = RiderWorkStatus.active;
+  String? _suspensionReason;
+
+  /// Failed-delivery attempt count and reason, keyed by job id. Persisted now
+  /// (see [advanceMilestone]) because the attempt counter is the one piece of
+  /// failure bookkeeping a rider needs after the app is killed mid-shift:
+  /// without it a fourth attempt becomes possible on relaunch.
+  final Map<String, int> _attempts = {};
+  final Map<String, String> _failureReasons = {};
+  final Map<String, bool> _returned = {};
+
+  /// Delivery OTP failure count and lock expiry, per job. In memory: the same
+  /// server that issued the code owns the durable attempt count. The lock is
+  /// 15 minutes and starts on the fifth wrong code (RID-DLV-004).
+  final Map<String, int> _otpFailures = {};
+  final Map<String, DateTime> _otpLockedUntil = {};
+
+  /// Cash collected at the door, keyed by job id, and remittances requested
+  /// against it. Confirmed remittances reduce [codOutstanding]; pending ones
+  /// do not — the rider still holds the cash until Logistics confirms.
+  final Map<String, CodCollection> _codCollected = {};
+  final List<CodRemittance> _remittances = [];
 
   /// The dispatcher's jobs, as of the last [load].
   ///
@@ -141,12 +310,6 @@ class CourierState extends ChangeNotifier {
 
   final Map<String, DeliveryMilestone> _milestones = {};
   final Map<String, DateTime> _completedAt = {};
-
-  /// Failed-delivery attempt count and reason, keyed by job id. In memory:
-  /// the server owns the durable copy, and the app only needs to keep the
-  /// tracker's own copy honest while the courier is on the screen.
-  final Map<String, int> _attempts = {};
-  final Map<String, String> _failureReasons = {};
 
   /// What each completed job actually paid, keyed by job id.
   ///
@@ -176,6 +339,9 @@ class CourierState extends ChangeNotifier {
   static const _ratingsKey = 'courier_ratings'; // "jobId|stars" per entry
   static const _dispatchedKey =
       'courier_dispatched'; // JSON list of dispatched jobs
+  static const _attemptsKey = 'courier_attempts'; // JSON jobId → {count,reason}
+  static const _codCollectedKey = 'courier_cod_collected'; // JSON list
+  static const _remittancesKey = 'courier_remittances'; // JSON list
 
   /// Seeded sample jobs use REQ-55xx numbers; dispatched ones start well
   /// clear of them so an id never collides.
@@ -228,7 +394,14 @@ class CourierState extends ChangeNotifier {
         // Falls back to the full fee for entries written before payouts were
         // recorded — those were all full-fee by definition, so the fallback
         // is the historically correct value, not a guess.
-        result.add(CompletedJob(job, completedAt, _payouts[job.id] ?? job.fee));
+        result.add(
+          CompletedJob(
+            job,
+            completedAt,
+            _payouts[job.id] ?? job.fee,
+            returned: _returned[job.id] ?? false,
+          ),
+        );
       }
     }
     result.sort((a, b) => b.completedAt.compareTo(a.completedAt));
@@ -325,6 +498,217 @@ class CourierState extends ChangeNotifier {
   /// The reason chosen on the most recent failure, if any.
   String? failureReasonFor(String jobId) => _failureReasons[jobId];
 
+  // ── Availability ─────────────────────────────────────────────────────────
+
+  bool get isOnline => _online;
+
+  RiderWorkStatus get workStatus => _workStatus;
+
+  bool get isSuspended => _workStatus == RiderWorkStatus.suspended;
+
+  String? get suspensionReason => _suspensionReason;
+
+  /// Goes online, or explains why the account cannot.
+  ///
+  /// A suspension is a server decision mirrored here. The message names the
+  /// restriction rather than failing silently: "you are suspended" is
+  /// actionable (contact Logistics); an unchanged toggle looks like a bug.
+  String? goOnline() {
+    if (isSuspended) {
+      final reason = _suspensionReason;
+      return reason == null || reason.trim().isEmpty
+          ? 'Your account is suspended. Contact Logistics before going online.'
+          : 'Your account is suspended: $reason';
+    }
+    if (_online) return null;
+    _online = true;
+    notifyListeners();
+    return null;
+  }
+
+  /// Going offline is always allowed, including with a picked-up job: the
+  /// rider must not be forced to keep accepting work to finish the parcel
+  /// already in their hands (RID-AVAIL-003).
+  void goOffline() {
+    if (!_online) return;
+    _online = false;
+    notifyListeners();
+  }
+
+  /// Applies a Logistics decision. The server is the authority; this is the
+  /// cached copy the app gates on.
+  void setSuspended({required bool suspended, String? reason}) {
+    _workStatus = suspended
+        ? RiderWorkStatus.suspended
+        : RiderWorkStatus.active;
+    _suspensionReason = suspended ? reason : null;
+    if (suspended) _online = false;
+    notifyListeners();
+  }
+
+  // ── Delivery OTP ─────────────────────────────────────────────────────────
+
+  static const int maxOtpAttempts = 5;
+  static const Duration otpLockout = Duration(minutes: 15);
+
+  /// Remaining lockout, or null when entry is open.
+  Duration? otpLockRemaining(String jobId) {
+    final until = _otpLockedUntil[jobId];
+    if (until == null) return null;
+    final remaining = until.difference(_clock());
+    // Exactly 15 minutes is *expired*, not still locked. RID-DLV-004's
+    // boundary is "try again after 15 minutes", and a zero-length remaining
+    // duration would keep the field disabled forever at that instant.
+    if (remaining <= Duration.zero) {
+      _otpLockedUntil.remove(jobId);
+      return null;
+    }
+    return remaining;
+  }
+
+  bool isOtpLocked(String jobId) => otpLockRemaining(jobId) != null;
+
+  int otpFailuresFor(String jobId) => _otpFailures[jobId] ?? 0;
+
+  /// Checks the code the buyer read out. Returns null when it is accepted.
+  ///
+  /// A five-digit entry is a format error and does not count toward the five
+  /// wrong-code attempts: the workbook distinguishes "5 digits is rejected"
+  /// from "each wrong OTP is rejected", and counting a mistyped length would
+  /// lock a rider out for tapping one key short.
+  String? validateDeliveryOtp(String jobId, String input) {
+    final job = jobById(jobId);
+    if (job == null) return 'This job is no longer available.';
+
+    final locked = otpLockRemaining(jobId);
+    if (locked != null) {
+      final minutes = (locked.inSeconds / 60).ceil();
+      return 'Too many wrong codes. Try again in $minutes '
+          '${minutes == 1 ? 'minute' : 'minutes'}.';
+    }
+    // A lock that has just expired starts a fresh set of attempts.
+    _otpLockedUntil.remove(jobId);
+    if (otpFailuresFor(jobId) >= maxOtpAttempts) _otpFailures.remove(jobId);
+
+    final code = input.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      return 'Enter the 6-digit code shown by the buyer.';
+    }
+    // A live job arrives without the code by design: the server keeps the
+    // hash and verifies it with the milestone write. Accept the shape here
+    // and let the server's five-attempt/15-minute lock be the authority.
+    // Counting a failure locally would lock the rider out of a code this
+    // device was never given.
+    if (job.deliveryOtp.isEmpty) return null;
+
+    if (code == job.deliveryOtp) {
+      _otpFailures.remove(jobId);
+      _otpLockedUntil.remove(jobId);
+      return null;
+    }
+
+    final failures = otpFailuresFor(jobId) + 1;
+    _otpFailures[jobId] = failures;
+    if (failures >= maxOtpAttempts) {
+      _otpLockedUntil[jobId] = _clock().add(otpLockout);
+      notifyListeners();
+      return 'Too many wrong codes. Entry is locked for 15 minutes.';
+    }
+    notifyListeners();
+    return 'That code is incorrect. ${maxOtpAttempts - failures} '
+        '${maxOtpAttempts - failures == 1 ? 'attempt' : 'attempts'} left.';
+  }
+
+  // ── COD ──────────────────────────────────────────────────────────────────
+
+  /// Checks the amount entered at the door against the job's own COD total.
+  /// Null when it matches (and for a prepaid job, where nothing is asked).
+  String? validateCodAmount(String jobId, String input) {
+    final job = jobById(jobId);
+    if (job == null) return 'This job is no longer available.';
+    if (!job.hasCod) return null;
+
+    final normalized = input
+        .replaceAll('₱', '')
+        .replaceAll(',', '')
+        .replaceAll(' ', '')
+        .trim();
+    final parsed = double.tryParse(normalized);
+    if (parsed == null) return 'Enter the amount collected.';
+    final expected = (job.codAmount * 100).round();
+    final actual = (parsed * 100).round();
+    if (actual != expected) {
+      return 'Amount does not match. Collect exactly ${formatPeso(job.codAmount)}.';
+    }
+    return null;
+  }
+
+  List<CodCollection> get codCollections {
+    final result = _codCollected.values.toList()
+      ..sort((a, b) => b.collectedAt.compareTo(a.collectedAt));
+    return result;
+  }
+
+  /// Everything collected minus everything Logistics has confirmed receiving.
+  /// A pending remittance does not reduce this — the rider still has the cash
+  /// until the handover is confirmed (RID-EARN-004).
+  double get codOutstanding {
+    final collected = _codCollected.values.fold(
+      0.0,
+      (sum, c) => sum + c.amount,
+    );
+    final confirmed = _remittances
+        .where((r) => r.status == RemittanceStatus.confirmed)
+        .fold(0.0, (sum, r) => sum + r.amount);
+    final outstanding = collected - confirmed;
+    return outstanding < 0 ? 0 : outstanding;
+  }
+
+  List<CodRemittance> get remittances => List.unmodifiable(_remittances);
+
+  double get pendingRemittanceTotal => _remittances
+      .where((r) => r.isPending)
+      .fold(0.0, (sum, r) => sum + r.amount);
+
+  /// Requests a cash handover. Short remittances are allowed: the rider may
+  /// hand over less than the full balance, and the remainder stays outstanding
+  /// after Logistics confirms (RID-EARN-005).
+  String? requestRemittance(double amount) {
+    final cents = (amount * 100).round();
+    if (cents <= 0) return 'Enter an amount to remit.';
+    if (cents > (codOutstanding * 100).round()) {
+      return 'You cannot remit more than the ${formatPeso(codOutstanding)} balance.';
+    }
+    _remittances.insert(
+      0,
+      CodRemittance(
+        id: 'REM-${_clock().millisecondsSinceEpoch}-${_remittances.length + 1}',
+        amount: cents / 100,
+        requestedAt: _clock(),
+      ),
+    );
+    notifyListeners();
+    _save();
+    return null;
+  }
+
+  /// Applies Logistics' confirmation. Not reachable from the rider's UI: the
+  /// rider may request a remittance, never confirm one (RID-EARN-006).
+  /// Public so the mock Logistics side and tests can exercise the other half.
+  bool confirmRemittance(String id, {DateTime? confirmedAt}) {
+    final index = _remittances.indexWhere((r) => r.id == id);
+    if (index < 0) return false;
+    final remittance = _remittances[index];
+    if (!remittance.isPending) return false;
+    _remittances[index] = remittance.copyWith(
+      status: RemittanceStatus.confirmed,
+      confirmedAt: confirmedAt ?? _clock(),
+    );
+    notifyListeners();
+    _save();
+    return true;
+  }
+
   DeliveryJob? jobById(String jobId) {
     final matches = allJobs.where((j) => j.id == jobId);
     return matches.isEmpty ? null : matches.first;
@@ -384,6 +768,14 @@ class CourierState extends ChangeNotifier {
               orderId: m['orderId'] as String?,
               courierName: m['courierName'] as String?,
               courierPhotoPath: m['courierPhotoPath'] as String?,
+              sellerPhone: m['sellerPhone'] as String?,
+              buyerPhone: m['buyerPhone'] as String?,
+              trackingNumber: m['trackingNumber'] as String?,
+              parcelCount: (m['parcelCount'] as num?)?.toInt() ?? 1,
+              codAmount: (m['codAmount'] as num?)?.toDouble() ?? 0,
+              prepaid: m['prepaid'] as bool? ?? false,
+              deliveryOtp:
+                  m['deliveryOtp'] as String? ?? kMockDeliveryOtp,
             ),
           );
         }
@@ -391,11 +783,12 @@ class CourierState extends ChangeNotifier {
 
       _completedAt.clear();
       _payouts.clear();
-      // New shape: "jobId|iso8601|payout". The legacy colon-only shape is
-      // still parsed, because an install that already completed jobs must not
-      // lose its earnings history — those entries simply have no stored payout
-      // and fall back to the job's fee (correct, since they predate partial
-      // returns).
+      _returned.clear();
+      // New shape: "jobId|iso8601|payout|returned". The legacy colon-only
+      // shape is still parsed, because an install that already completed jobs
+      // must not lose its earnings history — those entries simply have no
+      // stored payout and fall back to the job's fee (correct, since they
+      // predate partial returns).
       for (final entry in prefs.getStringList(_completedKey) ?? const []) {
         if (entry.contains('|')) {
           final parts = entry.split('|');
@@ -405,6 +798,7 @@ class CourierState extends ChangeNotifier {
           _completedAt[parts[0]] = timestamp;
           final payout = parts.length > 2 ? double.tryParse(parts[2]) : null;
           if (payout != null) _payouts[parts[0]] = payout;
+          if (parts.length > 3) _returned[parts[0]] = parts[3] == 'true';
           continue;
         }
         final sepIndex = entry.indexOf(':');
@@ -421,13 +815,63 @@ class CourierState extends ChangeNotifier {
         final stars = int.tryParse(parts[1]);
         if (stars != null) _ratings[parts[0]] = stars;
       }
+
+      _attempts.clear();
+      _failureReasons.clear();
+      final attemptsRaw = prefs.getString(_attemptsKey);
+      if (attemptsRaw != null) {
+        final decoded = jsonDecode(attemptsRaw);
+        if (decoded is Map) {
+          for (final entry in decoded.entries) {
+            final row = entry.value;
+            if (row is! Map) continue;
+            _attempts[entry.key.toString()] =
+                (row['count'] as num?)?.toInt() ?? 0;
+            final reason = row['reason']?.toString();
+            if (reason != null && reason.isNotEmpty) {
+              _failureReasons[entry.key.toString()] = reason;
+            }
+          }
+        }
+      }
+
+      _codCollected.clear();
+      final collectedRaw = prefs.getString(_codCollectedKey);
+      if (collectedRaw != null) {
+        for (final row in jsonDecode(collectedRaw) as List<dynamic>) {
+          if (row is! Map) continue;
+          final collection = CodCollection.fromJson(
+            row.map((key, value) => MapEntry(key.toString(), value)),
+          );
+          if (collection != null) {
+            _codCollected[collection.jobId] = collection;
+          }
+        }
+      }
+
+      _remittances.clear();
+      final remittancesRaw = prefs.getString(_remittancesKey);
+      if (remittancesRaw != null) {
+        for (final row in jsonDecode(remittancesRaw) as List<dynamic>) {
+          if (row is! Map) continue;
+          final remittance = CodRemittance.fromJson(
+            row.map((key, value) => MapEntry(key.toString(), value)),
+          );
+          if (remittance != null) _remittances.add(remittance);
+        }
+      }
     } catch (_) {
       // Corrupt/old data shape — start clean rather than crash.
       _milestones.clear();
       _completedAt.clear();
       _payouts.clear();
+      _returned.clear();
       _ratings.clear();
       _dispatched.clear();
+      _attempts.clear();
+      _failureReasons.clear();
+      _codCollected.clear();
+      _remittances.clear();
     }
   }
 
@@ -442,7 +886,7 @@ class CourierState extends ChangeNotifier {
       _completedAt.entries
           .map(
             (e) =>
-                '${e.key}|${e.value.toIso8601String()}|${_payouts[e.key] ?? jobById(e.key)?.fee ?? 0}',
+                '${e.key}|${e.value.toIso8601String()}|${_payouts[e.key] ?? jobById(e.key)?.fee ?? 0}|${_returned[e.key] ?? false}',
           )
           .toList(),
     );
@@ -465,8 +909,36 @@ class CourierState extends ChangeNotifier {
             'orderId': j.orderId,
             'courierName': j.courierName,
             'courierPhotoPath': j.courierPhotoPath,
+            'sellerPhone': j.sellerPhone,
+            'buyerPhone': j.buyerPhone,
+            'trackingNumber': j.trackingNumber,
+            'parcelCount': j.parcelCount,
+            'codAmount': j.codAmount,
+            'prepaid': j.prepaid,
+            'deliveryOtp': j.deliveryOtp,
           },
       ]),
+    );
+    await prefs.setString(
+      _attemptsKey,
+      jsonEncode({
+        for (final entry in _attempts.entries)
+          entry.key: {
+            'count': entry.value,
+            if (_failureReasons[entry.key] != null)
+              'reason': _failureReasons[entry.key],
+          },
+      }),
+    );
+    await prefs.setString(
+      _codCollectedKey,
+      jsonEncode([
+        for (final collection in _codCollected.values) collection.toJson(),
+      ]),
+    );
+    await prefs.setString(
+      _remittancesKey,
+      jsonEncode([for (final remittance in _remittances) remittance.toJson()]),
     );
   }
 
@@ -515,6 +987,9 @@ class CourierState extends ChangeNotifier {
     String? buyerPhone,
     String? sellerPhone,
     String? trackingNumber,
+    double codAmount = 0,
+    bool prepaid = false,
+    String? deliveryOtp,
   }) {
     final sameShop = _assigned.where((j) => j.shopName == order.shopName);
     _dispatched.add(
@@ -534,6 +1009,9 @@ class CourierState extends ChangeNotifier {
             sellerPhone ??
             (sameShop.isEmpty ? null : sameShop.first.sellerPhone),
         trackingNumber: trackingNumber ?? order.id,
+        codAmount: prepaid ? 0 : codAmount,
+        prepaid: prepaid,
+        deliveryOtp: deliveryOtp ?? kMockDeliveryOtp,
       ),
     );
     notifyListeners();
@@ -565,14 +1043,26 @@ class CourierState extends ChangeNotifier {
     String? courierName,
     String? courierPhotoPath,
     String? failureReason,
+    String? deliveryOtp,
+    double? codAmount,
+    String? trackingNumber,
   }) {
+    // A return is terminal. The UI only offers "Return Complete", but this
+    // guard is what makes a fourth delivery attempt impossible even if a
+    // caller (or a stale screen) asks for one (RID-FAIL-005).
+    if (_milestones[jobId] == DeliveryMilestone.returnToSender) return;
+
+    final reason = failureReason?.trim();
     var target = next;
     if (next == DeliveryMilestone.failedDelivery) {
+      // A failure without a reason is not actionable for the buyer or
+      // Logistics, so it changes nothing (RID-FAIL-002). The UI already
+      // refuses to close the sheet without a choice; this is the same rule
+      // one layer down, where the server will also enforce it.
+      if (reason == null || reason.isEmpty) return;
       final attempt = attemptsFor(jobId) + 1;
       _attempts[jobId] = attempt;
-      if (failureReason != null && failureReason.isNotEmpty) {
-        _failureReasons[jobId] = failureReason;
-      }
+      _failureReasons[jobId] = reason;
       // Third failure ends the attempts: the parcel goes back to the
       // seller. The server must enforce the same limit independently.
       if (attempt >= 3) target = DeliveryMilestone.returnToSender;
@@ -599,7 +1089,16 @@ class CourierState extends ChangeNotifier {
     // own screen is always authoritative.
     final serverValue = _milestoneToServerString(target);
     if (serverValue != null) {
-      _repository.advanceMilestone(jobId, serverValue).catchError((_) {});
+      _repository
+          .advanceMilestone(
+            jobId,
+            serverValue,
+            trackingNumber: trackingNumber,
+            failureReason: reason,
+            deliveryOtp: deliveryOtp,
+            codAmount: codAmount,
+          )
+          .catchError((_) {});
     }
   }
 
@@ -637,7 +1136,16 @@ class CourierState extends ChangeNotifier {
     final job = jobById(jobId);
     final fee = job?.fee ?? 0;
     _payouts[jobId] = returned ? fee * kReturnFeeShare : fee;
-    _completedAt[jobId] = DateTime.now();
+    _completedAt[jobId] = _clock();
+    _returned[jobId] = returned;
+    if (!returned && job != null && job.hasCod) {
+      _codCollected[jobId] = CodCollection(
+        jobId: jobId,
+        trackingNumber: job.trackingNumber ?? job.id,
+        amount: job.codAmount,
+        collectedAt: _clock(),
+      );
+    }
     _milestones.remove(jobId);
     notifyListeners();
     _save();

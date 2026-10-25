@@ -9,6 +9,7 @@ import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
+import '../../utils/timed_snackbar.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
 import '../../widgets/app_page_route.dart';
@@ -62,6 +63,7 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
                         const EditorialHeader(
                           eyebrow: 'FOR PICKUP',
                           title: 'Assigned to You',
+                          trailing: _AvailabilityToggle(),
                           padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
                         ),
                         const SizedBox(height: 40),
@@ -78,6 +80,7 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
                             child: EditorialHeader(
                               eyebrow: 'FOR PICKUP',
                               title: 'Assigned to You',
+                              trailing: _AvailabilityToggle(),
                               padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
                             ),
                           );
@@ -152,5 +155,68 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
     } on ApiException {
       // Rendered above, from the state.
     }
+  }
+}
+
+/// The Online/Offline control the rider uses to start and stop receiving work.
+///
+/// Going offline is never blocked — a job already picked up stays with the
+/// rider — while going online is refused for a suspended account with the
+/// reason shown inline. The switch mirrors [CourierState] rather than holding
+/// its own bool, so the dashboard and the profile cannot disagree.
+class _AvailabilityToggle extends StatelessWidget {
+  const _AvailabilityToggle();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final courier = context.watch<CourierState>();
+    final suspended = courier.isSuspended;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              courier.isOnline ? 'ONLINE' : 'OFFLINE',
+              style: AppType.eyebrow.copyWith(
+                color: courier.isOnline
+                    ? AppColors.tertiary
+                    : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Switch(
+              key: const ValueKey('availability-switch'),
+              value: courier.isOnline,
+              onChanged: suspended
+                  ? null
+                  : (value) {
+                      if (value) {
+                        final problem = courier.goOnline();
+                        if (problem != null && context.mounted) {
+                          showTimedSnackBar(
+                            context,
+                            SnackBar(content: Text(problem)),
+                          );
+                        }
+                      } else {
+                        courier.goOffline();
+                      }
+                    },
+            ),
+          ],
+        ),
+        if (suspended)
+          Text(
+            courier.suspensionReason ?? 'Account suspended',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.danger,
+            ),
+          ),
+      ],
+    );
   }
 }

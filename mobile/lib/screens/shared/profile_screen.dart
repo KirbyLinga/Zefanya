@@ -51,6 +51,7 @@ import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/theme_toggle.dart';
 import '../buyer/address_book_screen.dart';
+import '../courier/rider_profile_section.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
 /// name/email/phone/address from the shared AuthState and edits them
@@ -145,6 +146,10 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (isCourier) ...[
+              const SizedBox(height: 26),
+              const EaseInFrame(index: 3, child: RiderProfileSection()),
+            ],
             const SizedBox(height: 26),
             EaseInFrame(
               index: 3,
@@ -396,6 +401,11 @@ class ProfileScreen extends StatelessWidget {
     await CloudTransition.run(
       context,
       swap: () {
+        // A rider signing out is no longer available for work, even though the
+        // job already picked up stays with them when they sign back in.
+        if (context.read<AuthState>().role == UserRole.courier) {
+          context.read<CourierState>().goOffline();
+        }
         context.read<AuthState>().logout();
         // AuthGate (in main.dart) rebuilds to LoginScreen once the state
         // changes — this just unwinds back to that root route.

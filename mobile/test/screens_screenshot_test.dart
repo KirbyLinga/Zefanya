@@ -222,7 +222,7 @@ void main() {
         await _renderAndCapture(
           tester,
           name: 'buyer_home',
-          builder: () => const BuyerShell(),
+          builder: () => BuyerShell(now: DateTime(2026, 1, 1, 18)),
           size: size,
           brightness: brightness,
           disableAnimations: true,
