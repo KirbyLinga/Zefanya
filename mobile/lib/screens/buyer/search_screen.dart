@@ -103,6 +103,117 @@ class _PriceRange {
   final double? max;
 }
 
+/// Owns the two price fields for as long as the route exists.
+///
+/// The controllers used to live in `_openPriceRange` and were disposed as soon
+/// as `showDialog` returned. That future completes when the route *starts*
+/// popping, not when its exit animation finishes, so the still-visible dialog
+/// rebuilt against two disposed controllers (the debug assertion, then a
+/// runaway layout). A StatefulWidget cannot outlive its own dispose.
+class _PriceRangeDialog extends StatefulWidget {
+  const _PriceRangeDialog({required this.initialMin, required this.initialMax});
+
+  final String initialMin;
+  final String initialMax;
+
+  @override
+  State<_PriceRangeDialog> createState() => _PriceRangeDialogState();
+}
+
+class _PriceRangeDialogState extends State<_PriceRangeDialog> {
+  late final TextEditingController _minController;
+  late final TextEditingController _maxController;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _minController = TextEditingController(text: widget.initialMin);
+    _maxController = TextEditingController(text: widget.initialMax);
+  }
+
+  @override
+  void dispose() {
+    _minController.dispose();
+    _maxController.dispose();
+    super.dispose();
+  }
+
+  void _clear() {
+    _minController.clear();
+    _maxController.clear();
+    setState(() => _errorText = null);
+  }
+
+  void _apply() {
+    final error = priceRangeError(_minController.text, _maxController.text);
+    if (error != null) {
+      setState(() => _errorText = error);
+      return;
+    }
+    Navigator.of(context).pop(
+      _PriceRange(
+        parsePriceBound(_minController.text),
+        parsePriceBound(_maxController.text),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Price range'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const ValueKey('min-price'),
+              controller: _minController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Minimum',
+                prefixText: '₱ ',
+                hintText: 'No minimum',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('max-price'),
+              controller: _maxController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Maximum',
+                prefixText: '₱ ',
+                hintText: 'No maximum',
+              ),
+            ),
+            if (_errorText != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _errorText!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: _clear, child: const Text('Clear')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _apply, child: const Text('Apply')),
+      ],
+    );
+  }
+}
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, this.focusRequests});
 
@@ -209,97 +320,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _openPriceRange() async {
-    final minController = TextEditingController(
-      text: _minPrice == null ? '' : _minPrice!.toStringAsFixed(0),
-    );
-    final maxController = TextEditingController(
-      text: _maxPrice == null ? '' : _maxPrice!.toStringAsFixed(0),
-    );
-    String? errorText;
-
     final result = await showDialog<_PriceRange>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Price range'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                key: const ValueKey('min-price'),
-                controller: minController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Minimum',
-                  prefixText: '₱ ',
-                  hintText: 'No minimum',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const ValueKey('max-price'),
-                controller: maxController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Maximum',
-                  prefixText: '₱ ',
-                  hintText: 'No maximum',
-                ),
-              ),
-              if (errorText != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  errorText!,
-                  style: TextStyle(
-                    color: Theme.of(dialogContext).colorScheme.error,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                minController.clear();
-                maxController.clear();
-                setDialogState(() => errorText = null);
-              },
-              child: const Text('Clear'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final error = priceRangeError(
-                  minController.text,
-                  maxController.text,
-                );
-                if (error != null) {
-                  setDialogState(() => errorText = error);
-                  return;
-                }
-                Navigator.of(dialogContext).pop(
-                  _PriceRange(
-                    parsePriceBound(minController.text),
-                    parsePriceBound(maxController.text),
-                  ),
-                );
-              },
-              child: const Text('Apply'),
-            ),
-          ],
-        ),
+      builder: (_) => _PriceRangeDialog(
+        initialMin: _minPrice == null ? '' : _minPrice!.toStringAsFixed(0),
+        initialMax: _maxPrice == null ? '' : _maxPrice!.toStringAsFixed(0),
       ),
     );
 
-    minController.dispose();
-    maxController.dispose();
     if (result == null || !mounted) return;
     setState(() {
       _minPrice = result.min;

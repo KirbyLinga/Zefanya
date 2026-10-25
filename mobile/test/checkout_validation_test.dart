@@ -106,7 +106,8 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('checkout pre-selects the address-book default', (tester) async {
+  testWidgets('BUY-ADDR-006 checkout pre-selects the address-book default',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     final auth = AuthState();
     auth.updateProfile(

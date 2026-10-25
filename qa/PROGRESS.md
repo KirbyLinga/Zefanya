@@ -11,7 +11,7 @@ Source of truth: `qa/Mobile_App_Combined_Test_Results.xlsx` (377 cases).
 | 0. Branch + baseline | Done | Baseline `flutter test`: **533 passed / 40 failed** (all 40 golden/screenshot. `qa/analyze_baseline.txt`: 10 lints, 0 errors). Baseline saved in `qa/full_test_run_baseline.txt`. |
 | 1. Foundation | Done | See below. Full suite now **573 passed / 0 failed**. `flutter analyze`: 0 errors, 9 pre-existing info lints. |
 | 2. Buyer account/profile | Done (003-009, 011 app half) | Password/email/phone change end to end: server endpoints + token revocation, mock/live repository, screens, 13 case-named app tests and 9 PHP tests. ACCT-001/010 still need live profile/device. |
-| 3. Buyer commerce gaps | Partly built | 27 B cases + B-M quick-win cluster implemented in earlier pass. Remaining B failures still need work. |
+| 3. Buyer commerce gaps | Done for this pass (18 new case tests + 19 re-tagged) | Address book, reviews, vouchers, checkout, search, variants and store follow now have case-named evidence. Full suite **609 passed / 0 failed**. Device/API-only rows are listed under “Phase 3 honest limits”. |
 | 4. Courier/rider app | Partly built | Pickup verification, job lifecycle, completion view. Online toggle, offers, profile documents, COD/remittance still to audit. |
 | 5. Laravel server | Not started in this pass | Laravel app found in `web/`; PHP 8.5 and Composer available. D cases still blocked. |
 | 6. Traceability/report | Not started in this pass | `qa/final_results.csv` and rebuilt `qa/static_review.csv` still to do. |
@@ -120,8 +120,100 @@ word `closed` on both the delivered and returned paths.
   password stops working; the Dart test proves phone A stays signed in. Showing
   phone B's login screen still needs two devices against the live API.
 
+## Phase 3 details
+
+### 3a. Cases now backed by a named test
+
+`mobile/test/workbook_buyer_phase3_test.dart` (**18 passed**) covers:
+
+- `BUY-ACCT-002` — invalid first name shows the field message and leaves the
+  saved profile untouched.
+- `BUY-VOU-004` — ₱299.99 is short by exactly ₱0.01; ₱300.00 and ₱300.01 earn
+  the ₱50 store voucher.
+- `BUY-VOU-006` — a per-buyer-used `MCH50` stays refused after a cart restart.
+- `BUY-VOU-007` — removing the second line drops below ₱300, prunes the voucher
+  and returns the total to ₱249.00.
+- `BUY-VOU-008` — 10% of ₱999 is ₱99.90; ₱1,000 and above cap at ₱100.
+- `BUY-VOU-009` — a ₱50 shipping voucher makes ₱50 free and leaves ₱15 on a ₱65
+  fee, never discounting goods.
+- `BUY-PDP-007` — Buy Now passes one detached line to checkout and leaves the
+  existing cart untouched.
+- `BUY-CHK-001` — the workbook example renders ₱1,098 + ₱185 − ₱200 = ₱1,083
+  and splits into one order per seller.
+- `BUY-CHK-005` — the note field stops at 200 characters.
+- `BUY-CHK-006` — Cash on Delivery is preselected.
+- `BUY-CHK-007` — a held repository proves Place Order disables and is called
+  once.
+- `BUY-CHK-009` — an out-of-stock line blocks the order and the message stays
+  on screen.
+- `BUY-CHK-010` — a voucher that no longer meets its minimum is removed, the
+  sentence is shown, and the total moves to ₱259.00.
+- `BUY-SRCH-004` — a one-letter typo offers `rattan`; `zzqxw` stays an honest
+  empty state.
+- `BUY-SRCH-007` — min > max and negative prices are refused without filtering;
+  both bounds are inclusive.
+- `BUY-SRCH-012` — the Search key closes the keyboard and pull-to-refresh reloads
+  once without duplicating cards.
+
+`mobile/test/address_book_test.dart` now carries `BUY-ADDR-001`–`007` and
+`BUY-ADDR-011`, including the tenth/eleventh limit, both phone formats, the
+region → city → barangay cascade, one default at a time, delete-default
+protection, and a 300px simulated keyboard inset with Save still reachable.
+`mobile/test/checkout_validation_test.dart` tags the checkout default-address
+test `BUY-ADDR-006`.
+
+`mobile/test/review_limits_test.dart` now carries `BUY-RATE-004` (0 stars
+disables Submit, 501 characters stop at 500, five photos hide the add tile) and
+`BUY-RATE-005` (first edit saves; second and day-30 edits are refused).
+`mobile/test/store_follow_test.dart` carries `BUY-WISH-004`, including the
+following count going N → N+1 → N with the list.
+
+### 3b. Real bugs fixed while writing the tests
+
+- `cart_state.dart`: minimum-spend text read “Spend ₱0.01 at Seller more”; it
+  now reads “Spend ₱0.01 more at Seller”.
+- `checkout_screen.dart`: any non-empty item list cleared a stock/limit error
+  on the next frame. It now clears only the “no items selected” sentence, so a
+  sold-out line keeps its explanation.
+- `zefanya_mark.dart`: `_ZefanyaLoaderState` created its animation controller
+  lazily inside `dispose()` when reduced motion was on, which crashed on
+  teardown. The controller is now built in `initState`.
+- `search_screen.dart`: the price-range dialog disposed its controllers when
+  the route started popping, then rebuilt during the exit animation against
+  disposed controllers. The dialog is now a `StatefulWidget` that owns them.
+
+### 3c. Honest limits in this phase
+
+- `BUY-ACCT-001` still needs a live profile endpoint; edits remain device-local.
+- `BUY-ACCT-010` needs a real phone/emulator for camera and gallery denial.
+- `BUY-ACCT-011` needs two phones against the live API for the second login
+  screen; server-side token revocation is already proven.
+- `BUY-ADDR-008` needs an order address snapshot; orders still store none.
+- `BUY-ADDR-009` needs the live API; the address book is local-only.
+- `BUY-ADDR-010` needs device location permission.
+- `BUY-CAN-001/003/006` — stock restore, refund start, seller notification and
+  voucher return have no implementation.
+- `BUY-RET-001` status exists, but seller notification needs the live API.
+- `BUY-RATE-001` — review display still lacks the variant and masked name.
+- `BUY-RATE-007` — camera and multi-select gallery need a device; the 5-photo
+  cap itself is proven by `BUY-RATE-004`.
+- `BUY-PDP-006` — sale price shows, but countdown, flash units and a claim
+  button are absent.
+- `BUY-PDP-009` — swipe/zoom and selection retention need a device.
+- `BUY-CART-008` contradicts the recorded local-cart decision.
+- `BUY-CHK-002/003/004` contradict flat shipping / need serviceability data.
+- `BUY-CHK-008/011/012`, `BUY-PAY-*` need the live API/payment gateway.
+- `BUY-CHK-013` needs an interrupted-connection device run.
+- `BUY-TRK-002/005/006/007`, `BUY-CHAT-001/003/004/006/007`,
+  `BUY-VOU-012` remain Needs device/API.
+
 ## Current test counts
 
+- Full suite after Phase 3: **609 passed / 0 failed**
+  (`qa/phase3_full_test.txt`).
+- `flutter analyze --no-pub`: **0 errors**, the same 9 pre-existing info lints
+  (`qa/phase3_analyze.txt`).
+- Phase 3 workbook tests: **18 passed** (`workbook_buyer_phase3_test.dart`).
 - Full suite after Phase 2: **586 passed / 0 failed**
   (`qa/phase2_full_test.txt`).
 - `flutter analyze --no-pub`: **0 errors**, the same 9 pre-existing info lints

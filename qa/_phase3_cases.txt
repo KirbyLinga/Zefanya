@@ -1,0 +1,167 @@
+=== BUY-ACCT-002 [B1 Account] Fail
+Scenario: Profile field validation
+Expected: Each is rejected with a field message; the saved profile is unchanged after a pull-to-refresh.
+Actual: Name fields only check length >= 2. No letters-only rule.
+Remarks: Same gap as TC-BUY-004.
+
+=== BUY-ADDR-001 [B2 Address Book] Fail
+Scenario: Add an address with valid data
+Expected: ADDR-2 is listed with exactly the entered values and is not default. ADDR-1 is still default.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-002 [B2 Address Book] Fail
+Scenario: Region → city → barangay cascade
+Expected: Each list shows only places under the one above (no Cebu cities under NCR). Changing Region clears City and Barangay.
+Actual: Province > Municipality > Barangay dropdowns are linked, but there is no Region level and no address book to add to.
+Remarks: Cascade exists on the profile/registration form.
+
+=== BUY-ADDR-003 [B2 Address Book] Fail
+Scenario: Each required field left blank
+Expected: Each attempt is blocked with a message on the blank field. No address is added.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-004 [B2 Address Book] Fail
+Scenario: Phone number format
+Expected: Only the two valid formats save.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-005 [B2 Address Book] Fail
+Scenario: Address book limit
+Expected: The 10th saves. The 11th is blocked with a limit message.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-006 [B2 Address Book] Fail
+Scenario: Set a different default address
+Expected: Only ADDR-2 shows Default and checkout pre-selects it.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-007 [B2 Address Book] Fail
+Scenario: Delete the default address
+Expected: The first attempt is blocked with a message to choose another default first. The second succeeds. There is always exactly one default.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-011 [B2 Address Book] Fail
+Scenario: [Mobile] Keyboard on the address form
+Expected: Phone opens a number pad. Street and Recipient open a text keyboard. Save can be reached and tapped while the keyboard is open or after tapping Done.
+Actual: Street uses a street-address keyboard, but there are no Recipient or per-address Phone fields.
+Remarks: Feature is not in the app.
+
+=== BUY-SRCH-004 [B3 Browse & Search] Fail
+Scenario: Search: typo and no results
+Expected: The typo returns P-02 or a 'Did you mean rattan basket?' suggestion. zzqxw shows a clear 'no results' state, not an error.
+Actual: No typo tolerance and no "Did you mean" suggestion.
+Remarks: The no-results state was not checked.
+
+=== BUY-SRCH-007 [B3 Browse & Search] Fail
+Scenario: Price range filter
+Expected: Range ends are inclusive. Min greater than Max and negative values are rejected with a message and the results are not filtered by them.
+Actual: Only "max price" chips and a rating filter. No min/max inputs, so no validation of min > max or negatives.
+Remarks: None
+
+=== BUY-SRCH-012 [B3 Browse & Search] Fail
+Scenario: [Mobile] Search key on the keyboard and pull to refresh
+Expected: Step 1 runs the search and closes the keyboard. Step 2 reloads the results; the same products appear with no duplicates.
+Actual: The Search key runs the search, but the results screen has no pull-to-refresh.
+Remarks: None
+
+=== BUY-PDP-007 [B4 Product Detail] Fail
+Scenario: Buy Now checks out only that item
+Expected: Checkout opens with only P-01 Natural-M × 1. P-05 stays in the cart and is not in this checkout.
+Actual: Buy Now adds the item to the cart and opens checkout with every selected cart line, not only that item.
+Remarks: product_details_screen.dart Buy Now button.
+
+=== BUY-WISH-004 [B5 Wishlist & Follow] Fail
+Scenario: Follow and unfollow a store
+Expected: Count becomes N+1 and Seller 1 is in Following; after unfollowing, N and removed.
+Actual: No follow-store feature.
+Remarks: Feature is not in the app.
+
+=== BUY-VOU-004 [B7 Vouchers] Blocked
+Scenario: Minimum spend at the boundary
+Expected: ₱299.99: not applicable, with 'Spend ₱0.01 more'. ₱300.00 and ₱300.01: ₱50.00 off.
+Actual: The boundary is inclusive (below min is rejected). The message says "Spend at least P X" rather than "Spend P0.01 more".
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-VOU-006 [B7 Vouchers] Fail
+Scenario: Per-buyer limit reached
+Expected: Rejected: already used. Buyer 2 can still use it.
+Actual: No per-buyer usage limit.
+Remarks: Feature is not in the app.
+
+=== BUY-VOU-007 [B7 Vouchers] Pass
+Scenario: Removing an item drops below the minimum spend
+Expected: MCH50 is removed automatically with a notice. Total is ₱199 + ₱50 = ₱249.00.
+Actual: The voucher is removed automatically with "Voucher removed - cart dropped below the minimum".
+Remarks: None
+
+=== BUY-VOU-008 [B7 Vouchers] Pass
+Scenario: Percentage voucher respects its cap
+Expected: ₱499.99: not applicable. ₱999.00 → ₱99.90 off. ₱1,000.00 → ₱100.00 off. ₱1,250 → ₱100.00 off (cap, not ₱125.00).
+Actual: Percentage vouchers are capped at maxDiscount after the minimum-spend check.
+Remarks: Logic reviewed only; seed values differ.
+
+=== BUY-VOU-009 [B7 Vouchers] Pass
+Scenario: Shipping voucher larger than shipping
+Expected: ₱50 shipping → ₱0.00 shipping (not negative). ₱65 shipping → ₱15.00. Merchandise amounts are unchanged.
+Actual: A shipping voucher gives min(max discount, shipping fee), so shipping never goes negative.
+Remarks: None
+
+=== BUY-CHK-001 [B8 Checkout] Fail
+Scenario: Checkout with the worked example
+Expected: Summary: merchandise ₱1,098.00, shipping ₱185.00 (₱65 + ₱120), store voucher −₱50.00, platform voucher −₱100.00, shipping voucher −₱50.00, total ₱1,083.00. Two orders are created, one per store, whose totals add up to ₱1,083.00. Cart no longer has these items.
+Actual: Checkout shows subtotal, one voucher and flat shipping. No store/platform/shipping voucher lines and no per-store totals.
+Remarks: None
+
+=== BUY-CHK-005 [B8 Checkout] Fail
+Scenario: Note to seller length
+Expected: 200 characters are saved and shown in full on the seller's order. 201 cannot be entered or is rejected.
+Actual: The note limit is 140 characters, not 200.
+Remarks: checkout_screen.dart _notesMaxLength
+
+=== BUY-CHK-006 [B8 Checkout] Pass
+Scenario: No payment method selected
+Expected: Blocked until a payment method is chosen.
+Actual: Cash on Delivery is pre-selected, so an order can never be placed without a payment method.
+Remarks: None
+
+=== BUY-CHK-007 [B8 Checkout] Pass
+Scenario: Double-tap Place Order
+Expected: Exactly one order exists. P-02 stock is 19. The resubmit shows the existing order or a message; it does not create another.
+Actual: Place Order is disabled while the order is being placed.
+Remarks: The stock-is-19 part needs the live API.
+
+=== BUY-CHK-009 [B8 Checkout] Fail
+Scenario: Stock ran out during checkout
+Expected: Buyer 1's order is blocked with an out-of-stock message. Stock is 0.
+Actual: No stock check in cart or checkout.
+Remarks: None
+
+=== BUY-CHK-010 [B8 Checkout] Fail
+Scenario: Voucher becomes invalid during checkout
+Expected: The order is not placed with MCH50. A message says the voucher is no longer valid and the total is updated.
+Actual: The voucher is not re-validated when Place Order is tapped.
+Remarks: None
+
+=== BUY-RATE-004 [B13 Ratings & Reviews] Fail
+Scenario: Stars, text and photo limits
+Expected: 0 stars is blocked. 500 characters and 5 photos are accepted; 501 characters and a 6th photo are not.
+Actual: 0 stars blocks submit. Text limit is 400, not 500. No photos.
+Remarks: None
+
+=== BUY-RATE-005 [B13 Ratings & Reviews] Fail
+Scenario: Edit once within the window
+Expected: The first edit saves. A second edit and an edit after 30 days are not possible.
+Actual: No edit-once or 30-day rule found.
+Remarks: None
+
+=== BUY-RATE-007 [B13 Ratings & Reviews] Fail
+Scenario: [Mobile] Review photos from the camera and a multi-select
+Expected: No more than 5 photos can be attached: the gallery stops at 4 more, or a message says only 5 are allowed. The review saves with 5 photos.
+Actual: No photo attachments in reviews.
+Remarks: Feature is not in the app.

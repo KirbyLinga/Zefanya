@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zefanya/utils/validators.dart';
 
 void main() {
-  group('person names (A2)', () {
+  group('BUY-ACCT-002 person names (A2)', () {
     test('empty and one-character names are refused', () {
       expect(
         validatePersonName('', label: 'First name'),

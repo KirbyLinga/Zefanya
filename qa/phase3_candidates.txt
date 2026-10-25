@@ -1,0 +1,427 @@
+A	TC-BUY-004	Name	Name with numbers or symbols
+  RES: Fixed in this pass
+  ACT: Names with numbers and symbols are accepted. Only length of at least 2 is checked.
+
+A	TC-BUY-006	Name	Name length at the limits
+  RES: Fixed in this pass
+  ACT: 1 character shows "First name is required" (not a length message). 51 characters is accepted; there is no 50-character limit.
+
+A	TC-BUY-007	Date of Birth	Age at the 18-year limit
+  RES: Fixed in this pass
+  ACT: The age is calculated but never checked. A 17-year-old date of birth is accepted.
+
+A	TC-BUY-018	Password	Password missing a required character type
+  RES: Fixed in this pass
+  ACT: All four passwords are accepted. Only the 8-character minimum is enforced; no upper/lower/number/special rule.
+
+A	TC-BUY-021	Terms and Privacy Policy	Register without accepting the terms
+  RES: Fixed in this pass
+  ACT: No Terms and Privacy checkbox on the registration form. The only terms checkbox is at checkout.
+
+A	TC-BUY-038	Email Verification (OTP)	[Mobile] OTP countdown after switching to the mail app
+  RES: Fixed in this pass
+  ACT: There is no countdown on the OTP screen, so nothing shows time left.
+
+A	TC-BUY-039	Email Verification (OTP)	[Mobile] System Back on the form and the verification screen
+  RES: Fixed in this pass
+  ACT: Back on the first registration step leaves without asking. DirtyGuard is only used on Edit Profile.
+
+A	BUY-ACCT-002	Account & Security	Profile field validation
+  RES: Fixed in this pass
+  ACT: Name fields only check length >= 2. No letters-only rule.
+
+B-M	BUY-ACCT-003	Account & Security	Change password with the correct old password
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-004	Account & Security	Change password with a wrong old password
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-005	Account & Security	New password breaks the rule
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-006	Account & Security	Change email with verification
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-007	Account & Security	Change email: wrong or expired OTP
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-008	Account & Security	Change email to one already used
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-009	Account & Security	Change phone with verification and format
+  RES: 
+  ACT: No change-password, change-email or change-phone screen.
+
+B-M	BUY-ACCT-011	Account & Security	[Mobile] Password change ends the session on the other phone
+  RES: 
+  ACT: No password change, so no cross-phone session end.
+
+B-L	BUY-ADDR-001	Address Book	Add an address with valid data
+  RES: Fixed in this pass
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-002	Address Book	Region → city → barangay cascade
+  RES: Fixed in this pass
+  ACT: Province > Municipality > Barangay dropdowns are linked, but there is no Region level and no address book to add to.
+
+B-L	BUY-ADDR-003	Address Book	Each required field left blank
+  RES: Fixed in this pass
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-004	Address Book	Phone number format
+  RES: Fixed in this pass
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-005	Address Book	Address book limit
+  RES: Fixed in this pass
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-006	Address Book	Set a different default address
+  RES: Fixed in this pass
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-007	Address Book	Delete the default address
+  RES: Fixed in this pass
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-008	Address Book	Edit or delete an address used by an active order
+  RES: Partial
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-009	Address Book	Cannot open another buyer's address
+  RES: 
+  ACT: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+B-L	BUY-ADDR-010	Address Book	[Mobile] Use My Location with permission allowed and denied
+  RES: 
+  ACT: No Use My Location button.
+
+B-L	BUY-ADDR-011	Address Book	[Mobile] Keyboard on the address form
+  RES: Fixed in this pass
+  ACT: Street uses a street-address keyboard, but there are no Recipient or per-address Phone fields.
+
+B-M	BUY-SRCH-004	Browse, Search & Filter	Search: typo and no results
+  RES: Fixed in this pass
+  ACT: No typo tolerance and no "Did you mean" suggestion.
+
+B-M	BUY-SRCH-007	Browse, Search & Filter	Price range filter
+  RES: Fixed in this pass
+  ACT: Only "max price" chips and a rating filter. No min/max inputs, so no validation of min > max or negatives.
+
+B-M	BUY-SRCH-011	Browse, Search & Filter	Products of a vacation store
+  RES: 
+  ACT: No vacation-store state.
+
+A	BUY-SRCH-012	Browse, Search & Filter	[Mobile] Search key on the keyboard and pull to refresh
+  RES: Fixed in this pass
+  ACT: The Search key runs the search, but the results screen has no pull-to-refresh.
+
+B-M	BUY-PDP-001	Product Detail Page	All variation types must be selected
+  RES: Fixed in this pass
+  ACT: The first variant is pre-selected, so no "Please select a variation" check. Only one variation type exists.
+
+B-M	BUY-PDP-002	Product Detail Page	Selecting a variant updates price, stock and image
+  RES: Fixed in this pass
+  ACT: Variants are plain labels. No per-variant price, stock or image.
+
+B-M	BUY-PDP-003	Product Detail Page	Out-of-stock variant disabled
+  RES: Fixed in this pass
+  ACT: No per-variant stock or disabled state.
+
+A	BUY-PDP-004	Product Detail Page	Quantity limits
+  RES: Fixed in this pass
+  ACT: The + button stops at the product stock, not at 20. No typed quantity.
+
+B-M	BUY-PDP-005	Product Detail Page	Per-buyer purchase limit
+  RES: 
+  ACT: No per-buyer purchase limit.
+
+B-L	BUY-PDP-006	Product Detail Page	Sale price, countdown and vouchers shown
+  RES: 
+  ACT: No sale price, countdown, flash units or voucher claim on the product screen.
+
+A	BUY-PDP-007	Product Detail Page	Buy Now checks out only that item
+  RES: Fixed in this pass
+  ACT: Buy Now adds the item to the cart and opens checkout with every selected cart line, not only that item.
+
+B-M	BUY-PDP-010	Product Detail Page	[Mobile] Share link opens the product in the app
+  RES: 
+  ACT: No share link or deep-link handling.
+
+B-M	BUY-WISH-004	Wishlist & Follow Store	Follow and unfollow a store
+  RES: Fixed in this pass
+  ACT: No follow-store feature.
+
+B-M	BUY-CART-002	Cart	Different variants stay separate
+  RES: Fixed in this pass
+  ACT: Lines stay separate, but variants cannot have their own prices.
+
+A	BUY-CART-005	Cart	Change quantity at the limits
+  RES: Fixed in this pass
+  ACT: Minus at 1 removes the line (with Undo). There is no 20 cap and no "only 20 available" message.
+
+B-M	BUY-CART-007	Cart	Item goes out of stock or is deleted while in the cart
+  RES: 
+  ACT: Products missing from the catalogue are silently dropped on load. No unavailable marking and no stock check.
+
+B-L	BUY-CART-008	Cart	Cart persists after logout and on another device
+  RES: 
+  ACT: The cart is stored on the phone only. It is not tied to the account or synced to another phone.
+
+B-M	BUY-VOU-001	Vouchers & Promotions	Claim a voucher into the wallet
+  RES: 
+  ACT: The wallet lists vouchers. There is no Claim button or Claimed state.
+
+B-M	BUY-VOU-003	Vouchers & Promotions	Stacking per the agreed rule
+  RES: 
+  ACT: Only one voucher can be applied at a time. No store/platform/shipping stacking.
+
+B-M	BUY-VOU-005	Vouchers & Promotions	Expired, not started, limit reached, invalid code
+  RES: 
+  ACT: Invalid code shows "isn't a valid voucher code". Expired vouchers are only shown muted; no "not started" or "limit reached" messages.
+
+B-M	BUY-VOU-011	Vouchers & Promotions	Voucher on items already on sale
+  RES: 
+  ACT: No sale or strike-through price in the app.
+
+B-L	BUY-VOU-012	Vouchers & Promotions	Voucher returned after cancellation
+  RES: 
+  ACT: No cancellation, so no voucher return.
+
+B-L	BUY-CHK-001	Checkout	Checkout with the worked example
+  RES: 
+  ACT: Checkout shows subtotal, one voucher and flat shipping. No store/platform/shipping voucher lines and no per-store totals.
+
+B-L	BUY-CHK-003	Checkout	Shipping weight at the 1 kg boundary
+  RES: 
+  ACT: No weight-based shipping.
+
+A	BUY-CHK-005	Checkout	Note to seller length
+  RES: Fixed in this pass
+  ACT: The note limit is 140 characters, not 200.
+
+A	BUY-CHK-010	Checkout	Voucher becomes invalid during checkout
+  RES: Fixed in this pass
+  ACT: The voucher is not re-validated when Place Order is tapped.
+
+B-L	BUY-TRK-002	Order Tracking & History	Timeline matches seller, rider, courier and logistics updates
+  RES: 
+  ACT: The timeline uses the app's own steps (sorting centre, rider) from local courier state, not hubs from Logistics.
+
+B-M	BUY-TRK-003	Order Tracking & History	Order Received button
+  RES: Partial
+  ACT: No Order Received button. The order moves to To Rate when the courier completes it.
+
+B-M	BUY-TRK-004	Order Tracking & History	Order Received not available before delivery
+  RES: Fixed in this pass
+  ACT: No Order Received action to restrict.
+
+B-M	BUY-CAN-001	Cancellation	Cancel a COD order before shipping
+  RES: Partial
+  ACT: The buyer has no Cancel option.
+
+B-M	BUY-CAN-002	Cancellation	Reason is required
+  RES: Fixed in this pass
+  ACT: The buyer has no Cancel option.
+
+B-M	BUY-CAN-003	Cancellation	Cancel a prepaid order
+  RES: Partial
+  ACT: The buyer has no Cancel option.
+
+B-M	BUY-CAN-004	Cancellation	No cancel after Ready for Pickup
+  RES: Fixed in this pass
+  ACT: The buyer has no Cancel option.
+
+B-M	BUY-CAN-005	Cancellation	No cancel after shipping
+  RES: Fixed in this pass
+  ACT: The buyer has no Cancel option.
+
+B-M	BUY-CAN-006	Cancellation	Double-tap Cancel
+  RES: Partial
+  ACT: The buyer has no Cancel option.
+
+B-L	BUY-RET-001	Return & Refund Request	Request a return within the window
+  RES: Partial
+  ACT: No Return/Refund request.
+
+B-L	BUY-RET-002	Return & Refund Request	Return not allowed before delivery
+  RES: Fixed in this pass
+  ACT: No Return/Refund request.
+
+B-L	BUY-RET-003	Return & Refund Request	Return window boundary
+  RES: Fixed in this pass
+  ACT: No Return/Refund request.
+
+B-L	BUY-RET-004	Return & Refund Request	Evidence and description rules
+  RES: Fixed in this pass
+  ACT: No Return/Refund request.
+
+B-L	BUY-RET-005	Return & Refund Request	Track request status
+  RES: Partial
+  ACT: No Return/Refund request.
+
+B-L	BUY-RET-006	Return & Refund Request	[Mobile] Return evidence from the camera and the gallery
+  RES: Partial
+  ACT: No Return/Refund request.
+
+B-M	BUY-RATE-001	Ratings & Reviews	Rate a completed order
+  RES: Partial
+  ACT: A review has stars and an optional comment only. No photo, variant or masked name.
+
+B-M	BUY-RATE-004	Ratings & Reviews	Stars, text and photo limits
+  RES: Fixed in this pass
+  ACT: 0 stars blocks submit. Text limit is 400, not 500. No photos.
+
+B-M	BUY-RATE-005	Ratings & Reviews	Edit once within the window
+  RES: Fixed in this pass
+  ACT: No edit-once or 30-day rule found.
+
+B-M	BUY-RATE-007	Ratings & Reviews	[Mobile] Review photos from the camera and a multi-select
+  RES: Fixed in this pass
+  ACT: No photo attachments in reviews.
+
+B-M	BUY-CHAT-002	Chat & Notifications	Invalid attachments and message length
+  RES: 
+  ACT: Only empty messages are blocked. No attachments and no length limit.
+
+B-L	BUY-CHAT-003	Chat & Notifications	Order status notifications
+  RES: 
+  ACT: No notifications for order status changes.
+
+B-L	BUY-CHAT-004	Chat & Notifications	Flash-sale reminder
+  RES: 
+  ACT: No flash-sale reminders.
+
+B-M	BUY-CHAT-005	Chat & Notifications	Mark notifications as read
+  RES: 
+  ACT: No notification list or unread count.
+
+B-M	RID-PROF-001	Profile, Vehicle & Documents	View profile, vehicle and verification status
+  RES: 
+  ACT: Profile shows name, contact and address. Vehicle, plate, license, expiry and verification status are collected at sign-up but not shown.
+
+B-M	RID-PROF-002	Profile, Vehicle & Documents	Update vehicle details
+  RES: 
+  ACT: No vehicle edit and no re-verification flag.
+
+B-M	RID-PROF-004	Profile, Vehicle & Documents	License expiry boundary
+  RES: 
+  ACT: No license expiry field.
+
+B-M	RID-PROF-005	Profile, Vehicle & Documents	Document upload rules
+  RES: 
+  ACT: Uploads are photos from camera or gallery. No 5 MB or file-type check.
+
+B-M	RID-PROF-008	Profile, Vehicle & Documents	[Mobile] Update documents with the camera and the Files app
+  RES: 
+  ACT: No Files source and no re-verification flag.
+
+B-L	RID-AVAIL-001	Availability	Go Online
+  RES: 
+  ACT: No Online/Offline toggle, location permission or presence tracking.
+
+B-L	RID-AVAIL-002	Availability	Go Offline
+  RES: 
+  ACT: No Online/Offline toggle, location permission or presence tracking.
+
+B-L	RID-AVAIL-003	Availability	Go Offline with an active job
+  RES: 
+  ACT: No Online/Offline toggle, location permission or presence tracking.
+
+B-L	RID-AVAIL-004	Availability	Offline after logout or session timeout
+  RES: 
+  ACT: No Online/Offline toggle, location permission or presence tracking.
+
+B-M	RID-JOB-001	Job Assignment	View and accept a job
+  RES: 
+  ACT: Jobs list pickup, drop-off area and package. No COD amount; jobs are not timed offers.
+
+B-M	RID-JOB-002	Job Assignment	Decline a job
+  RES: 
+  ACT: No decline/offer flow.
+
+B-M	RID-JOB-003	Job Assignment	Offer timeout
+  RES: 
+  ACT: No 60-second offer timeout.
+
+B-M	RID-JOB-004	Job Assignment	Job goes to Unassigned after 3 declines
+  RES: 
+  ACT: No Unassigned queue or 3-decline rule.
+
+B-M	RID-JOB-006	Job Assignment	Concurrent job limit
+  RES: 
+  ACT: No concurrent job limit.
+
+A	RID-PICK-001	Pickup	Pickup details shown
+  RES: Fixed in this pass
+  ACT: Shows seller and pickup address. No contact number or tracking number.
+
+B-M	RID-PICK-002	Pickup	Confirm pickup by scanning
+  RES: 
+  ACT: Pickup is confirmed with the "Confirm Pickup from Seller" button. No waybill scan.
+
+B-M	RID-PICK-003	Pickup	Confirm pickup by typing the tracking number
+  RES: Fixed in this pass
+  ACT: No tracking-number entry.
+
+B-M	RID-PICK-004	Pickup	Wrong tracking number
+  RES: Fixed in this pass
+  ACT: No tracking-number check.
+
+B-M	RID-DLV-004	Delivery & Status Updates	OTP checks
+  RES: 
+  ACT: No delivery OTP.
+
+B-M	RID-DLV-005	Delivery & Status Updates	COD amount must match
+  RES: 
+  ACT: No COD amount entry or check.
+
+B-M	RID-DLV-006	Delivery & Status Updates	Prepaid order has no COD
+  RES: 
+  ACT: The tracker always shows Cash on Delivery; no prepaid case.
+
+A	RID-DLV-008	Delivery & Status Updates	[Mobile] Proof-of-delivery photo must be taken live
+  RES: Fixed in this pass
+  ACT: The picker offers Gallery as well as Camera, so a live photo is not enforced.
+
+A	RID-DLV-010	Delivery & Status Updates	[Mobile] Call or message the buyer from the job
+  RES: Fixed in this pass
+  ACT: No call or message to the buyer from the job.
+
+B-M	RID-FAIL-001	Failed Delivery	Mark failed with a reason
+  RES: 
+  ACT: Mark Delivery Failed has no reason, attempt counter or buyer/Logistics notification.
+
+A	RID-FAIL-002	Failed Delivery	Reason required
+  RES: Fixed in this pass
+  ACT: No reason is asked for.
+
+A	RID-FAIL-003	Failed Delivery	Refused goes straight to Return to Sender
+  RES: Fixed in this pass
+  ACT: No "Refused" reason. Return to Sender exists only as a step.
+
+A	RID-FAIL-004	Failed Delivery	Attempt counter and reschedule
+  RES: Fixed in this pass
+  ACT: No attempt counter. Retry Delivery returns the job to In Transit.
+
+B-M	RID-FAIL-005	Failed Delivery	Return to Sender after the 3rd failed attempt
+  RES: Partial
+  ACT: No 3-attempt rule.
+
+B-M	RID-EARN-003	History, Earnings & COD Remittance	COD balance to remit
+  RES: 
+  ACT: No COD balance.
+
+B-M	RID-EARN-004	History, Earnings & COD Remittance	Remit COD and confirmation
+  RES: 
+  ACT: No remittance flow.
+
+B-M	RID-EARN-005	History, Earnings & COD Remittance	Short remittance
+  RES: 
+  ACT: No remittance flow.

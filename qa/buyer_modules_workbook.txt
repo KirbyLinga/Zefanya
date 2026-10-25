@@ -1,0 +1,785 @@
+=== BUY-ACCT-001 [B1 Account] Blocked
+Scenario: Edit profile with valid data
+Expected: A success message is shown. After a pull-to-refresh and re-login the new name and photo are shown on the profile screen and the account (Me) tab. Email and phone are unchanged.
+Actual: Edit Profile saves name, initial, sex, phone, address and photo to the phone only (no profile endpoint).
+Remarks: Needs live Laravel API. Retest when the profile API exists.
+
+=== BUY-ACCT-002 [B1 Account] Fail
+Scenario: Profile field validation
+Expected: Each is rejected with a field message; the saved profile is unchanged after a pull-to-refresh.
+Actual: Name fields only check length >= 2. No letters-only rule.
+Remarks: Same gap as TC-BUY-004.
+
+=== BUY-ACCT-003 [B1 Account] Fail
+Scenario: Change password with the correct old password
+Expected: Password changes with a success message. The old password is rejected; the new one works.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-004 [B1 Account] Fail
+Scenario: Change password with a wrong old password
+Expected: Blocked with 'current password is incorrect'. The original password still works.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-005 [B1 Account] Fail
+Scenario: New password breaks the rule
+Expected: Each is rejected with the specific rule that failed. The password is unchanged.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-006 [B1 Account] Fail
+Scenario: Change email with verification
+Expected: Before verification the old email still logs in and the profile still shows it. After the correct OTP, only the new email logs in; the old one is rejected.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-007 [B1 Account] Fail
+Scenario: Change email: wrong or expired OTP
+Expected: Both are rejected. The email is not changed.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-008 [B1 Account] Fail
+Scenario: Change email to one already used
+Expected: Both are blocked with 'email already in use' and no OTP is sent.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-009 [B1 Account] Fail
+Scenario: Change phone with verification and format
+Expected: Invalid and duplicate numbers are rejected without an OTP. The valid number is saved only after verification.
+Actual: No change-password, change-email or change-phone screen.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-010 [B1 Account] Blocked
+Scenario: [Mobile] Change the profile photo with the camera and the gallery
+Expected: Steps 1 and 2: the new photo shows on the profile and is still there after the app is closed and reopened. Step 3: no crash; a message says camera access is off and offers Settings; Gallery still works.
+Actual: Edit Profile offers Camera or Gallery. Camera-denied handling is not in the code (no Settings link).
+Remarks: Needs a phone or emulator; code review only.
+
+=== BUY-ACCT-011 [B1 Account] Fail
+Scenario: [Mobile] Password change ends the session on the other phone
+Expected: Phone B's session ends and the login screen is shown. The old password is rejected and the new one works. Phone A stays logged in.
+Actual: No password change, so no cross-phone session end.
+Remarks: Feature is not in the app.
+
+=== BUY-ACCT-012 [B1 Account] Pass
+Scenario: [Mobile] Stay logged in, then log out and press Back
+Expected: Step 1: the app opens on the home screen, still logged in as Juan Miguel. Steps 2–3: the login screen stays; no account screen appears again and the app does not log back in by itself.
+Actual: Session is restored at startup; logout returns to the login screen and nothing logs back in.
+Remarks: None
+
+=== BUY-ADDR-001 [B2 Address Book] Fail
+Scenario: Add an address with valid data
+Expected: ADDR-2 is listed with exactly the entered values and is not default. ADDR-1 is still default.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-002 [B2 Address Book] Fail
+Scenario: Region → city → barangay cascade
+Expected: Each list shows only places under the one above (no Cebu cities under NCR). Changing Region clears City and Barangay.
+Actual: Province > Municipality > Barangay dropdowns are linked, but there is no Region level and no address book to add to.
+Remarks: Cascade exists on the profile/registration form.
+
+=== BUY-ADDR-003 [B2 Address Book] Fail
+Scenario: Each required field left blank
+Expected: Each attempt is blocked with a message on the blank field. No address is added.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-004 [B2 Address Book] Fail
+Scenario: Phone number format
+Expected: Only the two valid formats save.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-005 [B2 Address Book] Fail
+Scenario: Address book limit
+Expected: The 10th saves. The 11th is blocked with a limit message.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-006 [B2 Address Book] Fail
+Scenario: Set a different default address
+Expected: Only ADDR-2 shows Default and checkout pre-selects it.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-007 [B2 Address Book] Fail
+Scenario: Delete the default address
+Expected: The first attempt is blocked with a message to choose another default first. The second succeeds. There is always exactly one default.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-008 [B2 Address Book] Fail
+Scenario: Edit or delete an address used by an active order
+Expected: The order, the seller's view and the waybill still show the original ADDR-2 exactly.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-009 [B2 Address Book] Fail
+Scenario: Cannot open another buyer's address
+Expected: Access is denied. No part of ADDR-3 is shown.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-010 [B2 Address Book] Fail
+Scenario: [Mobile] Use My Location with permission allowed and denied
+Expected: Step 1: Region, City and Barangay are filled from the location and can still be edited before saving. Step 2: no crash; a message explains that location is off; the address can still be entered by hand.
+Actual: No Use My Location button.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-011 [B2 Address Book] Fail
+Scenario: [Mobile] Keyboard on the address form
+Expected: Phone opens a number pad. Street and Recipient open a text keyboard. Save can be reached and tapped while the keyboard is open or after tapping Done.
+Actual: Street uses a street-address keyboard, but there are no Recipient or per-address Phone fields.
+Remarks: Feature is not in the app.
+
+=== BUY-SRCH-001 [B3 Browse & Search] Blocked
+Scenario: Browse a platform category
+Expected: Every Active product in Home & Living is listed, including P-02. No product from other categories appears.
+Actual: Category listing works on the mock catalogue, but P-02 and the test categories are not in it.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-SRCH-002 [B3 Browse & Search] Blocked
+Scenario: Store screen with store categories
+Expected: Store categories match CAT-1 to CAT-5. Lamps shows P-03 only.
+Actual: Categories come from the catalogue (CAT-1 to CAT-5 are not seeded).
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-SRCH-003 [B3 Browse & Search] Blocked
+Scenario: Search: exact and partial match
+Expected: P-02 appears for all four terms (case and outer spaces do not matter).
+Actual: Search is a text match on the catalogue; P-02 is not seeded.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-SRCH-004 [B3 Browse & Search] Fail
+Scenario: Search: typo and no results
+Expected: The typo returns P-02 or a 'Did you mean rattan basket?' suggestion. zzqxw shows a clear 'no results' state, not an error.
+Actual: No typo tolerance and no "Did you mean" suggestion.
+Remarks: The no-results state was not checked.
+
+=== BUY-SRCH-005 [B3 Browse & Search] Blocked
+Scenario: Search: special characters and injection
+Expected: Each returns no results or literal matches. No error screen, no pop-up, no list of all products from the SQL string, and the app log shows no script run.
+Actual: Mock search is client-side; live search sends q= to the server.
+Remarks: Needs live Laravel API.
+
+=== BUY-SRCH-006 [B3 Browse & Search] Pass
+Scenario: Empty search
+Expected: The search is not submitted (or the normal listing is shown). No error screen.
+Actual: Submitting an empty search does nothing (it returns early).
+Remarks: None
+
+=== BUY-SRCH-007 [B3 Browse & Search] Fail
+Scenario: Price range filter
+Expected: Range ends are inclusive. Min greater than Max and negative values are rejected with a message and the results are not filtered by them.
+Actual: Only "max price" chips and a rating filter. No min/max inputs, so no validation of min > max or negatives.
+Remarks: None
+
+=== BUY-SRCH-008 [B3 Browse & Search] Pass
+Scenario: Combined filters
+Expected: Only products matching all active filters are shown. Clearing filters widens the results correctly.
+Actual: Price and rating filters combine (both must match); toggling a chip clears it.
+Remarks: None
+
+=== BUY-SRCH-009 [B3 Browse & Search] Pass
+Scenario: Sort and loading more results
+Expected: Each sort orders the results correctly. No product repeats or disappears as more results load or when scrolling back.
+Actual: Sort by price low-high, high-low or featured, with a stable order.
+Remarks: The app loads everything at once; there is no load-more.
+
+=== BUY-SRCH-010 [B3 Browse & Search] Blocked
+Scenario: Inactive, deleted and draft products never appear
+Expected: None appears in search, category or store screens. Each share link opens an 'unavailable' or 'not found' screen in the app.
+Actual: Hiding inactive/draft products is a server rule; the app has no share links.
+Remarks: Needs live Laravel API.
+
+=== BUY-SRCH-011 [B3 Browse & Search] Fail
+Scenario: Products of a vacation store
+Expected: P-02 appears with the 'On vacation' label and cannot be added to the cart.
+Actual: No vacation-store state.
+Remarks: Feature is not in the app.
+
+=== BUY-SRCH-012 [B3 Browse & Search] Fail
+Scenario: [Mobile] Search key on the keyboard and pull to refresh
+Expected: Step 1 runs the search and closes the keyboard. Step 2 reloads the results; the same products appear with no duplicates.
+Actual: The Search key runs the search, but the results screen has no pull-to-refresh.
+Remarks: None
+
+=== BUY-SRCH-013 [B3 Browse & Search] Blocked
+Scenario: [Mobile] Search with no internet
+Expected: Step 1 shows a no-internet message, not an empty 'no results' state and not a crash. Step 2 shows P-02.
+Actual: Mock mode never goes to the network.
+Remarks: Needs live Laravel API. Use Airplane mode.
+
+=== BUY-PDP-001 [B4 Product Detail] Fail
+Scenario: All variation types must be selected
+Expected: Without both selections, Add to Cart and Buy Now show 'Please select a variation' and nothing is added. With both, the item is added once.
+Actual: The first variant is pre-selected, so no "Please select a variation" check. Only one variation type exists.
+Remarks: None
+
+=== BUY-PDP-002 [B4 Product Detail] Fail
+Scenario: Selecting a variant updates price, stock and image
+Expected: Price: ₱199 → ₱299 → ₱199. Stock: 10 → 5 → 10. Image switches to the colour's image.
+Actual: Variants are plain labels. No per-variant price, stock or image.
+Remarks: Feature is not in the app.
+
+=== BUY-PDP-003 [B4 Product Detail] Fail
+Scenario: Out-of-stock variant disabled
+Expected: M is disabled for Black and cannot be selected.
+Actual: No per-variant stock or disabled state.
+Remarks: Feature is not in the app.
+
+=== BUY-PDP-004 [B4 Product Detail] Fail
+Scenario: Quantity limits
+Expected: Only 1 and 20 are added. The + button stops at 20. Invalid values show a message and the cart is unchanged.
+Actual: The + button stops at the product stock, not at 20. No typed quantity.
+Remarks: None
+
+=== BUY-PDP-005 [B4 Product Detail] Fail
+Scenario: Per-buyer purchase limit
+Expected: The first 2 are bought. The 3rd is blocked with a limit message, including in a new cart.
+Actual: No per-buyer purchase limit.
+Remarks: Feature is not in the app.
+
+=== BUY-PDP-006 [B4 Product Detail] Fail
+Scenario: Sale price, countdown and vouchers shown
+Expected: Shows ₱299 with ₱450 struck through, a countdown to the slot end, the flash units left, and MCH50 with a Claim button.
+Actual: No sale price, countdown, flash units or voucher claim on the product screen.
+Remarks: Feature is not in the app.
+
+=== BUY-PDP-007 [B4 Product Detail] Fail
+Scenario: Buy Now checks out only that item
+Expected: Checkout opens with only P-01 Natural-M × 1. P-05 stays in the cart and is not in this checkout.
+Actual: Buy Now adds the item to the cart and opens checkout with every selected cart line, not only that item.
+Remarks: product_details_screen.dart Buy Now button.
+
+=== BUY-PDP-008 [B4 Product Detail] Blocked
+Scenario: Product screen of an unavailable product
+Expected: Both open a clear 'unavailable' screen with no Add to Cart. No crash or error screen.
+Actual: Handling of a removed product on the buyer screen needs a run.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-PDP-009 [B4 Product Detail] Blocked
+Scenario: [Mobile] Swipe and zoom product images
+Expected: Images change in the uploaded order with a position indicator. Zoom works and the image stays sharp. Closing returns to P-01 with Natural-M still selected.
+Actual: A photo carousel exists. Zoom and selection-kept-on-return need a device.
+Remarks: Needs a phone or emulator; code review only.
+
+=== BUY-PDP-010 [B4 Product Detail] Fail
+Scenario: [Mobile] Share link opens the product in the app
+Expected: Phone B opens P-02 directly in the app. Without the app, the link opens a mobile web page for P-02 or the app's store page. Never a blank or error page.
+Actual: No share link or deep-link handling.
+Remarks: Feature is not in the app.
+
+=== BUY-WISH-001 [B5 Wishlist & Follow] Pass
+Scenario: Add and remove a wishlist item
+Expected: P-02 appears once, then is gone after removal. The heart on P-02's screen matches each state.
+Actual: The heart saves/unsaves and the Saved list shows the item once.
+Remarks: Stored on the phone only.
+
+=== BUY-WISH-002 [B5 Wishlist & Follow] Pass
+Scenario: Add the same item twice quickly
+Expected: P-02 appears at most once, and the heart reflects the final state.
+Actual: toggle() keeps ids unique, so the item appears at most once and the heart follows the final state.
+Remarks: None
+
+=== BUY-WISH-003 [B5 Wishlist & Follow] Blocked
+Scenario: Wishlist item goes out of stock or is deleted
+Expected: P-02 shows Sold out with Add to Cart disabled. P-05 stays listed as Unavailable with no Add to Cart. The screen shows no error.
+Actual: Needs live stock or delete changes.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-WISH-004 [B5 Wishlist & Follow] Fail
+Scenario: Follow and unfollow a store
+Expected: Count becomes N+1 and Seller 1 is in Following; after unfollowing, N and removed.
+Actual: No follow-store feature.
+Remarks: Feature is not in the app.
+
+=== BUY-WISH-005 [B5 Wishlist & Follow] Pass
+Scenario: Wishlist and follow require login
+Expected: Each opens the login screen; nothing is saved without an account.
+Actual: There is no guest mode: the whole app needs login first, so nothing can be saved without an account.
+Remarks: None
+
+=== BUY-CART-001 [B6 Cart] Pass
+Scenario: Same variant added twice merges
+Expected: One line, Natural-M × 3, subtotal ₱747.00.
+Actual: Same product and variant merges into one line and the quantity adds up.
+Remarks: Prices differ from the plan; check totals on the seeded data.
+
+=== BUY-CART-002 [B6 Cart] Fail
+Scenario: Different variants stay separate
+Expected: Two separate lines with their own prices (₱249 and ₱199).
+Actual: Lines stay separate, but variants cannot have their own prices.
+Remarks: See BUY-PDP-002.
+
+=== BUY-CART-003 [B6 Cart] Pass
+Scenario: Items grouped by store
+Expected: Two store groups with store names, each listing only its own items.
+Actual: Cart lines are grouped by store with the store name.
+Remarks: None
+
+=== BUY-CART-004 [B6 Cart] Pass
+Scenario: Select and deselect items for checkout
+Expected: Subtotals: ₱399, then ₱1,098, then ₱699. Checkout contains only P-01 and P-02; P-05 stays in the cart.
+Actual: Select/deselect changes the subtotal and checkout only uses selected lines.
+Remarks: None
+
+=== BUY-CART-005 [B6 Cart] Fail
+Scenario: Change quantity at the limits
+Expected: 0 is not accepted (or asks to remove the item). 1 and 20 are accepted. 21 is blocked with 'only 20 available'.
+Actual: Minus at 1 removes the line (with Undo). There is no 20 cap and no "only 20 available" message.
+Remarks: None
+
+=== BUY-CART-006 [B6 Cart] Blocked
+Scenario: Price changes while in the cart
+Expected: The cart shows ₱420.00 and the subtotal updates.
+Actual: Cart prices are re-read only when the app loads; no live refresh for lines already in the cart.
+Remarks: Needs live Laravel API.
+
+=== BUY-CART-007 [B6 Cart] Fail
+Scenario: Item goes out of stock or is deleted while in the cart
+Expected: P-02 and P-05 are marked unavailable and cannot be selected. P-06 checks out normally.
+Actual: Products missing from the catalogue are silently dropped on load. No unavailable marking and no stock check.
+Remarks: None
+
+=== BUY-CART-008 [B6 Cart] Fail
+Scenario: Cart persists after logout and on another device
+Expected: The same 2 items and quantities appear in both phones.
+Actual: The cart is stored on the phone only. It is not tied to the account or synced to another phone.
+Remarks: None
+
+=== BUY-CART-009 [B6 Cart] Pass
+Scenario: Remove an item
+Expected: The line is gone after a pull-to-refresh and the subtotal updates.
+Actual: Remove deletes the line (with Undo) and the subtotal updates.
+Remarks: None
+
+=== BUY-CART-010 [B6 Cart] Blocked
+Scenario: Cannot change another buyer's cart
+Expected: Rejected (403 or not found). Buyer 2's cart is unchanged.
+Actual: The cart is local, so there is no cart API to test.
+Remarks: None
+
+=== BUY-CART-011 [B6 Cart] Blocked
+Scenario: [Mobile] Change quantity with no internet
+Expected: Step 1: a no-internet message; the quantity goes back to 1 or is clearly marked not saved. Step 2: the cart shows what the server saved. The phone never shows 3 while the server has 1.
+Actual: The cart is local; there is no network call to fail.
+Remarks: None
+
+=== BUY-CART-012 [B6 Cart] Pass
+Scenario: [Mobile] Cart badge count
+Expected: The cart icon badge shows 1, 2, then 1, and still 1 after reopening. (Note in Remarks whether the badge counts lines or units.)
+Actual: The nav badge shows itemCount, the total number of units (not lines).
+Remarks: Badge counts units. Confirm on a phone.
+
+=== BUY-VOU-001 [B7 Vouchers] Fail
+Scenario: Claim a voucher into the wallet
+Expected: MCH50 is in the wallet with its rule and end date. The button changes to Claimed and a second claim is not possible.
+Actual: The wallet lists vouchers. There is no Claim button or Claimed state.
+Remarks: None
+
+=== BUY-VOU-002 [B7 Vouchers] Blocked
+Scenario: Apply a store voucher
+Expected: Seller 1's group shows −₱50.00 and the total is ₱450 + ₱50 shipping − ₱50 = ₱450.00.
+Actual: Vouchers are applied by code in Cart. MCH50 is not in the mock list and vouchers are percentage with a cap, not flat.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-VOU-003 [B7 Vouchers] Fail
+Scenario: Stacking per the agreed rule
+Expected: MCH50 + PLAT100 + FREESHIP apply; total ₱1,083.00. Selecting MCH10 replaces MCH50 (Seller 1 ₱699 ≥ ₱500 → −₱69.90; total ₱1,063.10); never both. RVSECRET is not applicable (Seller 2 subtotal ₱399 < ₱1,000).
+Actual: Only one voucher can be applied at a time. No store/platform/shipping stacking.
+Remarks: None
+
+=== BUY-VOU-004 [B7 Vouchers] Blocked
+Scenario: Minimum spend at the boundary
+Expected: ₱299.99: not applicable, with 'Spend ₱0.01 more'. ₱300.00 and ₱300.01: ₱50.00 off.
+Actual: The boundary is inclusive (below min is rejected). The message says "Spend at least P X" rather than "Spend P0.01 more".
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-VOU-005 [B7 Vouchers] Fail
+Scenario: Expired, not started, limit reached, invalid code
+Expected: Each is rejected with its own specific message. No discount is applied.
+Actual: Invalid code shows "isn't a valid voucher code". Expired vouchers are only shown muted; no "not started" or "limit reached" messages.
+Remarks: None
+
+=== BUY-VOU-006 [B7 Vouchers] Fail
+Scenario: Per-buyer limit reached
+Expected: Rejected: already used. Buyer 2 can still use it.
+Actual: No per-buyer usage limit.
+Remarks: Feature is not in the app.
+
+=== BUY-VOU-007 [B7 Vouchers] Pass
+Scenario: Removing an item drops below the minimum spend
+Expected: MCH50 is removed automatically with a notice. Total is ₱199 + ₱50 = ₱249.00.
+Actual: The voucher is removed automatically with "Voucher removed - cart dropped below the minimum".
+Remarks: None
+
+=== BUY-VOU-008 [B7 Vouchers] Pass
+Scenario: Percentage voucher respects its cap
+Expected: ₱499.99: not applicable. ₱999.00 → ₱99.90 off. ₱1,000.00 → ₱100.00 off. ₱1,250 → ₱100.00 off (cap, not ₱125.00).
+Actual: Percentage vouchers are capped at maxDiscount after the minimum-spend check.
+Remarks: Logic reviewed only; seed values differ.
+
+=== BUY-VOU-009 [B7 Vouchers] Pass
+Scenario: Shipping voucher larger than shipping
+Expected: ₱50 shipping → ₱0.00 shipping (not negative). ₱65 shipping → ₱15.00. Merchandise amounts are unchanged.
+Actual: A shipping voucher gives min(max discount, shipping fee), so shipping never goes negative.
+Remarks: None
+
+=== BUY-VOU-010 [B7 Vouchers] Blocked
+Scenario: Total never negative
+Expected: Merchandise total is ₱0.00, never negative; shipping is still charged.
+Actual: Checkout clamps the total at 0, but that also drops shipping. The scenario uses a flat voucher the app cannot model.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-VOU-011 [B7 Vouchers] Fail
+Scenario: Voucher on items already on sale
+Expected: MCH50 applies (₱360 ≥ ₱300). Merchandise ₱310.00, total ₱360.00 with ₱50 shipping.
+Actual: No sale or strike-through price in the app.
+Remarks: Feature is not in the app.
+
+=== BUY-VOU-012 [B7 Vouchers] Fail
+Scenario: Voucher returned after cancellation
+Expected: MCH50 is back in the wallet, usable again before it expires.
+Actual: No cancellation, so no voucher return.
+Remarks: Feature is not in the app.
+
+=== BUY-CHK-001 [B8 Checkout] Fail
+Scenario: Checkout with the worked example
+Expected: Summary: merchandise ₱1,098.00, shipping ₱185.00 (₱65 + ₱120), store voucher −₱50.00, platform voucher −₱100.00, shipping voucher −₱50.00, total ₱1,083.00. Two orders are created, one per store, whose totals add up to ₱1,083.00. Cart no longer has these items.
+Actual: Checkout shows subtotal, one voucher and flat shipping. No store/platform/shipping voucher lines and no per-store totals.
+Remarks: None
+
+=== BUY-CHK-002 [B8 Checkout] Fail
+Scenario: Shipping fee per store and per address
+Expected: ADDR-1 (NCR): ₱50.00. ADDR-3 (Visayas): ₱120.00. The total updates immediately.
+Actual: Shipping is P60, free from P1,000. Not per store or address zone.
+Remarks: pricing.dart
+
+=== BUY-CHK-003 [B8 Checkout] Fail
+Scenario: Shipping weight at the 1 kg boundary
+Expected: 1.0 kg is charged as 1 kg: ₱60.00. 1.2 kg is charged as 2 kg: ₱80.00.
+Actual: No weight-based shipping.
+Remarks: Feature is not in the app.
+
+=== BUY-CHK-004 [B8 Checkout] Fail
+Scenario: Unserviceable address
+Expected: A message says the area is not serviceable and Place Order is disabled. No order can be created.
+Actual: No serviceability check.
+Remarks: Feature is not in the app.
+
+=== BUY-CHK-005 [B8 Checkout] Fail
+Scenario: Note to seller length
+Expected: 200 characters are saved and shown in full on the seller's order. 201 cannot be entered or is rejected.
+Actual: The note limit is 140 characters, not 200.
+Remarks: checkout_screen.dart _notesMaxLength
+
+=== BUY-CHK-006 [B8 Checkout] Pass
+Scenario: No payment method selected
+Expected: Blocked until a payment method is chosen.
+Actual: Cash on Delivery is pre-selected, so an order can never be placed without a payment method.
+Remarks: None
+
+=== BUY-CHK-007 [B8 Checkout] Pass
+Scenario: Double-tap Place Order
+Expected: Exactly one order exists. P-02 stock is 19. The resubmit shows the existing order or a message; it does not create another.
+Actual: Place Order is disabled while the order is being placed.
+Remarks: The stock-is-19 part needs the live API.
+
+=== BUY-CHK-008 [B8 Checkout] Blocked
+Scenario: Price changed during checkout
+Expected: The order is not placed at ₱450. A message shows the new price and the summary updates to ₱480 for the buyer to confirm.
+Actual: The client does not re-check the price at Place Order; the server must.
+Remarks: Needs live Laravel API.
+
+=== BUY-CHK-009 [B8 Checkout] Fail
+Scenario: Stock ran out during checkout
+Expected: Buyer 1's order is blocked with an out-of-stock message. Stock is 0.
+Actual: No stock check in cart or checkout.
+Remarks: None
+
+=== BUY-CHK-010 [B8 Checkout] Fail
+Scenario: Voucher becomes invalid during checkout
+Expected: The order is not placed with MCH50. A message says the voucher is no longer valid and the total is updated.
+Actual: The voucher is not re-validated when Place Order is tapped.
+Remarks: None
+
+=== BUY-CHK-011 [B8 Checkout] Blocked
+Scenario: Tampered price or total in the request
+Expected: The server ignores or rejects the tampered amount. Any created order uses the real price.
+Actual: The order request sends unitPrice from the client. The server must ignore it.
+Remarks: Needs live Laravel API. Needs a proxy tool (M11).
+
+=== BUY-CHK-012 [B8 Checkout] Blocked
+Scenario: [Mobile] Connection lost after tapping Place Order
+Expected: The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one order exists and P-02 stock is 19.
+Actual: Live order errors show a message with Retry and the cart is kept. Needs a real dropped connection.
+Remarks: Needs live Laravel API.
+
+=== BUY-CHK-013 [B8 Checkout] Blocked
+Scenario: [Mobile] App interrupted on the checkout screen
+Expected: The checkout screen still shows the same address, vouchers, payment method and total ₱1,083.00, or it reloads them and tells the buyer what changed. No order is placed without tapping Place Order.
+Actual: Cannot be judged from code.
+Remarks: Needs a phone or emulator; code review only.
+
+=== BUY-PAY-001 [B9 Payment] Pass
+Scenario: COD order
+Expected: The order goes straight to To Ship. Payment shows COD ₱500.00 to collect on delivery.
+Actual: COD orders appear under To Ship and show Cash on Delivery.
+Remarks: The "COD P500 to collect" line is not shown.
+
+=== BUY-PAY-002 [B9 Payment] Fail
+Scenario: E-wallet or card payment succeeds
+Expected: The order moves To Pay → To Ship and stores a payment reference. The amount charged equals the order total exactly.
+Actual: No payment gateway, To Pay status or payment reference.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-003 [B9 Payment] Fail
+Scenario: Payment fails
+Expected: The order stays To Pay with 'Payment failed' and Pay Again. It is not marked paid and the seller cannot ship it.
+Actual: No payment failure or Pay Again.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-004 [B9 Payment] Fail
+Scenario: Buyer cancels at the gateway
+Expected: Buyer returns to the order in To Pay. No duplicate order is created.
+Actual: No gateway to cancel at.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-005 [B9 Payment] Fail
+Scenario: App closed on the gateway screen
+Expected: The order shows To Ship once the gateway confirms. It is charged once only.
+Actual: No gateway screen.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-006 [B9 Payment] Fail
+Scenario: Unpaid order auto-cancels
+Expected: The order is Cancelled (reason: unpaid). Stock is 20. MCH50 is back in the wallet.
+Actual: No unpaid auto-cancel.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-007 [B9 Payment] Fail
+Scenario: Pay just before vs after the auto-cancel time
+Expected: The 59-minute payment succeeds. The 61-minute order is already Cancelled and Pay is not available.
+Actual: No pay window or auto-cancel.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-008 [B9 Payment] Fail
+Scenario: [Mobile] Pay in the e-wallet app and switch back
+Expected: The app returns to the order, which shows To Ship with the payment reference and is charged once. When returning by hand, the order updates (after a pull-to-refresh at most) and Pay is not offered again.
+Actual: No e-wallet app handoff.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-009 [B9 Payment] Fail
+Scenario: [Mobile] Back button while payment is processing
+Expected: The app asks before leaving, or ignores Back while processing. In the end the order is either paid once or still To Pay with Pay Again; never two payments or two orders.
+Actual: No payment processing screen.
+Remarks: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-TRK-001 [B10 Order Tracking] Pass
+Scenario: Orders appear in the correct tab
+Expected: Each order is in exactly one tab matching its status; counts match.
+Actual: Each order shows in exactly one tab: To Ship, In Transit, Out for Delivery or To Rate.
+Remarks: Tab names differ from the plan (no To Pay, Completed, Cancelled, Return).
+
+=== BUY-TRK-002 [B10 Order Tracking] Fail
+Scenario: Timeline matches seller, rider, courier and logistics updates
+Expected: Each event appears once, in order, with its time: Picked Up, At Hub (HUB-QC), In Transit to HUB-PSG, At Hub (HUB-PSG), Out for Delivery. The order moves to To Receive at Picked Up. The courier's name and location are not shown to the buyer.
+Actual: The timeline uses the app's own steps (sorting centre, rider) from local courier state, not hubs from Logistics.
+Remarks: None
+
+=== BUY-TRK-003 [B10 Order Tracking] Fail
+Scenario: Order Received button
+Expected: The order moves to Completed and the Rate button appears. Seller 1's earnings for it become Available.
+Actual: No Order Received button. The order moves to To Rate when the courier completes it.
+Remarks: None
+
+=== BUY-TRK-004 [B10 Order Tracking] Fail
+Scenario: Order Received not available before delivery
+Expected: Not shown; a direct request is rejected.
+Actual: No Order Received action to restrict.
+Remarks: Feature is not in the app.
+
+=== BUY-TRK-005 [B10 Order Tracking] Fail
+Scenario: Automatic completion
+Expected: To Receive before 7 days; Completed after, and earnings are released.
+Actual: No automatic completion after 7 days.
+Remarks: Feature is not in the app.
+
+=== BUY-TRK-006 [B10 Order Tracking] Blocked
+Scenario: Cannot open another buyer's order
+Expected: Denied. No details of Buyer 2's order are shown.
+Actual: Order ownership is a server rule.
+Remarks: Needs live Laravel API.
+
+=== BUY-TRK-007 [B10 Order Tracking] Fail
+Scenario: [Mobile] Push notification opens the order
+Expected: Step 1: a push notification for the change arrives, including on the lock screen. Step 2: the app opens on that order's tracking screen. Step 3: an in-app banner appears and the order screen updates. Exactly one notification per change.
+Actual: No push notifications (no Firebase or FCM in the project).
+Remarks: Feature is not in the app.
+
+=== BUY-CAN-001 [B11 Cancellation] Fail
+Scenario: Cancel a COD order before shipping
+Expected: The order is Cancelled on both sides. Stock is 20. Seller 1 is notified with the reason.
+Actual: The buyer has no Cancel option.
+Remarks: Feature is not in the app.
+
+=== BUY-CAN-002 [B11 Cancellation] Fail
+Scenario: Reason is required
+Expected: Blocked until a reason is chosen. The order is unchanged.
+Actual: The buyer has no Cancel option.
+Remarks: Feature is not in the app.
+
+=== BUY-CAN-003 [B11 Cancellation] Fail
+Scenario: Cancel a prepaid order
+Expected: The order is Cancelled and a refund for the exact amount paid is started. MCH50 returns to the wallet.
+Actual: The buyer has no Cancel option.
+Remarks: Feature is not in the app.
+
+=== BUY-CAN-004 [B11 Cancellation] Fail
+Scenario: No cancel after Ready for Pickup
+Expected: No Cancel option; a direct request is rejected and the status is unchanged.
+Actual: The buyer has no Cancel option.
+Remarks: Feature is not in the app.
+
+=== BUY-CAN-005 [B11 Cancellation] Fail
+Scenario: No cancel after shipping
+Expected: No Cancel option.
+Actual: The buyer has no Cancel option.
+Remarks: Feature is not in the app.
+
+=== BUY-CAN-006 [B11 Cancellation] Fail
+Scenario: Double-tap Cancel
+Expected: One cancellation; stock restored once (not twice).
+Actual: The buyer has no Cancel option.
+Remarks: Feature is not in the app.
+
+=== BUY-RET-001 [B12 Return & Refund] Fail
+Scenario: Request a return within the window
+Expected: The request is submitted. The order moves to Return/Refund. Seller 1 is notified. The order can no longer be completed automatically while the request is open.
+Actual: No Return/Refund request.
+Remarks: Feature is not in the app.
+
+=== BUY-RET-002 [B12 Return & Refund] Fail
+Scenario: Return not allowed before delivery
+Expected: Not available.
+Actual: No Return/Refund request.
+Remarks: Feature is not in the app.
+
+=== BUY-RET-003 [B12 Return & Refund] Fail
+Scenario: Return window boundary
+Expected: Allowed on day 7. Not available after the window or once Completed.
+Actual: No Return/Refund request.
+Remarks: Feature is not in the app.
+
+=== BUY-RET-004 [B12 Return & Refund] Fail
+Scenario: Evidence and description rules
+Expected: Each is blocked with a message. 1 to 5 valid photos and 10+ characters are required.
+Actual: No Return/Refund request.
+Remarks: Feature is not in the app.
+
+=== BUY-RET-005 [B12 Return & Refund] Fail
+Scenario: Track request status
+Expected: Status Rejected with the seller's exact reason and an Escalate button.
+Actual: No Return/Refund request.
+Remarks: Feature is not in the app.
+
+=== BUY-RET-006 [B12 Return & Refund] Fail
+Scenario: [Mobile] Return evidence from the camera and the gallery
+Expected: Photos are attached in the chosen order with previews, and a photo can be removed before submitting. The request is submitted with 2 photos and Seller 1 sees the same 2 photos.
+Actual: No Return/Refund request.
+Remarks: Feature is not in the app.
+
+=== BUY-RATE-001 [B13 Ratings & Reviews] Fail
+Scenario: Rate a completed order
+Expected: The review appears on P-02 with 5 stars, the text, the photo, the variant and Buyer 1's (masked) name.
+Actual: A review has stars and an optional comment only. No photo, variant or masked name.
+Remarks: None
+
+=== BUY-RATE-002 [B13 Ratings & Reviews] Pass
+Scenario: Rating not allowed before completion
+Expected: Not available; a direct request is rejected.
+Actual: Rating is offered only once the order reaches To Rate.
+Remarks: None
+
+=== BUY-RATE-003 [B13 Ratings & Reviews] Pass
+Scenario: One review per item
+Expected: Blocked; only Edit is offered.
+Actual: The review screen pre-fills an existing review, so it is an edit rather than a second review.
+Remarks: None
+
+=== BUY-RATE-004 [B13 Ratings & Reviews] Fail
+Scenario: Stars, text and photo limits
+Expected: 0 stars is blocked. 500 characters and 5 photos are accepted; 501 characters and a 6th photo are not.
+Actual: 0 stars blocks submit. Text limit is 400, not 500. No photos.
+Remarks: None
+
+=== BUY-RATE-005 [B13 Ratings & Reviews] Fail
+Scenario: Edit once within the window
+Expected: The first edit saves. A second edit and an edit after 30 days are not possible.
+Actual: No edit-once or 30-day rule found.
+Remarks: None
+
+=== BUY-RATE-006 [B13 Ratings & Reviews] Blocked
+Scenario: Average rating updates
+Expected: Average becomes 3.0 and the count 2 on the product screen and search card.
+Actual: Aggregate is built from stars, but the figures need the seeded reviews.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-RATE-007 [B13 Ratings & Reviews] Fail
+Scenario: [Mobile] Review photos from the camera and a multi-select
+Expected: No more than 5 photos can be attached: the gallery stops at 4 more, or a message says only 5 are allowed. The review saves with 5 photos.
+Actual: No photo attachments in reviews.
+Remarks: Feature is not in the app.
+
+=== BUY-CHAT-001 [B14 Chat & Notifs] Blocked
+Scenario: Chat with a seller from a product
+Expected: Seller 1 receives both in order. The chat shows the P-02 product card.
+Actual: Chat from the product opens a seller thread. No product card; seller receipt needs the live API.
+Remarks: Needs live Laravel API. The live chat repository is not wired yet.
+
+=== BUY-CHAT-002 [B14 Chat & Notifs] Fail
+Scenario: Invalid attachments and message length
+Expected: All are rejected; nothing is sent.
+Actual: Only empty messages are blocked. No attachments and no length limit.
+Remarks: None
+
+=== BUY-CHAT-003 [B14 Chat & Notifs] Fail
+Scenario: Order status notifications
+Expected: Exactly one notification per change. Each opens the right order.
+Actual: No notifications for order status changes.
+Remarks: Feature is not in the app.
+
+=== BUY-CHAT-004 [B14 Chat & Notifs] Fail
+Scenario: Flash-sale reminder
+Expected: A reminder arrives before the slot starts and links to P-02.
+Actual: No flash-sale reminders.
+Remarks: Feature is not in the app.
+
+=== BUY-CHAT-005 [B14 Chat & Notifs] Fail
+Scenario: Mark notifications as read
+Expected: Unread count goes 3 → 2 → 0.
+Actual: No notification list or unread count.
+Remarks: Feature is not in the app.
+
+=== BUY-CHAT-006 [B14 Chat & Notifs] Fail
+Scenario: [Mobile] Chat message while the app is in the background
+Expected: A push notification shows Seller 1's name and a preview of the message. Tapping it opens that chat with the message shown once.
+Actual: No push notifications.
+Remarks: Feature is not in the app.
+
+=== BUY-CHAT-007 [B14 Chat & Notifs] Fail
+Scenario: [Mobile] Notifications turned off in phone Settings
+Expected: No push notification arrives, and the app neither crashes nor keeps asking. The in-app notification list still shows the update.
+Actual: No in-app notification list to fall back on.
+Remarks: Feature is not in the app.
+
+=== BUY-CHAT-008 [B14 Chat & Notifs] Blocked
+Scenario: [Mobile] Send a chat message with no internet
+Expected: The message is marked not sent with a retry option, or is sent automatically once online. Seller 1 receives it exactly once.
+Actual: Chat is local in mock mode; the live chat repository is not wired yet.
+Remarks: Needs live Laravel API.

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/pricing.dart';
 import '../../data/api/api_exception.dart';
-import '../../data/mock_data.dart' show Order, Voucher;
+import '../../data/mock_data.dart' show Order, Voucher, VoucherScope;
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
 import '../../state/courier_state.dart';
@@ -554,7 +554,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     List<CartItem> items,
     CartQuote quote,
   ) {
-    if (items.isNotEmpty && _itemsError != null) {
+    // "Nothing selected" is the only item error that fixes itself when lines
+    // appear. A stock or purchase-limit refusal must stay on screen: the lines
+    // are still there, and clearing the sentence would hide why Place Order
+    // did nothing.
+    if (items.isNotEmpty &&
+        _itemsError == 'Your cart has no selected items to check out.') {
       _itemsError = null;
     }
     final hasError = _itemsError != null;
@@ -608,9 +613,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             for (final discount in quote.voucherDiscounts)
               _orderLine(
                 theme,
-                discount.voucher.isShipping
-                    ? 'Shipping voucher (${discount.voucher.code})'
-                    : 'Voucher (${discount.voucher.code})',
+                '${switch (discount.voucher.scope) {
+                  VoucherScope.store => 'Store',
+                  VoucherScope.platform => 'Platform',
+                  VoucherScope.shipping => 'Shipping',
+                }} voucher (${discount.voucher.code})',
                 '- ${formatPeso(discount.amount)}',
                 valueColor: AppColors.successText,
               ),

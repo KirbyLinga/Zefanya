@@ -99,13 +99,23 @@ class ZefanyaLoader extends StatefulWidget {
 }
 
 class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1900),
-  );
+  late final AnimationController _controller;
 
   bool _started = false;
   bool _reduced = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Built here, not lazily in the field initializer: reduced-motion users
+    // never touch it while the widget is alive, and a `late final` would then
+    // create it inside dispose(), where `vsync: this` cannot look up
+    // TickerMode on a deactivated element.
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    );
+  }
 
   @override
   void didChangeDependencies() {

@@ -1,0 +1,107 @@
+=== BUY-ACCT-001 [B1 Account] Blocked
+Scenario: Edit profile with valid data
+Expected: A success message is shown. After a pull-to-refresh and re-login the new name and photo are shown on the profile screen and the account (Me) tab. Email and phone are unchanged.
+Actual: Edit Profile saves name, initial, sex, phone, address and photo to the phone only (no profile endpoint).
+Remarks: Needs live Laravel API. Retest when the profile API exists.
+
+=== BUY-ACCT-010 [B1 Account] Blocked
+Scenario: [Mobile] Change the profile photo with the camera and the gallery
+Expected: Steps 1 and 2: the new photo shows on the profile and is still there after the app is closed and reopened. Step 3: no crash; a message says camera access is off and offers Settings; Gallery still works.
+Actual: Edit Profile offers Camera or Gallery. Camera-denied handling is not in the code (no Settings link).
+Remarks: Needs a phone or emulator; code review only.
+
+=== BUY-ADDR-008 [B2 Address Book] Fail
+Scenario: Edit or delete an address used by an active order
+Expected: The order, the seller's view and the waybill still show the original ADDR-2 exactly.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-009 [B2 Address Book] Fail
+Scenario: Cannot open another buyer's address
+Expected: Access is denied. No part of ADDR-3 is shown.
+Actual: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+Remarks: Feature is not in the app.
+
+=== BUY-ADDR-010 [B2 Address Book] Fail
+Scenario: [Mobile] Use My Location with permission allowed and denied
+Expected: Step 1: Region, City and Barangay are filled from the location and can still be edited before saving. Step 2: no crash; a message explains that location is off; the address can still be entered by hand.
+Actual: No Use My Location button.
+Remarks: Feature is not in the app.
+
+=== BUY-PDP-006 [B4 Product Detail] Fail
+Scenario: Sale price, countdown and vouchers shown
+Expected: Shows ₱299 with ₱450 struck through, a countdown to the slot end, the flash units left, and MCH50 with a Claim button.
+Actual: No sale price, countdown, flash units or voucher claim on the product screen.
+Remarks: Feature is not in the app.
+
+=== BUY-PDP-008 [B4 Product Detail] Blocked
+Scenario: Product screen of an unavailable product
+Expected: Both open a clear 'unavailable' screen with no Add to Cart. No crash or error screen.
+Actual: Handling of a removed product on the buyer screen needs a run.
+Remarks: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-PDP-009 [B4 Product Detail] Blocked
+Scenario: [Mobile] Swipe and zoom product images
+Expected: Images change in the uploaded order with a position indicator. Zoom works and the image stays sharp. Closing returns to P-01 with Natural-M still selected.
+Actual: A photo carousel exists. Zoom and selection-kept-on-return need a device.
+Remarks: Needs a phone or emulator; code review only.
+
+=== BUY-CART-008 [B6 Cart] Fail
+Scenario: Cart persists after logout and on another device
+Expected: The same 2 items and quantities appear in both phones.
+Actual: The cart is stored on the phone only. It is not tied to the account or synced to another phone.
+Remarks: None
+
+=== BUY-CHK-002 [B8 Checkout] Fail
+Scenario: Shipping fee per store and per address
+Expected: ADDR-1 (NCR): ₱50.00. ADDR-3 (Visayas): ₱120.00. The total updates immediately.
+Actual: Shipping is P60, free from P1,000. Not per store or address zone.
+Remarks: pricing.dart
+
+=== BUY-CHK-003 [B8 Checkout] Fail
+Scenario: Shipping weight at the 1 kg boundary
+Expected: 1.0 kg is charged as 1 kg: ₱60.00. 1.2 kg is charged as 2 kg: ₱80.00.
+Actual: No weight-based shipping.
+Remarks: Feature is not in the app.
+
+=== BUY-CHK-004 [B8 Checkout] Fail
+Scenario: Unserviceable address
+Expected: A message says the area is not serviceable and Place Order is disabled. No order can be created.
+Actual: No serviceability check.
+Remarks: Feature is not in the app.
+
+=== BUY-CHK-008 [B8 Checkout] Blocked
+Scenario: Price changed during checkout
+Expected: The order is not placed at ₱450. A message shows the new price and the summary updates to ₱480 for the buyer to confirm.
+Actual: The client does not re-check the price at Place Order; the server must.
+Remarks: Needs live Laravel API.
+
+=== BUY-CHK-011 [B8 Checkout] Blocked
+Scenario: Tampered price or total in the request
+Expected: The server ignores or rejects the tampered amount. Any created order uses the real price.
+Actual: The order request sends unitPrice from the client. The server must ignore it.
+Remarks: Needs live Laravel API. Needs a proxy tool (M11).
+
+=== BUY-CHK-012 [B8 Checkout] Blocked
+Scenario: [Mobile] Connection lost after tapping Place Order
+Expected: The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one order exists and P-02 stock is 19.
+Actual: Live order errors show a message with Retry and the cart is kept. Needs a real dropped connection.
+Remarks: Needs live Laravel API.
+
+=== BUY-CHK-013 [B8 Checkout] Blocked
+Scenario: [Mobile] App interrupted on the checkout screen
+Expected: The checkout screen still shows the same address, vouchers, payment method and total ₱1,083.00, or it reloads them and tells the buyer what changed. No order is placed without tapping Place Order.
+Actual: Cannot be judged from code.
+Remarks: Needs a phone or emulator; code review only.
+
+=== BUY-RATE-001 [B13 Ratings & Reviews] Fail
+Scenario: Rate a completed order
+Expected: The review appears on P-02 with 5 stars, the text, the photo, the variant and Buyer 1's (masked) name.
+Actual: A review has stars and an optional comment only. No photo, variant or masked name.
+Remarks: None
+
+=== BUY-RATE-007 [B13 Ratings & Reviews] Fail
+Scenario: [Mobile] Review photos from the camera and a multi-select
+Expected: No more than 5 photos can be attached: the gallery stops at 4 more, or a message says only 5 are allowed. The review saves with 5 photos.
+Actual: No photo attachments in reviews.
+Remarks: Feature is not in the app.

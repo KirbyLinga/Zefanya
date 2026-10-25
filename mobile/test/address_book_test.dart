@@ -52,7 +52,11 @@ AuthState _seededAuth() {
   return auth;
 }
 
-Future<void> _pumpBook(WidgetTester tester, AuthState auth) async {
+Future<void> _pumpBook(
+  WidgetTester tester,
+  AuthState auth, {
+  double keyboardInset = 0,
+}) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
   tester.view.physicalSize = const Size(390, 844);
@@ -64,6 +68,14 @@ Future<void> _pumpBook(WidgetTester tester, AuthState auth) async {
       value: auth,
       child: MaterialApp(
         theme: AppTheme.light,
+        builder: keyboardInset == 0
+            ? null
+            : (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  viewInsets: EdgeInsets.only(bottom: keyboardInset),
+                ),
+                child: child!,
+              ),
         home: const AddressBookScreen(),
       ),
     ),
@@ -84,7 +96,8 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('address state', () {
-    test('seeds ADDR-1 from the profile and keeps it the only default', () {
+    test('BUY-ADDR-001 seeds ADDR-1 from the profile and makes it default',
+        () {
       final auth = _seededAuth();
       expect(auth.addresses, hasLength(1));
       expect(auth.addresses.single.id, 'ADDR-1');
@@ -93,7 +106,8 @@ void main() {
       expect(auth.defaultAddress!.region, 'National Capital Region (NCR)');
     });
 
-    test('a second address gets ADDR-2 and leaves ADDR-1 default', () {
+    test('BUY-ADDR-001 a second address gets ADDR-2 and leaves ADDR-1 default',
+        () {
       final auth = _seededAuth();
       final error = auth.addAddress(_draft());
       expect(error, isNull);
@@ -103,7 +117,8 @@ void main() {
       expect(auth.defaultAddress!.id, 'ADDR-1');
     });
 
-    test('exactly one address is default after moving the marker', () {
+    test('BUY-ADDR-006 exactly one address is default after moving the marker',
+        () {
       final auth = _seededAuth();
       auth.addAddress(_draft());
       expect(auth.setDefaultAddress('ADDR-2'), isTrue);
@@ -112,7 +127,7 @@ void main() {
       expect(auth.addresses.first.isDefault, isFalse);
     });
 
-    test('both phone formats save and malformed ones do not', () {
+    test('BUY-ADDR-004 both phone formats save and malformed ones do not', () {
       final auth = _seededAuth();
       for (final phone in ['09912345678', '+639171234567']) {
         expect(auth.addAddress(_draft(phone: phone)), isNull);
@@ -124,7 +139,7 @@ void main() {
       expect(auth.addresses, hasLength(before));
     });
 
-    test('the tenth address saves and the eleventh is refused', () {
+    test('BUY-ADDR-005 the tenth address saves and the eleventh is refused', () {
       final auth = _seededAuth();
       for (var i = 2; i <= 10; i++) {
         expect(auth.addAddress(_draft(street: '$i Mabini Street')), isNull);
@@ -135,7 +150,8 @@ void main() {
       expect(auth.addresses, hasLength(10));
     });
 
-    test('the default cannot be deleted until another is chosen', () {
+    test('BUY-ADDR-007 the default cannot be deleted until another is chosen',
+        () {
       final auth = _seededAuth();
       auth.addAddress(_draft());
       expect(auth.deleteAddress('ADDR-1'), contains('default'));
@@ -164,7 +180,8 @@ void main() {
   });
 
   group('address book screen', () {
-    testWidgets('adds a second address with the values entered', (tester) async {
+    testWidgets('BUY-ADDR-001 adds a second address with the values entered',
+        (tester) async {
       final auth = _seededAuth();
       await _pumpBook(tester, auth);
 
@@ -209,7 +226,8 @@ void main() {
       expect(auth.addresses.last.isDefault, isFalse);
     });
 
-    testWidgets('changing region clears city and barangay', (tester) async {
+    testWidgets('BUY-ADDR-002 changing region clears city and barangay',
+        (tester) async {
       final auth = _seededAuth();
       await _pumpBook(tester, auth);
       await tester.tap(find.byKey(const ValueKey('add-address')));
@@ -237,7 +255,7 @@ void main() {
       expect(find.text('Quezon City'), findsNothing);
     });
 
-    testWidgets('blank fields keep the form open with field messages',
+    testWidgets('BUY-ADDR-003 blank fields keep the form open with messages',
         (tester) async {
       final auth = _seededAuth();
       await _pumpBook(tester, auth);
@@ -255,6 +273,81 @@ void main() {
       expect(find.text('Recipient name is required'), findsOneWidget);
       expect(find.text('Phone number is required'), findsOneWidget);
       expect(find.text('Select a region'), findsOneWidget);
+      expect(find.text('Street address is required'), findsOneWidget);
+      expect(auth.addresses, hasLength(1));
+    });
+
+    testWidgets('BUY-ADDR-006 only the new default shows Default', (
+      tester,
+    ) async {
+      final auth = _seededAuth();
+      auth.addAddress(_draft());
+      await _pumpBook(tester, auth);
+
+      expect(find.byKey(const ValueKey('default-ADDR-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('default-ADDR-2')), findsNothing);
+
+      await tester.tap(find.text('Set as default'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('default-ADDR-1')), findsNothing);
+      expect(find.byKey(const ValueKey('default-ADDR-2')), findsOneWidget);
+      expect(auth.addresses.where((a) => a.isDefault), hasLength(1));
+      expect(auth.defaultAddress!.id, 'ADDR-2');
+    });
+
+    testWidgets(
+        'BUY-ADDR-011 recipient/phone/street use the right keyboards and Save '
+        'stays reachable above the keyboard', (tester) async {
+      final auth = _seededAuth();
+      await _pumpBook(tester, auth, keyboardInset: 300);
+      await tester.tap(find.byKey(const ValueKey('add-address')));
+      await tester.pumpAndSettle();
+
+      TextField field(String key) => tester.widget<TextField>(
+            find.descendant(
+              of: find.byKey(ValueKey(key)),
+              matching: find.byType(TextField),
+            ),
+          );
+
+      expect(
+        field('address-recipient').keyboardType,
+        TextInputType.name,
+      );
+      expect(field('address-phone').keyboardType, TextInputType.phone);
+
+      // The form is a lazy ListView, so the street field exists only once it
+      // has been scrolled into view.
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('address-street')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        field('address-street').keyboardType,
+        TextInputType.streetAddress,
+      );
+
+      // Focus the street field so the simulated 300px keyboard is up, then
+      // prove the primary action can still be scrolled to and tapped.
+      await tester.tap(find.byKey(const ValueKey('address-street')));
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('save-address')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('save-address')));
+      await tester.pumpAndSettle();
+
+      // Save ran: the visible street field reports its required message and no
+      // address was added. (The phone message is above the fold in a lazy
+      // list, which is why the street message is the one asserted here.)
       expect(find.text('Street address is required'), findsOneWidget);
       expect(auth.addresses, hasLength(1));
     });

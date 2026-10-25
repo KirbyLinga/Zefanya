@@ -96,7 +96,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('review limits', () {
+  group('BUY-RATE-004 stars, text and photo limits', () {
     testWidgets('the form uses the shared 500/5 limits', (tester) async {
       await _pumpReview(tester);
 
@@ -107,6 +107,67 @@ void main() {
       expect(
         find.byKey(ValueKey('review-photo-add-${_deliveredProduct.id}')),
         findsOneWidget,
+      );
+    });
+
+    testWidgets('0 stars disables Submit; 501 characters stop at 500',
+        (tester) async {
+      await _pumpReview(tester);
+
+      ElevatedButton submit() => tester.widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Submit Review'),
+          );
+      expect(submit().onPressed, isNull);
+      expect(find.text('Tap a star to rate this item.'), findsOneWidget);
+
+      await tester.ensureVisible(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'a' * 501);
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text.length,
+        500,
+      );
+
+      await tester.tap(find.byIcon(Icons.star_border_rounded).at(3));
+      await tester.pump();
+      expect(submit().onPressed, isNotNull);
+    });
+
+    testWidgets('five stored photos fill the strip and hide the add tile',
+        (tester) async {
+      const paths = [
+        '/tmp/one.jpg',
+        '/tmp/two.jpg',
+        '/tmp/three.jpg',
+        '/tmp/four.jpg',
+        '/tmp/five.jpg',
+      ];
+      final reviews = ReviewState();
+      await reviews.submit(
+        ProductReview(
+          productId: _deliveredProduct.id,
+          orderId: _deliveredOrder.id,
+          stars: 4,
+          comment: 'Five photos',
+          photoPath: paths.first,
+          photoPaths: paths,
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      await _pumpReview(tester, reviews: reviews);
+
+      expect(
+        reviews.forOrderProduct(_deliveredOrder.id, _deliveredProduct.id)!
+            .photos,
+        hasLength(5),
+      );
+      expect(find.byIcon(Icons.close), findsNWidgets(5));
+      expect(
+        find.byKey(
+          ValueKey('review-photo-add-${_deliveredProduct.id}'),
+        ),
+        findsNothing,
       );
     });
 
@@ -125,7 +186,7 @@ void main() {
     });
   });
 
-  group('edit window', () {
+  group('BUY-RATE-005 edit once within the window', () {
     test('the first edit is allowed and preserves the original date', () async {
       final state = ReviewState();
       final original = DateTime.now().subtract(const Duration(days: 10));

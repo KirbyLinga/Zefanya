@@ -476,7 +476,8 @@ class CartState extends ChangeNotifier {
       return VoucherApplyResult(
         status: VoucherApplyStatus.minimumSpend,
         message:
-            'Spend at least ${formatPeso(voucher.minSpend)}$scope to use "$code".',
+            'Spend ${formatPeso(voucher.minSpend - base)} more$scope '
+            'to use "$code".',
         voucher: voucher,
       );
     }

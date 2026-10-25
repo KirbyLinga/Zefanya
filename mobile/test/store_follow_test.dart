@@ -62,7 +62,8 @@ void main() {
   });
 
   group('follow state', () {
-    test('follow/unfollow moves the shop in and out of the list', () async {
+    test('BUY-WISH-004 follow/unfollow moves the shop in and out of the list',
+        () async {
       final state = WishlistState();
       expect(state.isFollowing(_seller), isFalse);
 
@@ -99,7 +100,8 @@ void main() {
   });
 
   group('where following shows', () {
-    testWidgets('seller hero toggles Follow to Following', (tester) async {
+    testWidgets('BUY-WISH-004 seller hero toggles Follow to Following',
+        (tester) async {
       final wishlist = WishlistState();
       await _pump(
         tester,
@@ -113,6 +115,28 @@ void main() {
 
       expect(find.text('Following'), findsOneWidget);
       expect(wishlist.isFollowing(_seller), isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('BUY-WISH-004 the count goes N, N+1, N with the list',
+        (tester) async {
+      const other = 'Sage & Clay Studio';
+      final wishlist = WishlistState()..toggleFollow(other);
+      await _pump(tester, const SavedScreen(), wishlist: wishlist);
+
+      expect(find.text('STORES YOU FOLLOW · 1'), findsOneWidget);
+      expect(find.text(other), findsOneWidget);
+
+      wishlist.toggleFollow(_seller);
+      await tester.pump();
+      expect(find.text('STORES YOU FOLLOW · 2'), findsOneWidget);
+      expect(find.text(_seller), findsOneWidget);
+
+      wishlist.toggleFollow(_seller);
+      await tester.pump();
+      expect(find.text('STORES YOU FOLLOW · 1'), findsOneWidget);
+      expect(find.text(_seller), findsNothing);
+      expect(find.text(other), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
