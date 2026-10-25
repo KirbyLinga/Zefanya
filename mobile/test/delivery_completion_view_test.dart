@@ -165,6 +165,9 @@ void main() {
     expect(find.textContaining('120'), findsOneWidget);
     expect(find.textContaining('480'), findsOneWidget);
     expect(find.text('Delivered'), findsOneWidget);
+    // Failed and returned jobs close too, so the day line counts every
+    // closed job rather than saying "delivered".
+    expect(find.textContaining('4 closed'), findsOneWidget);
   });
 
   testWidgets('a return never claims the fee was earned', (tester) async {
@@ -176,5 +179,6 @@ void main() {
 
     expect(find.text('Returned to seller'), findsOneWidget);
     expect(find.textContaining('added to your earnings'), findsNothing);
+    expect(find.textContaining('4 closed'), findsOneWidget);
   });
 }

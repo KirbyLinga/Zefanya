@@ -1,0 +1,8 @@
+﻿00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart
+00:00 +0: completion screen ΓÇö light
+00:02 +1: completion screen ΓÇö dark
+00:02 +2: does not overflow on a short screen at 1.3x text
+00:02 +3: the celebrating path uses the flourish, the fast path does not
+00:03 +4: the fee and the day total are both stated
+00:03 +5: a return never claims the fee was earned
+00:03 +6: All tests passed!

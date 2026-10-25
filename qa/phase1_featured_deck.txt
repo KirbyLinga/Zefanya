@@ -1,0 +1,17 @@
+﻿00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart
+00:00 +0: rail helpers (pure) cycle helper still rotates an order
+00:00 +1: rail helpers (pure) window shows at most four, in order
+00:00 +2: rail helpers (pure) rolling numbers interpolate and clamp
+00:00 +3: the rail widget (animations disabled) shows the first card with featured semantics
+00:01 +4: the rail widget (animations disabled) card body fills with tag, name and price
+00:01 +5: the rail widget (animations disabled) rail swipe never drives the promo carousel
+00:02 +6: the rail widget (animations disabled) dot jumps to another page and back
+00:02 +7: the rail widget (animations disabled) swipe goes both ways without losing cards
+00:02 +8: the rail widget (animations disabled) rail height is fixed across pages
+00:02 +9: the rail widget (animations disabled) home composition (real sliver stack) rail, search and promo share one left edge (360dp)
+00:03 +10: the rail widget (animations disabled) home composition (real sliver stack) rail, search and promo share one left edge (411dp)
+00:03 +11: the rail widget (animations disabled) home composition (real sliver stack) second card peeks past the right edge, unclipped
+00:03 +12: the rail widget (animations disabled) card stays balanced with an empty description
+00:03 +13: the rail widget (animations disabled) dots never overlap the price at 1.5x text scale
+00:03 +14: the rail widget (animations disabled) empty products render nothing
+00:03 +15: All tests passed!

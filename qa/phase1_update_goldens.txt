@@ -1,0 +1,63 @@
+﻿00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart
+00:00 +0: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider ΓÇö light
+00:03 +1: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen ΓÇö light
+00:03 +2: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen ΓÇö light
+00:03 +3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:03 +4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:03 +5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:04 +6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:04 +7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:04 +8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:04 +9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation ΓÇö light
+00:04 +10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:04 +11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:04 +12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:05 +13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:05 +14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:05 +15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:05 +16: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_light
+00:05 +17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: does not overflow a short screen at 1.3x text
+00:05 +18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 ΓÇö 360x740_light
+00:06 +19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Login ΓÇö 360x740_light
+00:06 +20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home ΓÇö 360x740_light
+00:07 +21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search ΓÇö 360x740_light
+00:07 +22: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart ΓÇö 360x740_light
+00:08 +23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders ΓÇö 360x740_light
+00:08 +24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile ΓÇö 360x740_light
+00:08 +25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail ΓÇö 360x740_light
+00:08 +26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home ΓÇö 360x740_light
+00:09 +27: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker ΓÇö 360x740_light
+00:09 +28: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 360x740_dark
+00:09 +29: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 ΓÇö 360x740_dark
+00:09 +30: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Login ΓÇö 360x740_dark
+00:09 +31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home ΓÇö 360x740_dark
+00:10 +32: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search ΓÇö 360x740_dark
+00:10 +33: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart ΓÇö 360x740_dark
+00:10 +34: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders ΓÇö 360x740_dark
+00:10 +35: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile ΓÇö 360x740_dark
+00:11 +36: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail ΓÇö 360x740_dark
+00:11 +37: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home ΓÇö 360x740_dark
+00:11 +38: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker ΓÇö 360x740_dark
+00:11 +39: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 411x890_light
+00:11 +40: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 ΓÇö 411x890_light
+00:11 +41: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Login ΓÇö 411x890_light
+00:12 +42: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home ΓÇö 411x890_light
+00:12 +43: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search ΓÇö 411x890_light
+00:12 +44: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart ΓÇö 411x890_light
+00:12 +45: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders ΓÇö 411x890_light
+00:12 +46: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile ΓÇö 411x890_light
+00:13 +47: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail ΓÇö 411x890_light
+00:13 +48: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home ΓÇö 411x890_light
+00:13 +49: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker ΓÇö 411x890_light
+00:13 +50: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 ΓÇö 411x890_dark
+00:13 +51: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 ΓÇö 411x890_dark
+00:13 +52: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Login ΓÇö 411x890_dark
+00:13 +53: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home ΓÇö 411x890_dark
+00:14 +54: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search ΓÇö 411x890_dark
+00:14 +55: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart ΓÇö 411x890_dark
+00:14 +56: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders ΓÇö 411x890_dark
+00:14 +57: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile ΓÇö 411x890_dark
+00:14 +58: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail ΓÇö 411x890_dark
+00:15 +59: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home ΓÇö 411x890_dark
+00:15 +60: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker ΓÇö 411x890_dark
+00:15 +61: All tests passed!

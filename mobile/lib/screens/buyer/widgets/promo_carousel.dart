@@ -288,7 +288,7 @@ class _TextLeftLayout extends StatelessWidget {
           bottom: 0,
           right: 100,
           child: Align(
-            alignment: Alignment.center,
+            alignment: Alignment.centerLeft,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -507,7 +507,7 @@ class _IconSplitLayout extends StatelessWidget {
           top: 0,
           bottom: 0,
           child: Align(
-            alignment: Alignment.center,
+            alignment: Alignment.centerLeft,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,

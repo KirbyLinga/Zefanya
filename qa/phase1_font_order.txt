@@ -1,0 +1,8 @@
+﻿00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart
+00:00 +0: confirmation ΓÇö light
+00:01 +1: confirmation ΓÇö dark
+00:01 +2: it names the order the buyer just created
+00:01 +3: one order is singular, several are not
+00:02 +4: both actions do something
+00:02 +5: does not overflow a short screen at 1.3x text
+00:02 +6: All tests passed!

@@ -5,7 +5,13 @@
 // Import this everywhere instead of hardcoding colors/fonts.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+/// Families declared in pubspec.yaml and bundled under assets/fonts.
+/// Naming them here (instead of calling GoogleFonts.*) means the theme never
+/// touches the network, and Flutter registers the assets before the first
+/// frame so tests and release builds render the same glyphs.
+const String kDisplayFontFamily = 'PlayfairDisplay';
+const String kBodyFontFamily = 'Montserrat';
 
 /// One mode's worth of colour tokens.
 ///
@@ -625,7 +631,9 @@ class AppType {
   /// holds per-screen; Landing goes further still with its own
   /// `.copyWith(fontSize: 64)` for the same reason — see the comment at
   /// that call site.
-  static TextStyle get masthead => GoogleFonts.playfairDisplay(
+  static TextStyle get masthead => TextStyle(
+        fontFamily: kDisplayFontFamily,
+        fontFamilyFallback: const [kBodyFontFamily],
         fontSize: 54,
         height: 0.92,
         fontWeight: FontWeight.w600,
@@ -634,7 +642,9 @@ class AppType {
       );
 
   /// Section headings on Home — roughly double the old titleLarge.
-  static TextStyle get sectionDisplay => GoogleFonts.playfairDisplay(
+  static TextStyle get sectionDisplay => TextStyle(
+        fontFamily: kDisplayFontFamily,
+        fontFamilyFallback: const [kBodyFontFamily],
         fontSize: 34,
         height: 1.0,
         fontWeight: FontWeight.w600,
@@ -643,7 +653,9 @@ class AppType {
       );
 
   /// Pull-quote scale, for seller voice / editorial copy.
-  static TextStyle get pullQuote => GoogleFonts.playfairDisplay(
+  static TextStyle get pullQuote => TextStyle(
+        fontFamily: kDisplayFontFamily,
+        fontFamilyFallback: const [kBodyFontFamily],
         fontSize: 27,
         height: 1.28,
         fontWeight: FontWeight.w400,
@@ -661,8 +673,9 @@ class AppType {
   ///
   /// [color] is nullable rather than defaulted because the palette
   /// resolves at runtime now, and a default argument has to be const.
-  static TextStyle priceNumeral(double size, {Color? color}) =>
-      GoogleFonts.playfairDisplay(
+  static TextStyle priceNumeral(double size, {Color? color}) => TextStyle(
+        fontFamily: kDisplayFontFamily,
+        fontFamilyFallback: const [kBodyFontFamily],
         fontSize: size,
         height: 1.0,
         fontWeight: FontWeight.w600,
@@ -673,7 +686,8 @@ class AppType {
 
   /// Tiny all-caps kicker. The small end of the contrast — always
   /// pairs with one of the display sizes above, never used alone.
-  static TextStyle get eyebrow => GoogleFonts.montserrat(
+  static TextStyle get eyebrow => TextStyle(
+        fontFamily: kBodyFontFamily,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.2,
@@ -810,7 +824,7 @@ class AppTheme {
         foregroundColor: p.textPrimary,
         centerTitle: true,
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: kDisplayFontFamily,
           fontWeight: FontWeight.w600,
         ),
         iconTheme: IconThemeData(color: p.textPrimary),
@@ -966,8 +980,11 @@ class AppTheme {
   }
 
   static TextTheme _buildTextTheme(TextTheme base, AppPalette p) {
-    final headline = GoogleFonts.playfairDisplayTextTheme(base);
-    final body = GoogleFonts.montserratTextTheme(base);
+    final headline = base.apply(
+      fontFamily: kDisplayFontFamily,
+      fontFamilyFallback: const [kBodyFontFamily],
+    );
+    final body = base.apply(fontFamily: kBodyFontFamily);
 
     return body.copyWith(
       displayLarge: headline.displayLarge?.copyWith(color: p.textPrimary),

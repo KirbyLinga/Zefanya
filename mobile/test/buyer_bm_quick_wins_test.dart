@@ -96,12 +96,6 @@ List<ChangeNotifierProvider<dynamic>> _allCommerceProviders({
   ChangeNotifierProvider<ThemeState>(create: (_) => ThemeState()),
 ];
 
-/// Alias for backwards compatibility.
-List<ChangeNotifierProvider<dynamic>> _commerceProviders({
-  required CartState cart,
-  OrderState? orders,
-}) => _allCommerceProviders(cart: cart, orders: orders);
-
 /// A catalogue where p2 and p5 have just gone out of stock while p6 is still
 /// sellable. The cart rehydrates against this, which is the exact race
 /// BUY-CART-007 describes.

@@ -1,0 +1,2001 @@
+00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart
+00:00 +0: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: AppType.eyebrow enforces minimum fontSize >= 11 and letterSpacing <= 1.2
+00:00 +1: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +2: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:00 +8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +16: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:03 +17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:03 +18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:03 +19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+[timed_snackbar] shown, will remove in 3000ms
+00:06 +20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +22: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +27: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +28: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +29: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen adds a second address with the values entered
+00:06 +30: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:07 +31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:07 +31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-PDP-005 purchase limit a third unit is blocked in a fresh cart
+[timed_snackbar] shown, will remove in 3000ms
+00:07 +32: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:07 +33: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:08 +34: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:08 +35: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:08 +36: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:08 +37: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:09 +38: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:09 +38: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-CHAT-002 attachments and length an invalid file and a 1001-character message are not sent
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+00:09 +39: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+[timed_snackbar] shown, will remove in 4000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:09 +40: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-CHAT-005 notification unread count badge and screen go 3 -> 2 -> 0
+00:09 +41: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:10 +42: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:10 +43: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:10 +44: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:12 +45: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:12 +46: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +47: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +48: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +49: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +50: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +51: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +52: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +53: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +54: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +55: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +56: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +57: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:12 +58: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:13 +59: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:13 +60: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:13 +61: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:13 +62: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:14 +63: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:14 +64: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:14 +65: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:14 +66: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:15 +67: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: scrolls to terms error when address is valid
+00:15 +68: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:16 +69: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:17 +70: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:17 +71: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:17 +72: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "courier_tracker_light.png": Pixel test failed, 18.56%, 61107px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart:121:5)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:18 +72 -1: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light
+00:18 +72 -1: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light [E]
+  Test failed. See exception logs above.
+  The test description was: courier tracker with a named rider — light
+  
+00:19 +72 -1: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "completion_light.png": Pixel test failed, 17.16%, 73015px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart:95:5)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:19 +72 -2: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:19 +72 -2: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light [E]
+  Test failed. See exception logs above.
+  The test description was: completion screen — light
+  
+00:19 +72 -2: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "courier_tracker_dark.png": Pixel test failed, 23.64%, 77797px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart:127:5)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:19 +72 -3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:19 +72 -3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — dark [E]
+  Test failed. See exception logs above.
+  The test description was: courier tracker with a named rider — dark
+  
+00:20 +73 -3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:20 +74 -3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:20 +75 -3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:20 +75 -3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "completion_dark.png": Pixel test failed, 21.87%, 93072px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart:108:5)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:20 +75 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:20 +75 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — dark [E]
+  Test failed. See exception logs above.
+  The test description was: completion screen — dark
+  
+00:20 +76 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:20 +77 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:20 +78 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:21 +79 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:21 +80 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:21 +81 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:21 +82 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) rail swipe never drives the promo carousel
+00:21 +83 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: swipe reveals the other pages
+00:22 +84 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: swipe reveals the other pages
+00:22 +85 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) swipe goes both ways without losing cards
+00:22 +86 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: auto-advance turns the page after 6s
+00:22 +87 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) rail height is fixed across pages
+00:23 +88 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: timer stops when off-stage, restarts on return
+00:23 +89 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) home composition (real sliver stack) rail, search and promo share one left edge (360dp)
+00:23 +90 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) home composition (real sliver stack) rail, search and promo share one left edge (360dp)
+00:23 +91 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) home composition (real sliver stack) rail, search and promo share one left edge (360dp)
+00:23 +92 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:23 +93 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +94 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +95 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +96 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +97 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +98 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +99 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +100 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +101 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +102 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +103 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +104 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +105 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +106 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +107 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +108 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +109 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +110 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +111 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +112 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +113 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:24 +114 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:25 +115 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:25 +116 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:25 +117 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:25 +118 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: hint fades in after 1.2s
+00:26 +119 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:26 +120 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:26 +121 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:26 +122 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:26 +123 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:26 +124 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:26 +125 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:27 +126 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +127 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +128 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +129 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +130 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +131 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +132 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +133 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +134 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +135 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +136 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +137 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +138 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +139 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +140 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +141 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +142 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +143 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +144 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +145 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +146 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +147 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +148 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +149 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +150 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +151 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +152 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +153 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +154 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +155 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +156 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:27 +157 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +158 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +159 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +160 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +161 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +162 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +163 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +164 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +165 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +166 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +167 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +168 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +169 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +170 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:28 +171 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:29 +172 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:29 +173 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:30 +174 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:30 +175 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: maps the list into DeliveryJob objects
+00:30 +176 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: returns an empty list when no jobs assigned
+00:30 +177 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: a 401 throws UnauthorizedException
+00:30 +178 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: throws ApiNotConfiguredException when no base URL
+00:30 +179 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone sends PATCH to /courier/jobs/{id}/milestone
+00:30 +180 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone sends the milestone value in the body
+00:30 +181 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone throws on 422
+00:30 +182 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone throws ApiNotConfiguredException when no base URL
+00:30 +183 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping the server's pipeline becomes the app's four stages
+00:31 +184 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping a status this build has never seen is not claimed to have moved
+00:31 +185 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping the summary is the app's own format, built from the item rows
+00:31 +186 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping a line whose product is gone keeps its name and contributes no id
+00:31 +187 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping an unreadable body answers empty rather than throwing
+00:31 +188 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the request the history is asked for with the token, and read in the order it arrives
+00:31 +189 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the request a 401 says the token is no good, rather than looking like an empty history
+00:31 +190 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order it posts the lines with the token and reads the new parcels back
+00:31 +191 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order a two-shop checkout comes back as both parcels
+00:31 +192 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order nothing to place is answered locally, without a request
+00:31 +193 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order a refused basket surfaces the server sentence, not an empty list
+00:31 +194 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order a live build with no base URL says so instead of placing anyway
+00:31 +195 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() asks GET /reviews/mine with the token
+00:31 +196 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() maps the list into ProductReview objects
+00:31 +197 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() silently drops entries whose product_id is null
+00:31 +198 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() returns an empty list when there are no reviews
+00:31 +199 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() throws when the server returns 401
+00:31 +200 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() throws ApiNotConfiguredException when no base URL is set
+00:31 +201 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() sends PATCH to the right URL with stars and comment
+00:31 +202 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() includes photo_path when the review has one
+00:32 +203 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() omits comment from the body when it is empty
+00:32 +204 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() a 200 response (edit) is accepted the same as 201 (create)
+00:32 +205 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() a server 422 surfaces the message as a ValidationException
+00:32 +206 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() throws ApiNotConfiguredException when no base URL is set
+00:32 +207 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: load() is a no-op and does not touch the network
+00:33 +208 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +209 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +210 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +211 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +212 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +213 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +214 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +215 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +216 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +217 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +218 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +219 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +220 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +221 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +222 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +223 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +224 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +225 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +226 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +227 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:34 +228 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +229 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +230 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +231 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +232 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +233 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +234 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +235 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +236 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +237 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +238 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +239 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +240 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:36 +241 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:38 +242 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:39 +242 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: every other refusal stays on the form, with its sentence
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:39 +243 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:40 +244 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:40 +245 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/nav_glyphs_golden_test.dart: nav glyphs — dark
+00:40 +246 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:40 +247 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:40 +248 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:40 +249 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:41 +250 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:41 +251 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:41 +252 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +253 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +254 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +255 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +256 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +257 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +258 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +259 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +260 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +261 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +262 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +263 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:42 +264 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +265 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +266 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +267 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +268 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +269 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +270 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +271 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +272 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +273 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +274 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +275 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +276 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +277 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:43 +278 -4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "order_confirmation_light.png": Pixel test failed, 31.06%, 178889px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart:90:5)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:43 +278 -5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:43 +278 -5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light [E]
+  Test failed. See exception logs above.
+  The test description was: confirmation — light
+  
+00:44 +279 -5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:44 +279 -5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "order_confirmation_dark.png": Pixel test failed, 31.58%, 181887px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart:97:5)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:44 +279 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:44 +279 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — dark [E]
+  Test failed. See exception logs above.
+  The test description was: confirmation — dark
+  
+00:44 +280 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:44 +281 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:44 +282 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:44 +283 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:45 +284 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:45 +285 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:45 +286 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:45 +287 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:46 +288 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:46 +289 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +290 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +291 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +292 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +293 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +294 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +295 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:47 +296 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:48 +297 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:49 +298 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:49 +299 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:50 +300 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:50 +301 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: blank and wrong tracking numbers leave the job at seller
+00:51 +302 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:51 +302 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the OTP screen resending says so, counts down, and comes back
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:51 +303 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:51 +304 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:51 +305 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:52 +306 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:52 +307 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:52 +308 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:53 +309 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:53 +310 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:53 +311 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a single-photo product gets no pager and no dots
+00:53 +312 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a single-photo product gets no pager and no dots
+00:53 +313 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a single-photo product gets no pager and no dots
+00:53 +314 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: the indicator sits centred at the bottom of the gallery
+00:53 +315 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: swiping advances the indicator and the announced position
+00:54 +316 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: swiping advances the indicator and the announced position
+00:54 +317 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: swiping advances the indicator and the announced position
+00:54 +318 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: swiping advances the indicator and the announced position
+00:54 +319 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: swiping advances the indicator and the announced position
+00:55 +320 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:56 +321 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:56 +322 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:56 +323 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +324 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +325 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +326 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +327 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +328 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +329 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +330 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +331 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +332 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:58 +333 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +334 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +335 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +336 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +337 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +338 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +339 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +340 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +341 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +342 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +343 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +344 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +345 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +346 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +347 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +348 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +349 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +350 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +351 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +352 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +353 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +354 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +355 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +356 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +357 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +358 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +359 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +360 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +361 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +362 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +363 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +364 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +365 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +366 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +367 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+00:59 +368 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+01:00 +369 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +370 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +371 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +372 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +373 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +374 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +375 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:00 +376 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:01 +377 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +378 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +379 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +380 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +381 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +382 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +383 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +384 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +385 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +386 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:02 +387 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:03 +388 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:03 +389 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:03 +390 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:03 +391 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:03 +392 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:06 +393 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/returns_test.dart: the buyer screen rejection shows the exact reason and Escalate
+[timed_snackbar] shown, will remove in 3000ms
+01:06 +394 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Review form cannot submit unrated, and says what is missing
+01:06 +395 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Review form cannot submit unrated, and says what is missing
+01:08 +396 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: review limits the form uses the shared 500/5 limits
+01:08 +397 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: review limits the form uses the shared 500/5 limits
+01:09 +398 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: review limits the form uses the shared 500/5 limits
+01:09 +399 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: review limits the form uses the shared 500/5 limits
+01:10 +400 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: review limits the form uses the shared 500/5 limits
+01:10 +401 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: review limits the form uses the shared 500/5 limits
+01:10 +402 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:10 +403 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:10 +404 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:10 +405 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:10 +406 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:10 +407 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:11 +408 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:11 +409 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:12 +410 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:12 +411 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:12 +412 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:12 +413 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:12 +414 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:12 +415 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:12 +416 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:12 +417 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:12 +418 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the pending screen names the email gate when that is the gate, and the reviewer when it is not
+01:13 +419 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:13 +420 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:15 +421 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:15 +422 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:15 +423 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:15 +424 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:15 +425 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:16 +426 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:16 +427 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:16 +428 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:16 +429 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:16 +430 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:16 +431 -6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat1_360x740_light.png": Pixel test failed, 0.48%, 1279px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:183:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:17 +431 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls two mounted lists at once (Orders mid-swipe case)
+01:17 +431 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 1 — 360x740_light
+  
+01:17 +432 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +433 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +434 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +435 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +436 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +437 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +438 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +439 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +440 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +441 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +442 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +443 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +444 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +445 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +446 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +447 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +448 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +449 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+01:17 +450 -7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat2_360x740_light.png": Pixel test failed, 16.61%, 44245px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:197:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:18 +450 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 2 — 360x740_light
+  
+01:18 +450 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:20 +451 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:20 +452 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:20 +453 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:20 +454 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:20 +455 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:20 +456 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:22 +456 -8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/buyer_home_360x740_light.png": Pixel test failed, 31.00%, 82578px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:222:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:22 +456 -9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:22 +456 -9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Buyer Home — 360x740_light
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+01:22 +457 -9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:22 +458 -9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +459 -9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +459 -9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/search_360x740_light.png": Pixel test failed, 3.12%, 8312px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:234:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:23 +459 -10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +459 -10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Search — 360x740_light
+  
+01:23 +460 -10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:23 +461 -10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:24 +461 -10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/cart_360x740_light.png": Pixel test failed, 42.30%, 112684px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:245:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:24 +461 -11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:24 +461 -11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Cart — 360x740_light
+  
+01:25 +462 -11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:25 +462 -11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/orders_360x740_light.png": Pixel test failed, 8.20%, 21832px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:256:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:25 +462 -12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:25 +462 -12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Orders — 360x740_light
+  
+01:25 +463 -12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: typing to a dead end crossfades, both branches mounted
+01:25 +464 -12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 360x740_light
+01:25 +465 -12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/profile_360x740_light.png": Pixel test failed, 32.47%, 86503px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:267:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:26 +465 -13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: typing dims non-matches without reordering
+01:26 +465 -13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Profile — 360x740_light
+  
+01:26 +466 -13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: typing dims non-matches without reordering
+01:26 +467 -13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 360x740_light
+01:26 +468 -13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/product_detail_360x740_light.png": Pixel test failed, 9.17%, 24431px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:278:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:27 +468 -14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Product Detail — 360x740_light
+  
+01:27 +468 -14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_light
+01:27 +469 -14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_light
+01:27 +470 -14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_light
+01:27 +471 -14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/courier_home_360x740_light.png": Pixel test failed, 12.66%, 33720px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:289:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:27 +471 -15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows seller hero toggles Follow to Following
+01:27 +471 -15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_light [E]
+  Test failed. See exception logs above.
+  The test description was: Courier Home — 360x740_light
+  
+01:28 +472 -15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows seller hero toggles Follow to Following
+01:29 +472 -15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat1_360x740_dark.png": Pixel test failed, 0.68%, 1801px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:183:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:29 +472 -16: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows seller hero toggles Follow to Following
+01:29 +472 -16: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 1 — 360x740_dark
+  
+01:30 +472 -16: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat2_360x740_dark.png": Pixel test failed, 16.61%, 44245px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:197:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:30 +472 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows seller hero toggles Follow to Following
+01:30 +472 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 2 — 360x740_dark
+  
+01:30 +473 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows seller hero toggles Follow to Following
+01:31 +474 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:31 +475 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:31 +476 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:32 +476 -17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/buyer_home_360x740_dark.png": Pixel test failed, 31.02%, 82626px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:222:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:32 +476 -18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:32 +476 -18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Buyer Home — 360x740_dark
+  
+01:32 +477 -18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:32 +477 -18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/search_360x740_dark.png": Pixel test failed, 3.12%, 8320px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:234:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:32 +477 -19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:32 +477 -19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Search — 360x740_dark
+  
+01:33 +477 -19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/cart_360x740_dark.png": Pixel test failed, 42.30%, 112680px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:245:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +477 -20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +477 -20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Cart — 360x740_dark
+  
+01:33 +478 -20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +478 -20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/orders_360x740_dark.png": Pixel test failed, 8.21%, 21860px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:256:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +478 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +478 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Orders — 360x740_dark
+  
+01:33 +479 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +480 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +481 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +482 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +483 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +484 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +485 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +486 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +487 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +488 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +489 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +490 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +491 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +492 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +493 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +494 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +495 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +496 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +497 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +498 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +499 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +500 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +501 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +502 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +503 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +504 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +505 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +506 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +506 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/profile_360x740_dark.png": Pixel test failed, 34.98%, 93180px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:267:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:34 +507 -21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +507 -22: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +507 -22: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Profile — 360x740_dark
+  
+01:35 +507 -22: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/product_detail_360x740_dark.png": Pixel test failed, 9.17%, 24428px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:278:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:35 +507 -23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +507 -23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Product Detail — 360x740_dark
+  
+01:35 +507 -23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/courier_home_360x740_dark.png": Pixel test failed, 12.66%, 33724px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:289:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:35 +507 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +507 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Courier Home — 360x740_dark
+  
+01:36 +508 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:36 +509 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +510 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +511 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +512 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +513 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +514 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +515 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +516 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +517 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +518 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +519 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:36 +520 -24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat1_411x890_light.png": Pixel test failed, 0.49%, 1803px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:183:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:37 +520 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: voucherFromJson maps expires_at to expiresAt
+01:37 +520 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 1 — 411x890_light
+  
+01:37 +521 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+01:37 +522 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+01:37 +523 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+01:37 +524 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+01:37 +525 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+01:37 +526 -25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat2_411x890_light.png": Pixel test failed, 12.35%, 45186px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:197:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:37 +526 -26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 2 — 411x890_light
+  
+01:37 +526 -26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Login — 411x890_light
+01:38 +527 -26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/buyer_home_411x890_light.png": Pixel test failed, 22.51%, 82357px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:222:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:38 +527 -27: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/widget_test.dart: a signed-out cold start boots to the landing screen
+01:38 +527 -27: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Buyer Home — 411x890_light
+  
+01:39 +527 -27: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/search_411x890_light.png": Pixel test failed, 2.44%, 8933px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:234:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:39 +527 -28: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/widget_test.dart: a signed-out cold start boots to the landing screen
+01:39 +527 -28: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Search — 411x890_light
+  
+01:39 +527 -28: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/cart_411x890_light.png": Pixel test failed, 33.60%, 122895px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:245:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:39 +527 -29: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/widget_test.dart: a signed-out cold start boots to the landing screen
+01:39 +527 -29: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Cart — 411x890_light
+  
+01:39 +527 -29: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/orders_411x890_light.png": Pixel test failed, 6.23%, 22775px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:256:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:39 +527 -30: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/widget_test.dart: a signed-out cold start boots to the landing screen
+01:39 +527 -30: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Orders — 411x890_light
+  
+01:40 +528 -30: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/profile_411x890_light.png": Pixel test failed, 26.47%, 96842px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:267:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:40 +528 -31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Profile — 411x890_light
+  
+01:40 +528 -31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/product_detail_411x890_light.png": Pixel test failed, 7.15%, 26164px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:278:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:40 +528 -32: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Product Detail — 411x890_light
+  
+01:40 +528 -32: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 411x890_light
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/courier_home_411x890_light.png": Pixel test failed, 9.49%, 34724px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:289:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:41 +528 -33: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 411x890_light [E]
+  Test failed. See exception logs above.
+  The test description was: Courier Home — 411x890_light
+  
+01:41 +528 -33: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker — 411x890_light
+01:41 +529 -33: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat1_411x890_dark.png": Pixel test failed, 0.49%, 1803px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:183:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:42 +529 -34: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 1 — 411x890_dark
+  
+01:42 +529 -34: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/landing_beat2_411x890_dark.png": Pixel test failed, 12.35%, 45186px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:197:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:43 +529 -35: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 2 — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Landing Beat 2 — 411x890_dark
+  
+01:43 +529 -35: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Login — 411x890_dark
+01:43 +530 -35: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/buyer_home_411x890_dark.png": Pixel test failed, 22.53%, 82417px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:222:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:44 +530 -36: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Buyer Home — 411x890_dark
+  
+01:44 +530 -36: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/search_411x890_dark.png": Pixel test failed, 2.44%, 8941px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:234:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:44 +530 -37: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Search — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Search — 411x890_dark
+  
+01:44 +530 -37: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/cart_411x890_dark.png": Pixel test failed, 33.60%, 122892px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:245:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:45 +530 -38: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Cart — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Cart — 411x890_dark
+  
+01:45 +530 -38: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/orders_411x890_dark.png": Pixel test failed, 6.24%, 22822px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:256:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:45 +530 -39: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Orders — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Orders — 411x890_dark
+  
+01:45 +530 -39: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/profile_411x890_dark.png": Pixel test failed, 28.93%, 105816px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:267:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:46 +530 -40: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Profile — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Profile — 411x890_dark
+  
+01:46 +530 -40: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/product_detail_411x890_dark.png": Pixel test failed, 7.15%, 26161px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:278:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:47 +530 -41: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Product Detail — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Product Detail — 411x890_dark
+  
+01:47 +530 -41: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 411x890_dark
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown while running async test code:
+Golden "goldens/courier_home_411x890_dark.png": Pixel test failed, 9.50%, 34737px diff detected.
+Failure feedback can be found at /C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/failures
+
+When the exception was thrown, this was the stack:
+#0      LocalFileComparator.compare (package:flutter_test/src/_goldens_io.dart:108:5)
+<asynchronous suspension>
+#1      MatchesGoldenFile.matchAsync.<anonymous closure> (package:flutter_test/src/_matchers_io.dart:124:32)
+<asynchronous suspension>
+<asynchronous suspension>
+#3      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:153:17)
+<asynchronous suspension>
+<asynchronous suspension>
+#5      expectLater.<anonymous closure> (package:flutter_test/src/widget_tester.dart:508:19)
+<asynchronous suspension>
+#6      _renderAndCapture (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:158:3)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart:289:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The exception was caught asynchronously.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:47 +530 -42: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 411x890_dark [E]
+  Test failed. See exception logs above.
+  The test description was: Courier Home — 411x890_dark
+  
+01:47 +530 -42: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker — 411x890_dark
+01:47 +531 -42: Some tests failed.
+
+Failing tests:
+  C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — dark
+  C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+  C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — dark
+  C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light
+  ... and 38 more

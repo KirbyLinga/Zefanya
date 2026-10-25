@@ -89,13 +89,37 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # Bundles Playfair Display + Montserrat locally so google_fonts uses
-  # these instead of fetching over HTTP on first run — files here are
-  # auto-detected by name and take priority over the network fetch, no
-  # Dart code changes needed. Only the weights actually requested
-  # anywhere in the app are included (see the two folders below).
+  # Bundles Playfair Display + Montserrat locally; the theme names these
+  # families directly and never calls fonts.gstatic.com at runtime. The file
+  # names also match google_fonts' lookup convention for older call sites.
   assets:
     - assets/icon/
+    - assets/fonts/
+
+  fonts:
+    - family: PlayfairDisplay
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlayfairDisplay-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlayfairDisplay-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlayfairDisplay-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PlayfairDisplay-Italic.ttf
+          weight: 400
+          style: italic
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Montserrat-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Montserrat-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Montserrat-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:
