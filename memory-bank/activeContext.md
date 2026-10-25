@@ -608,9 +608,18 @@ This pass added four buyer-facing feature areas, all behind the mock/live reposi
 - **Validators** (`validators.dart`): person names (A2), password (A5), PH mobile, age 18+ (A6). Tested in `test/validators_test.dart`.
 - **Chat validation** (`chat_validation.dart`): message length, attachment size/extension rules.
 
-QA: `qa/QA_REPORT.md`, `qa/build_triage.py`, `qa/triage.csv` — a 377-case workbook triaged A–E; 20 app-defect fixes and 27 missing-feature cases now have app code and tests; 10 partial cases are app-side done but need server/device. Full run: **516 passed / 41 failed**, all 41 pre-existing golden/screenshot/device cases (no regressions).
+QA: `qa/QA_REPORT.md`, `qa/build_triage.py`, `qa/triage.csv`, `qa/static_review.csv`, `qa/DECISIONS.md` — a 377-case workbook triaged A–E; `qa/static_review.csv` reviews 57 Fail cases claimed fixed by this pass; `qa/DECISIONS.md` records four user decisions (all Option A).
 
 Status: **nothing committed or pushed** — `qa/QA_REPORT.md` §1 states "No commit or push has been made." The 37 local commits on `mobile-dev` are also unpushed relative to `origin/mobile-dev`.
+
+### Workbook decisions recorded (qa/DECISIONS.md)
+
+All four test-plan mismatches resolved as Option A by the user:
+
+1. **Courier/rider self-sign-up stays in the app** — Logistics account creation is out of scope for mobile. 88 C rows (TC-COU-001…050, TC-RID-001…047 excluding non-C gaps) marked `Decision: N/A - out of scope (decision A)` in `qa/triage.csv`. Contradicts workbook assumptions A17/A18.
+2. **Buyer stays on admin approval after OTP** — not auto-activated. 2 C rows (TC-BUY-023, TC-BUY-028) marked. Contradicts workbook assumption A12.
+3. **Shipping stays flat (₱60, free from ₱1,000, per seller group)** — per `config/pricing.dart`. 1 C row (BUY-CHK-002) marked.
+4. **Cart stays local on the phone** — not server-side. 2 C rows (BUY-CART-010, BUY-CART-011) marked.
 
 Next steps:
 1. Commit the `lib/` + `test/` + `qa/` changes (this pass's work).

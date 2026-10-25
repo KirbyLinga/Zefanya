@@ -599,7 +599,7 @@ boot" — now guarded, so a failed load is recorded and rendered instead of abor
 `validators.dart` (`test/validators_test.dart`): person names (A2), password (A5), PH mobile, age 18+ (A6). `chat_validation.dart`: message length (1000 chars), attachment size (5 MB), extensions (jpg/jpeg/png/pdf).
 
 ### QA
-`qa/QA_REPORT.md`, `qa/build_triage.py`, `qa/triage.csv`, `qa/full_test_run.txt`, `qa/failing_tests_all.txt`, `qa/implemented_fixes.diff`. 377-case workbook triaged A–E: 20 app-defect fixes + 27 missing-feature cases now have app code and tests; 10 partial cases are app-side done but need server/device. Full run: **516 passed / 41 failed**, all 41 pre-existing golden/screenshot/device cases (no regressions). Projection: 91/377 (24.1%) after fixes; 91/248 (36.7%) once the 129 C cases are approved out of scope.
+`qa/QA_REPORT.md`, `qa/build_triage.py`, `qa/triage.csv`, `qa/full_test_run.txt`, `qa/failing_tests_all.txt`, `qa/implemented_fixes.diff`. 377-case workbook triaged A–E: 20 app-defect fixes + 27 missing-feature cases now have app code and tests; 10 partial cases are app-side done but need server/device. Full run: **533 passed / 40 failed**, all 40 pre-existing golden/screenshot/font cases (no regressions, no non-golden failures). All 20 app-defect fixes from the 377-case workbook are implemented and passing.
 
 ### Status
 **Nothing committed or pushed.** `qa/QA_REPORT.md` §1: "No commit or push has been made." The 37 local commits on `mobile-dev` are also unpushed relative to `origin/mobile-dev`.
@@ -642,3 +642,14 @@ boot" — now guarded, so a failed load is recorded and rendered instead of abor
   `StaggeredReveal`'s delay. That was a real re-fade of the Confirm button when a
   digit was retyped, and it surfaced first as a pending-timer failure in a test
   that ended on the rebuild.
+
+### Workbook decisions recorded (qa/DECISIONS.md)
+
+All four test-plan mismatches resolved as Option A by the user on 2026-10-24:
+
+1. **Courier/rider self-sign-up stays in the app** — Logistics account creation is out of scope for mobile. Contradicts workbook assumptions A17/A18.
+2. **Buyer stays on admin approval after OTP** — not auto-activated. Contradicts workbook assumption A12.
+3. **Shipping stays flat (₱60, free from ₱1,000, per seller group)** — per `config/pricing.dart`.
+4. **Cart stays local on the phone** — not server-side.
+
+See `qa/DECISIONS.md` for full details and `qa/triage.csv` Decision column for the C rows marked `N/A - out of scope (decision A)`.

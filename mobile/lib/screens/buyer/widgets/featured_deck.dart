@@ -115,8 +115,7 @@ class _FeaturedDeckState extends State<FeaturedDeck> {
           // constant, so 360dp and 411dp both agree.
           LayoutBuilder(
             builder: (context, constraints) {
-              final rightPad =
-                  0.08 * constraints.maxWidth + 20;
+              final rightPad = 0.08 * constraints.maxWidth + 20;
               return Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, rightPad, 10),
                 child: Row(
@@ -159,8 +158,7 @@ class _FeaturedDeckState extends State<FeaturedDeck> {
                     onPageChanged: (i) => setState(() => _page = i),
                     itemBuilder: (context, i) {
                       final product = widget.products[i];
-                      final heroTag =
-                          '${widget.heroTagPrefix}-${product.id}';
+                      final heroTag = '${widget.heroTagPrefix}-${product.id}';
                       return _buildPage(context, i, product, heroTag);
                     },
                   ),
@@ -184,7 +182,11 @@ class _FeaturedDeckState extends State<FeaturedDeck> {
   /// side pages, end state at rest. Transforms only, one
   /// RepaintBoundary per page; reduced motion skips the tilt.
   Widget _buildPage(
-      BuildContext context, int i, Product product, String heroTag) {
+    BuildContext context,
+    int i,
+    Product product,
+    String heroTag,
+  ) {
     return AnimatedBuilder(
       animation: _pages,
       builder: (context, child) {
@@ -192,8 +194,10 @@ class _FeaturedDeckState extends State<FeaturedDeck> {
         var tilt = 0.0;
         if (!reduceMotion(context)) {
           try {
-            final delta =
-                ((_pages.page ?? _page.toDouble()) - i).clamp(-1.0, 1.0);
+            final delta = ((_pages.page ?? _page.toDouble()) - i).clamp(
+              -1.0,
+              1.0,
+            );
             scale = 1 - 0.06 * delta.abs();
             tilt = -0.02 * delta;
           } catch (_) {
@@ -253,7 +257,9 @@ class _FeaturedDeckState extends State<FeaturedDeck> {
               behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 14),
+                  horizontal: 12,
+                  vertical: 14,
+                ),
                 child: AnimatedContainer(
                   duration: reduceMotion(context)
                       ? Duration.zero
@@ -323,8 +329,7 @@ class _RailCard extends StatelessWidget {
                   width: double.infinity,
                   child: ClipPath(
                     clipper: const SoftArchClipper(),
-                    child:
-                        withHero ? Hero(tag: heroTag, child: photo) : photo,
+                    child: withHero ? Hero(tag: heroTag, child: photo) : photo,
                   ),
                 ),
                 // Label body: rectangular, below the curve. Fills its
@@ -334,7 +339,7 @@ class _RailCard extends StatelessWidget {
                 // page identical — see the height test.
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -396,8 +401,7 @@ class _RailCard extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   '  ·  ${product.soldCount} sold',
-                                  style:
-                                      theme.textTheme.labelSmall?.copyWith(
+                                  style: theme.textTheme.labelSmall?.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
                                   maxLines: 1,

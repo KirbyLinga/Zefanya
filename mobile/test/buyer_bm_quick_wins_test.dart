@@ -84,16 +84,16 @@ List<ChangeNotifierProvider<dynamic>> _allCommerceProviders({
   required CartState cart,
   OrderState? orders,
 }) => [
-  ChangeNotifierProvider<CartState>.value(value: cart),
-  ChangeNotifierProvider<OrderState>.value(
-    value: orders ?? OrderState(),
+  ChangeNotifierProvider<CartState>(create: (_) => cart),
+  ChangeNotifierProvider<OrderState>.value(value: orders ?? OrderState()),
+  ChangeNotifierProvider<WishlistState>(create: (_) => WishlistState()),
+  ChangeNotifierProvider<RecentlyViewedState>(
+    create: (_) => RecentlyViewedState(),
   ),
-  ChangeNotifierProvider(create: (_) => WishlistState()),
-  ChangeNotifierProvider(create: (_) => RecentlyViewedState()),
-  ChangeNotifierProvider(create: (_) => ReviewState()),
-  ChangeNotifierProvider(create: (_) => CourierState()),
-  ChangeNotifierProvider(create: (_) => CatalogState()),
-  ChangeNotifierProvider(create: (_) => ThemeState()),
+  ChangeNotifierProvider<ReviewState>(create: (_) => ReviewState()),
+  ChangeNotifierProvider<CourierState>(create: (_) => CourierState()),
+  ChangeNotifierProvider<CatalogState>(create: (_) => CatalogState()),
+  ChangeNotifierProvider<ThemeState>(create: (_) => ThemeState()),
 ];
 
 /// Alias for backwards compatibility.
@@ -182,20 +182,14 @@ void main() {
 
       final claim = find.byKey(const ValueKey('claim-MCH50'));
       expect(claim, findsOneWidget);
-      expect(
-        tester.widget<ElevatedButton>(claim).onPressed,
-        isNotNull,
-      );
+      expect(tester.widget<ElevatedButton>(claim).onPressed, isNotNull);
 
       await tester.tap(claim);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(cart.isClaimed('MCH50'), isTrue);
-      expect(
-        tester.widget<ElevatedButton>(claim).onPressed,
-        isNull,
-      );
+      expect(tester.widget<ElevatedButton>(claim).onPressed, isNull);
       expect(find.byKey(const ValueKey('use-MCH50')), findsOneWidget);
       expect(find.text('Claimed'), findsOneWidget);
     });
@@ -210,11 +204,7 @@ void main() {
       expect(cart.applyVoucher('MCH50').status, VoucherApplyStatus.applied);
       expect(cart.applyVoucher('PLAT100').status, VoucherApplyStatus.applied);
       expect(cart.applyVoucher('FREESHIP').status, VoucherApplyStatus.applied);
-      expect(cart.appliedVoucherCodes, [
-        'MCH50',
-        'PLAT100',
-        'FREESHIP',
-      ]);
+      expect(cart.appliedVoucherCodes, ['MCH50', 'PLAT100', 'FREESHIP']);
 
       final quote = cart.quote;
       expect(quote.merchandise, 1098);
@@ -228,7 +218,10 @@ void main() {
       expect(replacement.replaced?.code, 'MCH50');
       expect(cart.appliedVoucherCodes.contains('MCH50'), isFalse);
       expect(cart.appliedVoucherCodes.contains('MCH10'), isTrue);
-      expect(quoteCart(cart.items, cart.appliedVouchers).total, closeTo(1063.10, 0.001));
+      expect(
+        quoteCart(cart.items, cart.appliedVouchers).total,
+        closeTo(1063.10, 0.001),
+      );
 
       // RVSECRET belongs to Sage & Clay, whose only line is ₱399 — below its
       // ₱1,000 minimum, so it is rejected without disturbing the stack.
@@ -240,46 +233,52 @@ void main() {
   });
 
   group('BUY-VOU-005 distinct rejections', () {
-    test('invalid, expired, not started and used-up are separate messages', () async {
-      final cart = await _loadCart();
-      cart.addItem(_product('p2'));
+    test(
+      'invalid, expired, not started and used-up are separate messages',
+      () async {
+        final cart = await _loadCart();
+        cart.addItem(_product('p2'));
 
-      final invalid = cart.applyVoucher('NOPE50');
-      expect(invalid.status, VoucherApplyStatus.invalid);
-      expect(invalid.message, contains("isn't a valid voucher code"));
+        final invalid = cart.applyVoucher('NOPE50');
+        expect(invalid.status, VoucherApplyStatus.invalid);
+        expect(invalid.message, contains("isn't a valid voucher code"));
 
-      final expired = cart.applyVoucher('EXPIRED50');
-      expect(expired.status, VoucherApplyStatus.expired);
-      expect(expired.message, contains('expired'));
+        final expired = cart.applyVoucher('EXPIRED50');
+        expect(expired.status, VoucherApplyStatus.expired);
+        expect(expired.message, contains('expired'));
 
-      final early = cart.applyVoucher('NOTYET50');
-      expect(early.status, VoucherApplyStatus.notStarted);
-      expect(early.message, contains('not active yet'));
+        final early = cart.applyVoucher('NOTYET50');
+        expect(early.status, VoucherApplyStatus.notStarted);
+        expect(early.message, contains('not active yet'));
 
-      final usedUp = cart.applyVoucher('LIMIT50');
-      expect(usedUp.status, VoucherApplyStatus.usageLimit);
-      expect(usedUp.message, contains('usage limit'));
+        final usedUp = cart.applyVoucher('LIMIT50');
+        expect(usedUp.status, VoucherApplyStatus.usageLimit);
+        expect(usedUp.message, contains('usage limit'));
 
-      expect(cart.appliedVoucherCodes, isEmpty);
-      expect(cart.quote.discount, 0);
-    });
+        expect(cart.appliedVoucherCodes, isEmpty);
+        expect(cart.quote.discount, 0);
+      },
+    );
   });
 
   group('BUY-VOU-011 sale items', () {
-    test('the voucher discounts the paid sale price, not the old price', () async {
-      final cart = await _loadCart();
-      final sale = _product('p10');
-      expect(sale.price, 360);
-      expect(sale.compareAtPrice, 450);
-      cart.addItem(sale);
+    test(
+      'the voucher discounts the paid sale price, not the old price',
+      () async {
+        final cart = await _loadCart();
+        final sale = _product('p10');
+        expect(sale.price, 360);
+        expect(sale.compareAtPrice, 450);
+        cart.addItem(sale);
 
-      expect(cart.applyVoucher('MCH50').status, VoucherApplyStatus.applied);
-      final quote = cart.quote;
-      expect(quote.merchandise, 360);
-      expect(quote.merchandiseDiscount, 50);
-      expect(quote.shipping, 50);
-      expect(quote.total, closeTo(360, 0.001));
-    });
+        expect(cart.applyVoucher('MCH50').status, VoucherApplyStatus.applied);
+        final quote = cart.quote;
+        expect(quote.merchandise, 360);
+        expect(quote.merchandiseDiscount, 50);
+        expect(quote.shipping, 50);
+        expect(quote.total, closeTo(360, 0.001));
+      },
+    );
 
     testWidgets('cart shows the sale price, saving and payable total', (
       tester,
@@ -293,8 +292,8 @@ void main() {
         ChangeNotifierProvider<CartState>.value(value: cart),
       ]);
 
-      expect(find.text('Saved ₱50.00'), findsOneWidget);
-      expect(find.text('₱360.00'), findsWidgets);
+      expect(find.text('Saved ₱50'), findsOneWidget);
+      expect(find.text('₱360'), findsWidgets);
     });
   });
 
@@ -360,10 +359,7 @@ void main() {
         'p2',
       );
       expect(productIdFromLink(Uri.parse('zefanya://product/p2')), 'p2');
-      expect(
-        productIdFromLink(Uri.parse('https://zefanya.test/cart')),
-        isNull,
-      );
+      expect(productIdFromLink(Uri.parse('https://zefanya.test/cart')), isNull);
     });
 
     testWidgets('a product link resolves to the product page', (tester) async {
@@ -434,10 +430,7 @@ void main() {
       expect(validateChatMessage('a' * 1000), isNull);
       expect(validateChatMessage('a' * 1001), contains('1000'));
       expect(validateChatMessage(''), contains('Type a message'));
-      expect(
-        validateChatMessage('', hasAttachment: true),
-        isNull,
-      );
+      expect(validateChatMessage('', hasAttachment: true), isNull);
 
       expect(
         validateChatAttachment(
@@ -615,7 +608,7 @@ void main() {
       ]);
 
       expect(find.text('Out of stock'), findsNWidgets(2));
-      expect(find.text('₱519.00'), findsOneWidget);
+      expect(find.text('₱519'), findsOneWidget);
     });
   });
 
@@ -645,16 +638,16 @@ void main() {
           ),
         ),
         [
-          ChangeNotifierProvider(create: (_) => CartState()),
-          ChangeNotifierProvider(create: (_) => CatalogState()),
+          ChangeNotifierProvider<CartState>(create: (_) => CartState()),
+          ChangeNotifierProvider<CatalogState>(create: (_) => CatalogState()),
+          ChangeNotifierProvider<WishlistState>(create: (_) => WishlistState()),
         ],
       );
       expect(find.text('On vacation'), findsOneWidget);
 
       final cart = CartState();
       await _pump(tester, ProductDetailsScreen(product: _product('p8')), [
-        ..._commerceProviders(cart: cart),
-        ChangeNotifierProvider(create: (_) => CatalogState()),
+        ..._allCommerceProviders(cart: cart),
       ]);
 
       expect(find.text('Store on vacation'), findsOneWidget);
@@ -684,4 +677,3 @@ const _vacationProduct = Product(
 );
 
 void _noop() {}
-

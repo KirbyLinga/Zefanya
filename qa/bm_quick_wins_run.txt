@@ -1,0 +1,22 @@
+﻿00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart
+00:00 +0: BUY-VOU-001 claim a voucher claim is one-way and survives a reload
+00:00 +1: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+[timed_snackbar] shown, will remove in 3000ms
+00:02 +2: BUY-VOU-003 stacking store + platform + shipping stack once per slot
+00:02 +3: BUY-VOU-005 distinct rejections invalid, expired, not started and used-up are separate messages
+00:02 +4: BUY-VOU-011 sale items the voucher discounts the paid sale price, not the old price
+00:02 +5: BUY-VOU-011 sale items cart shows the sale price, saving and payable total
+00:02 +6: BUY-PDP-005 purchase limit a third unit is blocked in a fresh cart
+[timed_snackbar] shown, will remove in 3000ms
+00:03 +7: BUY-PDP-010 share link share URL round-trips through the parser
+00:03 +8: BUY-PDP-010 share link a product link resolves to the product page
+00:03 +9: BUY-PDP-010 share link an unknown id shows an unavailable page, not a blank one
+00:03 +10: BUY-CHAT-002 attachments and length validation boundaries are exact
+00:03 +11: BUY-CHAT-002 attachments and length an invalid file and a 1001-character message are not sent
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+00:03 +12: BUY-CHAT-005 notification unread count badge and screen go 3 -> 2 -> 0
+00:04 +13: BUY-CART-007 stock changes while in cart out-of-stock lines are visible but excluded from checkout
+00:04 +14: BUY-SRCH-011 vacation store a vacation product cannot enter the cart
+00:04 +15: BUY-SRCH-011 vacation store the card carries the label and the PDP disables actions
+00:04 +16: All tests passed!

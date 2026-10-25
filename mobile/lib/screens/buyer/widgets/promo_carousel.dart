@@ -35,22 +35,22 @@ import '../../../widgets/pressable_scale.dart';
       // Deep rose in both modes — the one rose that can host small light
       // text (see AppPalette.roseGround).
       PromoGround.brandRose => (
-          ground: AppColors.roseGround,
-          ink: AppColors.textOnDark,
-          accent: AppColors.primary,
-        ),
+        ground: AppColors.roseGround,
+        ink: AppColors.textOnDark,
+        accent: AppColors.primary,
+      ),
       // Sage and terracotta flip with the mode: powder ground with dark ink
       // on paper, deep ground with light ink on ink.
       PromoGround.sage => (
-          ground: AppColors.promoSageGround,
-          ink: AppColors.onPromoGround,
-          accent: AppColors.promoSageAccent,
-        ),
+        ground: AppColors.promoSageGround,
+        ink: AppColors.onPromoGround,
+        accent: AppColors.promoSageAccent,
+      ),
       PromoGround.terracotta => (
-          ground: AppColors.promoTerracottaGround,
-          ink: AppColors.onPromoGround,
-          accent: AppColors.promoTerracottaAccent,
-        ),
+        ground: AppColors.promoTerracottaGround,
+        ink: AppColors.onPromoGround,
+        accent: AppColors.promoTerracottaAccent,
+      ),
     };
 
 /// A [PromoSlide] with its colours resolved.
@@ -152,7 +152,9 @@ class _PromoCarouselState extends State<PromoCarousel> {
               itemCount: mockPromoSlides.length,
               onPageChanged: (i) => setState(() => _page = i),
               itemBuilder: (context, i) {
-                final card = _SlideCard(slide: _RenderedSlide(mockPromoSlides[i]));
+                final card = _SlideCard(
+                  slide: _RenderedSlide(mockPromoSlides[i]),
+                );
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(4, 20, 4, 0),
                   child: widget.onTapSlide == null
@@ -215,9 +217,9 @@ class _SlideCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(ext.heroRadius),
       child: switch (slide.layout) {
-        PromoSlideLayout.textLeft    => _TextLeftLayout(slide: slide),
+        PromoSlideLayout.textLeft => _TextLeftLayout(slide: slide),
         PromoSlideLayout.centeredHero => _CenteredHeroLayout(slide: slide),
-        PromoSlideLayout.iconSplit   => _IconSplitLayout(slide: slide),
+        PromoSlideLayout.iconSplit => _IconSplitLayout(slide: slide),
       },
     );
   }
@@ -285,31 +287,37 @@ class _TextLeftLayout extends StatelessWidget {
           top: 0,
           bottom: 0,
           right: 100,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(slide.eyebrow,
+          child: Align(
+            alignment: Alignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  slide.eyebrow,
                   style: AppType.eyebrow.copyWith(
-                      color: slide.foreground.withValues(alpha: 0.65))),
-              const SizedBox(height: 6),
-              Text(
-                slide.title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: slide.foreground,
-                  height: 1.1,
-                  fontSize: 20,
+                    color: slide.foreground.withValues(alpha: 0.65),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                slide.subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: slide.foreground.withValues(alpha: 0.72),
+                const SizedBox(height: 6),
+                Text(
+                  slide.title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: slide.foreground,
+                    height: 1.1,
+                    fontSize: 20,
+                  ),
                 ),
-                maxLines: 2,
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  slide.subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: slide.foreground.withValues(alpha: 0.72),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -396,34 +404,39 @@ class _CenteredHeroLayout extends StatelessWidget {
           right: 20,
           top: 0,
           bottom: 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                slide.eyebrow,
-                style: AppType.eyebrow.copyWith(
-                    color: slide.accentColor.withValues(alpha: 0.8)),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                slide.title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: slide.foreground,
-                  height: 1.1,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+          child: Align(
+            alignment: Alignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  slide.eyebrow,
+                  style: AppType.eyebrow.copyWith(
+                    color: slide.accentColor.withValues(alpha: 0.8),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                slide.subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: slide.foreground.withValues(alpha: 0.72),
+                const SizedBox(height: 8),
+                Text(
+                  slide.title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: slide.foreground,
+                    height: 1.1,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  slide.subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: slide.foreground.withValues(alpha: 0.72),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -457,9 +470,7 @@ class _IconSplitLayout extends StatelessWidget {
           top: 0,
           bottom: 0,
           width: 110,
-          child: ColoredBox(
-            color: slide.accentColor.withValues(alpha: 0.10),
-          ),
+          child: ColoredBox(color: slide.accentColor.withValues(alpha: 0.10)),
         ),
 
         // Big icon in the left panel.
@@ -485,9 +496,7 @@ class _IconSplitLayout extends StatelessWidget {
           bottom: 0,
           width: 28,
           child: CustomPaint(
-            painter: _DiagonalDividerPainter(
-              color: slide.background,
-            ),
+            painter: _DiagonalDividerPainter(color: slide.background),
           ),
         ),
 
@@ -497,33 +506,37 @@ class _IconSplitLayout extends StatelessWidget {
           right: 16,
           top: 0,
           bottom: 0,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                slide.eyebrow,
-                style: AppType.eyebrow.copyWith(
-                    color: slide.foreground.withValues(alpha: 0.55)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                slide.title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: slide.foreground,
-                  height: 1.1,
-                  fontSize: 20,
+          child: Align(
+            alignment: Alignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  slide.eyebrow,
+                  style: AppType.eyebrow.copyWith(
+                    color: slide.foreground.withValues(alpha: 0.55),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                slide.subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: slide.foreground.withValues(alpha: 0.72),
+                const SizedBox(height: 6),
+                Text(
+                  slide.title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: slide.foreground,
+                    height: 1.1,
+                    fontSize: 20,
+                  ),
                 ),
-                maxLines: 2,
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  slide.subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: slide.foreground.withValues(alpha: 0.72),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
         ),
       ],

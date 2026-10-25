@@ -1,0 +1,58 @@
+Test Case ID,Old Status,New Status,Evidence (file:line),Notes
+TC-BUY-004,Fail,Pass (code),mobile/lib/utils/validators.dart:13-33,validatePersonName enforces A2: letters/spaces/hyphen/apostrophe/period/ñ only; numbers and symbols refused.
+TC-BUY-006,Fail,Pass (code),mobile/lib/utils/validators.dart:16-19,kPersonNameMinLength=2, kPersonNameMaxLength=50 enforced with length message.
+TC-BUY-007,Fail,Pass (code),mobile/lib/utils/validators.dart:102-113; mobile/lib/screens/auth/registration_screen.dart:252-253,isAtLeastYearsOld(18) implemented; registration_screen calls it in _pickDob and shows "You must be at least 18 years old".
+TC-BUY-018,Fail,Pass (code),mobile/lib/utils/validators.dart:39-68,validatePassword enforces A5: 8+ chars, upper+lower+digit+special, no whitespace.
+TC-BUY-021,Fail,Pass (code),mobile/lib/screens/auth/registration_screen.dart:159;850-863,_acceptedTerms checkbox wired; submit blocked until accepted; error text shown.
+TC-BUY-038,Fail,Pass (code),mobile/lib/screens/auth/otp_screen.dart:57;77-81;105-118,kOtpLifetime=5-minute countdown (otp_screen.dart:57); _secondsLeft tracked; wall-clock countdown computed from sentAt; 30s resend cooldown also present.
+TC-BUY-039,Fail,Pass (code),mobile/lib/screens/auth/registration_screen.dart:70;432,DirtyGuard imported; DirtyGuard.confirmDiscard used on back navigation from credentials step.
+BUY-ACCT-002,Fail,Pass (code),mobile/lib/screens/shared/edit_profile_screen.dart:169-179,validatePersonName wired to First/Last name fields.
+BUY-ADDR-001,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart; mobile/lib/data/address_entry.dart,Address book screen with add/edit/delete/default; AddressEntry model with recipient, phone, region, city, barangay, street, isDefault.
+BUY-ADDR-002,Fail,Pass (code),mobile/lib/data/ph_regions.dart:16-40,Region → City → Barangay cascade (phRegionData) with parent-change clears children.
+BUY-ADDR-003,Fail,Pass (code),mobile/lib/screens/buyer/address_form_screen.dart:94-100,_cities and _barangays getters narrow by parent; changing region clears city/barangay.
+BUY-ADDR-004,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart:78-86,_setDefault clears old default marker in same write.
+BUY-ADDR-005,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart:47-76,_delete with confirmation dialog; orders keep their address.
+BUY-ADDR-006,Fail,Pass (code),mobile/lib/screens/buyer/address_form_screen.dart:102-311,Form validates recipient/phone/region/city/barangay/street before save.
+BUY-ADDR-007,Fail,Pass (code),mobile/lib/data/ph_regions.dart:48-68,regionForProvince maps legacy province to region for seeding from existing profile.
+BUY-ADDR-008,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart; mobile/lib/screens/buyer/checkout_screen.dart,Default address used at checkout; deleting current default refused when other rows exist.
+BUY-ADDR-011,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart; mobile/lib/data/address_entry.dart,Address book persists via AuthState; shared_preferences keyed by account.
+BUY-CHK-001,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart:46-47;69-77;142,_notesMaxLength=200 enforced on delivery notes; error shown when too long.
+BUY-CHK-003,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart:690;692,Delivery notes field with maxLength=_notesMaxLength controller.
+BUY-CHK-005,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart,Checkout confirmation names order number, states multi-seller honestly, opens real tracker.
+BUY-CHK-010,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart,Checkout flows completed end to end.
+BUY-RET-001,Fail,Needs device/API,mobile/lib/state/return_state.dart:245-267,returnRefusal: delivery-only, 7-day window, no double submit, cancelled check. Seller notification/server event is server-side.
+BUY-RET-002,Fail,Pass (code),mobile/lib/state/return_state.dart:275-322,submit() enforces rules at write seam: refusal check, 10-char min description, 1-5 photos.
+BUY-RET-003,Fail,Pass (code),mobile/lib/state/return_state.dart:259-257,Open request blocks Order Received ("A return request already exists for this order").
+BUY-RET-004,Fail,Pass (code),mobile/lib/state/return_state.dart:34-38;298-303,returnPhotoLimit=5, returnDescriptionMinLength=10 enforced in submit().
+BUY-RET-005,Fail,Pass (code),mobile/lib/screens/buyer/return_screen.dart:495-512,Rejected status shows seller's exact reason; Escalate button moves to escalated state.
+BUY-RET-006,Fail,Pass (code),mobile/lib/screens/buyer/return_screen.dart:75-89;480-493,Photos add in chosen order, preview thumbnails, remove by index before submission.
+BUY-RATE-001,Fail,Needs device/API,mobile/lib/state/review_state.dart:40-41;56-85,5 photos + 500 chars + one edit in 30 days implemented. Variant and masked buyer name remain missing (server-side).
+BUY-RATE-004,Fail,Pass (code),mobile/lib/state/review_state.dart:41,reviewCommentLimit=500 enforced.
+BUY-RATE-005,Fail,Pass (code),mobile/lib/state/review_state.dart:83-85,editCount tracked; one edit within 30-day window rule.
+BUY-RATE-007,Fail,Pass (code),mobile/lib/state/review_state.dart:40,reviewPhotoLimit=5 implemented.
+BUY-CAN-001,Fail,Needs device/API,mobile/lib/state/order_state.dart,App cancellation done; stock restore and seller notification remain server-side.
+BUY-CAN-002,Fail,Needs device/API,mobile/lib/state/order_state.dart,Pre-shipment gate and double-tap guard implemented; refund/voucher return server-side.
+BUY-CAN-003,Fail,Needs device/API,mobile/lib/state/order_state.dart,App cancellation done; refund and voucher return remain server-side.
+BUY-CAN-004,Fail,Needs device/API,mobile/lib/state/order_state.dart,Pre-shipment gate and double-tap guard implemented; server-side remains.
+BUY-CAN-005,Fail,Needs device/API,mobile/lib/state/order_state.dart,Pre-shipment gate and double-tap guard implemented; server-side remains.
+BUY-CAN-006,Fail,Needs device/API,mobile/lib/state/order_state.dart,App prevents second cancellation; stock not restored at all yet (server-side).
+BUY-TRK-002,Fail,Pass (code),mobile/lib/screens/buyer/delivery_tracker_screen.dart,Tracker shows courier name, photo, contact (chat), milestone state.
+BUY-TRK-003,Fail,Needs device/API,mobile/lib/screens/buyer/delivery_tracker_screen.dart,Completed + Rate button done; seller earnings release server-side.
+BUY-VOU-012,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart,Voucher applied at checkout; refused not dropped if invalid.
+BUY-SRCH-004,Fail,Pass (code),mobile/lib/utils/search_filter.dart,Typo suggestion and inclusive price range added.
+BUY-SRCH-007,Fail,Pass (code),mobile/lib/utils/search_filter.dart,min > max and negative validation added.
+BUY-SRCH-012,Fail,Pass (code),mobile/lib/screens/buyer/search_screen.dart,Pull-to-refresh added to results screen.
+BUY-PDP-001,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Two-dimensional variation matrix with required selection.
+BUY-PDP-002,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Variant lines stay separate with own unit price/image; disabled out-of-stock combos.
+BUY-PDP-003,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Per-SKU price/stock/image; out-of-stock combinations disabled.
+BUY-PDP-004,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Buy Now button wired.
+BUY-WISH-004,Fail,Pass (code),mobile/lib/state/wishlist_state.dart,"IN CART" tags from personalization join (Order.productIds).
+RID-PICK-001,Fail,Pass (code),mobile/lib/screens/buyer/delivery_tracker_screen.dart,Pickup card shows seller, pickup address, contact, tracking number, parcel count.
+RID-PICK-003,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart; mobile/test/pickup_verification_test.dart,Manual tracking-number entry implemented.
+RID-PICK-004,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart; mobile/test/pickup_verification_test.dart,Wrong tracking number rejected.
+RID-DLV-008,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Proof-of-delivery uses image_picker (camera/gallery); live photo context stated.
+RID-DLV-010,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Call/message buyer from job via url_launcher.
+RID-FAIL-002,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Failed delivery requires reason.
+RID-FAIL-003,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Refused → Return to Sender path implemented.
+RID-FAIL-004,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Attempt counter and reschedule implemented.
+RID-FAIL-005,Fail,Needs device/API,mobile/lib/screens/courier/delivery_tracker_screen.dart,Return/no fourth attempt done; buyer/seller notifications remain server-side.

@@ -50,7 +50,8 @@ class VouchersScreen extends StatelessWidget {
     final vouchers = context.watch<CartState>().vouchers;
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+      backgroundColor:
+          Colors.transparent, // the app-wide gradient in main.dart paints this
       // Title out of the AppBar and into the app's own eyebrow +
       // Playfair voice, like every other non-Home screen.
       appBar: AppBar(),
@@ -89,7 +90,8 @@ class _VoucherTile extends StatelessWidget {
     final ext = theme.extension<AppThemeExtension>()!;
     final cart = context.watch<CartState>();
     final claimed = cart.isClaimed(voucher.code);
-    final unavailable = isVoucherExpired(voucher) ||
+    final unavailable =
+        isVoucherExpired(voucher) ||
         isVoucherNotStarted(voucher) ||
         isVoucherUsageExhausted(
           voucher,
@@ -104,124 +106,136 @@ class _VoucherTile extends StatelessWidget {
         cornerRadius: ext.cardRadius,
         child: Container(
           color: AppColors.surfaceMuted,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Stub(voucher: voucher),
-                // The seam sits ON the perforation line, between the two
-                // punched holes.
-                const SizedBox(width: 1, child: _DashedSeam()),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(voucher.title, style: theme.textTheme.titleSmall),
-                        const SizedBox(height: 3),
-                        Text(voucher.scopeLabel, style: theme.textTheme.labelSmall?.copyWith(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Stub(voucher: voucher),
+              // The seam sits ON the perforation line, between the two
+              // punched holes.
+              const SizedBox(width: 1, child: _DashedSeam()),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(voucher.title, style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 3),
+                      Text(
+                        voucher.scopeLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
                           color: AppColors.primaryDark,
                           fontWeight: FontWeight.w600,
-                        )),
-                        const SizedBox(height: 2),
-                        Text(voucher.discountLabel, style: theme.textTheme.bodySmall),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Min. spend ${formatPeso(voucher.minSpend)} \u00b7 ${voucher.expiryLabel}',
-                          style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
                         ),
-                        if (_expiryCountdown(voucher.expiresAt) != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        voucher.discountLabel,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Min. spend ${formatPeso(voucher.minSpend)} \u00b7 ${voucher.expiryLabel}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (_expiryCountdown(voucher.expiresAt) != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            _expiryCountdown(voucher.expiresAt)!,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              // Expired: muted. Within 3 days: danger.
+                              // Otherwise quiet secondary.
+                              color: _isExpired(voucher.expiresAt)
+                                  ? AppColors.textSecondary.withValues(
+                                      alpha: 0.6,
+                                    )
+                                  : _isExpiringSoon(voucher.expiresAt)
+                                  ? AppColors.danger
+                                  : AppColors.textSecondary,
+                              fontWeight:
+                                  _isExpiringSoon(voucher.expiresAt) &&
+                                      !_isExpired(voucher.expiresAt)
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(
+                                ext.utilityRadius,
+                              ),
+                              border: Border.all(color: AppColors.divider),
+                            ),
                             child: Text(
-                              _expiryCountdown(voucher.expiresAt)!,
+                              voucher.code,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                // Expired: muted. Within 3 days: danger.
-                                // Otherwise quiet secondary.
-                                color: _isExpired(voucher.expiresAt)
-                                    ? AppColors.textSecondary.withValues(alpha: 0.6)
-                                    : _isExpiringSoon(voucher.expiresAt)
-                                        ? AppColors.danger
-                                        : AppColors.textSecondary,
-                                fontWeight: _isExpiringSoon(voucher.expiresAt) &&
-                                        !_isExpired(voucher.expiresAt)
-                                    ? FontWeight.w700
-                                    : FontWeight.w400,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.0,
                               ),
                             ),
                           ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(ext.utilityRadius),
-                                border: Border.all(color: AppColors.divider),
-                              ),
-                              child: Text(
-                                voucher.code,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            if (claimed && !unavailable) ...[
-                              OutlinedButton(
-                                key: ValueKey('use-${voucher.code}'),
-                                onPressed: () =>
-                                    Navigator.of(context).pop(voucher.code),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: const Text('Use'),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            ElevatedButton(
-                              key: ValueKey('claim-${voucher.code}'),
-                              onPressed: claimed || unavailable
-                                  ? null
-                                  : () async {
-                                      final error = await context
-                                          .read<CartState>()
-                                          .claimVoucher(voucher.code);
-                                      if (!context.mounted) return;
-                                      showTimedSnackBar(
-                                        context,
-                                        SnackBar(
-                                          content: Text(
-                                            error ??
-                                                'Voucher "${voucher.code}" claimed.',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                              style: ElevatedButton.styleFrom(
+                          const Spacer(),
+                          if (claimed && !unavailable) ...[
+                            OutlinedButton(
+                              key: ValueKey('use-${voucher.code}'),
+                              onPressed: () =>
+                                  Navigator.of(context).pop(voucher.code),
+                              style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
+                                  horizontal: 14,
                                   vertical: 8,
                                 ),
                               ),
-                              child: Text(
-                                claimed ? 'Claimed' : 'Claim',
+                              child: const Text('Use'),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          ElevatedButton(
+                            key: ValueKey('claim-${voucher.code}'),
+                            onPressed: claimed || unavailable
+                                ? null
+                                : () async {
+                                    final error = await context
+                                        .read<CartState>()
+                                        .claimVoucher(voucher.code);
+                                    if (!context.mounted) return;
+                                    showTimedSnackBar(
+                                      context,
+                                      SnackBar(
+                                        content: Text(
+                                          error ??
+                                              'Voucher "${voucher.code}" claimed.',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 8,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                            child: Text(claimed ? 'Claimed' : 'Claim'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -252,7 +266,10 @@ class _Stub extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.primaryDark, Color.lerp(AppColors.primaryDark, Colors.black, 0.2)!],
+          colors: [
+            AppColors.primaryDark,
+            Color.lerp(AppColors.primaryDark, Colors.black, 0.2)!,
+          ],
         ),
       ),
       alignment: Alignment.center,
@@ -271,25 +288,33 @@ class _Stub extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 6, right: 1),
                     child: Text(
                       '₱',
-                      style: AppType.priceNumeral(18, color: AppColors.textOnDark),
+                      style: AppType.priceNumeral(
+                        18,
+                        color: AppColors.textOnDark,
+                      ),
                     ),
                   ),
-                Text(value, style: AppType.priceNumeral(40, color: AppColors.textOnDark)),
+                Text(
+                  value,
+                  style: AppType.priceNumeral(40, color: AppColors.textOnDark),
+                ),
                 if (isPercent)
                   Padding(
                     padding: const EdgeInsets.only(top: 6, left: 1),
                     child: Text(
                       '%',
-                      style: AppType.priceNumeral(18, color: AppColors.textOnDark),
+                      style: AppType.priceNumeral(
+                        18,
+                        color: AppColors.textOnDark,
+                      ),
                     ),
                   ),
+                Text(
+                  voucher.isShipping ? 'SHIP' : 'OFF',
+                  style: AppType.eyebrow.copyWith(color: AppColors.secondary),
+                ),
               ],
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            voucher.isShipping ? 'SHIP' : 'OFF',
-            style: AppType.eyebrow.copyWith(color: AppColors.secondary),
           ),
         ],
       ),
@@ -349,7 +374,9 @@ class _DashedSeam extends StatelessWidget {
       builder: (context, constraints) {
         const dashHeight = 4.0;
         const dashGap = 4.0;
-        final available = constraints.maxHeight.isFinite ? constraints.maxHeight : 0.0;
+        final available = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : 0.0;
         final count = (available / (dashHeight + dashGap)).floor();
         if (count <= 0) return const SizedBox.shrink();
         return Column(
