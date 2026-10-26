@@ -1,58 +1,378 @@
-Test Case ID,Old Status,New Status,Evidence (file:line),Notes
-TC-BUY-004,Fail,Pass (code),mobile/lib/utils/validators.dart:13-33,validatePersonName enforces A2: letters/spaces/hyphen/apostrophe/period/ñ only; numbers and symbols refused.
-TC-BUY-006,Fail,Pass (code),mobile/lib/utils/validators.dart:16-19,kPersonNameMinLength=2, kPersonNameMaxLength=50 enforced with length message.
-TC-BUY-007,Fail,Pass (code),mobile/lib/utils/validators.dart:102-113; mobile/lib/screens/auth/registration_screen.dart:252-253,isAtLeastYearsOld(18) implemented; registration_screen calls it in _pickDob and shows "You must be at least 18 years old".
-TC-BUY-018,Fail,Pass (code),mobile/lib/utils/validators.dart:39-68,validatePassword enforces A5: 8+ chars, upper+lower+digit+special, no whitespace.
-TC-BUY-021,Fail,Pass (code),mobile/lib/screens/auth/registration_screen.dart:159;850-863,_acceptedTerms checkbox wired; submit blocked until accepted; error text shown.
-TC-BUY-038,Fail,Pass (code),mobile/lib/screens/auth/otp_screen.dart:57;77-81;105-118,kOtpLifetime=5-minute countdown (otp_screen.dart:57); _secondsLeft tracked; wall-clock countdown computed from sentAt; 30s resend cooldown also present.
-TC-BUY-039,Fail,Pass (code),mobile/lib/screens/auth/registration_screen.dart:70;432,DirtyGuard imported; DirtyGuard.confirmDiscard used on back navigation from credentials step.
-BUY-ACCT-002,Fail,Pass (code),mobile/lib/screens/shared/edit_profile_screen.dart:169-179,validatePersonName wired to First/Last name fields.
-BUY-ADDR-001,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart; mobile/lib/data/address_entry.dart,Address book screen with add/edit/delete/default; AddressEntry model with recipient, phone, region, city, barangay, street, isDefault.
-BUY-ADDR-002,Fail,Pass (code),mobile/lib/data/ph_regions.dart:16-40,Region → City → Barangay cascade (phRegionData) with parent-change clears children.
-BUY-ADDR-003,Fail,Pass (code),mobile/lib/screens/buyer/address_form_screen.dart:94-100,_cities and _barangays getters narrow by parent; changing region clears city/barangay.
-BUY-ADDR-004,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart:78-86,_setDefault clears old default marker in same write.
-BUY-ADDR-005,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart:47-76,_delete with confirmation dialog; orders keep their address.
-BUY-ADDR-006,Fail,Pass (code),mobile/lib/screens/buyer/address_form_screen.dart:102-311,Form validates recipient/phone/region/city/barangay/street before save.
-BUY-ADDR-007,Fail,Pass (code),mobile/lib/data/ph_regions.dart:48-68,regionForProvince maps legacy province to region for seeding from existing profile.
-BUY-ADDR-008,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart; mobile/lib/screens/buyer/checkout_screen.dart,Default address used at checkout; deleting current default refused when other rows exist.
-BUY-ADDR-011,Fail,Pass (code),mobile/lib/screens/buyer/address_book_screen.dart; mobile/lib/data/address_entry.dart,Address book persists via AuthState; shared_preferences keyed by account.
-BUY-CHK-001,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart:46-47;69-77;142,_notesMaxLength=200 enforced on delivery notes; error shown when too long.
-BUY-CHK-003,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart:690;692,Delivery notes field with maxLength=_notesMaxLength controller.
-BUY-CHK-005,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart,Checkout confirmation names order number, states multi-seller honestly, opens real tracker.
-BUY-CHK-010,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart,Checkout flows completed end to end.
-BUY-RET-001,Fail,Needs device/API,mobile/lib/state/return_state.dart:245-267,returnRefusal: delivery-only, 7-day window, no double submit, cancelled check. Seller notification/server event is server-side.
-BUY-RET-002,Fail,Pass (code),mobile/lib/state/return_state.dart:275-322,submit() enforces rules at write seam: refusal check, 10-char min description, 1-5 photos.
-BUY-RET-003,Fail,Pass (code),mobile/lib/state/return_state.dart:259-257,Open request blocks Order Received ("A return request already exists for this order").
-BUY-RET-004,Fail,Pass (code),mobile/lib/state/return_state.dart:34-38;298-303,returnPhotoLimit=5, returnDescriptionMinLength=10 enforced in submit().
-BUY-RET-005,Fail,Pass (code),mobile/lib/screens/buyer/return_screen.dart:495-512,Rejected status shows seller's exact reason; Escalate button moves to escalated state.
-BUY-RET-006,Fail,Pass (code),mobile/lib/screens/buyer/return_screen.dart:75-89;480-493,Photos add in chosen order, preview thumbnails, remove by index before submission.
-BUY-RATE-001,Fail,Needs device/API,mobile/lib/state/review_state.dart:40-41;56-85,5 photos + 500 chars + one edit in 30 days implemented. Variant and masked buyer name remain missing (server-side).
-BUY-RATE-004,Fail,Pass (code),mobile/lib/state/review_state.dart:41,reviewCommentLimit=500 enforced.
-BUY-RATE-005,Fail,Pass (code),mobile/lib/state/review_state.dart:83-85,editCount tracked; one edit within 30-day window rule.
-BUY-RATE-007,Fail,Pass (code),mobile/lib/state/review_state.dart:40,reviewPhotoLimit=5 implemented.
-BUY-CAN-001,Fail,Needs device/API,mobile/lib/state/order_state.dart,App cancellation done; stock restore and seller notification remain server-side.
-BUY-CAN-002,Fail,Needs device/API,mobile/lib/state/order_state.dart,Pre-shipment gate and double-tap guard implemented; refund/voucher return server-side.
-BUY-CAN-003,Fail,Needs device/API,mobile/lib/state/order_state.dart,App cancellation done; refund and voucher return remain server-side.
-BUY-CAN-004,Fail,Needs device/API,mobile/lib/state/order_state.dart,Pre-shipment gate and double-tap guard implemented; server-side remains.
-BUY-CAN-005,Fail,Needs device/API,mobile/lib/state/order_state.dart,Pre-shipment gate and double-tap guard implemented; server-side remains.
-BUY-CAN-006,Fail,Needs device/API,mobile/lib/state/order_state.dart,App prevents second cancellation; stock not restored at all yet (server-side).
-BUY-TRK-002,Fail,Pass (code),mobile/lib/screens/buyer/delivery_tracker_screen.dart,Tracker shows courier name, photo, contact (chat), milestone state.
-BUY-TRK-003,Fail,Needs device/API,mobile/lib/screens/buyer/delivery_tracker_screen.dart,Completed + Rate button done; seller earnings release server-side.
-BUY-VOU-012,Fail,Pass (code),mobile/lib/screens/buyer/checkout_screen.dart,Voucher applied at checkout; refused not dropped if invalid.
-BUY-SRCH-004,Fail,Pass (code),mobile/lib/utils/search_filter.dart,Typo suggestion and inclusive price range added.
-BUY-SRCH-007,Fail,Pass (code),mobile/lib/utils/search_filter.dart,min > max and negative validation added.
-BUY-SRCH-012,Fail,Pass (code),mobile/lib/screens/buyer/search_screen.dart,Pull-to-refresh added to results screen.
-BUY-PDP-001,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Two-dimensional variation matrix with required selection.
-BUY-PDP-002,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Variant lines stay separate with own unit price/image; disabled out-of-stock combos.
-BUY-PDP-003,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Per-SKU price/stock/image; out-of-stock combinations disabled.
-BUY-PDP-004,Fail,Pass (code),mobile/lib/screens/buyer/product_details_screen.dart,Buy Now button wired.
-BUY-WISH-004,Fail,Pass (code),mobile/lib/state/wishlist_state.dart,"IN CART" tags from personalization join (Order.productIds).
-RID-PICK-001,Fail,Pass (code),mobile/lib/screens/buyer/delivery_tracker_screen.dart,Pickup card shows seller, pickup address, contact, tracking number, parcel count.
-RID-PICK-003,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart; mobile/test/pickup_verification_test.dart,Manual tracking-number entry implemented.
-RID-PICK-004,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart; mobile/test/pickup_verification_test.dart,Wrong tracking number rejected.
-RID-DLV-008,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Proof-of-delivery uses image_picker (camera/gallery); live photo context stated.
-RID-DLV-010,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Call/message buyer from job via url_launcher.
-RID-FAIL-002,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Failed delivery requires reason.
-RID-FAIL-003,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Refused → Return to Sender path implemented.
-RID-FAIL-004,Fail,Pass (code),mobile/lib/screens/courier/delivery_tracker_screen.dart,Attempt counter and reschedule implemented.
-RID-FAIL-005,Fail,Needs device/API,mobile/lib/screens/courier/delivery_tracker_screen.dart,Return/no fourth attempt done; buyer/seller notifications remain server-side.
+﻿Test Case ID,Old Status,New Status,Evidence (file:line),Notes
+TC-BUY-001,Blocked,Needs device/API,Needs device/API; see Notes,Live registration/API and real OTP email. Mock registration stops at the admin gate and sends no email; app path is auth_state.dart:531-575.
+TC-BUY-002,Pass,Pass,"mobile/lib/screens/auth/registration_screen.dart:287-310,691-795",Passing test/source evidence listed in the Evidence column.
+TC-BUY-003,Pass,Pass,"mobile/lib/screens/auth/registration_screen.dart:287-310,691-795",Passing test/source evidence listed in the Evidence column.
+TC-BUY-004,Fail,Pass,mobile/test/validators_test.dart:49,Passing test/source evidence listed in the Evidence column.
+TC-BUY-005,Pass,Pass,mobile/test/validators_test.dart:32,Passing test/source evidence listed in the Evidence column.
+TC-BUY-006,Fail,Pass,mobile/test/validators_test.dart:24,Passing test/source evidence listed in the Evidence column.
+TC-BUY-007,Fail,Pass,mobile/test/validators_test.dart:82,Passing test/source evidence listed in the Evidence column.
+TC-BUY-008,Pass,Pass,mobile/lib/screens/auth/registration_screen.dart:247-253,Passing test/source evidence listed in the Evidence column.
+TC-BUY-009,Pass,Pass,mobile/lib/screens/auth/registration_screen.dart:767-775,Passing test/source evidence listed in the Evidence column.
+TC-BUY-010,Blocked,Pass,web/app/Http/Requests/Buyer/StoreBuyerRegistrationRequest.php:28; web/tests/Feature/Api/BuyerRegistrationApiTest.php:207; web/config/database.php:57,Passing test/source evidence listed in the Evidence column.
+TC-BUY-011,Blocked,Pass,web/app/Http/Requests/Buyer/StoreBuyerRegistrationRequest.php:28; web/config/database.php:57,Passing test/source evidence listed in the Evidence column.
+TC-BUY-012,Pass,Pass,mobile/lib/screens/auth/registration_screen.dart:390,Passing test/source evidence listed in the Evidence column.
+TC-BUY-013,Pass,Pass,mobile/lib/screens/auth/registration_screen.dart:778-795,Passing test/source evidence listed in the Evidence column.
+TC-BUY-014,Pass,Pass,mobile/lib/screens/auth/registration_screen.dart:778-795,Passing test/source evidence listed in the Evidence column.
+TC-BUY-015,Blocked,Fail,Missing required behaviour; see Notes,"No duplicate-phone rule. StoreBuyerRegistrationRequest validates only the 09XXXXXXXXX shape (line 28), and the app has no account store to check."
+TC-BUY-016,Blocked,Fail,Missing required behaviour; see Notes,No duplicate-phone rule and no +63-to-09 normalization on registration. The form accepts only 09; the server compares no unique contact value.
+TC-BUY-017,Pass,Pass,mobile/test/validators_test.dart:61,Passing test/source evidence listed in the Evidence column.
+TC-BUY-018,Fail,Pass,mobile/test/validators_test.dart:65,Passing test/source evidence listed in the Evidence column.
+TC-BUY-019,Pass,Pass,mobile/test/registration_flow_test.dart:261,Passing test/source evidence listed in the Evidence column.
+TC-BUY-020,Pass,Pass,"mobile/lib/screens/auth/registration_screen.dart:829-834,861-873",Passing test/source evidence listed in the Evidence column.
+TC-BUY-021,Fail,Pass,"mobile/lib/screens/auth/registration_screen.dart:159,886-903",Passing test/source evidence listed in the Evidence column.
+TC-BUY-022,Pass,Pass,"mobile/lib/screens/auth/registration_screen.dart:358,663",Passing test/source evidence listed in the Evidence column.
+TC-BUY-023,Fail,N/A,Decision 2; see qa/DECISIONS.md,Decision 2: the app requires admin approval after OTP; the workbook's auto-active assumption is out of scope.
+TC-BUY-024,Pass,Pass,mobile/test/otp_flow_test.dart:564; web/tests/Feature/Api/BuyerOtpApiTest.php:90,Passing test/source evidence listed in the Evidence column.
+TC-BUY-025,Pass,Pass,mobile/test/otp_flow_test.dart:552; mobile/lib/screens/auth/otp_screen.dart:360-362,Passing test/source evidence listed in the Evidence column.
+TC-BUY-026,Blocked,Pass,web/tests/Feature/Api/BuyerOtpApiTest.php:106; mobile/lib/screens/auth/otp_screen.dart:133-136,Passing test/source evidence listed in the Evidence column.
+TC-BUY-027,Blocked,Needs device/API,Needs device/API; see Notes,Resend against the live OTP endpoint and a real mailbox. The resend UI/cooldown is implemented at otp_screen.dart:177-220.
+TC-BUY-028,Fail,N/A,Decision 2; see qa/DECISIONS.md,Decision 2: the app requires admin approval after OTP; the workbook's auto-active assumption is out of scope.
+TC-BUY-029,Blocked,Needs device/API,Needs device/API; see Notes,Login as the newly verified account against the live API; admin approval and token issuance are server-side.
+TC-BUY-030,Blocked,Pass,"mobile/lib/state/auth_state.dart:224,291-310; mobile/lib/main.dart:381-397; web/tests/Feature/Api/CourierLoginApiTest.php:138",Passing test/source evidence listed in the Evidence column.
+TC-BUY-031,Pass,Pass,"mobile/lib/screens/auth/registration_screen.dart:694,709,762,790,829-834,861-873",Passing test/source evidence listed in the Evidence column.
+TC-BUY-032,Blocked,Pass,mobile/lib/screens/auth/registration_screen.dart:551-566; mobile/lib/main.dart:290-291,Code/layout evidence only; no physical keyboard run on a device. Keyboard-inset behaviour still needs a device check.
+TC-BUY-033,Blocked,Pass,"mobile/lib/screens/auth/registration_screen.dart:40-42,560-566",Lifecycle state is kept by the wizard's controllers and _KeepAlive; the OS background/kill case was not run on a device.
+TC-BUY-034,Blocked,Pass,mobile/android/app/src/main/AndroidManifest.xml:13; mobile/lib/screens/auth/registration_screen.dart:560-566,"Rotation keeps the activity and the PageView children alive, and the manifest handles orientation changes without recreating the activity; no physical rotation run."
+TC-BUY-035,Blocked,Needs device/API,Needs device/API; see Notes,Requires a real device with networking disabled; mock mode has no network call to fail. ApiClient timeout/error mapping is not exercised.
+TC-BUY-036,Blocked,Needs device/API,Needs device/API; see Notes,Requires a real device and a controllable network drop during submit; exactly-one-account is a server idempotency check.
+TC-BUY-037,Pass,Pass,mobile/test/otp_flow_test.dart:552; mobile/lib/screens/auth/otp_screen.dart:361-362,Passing test/source evidence listed in the Evidence column.
+TC-BUY-038,Fail,Pass,"mobile/lib/screens/auth/otp_screen.dart:57,105-118",Passing test/source evidence listed in the Evidence column.
+TC-BUY-039,Fail,Pass,mobile/lib/screens/auth/registration_screen.dart:459-484; mobile/lib/screens/auth/otp_screen.dart:247-252,Passing test/source evidence listed in the Evidence column.
+TC-BUY-040,Blocked,Needs device/API,Needs device/API; see Notes,Requires a device at the maximum system font size. The app clamps text scale to 1.3 (main.dart:290-291); the workbook asks for a real small-screen run.
+TC-BUY-041,Pass,Pass,mobile/test/auth_flow_test.dart:129,Passing test/source evidence listed in the Evidence column.
+TC-BUY-042,Pass,Pass,mobile/test/auth_flow_test.dart:146,Passing test/source evidence listed in the Evidence column.
+TC-COU-001,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-002,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-003,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-004,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-005,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-006,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-007,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-008,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-009,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-010,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-011,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-012,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-013,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-014,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-015,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-016,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-017,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-018,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-019,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-020,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-021,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-022,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-023,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-024,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-025,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-026,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-027,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-028,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-029,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-030,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-031,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-032,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-033,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-034,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-035,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-036,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-037,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-038,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-039,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-040,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-041,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-042,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-043,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-044,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-045,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-046,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-047,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-048,Blocked,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-049,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-050,Fail,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-051,Pass,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-COU-052,Pass,N/A,Decision 1/5; see qa/DECISIONS.md,Decision 1/5: courier accounts are created by Logistics web; mobile account creation is out of scope.
+TC-RID-001,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-002,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-003,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-004,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-005,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-006,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-007,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-008,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-009,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-010,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-011,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-012,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-013,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-014,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-015,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-016,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-017,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-018,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-019,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-020,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-021,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-022,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-023,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-024,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-025,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-026,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-027,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-028,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-029,Pass,Pass,mobile/lib/screens/auth/registration_screen.dart:1216-1234,Passing test/source evidence listed in the Evidence column.
+TC-RID-030,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-031,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-032,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-033,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-034,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-035,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-036,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-037,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-038,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-039,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-040,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-041,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-042,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-043,Blocked,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-044,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-045,Fail,N/A,Decision 1; see qa/DECISIONS.md,Decision 1: rider accounts are created/activated by Logistics web; the mobile app has no public rider registration.
+TC-RID-046,Blocked,Pass,"mobile/lib/state/auth_state.dart:291-310; mobile/test/auth_flow_test.dart:93-102,129",Passing test/source evidence listed in the Evidence column.
+TC-RID-047,Blocked,Pass,mobile/lib/state/auth_state.dart:291-310; mobile/test/auth_flow_test.dart:146; mobile/lib/main.dart:381-397,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-001,Blocked,Needs device/API,Needs device/API; see Notes,"Profile edit is implemented locally, but the workbook requires a live profile endpoint, refresh and re-login to prove persistence."
+BUY-ACCT-002,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:282; mobile/test/validators_test.dart:11,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-003,Fail,Pass,mobile/test/account_security_test.dart:99,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-004,Fail,Pass,mobile/test/account_security_test.dart:130,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-005,Fail,Pass,mobile/test/account_security_test.dart:158,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-006,Fail,Pass,mobile/test/account_security_test.dart:211,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-007,Fail,Pass,mobile/test/account_security_test.dart:266,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-008,Fail,Pass,mobile/test/account_security_test.dart:343,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-009,Fail,Pass,mobile/test/account_security_test.dart:401,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-010,Blocked,Needs device/API,Needs device/API; see Notes,Camera/gallery avatar replacement needs a real device and OS permission handling.
+BUY-ACCT-011,Fail,Pass,mobile/test/account_security_test.dart:502,Passing test/source evidence listed in the Evidence column.
+BUY-ACCT-012,Pass,Pass,"mobile/test/auth_flow_test.dart:129,146",Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-001,Fail,Pass,mobile/test/address_book_test.dart:99,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-002,Fail,Pass,mobile/test/address_book_test.dart:229,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-003,Fail,Pass,mobile/test/address_book_test.dart:258,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-004,Fail,Pass,mobile/test/address_book_test.dart:130,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-005,Fail,Pass,mobile/test/address_book_test.dart:142,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-006,Fail,Pass,mobile/test/address_book_test.dart:120,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-007,Fail,Pass,mobile/test/address_book_test.dart:153,Passing test/source evidence listed in the Evidence column.
+BUY-ADDR-008,Fail,Fail,Missing required behaviour; see Notes,Orders have no address snapshot (mock_data.dart:482-505). Editing/deleting a local address cannot preserve what the seller/waybill show.
+BUY-ADDR-009,Fail,Needs device/API,Needs device/API; see Notes,Address ownership is not enforced by an API because the address book is local-only; needs a live address endpoint to test cross-buyer denial.
+BUY-ADDR-010,Fail,Needs device/API,Needs device/API; see Notes,No geolocation/device-location integration; needs a real device with permission allowed/denied.
+BUY-ADDR-011,Fail,Pass,mobile/test/address_book_test.dart:300,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-001,Blocked,Pass,mobile/test/catalog_state_test.dart:121; mobile/test/catalog_wiring_test.dart:177,"The current mock catalogue does not seed the workbook's P-02 fixture. Category filtering is proven against a foreign-catalogue test fixture, not P-02."
+BUY-SRCH-002,Blocked,Pass,mobile/test/catalog_state_test.dart:132; mobile/test/catalog_wiring_test.dart:190,The workbook's CAT-1..CAT-5 fixture is not in the current mock catalogue. Store filtering is proven against a foreign-catalogue fixture.
+BUY-SRCH-003,Blocked,Pass,mobile/test/catalog_state_test.dart:140,Search matching is proven against the foreign-catalogue fixture; the workbook's P-02 row is not seeded in the mock catalogue.
+BUY-SRCH-004,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:688,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-005,Blocked,Needs device/API,Needs device/API; see Notes,Search input handling is client-side; SQL-injection safety and server empty-result behaviour need the live catalogue API.
+BUY-SRCH-006,Pass,Pass,mobile/test/catalog_state_test.dart:140; mobile/lib/screens/buyer/search_screen.dart:375-376,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-007,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:719,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-008,Pass,Pass,mobile/test/search_filter_test.dart:50,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-009,Pass,Pass,mobile/test/product_sort_test.dart:21-37; mobile/lib/screens/buyer/search_screen.dart:292-301,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-010,Blocked,Needs device/API,Needs device/API; see Notes,Inactive/draft/deleted filtering is a server catalogue rule; the current mock catalogue does not carry those states for this fixture.
+BUY-SRCH-011,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:609,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-012,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:781,Passing test/source evidence listed in the Evidence column.
+BUY-SRCH-013,Blocked,Needs device/API,Needs device/API; see Notes,Requires a real device with networking disabled and a live catalogue to prove the offline message then recovery.
+BUY-PDP-001,Fail,Pass,mobile/test/product_variants_test.dart:111,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-002,Fail,Pass,mobile/test/product_variants_test.dart:145,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-003,Fail,Pass,mobile/test/product_variants_test.dart:173,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-004,Fail,Pass,mobile/test/quantity_limit_test.dart:25,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-005,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:294,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-006,Fail,Fail,Missing required behaviour; see Notes,"Product supports compareAtPrice only; there is no flash-sale countdown, units-left field or voucher Claim action on the product screen (mock_data.dart:58-85)."
+BUY-PDP-007,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:460,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-008,Blocked,Pass,mobile/test/buyer_bm_quick_wins_test.dart:393,Passing test/source evidence listed in the Evidence column.
+BUY-PDP-009,Blocked,Needs device/API,Needs device/API; see Notes,Pinch-zoom needs a real touch screen. The pager itself is covered by product_gallery_test.dart:122; zoom sharpness is not a widget-test fact.
+BUY-PDP-010,Fail,Needs device/API,Needs device/API; see Notes,"Requires a real host, Android assetlinks.json/iOS associated domains, and a second phone. The in-app link parser is tested (buyer_bm_quick_wins_test.dart:343), the host handoff is not."
+BUY-WISH-001,Pass,Pass,mobile/lib/state/wishlist_state.dart:107-117; mobile/lib/screens/buyer/saved_screen.dart:52-66,Passing test/source evidence listed in the Evidence column.
+BUY-WISH-002,Pass,Pass,mobile/lib/state/wishlist_state.dart:107-117,Passing test/source evidence listed in the Evidence column.
+BUY-WISH-003,Blocked,Needs device/API,Needs device/API; see Notes,Wishlist rendering has no sold-out/unavailable product state; needs a live catalogue response carrying stock 0/deleted.
+BUY-WISH-004,Fail,Pass,mobile/test/store_follow_test.dart:65,Passing test/source evidence listed in the Evidence column.
+BUY-WISH-005,Pass,Pass,mobile/lib/state/auth_state.dart:224; mobile/lib/main.dart:381-397,Passing test/source evidence listed in the Evidence column.
+BUY-CART-001,Pass,Pass,mobile/test/quantity_limit_test.dart:45; mobile/lib/state/cart_state.dart:619-646,Passing test/source evidence listed in the Evidence column.
+BUY-CART-002,Fail,Pass,mobile/test/product_variants_test.dart:219,Passing test/source evidence listed in the Evidence column.
+BUY-CART-003,Pass,Pass,mobile/test/claude_followups_test.dart:29,Passing test/source evidence listed in the Evidence column.
+BUY-CART-004,Pass,Pass,"mobile/test/claude_followups_test.dart:47; mobile/lib/state/cart_state.dart:200-206,675",Passing test/source evidence listed in the Evidence column.
+BUY-CART-005,Fail,Pass,mobile/test/quantity_limit_test.dart:25,Passing test/source evidence listed in the Evidence column.
+BUY-CART-006,Blocked,Needs device/API,Needs device/API; see Notes,A live price change must be revalidated by the server at checkout; the local cart cannot receive that change by itself.
+BUY-CART-007,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:540,Passing test/source evidence listed in the Evidence column.
+BUY-CART-008,Fail,Fail,Missing required behaviour; see Notes,The cart is a phone-local SharedPreferences list (cart_state.dart:171); it is not tied to the account or synced to another device.
+BUY-CART-009,Pass,Pass,mobile/test/cart_swipe_test.dart:41; mobile/lib/state/cart_state.dart:707,Passing test/source evidence listed in the Evidence column.
+BUY-CART-010,Blocked,N/A,Decision 4; see qa/DECISIONS.md,Decision 4: the cart stays local on the phone; there is no server-side cart.
+BUY-CART-011,Blocked,N/A,Decision 4; see qa/DECISIONS.md,Decision 4: the cart stays local on the phone; there is no server-side cart.
+BUY-CART-012,Pass,Pass,"mobile/test/task5_cart_nav_test.dart:39; mobile/lib/widgets/cart_button.dart:21,47-70; mobile/lib/state/cart_state.dart:197",Passing test/source evidence listed in the Evidence column.
+BUY-VOU-001,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:155,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-002,Blocked,Pass,mobile/test/buyer_bm_quick_wins_test.dart:192,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-003,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:192,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-004,Blocked,Pass,mobile/test/workbook_buyer_phase3_test.dart:324,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-005,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:229,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-006,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:358,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-007,Pass,Pass,mobile/test/workbook_buyer_phase3_test.dart:376,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-008,Pass,Pass,mobile/test/workbook_buyer_phase3_test.dart:403,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-009,Pass,Pass,mobile/test/workbook_buyer_phase3_test.dart:436,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-010,Blocked,Pass,mobile/test/pricing_rules_test.dart:57-72; mobile/lib/config/pricing.dart:191-192,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-011,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:258,Passing test/source evidence listed in the Evidence column.
+BUY-VOU-012,Fail,Needs device/API,Needs device/API; see Notes,Requires cancellation/refund server support to return MCH50 to the wallet; cancellation currently only stores the buyer flag.
+BUY-CHK-001,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:512,Passing test/source evidence listed in the Evidence column.
+BUY-CHK-002,Fail,N/A,Decision 3; see qa/DECISIONS.md,"Decision 3: shipping stays flat per seller group (P60, free from P1,000); per-store/zone shipping is out of scope."
+BUY-CHK-003,Fail,Fail,Missing required behaviour; see Notes,Shipping is flat by seller group (pricing.dart:37-39). There is no weight input or 1 kg/1.2 kg tariff.
+BUY-CHK-004,Fail,Needs device/API,Needs device/API; see Notes,Serviceability is a server/address-provider rule; no serviceability endpoint is called by the app.
+BUY-CHK-005,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:557,Passing test/source evidence listed in the Evidence column.
+BUY-CHK-006,Pass,Pass,mobile/test/workbook_buyer_phase3_test.dart:575,Passing test/source evidence listed in the Evidence column.
+BUY-CHK-007,Pass,Pass,mobile/test/workbook_buyer_phase3_test.dart:588,Passing test/source evidence listed in the Evidence column.
+BUY-CHK-008,Blocked,Needs device/API,Needs device/API; see Notes,A live price change between cart and Place Order must be detected server-side; the app has no live price revalidation in mock mode.
+BUY-CHK-009,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:627,Passing test/source evidence listed in the Evidence column.
+BUY-CHK-010,Fail,Pass,mobile/test/workbook_buyer_phase3_test.dart:657,Passing test/source evidence listed in the Evidence column.
+BUY-CHK-011,Blocked,Needs device/API,Needs device/API; see Notes,Server must ignore/reject a tampered price. This cannot be proven from the client; PlaceOrderApiTest does not cover a tampered total.
+BUY-CHK-012,Blocked,Needs device/API,Needs device/API; see Notes,"Requires a real device and a network drop after Place Order, plus server idempotency to prove exactly one order."
+BUY-CHK-013,Blocked,Needs device/API,Needs device/API; see Notes,"Requires a real device interruption (background/kill) on checkout; restoration of address, vouchers, payment method and total is not tested."
+BUY-PAY-001,Pass,Pass,"mobile/test/workbook_buyer_phase3_test.dart:575; mobile/lib/screens/buyer/checkout_screen.dart:44,226-240",Passing test/source evidence listed in the Evidence column.
+BUY-PAY-002,Fail,Needs device/API,Needs device/API; see Notes,E-wallet/card success needs a real payment gateway and server callback; mock only offers the COD path.
+BUY-PAY-003,Fail,Needs device/API,Needs device/API; see Notes,Gateway failure handling needs a live payment provider.
+BUY-PAY-004,Fail,Needs device/API,Needs device/API; see Notes,Buyer-cancel-at-gateway needs a live payment provider and server order state.
+BUY-PAY-005,Fail,Needs device/API,Needs device/API; see Notes,App-closed-on-gateway needs a live provider callback and server reconciliation.
+BUY-PAY-006,Fail,Needs device/API,Needs device/API; see Notes,"Unpaid auto-cancel, stock restore and voucher return are server jobs; the app has no scheduler/refund worker."
+BUY-PAY-007,Fail,Needs device/API,Needs device/API; see Notes,The 59/61-minute boundary needs live server time and the auto-cancel job.
+BUY-PAY-008,Fail,Needs device/API,Needs device/API; see Notes,Switching back from an e-wallet app needs a device and a live gateway; no deep-link return handler is wired.
+BUY-PAY-009,Fail,Needs device/API,Needs device/API; see Notes,Back during payment processing needs a device plus a live gateway to prove exactly-once charging.
+BUY-TRK-001,Pass,Pass,"mobile/lib/screens/buyer/orders_status_screen.dart:144-147,350",Passing test/source evidence listed in the Evidence column.
+BUY-TRK-002,Fail,Fail,Missing required behaviour; see Notes,"The buyer timeline is built from the app's local DeliveryMilestone steps (courier_tracker_screen.dart:46-50), not Logistics hub events; hub names/times are absent."
+BUY-TRK-003,Fail,Pass,mobile/test/order_lifecycle_test.dart:99,App-side Order Received is implemented and tested. Seller earnings release is server-side and is not asserted by this app test.
+BUY-TRK-004,Fail,Pass,mobile/test/order_lifecycle_test.dart:115,Passing test/source evidence listed in the Evidence column.
+BUY-TRK-005,Fail,Needs device/API,Needs device/API; see Notes,Automatic completion and earnings release are server-side timers; the app only displays order status.
+BUY-TRK-006,Blocked,Needs device/API,Needs device/API; see Notes,Cross-buyer order denial is an API ownership check; the mock order list is local.
+BUY-TRK-007,Fail,Needs device/API,Needs device/API; see Notes,Push notification and lock-screen handling need Firebase/APNs (not in pubspec) and a device.
+BUY-CAN-001,Fail,Fail,Missing required behaviour; see Notes,Cancellation stores a buyer flag only (order_state.dart:278-298). It does not restore stock or notify the seller.
+BUY-CAN-002,Fail,Pass,mobile/test/order_lifecycle_test.dart:44,Passing test/source evidence listed in the Evidence column.
+BUY-CAN-003,Fail,Fail,Missing required behaviour; see Notes,Cancellation stores a buyer flag only (order_state.dart:278-298). It starts no refund and does not return MCH50 to the wallet.
+BUY-CAN-004,Fail,Pass,mobile/lib/data/mock_data.dart:564-569,Passing test/source evidence listed in the Evidence column.
+BUY-CAN-005,Fail,Pass,mobile/test/order_lifecycle_test.dart:56,Passing test/source evidence listed in the Evidence column.
+BUY-CAN-006,Fail,Fail,Missing required behaviour; see Notes,"The second tap is suppressed locally, but there is no stock restore at all, so restoring stock exactly once cannot be demonstrated."
+BUY-RET-001,Fail,Needs device/API,Needs device/API; see Notes,Seller notification and the server-side return state transition need the live returns API; the app-side request form is tested.
+BUY-RET-002,Fail,Pass,mobile/test/returns_test.dart:192,Passing test/source evidence listed in the Evidence column.
+BUY-RET-003,Fail,Pass,mobile/test/returns_test.dart:221,Passing test/source evidence listed in the Evidence column.
+BUY-RET-004,Fail,Pass,mobile/test/returns_test.dart:280,Passing test/source evidence listed in the Evidence column.
+BUY-RET-005,Fail,Needs device/API,Needs device/API; see Notes,Live return status/rejection reason and escalation must come from the server; the app renders a local ReturnState.
+BUY-RET-006,Fail,Needs device/API,Needs device/API; see Notes,Camera/gallery evidence needs a real device; the app has the picker and preview path (return_screen.dart).
+BUY-RATE-001,Fail,Fail,Missing required behaviour; see Notes,"ProductReview stores stars, text and photos, but no variant and no reviewer name/masking field (review_state.dart:49-80)."
+BUY-RATE-002,Pass,Pass,mobile/test/review_flow_test.dart:286; mobile/lib/screens/buyer/order_detail_screen.dart:493,Passing test/source evidence listed in the Evidence column.
+BUY-RATE-003,Pass,Pass,mobile/test/review_flow_test.dart:120,Passing test/source evidence listed in the Evidence column.
+BUY-RATE-004,Fail,Pass,mobile/test/review_limits_test.dart:99,Passing test/source evidence listed in the Evidence column.
+BUY-RATE-005,Fail,Pass,mobile/test/review_limits_test.dart:189,Passing test/source evidence listed in the Evidence column.
+BUY-RATE-006,Blocked,Needs device/API,Needs device/API; see Notes,Average rating and count are aggregate server values; the app only renders reviews returned by the API.
+BUY-RATE-007,Fail,Needs device/API,Needs device/API; see Notes,Camera and multi-select photo limits need a real device; the 5-photo limit is unit-tested (review_limits_test.dart:136).
+BUY-CHAT-001,Blocked,Needs device/API,Needs device/API; see Notes,Two-way seller chat needs the live chat API/websocket; the mock has a local thread only.
+BUY-CHAT-002,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:422,Passing test/source evidence listed in the Evidence column.
+BUY-CHAT-003,Fail,Fail,Missing required behaviour; see Notes,No order-status notification delivery. The app has an in-app notification list only; no push/messaging plugin is present.
+BUY-CHAT-004,Fail,Fail,Missing required behaviour; see Notes,No flash-sale reminder scheduler or notification delivery path.
+BUY-CHAT-005,Fail,Pass,mobile/test/buyer_bm_quick_wins_test.dart:496,Passing test/source evidence listed in the Evidence column.
+BUY-CHAT-006,Fail,Needs device/API,Needs device/API; see Notes,Background message push needs Firebase/APNs and a device; no push plugin is present in pubspec.
+BUY-CHAT-007,Fail,Needs device/API,Needs device/API; see Notes,OS notification permission disabled is a device Settings scenario; no push channel exists to observe.
+BUY-CHAT-008,Blocked,Needs device/API,Needs device/API; see Notes,Offline send/retry needs a device network drop and live chat transport.
+COU-PROF-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-005,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-006,Blocked,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-007,Blocked,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PROF-008,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-005,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-006,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-SHIFT-007,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-005,Blocked,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-006,Blocked,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-007,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRIP-008,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-005,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-006,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-007,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-008,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-LOAD-009,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-005,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-006,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-TRN-007,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-005,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-006,Blocked,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-ARR-007,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PAY-001,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PAY-002,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PAY-003,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PAY-004,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PAY-005,Blocked,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+COU-PAY-006,Fail,N/A,Decision 5; see qa/DECISIONS.md,Decision 5: Courier Modules are hub-to-hub line-haul work; the mobile app has no hub-to-hub role. App-side courier work is evidenced under Rider Modules.
+RID-PROF-001,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:140,Passing test/source evidence listed in the Evidence column.
+RID-PROF-002,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:217,Passing test/source evidence listed in the Evidence column.
+RID-PROF-003,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:245,Passing test/source evidence listed in the Evidence column.
+RID-PROF-004,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:270,Passing test/source evidence listed in the Evidence column.
+RID-PROF-005,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:302,Passing test/source evidence listed in the Evidence column.
+RID-PROF-006,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:345,Passing test/source evidence listed in the Evidence column.
+RID-PROF-007,Blocked,Needs device/API,Needs device/API; see Notes,Cross-rider profile denial is an API ownership check; the app has no server profile endpoint for Rider 2.
+RID-PROF-008,Fail,Fail,Missing required behaviour; see Notes,Document upload offers camera/gallery only (image_picker_helper.dart:27-45); there is no Files-app picker and no Logistics re-verification flag.
+RID-AVAIL-001,Fail,Fail,Missing required behaviour; see Notes,"Online is a local bool (courier_state.dart:516-527). No server presence call exists, so Logistics cannot see the rider go Online and no offer feed follows."
+RID-AVAIL-002,Fail,Fail,Missing required behaviour; see Notes,Offline is a local bool only (courier_state.dart:532-535); there is no server presence/offer routing to remove the rider from assignment.
+RID-AVAIL-003,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:372,Passing test/source evidence listed in the Evidence column.
+RID-AVAIL-004,Fail,Fail,Missing required behaviour; see Notes,No session-timeout/presence mechanism on the server; the local toggle cannot make Logistics show the rider Offline.
+RID-AVAIL-005,Fail,Needs device/API,Needs device/API; see Notes,Location permission and the Settings deep link need a real device; the local Online toggle does not request location.
+RID-AVAIL-006,Fail,Needs device/API,Needs device/API; see Notes,Location-off-while-online needs device location services and a server presence/offer feed.
+RID-AVAIL-007,Fail,Needs device/API,Needs device/API; see Notes,Force-close/session-timeout presence is server-owned; the app resets local Online on boot but cannot prove the 5-minute server timeout.
+RID-JOB-001,Fail,Fail,Missing required behaviour; see Notes,"Jobs are dispatcher-assigned, not timed offers (courier_state.dart:3-8,309-379). There is no COD-on-offer or Accept/Decline action."
+RID-JOB-002,Fail,Fail,Missing required behaviour; see Notes,No offer/decline flow; jobs are already assigned to the rider.
+RID-JOB-003,Fail,Fail,Missing required behaviour; see Notes,No 60-second offer timer or expiry rejection.
+RID-JOB-004,Fail,Fail,Missing required behaviour; see Notes,No decline counter or Unassigned queue.
+RID-JOB-005,Blocked,Needs device/API,Needs device/API; see Notes,Concurrent accept/manual assign needs the live assignment API and two clients.
+RID-JOB-006,Fail,Fail,Missing required behaviour; see Notes,No concurrent-job limit or fourth-offer block.
+RID-JOB-007,Blocked,Needs device/API,Needs device/API; see Notes,Cross-company job denial is a server authorization check.
+RID-JOB-008,Fail,Needs device/API,Needs device/API; see Notes,"Lock-screen offer push needs Firebase/APNs, a device and a server offer timer."
+RID-JOB-009,Blocked,Needs device/API,Needs device/API; see Notes,Opening the map app at the pickup address needs a real device and a maps/url_launcher handoff.
+RID-PICK-001,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:391,Passing test/source evidence listed in the Evidence column.
+RID-PICK-002,Fail,Fail,Missing required behaviour; see Notes,"Pickup uses manual tracking-number entry, not a waybill scan; there is no scan event/time or camera path to prove."
+RID-PICK-003,Fail,Pass,mobile/test/pickup_verification_test.dart:119; mobile/test/courier_handover_wiring_test.dart:136,Passing test/source evidence listed in the Evidence column.
+RID-PICK-004,Fail,Pass,mobile/test/pickup_verification_test.dart:91,Passing test/source evidence listed in the Evidence column.
+RID-PICK-005,Blocked,Needs device/API,Needs device/API; see Notes,"Double-scan locking needs a real scanner/device and server idempotency; the app uses manual tracking-number entry, so there is no scan event to double."
+RID-PICK-006,Fail,Fail,Missing required behaviour; see Notes,"No camera scan exists, so there is no camera-denied state or Settings link."
+RID-PICK-007,Blocked,Needs device/API,Needs device/API; see Notes,Offline pickup needs a device network drop and the live milestone API; the app does not queue milestones offline.
+RID-DLV-001,Blocked,Pass,"mobile/lib/screens/courier/delivery_tracker_screen.dart:59-71,973-987",The app-side step sequence and proof gate pass. Buyer-side display of the proof image is absent and is tracked as RID-DLV-008.
+RID-DLV-002,Pass,Pass,mobile/lib/screens/courier/delivery_tracker_screen.dart:973-987,Passing test/source evidence listed in the Evidence column.
+RID-DLV-003,Pass,Pass,"mobile/lib/screens/courier/delivery_tracker_screen.dart:486-488,996,1038",Passing test/source evidence listed in the Evidence column.
+RID-DLV-004,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:424; mobile/test/courier_handover_wiring_test.dart:85,Passing test/source evidence listed in the Evidence column.
+RID-DLV-005,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:461; mobile/test/courier_handover_wiring_test.dart:100,Passing test/source evidence listed in the Evidence column.
+RID-DLV-006,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:479; mobile/test/courier_handover_wiring_test.dart:119,Passing test/source evidence listed in the Evidence column.
+RID-DLV-007,Blocked,Needs device/API,Needs device/API; see Notes,Cross-rider milestone denial is a server authorization check.
+RID-DLV-008,Fail,Fail,Missing required behaviour; see Notes,"The courier picker is now camera-only (delivery_tracker_screen.dart:802-804), but the buyer's tracker does not display the proof photo or delivery time, which the workbook requires."
+RID-DLV-009,Blocked,Needs device/API,Needs device/API; see Notes,Offline Delivered needs a device network drop and retry queue; the app sends the milestone immediately and keeps the photo only in screen state.
+RID-DLV-010,Fail,Needs device/API,Needs device/API; see Notes,Phone dialer and SMS/chat handoff need a real device and buyer contact data.
+RID-DLV-011,Fail,Needs device/API,Needs device/API; see Notes,GPS delivery location needs device location permission and a server field; the app does not record coordinates.
+RID-FAIL-001,Fail,Pass,mobile/test/courier_failure_flow_test.dart:97; mobile/test/courier_handover_wiring_test.dart:152,Passing test/source evidence listed in the Evidence column.
+RID-FAIL-002,Fail,Pass,mobile/test/courier_failure_flow_test.dart:118,Passing test/source evidence listed in the Evidence column.
+RID-FAIL-003,Fail,Pass,mobile/test/courier_failure_flow_test.dart:147; mobile/test/courier_handover_wiring_test.dart:168,Passing test/source evidence listed in the Evidence column.
+RID-FAIL-004,Fail,Pass,mobile/test/courier_failure_flow_test.dart:172,Passing test/source evidence listed in the Evidence column.
+RID-FAIL-005,Fail,Fail,Missing required behaviour; see Notes,"The 3-attempt return is implemented (courier_state.dart:1065-1068; courier_failure_flow_test.dart:213), but buyer and seller notifications are absent."
+RID-EARN-001,Blocked,Pass,mobile/test/workbook_rider_phase4_test.dart:497,Passing test/source evidence listed in the Evidence column.
+RID-EARN-002,Blocked,Pass,mobile/test/workbook_rider_phase4_test.dart:543,Passing test/source evidence listed in the Evidence column.
+RID-EARN-003,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:559,Passing test/source evidence listed in the Evidence column.
+RID-EARN-004,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:580,Passing test/source evidence listed in the Evidence column.
+RID-EARN-005,Fail,Pass,mobile/test/workbook_rider_phase4_test.dart:605,Passing test/source evidence listed in the Evidence column.
+RID-EARN-006,Blocked,Needs device/API,Needs device/API; see Notes,The rider has no confirm button by design; the 403 on a self-confirmation can only be proven against the live remittance API.

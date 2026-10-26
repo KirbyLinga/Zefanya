@@ -48,6 +48,18 @@ No weight-based shipping exists. BUY-CHK-002 (1 C case) is re-mapped as out of s
 
 ---
 
+## Decision 5 — Courier Modules are hub-to-hub, not the app's pickup/delivery role
+
+**Workbook conflict:** The Courier Modules workbook tests a hub-to-hub line-haul role: assigned trips between hubs (HUB-QC to HUB-PSG), load manifests, departure/arrival, hub handover and trip remittance. The Flutter app has no hub-to-hub workflow. Its Courier role is the pickup-and-delivery role already covered by the Rider Modules workbook; the courier and rider screens share the same delivery job flow.
+
+**Decision:** Option A — re-map all 52 Courier Modules cases to the Logistics web plan. Do not build or test hub-to-hub trips against the app's pickup/delivery courier screens. All 52 are N/A in this report. The app-side courier work that does exist (profile, vehicle, documents, availability, pickup, delivery, failures, COD, earnings) is evidenced under Rider Modules.
+
+**Affected workbook assumptions:** The Courier Modules role definition (hub-to-hub line-haul) differs from the app's pickup/delivery Courier role. The 52 cases are recorded as N/A, not as failures, because the tested workflow is out of mobile scope.
+
+**Courier Account Creation:** Decision 1 already makes Logistics-created courier accounts out of scope. All 52 Courier Account Creation cases are N/A for the same reason, including `TC-COU-051`/`TC-COU-052`, which assume a Logistics-created courier account and a courier home screen; the app's session persistence is covered for the implemented roles under `TC-RID-046`/`TC-RID-047` and the buyer session tests.
+
+---
+
 ## Summary of workbook assumption changes
 
 | Assumption | Workbook states | App does | Status |

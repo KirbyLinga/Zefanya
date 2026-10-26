@@ -1,0 +1,290 @@
+=== TC-BUY-001 | Buyer - Account Creation | Registration Form | Register with all valid data
+EXPECTED: The form is accepted with no validation errors. A success message is shown, a 6-digit OTP is sent to the email, and the email verification screen opens. The account is saved with status Unverified.
+ACTUAL: Mock build: Submit goes straight to the Under Review screen and no OTP is sent. The form also asks for Sex, Middle Initial, address and a Gov ID upload that are not in the test data.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true). Check OTP email and Unverified status there.
+
+=== TC-BUY-027 | Buyer - Account Creation | Email Verification (OTP) | Resend OTP
+EXPECTED: A new OTP email arrives. The first code is rejected. The second code is accepted and the account is verified.
+ACTUAL: Resend has a 30-second cooldown and shows "A new code has been sent." The mock resend sends nothing and the old code stays valid.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-BUY-029 | Buyer - Account Creation | Access Control | Log in with the new verified account
+EXPECTED: Login succeeds. The buyer home screen opens and the name Juan Miguel is shown.
+ACTUAL: Mock login accepts any credentials, so this cannot prove a real verified account works.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-BUY-035 | Buyer - Account Creation | Registration Form | [Mobile] Register with no internet connection
+EXPECTED: Step 3: a clear no-internet message is shown, the typed data stays on the form, the app does not crash, and no account is created. Step 4: the account is saved once: exactly one account and one OTP email.
+ACTUAL: Mock mode never touches the network. The live path shows the NetworkException message in a snackbar and keeps the form.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true). Use Airplane mode.
+
+=== TC-BUY-036 | Buyer - Account Creation | Registration Form | [Mobile] Connection drops right after tapping Register
+EXPECTED: The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one account exists with this email. If the first attempt was saved, the app continues normally (or says the account already exists and lets the user continue); the account is never left in a state the user cannot reach.
+ACTUAL: Needs a real request to drop.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-BUY-040 | Buyer - Account Creation | Registration Form | [Mobile] Large system font on a small screen
+EXPECTED: All labels, placeholders, error messages and buttons can be read in full; none are cut off or overlapping. The screen scrolls to every field and Register can be tapped.
+ACTUAL: main.dart clamps text scale to 0.85-1.3x, so the largest system font is capped. Overflow cannot be judged from code.
+REMARKS: Needs a phone or emulator; code review only.
+
+=== BUY-ACCT-001 | Buyer - Modules | Account & Security | Edit profile with valid data
+EXPECTED: A success message is shown. After a pull-to-refresh and re-login the new name and photo are shown on the profile screen and the account (Me) tab. Email and phone are unchanged.
+ACTUAL: Edit Profile saves name, initial, sex, phone, address and photo to the phone only (no profile endpoint).
+REMARKS: Needs live Laravel API. Retest when the profile API exists.
+
+=== BUY-ACCT-010 | Buyer - Modules | Account & Security | [Mobile] Change the profile photo with the camera and the gallery
+EXPECTED: Steps 1 and 2: the new photo shows on the profile and is still there after the app is closed and reopened. Step 3: no crash; a message says camera access is off and offers Settings; Gallery still works.
+ACTUAL: Edit Profile offers Camera or Gallery. Camera-denied handling is not in the code (no Settings link).
+REMARKS: Needs a phone or emulator; code review only.
+
+=== BUY-ADDR-009 | Buyer - Modules | Address Book | Cannot open another buyer's address
+EXPECTED: Access is denied. No part of ADDR-3 is shown.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+REMARKS: Feature is not in the app.
+
+=== BUY-ADDR-010 | Buyer - Modules | Address Book | [Mobile] Use My Location with permission allowed and denied
+EXPECTED: Step 1: Region, City and Barangay are filled from the location and can still be edited before saving. Step 2: no crash; a message explains that location is off; the address can still be entered by hand.
+ACTUAL: No Use My Location button.
+REMARKS: Feature is not in the app.
+
+=== BUY-SRCH-005 | Buyer - Modules | Browse, Search & Filter | Search: special characters and injection
+EXPECTED: Each returns no results or literal matches. No error screen, no pop-up, no list of all products from the SQL string, and the app log shows no script run.
+ACTUAL: Mock search is client-side; live search sends q= to the server.
+REMARKS: Needs live Laravel API.
+
+=== BUY-SRCH-010 | Buyer - Modules | Browse, Search & Filter | Inactive, deleted and draft products never appear
+EXPECTED: None appears in search, category or store screens. Each share link opens an 'unavailable' or 'not found' screen in the app.
+ACTUAL: Hiding inactive/draft products is a server rule; the app has no share links.
+REMARKS: Needs live Laravel API.
+
+=== BUY-SRCH-013 | Buyer - Modules | Browse, Search & Filter | [Mobile] Search with no internet
+EXPECTED: Step 1 shows a no-internet message, not an empty 'no results' state and not a crash. Step 2 shows P-02.
+ACTUAL: Mock mode never goes to the network.
+REMARKS: Needs live Laravel API. Use Airplane mode.
+
+=== BUY-PDP-009 | Buyer - Modules | Product Detail Page | [Mobile] Swipe and zoom product images
+EXPECTED: Images change in the uploaded order with a position indicator. Zoom works and the image stays sharp. Closing returns to P-01 with Natural-M still selected.
+ACTUAL: A photo carousel exists. Zoom and selection-kept-on-return need a device.
+REMARKS: Needs a phone or emulator; code review only.
+
+=== BUY-PDP-010 | Buyer - Modules | Product Detail Page | [Mobile] Share link opens the product in the app
+EXPECTED: Phone B opens P-02 directly in the app. Without the app, the link opens a mobile web page for P-02 or the app's store page. Never a blank or error page.
+ACTUAL: No share link or deep-link handling.
+REMARKS: Feature is not in the app.
+
+=== BUY-WISH-003 | Buyer - Modules | Wishlist & Follow Store | Wishlist item goes out of stock or is deleted
+EXPECTED: P-02 shows Sold out with Add to Cart disabled. P-05 stays listed as Unavailable with no Add to Cart. The screen shows no error.
+ACTUAL: Needs live stock or delete changes.
+REMARKS: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-CART-006 | Buyer - Modules | Cart | Price changes while in the cart
+EXPECTED: The cart shows ₱420.00 and the subtotal updates.
+ACTUAL: Cart prices are re-read only when the app loads; no live refresh for lines already in the cart.
+REMARKS: Needs live Laravel API.
+
+=== BUY-VOU-012 | Buyer - Modules | Vouchers & Promotions | Voucher returned after cancellation
+EXPECTED: MCH50 is back in the wallet, usable again before it expires.
+ACTUAL: No cancellation, so no voucher return.
+REMARKS: Feature is not in the app.
+
+=== BUY-CHK-004 | Buyer - Modules | Checkout | Unserviceable address
+EXPECTED: A message says the area is not serviceable and Place Order is disabled. No order can be created.
+ACTUAL: No serviceability check.
+REMARKS: Feature is not in the app.
+
+=== BUY-CHK-008 | Buyer - Modules | Checkout | Price changed during checkout
+EXPECTED: The order is not placed at ₱450. A message shows the new price and the summary updates to ₱480 for the buyer to confirm.
+ACTUAL: The client does not re-check the price at Place Order; the server must.
+REMARKS: Needs live Laravel API.
+
+=== BUY-CHK-011 | Buyer - Modules | Checkout | Tampered price or total in the request
+EXPECTED: The server ignores or rejects the tampered amount. Any created order uses the real price.
+ACTUAL: The order request sends unitPrice from the client. The server must ignore it.
+REMARKS: Needs live Laravel API. Needs a proxy tool (M11).
+
+=== BUY-CHK-012 | Buyer - Modules | Checkout | [Mobile] Connection lost after tapping Place Order
+EXPECTED: The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one order exists and P-02 stock is 19.
+ACTUAL: Live order errors show a message with Retry and the cart is kept. Needs a real dropped connection.
+REMARKS: Needs live Laravel API.
+
+=== BUY-CHK-013 | Buyer - Modules | Checkout | [Mobile] App interrupted on the checkout screen
+EXPECTED: The checkout screen still shows the same address, vouchers, payment method and total ₱1,083.00, or it reloads them and tells the buyer what changed. No order is placed without tapping Place Order.
+ACTUAL: Cannot be judged from code.
+REMARKS: Needs a phone or emulator; code review only.
+
+=== BUY-PAY-002 | Buyer - Modules | Payment | E-wallet or card payment succeeds
+EXPECTED: The order moves To Pay → To Ship and stores a payment reference. The amount charged equals the order total exactly.
+ACTUAL: No payment gateway, To Pay status or payment reference.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-003 | Buyer - Modules | Payment | Payment fails
+EXPECTED: The order stays To Pay with 'Payment failed' and Pay Again. It is not marked paid and the seller cannot ship it.
+ACTUAL: No payment failure or Pay Again.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-004 | Buyer - Modules | Payment | Buyer cancels at the gateway
+EXPECTED: Buyer returns to the order in To Pay. No duplicate order is created.
+ACTUAL: No gateway to cancel at.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-005 | Buyer - Modules | Payment | App closed on the gateway screen
+EXPECTED: The order shows To Ship once the gateway confirms. It is charged once only.
+ACTUAL: No gateway screen.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-006 | Buyer - Modules | Payment | Unpaid order auto-cancels
+EXPECTED: The order is Cancelled (reason: unpaid). Stock is 20. MCH50 is back in the wallet.
+ACTUAL: No unpaid auto-cancel.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-007 | Buyer - Modules | Payment | Pay just before vs after the auto-cancel time
+EXPECTED: The 59-minute payment succeeds. The 61-minute order is already Cancelled and Pay is not available.
+ACTUAL: No pay window or auto-cancel.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-008 | Buyer - Modules | Payment | [Mobile] Pay in the e-wallet app and switch back
+EXPECTED: The app returns to the order, which shows To Ship with the payment reference and is charged once. When returning by hand, the order updates (after a pull-to-refresh at most) and Pay is not offered again.
+ACTUAL: No e-wallet app handoff.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-PAY-009 | Buyer - Modules | Payment | [Mobile] Back button while payment is processing
+EXPECTED: The app asks before leaving, or ignores Back while processing. In the end the order is either paid once or still To Pay with Pay Again; never two payments or two orders.
+ACTUAL: No payment processing screen.
+REMARKS: The checkout shows an e-wallet option but nothing processes it.
+
+=== BUY-TRK-005 | Buyer - Modules | Order Tracking & History | Automatic completion
+EXPECTED: To Receive before 7 days; Completed after, and earnings are released.
+ACTUAL: No automatic completion after 7 days.
+REMARKS: Feature is not in the app.
+
+=== BUY-TRK-006 | Buyer - Modules | Order Tracking & History | Cannot open another buyer's order
+EXPECTED: Denied. No details of Buyer 2's order are shown.
+ACTUAL: Order ownership is a server rule.
+REMARKS: Needs live Laravel API.
+
+=== BUY-TRK-007 | Buyer - Modules | Order Tracking & History | [Mobile] Push notification opens the order
+EXPECTED: Step 1: a push notification for the change arrives, including on the lock screen. Step 2: the app opens on that order's tracking screen. Step 3: an in-app banner appears and the order screen updates. Exactly one notification per change.
+ACTUAL: No push notifications (no Firebase or FCM in the project).
+REMARKS: Feature is not in the app.
+
+=== BUY-RET-001 | Buyer - Modules | Return & Refund Request | Request a return within the window
+EXPECTED: The request is submitted. The order moves to Return/Refund. Seller 1 is notified. The order can no longer be completed automatically while the request is open.
+ACTUAL: No Return/Refund request.
+REMARKS: Feature is not in the app.
+
+=== BUY-RET-005 | Buyer - Modules | Return & Refund Request | Track request status
+EXPECTED: Status Rejected with the seller's exact reason and an Escalate button.
+ACTUAL: No Return/Refund request.
+REMARKS: Feature is not in the app.
+
+=== BUY-RET-006 | Buyer - Modules | Return & Refund Request | [Mobile] Return evidence from the camera and the gallery
+EXPECTED: Photos are attached in the chosen order with previews, and a photo can be removed before submitting. The request is submitted with 2 photos and Seller 1 sees the same 2 photos.
+ACTUAL: No Return/Refund request.
+REMARKS: Feature is not in the app.
+
+=== BUY-RATE-006 | Buyer - Modules | Ratings & Reviews | Average rating updates
+EXPECTED: Average becomes 3.0 and the count 2 on the product screen and search card.
+ACTUAL: Aggregate is built from stars, but the figures need the seeded reviews.
+REMARKS: Needs the seeded test data (P-xx, ADDR-x) and live API; the mock catalogue is different.
+
+=== BUY-RATE-007 | Buyer - Modules | Ratings & Reviews | [Mobile] Review photos from the camera and a multi-select
+EXPECTED: No more than 5 photos can be attached: the gallery stops at 4 more, or a message says only 5 are allowed. The review saves with 5 photos.
+ACTUAL: No photo attachments in reviews.
+REMARKS: Feature is not in the app.
+
+=== BUY-CHAT-001 | Buyer - Modules | Chat & Notifications | Chat with a seller from a product
+EXPECTED: Seller 1 receives both in order. The chat shows the P-02 product card.
+ACTUAL: Chat from the product opens a seller thread. No product card; seller receipt needs the live API.
+REMARKS: Needs live Laravel API. The live chat repository is not wired yet.
+
+=== BUY-CHAT-006 | Buyer - Modules | Chat & Notifications | [Mobile] Chat message while the app is in the background
+EXPECTED: A push notification shows Seller 1's name and a preview of the message. Tapping it opens that chat with the message shown once.
+ACTUAL: No push notifications.
+REMARKS: Feature is not in the app.
+
+=== BUY-CHAT-007 | Buyer - Modules | Chat & Notifications | [Mobile] Notifications turned off in phone Settings
+EXPECTED: No push notification arrives, and the app neither crashes nor keeps asking. The in-app notification list still shows the update.
+ACTUAL: No in-app notification list to fall back on.
+REMARKS: Feature is not in the app.
+
+=== BUY-CHAT-008 | Buyer - Modules | Chat & Notifications | [Mobile] Send a chat message with no internet
+EXPECTED: The message is marked not sent with a retry option, or is sent automatically once online. Seller 1 receives it exactly once.
+ACTUAL: Chat is local in mock mode; the live chat repository is not wired yet.
+REMARKS: Needs live Laravel API.
+
+=== RID-PROF-007 | Rider - Modules | Profile, Vehicle & Documents | Rider cannot see another rider's profile
+EXPECTED: Denied. No Rider 2 data is shown.
+ACTUAL: Profile ownership is a server rule.
+REMARKS: Needs live Laravel API.
+
+=== RID-AVAIL-005 | Rider - Modules | Availability | [Mobile] Location permission needed to go Online
+EXPECTED: Step 1: Online is blocked with a message that location is needed and a link to Settings; no crash. Step 2: Rider 1 goes Online. Logistics 1 sees Rider 1 Online with a current location.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+REMARKS: Feature is not in the app.
+
+=== RID-AVAIL-006 | Rider - Modules | Availability | [Mobile] Location turned off while Online
+EXPECTED: The app warns that location is off. Rider 1 gets no new offer while location is off. After turning it back on, the rider can receive offers again.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+REMARKS: Feature is not in the app.
+
+=== RID-AVAIL-007 | Rider - Modules | Availability | [Mobile] App force-closed while Online
+EXPECTED: Within 5 minutes Rider 1 shows Offline and gets no new offer. The Assigned job stays with Rider 1 and is shown again when the app is reopened.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+REMARKS: Feature is not in the app.
+
+=== RID-JOB-005 | Rider - Modules | Job Assignment | Accept and manual assignment at the same moment
+EXPECTED: Exactly one rider has the job, and Logistics 1 shows that same rider. The other side gets a clear 'already assigned' message. No duplicate job exists.
+ACTUAL: Concurrent accept vs manual assign needs the backend.
+REMARKS: Needs live Laravel API.
+
+=== RID-JOB-007 | Rider - Modules | Job Assignment | Cannot accept another company's job
+EXPECTED: Rejected (403 or not found). The job is unchanged.
+ACTUAL: Company ownership is a server rule.
+REMARKS: Needs live Laravel API.
+
+=== RID-JOB-008 | Rider - Modules | Job Assignment | [Mobile] Job offer while the phone is locked
+EXPECTED: A push notification with sound arrives while the phone is locked. The offer shows about 40 seconds left (counted from when it was sent, not restarted at 60). Accept works within the 60 seconds.
+ACTUAL: No push notifications.
+REMARKS: Feature is not in the app.
+
+=== RID-JOB-009 | Rider - Modules | Job Assignment | [Mobile] Navigate to the pickup address
+EXPECTED: The map app opens with Seller 1's pickup location (Commonwealth, Quezon City). Switching back shows the same job.
+ACTUAL: open_maps.dart launches the maps app. Confirm on a phone.
+REMARKS: Needs a phone or emulator; code review only.
+
+=== RID-PICK-005 | Rider - Modules | Pickup | Double scan at pickup
+EXPECTED: One Picked Up event only; the second scan shows 'already picked up'. Pay counted once.
+ACTUAL: Whether a fast double tap advances two steps needs a run.
+REMARKS: Needs a phone or emulator; code review only.
+
+=== RID-PICK-007 | Rider - Modules | Pickup | [Mobile] Pickup with no internet
+EXPECTED: The scan is either blocked with a no-internet message, or saved as pending and sent once online with the original scan time. In the end there is one Picked Up event, and pickup pay is counted once.
+ACTUAL: State is local in mock mode; offline queueing is not in the code.
+REMARKS: Needs live Laravel API.
+
+=== RID-DLV-007 | Rider - Modules | Delivery & Status Updates | Cannot update another rider's job
+EXPECTED: Rejected. Rider 2's job is unchanged.
+ACTUAL: Job ownership is a server rule.
+REMARKS: Needs live Laravel API.
+
+=== RID-DLV-009 | Rider - Modules | Delivery & Status Updates | [Mobile] Mark Delivered with no internet
+EXPECTED: Step 1: the app clearly shows the delivery is not yet sent (or blocks it with a message) and keeps the photo, OTP and amount. Step 3: Delivered is recorded once with the photo; the COD balance rises by ₱500.00 and pay by ₱50.00 once. Nothing is lost when the app is reopened.
+ACTUAL: No offline queue in the code; mock mode never uses the network.
+REMARKS: Needs live Laravel API.
+
+=== RID-DLV-010 | Rider - Modules | Delivery & Status Updates | [Mobile] Call or message the buyer from the job
+EXPECTED: The phone dialer opens with Buyer 1's number (or a masked relay number). Messaging opens a conversation with Buyer 1. No other buyer's number is shown.
+ACTUAL: No call or message to the buyer from the job.
+REMARKS: Feature is not in the app.
+
+=== RID-DLV-011 | Rider - Modules | Delivery & Status Updates | [Mobile] Delivery location is recorded
+EXPECTED: The record shows the GPS location and time of the delivery, close to ADDR-1.
+ACTUAL: No GPS location recorded.
+REMARKS: Feature is not in the app.
+
+=== RID-EARN-006 | Rider - Modules | History, Earnings & COD Remittance | Rider cannot confirm own remittance
+EXPECTED: Rejected (403).
+ACTUAL: No remittance in the app; confirmation rules are a server concern.
+REMARKS: Needs live Laravel API.
+

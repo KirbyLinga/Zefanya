@@ -1,0 +1,12 @@
+=== TC-RID-029 | Rider | No public rider registration
+EXPECTED: Rider is not offered as a self-registration role. The Add Rider deep link opens the login screen.
+ACTUAL: Registration offers only Buyer and Courier. Rider is not a self-registration role. There are no deep links.
+
+=== TC-RID-046 | Rider | [Mobile] Stay logged in after closing the app or restarting the phone
+EXPECTED: Each time the app opens on the rider home screen still logged in, showing Pedro Jose Garcia. It does not ask to log in again and shows no other user's data.
+ACTUAL: No Rider home screen. The courier session does persist (see TC-COU-051).
+
+=== TC-RID-047 | Rider | [Mobile] Back after logging out
+EXPECTED: The login screen stays. No screen with account data appears again, and the app does not log back in by itself.
+ACTUAL: No Rider role. Logout works for the courier role (see TC-COU-052).
+

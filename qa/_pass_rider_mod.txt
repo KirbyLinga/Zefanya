@@ -1,0 +1,100 @@
+=== RID-PROF-001 | R1 Profile & Vehicle | View profile, vehicle and verification status
+EXPECTED: Shows Pedro Jose Garcia, license N01-23-456789, expiry 03/22/2030, Motorcycle, plate 123ABC, company Bilis Hatid Express Inc., status Active. Both documents open.
+ACTUAL: Profile shows name, contact and address. Vehicle, plate, license, expiry and verification status are collected at sign-up but not shown.
+
+=== RID-PROF-002 | R1 Profile & Vehicle | Update vehicle details
+EXPECTED: The change is saved and shown to Logistics 1 with the new OR/CR, flagged for re-verification. The old plate is no longer shown.
+ACTUAL: No vehicle edit and no re-verification flag.
+
+=== RID-PROF-003 | R1 Profile & Vehicle | Plate number already used
+EXPECTED: Both are blocked as already registered. The plate stays 123ABC.
+ACTUAL: No plate editing.
+
+=== RID-PROF-004 | R1 Profile & Vehicle | License expiry boundary
+EXPECTED: Yesterday is rejected with an expiry message. Today is accepted.
+ACTUAL: No license expiry field.
+
+=== RID-PROF-005 | R1 Profile & Vehicle | Document upload rules
+EXPECTED: Only the 5.0 MB JPG is accepted; the others are rejected and the previous document is kept.
+ACTUAL: Uploads are photos from camera or gallery. No 5 MB or file-type check.
+
+=== RID-PROF-006 | R1 Profile & Vehicle | Suspended rider cannot work
+EXPECTED: Rider 3 cannot go Online and sees a suspension message. Rider 3 receives no offer and is not selectable for manual assignment.
+ACTUAL: No suspension state.
+
+=== RID-AVAIL-003 | R2 Availability | Go Offline with an active job
+EXPECTED: Offline is allowed. The Picked Up job stays with Rider 1 and can still be delivered. No new offers arrive.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+
+=== RID-PICK-001 | R4 Pickup | Pickup details shown
+EXPECTED: Shows Seller 1's name, pickup address, contact number, tracking number and 1 parcel.
+ACTUAL: Shows seller and pickup address. No contact number or tracking number.
+
+=== RID-PICK-003 | R4 Pickup | Confirm pickup by typing the tracking number
+EXPECTED: Status becomes Picked Up exactly as with a scan.
+ACTUAL: No tracking-number entry.
+
+=== RID-PICK-004 | R4 Pickup | Wrong tracking number
+EXPECTED: Both are rejected with 'tracking number does not match this job'. Status stays Assigned.
+ACTUAL: No tracking-number check.
+
+=== RID-DLV-001 | R5 Delivery | Deliver with proof in sequence
+EXPECTED: Each status is shown in all views with times. After Delivered: Buyer 1 sees Delivered with the photo, Rider 1's COD balance rises by ₱500.00 and pay by ₱50.00.
+ACTUAL: Steps run in order and each updates the buyer's order status. Buyer-side proof photo, times and rider totals need a run.
+
+=== RID-DLV-002 | R5 Delivery | Skipping a status
+EXPECTED: Delivered is not available and a direct request is rejected. Status unchanged.
+ACTUAL: Confirm Order Delivered only appears after Start Delivery Transit; steps cannot be skipped.
+
+=== RID-DLV-003 | R5 Delivery | Photo is required
+EXPECTED: Both are blocked with a message. The status stays Out for Delivery.
+ACTUAL: Confirm Order Delivered stays disabled until a proof photo is attached.
+
+=== RID-DLV-004 | R5 Delivery | OTP checks
+EXPECTED: 5 digits is rejected. Each wrong OTP is rejected. After the 5th wrong entry, entry is locked for 15 minutes (the correct OTP is also refused). After 15 minutes the correct OTP works.
+ACTUAL: No delivery OTP.
+
+=== RID-DLV-005 | R5 Delivery | COD amount must match
+EXPECTED: ₱499.99 and ₱500.01 are rejected with a mismatch message. Only ₱500.00 completes delivery.
+ACTUAL: No COD amount entry or check.
+
+=== RID-DLV-006 | R5 Delivery | Prepaid order has no COD
+EXPECTED: COD shows ₱0.00 / Paid; no amount is asked for, and the COD balance does not change.
+ACTUAL: The tracker always shows Cash on Delivery; no prepaid case.
+
+=== RID-FAIL-001 | R6 Failed Delivery | Mark failed with a reason
+EXPECTED: Status Failed Delivery, attempt 1 of 3, with the reason. Buyer 1 and Logistics 1 are notified. No COD is collected and pay is ₱0.00 for the attempt.
+ACTUAL: Mark Delivery Failed has no reason, attempt counter or buyer/Logistics notification.
+
+=== RID-FAIL-002 | R6 Failed Delivery | Reason required
+EXPECTED: Blocked; status unchanged.
+ACTUAL: No reason is asked for.
+
+=== RID-FAIL-003 | R6 Failed Delivery | Refused goes straight to Return to Sender
+EXPECTED: Status Return to Sender immediately; no further attempt is scheduled.
+ACTUAL: No "Refused" reason. Return to Sender exists only as a step.
+
+=== RID-FAIL-004 | R6 Failed Delivery | Attempt counter and reschedule
+EXPECTED: The job shows attempt 2 of 3 and completes normally on success.
+ACTUAL: No attempt counter. Retry Delivery returns the job to In Transit.
+
+=== RID-EARN-001 | R7 Earnings & COD | Delivery history
+EXPECTED: Every job is listed once with date, tracking number, result and pay.
+ACTUAL: The Earnings tab lists completed jobs with pay. Tracking number and result columns need a phone check.
+
+=== RID-EARN-002 | R7 Earnings & COD | Pay per job and daily total
+EXPECTED: Today's total is exactly ₱210.00 (2 × ₱30 + 3 × ₱50 + 1 × ₱0). The weekly total includes it.
+ACTUAL: Pay per job and today's total are calculated in the app. The P30/P50 amounts in the plan are not confirmed.
+
+=== RID-EARN-003 | R7 Earnings & COD | COD balance to remit
+EXPECTED: Balance shows ₱1,800.00 with both orders listed.
+ACTUAL: No COD balance.
+
+=== RID-EARN-004 | R7 Earnings & COD | Remit COD and confirmation
+EXPECTED: Before confirmation the remittance is Pending and the balance still shows ₱1,800.00 pending. After confirmation the balance is ₱0.00.
+ACTUAL: No remittance flow.
+
+=== RID-EARN-005 | R7 Earnings & COD | Short remittance
+EXPECTED: Logistics 1 sees a ₱50.00 shortfall flag; Rider 1's balance shows ₱50.00 outstanding after confirmation.
+ACTUAL: No remittance flow.
+

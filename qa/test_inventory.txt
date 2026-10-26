@@ -1,0 +1,643 @@
+### accessibility_task4_test.dart (2)
+19: AppType.eyebrow enforces minimum fontSize >= 11 and letterSpacing <= 1.2
+24: Product details variant swatch shows checkmark when selected
+### account_security_test.dart (10)
+159: every broken rule names the rule and leaves the password alone
+194: the new-password field shows the specific missing class
+267: a wrong code and an expired code both leave the address unchanged
+306: the code field shows the wrong-code message inline
+344: a taken or unchanged address is refused before any code exists
+377: a taken address keeps the form on step one with no code field
+402: invalid and duplicate numbers are refused without a pending code
+438: a valid +63 number is normalized and saved only after verification
+468: the phone screen accepts +63, verifies, then reports the 
+503: the phone that changes the password keeps its signed-in session
+### address_book_test.dart (11)
+99: BUY-ADDR-001 seeds ADDR-1 from the profile and makes it default
+109: BUY-ADDR-001 a second address gets ADDR-2 and leaves ADDR-1 default
+120: BUY-ADDR-006 exactly one address is default after moving the marker
+130: BUY-ADDR-004 both phone formats save and malformed ones do not
+142: BUY-ADDR-005 the tenth address saves and the eleventh is refused
+153: BUY-ADDR-007 the default cannot be deleted until another is chosen
+165: stored addresses survive a fresh load
+183: BUY-ADDR-001 adds a second address with the values entered
+229: BUY-ADDR-002 changing region clears city and barangay
+258: BUY-ADDR-003 blank fields keep the form open with messages
+280: BUY-ADDR-006 only the new default shows Default
+### auth_flow_test.dart (6)
+80: the signed-in status is the repository\
+108: mock mode signs in exactly as it always did
+129: the signed-in session survives a restart
+146: signing out clears the session and asks the repository to revoke it
+171: a failed sign-in at the email gate lands on that gate, handle and all
+199: a session entered at the email gate survives a restart
+### buyer_bm_quick_wins_test.dart (14)
+156: claim is one-way and survives a reload
+168: wallet shows Claim then a disabled Claimed button
+193: store + platform + shipping stack once per slot
+277: cart shows the sale price, saving and payable total
+295: a third unit is blocked in a fresh cart
+344: share URL round-trips through the parser
+359: a product link resolves to the product page
+393: an unknown id shows an unavailable page, not a blank one
+423: validation boundaries are exact
+449: an invalid file and a 1001-character message are not sent
+497: badge and screen go 3 -> 2 -> 0
+541: out-of-stock lines are visible but excluded from checkout
+610: a vacation product cannot enter the cart
+616: the card carries the label and the PDP disables actions
+### cart_clear_all_test.dart (3)
+23: clearAll empties the cart and returns the snapshot
+34: restoreAll puts the snapshot back
+44: clearAll on an empty cart returns an empty snapshot
+### cart_swipe_test.dart (1)
+41: swiping a real tile removes it with an Undo offer
+### catalog_state_test.dart (5)
+92: the fixture really is foreign to the mock catalogue
+100: load() takes the catalogue from the repository
+110: a failure is recorded rather than thrown, and the catalogue stays empty
+132: bySeller narrows to one shop
+140: search matches name and category, and deliberately not the description
+### catalog_wiring_test.dart (5)
+177: the category grid renders the catalogue it was handed
+190: the seller screen lists what that shop sells, from the catalogue
+200: the review button joins an order to the catalogue, not to the mock file
+222: every label the app can be handed a category has its own icon
+254: and it still fits on a narrow phone
+### checkout_validation_test.dart (3)
+45: shows Add delivery address button and inline validation errors on empty submission
+75: scrolls to terms error when address is valid
+109: BUY-ADDR-006 checkout pre-selects the address-book default
+### claude_followups_test.dart (10)
+30: groups by seller in first-seen order
+43: empty cart yields no groups
+47: selection flags drive the tri-state checkbox
+66: holds the same CartItem objects, never copies
+74: below minimum is weak
+80: minimum length single-class is weak, mixed or longer is fair
+86: long with mixed classes is strong
+93: labels are words, never numbers
+101: tab count matches the four-stage stepper
+105: out-of-range stored values clamp to a valid index
+### courier_failure_flow_test.dart (6)
+98: a failure records its reason and attempt, collects no COD, pays 0
+119: a failure with no reason leaves the status and counter unchanged
+131: dismissing the reason sheet blocks the failure
+148: Buyer refused returns the parcel immediately, with no retry
+173: attempt 2 of 3 is shown and success still completes
+214: the third failure returns, and a fourth attempt is impossible
+### courier_flow_test.dart (4)
+41: a dispatched job lands in the courier queue, unassigned
+55: the courier name is recorded at dispatch, not before
+69: completing a job records the fee and clears it from the queue
+86: the name the buyer sees survives a restart
+### courier_handover_wiring_test.dart (7)
+86: a live job accepts any 6-digit code and leaves the check to server
+101: the exact cash and code are sent with DELIVERED
+120: a prepaid delivery sends no cash amount
+137: the typed waybill is sent with PICKED_UP
+153: a failed attempt sends its reason
+169: Buyer refused is sent as RETURNED with the reason
+185: the third failure is sent as RETURNED, not a fourth attempt
+### courier_tracker_golden_test.dart (5)
+119: courier tracker with a named rider — light
+125: courier tracker with a named rider — dark
+131: the no-rider state is a state, not an empty card
+147: the named-rider card offers contact with that rider
+160: the card survives 1.3x text on a narrow phone
+### delivery_completion_view_test.dart (5)
+88: completion screen — light
+101: completion screen — dark
+114: does not overflow on a short screen at 1.3x text
+158: the fee and the day total are both stated
+173: a return never claims the fee was earned
+### featured_deck_test.dart (15)
+50: cycle helper still rotates an order
+56: window shows at most four, in order
+62: rolling numbers interpolate and clamp
+72: shows the first card with featured semantics
+88: card body fills with tag, name and price
+102: rail swipe never drives the promo carousel
+160: dot jumps to another page and back
+174: swipe goes both ways without losing cards
+199: rail height is fixed across pages
+314: rail, search and promo share one left edge (360dp)
+339: rail, search and promo share one left edge (411dp)
+356: second card peeks past the right edge, unclipped
+382: card stays balanced with an empty description
+418: dots never overlap the price at 1.5x text scale
+461: empty products render nothing
+### landing_preview_rail_test.dart (7)
+50: renders the first page with dots
+59: swipe reveals the other pages
+72: auto-advance turns the page after 6s
+103: timer stops when off-stage, restarts on return
+169: reduced motion: end state, no auto-advance
+187: no overflow at 360dp
+193: no overflow at 1.5x text scale
+### landing_screen_test.dart (11)
+50: Beat 1 shows brand only: no BEGIN, no rail, no done
+63: hint fades in after 1.2s
+80: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+106: the 3s timer reaches Beat 2
+129: BEGIN still completes exactly once
+160: no timer leak on dispose from Beat 1
+177: no timer leak on dispose from Beat 2
+198: reduced motion shows static Beat 1 then advances to Beat 2
+219: no overflow at 360dp, both beats fit
+248: lockup morphs: size and position lerp across the hand-off
+306: no overflow at 1.3x text scale, both beats fit
+### live_auth_test.dart (19)
+129: registration posts the profile as multipart with the ID attached
+188: registration without an ID is refused without a request
+209: a server validation failure arrives as field errors
+238: the code goes to the handle the server gave, as otp
+265: a refused code surfaces the server sentence and changes nothing
+292: resend posts to the handle path and reads nothing back
+306: the courier role names the missing endpoint instead of posting
+344: login stores the token and returns who the account is
+377: a shut gate is not reported as a credential failure
+408: the email gate is told apart from the admin gate
+442: an email gate with no handle is not offered as a confirmable one
+472: a 200 without a token is malformed, not a session
+491: logout revokes the token it was called with
+502: a failed logout still forgets the token locally
+514: refresh forgets a rejected token and reports no session
+522: refresh reads a valid token the same way login does
+544: courier login posts to /login/courier and stores the token
+568: courier refresh calls /me/courier
+587: courier logout calls /logout/courier
+### live_boot_test.dart (7)
+99: an endpoint the server has not built leaves orders empty, not fatal
+110: an unreachable server is treated the same way
+119: the courier cache survives an unwired jobs endpoint too
+130: a refresh that works clears it and fills the cache
+143: refresh still throws, so a caller that wants the error still gets it
+151: the courier half records and clears it the same way
+166: says why it is empty, and offers Retry only when retrying could work
+### live_catalog_test.dart (29)
+124: the catalogue is fetched without a token, even when one is held
+138: the category chip is sent as the label it shows
+147: the app\
+158: search and shop filters become q and seller
+169: a blank filter is left off rather than sent as empty text
+179: one product is fetched by the id it holds
+191: a price in centavos becomes the pesos the app renders
+201: a price that arrives as a string is read the same way
+212: the cover photo is the first one, as the server ordered it
+228: a product with no photos keeps an empty list and still has a cover
+243: a live product states no sale price; rating reflects actual reviews
+260: a live product with reviews carries the real aggregate
+271: an empty catalogue is an empty list, not a failure
+280: a product that is gone reads as null rather than as an error
+292: a malformed list is an error, not an empty shop
+308: the categories chip row leads with the app\
+324: a category row with no label does not become a blank chip
+337: a percentage voucher maps exactly onto the app\
+364: a voucher with no minimum spend or expiry still reads sensibly
+384: a flat voucher is not offered, because it cannot be applied correctly
+405: one flat voucher does not take the percentage vouchers with it
+421: a voucher whose value cannot be read is refused rather than guessed
+437: makerNote fetches the note from the server for a known seller
+456: makerNote returns null when the seller has no note
+466: makerNote returns null when no products exist for that seller
+474: the promo carousel fetches slides from the server
+511: promo slides with unknown layout/ground fall back to safe defaults
+537: empty promotion list returns empty slides
+544: a live repository with no base URL is a configuration failure
+### live_chat_test.dart (10)
+106: messagesFor sends GET /chat/{contact} with auth
+118: messagesFor maps messages to ChatMessage objects
+136: messagesFor returns empty list for an empty thread
+144: messagesFor formats sent_at as a short time string
+159: messagesFor throws UnauthorizedException on 401
+171: messagesFor throws ApiNotConfiguredException when no base URL
+183: append sends POST /chat/{contact} with the message body
+202: append throws ApiNotConfiguredException when no base URL
+217: threads returns empty map (no list-all endpoint yet)
+227: seedIfEmpty is a no-op in live mode
+### live_courier_test.dart (11)
+111: asks GET /courier/jobs with the token
+122: maps the list into DeliveryJob objects
+146: maps the handover and payment fields into the job
+174: returns an empty list when no jobs assigned
+181: a 401 throws UnauthorizedException
+193: throws ApiNotConfiguredException when no base URL
+208: advanceMilestone sends PATCH to /courier/jobs/{id}/milestone
+221: advanceMilestone sends the milestone value in the body
+254: advanceMilestone sends the handover fields it was given
+311: advanceMilestone throws on 422
+323: advanceMilestone throws ApiNotConfiguredException when no base URL
+### live_orders_test.dart (10)
+134: a status this build has never seen is not claimed to have moved
+150: a line whose product is gone keeps its name and contributes no id
+162: an unreadable body answers empty rather than throwing
+175: the history is asked for with the token, and read in the order it arrives
+189: a 401 says the token is no good, rather than looking like an empty history
+211: it posts the lines with the token and reads the new parcels back
+254: a two-shop checkout comes back as both parcels
+282: nothing to place is answered locally, without a request
+292: a refused basket surfaces the server sentence, not an empty list
+316: a live build with no base URL says so instead of placing anyway
+### live_review_test.dart (13)
+119: asks GET /reviews/mine with the token
+130: maps the list into ProductReview objects
+151: silently drops entries whose product_id is null
+169: returns an empty list when there are no reviews
+178: throws when the server returns 401
+190: throws ApiNotConfiguredException when no base URL is set
+211: sends PATCH to the right URL with stars and comment
+235: includes photo_path when the review has one
+252: omits comment from the body when it is empty
+270: a 200 response (edit) is accepted the same as 201 (create)
+285: a server 422 surfaces the message as a ValidationException
+305: throws ApiNotConfiguredException when no base URL is set
+318: is a no-op and does not touch the network
+### login_gate_test.dart (2)
+161: a refused sign-in at the email gate opens that gate
+192: every other refusal stays on the form, with its sentence
+### microcopy_test.dart (16)
+10: returns morning greeting before 12pm
+16: returns afternoon greeting from 12pm to 6pm
+23: returns evening greeting at or after 6pm
+30: handles empty and whitespace names gracefully
+39: produces deterministic compliment based on seed
+49: includes product name when provided
+54: falls back to generic cart message for empty product names
+61: returns removal message when item is unsaved
+66: returns rotating compliments when item is saved
+75: formats voucher code with kind confirmation
+84: formats search query in typographic quotes
+90: converts null or empty errors to gentle default
+101: handles network and connection errors with kind reassurance
+112: handles failed to fetch errors cleanly
+119: preserves specific validation or domain messages
+126: empty state strings are calm and non-empty
+### money_format_test.dart (4)
+8: formats whole numbers without decimals by default
+15: formats numbers with fractional parts with 2 decimal places
+21: forces 2 decimal places when showDecimals is true
+26: formats negative amounts with minus sign before currency
+### money_mapping_test.dart (13)
+20: converts centavos to pesos
+28: is exact for the centavo values a price can hold
+39: converts pesos to centavos
+46: rounds to the nearest centavo rather than truncating
+55: rounds symmetrically about zero
+62: accepts an integer, which is the contract
+67: accepts a string, because PHP and DECIMAL casts emit one
+72: accepts a double and rounds it
+77: returns null for absent or unreadable values, never throws
+87: goes straight from wire value to the double the app stores
+92: keeps "absent" distinct from "zero"
+102: formats to two decimal places with the peso sign
+110: the scale factor lives here and nowhere else
+### motion_primitives_test.dart (9)
+24: renders child and completes entrance
+49: stagger delay respects index
+78: reduced motion shows end state immediately without timer
+102: disposing while delayed cancels timer cleanly
+124: swaps tabs with smooth fade and keeps states mounted
+167: reduced motion swaps instantly without animation
+210: calls swap exactly once and completes transition
+262: reduced motion runs 120ms cross-fade and calls swap
+312: hard timeout forces cleanup if swap throws or hangs
+### nav_glyphs_golden_test.dart (2)
+59: nav glyphs — light
+70: nav glyphs — dark
+### order_confirmation_dialog_test.dart (6)
+87: confirmation — light
+94: confirmation — dark
+101: it names the order the buyer just created
+112: one order is singular, several are not
+126: both actions do something
+145: does not overflow a short screen at 1.3x text
+### order_lifecycle_test.dart (10)
+31: before shipping it is cancelled, with the chosen reason
+44: a reason is required and leaves the order untouched
+56: there is no cancellation after the parcel has shipped
+67: a double tap produces one cancellation, not two
+84: the cancellation survives a fresh repository load
+99: a delivered order moves to Completed exactly once
+115: Order Received is rejected before delivery
+128: receipt confirmation survives a fresh repository load
+144: copyWith keeps the buyer flags while the courier moves the status
+162: a cancelled order is never completed
+### otp_flow_test.dart (24)
+180: a mock registration lands on the admin gate, with no handle
+191: the mock accepts its own code and rejects every other one
+214: a wrong code is a rejection carrying the server sentence
+236: the handle the registration returned is what the code is sent against
+250: the answer decides the new gate, and the handle goes with the old one
+263: a gate with no handle offers nothing to confirm
+273: a refused code leaves the gate open rather than half-closed
+290: the handle survives a restart, or the code could not be entered later
+302: signing out forgets the registration, handle included
+310: confirmation with nothing to confirm with sends nothing
+322: the dev-tools gate cannot be opened without a registration
+333: the dev-tools gate opens the mock gate, and the mock still checks the code
+361: the courier half names the endpoint the server does not have
+401: a live build with no base URL says that, not "network error"
+485: offers the code entry only when there is a handle to confirm
+498: offers nothing when the gate arrived with no handle
+509: a confirmed code lands back here, at the review gate
+536: a short code is refused before it reaches the repository
+552: the field cannot hold anything but six digits
+564: a refused code shows the server sentence and stays put
+586: editing the code clears the error about the old one
+613: resending says so, counts down, and comes back
+638: a resend that fails says why, and starts no cooldown
+655: the test hint names the code the mock actually accepts
+### personalization_test.dart (5)
+27: seeded history can be joined to the catalogue
+43: a placed order keeps the ids its summary was built from
+56: the ids survive a restart
+70: "pick up where you left off" drops what you already bought
+78: an order with unknown contents excludes nothing
+### pickup_verification_test.dart (2)
+92: blank and wrong tracking numbers leave the job at seller
+120: the matching number advances pickup exactly once
+### pricing_rules_test.dart (7)
+45: charges the flat fee below the free-shipping line
+50: is free at and above the line
+57: percentage discount is capped
+61: percentage discount applies to the given base
+72: flat shipping voucher never exceeds the actual shipping fee
+80: a category voucher only counts selected lines in that category
+93: a voucher dated yesterday is expired, today is usable
+### product_gallery_test.dart (4)
+82: a multi-photo product gets a pager with one dot per photo
+93: a single-photo product gets no pager and no dots
+107: the indicator sits centred at the bottom of the gallery
+122: swiping advances the indicator and the announced position
+### product_image_cache_test.dart (6)
+58: a 72pt slot at 3x asks for 216px, not the full source
+68: a 124pt rail tile asks for 372px
+73: a full-bleed slot decodes natively instead of upscaling
+84: the URL still points at the product\
+95: photoIndex renders a photo other than the cover
+107: an out-of-range photoIndex clamps to the cover, not an error
+### product_sort_test.dart (4)
+21: featured preserves catalogue order and copies the list
+27: price ascending orders low to high
+32: price descending orders high to low
+37: price ties keep catalogue order and input is untouched
+### product_variants_test.dart (3)
+111: BUY-PDP-001: both variation types are required
+145: BUY-PDP-002: price, stock and image follow the variant
+173: BUY-PDP-003: Black/M is disabled, White/M is not
+### quantity_limit_test.dart (3)
+25: 20 is accepted and 21 is refused
+37: the cap is the lower of 20 and stock
+45: adding the same line twice still stops at the cap
+### registration_flow_test.dart (7)
+232: a password under the server minimum is refused, and the form 
+261: a mismatched confirmation is refused, and the form does not 
+281: a matching password of the required length does advance
+344: the password and the form\
+410: the pending gate survives a cold start, as the same gate
+437: an install that predates the gate reads as the admin gate
+458: names the email gate when that is the gate, and the reviewer 
+### registration_payload_test.dart (10)
+51: the wire keys are the server\
+74: sex is lowercased for the wire, and an already-lowercase value survives
+86: birthday is a date, not a timestamp
+98: the address goes as names in manual mode, never as codes
+118: an absent optional is omitted, not sent blank
+131: the phone number is stripped to the digits the server\
+144: the password is sent twice, and cannot be sent inconsistently
+155: the minimum length is the server\
+163: the ID image is not a field — it is a part, and it stays out of the map
+174: a date is formatted the way the wire wants it, wherever it is called from
+### remote_status_mapping_test.dart (35)
+26: there are exactly 13 wire statuses
+30: every wire value parses to a real status, not to unknown
+39: every enum member except unknown has a wire value in the set
+47: allWireValues contains no duplicates and none is "UNKNOWN"
+54: accepts the camelCase case name
+61: accepts stray whitespace and hyphens
+71: an unrecognised string becomes unknown
+77: non-string input becomes unknown
+84: empty and near-empty input becomes unknown
+90: nothing in the parse path throws for any of the above
+100: every status maps to a buyer state — no nulls, no gaps
+107: seller-side stages are all "to ship"
+118: movement through the network is "in transit"
+128: the last leg is "out for delivery"
+138: a failed attempt stays "out for delivery" — a retry is coming
+143: delivered and completed both become the reviewable state
+148: a return is "in transit" — moving, but not towards the buyer
+153: unknown under-promises rather than raising alarm
+159: pre-rider stages map to no milestone at all
+170: every courier-leg stage maps to the matching milestone
+185: terminal and failure stages map to their milestones
+196: documented gap: arrivedAtSeller is unreachable from the wire
+209: unknown produces no milestone rather than a guess
+217: buyerStatusForWire maps a raw JSON value
+222: courierMilestoneForWire maps a raw JSON value
+230: every status has a line
+236: the failure outcomes are described differently from each other
+243: isFailure covers both bad outcomes and nothing else
+254: isTerminal covers the three finished states
+268: the four contract values all round-trip
+278: both pending gates route to the pending screen
+285: only the email gate asks the person to act
+293: approved becomes active, rejected falls back to login
+300: an unknown registration status never grants access
+312: parse does not throw on anything
+### repository_wiring_test.dart (7)
+126: the courier queue is the repository\
+139: a dispatched job takes the pickup address from the repository\
+157: the voucher catalogue is the repository\
+175: written reviews are the repository\
+195: threads come back from the repository before any is opened
+211: a live bundle fails loudly instead of quietly using mock data
+237: a live bundle with no base URL says that, not "network error"
+### returns_test.dart (12)
+192: before delivery it is refused
+210: a completed order is refused
+221: day 7 is allowed and day 8 is not
+245: one request per order; an open request blocks Order Received
+280: the description must be at least 10 characters
+299: one to five photos are required
+326: photos keep the order they were chosen in and persist
+351: a rejected request carries the exact seller reason
+384: an unwired live endpoint is recorded, not fatal at boot
+394: rejection shows the exact reason and Escalate
+433: an open request hides Order Received and names the status
+458: photos add in order, preview, remove, and submit
+### review_flow_test.dart (15)
+102: a submitted review is readable by product and by order
+120: re-submitting the same purchase replaces it, never duplicates
+144: reviews survive a restart
+165: corrupt stored data costs the reviews, not the app
+179: cannot submit unrated, and says what is missing
+194: rating enables submit and states the rating in words
+213: submitting stores the review and confirms it
+237: an existing review opens pre-filled
+259: two items do not overflow a short screen at 1.3x text
+286: a delivered order now opens the review form
+297: an order with unresolvable items offers no button
+306: once reviewed, the button becomes an edit
+327: a multi-item order is labelled as plural
+347: the product page shows it, badged as yours
+369: no invented reviewers are rendered anywhere
+### review_limits_test.dart (7)
+100: the form uses the shared 500/5 limits
+113: 0 stars disables Submit; 501 characters stop at 500
+136: five stored photos fill the strip and hide the add tile
+174: a legacy single photo and the new photo list both resolve
+190: the first edit is allowed and preserves the original date
+209: a second edit is refused without changing the stored review
+225: day 30 is outside the window; day 29 is inside
+### screens_screenshot_test.dart (11)
+182: Landing Beat 1 — $sName
+196: Landing Beat 2 — $sName
+210: Login — $sName
+221: Buyer Home — $sName
+233: Search — $sName
+244: Cart — $sName
+255: Orders — $sName
+266: Profile — $sName
+277: Product Detail — $sName
+288: Courier Home — $sName
+299: Courier Tracker — $sName
+### scroll_to_top_test.dart (3)
+45: scrolls a scrolled list back to the top
+60: is a no-op below the top and on an empty subtree
+75: scrolls two mounted lists at once (Orders mid-swipe case)
+### search_chips_test.dart (9)
+13: empty query preserves authored order, nothing dimmed
+19: whitespace-only query behaves as empty
+25: matching terms rise to the front, stably
+37: matching is case-insensitive
+43: input list is never mutated
+51: empty query preserves authored order, nothing dimmed
+57: non-empty query dims non-matches in place
+69: no matches: order preserved, everything dimmed
+75: input list is never mutated
+### search_filter_test.dart (18)
+32: inactive filter preserves order and copies the list
+38: price bound keeps at-or-under items only
+44: rating bound keeps at-or-above items only
+50: combined bounds intersect
+57: a bound that hides everything returns empty, input untouched
+64: minimum and maximum are both inclusive
+72: a minimum above every price returns empty
+82: blank means no bound
+87: minimum greater than maximum is rejected
+94: equal bounds are a valid one-price range
+98: negative and malformed amounts are rejected
+105: a one-letter typo suggests a catalogue word
+113: a real query or an unrelated dead end gets no suggestion
+126: payouts land on their local calendar day
+139: payouts older than 6 days are excluded
+146: calendar-day construction, not Duration arithmetic
+156: empty input is a flat zero week
+160: labels align: index 6 is today, all in range
+### search_screen_chips_test.dart (5)
+57: idle chips render in authored order, fully opaque
+77: tap fills the query and swaps to results
+92: typing to a dead end crossfades, both branches mounted
+138: typing dims non-matches without reordering
+167: rating row never overflows a 150dp tile at 1.5x scale
+### startup_notice_test.dart (9)
+60: a failed load is recorded, not thrown — the first frame always arrives
+72: a build mistake is still fatal
+85: the message names only retryable failures
+102: actionable lists only failures retrying could fix
+112: retry clears what now works and keeps what does not
+131: says nothing at all when nothing failed
+137: a non-retryable-only set shows nothing at all
+148: a mix shows only the retryable names
+158: a failure that could work gets a Retry, and it clears the notice
+### stock_logic_test.dart (3)
+48: shows Only N left when stock is <= 5
+74: shows Out of stock and disables actions when stock is 0
+101: ProductCard displays Sold out overlay when stock is 0
+### store_follow_test.dart (6)
+65: BUY-WISH-004 follow/unfollow moves the shop in and out of the list
+80: followed shops survive a restart
+92: following does not affect the product wishlist
+103: BUY-WISH-004 seller hero toggles Follow to Following
+121: BUY-WISH-004 the count goes N, N+1, N with the list
+143: Saved lists the followed shop with its count
+### task5_cart_nav_test.dart (4)
+20: MarketplaceApp uses title Zefanya
+39: CartButton renders shopping bag icon and badge
+61: SearchScreen contains CartButton in its header
+85: CategoriesScreen contains CartButton in its header
+### task6_home_hierarchy_test.dart (2)
+23: Buyer Home hierarchy renders search, categories, and Just for you in order
+88: Catalog ordering is deterministic by rating descending
+### theme_contrast_test.dart (15)
+56: body and secondary text clear AA on every ground
+72: a tinted fill is distinguishable from the card it sits on
+86: ink on a tinted fill clears the graphics floor
+96: a rating star is legible, because it is a control
+109: the gallery indicator stays legible over its scrim
+126: credit / warning / danger inks stay readable on their fills
+138: category and step rules stay visible on their band
+160: promo slides: ink and accent clear their own ground
+179: snack bar, prices and the shimmer band read on their ground
+194: surface tiers are distinguishable from the page
+201: ink on a light fill is dark ink, not near-white
+218: text on rose uses roseGround, which can host it
+232: primaryDark is a fill, and dark mode is where that matters
+251: toggle flips the mode, and the palette follows it
+264: a saved choice wins over the default on the next launch
+### validators_test.dart (10)
+12: empty and one-character names are refused
+24: 2 and 50 characters are accepted; 51 is not
+32: letters, spaces, hyphen, apostrophe, period and ñ survive
+49: numbers and other symbols are refused
+61: below eight characters gets the length message
+65: each missing character class is refused
+72: eight characters with all four classes pass
+76: spaces are refused
+82: the 18th birthday counts, the day before does not
+95: a 17-year-old is refused and an 18-year-old accepted
+### voucher_expiry_test.dart (5)
+14: voucherFromJson maps expires_at to expiresAt
+30: a missing expires_at maps to null, not a crash
+42: mock vouchers all carry a computable expiry date
+53: isVoucherExpired: yesterday expired, today and tomorrow usable
+103: Product still carries no created/updated timestamp
+### widget_test.dart (1)
+51: a signed-out cold start boots to the landing screen
+### workbook_buyer_phase3_test.dart (18)
+283: an invalid name is refused with a field message
+325: ₱299.99 is short by ₱0.01; ₱300.00 and ₱300.01 earn ₱50 off
+359: a used-up code stays refused after a cart restart
+377: the store voucher is pruned and the total returns to ₱249.00
+404: below ₱500 is refused; 10% applies and caps at ₱100
+437: ₱50 shipping becomes free; ₱65 becomes ₱15; goods unchanged
+461: checkout receives p1 alone while p6 stays in the cart
+513: summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+538: the cart becomes one order per seller and empties
+558: the field accepts 200 and refuses the 201st
+576: Cash on Delivery is preselected
+589: the button disables and the repository is called once
+628: an out-of-stock line blocks the order
+658: the code is removed, the message is shown, and the total moves
+689: a one-letter typo offers the catalogue word, zzqxw does not
+720: min > max and negatives are rejected without filtering
+760: both ends are inclusive
+782: Search closes the keyboard and pull-to-refresh reloads once
+### workbook_rider_phase4_test.dart (16)
+141: profile shows the rider record and opens both documents
+218: a changed vehicle replaces the plate and asks for re-verification
+246: a plate used by another rider is refused and the old plate stays
+271: expiry yesterday is rejected, today is accepted
+303: only a 5.0 MB JPG is accepted; a rejected file keeps the old one
+346: a suspended rider cannot go online and sees the message
+373: going offline with an active job keeps the job deliverable
+392: pickup details show seller, address, contact, tracking and 
+425: 5 digits is refused, five wrong codes lock 15 minutes, then the 
+462: COD must match exactly; one centavo either side is refused
+480: a prepaid order asks for no COD and adds no COD balance
+498: history shows result, tracking number and pay
+544: today total is exactly the sum of today\
+560: COD balance sums cash collected on delivery
+581: pending remittance leaves the balance; confirmation clears it
+606: a short remittance leaves the shortfall outstanding

@@ -1,0 +1,676 @@
+00:00 +0: loading C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart
+00:00 +0: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: AppType.eyebrow enforces minimum fontSize >= 11 and letterSpacing <= 1.2
+00:00 +1: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +2: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +3: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +4: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +5: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +6: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +7: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:01 +8: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +9: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +10: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +11: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +12: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +13: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:02 +14: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/accessibility_task4_test.dart: Product details variant swatch shows checkmark when selected
+00:03 +15: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/account_security_test.dart: BUY-ACCT-003 the correct current password changes it, shows success, and the old password no longer works in the mock account
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:06 +16: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:06 +17: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:07 +18: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:07 +19: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:07 +20: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:07 +21: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:07 +22: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:08 +23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:09 +23: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/account_security_test.dart: BUY-ACCT-006 the old address stays live until the code, then the profile and a cold start show the new one
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=true
+[timed_snackbar] timer fired, alreadyClosed=false
+00:09 +24: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:09 +25: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-001 adds a second address with the values entered
+00:09 +26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:09 +26: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/account_security_test.dart: BUY-ACCT-007 the code field shows the wrong-code message inline
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:09 +27: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:09 +28: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:10 +29: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:10 +30: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:10 +31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:11 +31: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/account_security_test.dart: BUY-ACCT-009 the phone screen accepts +63, verifies, then reports the normalized number
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=true
+[timed_snackbar] timer fired, alreadyClosed=false
+00:11 +32: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+00:11 +33: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+[timed_snackbar] shown, will remove in 3000ms
+00:11 +34: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-002 changing region clears city and barangay
+00:11 +35: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-002 changing region clears city and barangay
+00:11 +36: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-002 changing region clears city and barangay
+00:11 +37: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/address_book_test.dart: address book screen BUY-ADDR-002 changing region clears city and barangay
+00:11 +38: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:12 +39: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:12 +40: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:13 +41: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:13 +42: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:13 +42: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-PDP-005 purchase limit a third unit is blocked in a fresh cart
+[timed_snackbar] shown, will remove in 3000ms
+00:13 +43: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:13 +44: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:14 +45: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:14 +46: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:14 +47: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +48: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +49: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +50: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +51: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +52: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +53: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +53: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-CHAT-002 attachments and length an invalid file and a 1001-character message are not sent
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+00:15 +54: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:15 +55: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:16 +56: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+00:16 +57: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/cart_swipe_test.dart: swiping a real tile removes it with an Undo offer
+[timed_snackbar] shown, will remove in 4000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:16 +58: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/buyer_bm_quick_wins_test.dart: BUY-SRCH-011 vacation store the card carries the label and the PDP disables actions
+00:17 +59: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +60: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +61: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +62: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +63: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +64: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +65: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +66: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +67: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +68: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:19 +69: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:20 +70: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/catalog_wiring_test.dart: the category grid renders the catalogue it was handed
+00:20 +71: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:20 +72: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:20 +73: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:20 +74: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:20 +75: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:21 +76: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:21 +77: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:22 +78: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:22 +79: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:22 +80: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:22 +81: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/checkout_validation_test.dart: shows Add delivery address button and inline validation errors on empty submission
+00:22 +82: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-002 dismissing the reason sheet blocks the failure
+00:23 +83: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-002 dismissing the reason sheet blocks the failure
+00:23 +84: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-002 dismissing the reason sheet blocks the failure
+00:24 +85: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-002 dismissing the reason sheet blocks the failure
+00:24 +86: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_handover_wiring_test.dart: RID-DLV-005 the exact cash and code are sent with DELIVERED
+00:24 +87: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+00:24 +88: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+00:24 +89: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+00:24 +90: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+00:24 +91: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+00:24 +92: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+[timed_snackbar] shown, will remove in 3000ms
+00:25 +93: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_failure_flow_test.dart: RID-FAIL-004 attempt 2 of 3 is shown and success still completes
+00:25 +94: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:25 +95: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:27 +96: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:27 +97: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:27 +98: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/courier_tracker_golden_test.dart: courier tracker with a named rider — light
+00:28 +99: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light
+00:28 +100: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light
+00:29 +101: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/delivery_completion_view_test.dart: completion screen — light
+00:29 +102: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:29 +103: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:29 +104: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:29 +105: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:29 +106: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:30 +107: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:30 +108: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:30 +109: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) shows the first card with featured semantics
+00:30 +110: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:30 +111: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: renders the first page with dots
+00:31 +112: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) rail swipe never drives the promo carousel
+00:31 +113: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: swipe reveals the other pages
+00:32 +114: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: swipe reveals the other pages
+00:32 +115: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) swipe goes both ways without losing cards
+00:32 +116: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/featured_deck_test.dart: the rail widget (animations disabled) swipe goes both ways without losing cards
+00:32 +117: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: timer stops when off-stage, restarts on return
+00:33 +118: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_preview_rail_test.dart: timer stops when off-stage, restarts on return
+00:33 +119: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +120: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +121: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +122: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +123: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +124: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +125: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +126: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +127: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +128: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +129: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +130: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +131: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +132: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +133: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +134: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +135: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +136: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +137: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +138: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +139: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +140: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +141: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +142: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:33 +143: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:34 +144: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:34 +145: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:34 +146: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:34 +147: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: Beat 1 shows brand only: no BEGIN, no rail, no done
+00:35 +148: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: hint fades in after 1.2s
+00:35 +149: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +150: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +151: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +152: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +153: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +154: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +155: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/landing_screen_test.dart: a tap reaches Beat 2 (rail + BEGIN, no onDone)
+00:36 +156: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:36 +157: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +158: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +159: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +160: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +161: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +162: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +163: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +164: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +165: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +166: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +167: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +168: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +169: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +170: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +171: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +172: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +173: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +174: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +175: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +176: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +177: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +178: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +179: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +180: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +181: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +182: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +183: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +184: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +185: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +186: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +187: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +188: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +189: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:37 +190: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +191: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +192: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +193: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +194: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +195: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +196: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +197: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +198: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +199: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +200: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +201: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +202: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:38 +203: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_boot_test.dart: the Orders screen says why it is empty, and offers Retry only when retrying could work
+00:40 +204: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: asks GET /courier/jobs with the token
+00:40 +205: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: maps the list into DeliveryJob objects
+00:40 +206: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: maps the handover and payment fields into the job
+00:40 +207: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: returns an empty list when no jobs assigned
+00:40 +208: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: a 401 throws UnauthorizedException
+00:40 +209: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: throws ApiNotConfiguredException when no base URL
+00:40 +210: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone sends PATCH to /courier/jobs/{id}/milestone
+00:40 +211: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone sends the milestone value in the body
+00:40 +212: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone sends the handover fields it was given
+00:40 +213: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone throws on 422
+00:40 +214: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_courier_test.dart: advanceMilestone throws ApiNotConfiguredException when no base URL
+00:41 +215: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping the server's pipeline becomes the app's four stages
+00:41 +216: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping a status this build has never seen is not claimed to have moved
+00:41 +217: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping the summary is the app's own format, built from the item rows
+00:41 +218: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping a line whose product is gone keeps its name and contributes no id
+00:41 +219: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the mapping an unreadable body answers empty rather than throwing
+00:41 +220: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the request the history is asked for with the token, and read in the order it arrives
+00:41 +221: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: the request a 401 says the token is no good, rather than looking like an empty history
+00:41 +222: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order it posts the lines with the token and reads the new parcels back
+00:41 +223: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order a two-shop checkout comes back as both parcels
+00:41 +224: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order nothing to place is answered locally, without a request
+00:41 +225: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order a refused basket surfaces the server sentence, not an empty list
+00:41 +226: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_orders_test.dart: placing an order a live build with no base URL says so instead of placing anyway
+00:41 +227: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() asks GET /reviews/mine with the token
+00:42 +228: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() maps the list into ProductReview objects
+00:42 +229: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() silently drops entries whose product_id is null
+00:42 +230: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() returns an empty list when there are no reviews
+00:42 +231: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() throws when the server returns 401
+00:42 +232: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: all() throws ApiNotConfiguredException when no base URL is set
+00:42 +233: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() sends PATCH to the right URL with stars and comment
+00:42 +234: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() includes photo_path when the review has one
+00:42 +235: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() omits comment from the body when it is empty
+00:42 +236: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() a 200 response (edit) is accepted the same as 201 (create)
+00:42 +237: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() a server 422 surfaces the message as a ValidationException
+00:42 +238: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: submit() throws ApiNotConfiguredException when no base URL is set
+00:42 +239: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/live_review_test.dart: load() is a no-op and does not touch the network
+00:42 +240: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +241: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +242: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +243: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +244: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +245: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +246: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +247: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +248: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +249: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +250: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +251: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +252: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +253: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +254: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +255: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:43 +256: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:44 +257: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:44 +258: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:44 +259: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:44 +260: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +261: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +262: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +263: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +264: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +265: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +266: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +267: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +268: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +269: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +270: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +271: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +272: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:45 +273: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: a refused sign-in at the email gate opens that gate
+00:47 +274: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:47 +274: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/login_gate_test.dart: every other refusal stays on the form, with its sentence
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:47 +275: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:48 +276: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:48 +277: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/motion_primitives_test.dart: EaseInFrame renders child and completes entrance
+00:48 +278: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:48 +279: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:48 +280: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:48 +281: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:49 +282: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:49 +283: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:49 +284: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +285: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +286: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +287: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +288: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +289: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +290: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +291: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +292: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +293: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +294: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +295: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:50 +296: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — light
+00:51 +297: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: confirmation — dark
+00:51 +298: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: it names the order the buyer just created
+00:51 +299: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: one order is singular, several are not
+00:51 +300: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: one order is singular, several are not
+00:51 +301: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: one order is singular, several are not
+00:51 +302: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: one order is singular, several are not
+00:51 +303: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the confirmation goes through the repository the handle the registration returned is what the code is sent against
+00:51 +304: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +305: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +306: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +307: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +308: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +309: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +310: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +311: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +312: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +313: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:51 +314: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/order_confirmation_dialog_test.dart: both actions do something
+00:52 +315: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:52 +316: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:52 +317: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:52 +318: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:52 +319: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:52 +320: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:52 +321: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the pending screen offers the code entry only when there is a handle to confirm
+00:54 +322: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:54 +323: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +324: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +325: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +326: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +327: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +328: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +329: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:55 +330: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:56 +331: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:57 +332: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:57 +333: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:57 +334: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:58 +335: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/pickup_verification_test.dart: RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+00:58 +336: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:58 +336: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/otp_flow_test.dart: the OTP screen resending says so, counts down, and comes back
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] timer fired, alreadyClosed=false
+00:58 +337: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:59 +338: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:59 +339: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:59 +340: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a multi-photo product gets a pager with one dot per photo
+00:59 +341: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_image_cache_test.dart: a 72pt slot at 3x asks for 216px, not the full source
+00:59 +342: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a single-photo product gets no pager and no dots
+00:59 +343: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a single-photo product gets no pager and no dots
+00:59 +344: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: a single-photo product gets no pager and no dots
+00:59 +345: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_image_cache_test.dart: the URL still points at the product's cover
+01:00 +346: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: the indicator sits centred at the bottom of the gallery
+01:00 +347: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: the indicator sits centred at the bottom of the gallery
+01:00 +348: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: the indicator sits centred at the bottom of the gallery
+01:00 +349: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_gallery_test.dart: swiping advances the indicator and the announced position
+01:01 +350: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_sort_test.dart: featured preserves catalogue order and copies the list
+01:01 +351: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_sort_test.dart: price ascending orders low to high
+01:01 +352: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_sort_test.dart: price descending orders high to low
+01:01 +353: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_sort_test.dart: price ties keep catalogue order and input is untouched
+01:02 +354: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:02 +355: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:02 +356: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:02 +357: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +358: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +359: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +360: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +361: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +362: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +363: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +364: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +365: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +366: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:04 +367: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +368: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +369: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +370: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +371: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +372: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +373: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +374: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +375: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +376: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +377: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +378: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +379: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+[timed_snackbar] shown, will remove in 3000ms
+01:05 +380: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +381: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +382: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +383: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +384: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +385: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +386: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +387: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +388: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +389: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +390: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +391: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +392: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +393: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +394: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +395: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +396: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +397: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +398: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +399: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +400: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +401: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+01:05 +402: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/product_variants_test.dart: BUY-PDP-001: both variation types are required
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+[timed_snackbar] shown, will remove in 3000ms
+01:06 +403: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +404: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +405: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +406: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +407: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +408: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +409: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +410: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:07 +411: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +412: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +413: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +414: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +415: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +416: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +417: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +418: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +419: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +420: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:08 +421: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:09 +422: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:10 +423: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:10 +424: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:10 +425: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:10 +426: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a password under the server minimum is refused, and the form does not advance
+01:11 +427: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/returns_test.dart: the buyer screen rejection shows the exact reason and Escalate
+[timed_snackbar] shown, will remove in 3000ms
+01:12 +428: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Review form cannot submit unrated, and says what is missing
+01:12 +429: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Review form cannot submit unrated, and says what is missing
+01:13 +430: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a mismatched confirmation is refused, and the form does not advance
+01:13 +431: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits the form uses the shared 500/5 limits
+01:14 +432: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits the form uses the shared 500/5 limits
+01:14 +433: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits the form uses the shared 500/5 limits
+01:15 +434: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits the form uses the shared 500/5 limits
+01:15 +435: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:15 +436: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:15 +437: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the password step a matching password of the required length does advance
+01:16 +438: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits 0 stars disables Submit; 501 characters stop at 500
+01:16 +439: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits 0 stars disables Submit; 501 characters stop at 500
+01:16 +440: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits 0 stars disables Submit; 501 characters stop at 500
+01:16 +441: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits 0 stars disables Submit; 501 characters stop at 500
+01:16 +442: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: The button that used to do nothing an order with unresolvable items offers no button
+01:16 +443: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: The button that used to do nothing an order with unresolvable items offers no button
+01:16 +444: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: submitForApproval the pending gate survives a cold start, as the same gate
+01:16 +445: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: The button that used to do nothing once reviewed, the button becomes an edit
+01:16 +446: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: The button that used to do nothing once reviewed, the button becomes an edit
+01:16 +447: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits five stored photos fill the strip and hide the add tile
+01:16 +448: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_limits_test.dart: BUY-RATE-004 stars, text and photo limits five stored photos fill the strip and hide the add tile
+01:16 +449: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the pending screen names the email gate when that is the gate, and the reviewer when it is not
+01:16 +450: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the pending screen names the email gate when that is the gate, and the reviewer when it is not
+01:16 +451: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the pending screen names the email gate when that is the gate, and the reviewer when it is not
+01:16 +452: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the pending screen names the email gate when that is the gate, and the reviewer when it is not
+01:16 +453: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/registration_flow_test.dart: the pending screen names the email gate when that is the gate, and the reviewer when it is not
+01:16 +454: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/review_flow_test.dart: Where the review lands the product page shows it, badged as yours
+01:17 +455: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:17 +456: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 360x740_light
+01:19 +457: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +458: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +459: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +460: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +461: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +462: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +463: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +464: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +465: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:19 +466: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +467: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +468: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +469: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +470: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +471: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +472: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +473: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +474: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +475: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +476: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +477: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +478: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +479: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +480: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +481: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +482: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +483: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +484: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +485: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:20 +486: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/scroll_to_top_test.dart: scrolls a scrolled list back to the top
+01:21 +487: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_light
+01:21 +488: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_light
+01:21 +489: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Buyer Home — 360x740_light
+01:22 +490: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:22 +491: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +492: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +493: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +494: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +495: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +496: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +497: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +498: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:23 +499: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:24 +500: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:24 +501: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:24 +502: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:25 +503: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:25 +504: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:25 +505: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:25 +506: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: idle chips render in authored order, fully opaque
+01:25 +507: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:25 +508: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:25 +509: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:25 +510: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:26 +511: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:26 +512: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:26 +513: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:27 +514: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:27 +515: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:27 +516: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:27 +517: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Only N left when stock is <= 5
+01:27 +518: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: typing dims non-matches without reordering
+01:28 +519: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/search_screen_chips_test.dart: typing dims non-matches without reordering
+01:28 +520: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/stock_logic_test.dart: shows Out of stock and disables actions when stock is 0
+01:28 +521: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_dark
+01:28 +522: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_dark
+01:28 +523: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Home — 360x740_dark
+01:28 +524: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Courier Tracker — 360x740_dark
+01:28 +525: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:28 +526: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:28 +527: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:28 +528: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/screens_screenshot_test.dart: Landing Beat 1 — 411x890_light
+01:28 +529: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:29 +530: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:29 +531: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:29 +532: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:30 +533: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:30 +534: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:30 +535: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:30 +536: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:31 +537: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:31 +538: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:31 +539: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:32 +540: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/store_follow_test.dart: where following shows BUY-WISH-004 seller hero toggles Follow to Following
+01:32 +541: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:32 +542: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:32 +543: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:32 +544: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:32 +545: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task5_cart_nav_test.dart: MarketplaceApp uses title Zefanya
+01:32 +546: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +547: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +548: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +549: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +550: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:33 +551: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +552: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +553: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +554: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +555: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +556: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:34 +557: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +558: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +559: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +560: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +561: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +562: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +563: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +564: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +565: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +566: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +567: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +568: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +569: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +570: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +571: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +572: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +573: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +574: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +575: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +576: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +577: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +578: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +579: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +580: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +581: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +582: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +583: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +584: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:35 +585: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Buyer Home hierarchy renders search, categories, and Just for you in order
+01:36 +586: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/task6_home_hierarchy_test.dart: Catalog ordering is deterministic by rating descending
+01:36 +587: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: BUY-ACCT-002 person names (A2) empty and one-character names are refused
+01:36 +588: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: BUY-ACCT-002 person names (A2) 2 and 50 characters are accepted; 51 is not
+01:36 +589: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: BUY-ACCT-002 person names (A2) letters, spaces, hyphen, apostrophe, period and ñ survive
+01:36 +590: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: BUY-ACCT-002 person names (A2) numbers and other symbols are refused
+01:36 +591: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: password (A5) below eight characters gets the length message
+01:36 +592: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: password (A5) each missing character class is refused
+01:36 +593: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: password (A5) eight characters with all four classes pass
+01:36 +594: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: password (A5) spaces are refused
+01:36 +595: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: age (A6) the 18th birthday counts, the day before does not
+01:36 +596: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/validators_test.dart: age (A6) a 17-year-old is refused and an 18-year-old accepted
+01:37 +597: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: voucherFromJson maps expires_at to expiresAt
+01:37 +598: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: a missing expires_at maps to null, not a crash
+01:37 +599: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: mock vouchers all carry a computable expiry date
+01:37 +600: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: isVoucherExpired: yesterday expired, today and tomorrow usable
+01:37 +601: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: isVoucherExpired: null date is usable, UTC instant lands on its local day
+01:37 +602: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/voucher_expiry_test.dart: Product still carries no created/updated timestamp
+01:38 +603: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/widget_test.dart: a signed-out cold start boots to the landing screen
+01:40 +604: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-ACCT-002 profile field validation an invalid name is refused with a field message
+01:41 +605: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-PROF-001 profile shows the rider record and opens both documents
+01:41 +606: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-PROF-001 profile shows the rider record and opens both documents
+01:41 +607: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-PROF-001 profile shows the rider record and opens both documents
+01:41 +608: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-PROF-001 profile shows the rider record and opens both documents
+01:42 +609: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-PROF-001 profile shows the rider record and opens both documents
+01:42 +610: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-PROF-001 profile shows the rider record and opens both documents
+01:42 +611: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:42 +612: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:42 +613: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:42 +614: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:42 +615: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:42 +616: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:42 +617: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:43 +618: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:43 +619: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:43 +620: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:43 +621: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+01:43 +622: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_rider_phase4_test.dart: RID-EARN-001 history shows result, tracking number and pay
+01:43 +623: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-001 checkout with the worked example summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+01:43 +624: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-001 checkout with the worked example summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+01:43 +625: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-001 checkout with the worked example summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+01:43 +626: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-001 checkout with the worked example summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+01:43 +627: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-001 checkout with the worked example summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+01:43 +628: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-001 checkout with the worked example the cart becomes one order per seller and empties
+01:43 +629: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-005 delivery note caps at 200 characters the field accepts 200 and refuses the 201st
+01:43 +630: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-006 payment method Cash on Delivery is preselected
+01:43 +631: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-007 double-tap Place Order the button disables and the repository is called once
+01:44 +632: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-009 stock ran out during checkout an out-of-stock line blocks the order
+01:44 +633: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-CHK-010 voucher becomes invalid during checkout the code is removed, the message is shown, and the total moves
+[timed_snackbar] shown, will remove in 3000ms
+01:44 +634: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-SRCH-004 typo and no results a one-letter typo offers the catalogue word, zzqxw does not
+01:45 +635: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-SRCH-007 price range filter min > max and negatives are rejected without filtering
+01:45 +636: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-SRCH-007 price range filter both ends are inclusive
+01:45 +637: C:/Users/Lenovo/Documents/lavarel/Zefanya/mobile/test/workbook_buyer_phase3_test.dart: BUY-SRCH-012 Search key and pull-to-refresh Search closes the keyboard and pull-to-refresh reloads once
+01:46 +638: All tests passed!

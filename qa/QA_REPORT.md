@@ -1,5 +1,10 @@
 # Zefanya QA workbook triage - 24 October 2026
 
+> **Historical triage, not the final result.** This 24-Oct report predates the
+> Phase 1–6 work. For the final 377-row classification and evidence, use
+> `qa/final_results.csv`, `qa/PHASE6_COUNTS.md`, `qa/MANUAL_TESTS.md` and
+> `qa/PROGRESS.md`.
+
 Source of truth: the current `mobile/lib` tree, not the older zip copies.
 
 Artifacts:

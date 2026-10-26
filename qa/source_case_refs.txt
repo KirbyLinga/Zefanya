@@ -1,0 +1,84 @@
+BUY-ACCT-002	mobile/test/validators_test.dart:11	BUY-ACCT-002 person names (A2)
+BUY-ACCT-002	mobile/test/workbook_buyer_phase3_test.dart:282	BUY-ACCT-002 profile field validation
+BUY-ACCT-003	mobile/test/account_security_test.dart:99	BUY-ACCT-003
+BUY-ACCT-004	mobile/test/account_security_test.dart:130	BUY-ACCT-004
+BUY-ACCT-005	mobile/test/account_security_test.dart:158	BUY-ACCT-005
+BUY-ACCT-006	mobile/test/account_security_test.dart:211	BUY-ACCT-006
+BUY-ACCT-007	mobile/test/account_security_test.dart:266	BUY-ACCT-007
+BUY-ACCT-008	mobile/test/account_security_test.dart:343	BUY-ACCT-008
+BUY-ACCT-009	mobile/test/account_security_test.dart:401	BUY-ACCT-009
+BUY-ACCT-011	mobile/test/account_security_test.dart:502	BUY-ACCT-011
+BUY-ADDR-001	mobile/test/address_book_test.dart:99	BUY-ADDR-001 seeds ADDR-1 from the profile and makes it default
+BUY-ADDR-001	mobile/test/address_book_test.dart:109	BUY-ADDR-001 a second address gets ADDR-2 and leaves ADDR-1 default
+BUY-ADDR-001	mobile/test/address_book_test.dart:183	BUY-ADDR-001 adds a second address with the values entered
+BUY-ADDR-002	mobile/test/address_book_test.dart:229	BUY-ADDR-002 changing region clears city and barangay
+BUY-ADDR-003	mobile/test/address_book_test.dart:258	BUY-ADDR-003 blank fields keep the form open with messages
+BUY-ADDR-004	mobile/test/address_book_test.dart:130	BUY-ADDR-004 both phone formats save and malformed ones do not
+BUY-ADDR-005	mobile/test/address_book_test.dart:142	BUY-ADDR-005 the tenth address saves and the eleventh is refused
+BUY-ADDR-006	mobile/test/address_book_test.dart:120	BUY-ADDR-006 exactly one address is default after moving the marker
+BUY-ADDR-006	mobile/test/address_book_test.dart:280	BUY-ADDR-006 only the new default shows Default
+BUY-ADDR-006	mobile/test/checkout_validation_test.dart:109	BUY-ADDR-006 checkout pre-selects the address-book default
+BUY-ADDR-007	mobile/test/address_book_test.dart:153	BUY-ADDR-007 the default cannot be deleted until another is chosen
+BUY-CART-007	mobile/test/buyer_bm_quick_wins_test.dart:540	BUY-CART-007 stock changes while in cart
+BUY-CHAT-002	mobile/test/buyer_bm_quick_wins_test.dart:422	BUY-CHAT-002 attachments and length
+BUY-CHAT-005	mobile/test/buyer_bm_quick_wins_test.dart:496	BUY-CHAT-005 notification unread count
+BUY-CHK-001	mobile/test/workbook_buyer_phase3_test.dart:512	BUY-CHK-001 checkout with the worked example
+BUY-CHK-005	mobile/test/workbook_buyer_phase3_test.dart:557	BUY-CHK-005 delivery note caps at 200 characters
+BUY-CHK-006	mobile/test/workbook_buyer_phase3_test.dart:575	BUY-CHK-006 payment method
+BUY-CHK-007	mobile/test/workbook_buyer_phase3_test.dart:588	BUY-CHK-007 double-tap Place Order
+BUY-CHK-009	mobile/test/workbook_buyer_phase3_test.dart:627	BUY-CHK-009 stock ran out during checkout
+BUY-CHK-010	mobile/test/workbook_buyer_phase3_test.dart:657	BUY-CHK-010 voucher becomes invalid during checkout
+BUY-PDP-001	mobile/test/product_variants_test.dart:111	BUY-PDP-001: both variation types are required
+BUY-PDP-002	mobile/test/product_variants_test.dart:145	BUY-PDP-002: price, stock and image follow the variant
+BUY-PDP-003	mobile/test/product_variants_test.dart:173	BUY-PDP-003: Black/M is disabled, White/M is not
+BUY-PDP-005	mobile/test/buyer_bm_quick_wins_test.dart:294	BUY-PDP-005 purchase limit
+BUY-PDP-007	mobile/test/workbook_buyer_phase3_test.dart:460	BUY-PDP-007 Buy Now checks out only that item
+BUY-PDP-010	mobile/test/buyer_bm_quick_wins_test.dart:343	BUY-PDP-010 share link
+BUY-RATE-004	mobile/test/review_limits_test.dart:99	BUY-RATE-004 stars, text and photo limits
+BUY-RATE-005	mobile/test/review_limits_test.dart:189	BUY-RATE-005 edit once within the window
+BUY-SRCH-004	mobile/test/workbook_buyer_phase3_test.dart:688	BUY-SRCH-004 typo and no results
+BUY-SRCH-007	mobile/test/workbook_buyer_phase3_test.dart:719	BUY-SRCH-007 price range filter
+BUY-SRCH-011	mobile/test/buyer_bm_quick_wins_test.dart:609	BUY-SRCH-011 vacation store
+BUY-SRCH-012	mobile/test/workbook_buyer_phase3_test.dart:781	BUY-SRCH-012 Search key and pull-to-refresh
+BUY-VOU-001	mobile/test/buyer_bm_quick_wins_test.dart:155	BUY-VOU-001 claim a voucher
+BUY-VOU-003	mobile/test/buyer_bm_quick_wins_test.dart:192	BUY-VOU-003 stacking
+BUY-VOU-004	mobile/test/workbook_buyer_phase3_test.dart:324	BUY-VOU-004 minimum spend at the boundary
+BUY-VOU-005	mobile/test/buyer_bm_quick_wins_test.dart:229	BUY-VOU-005 distinct rejections
+BUY-VOU-006	mobile/test/workbook_buyer_phase3_test.dart:358	BUY-VOU-006 per-buyer limit
+BUY-VOU-007	mobile/test/workbook_buyer_phase3_test.dart:376	BUY-VOU-007 removing an item drops below the minimum
+BUY-VOU-008	mobile/test/workbook_buyer_phase3_test.dart:403	BUY-VOU-008 percentage voucher respects its cap
+BUY-VOU-009	mobile/test/workbook_buyer_phase3_test.dart:436	BUY-VOU-009 shipping voucher larger than shipping
+BUY-VOU-011	mobile/test/buyer_bm_quick_wins_test.dart:258	BUY-VOU-011 sale items
+BUY-WISH-004	mobile/test/store_follow_test.dart:65	BUY-WISH-004 follow/unfollow moves the shop in and out of the list
+BUY-WISH-004	mobile/test/store_follow_test.dart:103	BUY-WISH-004 seller hero toggles Follow to Following
+BUY-WISH-004	mobile/test/store_follow_test.dart:121	BUY-WISH-004 the count goes N, N+1, N with the list
+RID-AVAIL-003	mobile/test/workbook_rider_phase4_test.dart:372	RID-AVAIL-003
+RID-DLV-004	mobile/test/courier_handover_wiring_test.dart:85	RID-DLV-004
+RID-DLV-004	mobile/test/workbook_rider_phase4_test.dart:424	RID-DLV-004
+RID-DLV-005	mobile/test/courier_handover_wiring_test.dart:100	RID-DLV-005
+RID-DLV-005	mobile/test/workbook_rider_phase4_test.dart:461	RID-DLV-005
+RID-DLV-006	mobile/test/courier_handover_wiring_test.dart:119	RID-DLV-006
+RID-DLV-006	mobile/test/workbook_rider_phase4_test.dart:479	RID-DLV-006
+RID-EARN-001	mobile/test/workbook_rider_phase4_test.dart:497	RID-EARN-001
+RID-EARN-002	mobile/test/workbook_rider_phase4_test.dart:543	RID-EARN-002
+RID-EARN-003	mobile/test/workbook_rider_phase4_test.dart:559	RID-EARN-003
+RID-EARN-004	mobile/test/workbook_rider_phase4_test.dart:580	RID-EARN-004
+RID-EARN-005	mobile/test/workbook_rider_phase4_test.dart:605	RID-EARN-005
+RID-FAIL-001	mobile/test/courier_failure_flow_test.dart:97	RID-FAIL-001
+RID-FAIL-001	mobile/test/courier_handover_wiring_test.dart:152	RID-FAIL-001
+RID-FAIL-002	mobile/test/courier_failure_flow_test.dart:118	RID-FAIL-002
+RID-FAIL-003	mobile/test/courier_failure_flow_test.dart:147	RID-FAIL-003
+RID-FAIL-003	mobile/test/courier_handover_wiring_test.dart:168	RID-FAIL-003
+RID-FAIL-004	mobile/test/courier_failure_flow_test.dart:172	RID-FAIL-004
+RID-FAIL-005	mobile/test/courier_failure_flow_test.dart:213	RID-FAIL-005
+RID-FAIL-005	mobile/test/courier_handover_wiring_test.dart:184	RID-FAIL-005
+RID-PICK-001	mobile/test/workbook_rider_phase4_test.dart:391	RID-PICK-001
+RID-PICK-003	mobile/test/courier_handover_wiring_test.dart:136	RID-PICK-003
+RID-PICK-003	mobile/test/pickup_verification_test.dart:119	RID-PICK-003
+RID-PICK-004	mobile/test/pickup_verification_test.dart:91	RID-PICK-004
+RID-PROF-001	mobile/test/workbook_rider_phase4_test.dart:140	RID-PROF-001
+RID-PROF-002	mobile/test/workbook_rider_phase4_test.dart:217	RID-PROF-002
+RID-PROF-003	mobile/test/workbook_rider_phase4_test.dart:245	RID-PROF-003
+RID-PROF-004	mobile/test/workbook_rider_phase4_test.dart:270	RID-PROF-004
+RID-PROF-005	mobile/test/workbook_rider_phase4_test.dart:302	RID-PROF-005
+RID-PROF-006	mobile/test/workbook_rider_phase4_test.dart:345	RID-PROF-006

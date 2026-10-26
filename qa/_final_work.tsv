@@ -1,0 +1,377 @@
+TC-BUY-001	Buyer - Account Creation	Buyer	Blocked	D	Register with all valid data	
+TC-BUY-002	Buyer - Account Creation	Buyer	Pass	-	Submit a completely empty form	
+TC-BUY-003	Buyer - Account Creation	Buyer	Pass	-	Leave one required field blank at a time	
+TC-BUY-004	Buyer - Account Creation	Buyer	Fail	A	Name with numbers or symbols	Fixed in this pass
+TC-BUY-005	Buyer - Account Creation	Buyer	Pass	-	Name with ñ and allowed punctuation	
+TC-BUY-006	Buyer - Account Creation	Buyer	Fail	A	Name length at the limits	Fixed in this pass
+TC-BUY-007	Buyer - Account Creation	Buyer	Fail	A	Age at the 18-year limit	Fixed in this pass
+TC-BUY-008	Buyer - Account Creation	Buyer	Pass	-	Date of birth in the future	
+TC-BUY-009	Buyer - Account Creation	Buyer	Pass	-	Email in an invalid format	
+TC-BUY-010	Buyer - Account Creation	Buyer	Blocked	D	Email that is already registered	
+TC-BUY-011	Buyer - Account Creation	Buyer	Blocked	D	Registered email typed in capital letters	
+TC-BUY-012	Buyer - Account Creation	Buyer	Pass	-	Email with spaces before and after	
+TC-BUY-013	Buyer - Account Creation	Buyer	Pass	-	Mobile number in an invalid format	
+TC-BUY-014	Buyer - Account Creation	Buyer	Pass	-	Mobile number length at the limits	
+TC-BUY-015	Buyer - Account Creation	Buyer	Blocked	D	Mobile number that is already registered	
+TC-BUY-016	Buyer - Account Creation	Buyer	Blocked	D	Registered number entered in +63 format	
+TC-BUY-017	Buyer - Account Creation	Buyer	Pass	-	Password length at the limit	
+TC-BUY-018	Buyer - Account Creation	Buyer	Fail	A	Password missing a required character type	Fixed in this pass
+TC-BUY-019	Buyer - Account Creation	Buyer	Pass	-	Confirm Password does not match	
+TC-BUY-020	Buyer - Account Creation	Buyer	Pass	-	Password is hidden while typing	
+TC-BUY-021	Buyer - Account Creation	Buyer	Fail	A	Register without accepting the terms	Fixed in this pass
+TC-BUY-022	Buyer - Account Creation	Buyer	Pass	-	Tap Register several times quickly	
+TC-BUY-023	Buyer - Account Creation	Buyer	Fail	C	Verify with the correct OTP	N/A - out of scope (decision A)
+TC-BUY-024	Buyer - Account Creation	Buyer	Pass	-	Verify with an incorrect OTP	
+TC-BUY-025	Buyer - Account Creation	Buyer	Pass	-	OTP in the wrong format	
+TC-BUY-026	Buyer - Account Creation	Buyer	Blocked	D	Verify with an expired OTP	
+TC-BUY-027	Buyer - Account Creation	Buyer	Blocked	D	Resend OTP	
+TC-BUY-028	Buyer - Account Creation	Buyer	Fail	C	Log in before verifying the email	N/A - out of scope (decision A)
+TC-BUY-029	Buyer - Account Creation	Buyer	Blocked	D	Log in with the new verified account	
+TC-BUY-030	Buyer - Account Creation	Buyer	Blocked	D	Open another role's screens	
+TC-BUY-031	Buyer - Account Creation	Buyer	Pass	-	[Mobile] Each field opens the right keyboard	
+TC-BUY-032	Buyer - Account Creation	Buyer	Blocked	E	[Mobile] Keyboard never hides the active field or Register	
+TC-BUY-033	Buyer - Account Creation	Buyer	Blocked	E	[Mobile] App sent to the background while filling the form	
+TC-BUY-034	Buyer - Account Creation	Buyer	Blocked	E	[Mobile] Rotate the phone while the form has data	
+TC-BUY-035	Buyer - Account Creation	Buyer	Blocked	D	[Mobile] Register with no internet connection	
+TC-BUY-036	Buyer - Account Creation	Buyer	Blocked	D	[Mobile] Connection drops right after tapping Register	
+TC-BUY-037	Buyer - Account Creation	Buyer	Pass	-	[Mobile] Paste the OTP copied from the mail app	
+TC-BUY-038	Buyer - Account Creation	Buyer	Fail	A	[Mobile] OTP countdown after switching to the mail app	Fixed in this pass
+TC-BUY-039	Buyer - Account Creation	Buyer	Fail	A	[Mobile] System Back on the form and the verification screen	Fixed in this pass
+TC-BUY-040	Buyer - Account Creation	Buyer	Blocked	E	[Mobile] Large system font on a small screen	
+TC-BUY-041	Buyer - Account Creation	Buyer	Pass	-	[Mobile] Stay logged in after closing the app or restarting the phone	
+TC-BUY-042	Buyer - Account Creation	Buyer	Pass	-	[Mobile] Back after logging out	
+BUY-ACCT-001	Buyer - Modules	B1 Account	Blocked	D	Edit profile with valid data	
+BUY-ACCT-002	Buyer - Modules	B1 Account	Fail	A	Profile field validation	Fixed in this pass
+BUY-ACCT-003	Buyer - Modules	B1 Account	Fail	B-M	Change password with the correct old password	
+BUY-ACCT-004	Buyer - Modules	B1 Account	Fail	B-M	Change password with a wrong old password	
+BUY-ACCT-005	Buyer - Modules	B1 Account	Fail	B-M	New password breaks the rule	
+BUY-ACCT-006	Buyer - Modules	B1 Account	Fail	B-M	Change email with verification	
+BUY-ACCT-007	Buyer - Modules	B1 Account	Fail	B-M	Change email: wrong or expired OTP	
+BUY-ACCT-008	Buyer - Modules	B1 Account	Fail	B-M	Change email to one already used	
+BUY-ACCT-009	Buyer - Modules	B1 Account	Fail	B-M	Change phone with verification and format	
+BUY-ACCT-010	Buyer - Modules	B1 Account	Blocked	E	[Mobile] Change the profile photo with the camera and the gallery	
+BUY-ACCT-011	Buyer - Modules	B1 Account	Fail	B-M	[Mobile] Password change ends the session on the other phone	
+BUY-ACCT-012	Buyer - Modules	B1 Account	Pass	-	[Mobile] Stay logged in, then log out and press Back	
+BUY-TRK-001	Buyer - Modules	B10 Order Tracking	Pass	-	Orders appear in the correct tab	
+BUY-TRK-002	Buyer - Modules	B10 Order Tracking	Fail	B-L	Timeline matches seller, rider, courier and logistics updates	
+BUY-TRK-003	Buyer - Modules	B10 Order Tracking	Fail	B-M	Order Received button	Partial
+BUY-TRK-004	Buyer - Modules	B10 Order Tracking	Fail	B-M	Order Received not available before delivery	Fixed in this pass
+BUY-TRK-005	Buyer - Modules	B10 Order Tracking	Fail	D	Automatic completion	
+BUY-TRK-006	Buyer - Modules	B10 Order Tracking	Blocked	D	Cannot open another buyer's order	
+BUY-TRK-007	Buyer - Modules	B10 Order Tracking	Fail	E	[Mobile] Push notification opens the order	
+BUY-CAN-001	Buyer - Modules	B11 Cancellation	Fail	B-M	Cancel a COD order before shipping	Partial
+BUY-CAN-002	Buyer - Modules	B11 Cancellation	Fail	B-M	Reason is required	Fixed in this pass
+BUY-CAN-003	Buyer - Modules	B11 Cancellation	Fail	B-M	Cancel a prepaid order	Partial
+BUY-CAN-004	Buyer - Modules	B11 Cancellation	Fail	B-M	No cancel after Ready for Pickup	Fixed in this pass
+BUY-CAN-005	Buyer - Modules	B11 Cancellation	Fail	B-M	No cancel after shipping	Fixed in this pass
+BUY-CAN-006	Buyer - Modules	B11 Cancellation	Fail	B-M	Double-tap Cancel	Partial
+BUY-RET-001	Buyer - Modules	B12 Return & Refund	Fail	B-L	Request a return within the window	Partial
+BUY-RET-002	Buyer - Modules	B12 Return & Refund	Fail	B-L	Return not allowed before delivery	Fixed in this pass
+BUY-RET-003	Buyer - Modules	B12 Return & Refund	Fail	B-L	Return window boundary	Fixed in this pass
+BUY-RET-004	Buyer - Modules	B12 Return & Refund	Fail	B-L	Evidence and description rules	Fixed in this pass
+BUY-RET-005	Buyer - Modules	B12 Return & Refund	Fail	B-L	Track request status	Partial
+BUY-RET-006	Buyer - Modules	B12 Return & Refund	Fail	B-L	[Mobile] Return evidence from the camera and the gallery	Partial
+BUY-RATE-001	Buyer - Modules	B13 Ratings & Reviews	Fail	B-M	Rate a completed order	Partial
+BUY-RATE-002	Buyer - Modules	B13 Ratings & Reviews	Pass	-	Rating not allowed before completion	
+BUY-RATE-003	Buyer - Modules	B13 Ratings & Reviews	Pass	-	One review per item	
+BUY-RATE-004	Buyer - Modules	B13 Ratings & Reviews	Fail	B-M	Stars, text and photo limits	Fixed in this pass
+BUY-RATE-005	Buyer - Modules	B13 Ratings & Reviews	Fail	B-M	Edit once within the window	Fixed in this pass
+BUY-RATE-006	Buyer - Modules	B13 Ratings & Reviews	Blocked	D	Average rating updates	
+BUY-RATE-007	Buyer - Modules	B13 Ratings & Reviews	Fail	B-M	[Mobile] Review photos from the camera and a multi-select	Fixed in this pass
+BUY-CHAT-001	Buyer - Modules	B14 Chat & Notifs	Blocked	D	Chat with a seller from a product	
+BUY-CHAT-002	Buyer - Modules	B14 Chat & Notifs	Fail	B-M	Invalid attachments and message length	
+BUY-CHAT-003	Buyer - Modules	B14 Chat & Notifs	Fail	B-L	Order status notifications	
+BUY-CHAT-004	Buyer - Modules	B14 Chat & Notifs	Fail	B-L	Flash-sale reminder	
+BUY-CHAT-005	Buyer - Modules	B14 Chat & Notifs	Fail	B-M	Mark notifications as read	
+BUY-CHAT-006	Buyer - Modules	B14 Chat & Notifs	Fail	E	[Mobile] Chat message while the app is in the background	
+BUY-CHAT-007	Buyer - Modules	B14 Chat & Notifs	Fail	E	[Mobile] Notifications turned off in phone Settings	
+BUY-CHAT-008	Buyer - Modules	B14 Chat & Notifs	Blocked	D	[Mobile] Send a chat message with no internet	
+BUY-ADDR-001	Buyer - Modules	B2 Address Book	Fail	B-L	Add an address with valid data	Fixed in this pass
+BUY-ADDR-002	Buyer - Modules	B2 Address Book	Fail	B-L	Region → city → barangay cascade	Fixed in this pass
+BUY-ADDR-003	Buyer - Modules	B2 Address Book	Fail	B-L	Each required field left blank	Fixed in this pass
+BUY-ADDR-004	Buyer - Modules	B2 Address Book	Fail	B-L	Phone number format	Fixed in this pass
+BUY-ADDR-005	Buyer - Modules	B2 Address Book	Fail	B-L	Address book limit	Fixed in this pass
+BUY-ADDR-006	Buyer - Modules	B2 Address Book	Fail	B-L	Set a different default address	Fixed in this pass
+BUY-ADDR-007	Buyer - Modules	B2 Address Book	Fail	B-L	Delete the default address	Fixed in this pass
+BUY-ADDR-008	Buyer - Modules	B2 Address Book	Fail	B-L	Edit or delete an address used by an active order	Partial
+BUY-ADDR-009	Buyer - Modules	B2 Address Book	Fail	B-L	Cannot open another buyer's address	
+BUY-ADDR-010	Buyer - Modules	B2 Address Book	Fail	B-L	[Mobile] Use My Location with permission allowed and denied	
+BUY-ADDR-011	Buyer - Modules	B2 Address Book	Fail	B-L	[Mobile] Keyboard on the address form	Fixed in this pass
+BUY-SRCH-001	Buyer - Modules	B3 Browse & Search	Blocked	E	Browse a platform category	
+BUY-SRCH-002	Buyer - Modules	B3 Browse & Search	Blocked	E	Store screen with store categories	
+BUY-SRCH-003	Buyer - Modules	B3 Browse & Search	Blocked	E	Search: exact and partial match	
+BUY-SRCH-004	Buyer - Modules	B3 Browse & Search	Fail	B-M	Search: typo and no results	Fixed in this pass
+BUY-SRCH-005	Buyer - Modules	B3 Browse & Search	Blocked	D	Search: special characters and injection	
+BUY-SRCH-006	Buyer - Modules	B3 Browse & Search	Pass	-	Empty search	
+BUY-SRCH-007	Buyer - Modules	B3 Browse & Search	Fail	B-M	Price range filter	Fixed in this pass
+BUY-SRCH-008	Buyer - Modules	B3 Browse & Search	Pass	-	Combined filters	
+BUY-SRCH-009	Buyer - Modules	B3 Browse & Search	Pass	-	Sort and loading more results	
+BUY-SRCH-010	Buyer - Modules	B3 Browse & Search	Blocked	D	Inactive, deleted and draft products never appear	
+BUY-SRCH-011	Buyer - Modules	B3 Browse & Search	Fail	B-M	Products of a vacation store	
+BUY-SRCH-012	Buyer - Modules	B3 Browse & Search	Fail	A	[Mobile] Search key on the keyboard and pull to refresh	Fixed in this pass
+BUY-SRCH-013	Buyer - Modules	B3 Browse & Search	Blocked	E	[Mobile] Search with no internet	
+BUY-PDP-001	Buyer - Modules	B4 Product Detail	Fail	B-M	All variation types must be selected	Fixed in this pass
+BUY-PDP-002	Buyer - Modules	B4 Product Detail	Fail	B-M	Selecting a variant updates price, stock and image	Fixed in this pass
+BUY-PDP-003	Buyer - Modules	B4 Product Detail	Fail	B-M	Out-of-stock variant disabled	Fixed in this pass
+BUY-PDP-004	Buyer - Modules	B4 Product Detail	Fail	A	Quantity limits	Fixed in this pass
+BUY-PDP-005	Buyer - Modules	B4 Product Detail	Fail	B-M	Per-buyer purchase limit	
+BUY-PDP-006	Buyer - Modules	B4 Product Detail	Fail	B-L	Sale price, countdown and vouchers shown	
+BUY-PDP-007	Buyer - Modules	B4 Product Detail	Fail	A	Buy Now checks out only that item	Fixed in this pass
+BUY-PDP-008	Buyer - Modules	B4 Product Detail	Blocked	E	Product screen of an unavailable product	
+BUY-PDP-009	Buyer - Modules	B4 Product Detail	Blocked	E	[Mobile] Swipe and zoom product images	
+BUY-PDP-010	Buyer - Modules	B4 Product Detail	Fail	B-M	[Mobile] Share link opens the product in the app	
+BUY-WISH-001	Buyer - Modules	B5 Wishlist & Follow	Pass	-	Add and remove a wishlist item	
+BUY-WISH-002	Buyer - Modules	B5 Wishlist & Follow	Pass	-	Add the same item twice quickly	
+BUY-WISH-003	Buyer - Modules	B5 Wishlist & Follow	Blocked	E	Wishlist item goes out of stock or is deleted	
+BUY-WISH-004	Buyer - Modules	B5 Wishlist & Follow	Fail	B-M	Follow and unfollow a store	Fixed in this pass
+BUY-WISH-005	Buyer - Modules	B5 Wishlist & Follow	Pass	-	Wishlist and follow require login	
+BUY-CART-001	Buyer - Modules	B6 Cart	Pass	-	Same variant added twice merges	
+BUY-CART-002	Buyer - Modules	B6 Cart	Fail	B-M	Different variants stay separate	Fixed in this pass
+BUY-CART-003	Buyer - Modules	B6 Cart	Pass	-	Items grouped by store	
+BUY-CART-004	Buyer - Modules	B6 Cart	Pass	-	Select and deselect items for checkout	
+BUY-CART-005	Buyer - Modules	B6 Cart	Fail	A	Change quantity at the limits	Fixed in this pass
+BUY-CART-006	Buyer - Modules	B6 Cart	Blocked	D	Price changes while in the cart	
+BUY-CART-007	Buyer - Modules	B6 Cart	Fail	B-M	Item goes out of stock or is deleted while in the cart	
+BUY-CART-008	Buyer - Modules	B6 Cart	Fail	B-L	Cart persists after logout and on another device	
+BUY-CART-009	Buyer - Modules	B6 Cart	Pass	-	Remove an item	
+BUY-CART-010	Buyer - Modules	B6 Cart	Blocked	C	Cannot change another buyer's cart	N/A - out of scope (decision A)
+BUY-CART-011	Buyer - Modules	B6 Cart	Blocked	C	[Mobile] Change quantity with no internet	N/A - out of scope (decision A)
+BUY-CART-012	Buyer - Modules	B6 Cart	Pass	-	[Mobile] Cart badge count	
+BUY-VOU-001	Buyer - Modules	B7 Vouchers	Fail	B-M	Claim a voucher into the wallet	
+BUY-VOU-002	Buyer - Modules	B7 Vouchers	Blocked	E	Apply a store voucher	
+BUY-VOU-003	Buyer - Modules	B7 Vouchers	Fail	B-M	Stacking per the agreed rule	
+BUY-VOU-004	Buyer - Modules	B7 Vouchers	Blocked	E	Minimum spend at the boundary	
+BUY-VOU-005	Buyer - Modules	B7 Vouchers	Fail	B-M	Expired, not started, limit reached, invalid code	
+BUY-VOU-006	Buyer - Modules	B7 Vouchers	Fail	D	Per-buyer limit reached	
+BUY-VOU-007	Buyer - Modules	B7 Vouchers	Pass	-	Removing an item drops below the minimum spend	
+BUY-VOU-008	Buyer - Modules	B7 Vouchers	Pass	-	Percentage voucher respects its cap	
+BUY-VOU-009	Buyer - Modules	B7 Vouchers	Pass	-	Shipping voucher larger than shipping	
+BUY-VOU-010	Buyer - Modules	B7 Vouchers	Blocked	E	Total never negative	
+BUY-VOU-011	Buyer - Modules	B7 Vouchers	Fail	B-M	Voucher on items already on sale	
+BUY-VOU-012	Buyer - Modules	B7 Vouchers	Fail	B-L	Voucher returned after cancellation	
+BUY-CHK-001	Buyer - Modules	B8 Checkout	Fail	B-L	Checkout with the worked example	
+BUY-CHK-002	Buyer - Modules	B8 Checkout	Fail	C	Shipping fee per store and per address	N/A - out of scope (decision A)
+BUY-CHK-003	Buyer - Modules	B8 Checkout	Fail	B-L	Shipping weight at the 1 kg boundary	
+BUY-CHK-004	Buyer - Modules	B8 Checkout	Fail	D	Unserviceable address	
+BUY-CHK-005	Buyer - Modules	B8 Checkout	Fail	A	Note to seller length	Fixed in this pass
+BUY-CHK-006	Buyer - Modules	B8 Checkout	Pass	-	No payment method selected	
+BUY-CHK-007	Buyer - Modules	B8 Checkout	Pass	-	Double-tap Place Order	
+BUY-CHK-008	Buyer - Modules	B8 Checkout	Blocked	D	Price changed during checkout	
+BUY-CHK-009	Buyer - Modules	B8 Checkout	Fail	D	Stock ran out during checkout	
+BUY-CHK-010	Buyer - Modules	B8 Checkout	Fail	A	Voucher becomes invalid during checkout	Fixed in this pass
+BUY-CHK-011	Buyer - Modules	B8 Checkout	Blocked	D	Tampered price or total in the request	
+BUY-CHK-012	Buyer - Modules	B8 Checkout	Blocked	D	[Mobile] Connection lost after tapping Place Order	
+BUY-CHK-013	Buyer - Modules	B8 Checkout	Blocked	E	[Mobile] App interrupted on the checkout screen	
+BUY-PAY-001	Buyer - Modules	B9 Payment	Pass	-	COD order	
+BUY-PAY-002	Buyer - Modules	B9 Payment	Fail	D	E-wallet or card payment succeeds	
+BUY-PAY-003	Buyer - Modules	B9 Payment	Fail	D	Payment fails	
+BUY-PAY-004	Buyer - Modules	B9 Payment	Fail	D	Buyer cancels at the gateway	
+BUY-PAY-005	Buyer - Modules	B9 Payment	Fail	D	App closed on the gateway screen	
+BUY-PAY-006	Buyer - Modules	B9 Payment	Fail	D	Unpaid order auto-cancels	
+BUY-PAY-007	Buyer - Modules	B9 Payment	Fail	D	Pay just before vs after the auto-cancel time	
+BUY-PAY-008	Buyer - Modules	B9 Payment	Fail	D	[Mobile] Pay in the e-wallet app and switch back	
+BUY-PAY-009	Buyer - Modules	B9 Payment	Fail	D	[Mobile] Back button while payment is processing	
+TC-COU-001	Courier - Account Creation	Courier	Blocked	C	Create a courier with all valid data	N/A - out of scope (decision A)
+TC-COU-002	Courier - Account Creation	Courier	Blocked	C	Submit a completely empty form	N/A - out of scope (decision A)
+TC-COU-003	Courier - Account Creation	Courier	Blocked	C	Leave one required field blank at a time	N/A - out of scope (decision A)
+TC-COU-004	Courier - Account Creation	Courier	Blocked	C	Name with numbers or symbols	N/A - out of scope (decision A)
+TC-COU-005	Courier - Account Creation	Courier	Blocked	C	Name length at the limits	N/A - out of scope (decision A)
+TC-COU-006	Courier - Account Creation	Courier	Blocked	C	Age at the 18-year limit	N/A - out of scope (decision A)
+TC-COU-007	Courier - Account Creation	Courier	Blocked	C	Email in an invalid format	N/A - out of scope (decision A)
+TC-COU-008	Courier - Account Creation	Courier	Blocked	C	Email already used by a rider or a buyer	N/A - out of scope (decision A)
+TC-COU-009	Courier - Account Creation	Courier	Blocked	C	Mobile number in an invalid format	N/A - out of scope (decision A)
+TC-COU-010	Courier - Account Creation	Courier	Blocked	C	Mobile number length at the limits	N/A - out of scope (decision A)
+TC-COU-011	Courier - Account Creation	Courier	Blocked	C	Mobile number already used by a rider	N/A - out of scope (decision A)
+TC-COU-012	Courier - Account Creation	Courier	Blocked	C	Driver's license number in an invalid format	N/A - out of scope (decision A)
+TC-COU-013	Courier - Account Creation	Courier	Blocked	C	License number already used by a courier or a rider	N/A - out of scope (decision A)
+TC-COU-014	Courier - Account Creation	Courier	Blocked	C	License expiry date at the limit	N/A - out of scope (decision A)
+TC-COU-015	Courier - Account Creation	Courier	Blocked	C	Only a professional license is accepted	N/A - out of scope (decision A)
+TC-COU-016	Courier - Account Creation	Courier	Blocked	C	DL codes must cover the vehicle type	N/A - out of scope (decision A)
+TC-COU-017	Courier - Account Creation	Courier	Blocked	C	Load capacity at the limits for each vehicle type	N/A - out of scope (decision A)
+TC-COU-018	Courier - Account Creation	Courier	Blocked	C	Changing the vehicle type re-checks capacity and DL codes	N/A - out of scope (decision A)
+TC-COU-019	Courier - Account Creation	Courier	Blocked	C	Plate number already used by a courier or a rider	N/A - out of scope (decision A)
+TC-COU-020	Courier - Account Creation	Courier	Blocked	C	Home hub list shows only the company's own hubs	N/A - out of scope (decision A)
+TC-COU-021	Courier - Account Creation	Courier	Blocked	C	Upload documents in each accepted file type	N/A - out of scope (decision A)
+TC-COU-022	Courier - Account Creation	Courier	Blocked	C	Upload a file type that is not accepted	N/A - out of scope (decision A)
+TC-COU-023	Courier - Account Creation	Courier	Blocked	C	File size at the limit	N/A - out of scope (decision A)
+TC-COU-024	Courier - Account Creation	Courier	Blocked	C	Tap Save several times quickly	N/A - out of scope (decision A)
+TC-COU-025	Courier - Account Creation	Courier	Fail	C	Courier activates the account with a valid password	N/A - out of scope (decision A)
+TC-COU-026	Courier - Account Creation	Courier	Fail	C	Set a password that breaks the password rule	N/A - out of scope (decision A)
+TC-COU-027	Courier - Account Creation	Courier	Fail	C	Confirm Password does not match	N/A - out of scope (decision A)
+TC-COU-028	Courier - Account Creation	Courier	Fail	C	Open an expired activation link	N/A - out of scope (decision A)
+TC-COU-029	Courier - Account Creation	Courier	Fail	C	Logistics resends the activation email	N/A - out of scope (decision A)
+TC-COU-030	Courier - Account Creation	Courier	Fail	C	Reuse the activation link after activating	N/A - out of scope (decision A)
+TC-COU-031	Courier - Account Creation	Courier	Blocked	C	Courier logs in before activating	N/A - out of scope (decision A)
+TC-COU-032	Courier - Account Creation	Courier	Blocked	C	Courier logs in after activating	N/A - out of scope (decision A)
+TC-COU-033	Courier - Account Creation	Courier	Blocked	D	Courier is visible only to the company that created it	N/A - out of scope (decision A)
+TC-COU-034	Courier - Account Creation	Courier	Fail	C	No public courier registration	N/A - out of scope (decision A)
+TC-COU-035	Courier - Account Creation	Courier	Blocked	D	Buyer, seller or rider opens the Add Courier form	N/A - out of scope (decision A)
+TC-COU-036	Courier - Account Creation	Courier	Blocked	D	Pending logistics account tries to add a courier	N/A - out of scope (decision A)
+TC-COU-037	Courier - Account Creation	Courier	Blocked	D	Open another role's screens, including rider jobs	N/A - out of scope (decision A)
+TC-COU-038	Courier - Account Creation	Courier	Blocked	C	[Mobile] Each field opens the right keyboard	N/A - out of scope (decision A)
+TC-COU-039	Courier - Account Creation	Courier	Blocked	C	[Mobile] Keyboard never hides the active field or Save	N/A - out of scope (decision A)
+TC-COU-040	Courier - Account Creation	Courier	Blocked	C	[Mobile] App sent to the background while filling the form	N/A - out of scope (decision A)
+TC-COU-041	Courier - Account Creation	Courier	Blocked	C	[Mobile] Rotate the phone while the form has data	N/A - out of scope (decision A)
+TC-COU-042	Courier - Account Creation	Courier	Blocked	C	[Mobile] Save with no internet connection	N/A - out of scope (decision A)
+TC-COU-043	Courier - Account Creation	Courier	Blocked	C	[Mobile] Connection drops right after tapping Save	N/A - out of scope (decision A)
+TC-COU-044	Courier - Account Creation	Courier	Blocked	C	[Mobile] System Back on the Add Courier form	N/A - out of scope (decision A)
+TC-COU-045	Courier - Account Creation	Courier	Blocked	C	[Mobile] Upload with the camera, the Files app and the gallery	N/A - out of scope (decision A)
+TC-COU-046	Courier - Account Creation	Courier	Blocked	C	[Mobile] Camera or photo access denied	N/A - out of scope (decision A)
+TC-COU-047	Courier - Account Creation	Courier	Blocked	C	[Mobile] Full-resolution camera photo bigger than 5 MB	N/A - out of scope (decision A)
+TC-COU-048	Courier - Account Creation	Courier	Blocked	C	[Mobile] Large system font on a small screen	N/A - out of scope (decision A)
+TC-COU-049	Courier - Account Creation	Courier	Fail	C	[Mobile] Activation link opened on the courier's phone with the app installed	N/A - out of scope (decision A)
+TC-COU-050	Courier - Account Creation	Courier	Fail	C	[Mobile] Activation link opened on a phone without the app	N/A - out of scope (decision A)
+TC-COU-051	Courier - Account Creation	Courier	Pass	-	[Mobile] Stay logged in after closing the app or restarting the phone	
+TC-COU-052	Courier - Account Creation	Courier	Pass	-	[Mobile] Back after logging out	
+COU-PROF-001	Courier - Modules	C1 Profile & Vehicle	Fail	C	View profile, vehicle and documents	
+COU-PROF-002	Courier - Modules	C1 Profile & Vehicle	Fail	C	Update load capacity and OR/CR	
+COU-PROF-003	Courier - Modules	C1 Profile & Vehicle	Fail	C	Plate number already used by a courier or a rider	
+COU-PROF-004	Courier - Modules	C1 Profile & Vehicle	Fail	C	License expiry boundary	
+COU-PROF-005	Courier - Modules	C1 Profile & Vehicle	Fail	C	Document upload rules	
+COU-PROF-006	Courier - Modules	C1 Profile & Vehicle	Blocked	D	Suspended courier cannot work	
+COU-PROF-007	Courier - Modules	C1 Profile & Vehicle	Blocked	D	Courier cannot see another courier's profile	
+COU-PROF-008	Courier - Modules	C1 Profile & Vehicle	Fail	C	[Mobile] Update documents with the camera and the Files app	
+COU-SHIFT-001	Courier - Modules	C2 Shift & Availability	Fail	C	Go On Duty after a passed pre-trip checklist	
+COU-SHIFT-002	Courier - Modules	C2 Shift & Availability	Fail	C	Checklist item marked Not OK	
+COU-SHIFT-003	Courier - Modules	C2 Shift & Availability	Fail	C	Checklist not finished	
+COU-SHIFT-004	Courier - Modules	C2 Shift & Availability	Fail	C	Off Duty is blocked during an active trip	
+COU-SHIFT-005	Courier - Modules	C2 Shift & Availability	Fail	C	Go Off Duty with no trip	
+COU-SHIFT-006	Courier - Modules	C2 Shift & Availability	Fail	E	[Mobile] Location permission needed to go On Duty	
+COU-SHIFT-007	Courier - Modules	C2 Shift & Availability	Fail	E	[Mobile] App force-closed while On Duty	
+COU-TRIP-001	Courier - Modules	C3 Trip Assignment	Fail	C	View an assigned trip	
+COU-TRIP-002	Courier - Modules	C3 Trip Assignment	Fail	C	Accept the trip	
+COU-TRIP-003	Courier - Modules	C3 Trip Assignment	Fail	C	Decline a trip with a reason	
+COU-TRIP-004	Courier - Modules	C3 Trip Assignment	Fail	C	Only one active trip per courier	
+COU-TRIP-005	Courier - Modules	C3 Trip Assignment	Blocked	D	Accept and reassignment at the same moment	
+COU-TRIP-006	Courier - Modules	C3 Trip Assignment	Blocked	D	Cannot accept another company's trip	
+COU-TRIP-007	Courier - Modules	C3 Trip Assignment	Fail	E	[Mobile] Trip notification while the phone is locked	
+COU-TRIP-008	Courier - Modules	C3 Trip Assignment	Fail	E	[Mobile] Navigate to the destination hub	
+COU-LOAD-001	Courier - Modules	C4 Loading & Departure	Fail	C	Load by scanning every parcel	
+COU-LOAD-002	Courier - Modules	C4 Loading & Departure	Fail	C	Scan a parcel that is not in this trip	
+COU-LOAD-003	Courier - Modules	C4 Loading & Departure	Fail	C	Scan the same parcel twice	
+COU-LOAD-004	Courier - Modules	C4 Loading & Departure	Fail	C	Depart with a parcel not loaded	
+COU-LOAD-005	Courier - Modules	C4 Loading & Departure	Fail	C	Seal number format	
+COU-LOAD-006	Courier - Modules	C4 Loading & Departure	Fail	C	Depart updates every parcel	
+COU-LOAD-007	Courier - Modules	C4 Loading & Departure	Fail	C	Depart away from the origin hub	
+COU-LOAD-008	Courier - Modules	C4 Loading & Departure	Fail	E	[Mobile] Scan with the camera, flashlight and manual entry	
+COU-LOAD-009	Courier - Modules	C4 Loading & Departure	Fail	E	[Mobile] Loading scans with no internet	
+COU-TRN-001	Courier - Modules	C5 In Transit	Fail	C	Live location visible to Logistics	
+COU-TRN-002	Courier - Modules	C5 In Transit	Fail	C	Report a delay	
+COU-TRN-003	Courier - Modules	C5 In Transit	Fail	C	Delay report validation	
+COU-TRN-004	Courier - Modules	C5 In Transit	Fail	C	Vehicle breakdown and reassignment	
+COU-TRN-005	Courier - Modules	C5 In Transit	Fail	C	Cannot mark Arrived far from the destination hub	
+COU-TRN-006	Courier - Modules	C5 In Transit	Fail	E	[Mobile] App closed during the trip	
+COU-TRN-007	Courier - Modules	C5 In Transit	Fail	E	[Mobile] No signal on the route	
+COU-ARR-001	Courier - Modules	C6 Arrival & Handover	Fail	C	Arrive and hand over every parcel	
+COU-ARR-002	Courier - Modules	C6 Arrival & Handover	Fail	C	Seal number does not match	
+COU-ARR-003	Courier - Modules	C6 Arrival & Handover	Fail	C	Parcel missing at unloading	
+COU-ARR-004	Courier - Modules	C6 Arrival & Handover	Fail	C	Damaged parcel at unloading	
+COU-ARR-005	Courier - Modules	C6 Arrival & Handover	Fail	C	Parcel scanned in at the wrong hub	
+COU-ARR-006	Courier - Modules	C6 Arrival & Handover	Blocked	D	Courier cannot confirm their own handover	
+COU-ARR-007	Courier - Modules	C6 Arrival & Handover	Fail	E	[Mobile] Trip-completed push notification	
+COU-PAY-001	Courier - Modules	C7 Trip History & Pay	Fail	C	Trip history	
+COU-PAY-002	Courier - Modules	C7 Trip History & Pay	Fail	C	Pay per trip and daily total	
+COU-PAY-003	Courier - Modules	C7 Trip History & Pay	Fail	C	Pay by vehicle type	
+COU-PAY-004	Courier - Modules	C7 Trip History & Pay	Fail	C	Date filter boundaries	
+COU-PAY-005	Courier - Modules	C7 Trip History & Pay	Blocked	D	Cannot view another courier's pay	
+COU-PAY-006	Courier - Modules	C7 Trip History & Pay	Fail	E	[Mobile] Earnings update after a trip is completed	
+TC-RID-001	Rider - Account Creation	Rider	Blocked	C	Create a rider with all valid data	N/A - out of scope (decision A)
+TC-RID-002	Rider - Account Creation	Rider	Blocked	C	Submit a completely empty form	N/A - out of scope (decision A)
+TC-RID-003	Rider - Account Creation	Rider	Blocked	C	Leave one required field blank at a time	N/A - out of scope (decision A)
+TC-RID-004	Rider - Account Creation	Rider	Blocked	C	Name with numbers or symbols	N/A - out of scope (decision A)
+TC-RID-005	Rider - Account Creation	Rider	Blocked	C	Name length at the limits	N/A - out of scope (decision A)
+TC-RID-006	Rider - Account Creation	Rider	Blocked	C	Age at the 18-year limit	N/A - out of scope (decision A)
+TC-RID-007	Rider - Account Creation	Rider	Blocked	C	Email in an invalid format	N/A - out of scope (decision A)
+TC-RID-008	Rider - Account Creation	Rider	Blocked	C	Email already used by an account of another role	N/A - out of scope (decision A)
+TC-RID-009	Rider - Account Creation	Rider	Blocked	C	Mobile number in an invalid format	N/A - out of scope (decision A)
+TC-RID-010	Rider - Account Creation	Rider	Blocked	C	Mobile number length at the limits	N/A - out of scope (decision A)
+TC-RID-011	Rider - Account Creation	Rider	Blocked	C	Mobile number that is already registered	N/A - out of scope (decision A)
+TC-RID-012	Rider - Account Creation	Rider	Blocked	C	Driver's license number in an invalid format	N/A - out of scope (decision A)
+TC-RID-013	Rider - Account Creation	Rider	Blocked	C	Driver's license number already registered	N/A - out of scope (decision A)
+TC-RID-014	Rider - Account Creation	Rider	Blocked	C	License expiry date at the limit	N/A - out of scope (decision A)
+TC-RID-015	Rider - Account Creation	Rider	Blocked	C	Plate number already registered	N/A - out of scope (decision A)
+TC-RID-016	Rider - Account Creation	Rider	Blocked	C	Upload documents in each accepted file type	N/A - out of scope (decision A)
+TC-RID-017	Rider - Account Creation	Rider	Blocked	C	Upload a file type that is not accepted	N/A - out of scope (decision A)
+TC-RID-018	Rider - Account Creation	Rider	Blocked	C	File size at the limit	N/A - out of scope (decision A)
+TC-RID-019	Rider - Account Creation	Rider	Blocked	C	Tap Save several times quickly	N/A - out of scope (decision A)
+TC-RID-020	Rider - Account Creation	Rider	Fail	C	Rider activates the account with a valid password	N/A - out of scope (decision A)
+TC-RID-021	Rider - Account Creation	Rider	Fail	C	Set a password that breaks the password rule	N/A - out of scope (decision A)
+TC-RID-022	Rider - Account Creation	Rider	Fail	C	Confirm Password does not match	N/A - out of scope (decision A)
+TC-RID-023	Rider - Account Creation	Rider	Fail	C	Open an expired activation link	N/A - out of scope (decision A)
+TC-RID-024	Rider - Account Creation	Rider	Fail	C	Logistics resends the activation email	N/A - out of scope (decision A)
+TC-RID-025	Rider - Account Creation	Rider	Fail	C	Reuse the activation link after activating	N/A - out of scope (decision A)
+TC-RID-026	Rider - Account Creation	Rider	Blocked	C	Rider logs in before activating	N/A - out of scope (decision A)
+TC-RID-027	Rider - Account Creation	Rider	Blocked	C	Rider logs in after activating	N/A - out of scope (decision A)
+TC-RID-028	Rider - Account Creation	Rider	Blocked	D	Rider is visible only to the company that created it	N/A - out of scope (decision A)
+TC-RID-029	Rider - Account Creation	Rider	Pass	-	No public rider registration	
+TC-RID-030	Rider - Account Creation	Rider	Blocked	D	Buyer or seller opens the Add Rider form	N/A - out of scope (decision A)
+TC-RID-031	Rider - Account Creation	Rider	Blocked	D	Pending logistics account tries to add a rider	N/A - out of scope (decision A)
+TC-RID-032	Rider - Account Creation	Rider	Blocked	D	Open another role's screens	N/A - out of scope (decision A)
+TC-RID-033	Rider - Account Creation	Rider	Blocked	C	[Mobile] Each field opens the right keyboard	N/A - out of scope (decision A)
+TC-RID-034	Rider - Account Creation	Rider	Blocked	C	[Mobile] Keyboard never hides the active field or Save	N/A - out of scope (decision A)
+TC-RID-035	Rider - Account Creation	Rider	Blocked	C	[Mobile] App sent to the background while filling the form	N/A - out of scope (decision A)
+TC-RID-036	Rider - Account Creation	Rider	Blocked	C	[Mobile] Rotate the phone while the form has data	N/A - out of scope (decision A)
+TC-RID-037	Rider - Account Creation	Rider	Blocked	C	[Mobile] Save with no internet connection	N/A - out of scope (decision A)
+TC-RID-038	Rider - Account Creation	Rider	Blocked	C	[Mobile] Connection drops right after tapping Save	N/A - out of scope (decision A)
+TC-RID-039	Rider - Account Creation	Rider	Blocked	C	[Mobile] System Back on the Add Rider form	N/A - out of scope (decision A)
+TC-RID-040	Rider - Account Creation	Rider	Blocked	C	[Mobile] Upload with the camera, the Files app and the gallery	N/A - out of scope (decision A)
+TC-RID-041	Rider - Account Creation	Rider	Blocked	C	[Mobile] Camera or photo access denied	N/A - out of scope (decision A)
+TC-RID-042	Rider - Account Creation	Rider	Blocked	C	[Mobile] Full-resolution camera photo bigger than 5 MB	N/A - out of scope (decision A)
+TC-RID-043	Rider - Account Creation	Rider	Blocked	C	[Mobile] Large system font on a small screen	N/A - out of scope (decision A)
+TC-RID-044	Rider - Account Creation	Rider	Fail	C	[Mobile] Activation link opened on the rider's phone with the app installed	N/A - out of scope (decision A)
+TC-RID-045	Rider - Account Creation	Rider	Fail	C	[Mobile] Activation link opened on a phone without the app	N/A - out of scope (decision A)
+TC-RID-046	Rider - Account Creation	Rider	Blocked	C	[Mobile] Stay logged in after closing the app or restarting the phone	N/A - out of scope (decision A)
+TC-RID-047	Rider - Account Creation	Rider	Blocked	C	[Mobile] Back after logging out	N/A - out of scope (decision A)
+RID-PROF-001	Rider - Modules	R1 Profile & Vehicle	Fail	B-M	View profile, vehicle and verification status	
+RID-PROF-002	Rider - Modules	R1 Profile & Vehicle	Fail	B-M	Update vehicle details	
+RID-PROF-003	Rider - Modules	R1 Profile & Vehicle	Fail	D	Plate number already used	
+RID-PROF-004	Rider - Modules	R1 Profile & Vehicle	Fail	B-M	License expiry boundary	
+RID-PROF-005	Rider - Modules	R1 Profile & Vehicle	Fail	B-M	Document upload rules	
+RID-PROF-006	Rider - Modules	R1 Profile & Vehicle	Fail	D	Suspended rider cannot work	
+RID-PROF-007	Rider - Modules	R1 Profile & Vehicle	Blocked	D	Rider cannot see another rider's profile	
+RID-PROF-008	Rider - Modules	R1 Profile & Vehicle	Fail	B-M	[Mobile] Update documents with the camera and the Files app	
+RID-AVAIL-001	Rider - Modules	R2 Availability	Fail	B-L	Go Online	
+RID-AVAIL-002	Rider - Modules	R2 Availability	Fail	B-L	Go Offline	
+RID-AVAIL-003	Rider - Modules	R2 Availability	Fail	B-L	Go Offline with an active job	
+RID-AVAIL-004	Rider - Modules	R2 Availability	Fail	B-L	Offline after logout or session timeout	
+RID-AVAIL-005	Rider - Modules	R2 Availability	Fail	E	[Mobile] Location permission needed to go Online	
+RID-AVAIL-006	Rider - Modules	R2 Availability	Fail	E	[Mobile] Location turned off while Online	
+RID-AVAIL-007	Rider - Modules	R2 Availability	Fail	E	[Mobile] App force-closed while Online	
+RID-JOB-001	Rider - Modules	R3 Job Assignment	Fail	B-M	View and accept a job	
+RID-JOB-002	Rider - Modules	R3 Job Assignment	Fail	B-M	Decline a job	
+RID-JOB-003	Rider - Modules	R3 Job Assignment	Fail	B-M	Offer timeout	
+RID-JOB-004	Rider - Modules	R3 Job Assignment	Fail	B-M	Job goes to Unassigned after 3 declines	
+RID-JOB-005	Rider - Modules	R3 Job Assignment	Blocked	D	Accept and manual assignment at the same moment	
+RID-JOB-006	Rider - Modules	R3 Job Assignment	Fail	B-M	Concurrent job limit	
+RID-JOB-007	Rider - Modules	R3 Job Assignment	Blocked	D	Cannot accept another company's job	
+RID-JOB-008	Rider - Modules	R3 Job Assignment	Fail	E	[Mobile] Job offer while the phone is locked	
+RID-JOB-009	Rider - Modules	R3 Job Assignment	Blocked	E	[Mobile] Navigate to the pickup address	
+RID-PICK-001	Rider - Modules	R4 Pickup	Fail	A	Pickup details shown	Fixed in this pass
+RID-PICK-002	Rider - Modules	R4 Pickup	Fail	B-M	Confirm pickup by scanning	
+RID-PICK-003	Rider - Modules	R4 Pickup	Fail	B-M	Confirm pickup by typing the tracking number	Fixed in this pass
+RID-PICK-004	Rider - Modules	R4 Pickup	Fail	B-M	Wrong tracking number	Fixed in this pass
+RID-PICK-005	Rider - Modules	R4 Pickup	Blocked	E	Double scan at pickup	
+RID-PICK-006	Rider - Modules	R4 Pickup	Fail	E	[Mobile] Camera access denied for the waybill scan	
+RID-PICK-007	Rider - Modules	R4 Pickup	Blocked	D	[Mobile] Pickup with no internet	
+RID-DLV-001	Rider - Modules	R5 Delivery	Blocked	E	Deliver with proof in sequence	
+RID-DLV-002	Rider - Modules	R5 Delivery	Pass	-	Skipping a status	
+RID-DLV-003	Rider - Modules	R5 Delivery	Pass	-	Photo is required	
+RID-DLV-004	Rider - Modules	R5 Delivery	Fail	B-M	OTP checks	
+RID-DLV-005	Rider - Modules	R5 Delivery	Fail	B-M	COD amount must match	
+RID-DLV-006	Rider - Modules	R5 Delivery	Fail	B-M	Prepaid order has no COD	
+RID-DLV-007	Rider - Modules	R5 Delivery	Blocked	D	Cannot update another rider's job	
+RID-DLV-008	Rider - Modules	R5 Delivery	Fail	A	[Mobile] Proof-of-delivery photo must be taken live	Fixed in this pass
+RID-DLV-009	Rider - Modules	R5 Delivery	Blocked	D	[Mobile] Mark Delivered with no internet	
+RID-DLV-010	Rider - Modules	R5 Delivery	Fail	A	[Mobile] Call or message the buyer from the job	Fixed in this pass
+RID-DLV-011	Rider - Modules	R5 Delivery	Fail	E	[Mobile] Delivery location is recorded	
+RID-FAIL-001	Rider - Modules	R6 Failed Delivery	Fail	B-M	Mark failed with a reason	
+RID-FAIL-002	Rider - Modules	R6 Failed Delivery	Fail	A	Reason required	Fixed in this pass
+RID-FAIL-003	Rider - Modules	R6 Failed Delivery	Fail	A	Refused goes straight to Return to Sender	Fixed in this pass
+RID-FAIL-004	Rider - Modules	R6 Failed Delivery	Fail	A	Attempt counter and reschedule	Fixed in this pass
+RID-FAIL-005	Rider - Modules	R6 Failed Delivery	Fail	B-M	Return to Sender after the 3rd failed attempt	Partial
+RID-EARN-001	Rider - Modules	R7 Earnings & COD	Blocked	E	Delivery history	
+RID-EARN-002	Rider - Modules	R7 Earnings & COD	Blocked	E	Pay per job and daily total	
+RID-EARN-003	Rider - Modules	R7 Earnings & COD	Fail	B-M	COD balance to remit	
+RID-EARN-004	Rider - Modules	R7 Earnings & COD	Fail	B-M	Remit COD and confirmation	
+RID-EARN-005	Rider - Modules	R7 Earnings & COD	Fail	B-M	Short remittance	
+RID-EARN-006	Rider - Modules	R7 Earnings & COD	Blocked	D	Rider cannot confirm own remittance	

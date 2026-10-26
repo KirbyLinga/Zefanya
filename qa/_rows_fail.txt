@@ -1,0 +1,130 @@
+=== TC-BUY-015 | Buyer - Account Creation | Mobile Number | Mobile number that is already registered
+EXPECTED: Registration is blocked. A message says the mobile number is already in use.
+ACTUAL: Duplicate mobile numbers are only detectable by the server.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== TC-BUY-016 | Buyer - Account Creation | Mobile Number | Registered number entered in +63 format
+EXPECTED: The +63 format is recognised as the same number. Registration is blocked. A message says the mobile number is already in use.
+ACTUAL: +63 and 09 forms both pass the format check; treating them as the same number is a server rule.
+REMARKS: Needs live Laravel API (--dart-define=zefanya.useLiveApi=true).
+
+=== BUY-ADDR-008 | Buyer - Modules | Address Book | Edit or delete an address used by an active order
+EXPECTED: The order, the seller's view and the waybill still show the original ADDR-2 exactly.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+REMARKS: Feature is not in the app.
+
+=== BUY-PDP-006 | Buyer - Modules | Product Detail Page | Sale price, countdown and vouchers shown
+EXPECTED: Shows ₱299 with ₱450 struck through, a countdown to the slot end, the flash units left, and MCH50 with a Claim button.
+ACTUAL: No sale price, countdown, flash units or voucher claim on the product screen.
+REMARKS: Feature is not in the app.
+
+=== BUY-CART-008 | Buyer - Modules | Cart | Cart persists after logout and on another device
+EXPECTED: The same 2 items and quantities appear in both phones.
+ACTUAL: The cart is stored on the phone only. It is not tied to the account or synced to another phone.
+REMARKS: None
+
+=== BUY-CHK-003 | Buyer - Modules | Checkout | Shipping weight at the 1 kg boundary
+EXPECTED: 1.0 kg is charged as 1 kg: ₱60.00. 1.2 kg is charged as 2 kg: ₱80.00.
+ACTUAL: No weight-based shipping.
+REMARKS: Feature is not in the app.
+
+=== BUY-TRK-002 | Buyer - Modules | Order Tracking & History | Timeline matches seller, rider, courier and logistics updates
+EXPECTED: Each event appears once, in order, with its time: Picked Up, At Hub (HUB-QC), In Transit to HUB-PSG, At Hub (HUB-PSG), Out for Delivery. The order moves to To Receive at Picked Up. The courier's name and location are not shown to the buyer.
+ACTUAL: The timeline uses the app's own steps (sorting centre, rider) from local courier state, not hubs from Logistics.
+REMARKS: None
+
+=== BUY-CAN-001 | Buyer - Modules | Cancellation | Cancel a COD order before shipping
+EXPECTED: The order is Cancelled on both sides. Stock is 20. Seller 1 is notified with the reason.
+ACTUAL: The buyer has no Cancel option.
+REMARKS: Feature is not in the app.
+
+=== BUY-CAN-003 | Buyer - Modules | Cancellation | Cancel a prepaid order
+EXPECTED: The order is Cancelled and a refund for the exact amount paid is started. MCH50 returns to the wallet.
+ACTUAL: The buyer has no Cancel option.
+REMARKS: Feature is not in the app.
+
+=== BUY-CAN-006 | Buyer - Modules | Cancellation | Double-tap Cancel
+EXPECTED: One cancellation; stock restored once (not twice).
+ACTUAL: The buyer has no Cancel option.
+REMARKS: Feature is not in the app.
+
+=== BUY-RATE-001 | Buyer - Modules | Ratings & Reviews | Rate a completed order
+EXPECTED: The review appears on P-02 with 5 stars, the text, the photo, the variant and Buyer 1's (masked) name.
+ACTUAL: A review has stars and an optional comment only. No photo, variant or masked name.
+REMARKS: None
+
+=== BUY-CHAT-003 | Buyer - Modules | Chat & Notifications | Order status notifications
+EXPECTED: Exactly one notification per change. Each opens the right order.
+ACTUAL: No notifications for order status changes.
+REMARKS: Feature is not in the app.
+
+=== BUY-CHAT-004 | Buyer - Modules | Chat & Notifications | Flash-sale reminder
+EXPECTED: A reminder arrives before the slot starts and links to P-02.
+ACTUAL: No flash-sale reminders.
+REMARKS: Feature is not in the app.
+
+=== RID-PROF-008 | Rider - Modules | Profile, Vehicle & Documents | [Mobile] Update documents with the camera and the Files app
+EXPECTED: Both are accepted with previews, and Logistics 1 sees the new documents flagged for re-verification, as in RID-PROF-002.
+ACTUAL: No Files source and no re-verification flag.
+REMARKS: None
+
+=== RID-AVAIL-001 | Rider - Modules | Availability | Go Online
+EXPECTED: Logistics 1 sees Rider 1 as Online within a few seconds. Rider 1 receives the offer.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+REMARKS: Feature is not in the app.
+
+=== RID-AVAIL-002 | Rider - Modules | Availability | Go Offline
+EXPECTED: Rider 1 receives no offer, and is not listed in Manual Assign. The job goes to Rider 2.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+REMARKS: Feature is not in the app.
+
+=== RID-AVAIL-004 | Rider - Modules | Availability | Offline after logout or session timeout
+EXPECTED: Rider 1 shows Offline and gets no offer.
+ACTUAL: No Online/Offline toggle, location permission or presence tracking.
+REMARKS: Feature is not in the app.
+
+=== RID-JOB-001 | Rider - Modules | Job Assignment | View and accept a job
+EXPECTED: The offer shows pickup (Seller 1, Commonwealth, QC), drop-off area (Brgy. Central, QC), COD ₱500.00 and pay ₱30.00 pickup. After Accept, the job is Assigned to Rider 1 and Logistics 1 sees Rider 1 as the assignee.
+ACTUAL: Jobs list pickup, drop-off area and package. No COD amount; jobs are not timed offers.
+REMARKS: None
+
+=== RID-JOB-002 | Rider - Modules | Job Assignment | Decline a job
+EXPECTED: The offer disappears for Rider 1 and is offered to Rider 2. Rider 1 is not assigned.
+ACTUAL: No decline/offer flow.
+REMARKS: Feature is not in the app.
+
+=== RID-JOB-003 | Rider - Modules | Job Assignment | Offer timeout
+EXPECTED: The first Accept succeeds. After 60 seconds the second offer is expired; Accept is disabled or rejected and the job goes to the next rider.
+ACTUAL: No 60-second offer timeout.
+REMARKS: Feature is not in the app.
+
+=== RID-JOB-004 | Rider - Modules | Job Assignment | Job goes to Unassigned after 3 declines
+EXPECTED: After the 3rd decline the job is in the Unassigned queue and no longer offered automatically.
+ACTUAL: No Unassigned queue or 3-decline rule.
+REMARKS: Feature is not in the app.
+
+=== RID-JOB-006 | Rider - Modules | Job Assignment | Concurrent job limit
+EXPECTED: The 3rd is accepted. Rider 1 gets no 4th offer, and manual assign of a 4th is blocked.
+ACTUAL: No concurrent job limit.
+REMARKS: Feature is not in the app.
+
+=== RID-PICK-002 | Rider - Modules | Pickup | Confirm pickup by scanning
+EXPECTED: Status is Picked Up with the scan time in all three views. Buyer 1's order moves to To Receive. Seller 1 can no longer cancel. Rider 1 earns ₱30.00.
+ACTUAL: Pickup is confirmed with the "Confirm Pickup from Seller" button. No waybill scan.
+REMARKS: None
+
+=== RID-PICK-006 | Rider - Modules | Pickup | [Mobile] Camera access denied for the waybill scan
+EXPECTED: No crash. A message explains that camera access is needed and links to Settings. Typing the tracking number gives Picked Up, as in RID-PICK-003.
+ACTUAL: No scan, so no camera-denied flow.
+REMARKS: Feature is not in the app.
+
+=== RID-DLV-008 | Rider - Modules | Delivery & Status Updates | [Mobile] Proof-of-delivery photo must be taken live
+EXPECTED: The gallery is not offered, or the gallery photo is refused. The live photo is accepted and Buyer 1 sees it with the delivery time.
+ACTUAL: The picker offers Gallery as well as Camera, so a live photo is not enforced.
+REMARKS: None
+
+=== RID-FAIL-005 | Rider - Modules | Failed Delivery | Return to Sender after the 3rd failed attempt
+EXPECTED: Status Return to Sender. No 4th attempt is possible. Buyer 1 and Seller 1 are notified.
+ACTUAL: No 3-attempt rule.
+REMARKS: Feature is not in the app.
+

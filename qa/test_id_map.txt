@@ -1,0 +1,72 @@
+BUY-ACCT-002 5
+   validators_test.dart | BUY-ACCT-002 person names (A2) empty and one-character names are refused
+   validators_test.dart | BUY-ACCT-002 person names (A2) 2 and 50 characters are accepted; 51 is not
+   validators_test.dart | BUY-ACCT-002 person names (A2) letters, spaces, hyphen, apostrophe, period and ñ survive
+   validators_test.dart | BUY-ACCT-002 person names (A2) numbers and other symbols are refused
+   workbook_buyer_phase3_test.dart | BUY-ACCT-002 profile field validation an invalid name is refused with a field message
+BUY-ACCT-003 2
+   account_security_test.dart | BUY-ACCT-003 the correct current password changes it, shows success, and the old password no longer works in the mock account
+BUY-ACCT-006 1
+   account_security_test.dart | BUY-ACCT-006 the old address stays live until the code, then the profile and a cold start show the new one
+BUY-ACCT-007 1
+   account_security_test.dart | BUY-ACCT-007 the code field shows the wrong-code message inline
+BUY-ACCT-009 1
+   account_security_test.dart | BUY-ACCT-009 the phone screen accepts +63, verifies, then reports the normalized number
+BUY-ADDR-001 10
+   address_book_test.dart | address book screen BUY-ADDR-001 adds a second address with the values entered
+BUY-ADDR-002 6
+   address_book_test.dart | address book screen BUY-ADDR-002 changing region clears city and barangay
+BUY-ADDR-003 1
+   address_book_test.dart | address book screen BUY-ADDR-003 blank fields keep the form open with messages
+BUY-ADDR-011 5
+   address_book_test.dart | address book screen BUY-ADDR-011 recipient/phone/street use the right keyboards and Save stays reachable above the keyboard
+BUY-CHAT-002 1
+   buyer_bm_quick_wins_test.dart | BUY-CHAT-002 attachments and length an invalid file and a 1001-character message are not sent
+BUY-CHK-001 6
+   workbook_buyer_phase3_test.dart | BUY-CHK-001 checkout with the worked example summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083
+   workbook_buyer_phase3_test.dart | BUY-CHK-001 checkout with the worked example the cart becomes one order per seller and empties
+BUY-CHK-005 1
+   workbook_buyer_phase3_test.dart | BUY-CHK-005 delivery note caps at 200 characters the field accepts 200 and refuses the 201st
+BUY-CHK-006 1
+   workbook_buyer_phase3_test.dart | BUY-CHK-006 payment method Cash on Delivery is preselected
+BUY-CHK-007 1
+   workbook_buyer_phase3_test.dart | BUY-CHK-007 double-tap Place Order the button disables and the repository is called once
+BUY-CHK-009 1
+   workbook_buyer_phase3_test.dart | BUY-CHK-009 stock ran out during checkout an out-of-stock line blocks the order
+BUY-CHK-010 1
+   workbook_buyer_phase3_test.dart | BUY-CHK-010 voucher becomes invalid during checkout the code is removed, the message is shown, and the total moves
+BUY-PDP-001 49
+   product_variants_test.dart | BUY-PDP-001: both variation types are required
+BUY-PDP-005 2
+   buyer_bm_quick_wins_test.dart | BUY-PDP-005 purchase limit a third unit is blocked in a fresh cart
+BUY-PDP-007 11
+   workbook_buyer_phase3_test.dart | BUY-PDP-007 Buy Now checks out only that item checkout receives p1 alone while p6 stays in the cart
+BUY-RATE-004 16
+   review_limits_test.dart | BUY-RATE-004 stars, text and photo limits the form uses the shared 500/5 limits
+   review_limits_test.dart | BUY-RATE-004 stars, text and photo limits 0 stars disables Submit; 501 characters stop at 500
+   review_limits_test.dart | BUY-RATE-004 stars, text and photo limits five stored photos fill the strip and hide the add tile
+BUY-SRCH-004 1
+   workbook_buyer_phase3_test.dart | BUY-SRCH-004 typo and no results a one-letter typo offers the catalogue word, zzqxw does not
+BUY-SRCH-007 2
+   workbook_buyer_phase3_test.dart | BUY-SRCH-007 price range filter min > max and negatives are rejected without filtering
+   workbook_buyer_phase3_test.dart | BUY-SRCH-007 price range filter both ends are inclusive
+BUY-SRCH-012 1
+   workbook_buyer_phase3_test.dart | BUY-SRCH-012 Search key and pull-to-refresh Search closes the keyboard and pull-to-refresh reloads once
+BUY-VOU-001 6
+   buyer_bm_quick_wins_test.dart | BUY-VOU-001 claim a voucher wallet shows Claim then a disabled Claimed button
+BUY-VOU-011 1
+   buyer_bm_quick_wins_test.dart | BUY-VOU-011 sale items cart shows the sale price, saving and payable total
+BUY-WISH-004 12
+   store_follow_test.dart | follow state BUY-WISH-004 follow/unfollow moves the shop in and out of the list
+   store_follow_test.dart | where following shows BUY-WISH-004 seller hero toggles Follow to Following
+RID-EARN-001 1
+   workbook_rider_phase4_test.dart | RID-EARN-001 history shows result, tracking number and pay
+RID-FAIL-002 14
+   courier_failure_flow_test.dart | RID-FAIL-002 dismissing the reason sheet blocks the failure
+RID-FAIL-003 1
+   courier_failure_flow_test.dart | RID-FAIL-003 Buyer refused returns the parcel immediately, with no retry
+RID-PICK-004 14
+   pickup_verification_test.dart | RID-PICK-004 blank and wrong tracking numbers leave the job at seller
+RID-PROF-001 6
+   workbook_rider_phase4_test.dart | RID-PROF-001 profile shows the rider record and opens both documents
+TOTAL IDS 31

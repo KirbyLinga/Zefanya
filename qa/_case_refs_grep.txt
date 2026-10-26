@@ -1,0 +1,138 @@
+﻿mobile\test\account_security_test.dart:3:// Workbook B1 Account & Security (BUY-ACCT-003 through 011).
+mobile\test\account_security_test.dart:8:// after the change (BUY-ACCT-006) or with another phone's token (BUY-ACCT-011),
+mobile\test\account_security_test.dart:99:group('BUY-ACCT-003', () {
+mobile\test\account_security_test.dart:130:group('BUY-ACCT-004', () {
+mobile\test\account_security_test.dart:158:group('BUY-ACCT-005', () {
+mobile\test\account_security_test.dart:211:group('BUY-ACCT-006', () {
+mobile\test\account_security_test.dart:266:group('BUY-ACCT-007', () {
+mobile\test\account_security_test.dart:343:group('BUY-ACCT-008', () {
+mobile\test\account_security_test.dart:401:group('BUY-ACCT-009', () {
+mobile\test\account_security_test.dart:502:group('BUY-ACCT-011', () {
+mobile\test\address_book_test.dart:99:test('BUY-ADDR-001 seeds ADDR-1 from the profile and makes it default',
+mobile\test\address_book_test.dart:109:test('BUY-ADDR-001 a second address gets ADDR-2 and leaves ADDR-1 default',
+mobile\test\address_book_test.dart:120:test('BUY-ADDR-006 exactly one address is default after moving the marker',
+mobile\test\address_book_test.dart:130:test('BUY-ADDR-004 both phone formats save and malformed ones do not', () {
+mobile\test\address_book_test.dart:142:test('BUY-ADDR-005 the tenth address saves and the eleventh is refused', () {
+mobile\test\address_book_test.dart:153:test('BUY-ADDR-007 the default cannot be deleted until another is chosen',
+mobile\test\address_book_test.dart:183:testWidgets('BUY-ADDR-001 adds a second address with the values entered',
+mobile\test\address_book_test.dart:229:testWidgets('BUY-ADDR-002 changing region clears city and barangay',
+mobile\test\address_book_test.dart:258:testWidgets('BUY-ADDR-003 blank fields keep the form open with messages',
+mobile\test\address_book_test.dart:280:testWidgets('BUY-ADDR-006 only the new default shows Default', (
+mobile\test\address_book_test.dart:300:'BUY-ADDR-011 recipient/phone/street use the right keyboards and Save '
+mobile\test\buyer_bm_quick_wins_test.dart:4://   BUY-VOU-001, BUY-VOU-003, BUY-VOU-005, BUY-VOU-011,
+mobile\test\buyer_bm_quick_wins_test.dart:5://   BUY-PDP-005, BUY-PDP-010, BUY-CHAT-002, BUY-CHAT-005,
+mobile\test\buyer_bm_quick_wins_test.dart:6://   BUY-CART-007, BUY-SRCH-011.
+mobile\test\buyer_bm_quick_wins_test.dart:101:/// BUY-CART-007 describes.
+mobile\test\buyer_bm_quick_wins_test.dart:155:group('BUY-VOU-001 claim a voucher', () {
+mobile\test\buyer_bm_quick_wins_test.dart:192:group('BUY-VOU-003 stacking', () {
+mobile\test\buyer_bm_quick_wins_test.dart:229:group('BUY-VOU-005 distinct rejections', () {
+mobile\test\buyer_bm_quick_wins_test.dart:258:group('BUY-VOU-011 sale items', () {
+mobile\test\buyer_bm_quick_wins_test.dart:294:group('BUY-PDP-005 purchase limit', () {
+mobile\test\buyer_bm_quick_wins_test.dart:343:group('BUY-PDP-010 share link', () {
+mobile\test\buyer_bm_quick_wins_test.dart:422:group('BUY-CHAT-002 attachments and length', () {
+mobile\test\buyer_bm_quick_wins_test.dart:496:group('BUY-CHAT-005 notification unread count', () {
+mobile\test\buyer_bm_quick_wins_test.dart:540:group('BUY-CART-007 stock changes while in cart', () {
+mobile\test\buyer_bm_quick_wins_test.dart:609:group('BUY-SRCH-011 vacation store', () {
+mobile\test\checkout_validation_test.dart:109:testWidgets('BUY-ADDR-006 checkout pre-selects the address-book default',
+mobile\test\courier_failure_flow_test.dart:5://   RID-FAIL-001  mark failed with a reason: attempt 1 of 3, no COD, no pay
+mobile\test\courier_failure_flow_test.dart:6://   RID-FAIL-002  a failure with no reason changes nothing
+mobile\test\courier_failure_flow_test.dart:7://   RID-FAIL-003  "Buyer refused" goes straight to Return to Sender
+mobile\test\courier_failure_flow_test.dart:8://   RID-FAIL-004  attempt 2 of 3 is shown, and success still completes
+mobile\test\courier_failure_flow_test.dart:9://   RID-FAIL-005  the third failure returns, and a fourth attempt is refused
+mobile\test\courier_failure_flow_test.dart:97:group('RID-FAIL-001', () {
+mobile\test\courier_failure_flow_test.dart:118:group('RID-FAIL-002', () {
+mobile\test\courier_failure_flow_test.dart:147:group('RID-FAIL-003', () {
+mobile\test\courier_failure_flow_test.dart:172:group('RID-FAIL-004', () {
+mobile\test\courier_failure_flow_test.dart:213:group('RID-FAIL-005', () {
+mobile\test\courier_handover_wiring_test.dart:85:group('RID-DLV-004', () {
+mobile\test\courier_handover_wiring_test.dart:100:group('RID-DLV-005', () {
+mobile\test\courier_handover_wiring_test.dart:119:group('RID-DLV-006', () {
+mobile\test\courier_handover_wiring_test.dart:136:group('RID-PICK-003', () {
+mobile\test\courier_handover_wiring_test.dart:152:group('RID-FAIL-001', () {
+mobile\test\courier_handover_wiring_test.dart:168:group('RID-FAIL-003', () {
+mobile\test\courier_handover_wiring_test.dart:184:group('RID-FAIL-005', () {
+mobile\test\pickup_verification_test.dart:91:group('RID-PICK-004', () {
+mobile\test\pickup_verification_test.dart:119:group('RID-PICK-003', () {
+mobile\test\product_variants_test.dart:111:testWidgets('BUY-PDP-001: both variation types are required', (tester) async {
+mobile\test\product_variants_test.dart:145:testWidgets('BUY-PDP-002: price, stock and image follow the variant', (
+mobile\test\product_variants_test.dart:173:testWidgets('BUY-PDP-003: Black/M is disabled, White/M is not', (
+mobile\test\product_variants_test.dart:219:'BUY-CART-002: different variants stay separate with own prices',
+mobile\test\quantity_limit_test.dart:3:// BUY-CART-005 / BUY-PDP-004: a cart line stops at 20, and the refusal is
+mobile\test\review_limits_test.dart:99:group('BUY-RATE-004 stars, text and photo limits', () {
+mobile\test\review_limits_test.dart:189:group('BUY-RATE-005 edit once within the window', () {
+mobile\test\store_follow_test.dart:65:test('BUY-WISH-004 follow/unfollow moves the shop in and out of the list',
+mobile\test\store_follow_test.dart:103:testWidgets('BUY-WISH-004 seller hero toggles Follow to Following',
+mobile\test\store_follow_test.dart:121:testWidgets('BUY-WISH-004 the count goes N, N+1, N with the list',
+mobile\test\validators_test.dart:11:group('BUY-ACCT-002 person names (A2)', () {
+mobile\test\workbook_buyer_phase3_test.dart:6://   BUY-ACCT-002  profile field validation
+mobile\test\workbook_buyer_phase3_test.dart:7://   BUY-VOU-004   minimum spend at the boundary
+mobile\test\workbook_buyer_phase3_test.dart:8://   BUY-VOU-006   per-buyer usage limit
+mobile\test\workbook_buyer_phase3_test.dart:9://   BUY-VOU-007   removing an item drops below the minimum
+mobile\test\workbook_buyer_phase3_test.dart:10://   BUY-VOU-008   percentage voucher cap
+mobile\test\workbook_buyer_phase3_test.dart:11://   BUY-VOU-009   shipping voucher larger than shipping
+mobile\test\workbook_buyer_phase3_test.dart:12://   BUY-PDP-007   Buy Now checks out only that item
+mobile\test\workbook_buyer_phase3_test.dart:13://   BUY-CHK-001   worked example: merchandise, shipping, three vouchers, total
+mobile\test\workbook_buyer_phase3_test.dart:14://   BUY-CHK-005   delivery note caps at 200 characters
+mobile\test\workbook_buyer_phase3_test.dart:15://   BUY-CHK-006   Cash on Delivery is preselected
+mobile\test\workbook_buyer_phase3_test.dart:16://   BUY-CHK-007   Place Order cannot be submitted twice
+mobile\test\workbook_buyer_phase3_test.dart:17://   BUY-CHK-009   stock ran out during checkout
+mobile\test\workbook_buyer_phase3_test.dart:18://   BUY-CHK-010   voucher no longer qualifies when Place Order is tapped
+mobile\test\workbook_buyer_phase3_test.dart:19://   BUY-SRCH-004  typo suggestion and honest no-results state
+mobile\test\workbook_buyer_phase3_test.dart:20://   BUY-SRCH-007  price range validation and inclusive bounds
+mobile\test\workbook_buyer_phase3_test.dart:21://   BUY-SRCH-012  Search key closes the keyboard; pull-to-refresh reloads
+mobile\test\workbook_buyer_phase3_test.dart:282:group('BUY-ACCT-002 profile field validation', () {
+mobile\test\workbook_buyer_phase3_test.dart:324:group('BUY-VOU-004 minimum spend at the boundary', () {
+mobile\test\workbook_buyer_phase3_test.dart:358:group('BUY-VOU-006 per-buyer limit', () {
+mobile\test\workbook_buyer_phase3_test.dart:376:group('BUY-VOU-007 removing an item drops below the minimum', () {
+mobile\test\workbook_buyer_phase3_test.dart:403:group('BUY-VOU-008 percentage voucher respects its cap', () {
+mobile\test\workbook_buyer_phase3_test.dart:436:group('BUY-VOU-009 shipping voucher larger than shipping', () {
+mobile\test\workbook_buyer_phase3_test.dart:460:group('BUY-PDP-007 Buy Now checks out only that item', () {
+mobile\test\workbook_buyer_phase3_test.dart:512:group('BUY-CHK-001 checkout with the worked example', () {
+mobile\test\workbook_buyer_phase3_test.dart:557:group('BUY-CHK-005 delivery note caps at 200 characters', () {
+mobile\test\workbook_buyer_phase3_test.dart:575:group('BUY-CHK-006 payment method', () {
+mobile\test\workbook_buyer_phase3_test.dart:588:group('BUY-CHK-007 double-tap Place Order', () {
+mobile\test\workbook_buyer_phase3_test.dart:627:group('BUY-CHK-009 stock ran out during checkout', () {
+mobile\test\workbook_buyer_phase3_test.dart:657:group('BUY-CHK-010 voucher becomes invalid during checkout', () {
+mobile\test\workbook_buyer_phase3_test.dart:688:group('BUY-SRCH-004 typo and no results', () {
+mobile\test\workbook_buyer_phase3_test.dart:719:group('BUY-SRCH-007 price range filter', () {
+mobile\test\workbook_buyer_phase3_test.dart:781:group('BUY-SRCH-012 Search key and pull-to-refresh', () {
+mobile\test\workbook_rider_phase4_test.dart:6://   RID-PROF-001  rider profile shows vehicle, licence, company, status, docs
+mobile\test\workbook_rider_phase4_test.dart:7://   RID-PROF-002  vehicle update replaces the plate and flags re-verification
+mobile\test\workbook_rider_phase4_test.dart:8://   RID-PROF-003  a plate registered to another rider is refused
+mobile\test\workbook_rider_phase4_test.dart:9://   RID-PROF-004  licence expiry boundary: yesterday rejected, today accepted
+mobile\test\workbook_rider_phase4_test.dart:10://   RID-PROF-005  document rules: 5.0 MB JPG accepted, others rejected, old kept
+mobile\test\workbook_rider_phase4_test.dart:11://   RID-PROF-006  a suspended rider cannot go online
+mobile\test\workbook_rider_phase4_test.dart:12://   RID-AVAIL-003 going offline with a picked-up job keeps the job
+mobile\test\workbook_rider_phase4_test.dart:13://   RID-PICK-001  pickup details: seller, address, contact, tracking, parcels
+mobile\test\workbook_rider_phase4_test.dart:14://   RID-DLV-004   delivery OTP: 5 digits, five wrong, 15-minute lock
+mobile\test\workbook_rider_phase4_test.dart:15://   RID-DLV-005   COD amount must match exactly
+mobile\test\workbook_rider_phase4_test.dart:16://   RID-DLV-006   a prepaid order asks for no COD and adds no balance
+mobile\test\workbook_rider_phase4_test.dart:17://   RID-EARN-001  history lists date, tracking number, result and pay
+mobile\test\workbook_rider_phase4_test.dart:18://   RID-EARN-002  today's total is the sum of today's payouts
+mobile\test\workbook_rider_phase4_test.dart:19://   RID-EARN-003  COD balance is the sum of cash collected at the door
+mobile\test\workbook_rider_phase4_test.dart:20://   RID-EARN-004  a pending remittance does not clear the balance; confirmation does
+mobile\test\workbook_rider_phase4_test.dart:21://   RID-EARN-005  a short remittance leaves the shortfall outstanding
+mobile\test\workbook_rider_phase4_test.dart:23:// RID-PICK-003/004/005 live in pickup_verification_test.dart and
+mobile\test\workbook_rider_phase4_test.dart:24:// RID-FAIL-001..005 in courier_failure_flow_test.dart.
+mobile\test\workbook_rider_phase4_test.dart:140:group('RID-PROF-001', () {
+mobile\test\workbook_rider_phase4_test.dart:217:group('RID-PROF-002', () {
+mobile\test\workbook_rider_phase4_test.dart:245:group('RID-PROF-003', () {
+mobile\test\workbook_rider_phase4_test.dart:270:group('RID-PROF-004', () {
+mobile\test\workbook_rider_phase4_test.dart:302:group('RID-PROF-005', () {
+mobile\test\workbook_rider_phase4_test.dart:345:group('RID-PROF-006', () {
+mobile\test\workbook_rider_phase4_test.dart:372:group('RID-AVAIL-003', () {
+mobile\test\workbook_rider_phase4_test.dart:391:group('RID-PICK-001', () {
+mobile\test\workbook_rider_phase4_test.dart:424:group('RID-DLV-004', () {
+mobile\test\workbook_rider_phase4_test.dart:461:group('RID-DLV-005', () {
+mobile\test\workbook_rider_phase4_test.dart:479:group('RID-DLV-006', () {
+mobile\test\workbook_rider_phase4_test.dart:497:group('RID-EARN-001', () {
+mobile\test\workbook_rider_phase4_test.dart:543:group('RID-EARN-002', () {
+mobile\test\workbook_rider_phase4_test.dart:559:group('RID-EARN-003', () {
+mobile\test\workbook_rider_phase4_test.dart:580:group('RID-EARN-004', () {
+mobile\test\workbook_rider_phase4_test.dart:605:group('RID-EARN-005', () {
+web\tests\Feature\Api\AccountSecurityApiTest.php:44:// ------ BUY-ACCT-003: correct current password -------------------------
+web\tests\Feature\Api\AccountSecurityApiTest.php:70:// revoked. This is the server half of BUY-ACCT-011.
+web\tests\Feature\Api\AccountSecurityApiTest.php:82:// ------ BUY-ACCT-004: wrong current password ---------------------------
+web\tests\Feature\Api\AccountSecurityApiTest.php:101:// ------ BUY-ACCT-005: the new password rule ----------------------------
+web\tests\Feature\Api\AccountSecurityApiTest.php:130:// ------ BUY-ACCT-006/007/008: email change -----------------------------
+web\tests\Feature\Api\AccountSecurityApiTest.php:240:// ------ BUY-ACCT-009: phone change -------------------------------------

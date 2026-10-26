@@ -1,0 +1,140 @@
+﻿TC-BUY-002	Buyer - Account Creation	Required Fields	Submit a completely empty form
+TC-BUY-003	Buyer - Account Creation	Required Fields	Leave one required field blank at a time
+TC-BUY-004	Buyer - Account Creation	Name	Name with numbers or symbols
+TC-BUY-005	Buyer - Account Creation	Name	Name with ├▒ and allowed punctuation
+TC-BUY-006	Buyer - Account Creation	Name	Name length at the limits
+TC-BUY-007	Buyer - Account Creation	Date of Birth	Age at the 18-year limit
+TC-BUY-008	Buyer - Account Creation	Date of Birth	Date of birth in the future
+TC-BUY-009	Buyer - Account Creation	Email	Email in an invalid format
+TC-BUY-010	Buyer - Account Creation	Email	Email that is already registered
+TC-BUY-011	Buyer - Account Creation	Email	Registered email typed in capital letters
+TC-BUY-012	Buyer - Account Creation	Email	Email with spaces before and after
+TC-BUY-013	Buyer - Account Creation	Mobile Number	Mobile number in an invalid format
+TC-BUY-014	Buyer - Account Creation	Mobile Number	Mobile number length at the limits
+TC-BUY-017	Buyer - Account Creation	Password	Password length at the limit
+TC-BUY-018	Buyer - Account Creation	Password	Password missing a required character type
+TC-BUY-019	Buyer - Account Creation	Password	Confirm Password does not match
+TC-BUY-020	Buyer - Account Creation	Password	Password is hidden while typing
+TC-BUY-021	Buyer - Account Creation	Terms and Privacy Policy	Register without accepting the terms
+TC-BUY-022	Buyer - Account Creation	Registration Form	Tap Register several times quickly
+TC-BUY-024	Buyer - Account Creation	Email Verification (OTP)	Verify with an incorrect OTP
+TC-BUY-025	Buyer - Account Creation	Email Verification (OTP)	OTP in the wrong format
+TC-BUY-026	Buyer - Account Creation	Email Verification (OTP)	Verify with an expired OTP
+TC-BUY-030	Buyer - Account Creation	Access Control	Open another role's screens
+TC-BUY-031	Buyer - Account Creation	Registration Form	[Mobile] Each field opens the right keyboard
+TC-BUY-032	Buyer - Account Creation	Registration Form	[Mobile] Keyboard never hides the active field or Register
+TC-BUY-033	Buyer - Account Creation	Registration Form	[Mobile] App sent to the background while filling the form
+TC-BUY-034	Buyer - Account Creation	Registration Form	[Mobile] Rotate the phone while the form has data
+TC-BUY-037	Buyer - Account Creation	Email Verification (OTP)	[Mobile] Paste the OTP copied from the mail app
+TC-BUY-038	Buyer - Account Creation	Email Verification (OTP)	[Mobile] OTP countdown after switching to the mail app
+TC-BUY-039	Buyer - Account Creation	Email Verification (OTP)	[Mobile] System Back on the form and the verification screen
+TC-BUY-041	Buyer - Account Creation	Access Control	[Mobile] Stay logged in after closing the app or restarting the phone
+TC-BUY-042	Buyer - Account Creation	Access Control	[Mobile] Back after logging out
+TC-RID-029	Rider - Account Creation	Access Control	No public rider registration
+TC-RID-046	Rider - Account Creation	Access Control	[Mobile] Stay logged in after closing the app or restarting the phone
+TC-RID-047	Rider - Account Creation	Access Control	[Mobile] Back after logging out
+BUY-ACCT-002	Buyer - Modules	Account & Security	Profile field validation
+BUY-ACCT-003	Buyer - Modules	Account & Security	Change password with the correct old password
+BUY-ACCT-004	Buyer - Modules	Account & Security	Change password with a wrong old password
+BUY-ACCT-005	Buyer - Modules	Account & Security	New password breaks the rule
+BUY-ACCT-006	Buyer - Modules	Account & Security	Change email with verification
+BUY-ACCT-007	Buyer - Modules	Account & Security	Change email: wrong or expired OTP
+BUY-ACCT-008	Buyer - Modules	Account & Security	Change email to one already used
+BUY-ACCT-009	Buyer - Modules	Account & Security	Change phone with verification and format
+BUY-ACCT-011	Buyer - Modules	Account & Security	[Mobile] Password change ends the session on the other phone
+BUY-ACCT-012	Buyer - Modules	Account & Security	[Mobile] Stay logged in, then log out and press Back
+BUY-ADDR-001	Buyer - Modules	Address Book	Add an address with valid data
+BUY-ADDR-002	Buyer - Modules	Address Book	Region ΓåÆ city ΓåÆ barangay cascade
+BUY-ADDR-003	Buyer - Modules	Address Book	Each required field left blank
+BUY-ADDR-004	Buyer - Modules	Address Book	Phone number format
+BUY-ADDR-005	Buyer - Modules	Address Book	Address book limit
+BUY-ADDR-006	Buyer - Modules	Address Book	Set a different default address
+BUY-ADDR-007	Buyer - Modules	Address Book	Delete the default address
+BUY-ADDR-011	Buyer - Modules	Address Book	[Mobile] Keyboard on the address form
+BUY-SRCH-001	Buyer - Modules	Browse, Search & Filter	Browse a platform category
+BUY-SRCH-002	Buyer - Modules	Browse, Search & Filter	Store screen with store categories
+BUY-SRCH-003	Buyer - Modules	Browse, Search & Filter	Search: exact and partial match
+BUY-SRCH-004	Buyer - Modules	Browse, Search & Filter	Search: typo and no results
+BUY-SRCH-006	Buyer - Modules	Browse, Search & Filter	Empty search
+BUY-SRCH-007	Buyer - Modules	Browse, Search & Filter	Price range filter
+BUY-SRCH-008	Buyer - Modules	Browse, Search & Filter	Combined filters
+BUY-SRCH-009	Buyer - Modules	Browse, Search & Filter	Sort and loading more results
+BUY-SRCH-011	Buyer - Modules	Browse, Search & Filter	Products of a vacation store
+BUY-SRCH-012	Buyer - Modules	Browse, Search & Filter	[Mobile] Search key on the keyboard and pull to refresh
+BUY-PDP-001	Buyer - Modules	Product Detail Page	All variation types must be selected
+BUY-PDP-002	Buyer - Modules	Product Detail Page	Selecting a variant updates price, stock and image
+BUY-PDP-003	Buyer - Modules	Product Detail Page	Out-of-stock variant disabled
+BUY-PDP-004	Buyer - Modules	Product Detail Page	Quantity limits
+BUY-PDP-005	Buyer - Modules	Product Detail Page	Per-buyer purchase limit
+BUY-PDP-007	Buyer - Modules	Product Detail Page	Buy Now checks out only that item
+BUY-PDP-008	Buyer - Modules	Product Detail Page	Product screen of an unavailable product
+BUY-WISH-001	Buyer - Modules	Wishlist & Follow Store	Add and remove a wishlist item
+BUY-WISH-002	Buyer - Modules	Wishlist & Follow Store	Add the same item twice quickly
+BUY-WISH-004	Buyer - Modules	Wishlist & Follow Store	Follow and unfollow a store
+BUY-WISH-005	Buyer - Modules	Wishlist & Follow Store	Wishlist and follow require login
+BUY-CART-001	Buyer - Modules	Cart	Same variant added twice merges
+BUY-CART-002	Buyer - Modules	Cart	Different variants stay separate
+BUY-CART-003	Buyer - Modules	Cart	Items grouped by store
+BUY-CART-004	Buyer - Modules	Cart	Select and deselect items for checkout
+BUY-CART-005	Buyer - Modules	Cart	Change quantity at the limits
+BUY-CART-007	Buyer - Modules	Cart	Item goes out of stock or is deleted while in the cart
+BUY-CART-009	Buyer - Modules	Cart	Remove an item
+BUY-CART-012	Buyer - Modules	Cart	[Mobile] Cart badge count
+BUY-VOU-001	Buyer - Modules	Vouchers & Promotions	Claim a voucher into the wallet
+BUY-VOU-002	Buyer - Modules	Vouchers & Promotions	Apply a store voucher
+BUY-VOU-003	Buyer - Modules	Vouchers & Promotions	Stacking per the agreed rule
+BUY-VOU-004	Buyer - Modules	Vouchers & Promotions	Minimum spend at the boundary
+BUY-VOU-005	Buyer - Modules	Vouchers & Promotions	Expired, not started, limit reached, invalid code
+BUY-VOU-006	Buyer - Modules	Vouchers & Promotions	Per-buyer limit reached
+BUY-VOU-007	Buyer - Modules	Vouchers & Promotions	Removing an item drops below the minimum spend
+BUY-VOU-008	Buyer - Modules	Vouchers & Promotions	Percentage voucher respects its cap
+BUY-VOU-009	Buyer - Modules	Vouchers & Promotions	Shipping voucher larger than shipping
+BUY-VOU-010	Buyer - Modules	Vouchers & Promotions	Total never negative
+BUY-VOU-011	Buyer - Modules	Vouchers & Promotions	Voucher on items already on sale
+BUY-CHK-001	Buyer - Modules	Checkout	Checkout with the worked example
+BUY-CHK-005	Buyer - Modules	Checkout	Note to seller length
+BUY-CHK-006	Buyer - Modules	Checkout	No payment method selected
+BUY-CHK-007	Buyer - Modules	Checkout	Double-tap Place Order
+BUY-CHK-009	Buyer - Modules	Checkout	Stock ran out during checkout
+BUY-CHK-010	Buyer - Modules	Checkout	Voucher becomes invalid during checkout
+BUY-PAY-001	Buyer - Modules	Payment	COD order
+BUY-TRK-001	Buyer - Modules	Order Tracking & History	Orders appear in the correct tab
+BUY-TRK-003	Buyer - Modules	Order Tracking & History	Order Received button
+BUY-TRK-004	Buyer - Modules	Order Tracking & History	Order Received not available before delivery
+BUY-CAN-002	Buyer - Modules	Cancellation	Reason is required
+BUY-CAN-004	Buyer - Modules	Cancellation	No cancel after Ready for Pickup
+BUY-CAN-005	Buyer - Modules	Cancellation	No cancel after shipping
+BUY-RET-002	Buyer - Modules	Return & Refund Request	Return not allowed before delivery
+BUY-RET-003	Buyer - Modules	Return & Refund Request	Return window boundary
+BUY-RET-004	Buyer - Modules	Return & Refund Request	Evidence and description rules
+BUY-RATE-002	Buyer - Modules	Ratings & Reviews	Rating not allowed before completion
+BUY-RATE-003	Buyer - Modules	Ratings & Reviews	One review per item
+BUY-RATE-004	Buyer - Modules	Ratings & Reviews	Stars, text and photo limits
+BUY-RATE-005	Buyer - Modules	Ratings & Reviews	Edit once within the window
+BUY-CHAT-002	Buyer - Modules	Chat & Notifications	Invalid attachments and message length
+BUY-CHAT-005	Buyer - Modules	Chat & Notifications	Mark notifications as read
+RID-PROF-001	Rider - Modules	Profile, Vehicle & Documents	View profile, vehicle and verification status
+RID-PROF-002	Rider - Modules	Profile, Vehicle & Documents	Update vehicle details
+RID-PROF-003	Rider - Modules	Profile, Vehicle & Documents	Plate number already used
+RID-PROF-004	Rider - Modules	Profile, Vehicle & Documents	License expiry boundary
+RID-PROF-005	Rider - Modules	Profile, Vehicle & Documents	Document upload rules
+RID-PROF-006	Rider - Modules	Profile, Vehicle & Documents	Suspended rider cannot work
+RID-AVAIL-003	Rider - Modules	Availability	Go Offline with an active job
+RID-PICK-001	Rider - Modules	Pickup	Pickup details shown
+RID-PICK-003	Rider - Modules	Pickup	Confirm pickup by typing the tracking number
+RID-PICK-004	Rider - Modules	Pickup	Wrong tracking number
+RID-DLV-001	Rider - Modules	Delivery & Status Updates	Deliver with proof in sequence
+RID-DLV-002	Rider - Modules	Delivery & Status Updates	Skipping a status
+RID-DLV-003	Rider - Modules	Delivery & Status Updates	Photo is required
+RID-DLV-004	Rider - Modules	Delivery & Status Updates	OTP checks
+RID-DLV-005	Rider - Modules	Delivery & Status Updates	COD amount must match
+RID-DLV-006	Rider - Modules	Delivery & Status Updates	Prepaid order has no COD
+RID-FAIL-001	Rider - Modules	Failed Delivery	Mark failed with a reason
+RID-FAIL-002	Rider - Modules	Failed Delivery	Reason required
+RID-FAIL-003	Rider - Modules	Failed Delivery	Refused goes straight to Return to Sender
+RID-FAIL-004	Rider - Modules	Failed Delivery	Attempt counter and reschedule
+RID-EARN-001	Rider - Modules	History, Earnings & COD Remittance	Delivery history
+RID-EARN-002	Rider - Modules	History, Earnings & COD Remittance	Pay per job and daily total
+RID-EARN-003	Rider - Modules	History, Earnings & COD Remittance	COD balance to remit
+RID-EARN-004	Rider - Modules	History, Earnings & COD Remittance	Remit COD and confirmation
+RID-EARN-005	Rider - Modules	History, Earnings & COD Remittance	Short remittance

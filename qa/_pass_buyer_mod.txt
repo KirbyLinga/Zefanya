@@ -1,0 +1,320 @@
+=== BUY-ACCT-002 | B1 Account | Profile field validation
+EXPECTED: Each is rejected with a field message; the saved profile is unchanged after a pull-to-refresh.
+ACTUAL: Name fields only check length >= 2. No letters-only rule.
+
+=== BUY-ACCT-003 | B1 Account | Change password with the correct old password
+EXPECTED: Password changes with a success message. The old password is rejected; the new one works.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-004 | B1 Account | Change password with a wrong old password
+EXPECTED: Blocked with 'current password is incorrect'. The original password still works.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-005 | B1 Account | New password breaks the rule
+EXPECTED: Each is rejected with the specific rule that failed. The password is unchanged.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-006 | B1 Account | Change email with verification
+EXPECTED: Before verification the old email still logs in and the profile still shows it. After the correct OTP, only the new email logs in; the old one is rejected.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-007 | B1 Account | Change email: wrong or expired OTP
+EXPECTED: Both are rejected. The email is not changed.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-008 | B1 Account | Change email to one already used
+EXPECTED: Both are blocked with 'email already in use' and no OTP is sent.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-009 | B1 Account | Change phone with verification and format
+EXPECTED: Invalid and duplicate numbers are rejected without an OTP. The valid number is saved only after verification.
+ACTUAL: No change-password, change-email or change-phone screen.
+
+=== BUY-ACCT-011 | B1 Account | [Mobile] Password change ends the session on the other phone
+EXPECTED: Phone B's session ends and the login screen is shown. The old password is rejected and the new one works. Phone A stays logged in.
+ACTUAL: No password change, so no cross-phone session end.
+
+=== BUY-ACCT-012 | B1 Account | [Mobile] Stay logged in, then log out and press Back
+EXPECTED: Step 1: the app opens on the home screen, still logged in as Juan Miguel. Steps 2–3: the login screen stays; no account screen appears again and the app does not log back in by itself.
+ACTUAL: Session is restored at startup; logout returns to the login screen and nothing logs back in.
+
+=== BUY-ADDR-001 | B2 Address Book | Add an address with valid data
+EXPECTED: ADDR-2 is listed with exactly the entered values and is not default. ADDR-1 is still default.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+=== BUY-ADDR-002 | B2 Address Book | Region → city → barangay cascade
+EXPECTED: Each list shows only places under the one above (no Cebu cities under NCR). Changing Region clears City and Barangay.
+ACTUAL: Province > Municipality > Barangay dropdowns are linked, but there is no Region level and no address book to add to.
+
+=== BUY-ADDR-003 | B2 Address Book | Each required field left blank
+EXPECTED: Each attempt is blocked with a message on the blank field. No address is added.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+=== BUY-ADDR-004 | B2 Address Book | Phone number format
+EXPECTED: Only the two valid formats save.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+=== BUY-ADDR-005 | B2 Address Book | Address book limit
+EXPECTED: The 10th saves. The 11th is blocked with a limit message.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+=== BUY-ADDR-006 | B2 Address Book | Set a different default address
+EXPECTED: Only ADDR-2 shows Default and checkout pre-selects it.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+=== BUY-ADDR-007 | B2 Address Book | Delete the default address
+EXPECTED: The first attempt is blocked with a message to choose another default first. The second succeeds. There is always exactly one default.
+ACTUAL: No address book: the app keeps one profile address plus a recent-addresses list. No default, limit, recipient or phone per address.
+
+=== BUY-ADDR-011 | B2 Address Book | [Mobile] Keyboard on the address form
+EXPECTED: Phone opens a number pad. Street and Recipient open a text keyboard. Save can be reached and tapped while the keyboard is open or after tapping Done.
+ACTUAL: Street uses a street-address keyboard, but there are no Recipient or per-address Phone fields.
+
+=== BUY-SRCH-001 | B3 Browse & Search | Browse a platform category
+EXPECTED: Every Active product in Home & Living is listed, including P-02. No product from other categories appears.
+ACTUAL: Category listing works on the mock catalogue, but P-02 and the test categories are not in it.
+
+=== BUY-SRCH-002 | B3 Browse & Search | Store screen with store categories
+EXPECTED: Store categories match CAT-1 to CAT-5. Lamps shows P-03 only.
+ACTUAL: Categories come from the catalogue (CAT-1 to CAT-5 are not seeded).
+
+=== BUY-SRCH-003 | B3 Browse & Search | Search: exact and partial match
+EXPECTED: P-02 appears for all four terms (case and outer spaces do not matter).
+ACTUAL: Search is a text match on the catalogue; P-02 is not seeded.
+
+=== BUY-SRCH-004 | B3 Browse & Search | Search: typo and no results
+EXPECTED: The typo returns P-02 or a 'Did you mean rattan basket?' suggestion. zzqxw shows a clear 'no results' state, not an error.
+ACTUAL: No typo tolerance and no "Did you mean" suggestion.
+
+=== BUY-SRCH-006 | B3 Browse & Search | Empty search
+EXPECTED: The search is not submitted (or the normal listing is shown). No error screen.
+ACTUAL: Submitting an empty search does nothing (it returns early).
+
+=== BUY-SRCH-007 | B3 Browse & Search | Price range filter
+EXPECTED: Range ends are inclusive. Min greater than Max and negative values are rejected with a message and the results are not filtered by them.
+ACTUAL: Only "max price" chips and a rating filter. No min/max inputs, so no validation of min > max or negatives.
+
+=== BUY-SRCH-008 | B3 Browse & Search | Combined filters
+EXPECTED: Only products matching all active filters are shown. Clearing filters widens the results correctly.
+ACTUAL: Price and rating filters combine (both must match); toggling a chip clears it.
+
+=== BUY-SRCH-009 | B3 Browse & Search | Sort and loading more results
+EXPECTED: Each sort orders the results correctly. No product repeats or disappears as more results load or when scrolling back.
+ACTUAL: Sort by price low-high, high-low or featured, with a stable order.
+
+=== BUY-SRCH-011 | B3 Browse & Search | Products of a vacation store
+EXPECTED: P-02 appears with the 'On vacation' label and cannot be added to the cart.
+ACTUAL: No vacation-store state.
+
+=== BUY-SRCH-012 | B3 Browse & Search | [Mobile] Search key on the keyboard and pull to refresh
+EXPECTED: Step 1 runs the search and closes the keyboard. Step 2 reloads the results; the same products appear with no duplicates.
+ACTUAL: The Search key runs the search, but the results screen has no pull-to-refresh.
+
+=== BUY-PDP-001 | B4 Product Detail | All variation types must be selected
+EXPECTED: Without both selections, Add to Cart and Buy Now show 'Please select a variation' and nothing is added. With both, the item is added once.
+ACTUAL: The first variant is pre-selected, so no "Please select a variation" check. Only one variation type exists.
+
+=== BUY-PDP-002 | B4 Product Detail | Selecting a variant updates price, stock and image
+EXPECTED: Price: ₱199 → ₱299 → ₱199. Stock: 10 → 5 → 10. Image switches to the colour's image.
+ACTUAL: Variants are plain labels. No per-variant price, stock or image.
+
+=== BUY-PDP-003 | B4 Product Detail | Out-of-stock variant disabled
+EXPECTED: M is disabled for Black and cannot be selected.
+ACTUAL: No per-variant stock or disabled state.
+
+=== BUY-PDP-004 | B4 Product Detail | Quantity limits
+EXPECTED: Only 1 and 20 are added. The + button stops at 20. Invalid values show a message and the cart is unchanged.
+ACTUAL: The + button stops at the product stock, not at 20. No typed quantity.
+
+=== BUY-PDP-005 | B4 Product Detail | Per-buyer purchase limit
+EXPECTED: The first 2 are bought. The 3rd is blocked with a limit message, including in a new cart.
+ACTUAL: No per-buyer purchase limit.
+
+=== BUY-PDP-007 | B4 Product Detail | Buy Now checks out only that item
+EXPECTED: Checkout opens with only P-01 Natural-M × 1. P-05 stays in the cart and is not in this checkout.
+ACTUAL: Buy Now adds the item to the cart and opens checkout with every selected cart line, not only that item.
+
+=== BUY-PDP-008 | B4 Product Detail | Product screen of an unavailable product
+EXPECTED: Both open a clear 'unavailable' screen with no Add to Cart. No crash or error screen.
+ACTUAL: Handling of a removed product on the buyer screen needs a run.
+
+=== BUY-WISH-001 | B5 Wishlist & Follow | Add and remove a wishlist item
+EXPECTED: P-02 appears once, then is gone after removal. The heart on P-02's screen matches each state.
+ACTUAL: The heart saves/unsaves and the Saved list shows the item once.
+
+=== BUY-WISH-002 | B5 Wishlist & Follow | Add the same item twice quickly
+EXPECTED: P-02 appears at most once, and the heart reflects the final state.
+ACTUAL: toggle() keeps ids unique, so the item appears at most once and the heart follows the final state.
+
+=== BUY-WISH-004 | B5 Wishlist & Follow | Follow and unfollow a store
+EXPECTED: Count becomes N+1 and Seller 1 is in Following; after unfollowing, N and removed.
+ACTUAL: No follow-store feature.
+
+=== BUY-WISH-005 | B5 Wishlist & Follow | Wishlist and follow require login
+EXPECTED: Each opens the login screen; nothing is saved without an account.
+ACTUAL: There is no guest mode: the whole app needs login first, so nothing can be saved without an account.
+
+=== BUY-CART-001 | B6 Cart | Same variant added twice merges
+EXPECTED: One line, Natural-M × 3, subtotal ₱747.00.
+ACTUAL: Same product and variant merges into one line and the quantity adds up.
+
+=== BUY-CART-002 | B6 Cart | Different variants stay separate
+EXPECTED: Two separate lines with their own prices (₱249 and ₱199).
+ACTUAL: Lines stay separate, but variants cannot have their own prices.
+
+=== BUY-CART-003 | B6 Cart | Items grouped by store
+EXPECTED: Two store groups with store names, each listing only its own items.
+ACTUAL: Cart lines are grouped by store with the store name.
+
+=== BUY-CART-004 | B6 Cart | Select and deselect items for checkout
+EXPECTED: Subtotals: ₱399, then ₱1,098, then ₱699. Checkout contains only P-01 and P-02; P-05 stays in the cart.
+ACTUAL: Select/deselect changes the subtotal and checkout only uses selected lines.
+
+=== BUY-CART-005 | B6 Cart | Change quantity at the limits
+EXPECTED: 0 is not accepted (or asks to remove the item). 1 and 20 are accepted. 21 is blocked with 'only 20 available'.
+ACTUAL: Minus at 1 removes the line (with Undo). There is no 20 cap and no "only 20 available" message.
+
+=== BUY-CART-007 | B6 Cart | Item goes out of stock or is deleted while in the cart
+EXPECTED: P-02 and P-05 are marked unavailable and cannot be selected. P-06 checks out normally.
+ACTUAL: Products missing from the catalogue are silently dropped on load. No unavailable marking and no stock check.
+
+=== BUY-CART-009 | B6 Cart | Remove an item
+EXPECTED: The line is gone after a pull-to-refresh and the subtotal updates.
+ACTUAL: Remove deletes the line (with Undo) and the subtotal updates.
+
+=== BUY-CART-012 | B6 Cart | [Mobile] Cart badge count
+EXPECTED: The cart icon badge shows 1, 2, then 1, and still 1 after reopening. (Note in Remarks whether the badge counts lines or units.)
+ACTUAL: The nav badge shows itemCount, the total number of units (not lines).
+
+=== BUY-VOU-001 | B7 Vouchers | Claim a voucher into the wallet
+EXPECTED: MCH50 is in the wallet with its rule and end date. The button changes to Claimed and a second claim is not possible.
+ACTUAL: The wallet lists vouchers. There is no Claim button or Claimed state.
+
+=== BUY-VOU-002 | B7 Vouchers | Apply a store voucher
+EXPECTED: Seller 1's group shows −₱50.00 and the total is ₱450 + ₱50 shipping − ₱50 = ₱450.00.
+ACTUAL: Vouchers are applied by code in Cart. MCH50 is not in the mock list and vouchers are percentage with a cap, not flat.
+
+=== BUY-VOU-003 | B7 Vouchers | Stacking per the agreed rule
+EXPECTED: MCH50 + PLAT100 + FREESHIP apply; total ₱1,083.00. Selecting MCH10 replaces MCH50 (Seller 1 ₱699 ≥ ₱500 → −₱69.90; total ₱1,063.10); never both. RVSECRET is not applicable (Seller 2 subtotal ₱399 < ₱1,000).
+ACTUAL: Only one voucher can be applied at a time. No store/platform/shipping stacking.
+
+=== BUY-VOU-004 | B7 Vouchers | Minimum spend at the boundary
+EXPECTED: ₱299.99: not applicable, with 'Spend ₱0.01 more'. ₱300.00 and ₱300.01: ₱50.00 off.
+ACTUAL: The boundary is inclusive (below min is rejected). The message says "Spend at least P X" rather than "Spend P0.01 more".
+
+=== BUY-VOU-005 | B7 Vouchers | Expired, not started, limit reached, invalid code
+EXPECTED: Each is rejected with its own specific message. No discount is applied.
+ACTUAL: Invalid code shows "isn't a valid voucher code". Expired vouchers are only shown muted; no "not started" or "limit reached" messages.
+
+=== BUY-VOU-006 | B7 Vouchers | Per-buyer limit reached
+EXPECTED: Rejected: already used. Buyer 2 can still use it.
+ACTUAL: No per-buyer usage limit.
+
+=== BUY-VOU-007 | B7 Vouchers | Removing an item drops below the minimum spend
+EXPECTED: MCH50 is removed automatically with a notice. Total is ₱199 + ₱50 = ₱249.00.
+ACTUAL: The voucher is removed automatically with "Voucher removed - cart dropped below the minimum".
+
+=== BUY-VOU-008 | B7 Vouchers | Percentage voucher respects its cap
+EXPECTED: ₱499.99: not applicable. ₱999.00 → ₱99.90 off. ₱1,000.00 → ₱100.00 off. ₱1,250 → ₱100.00 off (cap, not ₱125.00).
+ACTUAL: Percentage vouchers are capped at maxDiscount after the minimum-spend check.
+
+=== BUY-VOU-009 | B7 Vouchers | Shipping voucher larger than shipping
+EXPECTED: ₱50 shipping → ₱0.00 shipping (not negative). ₱65 shipping → ₱15.00. Merchandise amounts are unchanged.
+ACTUAL: A shipping voucher gives min(max discount, shipping fee), so shipping never goes negative.
+
+=== BUY-VOU-010 | B7 Vouchers | Total never negative
+EXPECTED: Merchandise total is ₱0.00, never negative; shipping is still charged.
+ACTUAL: Checkout clamps the total at 0, but that also drops shipping. The scenario uses a flat voucher the app cannot model.
+
+=== BUY-VOU-011 | B7 Vouchers | Voucher on items already on sale
+EXPECTED: MCH50 applies (₱360 ≥ ₱300). Merchandise ₱310.00, total ₱360.00 with ₱50 shipping.
+ACTUAL: No sale or strike-through price in the app.
+
+=== BUY-CHK-001 | B8 Checkout | Checkout with the worked example
+EXPECTED: Summary: merchandise ₱1,098.00, shipping ₱185.00 (₱65 + ₱120), store voucher −₱50.00, platform voucher −₱100.00, shipping voucher −₱50.00, total ₱1,083.00. Two orders are created, one per store, whose totals add up to ₱1,083.00. Cart no longer has these items.
+ACTUAL: Checkout shows subtotal, one voucher and flat shipping. No store/platform/shipping voucher lines and no per-store totals.
+
+=== BUY-CHK-005 | B8 Checkout | Note to seller length
+EXPECTED: 200 characters are saved and shown in full on the seller's order. 201 cannot be entered or is rejected.
+ACTUAL: The note limit is 140 characters, not 200.
+
+=== BUY-CHK-006 | B8 Checkout | No payment method selected
+EXPECTED: Blocked until a payment method is chosen.
+ACTUAL: Cash on Delivery is pre-selected, so an order can never be placed without a payment method.
+
+=== BUY-CHK-007 | B8 Checkout | Double-tap Place Order
+EXPECTED: Exactly one order exists. P-02 stock is 19. The resubmit shows the existing order or a message; it does not create another.
+ACTUAL: Place Order is disabled while the order is being placed.
+
+=== BUY-CHK-009 | B8 Checkout | Stock ran out during checkout
+EXPECTED: Buyer 1's order is blocked with an out-of-stock message. Stock is 0.
+ACTUAL: No stock check in cart or checkout.
+
+=== BUY-CHK-010 | B8 Checkout | Voucher becomes invalid during checkout
+EXPECTED: The order is not placed with MCH50. A message says the voucher is no longer valid and the total is updated.
+ACTUAL: The voucher is not re-validated when Place Order is tapped.
+
+=== BUY-PAY-001 | B9 Payment | COD order
+EXPECTED: The order goes straight to To Ship. Payment shows COD ₱500.00 to collect on delivery.
+ACTUAL: COD orders appear under To Ship and show Cash on Delivery.
+
+=== BUY-TRK-001 | B10 Order Tracking | Orders appear in the correct tab
+EXPECTED: Each order is in exactly one tab matching its status; counts match.
+ACTUAL: Each order shows in exactly one tab: To Ship, In Transit, Out for Delivery or To Rate.
+
+=== BUY-TRK-003 | B10 Order Tracking | Order Received button
+EXPECTED: The order moves to Completed and the Rate button appears. Seller 1's earnings for it become Available.
+ACTUAL: No Order Received button. The order moves to To Rate when the courier completes it.
+
+=== BUY-TRK-004 | B10 Order Tracking | Order Received not available before delivery
+EXPECTED: Not shown; a direct request is rejected.
+ACTUAL: No Order Received action to restrict.
+
+=== BUY-CAN-002 | B11 Cancellation | Reason is required
+EXPECTED: Blocked until a reason is chosen. The order is unchanged.
+ACTUAL: The buyer has no Cancel option.
+
+=== BUY-CAN-004 | B11 Cancellation | No cancel after Ready for Pickup
+EXPECTED: No Cancel option; a direct request is rejected and the status is unchanged.
+ACTUAL: The buyer has no Cancel option.
+
+=== BUY-CAN-005 | B11 Cancellation | No cancel after shipping
+EXPECTED: No Cancel option.
+ACTUAL: The buyer has no Cancel option.
+
+=== BUY-RET-002 | B12 Return & Refund | Return not allowed before delivery
+EXPECTED: Not available.
+ACTUAL: No Return/Refund request.
+
+=== BUY-RET-003 | B12 Return & Refund | Return window boundary
+EXPECTED: Allowed on day 7. Not available after the window or once Completed.
+ACTUAL: No Return/Refund request.
+
+=== BUY-RET-004 | B12 Return & Refund | Evidence and description rules
+EXPECTED: Each is blocked with a message. 1 to 5 valid photos and 10+ characters are required.
+ACTUAL: No Return/Refund request.
+
+=== BUY-RATE-002 | B13 Ratings & Reviews | Rating not allowed before completion
+EXPECTED: Not available; a direct request is rejected.
+ACTUAL: Rating is offered only once the order reaches To Rate.
+
+=== BUY-RATE-003 | B13 Ratings & Reviews | One review per item
+EXPECTED: Blocked; only Edit is offered.
+ACTUAL: The review screen pre-fills an existing review, so it is an edit rather than a second review.
+
+=== BUY-RATE-004 | B13 Ratings & Reviews | Stars, text and photo limits
+EXPECTED: 0 stars is blocked. 500 characters and 5 photos are accepted; 501 characters and a 6th photo are not.
+ACTUAL: 0 stars blocks submit. Text limit is 400, not 500. No photos.
+
+=== BUY-RATE-005 | B13 Ratings & Reviews | Edit once within the window
+EXPECTED: The first edit saves. A second edit and an edit after 30 days are not possible.
+ACTUAL: No edit-once or 30-day rule found.
+
+=== BUY-CHAT-002 | B14 Chat & Notifs | Invalid attachments and message length
+EXPECTED: All are rejected; nothing is sent.
+ACTUAL: Only empty messages are blocked. No attachments and no length limit.
+
+=== BUY-CHAT-005 | B14 Chat & Notifs | Mark notifications as read
+EXPECTED: Unread count goes 3 → 2 → 0.
+ACTUAL: No notification list or unread count.
+

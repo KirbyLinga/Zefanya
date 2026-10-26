@@ -13,8 +13,8 @@ Source of truth: `qa/Mobile_App_Combined_Test_Results.xlsx` (377 cases).
 | 2. Buyer account/profile | Done (003-009, 011 app half) | Password/email/phone change end to end: server endpoints + token revocation, mock/live repository, screens, 13 case-named app tests and 9 PHP tests. ACCT-001/010 still need live profile/device. |
 | 3. Buyer commerce gaps | Done for this pass (18 new case tests + 19 re-tagged) | Address book, reviews, vouchers, checkout, search, variants and store follow now have case-named evidence. Full suite **609 passed / 0 failed**. Device/API-only rows are listed under “Phase 3 honest limits”. |
 | 4. Courier/rider app | Done for this pass (Phase 4 scope) | Rider profile/vehicle/documents, online/offline + suspension, pickup verification, failure attempts, delivery OTP/COD handover, COD ledger and earnings history. 16 case-named Flutter tests + 7 handover-wiring tests + 21 PHP tests. Full suite **638 passed / 0 failed**; PHP **340 passed / 1472 assertions**. |
-| 5. Laravel server | In progress | Account-security endpoints landed in Phase 2; courier handover endpoint and migration landed in Phase 4. Live payment-gateway and ownership cases still need a running API. |
-| 6. Traceability/report | Not started in this pass | `qa/final_results.csv` and rebuilt `qa/static_review.csv` still to do. |
+| 5. Laravel server | Done for the scoped API work | Account-security endpoints landed in Phase 2; courier handover endpoint and migration landed in Phase 4. Payment gateway, presence, offers and ownership checks remain external dependencies and are recorded as Needs/Fail. |
+| 6. Traceability/report | Done | All 377 rows classified with evidence; `qa/final_results.csv`, rebuilt `qa/static_review.csv`, count tables and `qa/MANUAL_TESTS.md` generated. Final Flutter **638/638**, PHP **340 passed / 1472 assertions**. |
 
 ## Phase 1 details
 
@@ -326,8 +326,97 @@ following count going N → N+1 → N with the list.
 - The rider document endpoints are local/mock only; the server has no
   LogisticsProvider vehicle/licence/document columns yet.
 
+## Phase 6 details — traceability and final classification
+
+### 6a. Method
+
+- Source rows: all **377** cases in `qa/Mobile_App_Combined_Test_Results.xlsx`, read into
+  `qa/workbook_rows.json` and cross-checked against the workbook IDs.
+- Final-status sets live in `qa/_classify_tmp.py`; `qa/build_final_results.py`
+  asserts exact coverage, rejects overlapping pass/needs/fail sets, and refuses
+  to write if any of the 377 IDs is missing or duplicated.
+- `Pass` requires a passing test name or a `file:line` citation. The builder
+  checks that every cited file exists and every cited line is inside it.
+- `Needs device/API` means app-side work exists but the workbook outcome depends
+  on a live endpoint, real hardware, a mailbox, GPS, a payment gateway or push.
+  Every one of the 58 rows has a scripted manual test.
+- `Fail` means the required outcome is absent. Existing partial behaviour is
+  named in the note rather than hidden.
+- `N/A` is reserved for the recorded scope decisions in `qa/DECISIONS.md`
+  (Decisions 1–5), not for untested code.
+
+### 6b. Final counts
+
+| Workbook | Pass | Needs device/API | Fail | N/A | Total |
+|---|---:|---:|---:|---:|---:|
+| Buyer - Account Creation | 32 | 6 | 2 | 2 | 42 |
+| Buyer - Modules | 80 | 37 | 11 | 3 | 131 |
+| Rider - Account Creation | 3 | 0 | 0 | 44 | 47 |
+| Courier - Account Creation | 0 | 0 | 0 | 52 | 52 |
+| Rider - Modules | 25 | 15 | 13 | 0 | 53 |
+| Courier - Modules | 0 | 0 | 0 | 52 | 52 |
+| **Total** | **140** | **58** | **26** | **153** | **377** |
+
+Per-case evidence and notes: `qa/final_results.csv`. The same data in the older
+review shape: `qa/static_review.csv`. Machine-readable table:
+`qa/PHASE6_COUNTS.md` / `qa/phase6_counts.txt`.
+
+### 6c. Evidence caveats kept in the report
+
+- `TC-BUY-032/033/034` are left as Pass using the registration layout,
+  `_KeepAlive`, the Android `configChanges` declaration and the text-scale clamp.
+  They have not been run on a physical phone; a device pass is still preferable.
+- `BUY-SRCH-001/002/003` pass using the catalogue-state/wiring tests. The current
+  mock catalogue does not seed the workbook's P-02/CAT-1..5 fixture, so the
+  foreign-catalogue test is the proof of behaviour, not the workbook fixture.
+- `BUY-TRK-003` passes for the app-side Order Received flow. Seller earnings
+  release is server-side and is not asserted by that app test.
+- `RID-DLV-001` passes the app-side sequence and proof gate. The buyer-side
+  display of the proof photo is absent and remains tracked under `RID-DLV-008`.
+- `RID-DLV-008` is camera-only now, but remains Fail because the buyer's tracker
+  does not show the proof photo/time.
+- `RID-FAIL-005` has the three-attempt return and terminal state, but remains
+  Fail because buyer/seller notifications are absent.
+- `BUY-CAN-001/003/006` have a working cancellation UI/state, but remain Fail
+  because stock restore, refund start, voucher return and seller notification
+  are absent.
+- The email-duplicate cases `TC-BUY-010/011` rely on the server's unique email
+  rule and its `utf8mb4_unicode_ci` collation. The mock repository deliberately
+  has no account store.
+
+### 6d. Fail clusters
+
+- Buyer: duplicate-phone detection (2), order/address snapshot (1), flash sale
+  (1), local cart only (1), weight shipping (1), hub timeline (1), cancellation
+  side effects (3), review variant/masked name (1), status/flash notifications (2).
+- Rider: profile documents via Files (1), server presence/offline (3), offers /
+  declines / timeouts / concurrency (5), waybill scanning (2), buyer proof
+  display (1), return notifications (1).
+
+### 6e. Manual device/API script
+
+`qa/MANUAL_TESTS.md` contains one entry for each of the 58 `Needs device/API`
+cases, grouped by module and dependency. It includes live-build commands, seeded
+accounts, two-phone/network/GPS/payment prerequisites, steps and expected results,
+plus a coverage checklist.
+
+### 6f. Final verification
+
+- `flutter analyze --no-pub`: **0 errors, 8 info lints** (all pre-existing);
+  exit code 1 only because info lints are reported (`qa/phase6_analyze.txt`).
+- Full Flutter suite: **638 passed / 0 failed** (`qa/phase6_full_test.txt`).
+- Full PHP suite: **340 passed / 1472 assertions** (`qa/phase6_php_test.txt`).
+- No tests were deleted, skipped or weakened in Phase 6. No production behaviour
+  changed in this phase; the work is evidence, decisions and reporting.
+
 ## Current test counts
 
+- Full suite after Phase 6: **638 passed / 0 failed**
+  (`qa/phase6_full_test.txt`).
+- `flutter analyze --no-pub` after Phase 6: **0 errors**, the same 8 pre-existing
+  info lints (`qa/phase6_analyze.txt`).
+- Full PHP suite after Phase 6: **340 passed / 1472 assertions**
+  (`qa/phase6_php_test.txt`).
 - Full suite after Phase 4: **638 passed / 0 failed**
   (`qa/phase4_full_test.txt`).
 - `flutter analyze --no-pub`: **0 errors**, 8 pre-existing info lints
@@ -353,10 +442,12 @@ following count going N → N+1 → N with the list.
 - Baseline before Phase 1: **533 passed / 40 failed**
   (`qa/full_test_run_baseline.txt`).
 
-## Next
+## Remaining external work
 
-1. Build `qa/final_results.csv` for all 377 workbook rows, using named tests
-   and `file:line` evidence only; leave unrunnable rows as “Needs device/API.”
-2. Rebuild `qa/static_review.csv` and write the per-workbook counts plus the
-   device/API manual script.
-3. Push only `qa/workbook-pass` when the report is complete.
+1. Run `qa/MANUAL_TESTS.md` on devices and against the live API; record results
+   beside the 58 Needs rows.
+2. The 26 Fail rows need product/server work, not more tests. The largest clusters
+   are rider offers/presence, payment-gateway/auto-cancel, cancellation side
+   effects, notifications and proof-photo display.
+3. Do not mark a Needs row Pass from this report alone; it needs a device/API run
+   with the evidence named in the manual script.

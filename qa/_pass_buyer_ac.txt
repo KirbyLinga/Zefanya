@@ -1,0 +1,128 @@
+=== TC-BUY-002 | Buyer | Submit a completely empty form
+EXPECTED: Registration is blocked. A required-field message is shown for every mandatory field. No account is created and no OTP is sent.
+ACTUAL: Continue on step 1 flags every empty required field (names, sex, email, phone, date of birth). Nothing is submitted.
+
+=== TC-BUY-003 | Buyer | Leave one required field blank at a time
+EXPECTED: Each time, registration is blocked and a required-field message is shown on the blank field only. Other entered values (except passwords and uploads) are kept. No account is created.
+ACTUAL: Each required field shows its own message; other values stay in the form.
+
+=== TC-BUY-004 | Buyer | Name with numbers or symbols
+EXPECTED: Registration is blocked. A message on each name field says only letters are allowed.
+ACTUAL: Names with numbers and symbols are accepted. Only length of at least 2 is checked.
+
+=== TC-BUY-005 | Buyer | Name with ñ and allowed punctuation
+EXPECTED: The names are accepted and saved exactly as typed, including ñ.
+ACTUAL: Names with ñ, hyphen and apostrophe are accepted and kept as typed.
+
+=== TC-BUY-006 | Buyer | Name length at the limits
+EXPECTED: 1 and 51 characters are rejected with a length message. 2 and 50 characters are accepted.
+ACTUAL: 1 character shows "First name is required" (not a length message). 51 characters is accepted; there is no 50-character limit.
+
+=== TC-BUY-007 | Buyer | Age at the 18-year limit
+EXPECTED: The 17-year-old date is rejected with a message that the person must be at least 18. The other two dates are accepted.
+ACTUAL: The age is calculated but never checked. A 17-year-old date of birth is accepted.
+
+=== TC-BUY-008 | Buyer | Date of birth in the future
+EXPECTED: Registration is blocked. A message asks for a valid date of birth. If a date picker is used, future dates cannot be selected.
+ACTUAL: The date picker stops at today, so a future date cannot be chosen.
+
+=== TC-BUY-009 | Buyer | Email in an invalid format
+EXPECTED: Each value is rejected with a message asking for a valid email address. No account is created.
+ACTUAL: All five values are rejected with "Enter a valid email address".
+
+=== TC-BUY-010 | Buyer | Email that is already registered
+EXPECTED: Registration is blocked. A message says the email is already in use. No account is created.
+ACTUAL: Mock repository has no account store, so a duplicate email is never detected.
+
+=== TC-BUY-011 | Buyer | Registered email typed in capital letters
+EXPECTED: The email is treated as a duplicate. Registration is blocked.
+ACTUAL: Duplicate detection (case-insensitive) is a server rule; the mock does not do it.
+
+=== TC-BUY-012 | Buyer | Email with spaces before and after
+EXPECTED: The spaces are removed and the email is saved as buyer.test01@example.com.
+ACTUAL: Spaces are trimmed before validating and before submitting.
+
+=== TC-BUY-013 | Buyer | Mobile number in an invalid format
+EXPECTED: Each value is rejected with a message asking for a valid mobile number.
+ACTUAL: All four values are rejected with "Enter a valid PH number (09XXXXXXXXX)".
+
+=== TC-BUY-014 | Buyer | Mobile number length at the limits
+EXPECTED: 10 and 12 digits are rejected with a length message. 11 digits is accepted.
+ACTUAL: 10 and 12 digits are rejected; 11 digits is accepted.
+
+=== TC-BUY-017 | Buyer | Password length at the limit
+EXPECTED: 7 characters is rejected with a minimum-length message. 8 characters is accepted.
+ACTUAL: 7 characters is rejected with "Use at least 8 characters"; 8 is accepted.
+
+=== TC-BUY-018 | Buyer | Password missing a required character type
+EXPECTED: Each password is rejected with a message stating the password rule. No account is created.
+ACTUAL: All four passwords are accepted. Only the 8-character minimum is enforced; no upper/lower/number/special rule.
+
+=== TC-BUY-019 | Buyer | Confirm Password does not match
+EXPECTED: Registration is blocked. A message says the passwords do not match.
+ACTUAL: Shows "Passwords don't match".
+
+=== TC-BUY-020 | Buyer | Password is hidden while typing
+EXPECTED: Characters are hidden as dots by default. The icon reveals the password, then hides it again.
+ACTUAL: Password and confirmation are obscured; the eye icon toggles each one.
+
+=== TC-BUY-021 | Buyer | Register without accepting the terms
+EXPECTED: Registration is blocked. A message says the Terms and Privacy Policy must be accepted.
+ACTUAL: No Terms and Privacy checkbox on the registration form. The only terms checkbox is at checkout.
+
+=== TC-BUY-022 | Buyer | Tap Register several times quickly
+EXPECTED: Only one account is created and only one OTP email is sent. No duplicate-email error screen appears.
+ACTUAL: The submit button is disabled while the request runs, so repeated taps do nothing.
+
+=== TC-BUY-024 | Buyer | Verify with an incorrect OTP
+EXPECTED: Verification fails with an invalid-code message. The account stays Unverified.
+ACTUAL: A wrong code is rejected with "That code doesn't match. Please try again." and the account stays unverified.
+
+=== TC-BUY-025 | Buyer | OTP in the wrong format
+EXPECTED: Each value is rejected. The account stays Unverified.
+ACTUAL: Letters cannot be typed (digits only). 5 digits shows "The code is six digits." Blank shows a prompt. A 7th digit cannot be typed.
+
+=== TC-BUY-026 | Buyer | Verify with an expired OTP
+EXPECTED: Verification fails with a message that the code has expired, and a Resend option is offered. The account stays Unverified.
+ACTUAL: Expiry is decided by the server. The OTP screen has no expired state or countdown.
+
+=== TC-BUY-030 | Buyer | Open another role's screens
+EXPECTED: No other role's menus are shown. Each deep link shows an access-denied message or returns to the buyer home screen. The API request is refused (401/403). No data from the other role is shown.
+ACTUAL: The app has no deep links; the shell is chosen from the saved role. 401/403 handling is server-side.
+
+=== TC-BUY-031 | Buyer | [Mobile] Each field opens the right keyboard
+EXPECTED: Each field opens the keyboard listed in the test data. Password fields show no autocorrect or word suggestions. No field opens a keyboard that cannot type its valid value.
+ACTUAL: Email uses the email keyboard, phone uses the phone keypad, names use the name keyboard, password fields are obscured.
+
+=== TC-BUY-032 | Buyer | [Mobile] Keyboard never hides the active field or Register
+EXPECTED: The focused field always scrolls into view above the keyboard, with its error message visible. Register can be reached and tapped. The keyboard closes when Done or the background is tapped.
+ACTUAL: Cannot be judged from code.
+
+=== TC-BUY-033 | Buyer | [Mobile] App sent to the background while filling the form
+EXPECTED: Each time, the app returns to the same form with every typed value still there (passwords may be cleared). The app does not restart, crash or jump to the login screen. No account is created until Register is tapped.
+ACTUAL: Cannot be judged from code. Controllers live in the wizard state, so values should survive a pause.
+
+=== TC-BUY-034 | Buyer | [Mobile] Rotate the phone while the form has data
+EXPECTED: Either the app stays in portrait, or the layout switches to landscape and back keeping every value and the error message. Nothing is cleared and the app does not crash.
+ACTUAL: No orientation lock in code, so landscape is possible. Needs a device check.
+
+=== TC-BUY-037 | Buyer | [Mobile] Paste the OTP copied from the mail app
+EXPECTED: All 6 digits fill the OTP field (every box, in order, when it is split into boxes). Verification succeeds and the status changes exactly as in the correct-OTP case.
+ACTUAL: The OTP field is digits-only and limited to 6, so a pasted 6-digit code fills it.
+
+=== TC-BUY-038 | Buyer | [Mobile] OTP countdown after switching to the mail app
+EXPECTED: After step 2 the verification screen is still open and shows about 3 minutes left (the countdown kept running; it did not restart at 5:00). In step 3 the code is rejected as expired and Resend is offered.
+ACTUAL: There is no countdown on the OTP screen, so nothing shows time left.
+
+=== TC-BUY-039 | Buyer | [Mobile] System Back on the form and the verification screen
+EXPECTED: Leaving a form with typed data asks first, and Cancel keeps every value. Back from the verification screen does not create a second account; the account stays Unverified, and the next login brings the user back to verification.
+ACTUAL: Back on the first registration step leaves without asking. DirtyGuard is only used on Edit Profile.
+
+=== TC-BUY-041 | Buyer | [Mobile] Stay logged in after closing the app or restarting the phone
+EXPECTED: Each time the app opens on the buyer home screen still logged in, showing Juan Miguel. It does not ask to log in again and shows no other user's data.
+ACTUAL: Status and role are saved and restored at startup, so the app opens logged in.
+
+=== TC-BUY-042 | Buyer | [Mobile] Back after logging out
+EXPECTED: The login screen stays. No screen with account data appears again, and the app does not log back in by itself.
+ACTUAL: Logout clears the session and returns to the root; the login screen shows and nothing logs back in.
+
