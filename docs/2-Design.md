@@ -98,7 +98,7 @@ COMPLETED         -> (terminal)
 | DELIVERED → COMPLETED | buyer |
 | *(none — empty)* | system |
 
-**Retry limit:** `seller_orders.delivery_attempts` (tinyint, default 0) increments on every `DELIVERY_FAILED` (`DeliveryAssignmentsController.php:176`); `reschedule()` refuses once `>= 2`, so the **3rd failure can only be RETURNED** (`DeliveryAssignmentsController.php:211-213`).
+**Delivery attempt policy (confirmed 2026-10-23):** Two total attempts: the initial delivery plus one retry. `SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS = 2` is the shared limit. The legacy column `seller_orders.delivery_attempts` counts failed attempts, not starts: 0 before any failure, 1 after the first failure, 2 after the second. `transition()` increments it atomically only on a real `OUT_FOR_DELIVERY -> DELIVERY_FAILED` hop; duplicate reports do not increment it. `canRetryDelivery()` permits retry only from `DELIVERY_FAILED` with exactly one recorded failure. The second failure leaves the parcel failed until Logistics returns it; no third attempt is allowed. Changing Riders does not reset the count. A failed parcel with missing (zero) history requires review; no historical count is guessed or rewritten.
 
 ### 2.3 Order-level vs seller-order-level status
 
@@ -315,7 +315,7 @@ Channels are **split by purpose** (verified against each class's `via()`):
 | Channel | Classes |
 |---|---|
 | **`mail`** | OTP + registration decisions: `BuyerVerifyOtp`, `SellerRegistrationOtp`, `LogisticsRegistrationOtp`, `BuyerRegistrationDecision`, `SellerRegistrationDecision`, `LogisticsRegistrationDecision` |
-| **`database`** | In-app order/fulfilment alerts: `CourierAssigned`, `OrderOutForDelivery`, `OrderDelivered`, `DeliveryFailed` (buyer + seller), `NewOrderReceived`, `ParcelReturned` |
+| **`database`** | In-app order/fulfilment alerts: `CourierAssigned`, `OrderOutForDelivery`, `OrderDelivered`, `DeliveryFailed` (buyer + seller), `NewOrderReceived`, `ParcelReturned`; Rider alerts: `Rider\{PickupAssigned,DeliveryAssigned,AssignmentReassigned,DeliveryReturned,StationChanged,AccountStatusChanged}` |
 
 OTP **must** be mail — registration cannot complete if the code never leaves the server. Decision emails likewise use mail. Order lifecycle alerts are database-only (bell / notifications centre).
 
@@ -334,8 +334,14 @@ OTP **must** be mail — registration cannot complete if the code never leaves t
 | Parcel returned | `Seller\ParcelReturned` | database | `RETURNED` |
 | Logistics registration decision | `Logistics\LogisticsRegistrationDecision` | mail | admin decision |
 | Logistics OTP | `Logistics\LogisticsRegistrationOtp` | mail | registration; resend |
+| Rider pickup assigned | `Rider\PickupAssigned` | database | `CourierAssignmentService::reservePickup()` (and legacy `assignPickup()`) |
+| Rider delivery assigned | `Rider\DeliveryAssigned` | database | `CourierAssignmentService::assignDelivery()`; `rescheduled = true` after a failed attempt |
+| Rider task reassigned | `Rider\AssignmentReassigned` | database | `assignDelivery()` when a different courier replaces the failed one |
+| Rider delivery returned | `Rider\DeliveryReturned` | database | failed parcel returned to seller |
+| Rider station changed | `Rider\StationChanged` | database | `RiderRegistrationService::changeStation()` |
+| Rider account status | `Rider\AccountStatusChanged` | database | suspend / deactivate / reactivate |
 
-Status-change notifications are fired centrally from `SellerOrderStatusService::maybeNotify()` (`:224-252`). **No notification is sent for `COMPLETED`, `SORTED`, pickup, or the buyer on `RETURNED`.**
+Status-change notifications for Buyer/Seller are fired centrally from `SellerOrderStatusService::maybeNotify()` (`:224-252`). **No notification is sent for `COMPLETED`, `SORTED`, pickup, or the buyer on `RETURNED`.** Rider notifications are not emitted there: `CourierAssignmentService` and `RiderRegistrationService` call `RiderNotifier::send()` after their own transaction commits, and the stored `event_key` suppresses replayed events.
 
 ### 6.2 Messaging
 `conversations` (buyer↔seller, one thread per pair) + `messages` (`sender_role` enum buyer|seller). Endpoints exist on both sides (`MessageController`) with a `unread-count` endpoint (literal route ordered before the wildcard). The **Chat** pages are separate stubs that redirect "coming soon" — messaging itself works through `/messages`.

@@ -10,10 +10,14 @@ use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\SellerOrder;
 use App\Services\CourierAssignmentService;
+use App\Services\LogisticsHubService;
+use App\Services\ParcelHandoffVerification;
+use App\Services\ParcelIncidentService;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -44,10 +48,7 @@ class ParcelSortingController extends Controller
         }
 
         $baseQuery = SellerOrder::query()
-            ->where(function ($q) use ($provider): void {
-                $q->whereHas('courier.provider', fn ($sub) => $sub->whereKey($provider->id))
-                    ->orWhereHas('deliveryCourier.provider', fn ($sub) => $sub->whereKey($provider->id));
-            });
+            ->heldBy((int) $provider->id);
 
         // Tab counts for the UI
         $sortingCount = (clone $baseQuery)
@@ -65,14 +66,18 @@ class ParcelSortingController extends Controller
         $shipments = (clone $baseQuery)
             ->whereIn('status', $statuses)
             ->with([
+                'deliveryCourier' => fn ($q) => $q->withWorkload(),
+                'deliveryAssignments.courier',
+                'originStation',
+                'deliveryCourier.rider.station',
                 'courier.provider',
                 'deliveryCourier.provider',
                 'order.buyer',
                 'seller',
                 'orderItems.product',
             ])
-            ->orderBy('created_at')
-            ->get();
+            ->orderBy('created_at')->orderBy('id')
+            ->paginate(25)->withQueryString();
 
         return view('Logistics.ParcelSorting.index', [
             'shipments' => $shipments,
@@ -85,10 +90,33 @@ class ParcelSortingController extends Controller
                 ->get(),
             'availableCouriers' => Courier::query()
                 ->where('logistics_provider_id', $provider->id)
-                ->where('is_available', true)
+                ->eligibleForAssignment()->withWorkload()->withActiveWeight()
+                ->with(['area', 'rider'])
                 ->orderBy('name')
                 ->get(),
         ]);
+    }
+
+    public function previewAddress(Request $request, SellerOrder $sellerOrder, LogisticsHubService $hubs): View
+    {
+        $provider = $request->user('logistics');
+        $resolved = $hubs->previewLegacyDeliveryAddress($provider, $sellerOrder);
+
+        return view('Logistics.ParcelSorting.verify-address', ['parcel' => $sellerOrder, 'resolved' => $resolved]);
+    }
+
+    public function verifyAddress(Request $request, SellerOrder $sellerOrder, LogisticsHubService $hubs): RedirectResponse
+    {
+        $this->authorizeForUser($request->user('logistics'), 'remediate-shipment-address', $sellerOrder);
+        $data = $request->validate([
+            'snapshot_hash' => ['required', 'string', 'size:64'],
+            'barangay_code' => ['required', 'string', 'max:20'],
+            'evidence' => ['required', 'string', 'max:1000'],
+            'confirmed' => ['accepted'],
+        ]);
+        $hubs->confirmLegacyDeliveryAddress($request->user('logistics'), $sellerOrder, $data['snapshot_hash'], $data['barangay_code'], $data['evidence']);
+
+        return redirect()->route('logistics.parcel-sorting.index')->with('success', 'Original address evidence verified and destination coverage reconciled. The shipping snapshot and parcel status are unchanged.');
     }
 
     /**
@@ -99,43 +127,91 @@ class ParcelSortingController extends Controller
      * a rider from that area can be assigned. No match is not fatal — the
      * parcel still sorts and logistics can pick a rider by hand.
      */
-    public function sort(Request $request, SellerOrder $sellerOrder): RedirectResponse
-    {
+    public function sort(
+        Request $request,
+        SellerOrder $sellerOrder,
+        ParcelHandoffVerification $handoffVerify,
+        LogisticsHubService $hubs,
+    ): RedirectResponse {
         $provider = $request->user('logistics');
 
+        // Provider ownership before any idempotent success path.
         $this->authorizeForUser($provider, 'advance-shipment', [$sellerOrder]);
 
-        if ($sellerOrder->status !== OrderStatus::AtSortingCenter) {
+        $sellerOrder->loadMissing(['courier.provider', 'seller']);
+        $fresh = $sellerOrder->fresh() ?? $sellerOrder;
+        $alreadySorted = $fresh->status === OrderStatus::Sorted;
+        $token = $request->input('verification_token');
+
+        if (! $alreadySorted && $fresh->status !== OrderStatus::AtSortingCenter) {
             return back()->with('error', 'This parcel has already been sorted.');
         }
 
-        $area = $this->destinationAreaFor($provider, $sellerOrder);
+        $area = $this->destinationAreaFor($provider, $fresh);
 
         try {
-            DB::transaction(function () use ($sellerOrder, $provider, $area): void {
-                if ($area !== null && $sellerOrder->destination_area_id !== $area->id) {
-                    $sellerOrder->forceFill(['destination_area_id' => $area->id])->save();
+            // Authoritative origin Station Hub — required even for authorized retries.
+            $stationHubId = $hubs->sortingHubId((int) $provider->id, $fresh);
+            if ($stationHubId === null) {
+                throw ValidationException::withMessages(['station_hub' => 'This parcel has no authorized sorting hub. Resolve custody routing before sorting.']);
+            }
+
+            $method = null;
+            if (! $alreadySorted) {
+                $payload = $handoffVerify->assertValidForLogistics(
+                    $provider,
+                    $fresh,
+                    ParcelHandoffVerification::ACTION_SORT,
+                    $token,
+                    $stationHubId,
+                );
+                $method = $payload['method'] ?? null;
+            }
+
+            DB::transaction(function () use ($fresh, $provider, $area, $method, $alreadySorted): void {
+                $fresh = SellerOrder::query()->whereKey($fresh->id)->lockForUpdate()->firstOrFail();
+                ParcelIncidentService::assertOperationsAllowed($fresh);
+                if ($alreadySorted) {
+                    return;
                 }
 
+                if ($area !== null && $fresh->destination_area_id !== $area->id) {
+                    $fresh->forceFill(['destination_area_id' => $area->id])->save();
+                }
+
+                $base = $area !== null
+                    ? "Parcel sorted and routed to {$area->name}."
+                    : 'Parcel sorted and routed for delivery.';
+
                 $this->status->transition(
-                    $sellerOrder,
+                    $fresh,
                     OrderStatus::Sorted,
-                    note: $area !== null
-                        ? "Parcel sorted and routed to {$area->name}."
-                        : 'Parcel sorted and routed for delivery.',
-                    changedBy: 'system',
+                    note: $base.ParcelHandoffVerification::noteSuffix($method),
+                    changedBy: $provider->fullName(),
                     actor: OrderActor::Logistics,
                     actorId: $provider->id,
                     source: 'web',
                 );
             });
+
+            if (! $alreadySorted) {
+                $handoffVerify->consumeAfterSuccess(fn () => $handoffVerify->consumeForLogistics(
+                    $provider,
+                    $fresh,
+                    ParcelHandoffVerification::ACTION_SORT,
+                    $token,
+                    $stationHubId,
+                ));
+            }
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
 
         return back()->with('success', $area !== null
             ? "Parcel sorted for {$area->name}."
-            : 'Parcel sorted. No matching area — assign a rider manually.');
+            : 'Parcel sorted. New assignment is blocked: verify the original shipping-address barangay and configure validated coverage in an approved active Station Hub.');
     }
 
     /**
@@ -143,21 +219,22 @@ class ParcelSortingController extends Controller
      * delivery_courier_id). Logistics may confirm the area-suggested rider or
      * change it by passing ?courier_id=.
      */
-    public function assignDelivery(Request $request, SellerOrder $sellerOrder): RedirectResponse
+    public function assignDelivery(Request $request, SellerOrder $sellerOrder, LogisticsHubService $hubs): RedirectResponse
     {
         $provider = $request->user('logistics');
 
         $this->authorizeForUser($provider, 'advance-shipment', [$sellerOrder]);
 
+        if (($reason = $hubs->assignmentBlockReason($provider->id)) !== null) {
+            return back()->with('error', $reason);
+        }
+
         if ($sellerOrder->status !== OrderStatus::Sorted) {
             return back()->with('error', 'This parcel must be sorted first.');
         }
 
-        if ($sellerOrder->deliveryCourier !== null) {
-            return back()->with('warning', 'A delivery courier is already assigned.');
-        }
-
         $preferredCourierId = $request->integer('courier_id') ?: null;
+        $request->validate(['courier_id' => ['nullable', 'integer']]);
 
         try {
             $courier = $this->assignment->assignDelivery(
@@ -171,7 +248,7 @@ class ParcelSortingController extends Controller
         }
 
         if ($courier === null) {
-            return back()->with('error', 'No available courier in your fleet serves this destination.');
+            return back()->with('error', 'New assignment is blocked. Verify the original delivery barangay, configure its active Station Hub coverage, and select an eligible available rider from that station.');
         }
 
         return back()->with('success', "Delivery courier {$courier->name} assigned.");
@@ -183,16 +260,6 @@ class ParcelSortingController extends Controller
      */
     private function destinationAreaFor(LogisticsProvider $provider, SellerOrder $sellerOrder): ?Area
     {
-        $municipality = $sellerOrder->buyerMunicipality();
-
-        if ($municipality === null) {
-            return null;
-        }
-
-        return Area::query()
-            ->where('logistics_provider_id', $provider->id)
-            ->where('is_active', true)
-            ->whereRaw('LOWER(municipality) = ?', [mb_strtolower($municipality)])
-            ->first();
+        return (new LogisticsHubService)->areaForBarangay($provider->id, $sellerOrder->buyerBarangayCode());
     }
 }

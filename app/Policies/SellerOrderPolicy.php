@@ -27,9 +27,14 @@ class SellerOrderPolicy
         return $this->manage($seller, $sellerOrder);
     }
 
+    public function decline(Seller $seller, SellerOrder $sellerOrder): bool
+    {
+        return $this->manage($seller, $sellerOrder);
+    }
+
     /**
-     * Single rule behind both abilities: the seller_order belongs to the
-     * acting seller's shop.
+     * Single rule behind view/manage abilities: the seller_order belongs to
+     * the acting seller's shop.
      */
     private function manage(Seller $seller, SellerOrder $sellerOrder): bool
     {

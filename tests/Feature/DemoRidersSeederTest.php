@@ -47,6 +47,9 @@ class DemoRidersSeederTest extends TestCase
         ]);
         $this->assertSame(['Santa Cruz'], Courier::where('phone', '09170000011')->firstOrFail()->service_area);
         $this->assertSame(['Los Baños'], Courier::where('phone', '09170000022')->firstOrFail()->service_area);
+        $this->assertTrue(Courier::where('logistics_provider_id', $providerA->id)->get()->every(
+            fn (Courier $courier): bool => $courier->rider !== null && $courier->isEligibleForAssignment()
+        ));
     }
 
     public function test_seeder_is_idempotent_on_a_second_run(): void

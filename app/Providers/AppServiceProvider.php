@@ -3,13 +3,16 @@
 namespace App\Providers;
 
 use App\Models\CartItem;
+use App\Models\Incidents;
 use App\Models\Order;
 use App\Models\SellerOrder;
 use App\Models\Shared\Category;
 use App\Models\Wishlist;
 use App\Policies\BuyerOrderPolicy;
+use App\Policies\IncidentsPolicy;
 use App\Policies\SellerOrderFleetPolicy;
 use App\Policies\SellerOrderPolicy;
+use App\View\Composers\RiderNotificationComposer;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -70,7 +73,7 @@ class AppServiceProvider extends ServiceProvider
         // Registration: tight per-email+IP limit, looser per-IP ceiling so a
         // campus/office NAT cannot block every applicant on the same network.
         RateLimiter::for('register', function (Request $request) {
-            $email = Str::lower((string) $request->input('email'));
+            $email = is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : '';
 
             return [
                 Limit::perMinute(5)->by('register-email:'.$email.'|'.$request->ip()),
@@ -93,8 +96,10 @@ class AppServiceProvider extends ServiceProvider
         // auto-discovery naming (Order → OrderPolicy), so they are registered
         // explicitly. The fleet policy is exposed as a named ability because
         // a model can only carry ONE policy and SellerOrder's is the owner's.
+        Gate::policy(Incidents::class, IncidentsPolicy::class);
         Gate::policy(Order::class, BuyerOrderPolicy::class);
         Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
+        Gate::define('remediate-shipment-address', [SellerOrderFleetPolicy::class, 'remediateAddress']);
         Gate::define('advance-shipment', [SellerOrderFleetPolicy::class, 'advance']);
 
         // In production every generated URL (routes, assets, pagination, password
@@ -103,6 +108,11 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
+
+        // Login-side single-account enforcement is handled by a Login event
+        // listener (see EventServiceProvider). That keeps every login path —
+        // password, Google and any future path — in one place instead of in
+        // each controller.
 
         // buyer.php already applies its own prefix('buyer') and name('buyer.')
         // inside the file (line 9), so we only wrap it in the web middleware here.
@@ -137,6 +147,10 @@ class AppServiceProvider extends ServiceProvider
             $view->with('unreadNotificationCount', $this->buyerUnreadNotificationCount());
             $view->with('categories', $this->getCategories());
         });
+
+        // Rider panel: the bell lives in Layouts/rider so it is present on
+        // every page, not only the dashboard.
+        View::composer('Layouts.rider', RiderNotificationComposer::class);
     }
 
     /**
@@ -209,6 +223,6 @@ class AppServiceProvider extends ServiceProvider
     {
         return Category::query()
             ->orderBy('id')
-            ->get(['id', 'label']);
+            ->get(['id', 'label', 'icon']);
     }
 }

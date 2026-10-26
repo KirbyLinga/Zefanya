@@ -281,6 +281,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // ===== Name fields: letters only =====
     var nameFields = document.querySelectorAll('input[name="first_name"], input[name="last_name"], input[name="middle_initial"]');
     nameFields.forEach(function (field) {
+        // Rider names use shared Unicode validation; preserve spaces and punctuation.
+        if (field.closest('#riderRegisterForm')) return;
         field.addEventListener('input', function () {
             // Remove any non-letter characters (basic Latin letters only)
             this.value = this.value.replace(/[^a-zA-Z]/g, '');
@@ -290,6 +292,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // ===== Name fields: letters only =====
     var nameFields = document.querySelectorAll('input[name="first_name"], input[name="last_name"], input[name="middle_initial"]');
     nameFields.forEach(function (field) {
+        // Rider names use shared Unicode validation; preserve spaces and punctuation.
+        if (field.closest('#riderRegisterForm')) return;
         field.addEventListener('input', function () {
             // Remove any non-letter characters (keep Unicode letters via \p{L})
             this.value = this.value.replace(/[^a-zA-ZÀ-ÿ\u0100-\u017F\u0180-\u024F\u0250-\u0277\u0278-\u029C\u029D-\u02B8\u0386\u0388-\u038A\u038C\u038E-\u03A1\u03A3-\u03F5\u03F6-\u03FF\u0400-\u0484\u0487-\u052F\u0531-\u0556\u0559\u0560-\u0588]/g, '');

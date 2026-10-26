@@ -282,6 +282,25 @@ function checkBirthdate(y, m, d, minAge = 18, today = new Date()) {
     return null;
 }
 
+// Expiry fields carry the server's Asia/Manila "today" (data-today) so the
+// browser does not disagree with Laravel around midnight or across timezones.
+function fieldToday(field) {
+    const raw = field && field.getAttribute('data-today');
+    const m = raw && /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw).trim());
+    if (!m) return new Date();
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+function datePartsFromField(field, value) {
+    const p = dateInputParts(value);
+    if (p) return p;
+    // Some browsers report a localized string; valueAsDate still holds the date.
+    if (field && field.valueAsDate instanceof Date && !Number.isNaN(field.valueAsDate.getTime())) {
+        return [field.valueAsDate.getFullYear(), field.valueAsDate.getMonth() + 1, field.valueAsDate.getDate()];
+    }
+    return null;
+}
+
 function checkNotExpired(y, m, d, today = new Date()) {
     y = parseInt(y, 10); m = parseInt(m, 10); d = parseInt(d, 10);
     if (!y || !m || !d || m > 12 || d > getDaysInMonth(m, y)) return DATE_MSG;
@@ -411,10 +430,10 @@ const validators = {
         if (!v) return REQUIRED;
         return /^[A-Za-z]\d{2}-\d{2}-\d{6}$/.test(v) ? null : 'Use the format A00-00-000000.';
     },
-    'license-expiry'(value) {
-        const p = dateInputParts(value);
+    'license-expiry'(value, field) {
+        const p = datePartsFromField(field, value);
         if (!p) return DATE_MSG;
-        return checkNotExpired(p[0], p[1], p[2]);
+        return checkNotExpired(p[0], p[1], p[2], fieldToday(field));
     },
     'doc-file'(file) {
         return checkDocFile(file);
@@ -680,9 +699,12 @@ function updateBirthdayFields() {
         const minAge = parseInt(el.getAttribute('data-min-age') || '18', 10);
         el.max = (t[0] - minAge) + '-' + pad2(t[1]) + '-' + pad2(t[2]);
     });
+    // License expiry: earliest is today (Manila), there is no upper bound, and
+    // any stale max from a previous render is removed.
     document.querySelectorAll('input[type="date"][data-validate-rule="license-expiry"]').forEach((el) => {
-        const t = todayParts();
+        const t = todayParts(fieldToday(el));
         el.min = t[0] + '-' + pad2(t[1]) + '-' + pad2(t[2]);
+        el.removeAttribute('max');
     });
 }
 

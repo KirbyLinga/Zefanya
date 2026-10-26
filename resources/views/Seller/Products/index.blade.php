@@ -222,7 +222,12 @@
                                         @else
                                             <span class="sp-product__thumb sp-product__thumb--empty"><i data-lucide="package" width="16" height="16"></i></span>
                                         @endif
-                                        <span class="sp-product__name">{{ $product->name }}</span>
+                                        <span class="sp-product__name">
+                                            {{ $product->name }}
+                                            @if ($product->needsWeight())
+                                                <span class="sp-pill sp-pill--amber ml-2 align-middle" title="Add a weight so a courier can be assigned.">Needs weight</span>
+                                            @endif
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="sp-col--category sp-product__category">{{ $product->category->label ?? '—' }}</td>

@@ -163,7 +163,7 @@ class ProductController extends Controller
         return back()->with('success', $message);
     }
 
-    public function toggleStatus(Request $request, Product $product)
+    public function toggleStatus(Request $request, Product $product, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
 
@@ -171,7 +171,10 @@ class ProductController extends Controller
             'status' => ['required', 'in:active,inactive'],
         ]);
 
-        $product->update(['status' => $validated['status']]);
+        if ($validated['status'] === 'active') {
+            $publishing->assertPublishable($product);
+        }
+        $product->forceFill(['status' => $validated['status']])->save();
 
         $message = "\"{$product->name}\" was marked as {$product->status}.";
 

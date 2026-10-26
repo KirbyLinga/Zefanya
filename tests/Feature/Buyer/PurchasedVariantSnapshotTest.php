@@ -18,10 +18,12 @@ use App\Services\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class PurchasedVariantSnapshotTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private function shirt(?Seller $seller = null, string $name = 'Classic Cotton Shirt'): Product
@@ -59,9 +61,18 @@ class PurchasedVariantSnapshotTest extends TestCase
 
     private function purchase(Buyer $buyer, array $lines): Order
     {
+        $sellers = collect($lines)
+            ->map(fn (CartItem $line) => $line->product->seller)
+            ->unique('id')
+            ->values();
+        $this->bootstrapCheckoutCarriers($buyer, $sellers);
+
         $this->actingAs($buyer, 'buyer');
         session([CheckoutController::SESSION_KEY => array_map(fn ($line) => $line->id, $lines)]);
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($buyer->id)->token])
+        $this->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($buyer->id)->token,
+            ...$this->checkoutCarrierPayload($sellers),
+        ])
             ->assertSessionMissing('error')->assertRedirect();
 
         return Order::query()->latest('id')->firstOrFail();
@@ -93,9 +104,9 @@ class PurchasedVariantSnapshotTest extends TestCase
         $this->assertSame(20050, $item->lineTotalMinor());
         $this->assertSame(20050, $order->subtotal_minor);
         $this->assertSame(0, $order->discount_minor);
-        $this->assertSame(20050, $order->total_minor);
+        $this->assertSame(24950, $order->total_minor);
         $this->assertSame(20050, $order->sellerOrders()->sole()->subtotal_minor);
-        $this->assertSame(20050, Payment::query()->sole()->amount_minor);
+        $this->assertSame(24950, Payment::query()->sole()->amount_minor);
         $this->assertSame('cod', Payment::query()->sole()->method->value);
         $this->assertSame(3, $variant->fresh()->stock_quantity);
         $this->assertSame(18, $product->fresh()->stock_quantity);
@@ -144,8 +155,8 @@ class PurchasedVariantSnapshotTest extends TestCase
         $this->assertSame(2, $item->quantity);
         $this->assertSame(10025, $item->price_minor);
         $this->assertSame(20050, $item->lineTotalMinor());
-        $this->assertSame(20050, $order->fresh()->total_minor);
-        $this->assertSame(20050, Payment::query()->sole()->amount_minor);
+        $this->assertSame(24950, $order->fresh()->total_minor);
+        $this->assertSame(24950, Payment::query()->sole()->amount_minor);
         $this->visible($order, ['Classic Cotton Shirt', 'Color: Black / Size: Large']);
     }
 
@@ -160,7 +171,7 @@ class PurchasedVariantSnapshotTest extends TestCase
         $items = OrderItem::query()->get()->keyBy('variant_id');
         $this->assertSame($this->expectedOptions(), $items[$black->id]->variant_options);
         $this->assertSame($this->expectedOptions('White', 'Small'), $items[$white->id]->variant_options);
-        $this->assertSame(32100, $order->total_minor);
+        $this->assertSame(37000, $order->total_minor);
         $this->assertSame([3, 4], [$black->fresh()->stock_quantity, $white->fresh()->stock_quantity]);
         $this->visible($order, ['Color: Black / Size: Large', 'Color: White / Size: Small']);
     }
@@ -178,8 +189,8 @@ class PurchasedVariantSnapshotTest extends TestCase
         $items = OrderItem::query()->get()->keyBy('product_id');
         $this->assertSame($this->expectedOptions(), $items[$first->id]->variant_options);
         $this->assertSame($this->expectedOptions('White', 'Small'), $items[$second->id]->variant_options);
-        $this->assertSame(56200, $order->total_minor);
-        $this->assertSame(56200, (int) Payment::query()->sum('amount_minor'));
+        $this->assertSame(66000, $order->total_minor);
+        $this->assertSame(66000, (int) Payment::query()->sum('amount_minor'));
         $this->assertSame([3, 2], [$a->fresh()->stock_quantity, $b->fresh()->stock_quantity]);
         $this->visible($order, ['Classic Cotton Shirt', 'Second Shop Shirt', 'Color: Black / Size: Large', 'Color: White / Size: Small']);
     }
@@ -193,7 +204,7 @@ class PurchasedVariantSnapshotTest extends TestCase
         $item = OrderItem::query()->sole();
         $this->assertSame([], $item->variant_options);
         $this->assertSame('', $item->variantDescription());
-        $this->assertSame(1250, $order->total_minor);
+        $this->assertSame(6150, $order->total_minor);
         $this->visible($order, ['Plain Mug']);
         foreach ([route('buyer.orders.index'), route('buyer.orders.show', $order)] as $url) {
             $this->get($url)->assertDontSee('Color:')->assertDontSee('Size:');
@@ -253,7 +264,7 @@ class PurchasedVariantSnapshotTest extends TestCase
         $this->assertTrue($changed);
         $this->assertSame('Black', $oldColor);
         $this->assertSame($this->expectedOptions('Navy Blue'), OrderItem::query()->sole()->variant_options);
-        $this->assertSame(20050, $order->total_minor);
+        $this->assertSame(24950, $order->total_minor);
         $this->visible($order, ['Color: Navy Blue / Size: Large']);
     }
 

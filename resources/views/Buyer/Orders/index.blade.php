@@ -115,7 +115,7 @@
                                         'label' => 'Completed',
                                         'color' => 'border-neutral-200 bg-neutral-100 text-neutral-700',
                                     ],
-                                    $statuses->contains(fn ($s) => $s === OrderStatus::DeliveryFailed || $s === OrderStatus::Returned) => [
+                                    $statuses->contains(fn ($s) => $s === OrderStatus::DeliveryFailed || $s === OrderStatus::Returned || $s === OrderStatus::Cancelled) => [
                                         'label' => 'Cancelled / Returned',
                                         'color' => 'border-red-200 bg-red-50 text-red-700',
                                     ],

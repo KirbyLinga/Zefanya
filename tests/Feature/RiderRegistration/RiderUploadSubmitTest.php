@@ -31,7 +31,7 @@ class RiderUploadSubmitTest extends RiderTestBase
     public function test_tc_rid_019_rapid_triple_save_creates_one(): void
     {
         $p = $this->logisticsA();
-        $payload = $this->validPayload(['email' => 'markanthony.bautista@example.com', 'contact_no' => '09662345678', 'license_no' => 'D05-19-123456', 'plate_number' => 'NBC1234', 'first_name' => 'Mark Anthony', 'last_name' => 'Bautista', 'birthday' => '1999-08-09', 'license_expiry' => '2031-08-09', 'vehicle_type' => 'Van']);
+        $payload = $this->validPayload(['email' => 'markanthony.bautista@example.com', 'contact_no' => '09662345678', 'license_no' => 'D05-19-123456', 'plate_number' => 'NBC1234', 'first_name' => 'Mark Anthony', 'last_name' => 'Bautista', 'birthday' => '1999-08-09', 'license_expiry' => '2031-08-09', 'vehicle_type' => 'Van', 'station_hub_id' => $this->stationFor($p)->id]);
         for ($k = 0; $k < 3; $k++) {
             $this->actingAs($p, 'logistics')->post(route('logistics.riders.store'), $payload);
         }

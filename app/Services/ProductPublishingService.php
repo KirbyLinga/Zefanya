@@ -40,16 +40,20 @@ class ProductPublishingService
                         ? Product::generateUniqueSlug($data['name']) : $product->slug,
                     'description' => $data['description'] ?? null,
                     'price' => $data['price'],
+                    'weight_grams' => $withVariants ? (min(array_column($data['variants'], 'weight_grams') ?: [0])) : ($data['weight_grams'] ?? 0),
                     // Newly created inventory starts at zero; StockService writes its ledger.
                     'stock_quantity' => ! $product->exists ? 0 : $data['stock_quantity'],
                     'low_stock_threshold' => $data['low_stock_threshold'] ?? 5,
-                    'status' => $data['status'],
                 ]);
+                $product->forceFill(['status' => $data['status']]);
                 $product->save();
                 if (! $withVariants) {
                     $product->stock_quantity = (int) $data['stock_quantity'];
                 }
                 $this->variants->sync($product, $withVariants ? $data['options'] : [], $withVariants ? $data['variants'] : [], $withVariants);
+                if ($product->status === 'active') {
+                    $this->assertPublishable($product);
+                }
                 $this->generalImages($product, $data, $stored);
                 $this->removeColorImages($product, $data['color_images'] ?? [], $removedPaths);
                 $this->colorImages($product, $data['color_images'] ?? [], $stored, (bool) ($data['color_first'] ?? false));
@@ -80,6 +84,18 @@ class ProductPublishingService
         });
 
         return $saved;
+    }
+
+    public function assertPublishable(Product $product): void
+    {
+        $weights = $product->options()->exists()
+            ? $product->variants()->where('is_available', true)->pluck('weight_grams')->all()
+            : [$product->weight_grams];
+        foreach ($weights ?: [null] as $weight) {
+            if ($weight === null || $weight < 1 || $weight > 100000) {
+                throw ValidationException::withMessages(['weight' => 'Enter a weight from 1 g to 100 kg for the product and each selling variant before publishing.']);
+            }
+        }
     }
 
     /** A signed snapshot of existing stock and variant identities; no schema change. */

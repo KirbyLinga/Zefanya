@@ -21,11 +21,11 @@ class ProductEditingSafetyTest extends TestCase
         foreach (['Black', 'White'] as $color) {
             foreach (['S', 'M'] as $size) {
                 $rows[] = ['values' => [$color, $size], 'sku' => $color.'-'.$size,
-                    'price' => 299, 'stock_quantity' => 10, 'is_available' => true];
+                    'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 10, 'is_available' => true];
             }
         }
 
-        return ['name' => 'Oversized Cotton Shirt', 'price' => 299, 'stock_quantity' => 0, 'status' => 'active',
+        return ['name' => 'Oversized Cotton Shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0, 'status' => 'active',
             'variants_exist' => true, 'options' => [
                 ['name' => 'Color', 'values' => ['Black', 'White']],
                 ['name' => 'Size', 'values' => ['S', 'M']],
@@ -58,7 +58,7 @@ class ProductEditingSafetyTest extends TestCase
         Storage::fake('public');
         $seller = Seller::factory()->create();
         $service = app(ProductPublishingService::class);
-        $data = ['name' => 'Single shirt', 'price' => 299, 'stock_quantity' => 10, 'status' => 'active'];
+        $data = ['name' => 'Single shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 10, 'status' => 'active'];
         $product = $service->save(new Product, $seller, $data);
         $data['inventory_revision'] = $service->inventoryRevision($product->load('variants'));
         $variant = $product->variants->first();
@@ -111,7 +111,7 @@ class ProductEditingSafetyTest extends TestCase
         $seller = Seller::factory()->create();
         $product = Product::factory()->create(['seller_id' => $seller->id]);
         $this->actingAs($seller, 'seller')->put(route('seller.products.update', $product),
-            ['name' => 'Changed shirt', 'price' => 299, 'stock_quantity' => 10, 'status' => 'active'])
+            ['name' => 'Changed shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 10, 'status' => 'active'])
             ->assertSessionHasErrors('inventory_revision');
         $this->assertNotSame('Changed shirt', $product->fresh()->name);
     }

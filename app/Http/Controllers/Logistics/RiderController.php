@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Logistics\StoreRiderRequest;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Rider;
 use App\Notifications\Rider\RiderActivation;
+use App\Services\RiderRegistrationService;
 use App\Support\RiderValidation;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -19,21 +22,35 @@ class RiderController extends Controller
     public function index(): View
     {
         $provider = Auth::guard('logistics')->user();
-        $riders = Rider::query()->where('logistics_provider_id', $provider->getKey())->latest()->get();
+        $riders = Rider::query()->where('logistics_provider_id', $provider->getKey())
+            ->with('station')->latest()->get();
+        $applications = $riders->where('status', Rider::STATUS_PENDING)->values();
 
-        return view('Logistics.Riders.index', ['riders' => $riders, 'provider' => $provider]);
+        return view('Logistics.Riders.index', [
+            'riders' => $riders->where('status', '!=', Rider::STATUS_PENDING)->values(),
+            'applications' => $applications,
+            'stations' => $this->stationOptions($provider->getKey()),
+            'provider' => $provider,
+        ]);
     }
 
     public function create(): View
     {
-        return view('Logistics.Riders.create');
+        $provider = Auth::guard('logistics')->user();
+
+        return view('Logistics.Riders.create', [
+            'stations' => $this->stationOptions($provider->getKey()),
+        ]);
     }
 
     public function show(Rider $rider): View
     {
         $this->scope($rider);
 
-        return view('Logistics.Riders.show', ['rider' => $rider]);
+        return view('Logistics.Riders.show', [
+            'rider' => $rider->load('station', 'courier'),
+            'stations' => $this->stationOptions((int) $rider->logistics_provider_id),
+        ]);
     }
 
     public function store(StoreRiderRequest $request): RedirectResponse
@@ -57,10 +74,24 @@ class RiderController extends Controller
                     'plate_number' => $data['plate_number'],
                     'drivers_license_path' => $licensePath,
                     'or_cr_path' => $orcrPath,
+                    'address_mode' => $data['address_mode'] ?? null,
+                    'province_code' => $data['province'] ?? null,
+                    'province_name' => $data['province_name'] ?? null,
+                    'municipality_code' => $data['municipality'] ?? null,
+                    'municipality_name' => $data['municipality_name'] ?? null,
+                    'barangay_code' => $data['barangay'] ?? null,
+                    'barangay_name' => $data['barangay_name'] ?? null,
+                    'street' => $data['street'] ?? null,
+                    'house_number' => $data['house_number'] ?? null,
+                    'address_detail' => $data['address_detail'] ?? null,
+                    'postal_code' => $data['postal_code'] ?? null,
                 ]);
-                $row->logistics_provider_id = $provider->getKey();
-                $row->status = 'pending_activation';
-                $row->save();
+                $row->forceFill([
+                    'logistics_provider_id' => $provider->getKey(),
+                    'station_hub_id' => $data['station_hub_id'],
+                    'status' => Rider::STATUS_PENDING_ACTIVATION,
+                    'status_changed_at' => now(),
+                ])->save();
                 $this->issueToken($row);
 
                 return $row;
@@ -84,9 +115,71 @@ class RiderController extends Controller
         return redirect()->route('logistics.riders.index')->with('success', 'Rider created. Activation email sent.');
     }
 
+    public function approve(Request $request, Rider $rider, RiderRegistrationService $service): RedirectResponse
+    {
+        $this->scope($rider);
+        $data = $request->validate([
+            'station_hub_id' => ['required', 'integer'],
+        ]);
+
+        $service->decide($rider, Auth::guard('logistics')->user(), Rider::STATUS_APPROVED, null, (int) $data['station_hub_id']);
+
+        return redirect()->route('logistics.riders.show', $rider)->with('success', 'Rider application approved and assigned to the Station Hub.');
+    }
+
+    public function reject(Request $request, Rider $rider, RiderRegistrationService $service): RedirectResponse
+    {
+        $this->scope($rider);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $service->decide($rider, Auth::guard('logistics')->user(), Rider::STATUS_REJECTED, $data['reason']);
+
+        return redirect()->route('logistics.riders.index')->with('success', 'Rider application rejected.');
+    }
+
+    public function suspend(Request $request, Rider $rider, RiderRegistrationService $service): RedirectResponse
+    {
+        $this->scope($rider);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
+        $service->suspend($rider, Auth::guard('logistics')->user(), $data['reason'] ?? null);
+
+        return redirect()->route('logistics.riders.show', $rider)->with('success', 'Rider suspended. Affected parcels are flagged for reassignment.');
+    }
+
+    public function deactivate(Request $request, Rider $rider, RiderRegistrationService $service): RedirectResponse
+    {
+        $this->scope($rider);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
+        $service->deactivate($rider, Auth::guard('logistics')->user(), $data['reason'] ?? null);
+
+        return redirect()->route('logistics.riders.show', $rider)->with('success', 'Rider deactivated. Affected parcels are flagged for reassignment.');
+    }
+
+    public function reactivate(Rider $rider, RiderRegistrationService $service): RedirectResponse
+    {
+        $this->scope($rider);
+        $service->reactivate($rider, Auth::guard('logistics')->user());
+
+        return redirect()->route('logistics.riders.show', $rider)->with('success', 'Rider reactivated.');
+    }
+
+    public function changeStation(Request $request, Rider $rider, RiderRegistrationService $service): RedirectResponse
+    {
+        $this->scope($rider);
+        $data = $request->validate([
+            'station_hub_id' => ['required', 'integer'],
+        ]);
+        $service->changeStation($rider, Auth::guard('logistics')->user(), (int) $data['station_hub_id']);
+
+        return redirect()->route('logistics.riders.show', $rider)->with('success', 'Rider station updated.');
+    }
+
     public function resend(Rider $rider): RedirectResponse
     {
         $this->scope($rider);
+        abort_unless($rider->status === Rider::STATUS_PENDING_ACTIVATION, 403, 'This registration cannot use activation links.');
         DB::table('rider_activation_tokens')->where('rider_id', $rider->getKey())->delete();
         $this->issueToken($rider->fresh());
 
@@ -99,6 +192,18 @@ class RiderController extends Controller
         if ((int) $rider->logistics_provider_id !== (int) $provider->getKey()) {
             abort(403);
         }
+    }
+
+    private function stationOptions(int $providerId)
+    {
+        return LogisticsHub::query()
+            ->where('logistics_provider_id', $providerId)
+            ->where('hub_type', LogisticsHub::STATION)
+            ->where('approval_status', LogisticsHub::APPROVAL_APPROVED)
+            ->where('is_active', true)
+            ->orderBy('province_name')
+            ->orderBy('municipality')
+            ->get();
     }
 
     private function issueToken(Rider $rider): string

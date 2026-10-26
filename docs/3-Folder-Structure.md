@@ -122,12 +122,14 @@ app/
 │   ├── ProductVariant.php  SellerOrder.php  StatusHistory.php  Voucher.php  Wishlist.php
 ├── Notifications/
 │   ├── Buyer/{BuyerRegistrationDecision,BuyerVerifyOtp,CourierAssigned,DeliveryFailed,OrderDelivered,OrderOutForDelivery}.php
-│   ├── Logistics/{LogisticsRegistrationDecision,LogisticsRegistrationOtp}.php
+│   ├── Logistics/{LogisticsRegistrationDecision,LogisticsRegistrationOtp,RiderAssignmentsNeedReassignment,RiderParcelActivity}.php
 │   └── Seller/{DeliveryFailed,NewOrderReceived,ParcelReturned,SellerRegistrationDecision,SellerRegistrationOtp}.php
 ├── Policies/{BuyerOrderPolicy,ConversationPolicy,SellerOrderFleetPolicy,SellerOrderPolicy}.php
 ├── Providers/AppServiceProvider.php               # policies, buyer routes, rate config
-└── Services/{CartSummary,CourierAssignmentService,SellerOrderStatusService,StockService,VariantSyncService}.php
+└── Services/{CartSummary,CourierAssignmentService,RiderNotifier,SellerOrderStatusService,StockService,VariantSyncService}.php
 ```
+
+**Rider notifications:** `app/Notifications/Rider/` holds the database-only rider alerts (`PickupAssigned`, `DeliveryAssigned`, `AssignmentReassigned`, `DeliveryReturned`, `StationChanged`, `AccountStatusChanged`) and their `RiderNotification` base. The bell lives in `resources/views/Components/rider/notification-bell.blade.php`; the page is `Rider/Notifications/index.blade.php`.
 
 ---
 
@@ -180,7 +182,7 @@ resources/views/
 
 ## 5. `resources/js` and `resources/css`
 
-**JS** (`resources/js/`): `app.js` (barrel), `registration-validation.js`; `buyer/` (address-lookup, add-to-cart-animation, buyer, buyer-register-modal, cart, category-scroll, home, messages, navbar, navbar-search, product-show, search, wishlist-cards); `seller/` (notification-bell, product-create-modal, products-index, products-table, seller-register-modal, sidebar-tooltips, theme-toggle); `logistics/` (logistics-register-modal, sidebar-tooltips).
+**JS** (`resources/js/`): `app.js` (barrel), `registration-validation.js`; `buyer/` (address-lookup, add-to-cart-animation, buyer, buyer-register-modal, cart, category-scroll, home, messages, navbar, navbar-search, product-show, search, wishlist-cards); `seller/` (notification-bell, product-create-modal, products-index, products-table, seller-register-modal, sidebar-tooltips, theme-toggle); `logistics/` (logistics-register-modal, sidebar-tooltips); `rider/` (notification-bell, rider-register-modal, sidebar-tooltips).
 
 **CSS** (`resources/css/`): `app.css` (Tailwind v4 `@theme` — **the design-token source**), `login-modal.css`, `auth.css` + `auth-pages.css` (legacy auth chain), `theme.css`, `buyer/buyer-register-modal.css`, `seller/{seller-register-modal,products-index}.css`, `logistics/logistics-register-modal.css`.
 

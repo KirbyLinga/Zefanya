@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Shared\Category;
 use App\Services\ProductReviewService;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -74,8 +73,17 @@ class ProductController extends Controller
         ];
 
         $galleryImages = $product->images->isNotEmpty()
-            ? $product->images->sortByDesc('is_primary')->unique('path')->map(fn ($img) => Storage::url($img->path))->values()->all()
+            ? $product->images->sortByDesc('is_primary')->unique('path')
+                ->map(fn ($img) => $product->catalogImageUrl(collect([$img]), requireExistingFile: false))
+                ->filter()->values()->all()
             : array_fill(0, 5, null);
+
+        // Prefer a surviving upload over a missing primary image, while keeping
+        // URLs available for uploads served outside this PHP instance.
+        $coverImage = $product->catalogImageUrl(requireExistingFile: false);
+        if ($coverImage !== null) {
+            $galleryImages = array_values(array_unique([$coverImage, ...$galleryImages]));
+        }
 
         $price = $product->formattedPriceRange();
 
@@ -101,8 +109,9 @@ class ProductController extends Controller
                     'price' => (float) $variant->price,
                     'stock' => (int) $variant->stock_quantity,
                     'available' => $variant->is_available,
-                    'images' => $product->images->where('variant_id', $variant->id)->unique('path')
-                        ->map(fn ($image) => Storage::url($image->path))->values()->all(),
+                    'images' => ($variantImage = $product->catalogImageUrl(
+                        $product->images->where('variant_id', $variant->id), requireExistingFile: false,
+                    )) !== null ? [$variantImage] : [],
                     'color_axis' => $product->options->values()->search(fn ($option) => in_array(mb_strtolower($option->name), ['color', 'colour'], true)),
                     'values' => $product->options
                         ->filter(fn ($option) => $option->values->isNotEmpty())

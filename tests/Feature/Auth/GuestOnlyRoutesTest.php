@@ -17,7 +17,7 @@ class GuestOnlyRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const GUEST_ONLY_URLS = ['/login', '/register', '/admin/login'];
+    private const GUEST_ONLY_URLS = ['/register', '/admin/login'];
 
     private function signIn(string $role): void
     {
@@ -92,9 +92,10 @@ class GuestOnlyRoutesTest extends TestCase
         $this->get('/register')->assertOk();
     }
 
-    public function test_guest_can_open_login_page(): void
+    public function test_guest_can_open_shared_login_modal(): void
     {
-        $this->get('/login')->assertOk();
+        $this->get(route('home', ['login' => 1]))->assertOk()
+            ->assertSee('id="loginModalOverlay"', false);
     }
 
     #[DataProvider('roles')]

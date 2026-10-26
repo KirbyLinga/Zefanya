@@ -9,6 +9,7 @@ use App\Models\Seller\Seller;
 use App\Notifications\Buyer\BuyerRegistrationDecision;
 use App\Notifications\Logistics\LogisticsRegistrationDecision;
 use App\Notifications\Seller\SellerRegistrationDecision;
+use App\Services\ProviderProvinceService;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -16,6 +17,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends Controller
 {
@@ -375,22 +377,30 @@ class RegistrationController extends Controller
         return back()->with('success', "{$seller->fullName()}'s seller registration was rejected.");
     }
 
-    public function approveLogistics(LogisticsProvider $logisticsProvider)
+    public function approveLogistics(LogisticsProvider $logisticsProvider, ProviderProvinceService $provinces)
     {
         if ($logisticsProvider->status->value !== 'pending') {
             return back()->with('error', 'Only pending registrations can be approved.');
         }
 
+        $admin = Auth::guard('admin')->user();
+
+        try {
+            $provinces->verifyProvinceOnApproval($logisticsProvider, $admin);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
         $logisticsProvider->update([
             'status' => 'approved',
-            'approved_by' => Auth::guard('admin')->id(),
+            'approved_by' => $admin?->id,
             'approved_at' => now(),
             'rejection_reason' => null,
         ]);
 
         $logisticsProvider->notify(new LogisticsRegistrationDecision('approved'));
 
-        return back()->with('success', "{$logisticsProvider->fullName()}'s logistics registration was approved.");
+        return back()->with('success', "{$logisticsProvider->fullName()}'s logistics registration was approved. Province {$logisticsProvider->province_name} is now verified.");
     }
 
     public function rejectLogistics(LogisticsProvider $logisticsProvider, Request $request)

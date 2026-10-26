@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers\Buyer;
 
+use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\SellerOrder;
 use App\Services\BuyerShipmentConfirmation;
+use App\Services\SellerOrderStatusService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class OrderController extends Controller
@@ -35,6 +40,7 @@ class OrderController extends Controller
     private const CANCELLED_STATUSES = [
         OrderStatus::DeliveryFailed,
         OrderStatus::Returned,
+        OrderStatus::Cancelled,
     ];
 
     public function __construct(
@@ -106,7 +112,7 @@ class OrderController extends Controller
             ),
             'completed' => $baseQuery
                 ->whereHas('sellerOrders', fn ($q) => $q->where('status', OrderStatus::Completed))
-                ->whereDoesntHave('sellerOrders', fn ($q) => $q->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Returned])),
+                ->whereDoesntHave('sellerOrders', fn ($q) => $q->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled])),
             'cancelled' => $baseQuery->whereHas(
                 'sellerOrders',
                 fn ($q) => $q->whereIn('status', self::CANCELLED_STATUSES)
@@ -141,7 +147,17 @@ class OrderController extends Controller
 
         $order->load([
             'sellerOrders' => fn ($q) => $q
-                ->with('seller', 'courier', 'orderItems.product', 'statusHistories', 'payment'),
+                ->with(
+                    'seller',
+                    'courier',
+                    'orderItems.product',
+                    'statusHistories',
+                    'parcelHandoffs', 'parcelReturn.events',
+                    'payment',
+                    'manifestItems.manifest.originHub',
+                    'manifestItems.manifest.destinationHub',
+                    'manifestItems.manifest.provider',
+                ),
         ]);
 
         return view('Buyer.Orders.show', [
@@ -161,5 +177,76 @@ class OrderController extends Controller
         );
 
         return back()->with('success', 'Delivered shipment confirmed. Thank you!');
+    }
+
+    /**
+     * Buyer cancels one seller_order slice while it is still PLACED (before
+     * the seller accepts). Stock/payment side effects run through the shared
+     * status service (same path as F1 seller decline).
+     */
+    public function cancelSellerOrder(
+        Order $order,
+        SellerOrder $sellerOrder,
+        Request $request,
+    ): RedirectResponse|JsonResponse {
+        $buyer = $request->user('buyer');
+        $this->authorizeForUser($buyer, 'cancelSellerOrder', $order);
+
+        if ((int) $sellerOrder->order_id !== (int) $order->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $service = new SellerOrderStatusService;
+
+        try {
+            DB::transaction(function () use ($sellerOrder, $service, $validated, $buyer): void {
+                $current = SellerOrder::query()
+                    ->whereKey($sellerOrder->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($current === null) {
+                    abort(404);
+                }
+
+                if ($current->status !== OrderStatus::Placed) {
+                    throw new \InvalidArgumentException(
+                        'This shipment can no longer be cancelled — the seller has already started preparing it.'
+                    );
+                }
+
+                $service->transition(
+                    $current,
+                    OrderStatus::Cancelled,
+                    note: 'Buyer cancelled: '.$validated['reason'],
+                    changedBy: 'buyer',
+                    actor: OrderActor::Buyer,
+                    actorId: (int) $buyer->id,
+                    source: 'web',
+                    expectedFrom: OrderStatus::Placed,
+                );
+            });
+        } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return back()->withErrors(['reason' => $e->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'status' => OrderStatus::Cancelled->value,
+                'status_label' => OrderStatus::Cancelled->label(),
+                'message' => 'Shipment cancelled. The seller has been notified.',
+            ]);
+        }
+
+        return back()->with('success', 'Shipment cancelled. The seller has been notified.');
     }
 }

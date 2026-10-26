@@ -306,6 +306,8 @@ class LogisticsRegistrationTest extends TestCase
         $this->assertSame(LogisticsProviderStatus::Approved, $provider->status);
         $this->assertNotNull($provider->approved_at);
         $this->assertNotNull($provider->approved_by);
+        $this->assertNotNull($provider->province_verified_at);
+        $this->assertNotNull($provider->province_code);
     }
 
     public function test_admin_can_reject_a_logistics_registration_with_a_reason(): void

@@ -175,14 +175,11 @@ class GoogleAuthController extends Controller
 
         Auth::guard(self::ROLE_MAP[$role]['guard'])->login($account);
 
-        // One account per browser: end every other role's session.
+        // One account per browser: end every other role's session and stash the
+        // suppressed session so a later same-guard login (password reset, etc.)
+        // can restore it.
         $this->clearOtherGuards(self::ROLE_MAP[$role]['guard']);
 
-        $request->session()->regenerate();
-
-        // Explicit home for this role — never intended(). A prior visit to an
-        // admin (or other) gated URL can leave url.intended pointing at the
-        // wrong dashboard and send a Google-signed buyer there.
         return redirect()->route(AuthRole::from($role)->dashboardRoute());
     }
 
@@ -195,9 +192,7 @@ class GoogleAuthController extends Controller
     private function linkGoogleAccount(Model $account, string $googleId): ?string
     {
         if ($account->google_id === null) {
-            $alreadyLinked = $account->newQuery()->where('google_id', $googleId)->exists();
-
-            if ($alreadyLinked) {
+            if ($account->newQuery()->where('google_id', $googleId)->exists()) {
                 return 'That Google account is already linked to another Zefanya account.';
             }
 
@@ -264,8 +259,7 @@ class GoogleAuthController extends Controller
      * Back to the login screen with the reason whenever Google sign-in cannot
      * proceed (unknown email, link conflict, or the approval gate). Matches the
      * class docblock and the redirect the approval middleware uses.
-     */
-    /**
+     *
      * @param  array<string, mixed>  $extra
      */
     private function failed(string $message, array $extra = []): RedirectResponse
@@ -277,5 +271,18 @@ class GoogleAuthController extends Controller
         }
 
         return $redirect;
+    }
+
+    /**
+     * Log out from every guard and redirect to the home page.
+     */
+    public function logout(Request $request): RedirectResponse
+    {
+        $this->clearAllGuards();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('home');
     }
 }

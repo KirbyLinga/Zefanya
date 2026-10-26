@@ -48,7 +48,7 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
     Route::get('/help', [HelpController::class, 'index'])->name('help.index');
 
     // ── Login required from here down ──────────────────────
-    Route::middleware('auth:buyer')->group(function () {
+    Route::middleware(['auth:buyer', 'buyer.active'])->group(function () {
         Route::post('/products/{product}/reviews', [ReviewController::class, 'store'])
             ->middleware('throttle:10,1')->name('products.reviews.store');
 
@@ -78,6 +78,8 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/confirm-received', [OrderController::class, 'confirmReceived'])->name('orders.confirmReceived');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/cancel', [OrderController::class, 'cancelSellerOrder'])
+            ->name('orders.cancelSellerOrder');
 
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
         Route::get('/chat/{id}', [ChatController::class, 'show'])->name('chat.show');

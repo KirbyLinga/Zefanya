@@ -3,7 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Courier;
+use App\Models\Logistics\Area;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Rider;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -92,24 +95,95 @@ class DemoRidersSeeder extends Seeder
             self::PROVIDER_B_EMAIL => $providerB,
         ];
 
-        foreach (self::plannedRiders() as $rider) {
+        foreach (self::plannedRiders() as $index => $rider) {
             $provider = $providers[$rider['provider_email']];
+            $station = $this->stationFor($provider);
+            $coveredAreas = collect($rider['service_area'])
+                ->map(fn (string $municipality) => $this->coverageFor($provider, $station, $municipality));
 
-            Courier::updateOrCreate(
-                ['phone' => $rider['phone']],
-                [
-                    'logistics_provider_id' => $provider->getKey(),
-                    'name' => $rider['name'],
-                    'service_area' => $rider['service_area'],
-                    'is_available' => $rider['is_available'],
-                    'vehicle_type' => $rider['vehicle_type'],
-                    'max_weight_grams' => $rider['max_weight_grams'],
-                ]
-            );
+            $courier = Courier::firstOrNew(['phone' => $rider['phone']]);
+            $riderModel = $courier->rider_id !== null ? Rider::find($courier->rider_id) : null;
+            $riderModel ??= Rider::firstOrNew(['contact_no' => $rider['phone']]);
+
+            $nameParts = explode(' - ', $rider['name'], 2);
+            $name = explode(' ', $nameParts[0], 2);
+
+            $riderModel->fill([
+                'first_name' => $name[0],
+                'last_name' => $name[1] ?? 'Rider',
+                'birthday' => '1995-03-22',
+                'email' => 'demo.rider.'.$rider['phone'].'@example.com',
+                'contact_no' => $rider['phone'],
+                'license_no' => 'DMO-00-'.str_pad((string) ($index + 1), 6, '0', STR_PAD_LEFT),
+                'license_expiry' => '2030-03-22',
+                'vehicle_type' => ucfirst($rider['vehicle_type']),
+                'plate_number' => 'DEMO'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
+                'drivers_license_path' => 'rider-licenses/test.jpg',
+                'or_cr_path' => 'rider-or-crs/test.pdf',
+            ]);
+            $riderModel->forceFill([
+                'logistics_provider_id' => $provider->getKey(),
+                'station_hub_id' => $station->id,
+                'status' => Rider::STATUS_APPROVED,
+                'email_verified_at' => now(),
+                'status_changed_at' => now(),
+            ])->save();
+
+            $courier->fill([
+                'logistics_provider_id' => $provider->getKey(),
+                'rider_id' => $riderModel->id,
+                'area_id' => $coveredAreas->first()?->id,
+                'name' => $rider['name'],
+                'service_area' => $rider['service_area'],
+                'is_available' => $rider['is_available'],
+                'vehicle_type' => $rider['vehicle_type'],
+                'max_weight_grams' => $rider['max_weight_grams'],
+            ])->save();
         }
 
         $this->command?->info('Demo riders seeded for Provider A and Provider B.');
         $this->command?->info('Provider login password: '.self::PROVIDER_PASSWORD);
+    }
+
+    private function stationFor(LogisticsProvider $provider): LogisticsHub
+    {
+        $province = LogisticsHub::firstOrCreate([
+            'logistics_provider_id' => $provider->getKey(),
+            'hub_type' => LogisticsHub::PROVINCE,
+            'name' => 'Demo Province Hub '.$provider->id,
+        ], [
+            'province_name' => 'Laguna',
+            'region_name' => 'Region IV-A',
+            'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'approved_at' => now(),
+        ]);
+
+        return LogisticsHub::firstOrCreate([
+            'logistics_provider_id' => $provider->getKey(),
+            'hub_type' => LogisticsHub::STATION,
+            'name' => 'Demo Station Hub '.$provider->id,
+        ], [
+            'parent_hub_id' => $province->id,
+            'province_name' => 'Laguna',
+            'region_name' => 'Region IV-A',
+            'municipality' => self::AREA_SANTA_CRUZ,
+            'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'approved_at' => now(),
+        ]);
+    }
+
+    private function coverageFor(LogisticsProvider $provider, LogisticsHub $station, string $municipality): Area
+    {
+        return Area::firstOrCreate([
+            'logistics_provider_id' => $provider->getKey(),
+            'municipality' => $municipality,
+        ], [
+            'station_hub_id' => $station->id,
+            'name' => $municipality,
+            'is_active' => true,
+        ]);
     }
 
     private function demoProvider(string $email, string $businessName): LogisticsProvider

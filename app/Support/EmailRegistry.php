@@ -5,8 +5,8 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * One email address must belong to exactly ONE role across the four account
- * tables: buyers, sellers, logistics_providers and admins.
+ * One email address must belong to exactly ONE role across the account
+ * tables: buyers, sellers, logistics_providers, riders and admins.
  *
  * Registration requests use this to reject an address that already belongs to
  * another role, and the unified login uses it to refuse an address that is
@@ -27,6 +27,7 @@ class EmailRegistry
         'seller' => ['table' => 'sellers', 'label' => 'seller'],
         'logistics' => ['table' => 'logistics_providers', 'label' => 'logistics provider'],
         'admin' => ['table' => 'admins', 'label' => 'administrator'],
+        'rider' => ['table' => 'riders', 'label' => 'rider'],
     ];
 
     /**
@@ -48,7 +49,7 @@ class EmailRegistry
             $query = DB::table($source['table'])->whereRaw('LOWER(email) = ?', [$needle]);
 
             // Role tables archive leftover applicants; admins never archive.
-            if ($role !== 'admin') {
+            if (! in_array($role, ['admin', 'rider'], true)) {
                 $query->whereNull('archived_at');
             }
 

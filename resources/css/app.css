@@ -440,6 +440,68 @@ html[data-theme="dark"] .html-body .bg-buyer-ink\/25 {
     display: none;  /* Chrome, Safari, Opera */
 }
 
+/* ===== In-panel session-expired banner ===== */
+.app-session-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 10px 14px;
+    background-color: var(--color-error);
+    color: #fff;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-error) 82%, #000 18%);
+}
+
+.app-session-banner[hidden] {
+    display: none;
+}
+
+.app-session-banner .sp-banner__inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.app-session-banner .sp-banner__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.app-session-banner .sp-banner__text {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.app-session-banner .sp-banner__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 120ms ease;
+}
+
+.app-session-banner .sp-banner__close:hover,
+.app-session-banner .sp-banner__close:focus-visible {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.app-session-banner .sp-banner__close svg {
+    pointer-events: none;
+}
+
 /* ===== Wishlist add pop (product-card heart) ===== */
 @keyframes wishlist-pop {
     0% { transform: scale(1); }

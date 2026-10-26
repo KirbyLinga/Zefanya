@@ -82,10 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
             state.axes = [{ name: 'Color', values: colors }, { name: 'Size', values: [...new Set(state.groups.flatMap(group => group.sizes))] }];
         }
         if (!state.axes.length) state.axes.push({ name: '', values: [] });
+        weightBounds(q('#weight'), q('[data-pf-single-weight] [data-pf-weight-unit]').value);
         renderOptions();
         syncVariations();
         generate();
         showStep(1);
+    }
+    function weightBounds(field, unit) {
+        field.min = unit === 'kg' ? '0.001' : '1';
+        field.max = unit === 'kg' ? '100' : '100000';
+        field.step = unit === 'kg' ? '0.001' : '1';
     }
     function enabled() { return q('[data-pf-variants-toggle]').checked; }
     function renderOptions() {
@@ -139,6 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
         syncVariations();
     }
     function syncVariations() {
+        q('[data-pf-single-weight]').hidden = enabled();
+        q('[data-pf-single-weight] [data-pf-weight]').disabled = enabled();
+        q('[data-pf-single-weight] [data-pf-weight-unit]').disabled = enabled();
         q('[data-pf-variants-exist]').value = enabled() ? '1' : '0';
         q('[data-pf-options-area]').hidden = !enabled();
         q('[data-pf-single-message]').hidden = enabled();
@@ -148,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         q('[data-pf-variant-body]').closest('table').parentElement.hidden = state.colorFirst;
         q('#price').readOnly = enabled();
         q('#stock_quantity').readOnly = enabled();
-        qa('[data-pf-variant-row] input').forEach(field => { field.disabled = !enabled(); });
+        qa('[data-pf-variant-row] input, [data-pf-variant-row] select').forEach(field => { field.disabled = !enabled(); });
         qa('[data-pf-colors] input').forEach(field => { field.disabled = !enabled(); });
         const count = state.colorFirst ? state.groups.reduce((sum, group) => sum + group.sizes.length, 0) : state.axes.reduce((total, axis) => total * axis.values.length, 1);
         q('[data-pf-combo-summary]').textContent = count + ' combination' + (count === 1 ? '' : 's') + ' · maximum 50';
@@ -157,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveRows() {
         qa('[data-pf-variant-row]').forEach(row => {
             const values = JSON.parse(row.dataset.values);
-            state.rows.set(key(values), { id: state.rows.get(key(values))?.id, values, price: row.querySelector('[data-pf-price]').value, stock_quantity: row.querySelector('[data-pf-stock]').value, sku: row.querySelector('[data-pf-sku]').value, is_available: row.querySelector('[data-pf-enabled]').checked });
+            state.rows.set(key(values), { id: state.rows.get(key(values))?.id, values, price: row.querySelector('[data-pf-price]').value, weight: row.querySelector('[data-pf-weight]').value, weight_unit: row.querySelector('[data-pf-weight-unit]').value, stock_quantity: row.querySelector('[data-pf-stock]').value, sku: row.querySelector('[data-pf-sku]').value, is_available: row.querySelector('[data-pf-enabled]').checked });
         });
     }
     function combinations() {
@@ -181,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             label.append(input('hidden', 'variants[' + index + '][values]', values.join(',')));
             if (old.id) label.append(input('hidden', 'variants[' + index + '][id]', old.id));
             row.append(label);
-            [['price', 'number', 'data-pf-price'], ['stock_quantity', 'number', 'data-pf-stock'], ['sku', 'text', 'data-pf-sku']].forEach(([name, type, hook]) => {
+            [['price', 'number', 'data-pf-price'], ['stock_quantity', 'number', 'data-pf-stock'], ['weight', 'number', 'data-pf-weight'], ['sku', 'text', 'data-pf-sku']].forEach(([name, type, hook]) => {
                 const cell = node('td', undefined, 'p-3');
                 const field = input(type, 'variants[' + index + '][' + name + ']', old[name], hook);
                 field.setAttribute('aria-label', values.join(' / ') + ' ' + name.replace('_quantity', ''));
@@ -189,6 +198,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 else field.maxLength = 64;
                 field.classList.add(name === 'sku' ? 'min-w-28' : 'min-w-24');
                 cell.append(field);
+                if (name === 'weight') {
+                    const unit = node('select', undefined, fieldClass);
+                    unit.name = 'variants[' + index + '][weight_unit]';
+                    unit.setAttribute('data-pf-weight-unit', '');
+                    unit.setAttribute('aria-label', values.join(' / ') + ' weight unit');
+                    ['g', 'kg'].forEach(value => { const option = node('option', value); option.value = value; unit.append(option); });
+                    unit.value = old.weight_unit || 'g';
+                    cell.append(unit);
+                    weightBounds(field, unit.value);
+                }
                 row.append(cell);
             });
             const cell = node('td', undefined, 'p-3');
@@ -256,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const wrapper = node('div', undefined, 'overflow-auto');
                     const table = node('table', undefined, 'w-full min-w-[650px] text-left text-sm');
                     const head = node('thead'); const tr = node('tr');
-                    ['Size', 'Price (PHP)', 'Stock', 'SKU', 'Selling'].forEach(text => tr.append(node('th', text, 'p-3')));
+                    ['Size', 'Price (PHP)', 'Stock', 'Weight (required)', 'SKU', 'Selling'].forEach(text => tr.append(node('th', text, 'p-3')));
                     head.append(tr); inventory = node('tbody'); inventory.setAttribute('data-pf-color-inventory', '');
                     table.append(head, inventory); wrapper.append(table); card.append(wrapper);
                 }
@@ -485,6 +504,12 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('change', event => {
         if (!state) return;
         const target = event.target;
+        if (target.matches('[data-pf-weight-unit]')) {
+            const field = target.parentElement.querySelector('[data-pf-weight]');
+            const oldUnit = field.step === '0.001' ? 'kg' : 'g';
+            if (field.value !== '' && oldUnit !== target.value) field.value = String(Number((Number(field.value) * (target.value === 'kg' ? 0.001 : 1000)).toFixed(6)));
+            weightBounds(field, target.value);
+        }
         if (target.matches('[data-pf-color-name], [data-pf-color-sizes]')) {
             saveRows();
             const card = target.closest('[data-pf-color-card]');

@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use ReflectionMethod;
 use Symfony\Component\Process\Process;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 /**
@@ -29,6 +30,7 @@ use Tests\TestCase;
  */
 class CheckoutStockConcurrencyTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     /**
@@ -134,16 +136,25 @@ class CheckoutStockConcurrencyTest extends TestCase
             'quantity' => 1,
         ]);
 
+        $this->bootstrapCheckoutCarriers($buyerA, [$seller]);
+        $this->bootstrapCheckoutCarriers($buyerB, [$seller]);
+
         // Buyer A checks out first and takes the last unit.
         session([CheckoutController::SESSION_KEY => [$cartA->id]]);
         $this->actingAs($buyerA, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($buyerA->id)->token])
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($buyerA->id)->token,
+                ...$this->checkoutCarrierPayload([$seller]),
+            ])
             ->assertRedirect(route('buyer.checkout.success', Order::query()->sole()));
 
         // Buyer B checks out next: the locked row is now 0.
         session([CheckoutController::SESSION_KEY => [$cartB->id]]);
         $this->actingAs($buyerB, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($buyerB->id)->token])
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($buyerB->id)->token,
+                ...$this->checkoutCarrierPayload([$seller]),
+            ])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -165,9 +176,14 @@ class CheckoutStockConcurrencyTest extends TestCase
             'quantity' => 2,
         ]);
 
+        $this->bootstrapCheckoutCarriers($buyer, [$seller]);
+
         session([CheckoutController::SESSION_KEY => [$cart->id]]);
         $this->actingAs($buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($buyer->id)->token])
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$seller]),
+            ])
             ->assertRedirect();
 
         $this->assertSame(3, (int) $variant->fresh()->stock_quantity, '5 − 2');

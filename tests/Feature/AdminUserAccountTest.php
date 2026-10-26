@@ -7,6 +7,7 @@ use App\Models\Seller\Seller;
 use App\Notifications\Admin\AccountStatusChanged;
 use App\Notifications\Buyer\BuyerRegistrationDecision;
 use App\Notifications\Seller\SellerRegistrationDecision;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -23,6 +24,19 @@ class AdminUserAccountTest extends TestCase
             'password' => bcrypt('password'),
             'role' => 'admin',
         ]);
+    }
+
+    public function test_admin_can_paginate_each_account_type_with_and_without_search(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+
+        foreach (['buyer', 'seller', 'logistics'] as $type) {
+            foreach (['', 'example'] as $search) {
+                $this->get(route('admin.users.index', compact('type', 'search')))
+                    ->assertOk()
+                    ->assertViewHas('accounts', fn ($accounts) => $accounts instanceof LengthAwarePaginator);
+            }
+        }
     }
 
     public function test_admin_can_list_and_suspend_an_approved_seller(): void
@@ -82,7 +96,7 @@ class AdminUserAccountTest extends TestCase
 
         $this->actingAs($seller, 'seller')
             ->get(route('seller.dashboard'))
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('home', ['login' => 1]));
 
         $this->assertGuest('seller');
     }

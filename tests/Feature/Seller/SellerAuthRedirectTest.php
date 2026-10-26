@@ -28,12 +28,12 @@ class SellerAuthRedirectTest extends TestCase
             ->assertStatus(200);
     }
 
-    public function test_authenticated_seller_visiting_login_page_is_redirected_to_dashboard(): void
+    public function test_authenticated_seller_posting_login_is_redirected_to_dashboard(): void
     {
         $seller = Seller::factory()->create(['status' => 'approved']);
 
         $this->actingAs($seller, 'seller')
-            ->get(route('seller.login'))
+            ->post(route('unified.login'), [])
             ->assertRedirect(route('seller.dashboard'));
     }
 
@@ -76,6 +76,6 @@ class SellerAuthRedirectTest extends TestCase
     public function test_guest_visiting_dashboard_is_redirected_to_seller_login(): void
     {
         $this->get(route('seller.dashboard'))
-            ->assertRedirect(route('seller.login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 }

@@ -176,7 +176,7 @@ class HomeController extends Controller
     private function heroImage(Product $product): array
     {
         $disk = Storage::disk('public');
-        $best = ['image' => $product->catalogImageUrl(), 'width' => 1200, 'height' => 900];
+        $best = ['image' => $product->catalogImageUrl(requireExistingFile: false), 'width' => 1200, 'height' => 900];
         $largestArea = 0;
 
         foreach ($product->images as $image) {

@@ -59,7 +59,10 @@ final class Race
 
     public static function run(array $a, array $b, bool $bothHeld = false, bool $rejectionWithoutLock = false): array
     {
-        $directory = dirname(__DIR__, 2).'/.codex/t05-runs/'.bin2hex(random_bytes(8));
+        $runRoot = match ($a['action'] ?? '') {
+            'dispatch' => '/storage/logs/phase6-races/', 'return_request', 'return_receipt' => '/storage/logs/phase7-races/', default => '/.codex/t05-runs/'
+        };
+        $directory = dirname(__DIR__, 2).$runRoot.bin2hex(random_bytes(8));
         mkdir($directory, 0700, true);
         $processes = [];
         foreach (['a' => $a, 'b' => $b] as $name => $task) {
@@ -94,6 +97,8 @@ final class Race
                     foreach (DB::connection()->getPdo()->query('SHOW FULL PROCESSLIST')->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                         $sql = strtolower((string) ($row['Info'] ?? ''));
                         $target = match ($b['watch'] ?? '') {
+                            'parcel' => str_contains($sql, 'from `seller_orders`') && str_contains($sql, 'for update'),
+                            'provider' => str_contains($sql, 'from `logistics_providers`') && str_contains($sql, 'for update'),
                             'product' => str_contains($sql, 'from `products`') && str_contains($sql, 'for update'),
                             'seller' => str_contains($sql, 'from `sellers`') && str_contains($sql, 'for update'),
                             'token' => str_starts_with($sql, 'update `checkout_tokens`'),

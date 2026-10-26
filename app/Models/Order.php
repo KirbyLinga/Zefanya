@@ -42,8 +42,9 @@ class Order extends Model
     // ── Status rollup ────────────────────────────────────────────────────────
 
     /**
-     * Returned shipments are resolved without becoming completed.
-     * A fully resolved mixed order is Completed; an all-returned order is Returned.
+     * Returned / cancelled shipments are resolved without becoming completed.
+     * A fully resolved mixed order is Completed; an all-returned order is Returned;
+     * an all-cancelled order is Cancelled.
      */
     public function computeRollupStatus(): ?OrderStatus
     {
@@ -51,10 +52,17 @@ class Order extends Model
         if ($statuses->isEmpty()) {
             return null;
         }
-        $unresolved = $statuses->reject(fn (OrderStatus $status): bool => in_array($status, [OrderStatus::Completed, OrderStatus::Returned], true));
+        $resolved = [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled];
+        $unresolved = $statuses->reject(fn (OrderStatus $status): bool => in_array($status, $resolved, true));
         if ($unresolved->isEmpty()) {
-            return $statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Returned)
-                ? OrderStatus::Returned : OrderStatus::Completed;
+            if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Returned)) {
+                return OrderStatus::Returned;
+            }
+            if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Cancelled)) {
+                return OrderStatus::Cancelled;
+            }
+
+            return OrderStatus::Completed;
         }
         if ($unresolved->contains(OrderStatus::DeliveryFailed)) {
             return OrderStatus::DeliveryFailed;

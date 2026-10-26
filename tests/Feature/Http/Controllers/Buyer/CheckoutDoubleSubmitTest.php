@@ -12,6 +12,7 @@ use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 /**
@@ -21,6 +22,7 @@ use Tests\TestCase;
  */
 class CheckoutDoubleSubmitTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private Buyer $buyer;
@@ -40,6 +42,8 @@ class CheckoutDoubleSubmitTest extends TestCase
             'price' => 100.00,
             'stock_quantity' => 5,
         ]);
+
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller]);
     }
 
     private function parkCheckout(): void
@@ -56,6 +60,15 @@ class CheckoutDoubleSubmitTest extends TestCase
         ]);
     }
 
+    /** @return array<string, mixed> */
+    private function storePayload(mixed $checkoutToken): array
+    {
+        return [
+            'checkout_token' => $checkoutToken,
+            ...$this->checkoutCarrierPayload([$this->seller]),
+        ];
+    }
+
     public function test_a_second_submit_with_a_consumed_token_does_not_create_a_second_order(): void
     {
         $this->parkCheckout();
@@ -65,7 +78,7 @@ class CheckoutDoubleSubmitTest extends TestCase
         session([CheckoutController::TOKEN_KEY => $token->token]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+            ->post(route('buyer.checkout.store'), $this->storePayload($token->token))
             ->assertRedirect();
 
         $this->assertSame(1, Order::query()->count(), 'first submit places one order');
@@ -74,7 +87,7 @@ class CheckoutDoubleSubmitTest extends TestCase
 
         // The token is consumed now — replay it (double-click / double POST).
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+            ->post(route('buyer.checkout.store'), $this->storePayload($token->token))
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -90,7 +103,7 @@ class CheckoutDoubleSubmitTest extends TestCase
         session([CheckoutController::TOKEN_KEY => $token->token]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+            ->post(route('buyer.checkout.store'), $this->storePayload($token->token))
             ->assertRedirect();
 
         $this->assertTrue($token->refresh()->used, 'successful order marks the token used');
@@ -105,12 +118,12 @@ class CheckoutDoubleSubmitTest extends TestCase
         session([CheckoutController::TOKEN_KEY => $token->token]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $token->token]);
+            ->post(route('buyer.checkout.store'), $this->storePayload($token->token));
 
         $this->parkCheckout();
         // Second (racing/double-clicked) request with the SAME token.
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $token->token]);
+            ->post(route('buyer.checkout.store'), $this->storePayload($token->token));
 
         // 5 − 2 = 3, not 5 − 2 − 2 = 1. The variant-backed stock rollup must
         // also reflect exactly one decrement.
@@ -125,7 +138,7 @@ class CheckoutDoubleSubmitTest extends TestCase
         session([CheckoutController::TOKEN_KEY => $first->token]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $first->token])
+            ->post(route('buyer.checkout.store'), $this->storePayload($first->token))
             ->assertRedirect();
 
         // A NEW checkout visit issues a NEW token and places a NEW order —
@@ -135,7 +148,7 @@ class CheckoutDoubleSubmitTest extends TestCase
         $this->parkCheckout();
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => $second->token])
+            ->post(route('buyer.checkout.store'), $this->storePayload($second->token))
             ->assertRedirect();
 
         $this->assertSame(2, Order::query()->count());
@@ -186,7 +199,11 @@ class CheckoutDoubleSubmitTest extends TestCase
             $token->update(['used' => true]);
         }
 
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $case === 'missing' ? [] : ['checkout_token' => $value])
+        $payload = $case === 'missing'
+            ? $this->checkoutCarrierPayload([$this->seller])
+            : $this->storePayload($value);
+
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $payload)
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
 
         foreach (['orders', 'seller_orders', 'order_items', 'payments', 'inventory_transactions'] as $table) {
@@ -203,7 +220,7 @@ class CheckoutDoubleSubmitTest extends TestCase
         // This table exists only in the verified disposable SQLite :memory: test DB.
         Schema::drop('checkout_tokens');
 
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), ['checkout_token' => str_repeat('a', 64)])
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload(str_repeat('a', 64)))
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
         $this->get(route('buyer.checkout.index'))->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
 
@@ -225,7 +242,7 @@ class CheckoutDoubleSubmitTest extends TestCase
             }
         });
 
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload($token->token))
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
 
         $this->assertTrue($drained);

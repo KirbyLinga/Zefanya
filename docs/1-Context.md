@@ -9,9 +9,9 @@
 
 ## 1. What this project is
 
-Zefanya is a marketplace where independent **sellers** list products, **buyers** purchase them, a **logistics provider** (sorting center) moves parcels from seller to buyer using **riders/couriers**, and an **admin** back office approves accounts and oversees the platform. It is a **monolithic Laravel web app** (Blade server-rendered) with four session login guards plus one planned rider API.
+Zefanya is a marketplace where independent **sellers** list products, **buyers** purchase them, a **logistics provider** (sorting center) moves parcels from seller to buyer using **riders/couriers**, and an **admin** back office approves accounts and oversees the platform. It is a **monolithic Laravel web app** (Blade server-rendered) with five session login guards (`admin`, `seller`, `logistics`, `buyer`, `rider`).
 
-There is **no rider-facing UI yet** (Batch D, not built) and **no admin back-office modules beyond the registration queue** (Batch E, not built). See §6.
+Riders now have a **web operations UI** (dashboard, pickups, deliveries, proof of delivery, COD) and the Admin back office includes Hub approval plus the registration queue. A Rider **mobile** app is still not built. See §6.
 
 ---
 
@@ -20,14 +20,14 @@ There is **no rider-facing UI yet** (Batch D, not built) and **no admin back-off
 | Role | Guard | Login entry | What they do |
 |---|---|---|---|
 | **Buyer** | `buyer` | `/login` (unified) or Google | Browse, cart, checkout, track orders, confirm receipt, message sellers, manage account/wishlist/settings |
-| **Seller** | `seller` | `/login` (unified) or Google | Register a shop, list products (+variants), accept orders, pack, print waybills, hand over to logistics, view shipments |
-| **Courier / Rider** | *(none yet)* | *(none yet — Batch D)* | Pick up parcels from sellers, deliver to buyers (rider UI is planned **mobile-only**, backend/API) |
+| **Seller** | `seller` | `/login` (unified) or Google | Register a shop, list products (+variants), accept or decline orders, pack, print waybills, hand over to logistics, view shipments |
+| **Courier / Rider** | `rider` | `/login` (unified) | Pick up assigned parcels from sellers, deliver to buyers, capture proof of delivery and collect COD; operational only when approved + verified + assigned to an approved Station Hub with a linked Courier |
 | **Logistics / Sorting Center** | `logistics` | `/login` (unified) or Google | Receive parcels, scan/sort, determine delivery area, assign riders by area, monitor deliveries, manage delivery areas |
 | **Admin** | `admin` | `/admin/login` | Approve/reject buyer, seller and logistics registrations; stream ID documents; (back-office modules pending) |
 
 There is also a legacy `web` guard bound to `App\Models\Shared\User` / the `users` table, which no app feature uses (§9).
 
-**How a shared email logs in:** the unified login tries guards in order **seller → logistics → buyer** (`app/Http/Controllers/Auth/UnifiedLoginController.php:42,47,52`). Google role resolution uses the same order (`GoogleAuthController` `ROLES`). Password reset tries brokers **admins → sellers → logistics → buyers** (`app/Http/Controllers/Auth/PasswordResetController.php:33`).
+**How a shared email logs in:** the unified login tries **seller → logistics → buyer**, then **rider** (`app/Http/Controllers/Auth/UnifiedLoginController.php`). A Rider only receives a session when `Rider::isOperational()`. Google role resolution uses the same order (`GoogleAuthController` `ROLES`). Password reset tries brokers **admins → sellers → logistics → buyers** (`app/Http/Controllers/Auth/PasswordResetController.php:33`).
 
 ---
 
@@ -46,18 +46,19 @@ There is also a legacy `web` guard bound to `App\Models\Shared\User` / the `user
 ### Seller
 - [x] Register → OTP → admin decision → login only if `approved`.
 - [x] Manage products with 1–2 option axes (variants), prices, stock, images.
-- [x] View incoming orders, accept, mark ready, print waybill, hand over.
+- [x] View incoming orders, accept or decline (cancels that shop’s slice + restores stock), mark ready, print waybill, hand over.
 - [x] See shipments list; stock ledger is written for every stock change.
 - [ ] Vouchers, Reports, Feedback pages — **placeholders** (routes render stub views).
 - [ ] Account management page — **placeholder**.
 - [ ] Seller-created vouchers — **missing**.
 
-### Courier / Rider (planned, largely missing)
-- [ ] Riders **register themselves** — **missing**.
-- [ ] **Logistics** approves / activates / deactivates riders — **missing** (no rider accounts or status).
-- [x] Logistics assigns parcels to a rider **by delivery area** (with manual override) — works against existing `couriers` records.
-- [ ] Rider interface **mobile-only**, backend/API — **missing** (`routes/api.php` does not exist; no Sanctum).
-- [x] Rider actions exist server-side (pickup, out-for-delivery, delivered, failed) but are driven by the **logistics** web panel, not a rider app.
+### Courier / Rider
+- [x] Riders **register themselves** (web dialog or mobile API) with OTP verification and Logistics review.
+- [x] **Logistics** approves / rejects / activates / suspends / deactivates riders and assigns their Station Hub.
+- [x] Logistics assigns parcels to a rider **by delivery area** (with manual override) using the linked `couriers` record.
+- [x] Rider **web** interface: dashboard, pickup assignments, delivery assignments, delivery history, account.
+- [x] Rider confirms pickup, starts delivery, records proof of delivery, collects COD and reports failed attempts.
+- [ ] Rider **mobile app** — still unbuilt; `routes/api.php` covers registration/OTP and Logistics review only (no Sanctum).
 
 ### Logistics / Sorting Center
 - [x] Register → OTP → admin decision → login only if `approved`.
@@ -65,7 +66,7 @@ There is also a legacy `web` guard bound to `App\Models\Shared\User` / the `user
 - [x] Assign delivery rider by area (auto) with manual override.
 - [x] Mark out-for-delivery / delivered / failed; on failure retry (≤2) or return to seller.
 - [x] Manage **delivery areas** (provider-scoped) and link riders to areas.
-- [ ] "Rider Management" and "Courier Applications" screens — **dead sidebar links**.
+- [x] "Rider Management" screen (fleet list, applications, station assignment, suspend/deactivate) — implemented; Courier Applications is covered by the rider application review API.
 
 ### Admin
 - [x] Unified registration queue for buyers, sellers, logistics with type/status/date/search filters.
@@ -190,7 +191,18 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Delivery: start, delivered, failed, reschedule, return | Implemented | `Logistics/DeliveryAssignmentsController.php` |
 | Delivery monitoring | Implemented | `Logistics/DeliveryMonitoringController.php` |
 | Delivery areas CRUD + link riders | Implemented | `Logistics/AreaController.php`, `Logistics/Areas/index.blade.php` |
-| **Rider Management / Courier Applications** | **Missing** | sidebar items have `route => null` |
+| **Rider Management** | Implemented | `Logistics/RiderController.php`, `Logistics/Riders/*`; pending applications reviewed via `api/logistics/rider-applications` |
+
+### Rider
+| Feature | Status | Evidence |
+|---|---|---|
+| Unified login + operational gate | Implemented | `Auth/UnifiedLoginController::tryRider`, `Rider::isOperational()`, `Middleware/Rider/EnsureRiderActive.php` |
+| Dashboard (company, station, real counters, attention items) | Implemented | `Rider/DashboardController.php`, `Services/RiderOperationsService::dashboard()` |
+| Pickup assignments + confirm collection | Implemented | `Rider/PickupAssignmentsController.php`, `RiderOperationsService::confirmPickup()` |
+| Delivery assignments, start, failed attempts | Implemented | `Rider/DeliveryAssignmentsController.php`, `RiderOperationsService::{startDelivery,failDelivery}()` |
+| Proof of delivery + COD collection | Implemented | `Rider/DeliveryProofController.php`, `Logistics/DeliveryProofController.php`, `Models/DeliveryProof.php`, `Payment::recordCodCollection()` |
+| Delivery history + account | Implemented | `Rider/DeliveryHistoryController.php`, `Rider/AccountController.php` |
+| Notifications centre (assignments, reassignment, station, account) | Implemented | `Rider/NotificationController.php`, `Services/RiderNotifier.php`, `Notifications/Rider/*` |
 
 ### Admin
 | Feature | Status | Evidence |
@@ -226,7 +238,7 @@ Each item was checked in the current code. "Verified" means the file/line was re
 | C7 | `RETURNED` can → `COMPLETED` in the graph but **no actor owns it**; a returned slice is a dead end and blocks buyer confirmation of the whole order | `SellerOrderStatusService.php:53`, `Enums/OrderActor.php:61-63`, `Order.php:118-123` | yes | High (logic) |
 | C8 | Idempotent-replay path can **re-fire notifications** (the post-transaction `status === $to` guard is true on a racing replay) | `SellerOrderStatusService.php:119-121,186` | yes | Medium |
 | C9 | `Buyer/CourierAssigned` notification on `ASSIGNED_TO_RIDER` reads `courier?->name` (**pickup** courier), not `delivery_courier_id` | `Notifications/Buyer/CourierAssigned.php:25` | yes | Low |
-| C10 | `delivery_attempts` is incremented in the **controller**, not inside `transition()` — any other caller reaching `DELIVERY_FAILED` bypasses the counter | `DeliveryAssignmentsController.php:176` | yes | Low |
+| C10 | **Fixed 2026-10-23:** failed attempts increment atomically in `SellerOrderStatusService::transition()`, including direct service callers; duplicate reports do not increment. Two total attempts (initial + one retry) are enforced under lock. | `SellerOrderStatusService`, `CourierAssignmentService` | yes | Resolved |
 | C11 | Pickup courier is released **twice** on `AT_SORTING_CENTER` (service + controller) — harmless but redundant | `IncomingParcelsController.php:123-126`, `SellerOrderStatusService.php:204-208` | yes | Low |
 | C12 | Order rollup rank puts `DELIVERY_FAILED`/`RETURNED` **after** `COMPLETED`, so a failed sibling shows `DELIVERED` as the bottleneck instead of the failure | `Order.php:52-63` | yes | Medium |
 | C13 | `OrderStatus` docblock claims a native MySQL ENUM; the columns are `VARCHAR(20)` | `Enums/OrderStatus.php:9-11` vs migrations | yes | Low |
@@ -240,7 +252,7 @@ Each item was checked in the current code. "Verified" means the file/line was re
 | C22 | ~~Admin registrations "View details" unwired~~ **Fixed** — detail modal with address + document links | `Admin/Registrations/index.blade.php` | yes | — |
 | C23 | `SESSION_ENCRYPT=false` and `SESSION_SECURE_COOKIE=false` in `.env` (dev; must be reviewed for prod) | `.env:32,35` | yes | Medium (prod) |
 
-**Notable structural gaps:** no `deliveries` table (delivery carried by `seller_orders` columns + `status_histories`); no commission; no shipping fee; no rider accounts/API.
+**Notable structural gaps:** no `deliveries` table (delivery carried by `seller_orders` columns + `status_histories`); no commission; no shipping fee; no Rider mobile app/bearer tokens (web guard only; `routes/api.php` is registration/OTP + Logistics review).
 **Documented-but-absent classes:** `CourierApplicationPolicy`, `DeliveryPolicy` — grep finds them **only in old docs**; they do not exist. `CourierApplication` model does **not** exist either.
 
 **Things old docs claimed that are now FALSE (do not re-report):** `buyer.home` duplicate route name (fixed — `/home` is now unnamed); `Seller/Products/show.blade.php` being byte-identical to `_form.blade.php` (they differ); wishlist being unwired (it works); `CheckoutController` clearing voucher on the wrong path (no). `EnsureLogisticsApproved` enum bug, `/messages/unread-count` shadowing, `seller->name`, and voucher `times_used` are **fixed**.
@@ -258,11 +270,12 @@ Each item was checked in the current code. "Verified" means the file/line was re
 |---|---|
 | 2026-10-16 | **One account per browser** — signing in on one guard clears the other three; logout clears all (`ClearsOtherGuards`). |
 | 2026-10-16 | Only `PaymentMethod::Cod` is **integrated**; GCash / Bank transfer / Card are selectable, stored `pending`, and labelled so checkout never blocks. |
-| 2026-10-16 | `DELIVERY_FAILED → RETURNED` is gated to a **maximum of 2 reschedules** via `seller_orders.delivery_attempts`. |
+| 2026-10-23 | **Delivery policy clarified:** two total attempts (initial delivery + one retry). The second failure requires Logistics return; not two reschedules or a third failure. Counting/enforcement are centralized in `SellerOrderStatusService`. |
 | 2026-10-16 | Delivery is routed by **provider-scoped areas**; `areas` + `couriers.area_id` + `seller_orders.destination_area_id`; every assignment is logged to `delivery_assignments`. |
 | 2026-10-16 | Tracking number is minted **at order placement** so a waybill can be printed before pickup. |
 | 2026-10-17 | **Admin approval Stage 3:** registration queue defaults to **all-time** for pending; list uses SQL UNION pagination; approve/reject already **mail**; document `{document}` whitelisted; View details modal wired; User Accounts suspend/reactivate + `suspended` status; dead admin `#` links replaced with "Soon" labels; `AdminRole` enum enforced on save. |
 | 2026-10-17 | **OTP ownership via signed URLs:** every OTP show/verify/resend route requires a temporary signed URL (`SignedOtpLink`, 60 min) plus IP throttles (`otp-show` 30/min, `otp-verify` 10/min, `otp-resend` 5/min). Unsigned id guessing cannot lock verification or trigger mail. OTP + registration-decision notifications use **`mail`**; order alerts use **`database`** (docs previously claimed database-only for all — that was wrong). |
+| 2026-10-20 | **Rider notifications are database-only** (`Notifications/Rider/*`), dispatched by `RiderNotifier` after the owning service transaction commits. A payload `event_key` suppresses replayed events; links point at Rider list/account pages so `rider.active` and the list query revalidate ownership when opened. No WebSocket, Redis, queue or email channel was added. |
 | 2026-10-16 | **OTP hardening:** buyer/seller/logistics share one OTP implementation (`HasEmailOtp`) and one limit implementation (`VerifiesEmailOtp`). Per account: 5 wrong codes → 15-minute lock (HTTP 429 / validation error); 3 resends / 10 min. The three **verify** routes are `throttle:10,1`; the three **resend** routes are `throttle:5,1`. `commitOtp()` no longer resets the failure counter — only a successful verification does. |
 | 2026-10-16 | **OTP codes are keyed:** stored as `hash_hmac('sha256', $otp, config('app.key'))`, not a bare sha256, so a leaked code hash is useless without `APP_KEY`. Single change point is `HasEmailOtp::hashOtp()` (public static). |
 | 2026-10-16 | Unverified accounts can **resume verification**: buyer/seller/logistics each have a GET OTP page, and the login surfaces link to it when a correct-credentials login is blocked by `unverified` status. |

@@ -109,12 +109,13 @@
 | # | Actor | Route → method | DB writes | Notified | Next sees | Status / evidence |
 |---|---|---|---|---|---|---|
 | 1 | System→Seller | (checkout) | `seller_orders.status=PLACED` | `Seller\NewOrderReceived` | new order in list | WORKS |
-| 2 | Seller | `POST /seller/orders/{id}/accept` → `OrderController@acceptOrder` | `PLACED→CONFIRMED` then `CONFIRMED→PREPARING` (2 `status_histories` rows + parent rollup) | — | order accepted | WORKS — `Seller/OrderController.php:79-119` |
-| 3 | Seller | `POST /seller/orders/{id}/mark-ready` → `@markReady` | `PREPARING→READY_FOR_PICKUP` (or `PLACED→READY_FOR_PICKUP` skip) | — | parcel ready | WORKS — `OrderController.php:132-184` |
-| 4 | Seller | `GET /seller/shipments` → `ShipmentController@index` | — (read-only; excludes `Returned`) | — | shipment list | WORKS — `ShipmentController.php:25-39` |
-| 5 | Seller | `GET /seller/shipments/{id}/label` → `@label` | — | — | printable waybill (tracking exists from placement) | WORKS — `ShipmentController.php:50-64` |
+| 2 | Seller | `POST /seller/orders/{id}/accept` → `OrderController@acceptOrder` | `PLACED→CONFIRMED` then `CONFIRMED→PREPARING` (2 `status_histories` rows + parent rollup) | — | order accepted | WORKS — `Seller/OrderController.php` |
+| 2b | Seller | `POST /seller/orders/{id}/decline` → `@declineOrder` | `PLACED`/`CONFIRMED`/`PREPARING`→`CANCELLED`; restore stock (`inventory_transactions` reason `cancel`); void pending payment; parent rollup treats Cancelled as resolved | **`Buyer\SellerOrderCancelled`** | this seller's slice cancelled; siblings continue | WORKS — `OrderController@declineOrder`, `SellerOrderStatusService` |
+| 3 | Seller | `POST /seller/orders/{id}/mark-ready` → `@markReady` | `PREPARING→READY_FOR_PICKUP` (or `PLACED→READY_FOR_PICKUP` skip) | — | parcel ready | WORKS — `OrderController.php` |
+| 4 | Seller | `GET /seller/shipments` → `ShipmentController@index` | — (read-only; excludes `Returned`) | — | shipment list | WORKS — `ShipmentController.php` |
+| 5 | Seller | `GET /seller/shipments/{id}/label` → `@label` | — | — | printable waybill (tracking exists from placement) | WORKS — `ShipmentController.php` |
 
-**Divergences / stops.** Two seller paths produce different histories (`PLACED→READY_FOR_PICKUP` skips Confirmed/Preparing — bug-severity LOW, documented as intentional). Seller **Vouchers/Reports/Feedback/Chat/Account** are placeholders (routes at `routes/seller.php:47-73`).
+**Divergences / stops.** Two seller paths produce different histories (`PLACED→READY_FOR_PICKUP` skips Confirmed/Preparing — bug-severity LOW, documented as intentional). Seller **Vouchers/Reports/Feedback/Chat/Account** are placeholders (routes at `routes/seller.php`). Decline is only allowed before logistics handover (`READY_FOR_PICKUP` and later are locked).
 
 ---
 
@@ -122,14 +123,16 @@
 
 | # | Actor | Route → method | DB writes | Notified | Next sees | Status / evidence |
 |---|---|---|---|---|---|---|
-| 1 | Logistics | `GET /logistics/incoming-parcels` → `IncomingParcelsController@index` | — | — | parcels `READY_FOR_PICKUP`/`PICKED_UP` | WORKS |
-| 2 | Logistics | `POST …/{id}/pickup` → `@pickup` | `assignPickup`: match rider by **seller** municipality; set `courier_id`, `couriers.is_available=false`, `delivery_assignments` row (`pickup`); transition `READY_FOR_PICKUP→PICKED_UP` (**mints tracking if absent**); set `handover_at` | — | parcel picked up | WORKS — `IncomingParcelsController.php:65-92`, `CourierAssignmentService.php:35-99` |
-| 3 | Logistics | `POST …/{id}/to-sorting-center` → `@toSortingCenter` | transition `PICKED_UP→AT_SORTING_CENTER`; release pickup courier | — | parcel at sorting center | WORKS — `IncomingParcelsController.php:99-128` |
-| 4 | Logistics | `POST /logistics/parcel-sorting/{id}/sort` → `ParcelSortingController@sort` | compute destination area (buyer municipality vs provider's **active** areas, case-insensitive); set `destination_area_id`; transition `AT_SORTING_CENTER→SORTED` | — | sorted, awaiting rider | WORKS — `ParcelSortingController.php:102-138`, `:184-197` |
-| 5 | Logistics | `POST …/{id}/assign-delivery` → `@assignDelivery` | `assignDelivery`: prefer area-linked rider (manual `courier_id` override); set `delivery_courier_id`, courier busy, `delivery_assignments` (`delivery`); transition `SORTED→ASSIGNED_TO_RIDER` | **`Buyer\CourierAssigned`** | rider assigned | WORKS — `ParcelSortingController.php:146-177`, `CourierAssignmentService.php:102-149` |
-| 6 | Logistics | `GET/POST/PATCH/DELETE /logistics/areas…` → `AreaController` | area CRUD + link riders to areas | — | Delivery Areas screen | WORKS — `Logistics/AreaController.php` |
+| 1 | Seller | `POST /seller/orders/{id}/mark-ready` → `@markReady` | transition to `READY_FOR_PICKUP`; after commit, automatic pickup dispatch selects a Rider by **seller** barangay, sets `courier_id`, `couriers.is_available=false`, `delivery_assignments` (`pickup`), and confirms the dispatch | **`Rider\PickupAssigned`** | parcel awaiting Rider collection | Implemented — `SellerOrderStatusService`, `CourierAssignmentService@dispatchAfterCommit` |
+| 2 | Logistics | `GET /logistics/incoming-parcels` → `IncomingParcelsController@index` | — | — | parcels `READY_FOR_PICKUP`/`PICKED_UP`; manual override or automatic retry | WORKS |
+| 3 | Logistics | `POST …/{id}/assign-pickup-rider` / `…/confirm-pickup-dispatch` | manual reserve/reassign without advancing status; confirmation notifies the assigned Rider once | **`Rider\PickupAssigned`** | Rider confirms collection | WORKS |
+| 4 | Rider | F2 pickup confirmation | transition `READY_FOR_PICKUP→PICKED_UP` (**mints tracking if absent**); set `handover_at` | — | parcel picked up | WORKS — `RiderPickupController` |
+| 5 | Logistics | `POST …/{id}/to-sorting-center` → `@toSortingCenter` | transition `PICKED_UP→AT_SORTING_CENTER`; release pickup courier | — | parcel at sorting center | WORKS |
+| 6 | Logistics | `POST /logistics/parcel-sorting/{id}/sort` → `ParcelSortingController@sort` | compute destination area (buyer municipality vs provider's **active** areas, case-insensitive); set `destination_area_id`; transition `AT_SORTING_CENTER→SORTED` | — | sorted, awaiting rider | WORKS — `ParcelSortingController.php:102-138`, `:184-197` |
+| 7 | Logistics | `POST …/{id}/assign-delivery` → `@assignDelivery` | `assignDelivery`: prefer area-linked rider (manual `courier_id` override); set `delivery_courier_id`, courier busy, `delivery_assignments` (`delivery`); transition `SORTED→ASSIGNED_TO_RIDER` | **`Buyer\CourierAssigned`** | rider assigned | WORKS — `ParcelSortingController.php:146-177`, `CourierAssignmentService.php:102-149` |
+| 8 | Logistics | `GET/POST/PATCH/DELETE /logistics/areas…` → `AreaController` | area CRUD + link riders to areas | — | Delivery Areas screen | WORKS — `Logistics/AreaController.php` |
 
-**Divergences / stops.** Destination area determination **never fails fatally** — an unmatched buyer municipality leaves `destination_area_id` null (`ParcelSortingController.php:136-138`). Rider selection weight filter uses `max_weight_grams`; **parcel weight must be ≤ the courier limit**.
+**Divergences / stops.** Pickup dispatch is automatic after the Seller marks ready, but a failed reservation (no eligible Rider or coverage) stays visible in Incoming Parcels with a retry action; Logistics may also reserve or reassign manually. Destination area determination **never fails fatally** — an unmatched buyer municipality leaves `destination_area_id` null (`ParcelSortingController.php:136-138`). Rider selection is cumulative by weight: active pickup + delivery parcel weights plus the new parcel must fit `max_weight_grams`.
 
 ---
 
@@ -139,12 +142,12 @@
 |---|---|---|---|---|---|---|
 | 1 | Logistics | `POST …/delivery-assignments/{id}/start` → `@startDelivery` | `ASSIGNED_TO_RIDER→OUT_FOR_DELIVERY` | **`Buyer\OrderOutForDelivery`** | out for delivery | WORKS — `DeliveryAssignmentsController.php:60-84` |
 | 2 | Logistics | `POST …/{id}/delivered` → `@markDelivered` | `OUT_FOR_DELIVERY→DELIVERED`; **settle COD** if method COD & pending; release delivery courier | **`Buyer\OrderDelivered`** | delivered | WORKS — `DeliveryAssignmentsController.php:90-119`, `SellerOrderStatusService.php:336-346` |
-| 3 | Logistics | `GET/POST …/{id}/failed` → `@showMarkFailedForm`/`@markFailed` | set `delivery_failure_reason`/`notes`, **`delivery_attempts++`**; transition `OUT_FOR_DELIVERY→DELIVERY_FAILED`; release courier | **`Buyer\DeliveryFailed`** + **`Seller\DeliveryFailed`** | failed | WORKS — `DeliveryAssignmentsController.php:147-193` |
-| 4a | Logistics | `POST …/{id}/reschedule` → `@reschedule` | **guarded `delivery_attempts < 2`**; clear `delivery_courier_id`; `assignDelivery` again → `DELIVERY_FAILED→ASSIGNED_TO_RIDER` | **`Buyer\CourierAssigned`** | rider reassigned | WORKS — `DeliveryAssignmentsController.php:201-224` |
+| 3 | Rider | `POST /rider/deliveries/{sellerOrder}/failed` -> `RiderOperationsService::failDelivery()` | store failure reason/notes; `SellerOrderStatusService::transition()` atomically increments failed attempts and moves `OUT_FOR_DELIVERY -> DELIVERY_FAILED`; duplicate reports are idempotent | Buyer/Seller delivery-failed alerts and Logistics rider activity | failed | Implemented |
+| 4a | Logistics | `POST /logistics/delivery-assignments/{seller_order}/reschedule` -> `reschedule()` | exactly one recorded failure required; `CourierAssignmentService::assignDelivery()` locks/rechecks the parcel, replaces the courier and transitions `DELIVERY_FAILED -> ASSIGNED_TO_RIDER` atomically; no temporary unassignment | Buyer/Rider assignment alerts | final attempt scheduled | Implemented |
 | 4b | Logistics | `POST …/{id}/return` → `@returnToSeller` | `DELIVERY_FAILED→RETURNED`; **restoreStock()** adds item qty back to variants + `inventory_transactions` reason `return` | **`Seller\ParcelReturned`** | returned to seller | WORKS — `DeliveryAssignmentsController.php:231-255`, `SellerOrderStatusService.php:258-287` |
 | 5 | Buyer | `POST /buyer/orders/{order}/confirm-received` | ownership required (foreign order: 404); selected Delivered shipment becomes Completed via BuyerShipmentConfirmation and SellerOrderStatusService; omitted seller_order_id confirms all Delivered shipments, leaving other siblings unchanged | - | shipment completed | WORKS - BuyerShipmentConfirmation |
 
-**Retry rule:** after the **3rd** failure (`delivery_attempts >= 2`), only RETURNED is available (`DeliveryAssignmentsController.php:211-213`).
+**Two-attempt rule (confirmed 2026-10-23):** One initial delivery plus one retry, maximum two total attempts. `delivery_attempts` is the number of failures: first failure = 1, second failure = 2. After the first failure, Logistics may schedule the final attempt or return early. After the second failure, only return is available; return is an explicit Logistics action, not an automatic status change. A successful delivery does not increment this failed-attempt counter. Rider reassignment does not reset it. The shared limit and locked enforcement live in `SellerOrderStatusService`; failed parcels with zero or inconsistent history require review before retry. No third attempt or two additional reschedules are permitted.
 **Divergences / stops.**
 - **Fixed (C7):** Returned stays terminal and does not block confirmation of Delivered siblings; confirmation eligibility is per shipment.
 - **Rollup (C12):** `DELIVERY_FAILED`/`RETURNED` rank after `COMPLETED`, so a mixed order shows `DELIVERED` as the bottleneck.
@@ -266,7 +269,7 @@ Participating guards: `['admin','seller','logistics','buyer']`. The unused `web`
 | Checkout | order placed + COD | non-COD methods only recorded; no shipping fee; voucher not cleared on failure (C16) |
 | Seller fulfilment | parcel ready + waybill | seller stub pages |
 | Pickup & sorting | rider assigned by area | unmatched municipality leaves area null |
-| Delivery | Delivered → Completed | 3rd failure → Returned is a **dead end** (C7); no gateway refund |
+| Delivery | Delivered -> Completed | Two total attempts (initial + one retry); after the second failure, Logistics returns the parcel. Returned is terminal; no gateway refund. |
 | Admin | approvals + documents | **all** other back-office modules |
 | Messaging | buyer↔seller threads | Chat pages (placeholder); no seller/logistics notification centre |
 | Sessions | all-guard one-per-browser | unused `web` guard not cleared |
@@ -299,3 +302,103 @@ The multipart payload posts to the existing seller product store/update routes. 
 The Price heading and values align left. Seller prices show the minimum and maximum across all variants, including paused and sold-out variants; equal prices display once.
 
 Archive uses the existing soft-delete endpoint (`seller.products.destroy`): it sets `products.deleted_at`, hides the listing from seller and buyer catalog queries, and preserves variants, images, stock, order items, and inventory transactions. Order-item and inventory-transaction product relationships include archived products. Records remain restorable through Eloquent; a seller restoration screen is not implemented. The bulk actions menu remains a UI placeholder.
+
+
+## Mobile Rider self-registration (2026-10-20)
+
+The older Logistics-created Rider activation flow remains available. Mobile self-registration reuses `riders`, `RiderValidation`, `StoreRiderRequest`, `HasEmailOtp`, and the shared OTP throttling rules. It does not create a Courier, session, or access token.
+
+| Method | Endpoint | Behavior |
+|---|---|---|
+| POST | `/api/rider/register` | Multipart registration; returns HTTP 201 with `message` and `data` containing `rider_id`, `status`, masked email, and signed `verify_url` / `resend_url` |
+| POST | `/api/rider/registration/resume` | Email and registration password recover fresh signed URLs for an unverified application; does not authenticate the Rider |
+| POST | returned `verify_url` | JSON `{ "otp": "123456" }`; valid code moves `unverified` to `pending` and consumes the code |
+| POST | returned `resend_url` | Sends a replacement code only while unverified; preserves the old code if email delivery fails |
+| GET | `/api/logistics/rider-applications` | Paginated pending applications belonging to the signed-in, approved Logistics provider |
+| GET | `/api/logistics/rider-applications/{rider}/documents/{document}` | Private download; document is `drivers_license` or `or_cr`; scoped to the same approved Logistics provider |
+| POST | `/api/logistics/rider-applications/{rider}/approve` | Only the owning approved Logistics provider may change a verified pending application to `approved` |
+| POST | `/api/logistics/rider-applications/{rider}/reject` | Same ownership/approval restrictions; requires JSON `reason` (maximum 1,000 characters), sets `rejected` |
+
+Required registration fields: `first_name`, `last_name`, `birthday` (18 or older), `email`, `contact_no` (PH mobile), `password`, `password_confirmation`, `license_no`, `license_expiry` (today or later in Manila), `vehicle_type` (Motorcycle/Car/Van), `plate_number`, `logistics_provider_id` (approved, non-archived provider), `drivers_license`, `or_cr`, and accepted `terms`. Documents must be real JPG/PNG/PDF uploads, at most 5 MB each, with an allowed filename extension. Email, phone, license, and plate normalization use the existing Rider helpers.
+
+Email is checked case-insensitively across Buyer, Seller, Logistics, Admin, and Rider accounts through `EmailRegistry`. Existing Buyer/Seller/Logistics registration validators consequently also reject Rider-owned email addresses. Passwords use the existing hashed cast, require upper/lowercase letters, a number and a special character, and are limited to 8-72 characters and at most 72 bytes for bcrypt compatibility; null bytes are rejected. OTPs use the shared APP_KEY HMAC and expire after ten minutes; signed URLs expire after one hour. Five incorrect codes lock the account for fifteen minutes; three resends are allowed per ten minutes, and resending/resuming does not clear verification lockouts. Registration and recovery use the existing per-email/IP registration limiter. OTP routes also retain the existing IP limits.
+
+Successful replies use `message` and optional `data`. Validation errors use HTTP 422 with `message` / `errors`; rate limits use HTTP 429, and OTP account limits include `retry_after` plus `Retry-After`. Invalid/expired signatures return JSON HTTP 403. Mail delivery failure returns JSON HTTP 503; initial registration rolls back the Rider and removes newly stored files. Verification and review are serialized using database row locks. Decisions record `decided_by`, `decided_at`, and any `rejection_reason`.
+
+The Logistics JSON endpoints use the existing `logistics` session and web CSRF protection, with no UI changes. Mobile applicants cannot request or redeem legacy activation links to bypass Logistics review. Registration/OTP verification never signs a Rider in. Rider password login, the web operations dashboard and the delivery functions are now implemented in the Phase 4 section below; mobile bearer authentication is still not built.
+
+The additive `add_registration_verification_to_riders_table` migration must be applied before this API is used. No production migration or data change was performed during implementation.
+
+
+## Rider option on web registration (2026-10-20)
+
+`GET /register` now includes Rider alongside the unchanged Buyer, Seller, and Logistics options. `GET /register/rider` redirects to `/register?open=rider`, which opens the Rider dialog. Its two form steps collect only the existing Rider fields above. The provider selector lists approved, non-archived Logistics providers; if none are available, Rider submission is disabled with an explanation.
+
+The modal posts multipart data with CSRF protection to `POST /register/rider` (`register.rider.store`). That guest-only route reuses `Rider\RegistrationController`, its Form Request, and `RiderRegistrationService`; it does not create a second registration implementation or require a new migration. JSON field errors appear in the existing shared validation style and preserve entered details and uploads. OTP verification and resend use the returned signed API URLs, with inline pending-approval confirmation after verification. Step 1 also offers **Already applied? Resend code**: it posts the entered email and registration password to `/api/rider/registration/resume`, then immediately requests a fresh code through the returned `resend_url`. This recovers an application whose modal was closed, whose code expired, or whose one-hour signed URLs have lapsed without creating a duplicate application; a duplicate license error points the rider to that recovery. Closing/reopening the modal preserves its current OTP step; successful registration clears the entered passwords. Operational access after approval is the web Rider panel described in the Phase 4 section below.
+
+Frontend assets: `Components/rider-register-modal.blade.php`, `resources/js/rider/rider-register-modal.js`, and its Vite entry. New styling uses Tailwind v4 utilities and existing theme tokens. The existing other-role modal components and styles are unchanged. The two legacy Logistics name filters exclude only the new Rider form, so they cannot strip spaces or punctuation from Rider names; all existing role bindings retain their previous behavior.
+
+Verification includes `WebRiderRegistrationTest` and the existing Rider/OTP tests. `playwright/check-rider-registration.mjs` runs desktop/mobile browser checks against an isolated loopback preview. Set `RIDER_WEB_PREVIEW_DIR` to its temporary directory (including a private `mail.log`, and a preview router that sends `X-Zefanya-Isolated-Preview: rider-registration`) and optionally `RIDER_WEB_BASE`; it submits real test applications and must run only against an isolated temporary database, private upload directory, and log mail transport, never the configured or production database. It checks modal controls, validation, submit, duplicate email feedback, OTP/resend throttling, pending state, existing role modal opening, and 390/320px layouts.
+
+
+## Rider web operations (Phase 4, 2026-10-20)
+
+Riders now use the same session-based web app as the other roles. There is still **no Rider mobile app**; `/api/rider/*` and `/api/logistics/rider-applications/*` remain registration/OTP and review only.
+
+### Sign-in and the operational gate
+
+| Step | Behaviour |
+|---|---|
+| 1 | `POST /login` (`UnifiedLoginController@login`) tries seller → logistics → buyer, then rider. The rider attempt is separate because a Rider account has extra eligibility rules. |
+| 2 | A rider session is created only when `Rider::isOperational()`: status `approved`/`active`, `email_verified_at` set, an assigned Station Hub that is `approved` + `is_active` + owned by the Rider's own Logistics provider, and a linked `couriers` row. |
+| 3 | Pending, rejected, suspended and deactivated riders, unverified email, missing station or missing Courier all get the generic credential error plus `auth.status_message`; no session is created and password validity is not leaked. |
+| 4 | `EnsureRiderActive` (alias `rider.active`) re-checks the gate on every `/rider/*` request. If eligibility stops holding mid-session (suspension, station rejection/deactivation, deleted Courier) the guard is logged out, the password hash is forgotten and the user is sent back to the login modal with a status message. |
+| 5 | `EnforceSingleBrowserAccount` keeps one role per browser. When a request carries two active guards, the guard that owns the visited area survives and the other is logged out; `AuthenticateRoleSession` now includes the `rider` guard, and unauthenticated `/rider/*` requests redirect to the shared login modal. |
+| 6 | Logout is the shared route and flushes every guard, so no Rider session survives a Buyer/Seller/Logistics logout. Existing Buyer/Seller/Logistics/Admin behaviour is unchanged. |
+
+### Dashboard (`GET /rider/dashboard`)
+
+Header shows the Rider's name, company and assigned Station Hub. Counters are real and scoped to the signed-in Rider's linked Courier only (never a company-wide total):
+
+- **Pending pickups** — `courier_id` = this Courier and status `READY_FOR_PICKUP`.
+- **Active deliveries** — `delivery_courier_id` = this Courier and status `ASSIGNED_TO_RIDER` or `OUT_FOR_DELIVERY`.
+- **Completed deliveries** — `DELIVERED` or `COMPLETED`.
+- **Needs attention** — parcels with `needs_reassignment = true`, ordered by `reassignment_flagged_at`.
+
+Empty states render zeroes; no demo parcels or hardcoded numbers. Navigation: Dashboard, Pickup Assignments, Delivery Assignments, Delivery History, My Account.
+
+### Pickup assignments (`GET /rider/pickups`, `POST /rider/pickups/{sellerOrder}/confirm`)
+
+- The list contains only `READY_FOR_PICKUP` parcels whose `courier_id` is the signed-in Rider's Courier.
+- Logistics can pre-seat a Courier with `POST /logistics/incoming-parcels/{sellerOrder}/assign-pickup-rider` (`CourierAssignmentService::reservePickup()`), which records the assignment **without** changing status. The legacy `POST …/{id}/pickup` (`assignPickup()`) still assigns and advances in one step.
+- Confirm validates, server-side: the parcel is assigned to this Courier, status is `READY_FOR_PICKUP`, the seller's origin municipality is covered by the Courier (`coversMunicipality()`), and the origin Station Hub is the Rider's own. Then `SellerOrderStatusService::transition(..., PICKED_UP, OrderActor::Rider, actorId = courier->id)` records the rider, time and note, `handover_at` is stamped and tracking is minted if absent.
+- A second confirmation is a no-op (already `PICKED_UP` → no second history row, no second notification). Pickups never touch payments or COD.
+- Logistics still confirms physical receipt at the origin Station Hub with the existing sorting receipt (`PICKED_UP → AT_SORTING_CENTER`); province sorting stays unavailable before that, so a rider cannot bypass the handoff.
+
+### Delivery assignments (`GET /rider/deliveries`)
+
+Two groups: `ASSIGNED_TO_RIDER` and `OUT_FOR_DELIVERY`, each limited to `delivery_courier_id` = this Courier. Rows show tracking number, buyer/municipality/street, parcel size and weight, payment method, and the COD amount to collect.
+
+- `POST /rider/deliveries/{sellerOrder}/start` — ownership plus destination-station checks; requires `destination_area_id` to resolve to the Rider's own Station Hub. `ASSIGNED_TO_RIDER → OUT_FOR_DELIVERY`; a repeat is a no-op.
+- `GET/POST /rider/deliveries/{sellerOrder}/failed` — `MarkDeliveryFailedRequest` (`DeliveryFailureReason`, notes required for `other`). `OUT_FOR_DELIVERY → DELIVERY_FAILED`, increments `delivery_attempts`, stores reason/notes, records the Rider as actor, and notifies Logistics. Repeating the same report is idempotent.
+- Neither action can skip a station/province handoff: start needs the destination station match and deliver needs `OUT_FOR_DELIVERY`.
+
+### Proof of delivery and COD (`GET/POST /rider/deliveries/{sellerOrder}/proof`)
+
+- `CompleteDeliveryRequest`: `proof_photo` required (`mimes:jpg,jpeg,png,webp`, max 5 MB), optional `received_by` and `delivery_notes`, and a `cod_amount` peso string converted to exact centavos.
+- One `delivery_proofs` row per seller order (unique `seller_order_id`). The photo is written to the private `local` disk under `delivery-proofs/{order}`; the table stores path, mime, size, receiver, notes and `submitted_at`. If the transaction rolls back, the stored file is deleted.
+- Evidence is streamed only through `GET /rider/proofs/{proof}` (the submitting rider) and `GET /logistics/proofs/{proof}` (the owning provider). Another rider gets 403; another provider gets 404; there is no public URL.
+- COD is collected only on a successful final delivery. If a pending `cod` payment exists, the submitted amount must equal `payments.amount_minor` to the centavo, or `cod_amount_minor` fails and the whole delivery rolls back (no proof, no status change). On success `Payment::recordCodCollection()` writes `collected_by_type = rider`, `collected_by_id` = Courier id, `collected_amount_minor`, `collected_at` and marks the payment paid — inside the same row-locked transaction. Non-COD or already-paid payments need no amount. Pickup, handoff and province transfer never collect COD.
+- `DELIVERED` is written only by `SellerOrderStatusService`; a duplicate submit returns success without a second proof or history row, and the parent `orders` row rolls up to `Delivered`.
+
+### Notifications
+
+Rider-facing events are database notifications (`App\Notifications\Rider\*`) rendered by the bell in `Layouts/rider` and the dedicated `GET /rider/notifications` page. `RiderNotifier::send()` stores one row per payload `event_key`, so a retried operation cannot duplicate an alert. Dispatch happens after the owning service transaction commits: `CourierAssignmentService` (pickup assigned, delivery assigned, delivery reassigned), `DeliveryAssignmentsController` (delivery returned/cancelled) and `RiderRegistrationService` (station changed, suspended/deactivated/reactivated). The bell polls `GET /rider/notifications/recent` every 30 seconds; `POST /rider/notifications/read-all`, `…/{id}/read` and `…/{id}/open` are scoped to the signed-in rider, and `open` accepts only stored URLs inside `/rider`. Links point at list/account pages (never at a parcel action), so `rider.active` and the list query revalidate the assignment when opened. Suspended/deactivated riders keep the rows but cannot open any link until reactivated.
+
+`App\Notifications\Logistics\RiderParcelActivity` (mail) tells the Logistics provider about pickup, out for delivery, delivered and delivery failed. It carries no internal company details to buyer/seller. Buyer and seller tracking continues to come from `status_histories` and the existing status notifications, so there is no parallel tracking system. Reassignment flags raised when a rider is suspended/deactivated keep surfacing on the Rider dashboard and to Logistics; failed attempts stay with Logistics for reschedule/return under the existing retry rules.
+
+### Schema, tests and limits
+
+Additive migrations only: `2026_10_20_190000_create_delivery_proofs_table` and `2026_10_20_190001_add_cod_collection_to_payments_table`. No commission code exists in the project, so no commission/payout rule is involved (COD money is recorded, not remitted). Coverage: `tests/Feature/Rider` (auth, dashboard, pickups, deliveries, POD/COD and `RiderNotificationsTest`) plus the Rider registration suite.
+
+Not implemented: Rider mobile app/bearer auth, COD remittance/payout, automatic reassignment after a failed attempt (Logistics decides), an explicit Logistics cancel/reassign action for an active pickup (reassignment exists only through the failed-delivery reschedule), and any commission calculation.

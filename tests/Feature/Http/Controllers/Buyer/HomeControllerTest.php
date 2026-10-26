@@ -16,7 +16,7 @@ class HomeControllerTest extends TestCase
         $response = $this->get(route('buyer.home'));
 
         $response->assertOk();
-        $response->assertSee('Limited Time Offer');
+        $response->assertSee('Discover Zefanya');
         $response->assertSee('Flash Sale');
         $response->assertSee('Todays For You!');
         $response->assertSee('Best Selling Store');

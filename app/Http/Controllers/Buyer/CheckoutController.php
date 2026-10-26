@@ -22,6 +22,7 @@ use App\Models\Voucher;
 use App\Notifications\Seller\NewOrderReceived;
 use App\Services\CartSummary;
 use App\Services\CartVariantResolver;
+use App\Services\CheckoutCarrierService;
 use App\Services\PurchasedVariantSnapshot;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -106,6 +107,9 @@ class CheckoutController extends Controller
         );
 
         $summary = new CartSummary($items, $voucher, $selectedIds);
+        $carrierService = app(CheckoutCarrierService::class);
+        $carrierOptions = $carrierService->optionsForCheckout($buyer, $summary->sellerGroups);
+        $carriersAvailable = $carrierService->allRoutesAvailable($carrierOptions);
 
         return view('Buyer.Checkout.index', [
             'buyer' => $buyer,
@@ -120,6 +124,9 @@ class CheckoutController extends Controller
                     ->implode(' | ') ?? '',
             ]),
             'checkoutToken' => $checkoutToken->token,
+            'carrierOptions' => $carrierOptions,
+            'carriersAvailable' => $carriersAvailable,
+            'merchandiseTotalMinor' => $summary->totalCentavos,
         ]);
     }
 
@@ -203,8 +210,32 @@ class CheckoutController extends Controller
         $paymentMethod = PaymentMethod::tryFrom((string) $request->input('payment_method', ''))
             ?? PaymentMethod::Cod;
 
+        // Revalidate carrier eligibility and server fees before entering checkout.
+        $checkoutReturn = route('buyer.checkout.index', ['items' => $parkedIds]);
+
+        if ($request->filled('shipping_fee') || $request->filled('shipping_fees') || $request->filled('shipping_total')) {
+            return redirect()->to($checkoutReturn)
+                ->withInput()
+                ->withErrors(['shipping' => 'Shipping fees are calculated by the server and cannot be submitted.']);
+        }
+
         try {
-            $order = $this->placeOrder($buyer, $items, $summary, $formToken, $paymentMethod);
+            $carrierQuote = app(CheckoutCarrierService::class)->validateSelection(
+                $buyer,
+                $summary->sellerGroups,
+                (array) $request->input('carriers', []),
+            );
+        } catch (ValidationException $e) {
+            return redirect()->to($checkoutReturn)
+                ->withInput()
+                ->withErrors($e->errors())
+                ->with('error', 'Shipping is not available for one or more shops in your order. Review carrier options or your delivery address.');
+        }
+
+        session([CheckoutCarrierService::SESSION_KEY => $carrierQuote['selections']]);
+
+        try {
+            $order = $this->placeOrder($buyer, $items, $summary, $formToken, $paymentMethod, $carrierQuote['selections']);
         } catch (CheckoutException $e) {
             return redirect()->route('buyer.cart.index')->with('error', $e->getMessage());
         }
@@ -220,7 +251,7 @@ class CheckoutController extends Controller
         // left in the cart survives for the next checkout.
         $buyer->cartItems()->whereIn('id', $parkedIds)->delete();
 
-        session()->forget([self::SESSION_KEY, 'cart_voucher', self::TOKEN_KEY]);
+        session()->forget([self::SESSION_KEY, 'cart_voucher', self::TOKEN_KEY, CheckoutCarrierService::SESSION_KEY]);
 
         $redirect = redirect()->route('buyer.checkout.success', $order);
 
@@ -238,9 +269,9 @@ class CheckoutController extends Controller
      *
      * @param  Collection<int, CartItem>  $items  The buyer's validated selection
      */
-    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, PaymentMethod $paymentMethod = PaymentMethod::Cod): Order
+    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, PaymentMethod $paymentMethod = PaymentMethod::Cod, array $carrierSelections = []): Order
     {
-        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $paymentMethod): Order {
+        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $paymentMethod, $carrierSelections): Order {
             // ONE-TIME TOKEN GUARD (double-submit): claim the token first,
             // inside this transaction, via a conditional UPDATE. On a
             // double-click the second request finds used=1 already and gets
@@ -341,6 +372,15 @@ class CheckoutController extends Controller
             }
             $summary = $lockedSummary;
 
+            $buyer = Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
+            try {
+                $carrierQuote = app(CheckoutCarrierService::class)->validateSelectionForOrder(
+                    $buyer, $summary->sellerGroups, $carrierSelections,
+                );
+            } catch (ValidationException $exception) {
+                throw new CheckoutException(collect($exception->errors())->flatten()->implode(' '));
+            }
+
             $order = new Order;
             $order->forceFill([
                 'buyer_id' => $buyer->id,
@@ -348,7 +388,7 @@ class CheckoutController extends Controller
                 'shipping_address' => $this->addressSnapshot($buyer),
                 'subtotal_minor' => $summary->subtotalCentavos,
                 'discount_minor' => $summary->discountCentavos,
-                'total_minor' => $summary->totalCentavos,
+                'total_minor' => $summary->totalCentavos + $carrierQuote['shipping_total_minor'],
                 'status' => OrderStatus::Placed,
             ])->save();
 
@@ -370,6 +410,10 @@ class CheckoutController extends Controller
                     ->all(),
             );
 
+            if (array_sum($discounts) !== $summary->discountCentavos) {
+                throw new CheckoutException('The voucher allocation does not match the applied discount.');
+            }
+
             $sellerOrderIdsByCartItemId = [];
 
             foreach ($summary->sellerGroups as $index => $group) {
@@ -377,9 +421,24 @@ class CheckoutController extends Controller
                 $sellerOrder->forceFill([
                     'order_id' => $order->id,
                     'seller_id' => $group['seller']->id,
+                    // Snapshot the locked voucher and the exact existing payment allocation.
+                    'voucher_id' => $summary->voucher?->getKey(),
+                    'voucher_funding_source' => $summary->voucher?->funding_source,
+                    'voucher_discount_minor' => $discounts[$index],
+                    'carrier_provider_id' => $carrierQuote['selections'][$group['seller']->id],
+                    'handoff_destination_provider_id' => $carrierQuote['destinations'][$group['seller']->id] ?? null,
+                    'shipping_fee_minor' => $carrierQuote['fees'][$group['seller']->id],
                     'subtotal_minor' => (int) $group['items']->sum(
                         fn (CartItem $item): int => $item->lineTotalCentavos(),
                     ),
+                    // Freeze the parcel weight with the address and prices so
+                    // later catalog edits cannot change an in-transit parcel.
+                    'parcel_weight_grams' => (int) $group['items']->sum(function (CartItem $item): int {
+                        $weight = $item->variant?->effectiveWeightGrams()
+                            ?? (int) ($item->product?->weight_grams ?? 0);
+
+                        return $item->quantity * $weight;
+                    }),
                     'status' => OrderStatus::Placed,
                     // Tracking number exists from the moment the parcel is a
                     // seller_order, so the seller can print the waybill BEFORE
@@ -409,10 +468,14 @@ class CheckoutController extends Controller
                     $sellerOrderIdsByCartItemId[$item->id] = $sellerOrder->id;
                 }
 
+                if ($discounts[$index] < 0 || $discounts[$index] > $sellerOrder->subtotal_minor) {
+                    throw new CheckoutException('The allocated discount exceeds the Seller subtotal.');
+                }
+
                 $payment = new Payment;
                 $payment->forceFill([
                     'seller_order_id' => $sellerOrder->id,
-                    'amount_minor' => $sellerOrder->subtotal_minor - $discounts[$index],
+                    'amount_minor' => $sellerOrder->subtotal_minor - $discounts[$index] + $sellerOrder->shipping_fee_minor,
                     'method' => $paymentMethod,
                     'status' => PaymentStatus::Pending,
                 ])->save();
@@ -551,8 +614,11 @@ class CheckoutController extends Controller
             'name' => $buyer->fullName(),
             'phone' => $buyer->contact_no,
             'province' => $buyer->province_name,
+            'province_code' => $buyer->province_code,
             'municipality' => $buyer->municipality_name,
+            'municipality_code' => $buyer->municipality_code,
             'barangay' => $buyer->barangay_name,
+            'barangay_code' => $buyer->barangay_code,
             'street' => $buyer->street,
             'house_number' => $buyer->house_number,
             'address_detail' => $buyer->address_detail,

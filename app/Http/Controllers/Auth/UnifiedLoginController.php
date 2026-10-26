@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Support\EmailRegistry;
 use App\Support\SignedOtpLink;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -47,6 +48,11 @@ class UnifiedLoginController extends Controller
             if ($this->tryGuard($role->guard(), $email, $password, $remember, $request)) {
                 $request->session()->forget('auth.open_login_modal');
 
+                // After a successful guard attempt Laravel has already stored the
+                // user on that guard, so PaymentTreatment is available here.
+                // One account per browser: end every other role's session.
+                $this->clearOtherGuards($role->guard());
+
                 return redirect()->intended($role->dashboardUrl());
             }
         }
@@ -64,8 +70,10 @@ class UnifiedLoginController extends Controller
     }
 
     /**
-     * Rider login: credentials must match AND status must be active.
-     * Pending Activation riders are denied without leaking password validity.
+     * Rider login: credentials must match AND the account must be operational
+     * (approved/active, email-verified, assigned to an approved and active
+     * Station Hub, with a linked Courier). Pending, rejected, suspended and
+     * deactivated riders are denied without leaking password validity.
      */
     private function tryRider(string $email, string $password, bool $remember, Request $request): bool
     {
@@ -73,13 +81,20 @@ class UnifiedLoginController extends Controller
             return false;
         }
         $rider = Auth::guard('rider')->user();
-        if (! $rider || $rider->status !== 'active') {
+        if (! $rider || ! $rider->isOperational()) {
             Auth::guard('rider')->logout();
+            $request->session()->forget('password_hash_rider');
+
+            $request->session()->flash(
+                'auth.status_message',
+                'Your rider account is not active yet. Please contact your logistics company.',
+            );
 
             return false;
         }
-        $this->clearOtherGuards('rider');
         $request->session()->regenerate();
+        $this->clearOtherGuards('rider');
+        $this->rememberSession('rider');
 
         return true;
     }
@@ -140,6 +155,7 @@ class UnifiedLoginController extends Controller
         // One account per browser: signing in on this guard ends every other
         // role's session in the same browser.
         $this->clearOtherGuards($guard);
+        $this->rememberSession($guard);
 
         $request->session()->regenerate();
 
@@ -186,7 +202,7 @@ class UnifiedLoginController extends Controller
     /**
      * Log out from every guard and redirect to the home page.
      */
-    public function logout(Request $request)
+    public function logout(Request $request): RedirectResponse
     {
         // Logout ends EVERY guard, including the admin panel — a browser
         // session must never leave another role signed in.

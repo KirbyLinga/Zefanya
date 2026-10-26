@@ -24,6 +24,9 @@ class BuyerShipmentConfirmation
                 abort(404);
             }
             $delivered = $shipments->where('status', OrderStatus::Delivered);
+            foreach ($delivered as $shipment) {
+                ParcelIncidentService::assertOperationsAllowed($shipment);
+            }
             if ($delivered->isEmpty()) {
                 if ($shipments->isNotEmpty() && $shipments->every(fn ($shipment) => $shipment->status === OrderStatus::Completed)) {
                     return;

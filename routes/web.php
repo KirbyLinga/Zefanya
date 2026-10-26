@@ -8,10 +8,11 @@ use App\Http\Controllers\Buyer\VerifyBuyerOtpController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\Logistics\RegisterLogisticsController;
 use App\Http\Controllers\Logistics\VerifyLogisticsOtpController;
+use App\Http\Controllers\Rider\ActivationController;
+use App\Http\Controllers\Rider\RegistrationController as RiderRegistrationController;
 use App\Http\Controllers\Seller\RegisterSellerController;
 use App\Http\Controllers\Seller\VerifySellerOtpController;
-use App\Http\Controllers\Rider\ActivationController;
-use App\Http\Controllers\Rider\DashboardController as RiderDashboardController;
+use App\Models\Logistics\LogisticsProvider;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingPageController::class, 'index'])->name('home');
@@ -20,8 +21,19 @@ Route::get('/', [LandingPageController::class, 'index'])->name('home');
 // Logout stays outside this group.
 Route::middleware('guest.role')->group(function (): void {
     Route::get('/register', function () {
-        return view('Auth.Register-Type');
+        return view('Auth.Register-Type', [
+            'riderProviders' => LogisticsProvider::query()->where('status', 'approved')->whereNull('archived_at')
+                ->orderBy('business_name')->get(['id', 'business_name']),
+        ]);
     })->name('register.type');
+
+    Route::get('/register/rider', function () {
+        return redirect()->route('register.type', ['open' => 'rider']);
+    })->name('register.rider');
+
+    Route::post('/register/rider', [RiderRegistrationController::class, 'store'])
+        ->name('register.rider.store')
+        ->middleware('throttle:register');
 
     Route::get('/register/buyer', function () {
         return redirect()->route('register.type', ['open' => 'buyer']);
@@ -169,9 +181,7 @@ Route::post('/logout', [UnifiedLoginController::class, 'logout'])
     ->name('unified.logout')
     ->middleware('throttle:logout');
 
-// ── Rider activation (public link, 24h single-use) + dashboard ─────────
+// ── Rider activation (public link, 24h single-use) ──────────────────────
+// The authenticated Rider panel lives in routes/rider.php.
 Route::get('/rider/activate/{token}', [ActivationController::class, 'show'])->name('rider.activate.show');
 Route::post('/rider/activate/{token}', [ActivationController::class, 'store'])->name('rider.activate')->middleware('throttle:10,1');
-Route::middleware(['auth:rider', 'rider.active'])->group(function (): void {
-    Route::get('/rider/dashboard', [RiderDashboardController::class, 'index'])->name('rider.dashboard');
-});

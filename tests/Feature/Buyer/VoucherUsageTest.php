@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Seller\Seller;
 use App\Models\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 /**
@@ -19,6 +20,7 @@ use Tests\TestCase;
  */
 class VoucherUsageTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     public function test_placing_an_order_increments_the_vouchers_times_used(): void
@@ -30,8 +32,9 @@ class VoucherUsageTest extends TestCase
             'street' => 'Maple Street',
         ]);
 
+        $seller = Seller::factory()->create();
         $product = Product::factory()->create([
-            'seller_id' => Seller::factory()->create()->id,
+            'seller_id' => $seller->id,
             'price' => 100.00,
             'stock_quantity' => 5,
         ]);
@@ -48,6 +51,7 @@ class VoucherUsageTest extends TestCase
             'times_used' => 0,
         ]);
 
+        $this->bootstrapCheckoutCarriers($buyer, [$seller]);
         $this->actingAs($buyer, 'buyer');
 
         session([
@@ -55,8 +59,10 @@ class VoucherUsageTest extends TestCase
             'cart_voucher' => 'ONCEONLY',
         ]);
 
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($buyer->id)->token])->assertRedirect();
-
+        $this->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$seller]),
+        ])->assertRedirect();
         $this->assertSame(1, $voucher->fresh()->times_used, 'The order must count against the voucher usage limit.');
 
         // Having been consumed, the same voucher can no longer be applied.

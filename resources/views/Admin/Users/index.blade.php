@@ -48,6 +48,9 @@
                 <tr>
                     <th class="px-6 py-4 text-left font-semibold text-neutral-700">Name</th>
                     <th class="px-6 py-4 text-left font-semibold text-neutral-700">Email</th>
+                    @if ($type === 'logistics')
+                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Province</th>
+                    @endif
                     <th class="px-6 py-4 text-left font-semibold text-neutral-700">Status</th>
                     <th class="px-6 py-4 text-center font-semibold text-neutral-700">Actions</th>
                 </tr>
@@ -56,6 +59,7 @@
                 @foreach ($accounts as $account)
                     @php
                         $statusValue = $account->status instanceof \BackedEnum ? $account->status->value : $account->status;
+                        $blockers = ($provinceBlockers ?? [])[$account->id] ?? [];
                     @endphp
                     <tr class="hover:bg-neutral-50">
                         <td class="px-6 py-4 font-semibold text-neutral-950">
@@ -65,6 +69,40 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 text-neutral-700">{{ $account->email }}</td>
+                        @if ($type === 'logistics')
+                            <td class="px-6 py-4 text-sm text-neutral-700">
+                                <p class="font-semibold">{{ $account->province_name ?: '—' }}</p>
+                                @if ($account->province_verified_at)
+                                    <p class="text-xs text-green-700 mt-0.5">Verified {{ $account->province_verified_at->format('M d, Y') }}</p>
+                                @else
+                                    <p class="text-xs text-amber-700 mt-0.5">Not verified</p>
+                                @endif
+                                <details class="mt-2">
+                                    <summary class="cursor-pointer text-xs font-semibold text-primary-800">Change province</summary>
+                                    @if ($blockers !== [])
+                                        <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                                            <p class="font-semibold">Resolve before changing:</p>
+                                            <ul class="list-disc pl-4 mt-1">
+                                                @foreach ($blockers as $blocker)
+                                                    <li>{{ $blocker }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @else
+                                        <form method="POST" action="{{ route('admin.users.logistics.province', $account) }}" class="mt-2 flex flex-col gap-2">
+                                            @csrf
+                                            <input name="province_code" required maxlength="20" placeholder="PSGC province code" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
+                                            <input name="province_name" maxlength="120" placeholder="Province name (optional)" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
+                                            <input name="region_code" maxlength="20" placeholder="Region code (optional)" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
+                                            <button type="submit" class="h-8 px-3 text-xs font-semibold text-white bg-primary-800 rounded-lg hover:bg-primary-900"
+                                                    onclick="return confirm('Change this provider\'s verified province? Their live Province Hub will be archived.');">
+                                                Save province
+                                            </button>
+                                        </form>
+                                    @endif
+                                </details>
+                            </td>
+                        @endif
                         <td class="px-6 py-4">
                             @if ($statusValue === 'suspended')
                                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700">Suspended</span>

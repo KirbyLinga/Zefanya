@@ -5,11 +5,18 @@ require_once __DIR__.'/Preflight.php';
 
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
+use App\Models\Logistics\LogisticsProvider;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Product;
+use App\Models\Seller\Seller;
+use App\Models\SellerOrder;
+use App\Services\CourierAssignmentService;
+use App\Services\ParcelReturnService;
 use App\Services\VariantSyncService;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\MySql\Preflight;
 use Tests\TestCase;
 
@@ -62,6 +69,8 @@ final class T05Worker extends TestCase
         $sql = strtolower($sql);
 
         return match ($point) {
+            'parcel' => str_starts_with($sql, 'select') && str_contains($sql, 'from `seller_orders`') && str_contains($sql, 'for update'),
+            'provider' => str_starts_with($sql, 'select') && str_contains($sql, 'from `logistics_providers`') && str_contains($sql, 'for update'),
             'product' => str_starts_with($sql, 'select') && str_contains($sql, 'from `products`') && str_contains($sql, 'for update'),
             'seller' => str_starts_with($sql, 'select') && str_contains($sql, 'from `sellers`') && str_contains($sql, 'for update'),
             'token' => str_starts_with($sql, 'update `checkout_tokens`'),
@@ -105,7 +114,28 @@ final class T05Worker extends TestCase
             }
         });
         $start = microtime(true);
-        if (in_array($task['action'], ['price', 'suspend', 'variations'], true)) {
+        if ($task['action'] === 'return_request') {
+            $parcel = SellerOrder::query()->findOrFail($task['parcel']);
+            $provider = LogisticsProvider::query()->findOrFail($task['provider']);
+            $record = app(ParcelReturnService::class)->request($parcel, $provider, 'Concurrent physical return request.');
+            $result = ['status' => 'requested', 'success' => true, 'return_id' => $record->id];
+        } elseif ($task['action'] === 'return_receipt') {
+            config(['returns.restore_verified_resellable' => true]);
+            $record = ParcelReturn::query()->findOrFail($task['return']);
+            $seller = Seller::query()->findOrFail($task['seller']);
+            $service = app(ParcelReturnService::class);
+            try {
+                $token = $service->verifySeller($record, $seller, $record->sellerOrder->tracking_number, $task['handover_code'], 'resellable');
+                $service->receiveBySeller($record, $seller, 'resellable', $token);
+                $result = ['status' => 'completed', 'success' => true];
+            } catch (ValidationException) {
+                $result = ['status' => 'rejected', 'success' => false];
+            }
+        } elseif ($task['action'] === 'dispatch') {
+            $dispatch = app(CourierAssignmentService::class)->dispatch(
+                SellerOrder::query()->findOrFail($task['parcel']), $task['role']);
+            $result = ['status' => $dispatch['status'], 'success' => $dispatch['status'] === 'assigned', 'courier_id' => $dispatch['courier']?->id];
+        } elseif (in_array($task['action'], ['price', 'suspend', 'variations'], true)) {
             DB::transaction(function () use ($task): void {
                 if ($task['action'] === 'suspend') {
                     DB::table('sellers')->where('id', $task['seller'])->lockForUpdate()->first();
@@ -150,7 +180,10 @@ final class T05Worker extends TestCase
 }
 
 $task = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
-$root = realpath(dirname(__DIR__, 2).'/.codex/t05-runs');
+$runRoot = match ($task['action'] ?? '') {
+    'dispatch' => '/storage/logs/phase6-races', 'return_request', 'return_receipt' => '/storage/logs/phase7-races', default => '/.codex/t05-runs'
+};
+$root = realpath(dirname(__DIR__, 2).$runRoot);
 if ($root === false || ! str_starts_with(realpath($task['directory']), $root.DIRECTORY_SEPARATOR)) {
     exit(2);
 }

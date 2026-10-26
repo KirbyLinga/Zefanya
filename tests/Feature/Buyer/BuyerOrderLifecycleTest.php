@@ -265,7 +265,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $service = new SellerOrderStatusService;
         // Walk the full pipeline with correct actors:
         $so = $service->transition($so, OrderStatus::PickedUp, actor: OrderActor::Rider, note: 'sim');
-        $so = $service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Rider, note: 'sim');
+        $so = $service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Logistics, note: 'sim');
         $so = $service->transition($so, OrderStatus::Sorted, actor: OrderActor::Logistics, note: 'sim');
         $so = $service->transition($so, OrderStatus::AssignedToRider, actor: OrderActor::Logistics, note: 'sim');
         $so = $service->transition($so, OrderStatus::OutForDelivery, actor: OrderActor::Rider, note: 'sim');
@@ -747,5 +747,56 @@ class BuyerOrderLifecycleTest extends TestCase
 
         // Rollback: seller_order stays Delivered.
         $this->assertSame(OrderStatus::Delivered, $so->fresh()->status);
+    }
+
+    public function test_cancelled_tab_counts_and_lists_seller_declined_orders(): void
+    {
+        $order = $this->fullOrder();
+        $order->sellerOrders->first()->forceFill(['status' => OrderStatus::Cancelled->value])->save();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index', ['tab' => 'cancelled']))
+            ->assertOk()
+            ->assertSee($order->reference)
+            ->assertSee('Cancelled', false);
+    }
+
+    public function test_mixed_cancelled_and_active_siblings_count_as_to_ship_not_cancelled(): void
+    {
+        $sellerA = Seller::factory()->create(['status' => 'approved']);
+        $sellerB = Seller::factory()->create(['status' => 'approved']);
+
+        $order = Order::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'shipping_address' => ['municipality' => 'Quezon City'],
+        ]);
+
+        SellerOrder::factory()->create([
+            'order_id' => $order->id,
+            'seller_id' => $sellerA->id,
+            'status' => OrderStatus::Cancelled->value,
+        ]);
+        SellerOrder::factory()->create([
+            'order_id' => $order->id,
+            'seller_id' => $sellerB->id,
+            'status' => OrderStatus::Placed->value,
+        ]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index'))
+            ->assertOk()
+            ->assertSee($order->reference);
+
+        // Active PLACED sibling keeps the order in to_ship.
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index', ['tab' => 'to_ship']))
+            ->assertOk()
+            ->assertSee($order->reference);
+
+        // Cancelled sibling also makes it match the cancelled filter.
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index', ['tab' => 'cancelled']))
+            ->assertOk()
+            ->assertSee($order->reference);
     }
 }

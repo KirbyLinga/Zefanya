@@ -26,7 +26,7 @@ class EnforceSingleBrowserAccount
      *
      * @var list<string>
      */
-    private const GUARDS = ['admin', 'seller', 'logistics', 'buyer'];
+    private const GUARDS = ['admin', 'seller', 'logistics', 'buyer', 'rider'];
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -85,6 +85,10 @@ class EnforceSingleBrowserAccount
 
         if ($request->is('buyer', 'buyer/*')) {
             return 'buyer';
+        }
+
+        if ($request->is('rider', 'rider/*')) {
+            return 'rider';
         }
 
         return null;

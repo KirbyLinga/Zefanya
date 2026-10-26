@@ -22,7 +22,7 @@ class AuthenticateRoleSession
     /**
      * @var list<string>
      */
-    private const GUARDS = ['admin', 'seller', 'logistics', 'buyer'];
+    private const GUARDS = ['admin', 'seller', 'logistics', 'buyer', 'rider'];
 
     public function handle(Request $request, Closure $next): Response
     {

@@ -2,7 +2,7 @@
      Lives under resources/views/components/logistics/ and is referenced only as
      <x-logistics.sidebar-brand>. Mirrors x-seller.sidebar-brand 1:1. --}}
 
-<div class="px-5 py-4 border-b border-[var(--sidebar-border)] flex items-center gap-3 [.is-collapsed_&]:px-2 [.is-collapsed_&]:justify-center">
+<div class="shrink-0 px-4 py-4 border-b border-[var(--sidebar-border)] flex items-center gap-3 [.is-collapsed_&]:px-2 [.is-collapsed_&]:justify-center">
     <span class="w-9 h-9 rounded-full bg-[var(--sidebar-active-bg)] flex items-center justify-center shrink-0 [.is-collapsed_&]:hidden">
         <img src="{{ asset('Images/Zefanya-Logo.png') }}"
              alt="Zefanya logo"
@@ -10,13 +10,13 @@
     </span>
     <div class="flex-1 min-w-0 [.is-collapsed_&]:hidden">
         <p class="font-sans text-[14px] font-semibold text-[var(--sidebar-text)]">Zefanya</p>
-        <p class="font-sans text-[11px] text-[var(--sidebar-muted)]">Logistics Panel</p>
+        <p class="font-sans text-[11px] text-[var(--sidebar-muted)]">Logistics workspace</p>
     </div>
     {{-- aria-label and data-tooltip are updated dynamically by sidebar.blade.php JS --}}
     <button
         type="button"
         id="logisticsSidebarToggle"
-        class="bg-transparent border-none text-[var(--sidebar-muted)] cursor-pointer p-2 rounded-md flex items-center justify-center flex-shrink-0 transition-colors duration-150 hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
+        class="bg-transparent border-none text-[var(--sidebar-muted)] cursor-pointer p-2 rounded-md flex items-center justify-center shrink-0 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sidebar-active-border)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
         aria-label="Collapse sidebar"
         aria-expanded="true"
         aria-controls="logisticsNav"

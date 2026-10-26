@@ -90,40 +90,30 @@
                                     </button>
                                 @endif
                             </div>
-                            @if ($sellerOrder->statusHistories->isEmpty())
-                                <p class="font-sans text-sm leading-relaxed text-[var(--text-muted)]">
-                                    Current status: <span class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label() }}</span>
-                                </p>
-                            @else
-                                <ul class="space-y-4">
-                                    <li class="flex items-start gap-3">
-                                        <span class="font-sans text-sm text-[var(--text-muted)] mt-0.5">↳</span>
-                                        <div>
-                                            <p class="font-sans text-sm leading-relaxed text-[var(--text-muted)]">Order created</p>
-                                            <p class="font-sans text-xs text-[var(--text-muted)]">{{ $sellerOrder->created_at->format('M d, Y h:i A') }}</p>
-                                        </div>
-                                    </li>
-                                    @foreach ($sellerOrder->statusHistories as $hist)
-                                        <li class="flex items-start gap-3">
-                                            <span class="font-sans text-sm text-[var(--text-muted)] mt-0.5">→</span>
-                                            <div>
-                                                <p class="font-sans text-sm font-semibold text-[var(--text-ink)]">
-                                                    {{ $hist->from_status?->label() ?? '—' }} → {{ $hist->to_status->label() }}
-                                                </p>
-                                                <p class="font-sans text-xs text-[var(--text-muted)]">
-                                                    {{ $hist->created_at->format('M d, Y h:i A') }}
-                                                    @isset($hist->changed_by) · <span class="font-semibold">{{ $hist->changed_by }}</span>@endisset
-                                                </p>
-                                                @isset($hist->note)
-                                                    <p class="font-sans text-sm text-[var(--text-muted)] italic">{{ $hist->note }}</p>
-                                                @endisset
-                                            </div>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                                <p class="mt-3 font-sans text-sm leading-relaxed text-[var(--text-muted)]">
-                                    Current: <span class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label() }}</span>
-                                </p>
+                            <x-shipment-tracking :shipment="$sellerOrder" />
+
+                            @php($hubMovements = $sellerOrder->manifestMovementEvents())
+                            @if ($hubMovements !== [])
+                                <div class="mt-6 border-t border-[var(--border-strong)] pt-5">
+                                    <h3 class="font-sans text-sm font-semibold text-[var(--text-ink)]">Hub movements</h3>
+                                    <p class="mt-1 font-sans text-xs leading-relaxed text-[var(--text-muted)]">Internal transfers inside the logistics network. These events do not replace the delivery status above.</p>
+                                    <ul class="mt-4 space-y-4">
+                                        @foreach ($hubMovements as $movement)
+                                            <li class="flex items-start gap-3">
+                                                <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border {{ $movement['type'] === 'dispatch' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' }}">
+                                                    <i data-lucide="{{ $movement['type'] === 'dispatch' ? 'truck' : 'warehouse' }}" class="size-3"></i>
+                                                </span>
+                                                <div class="min-w-0">
+                                                    <p class="font-sans text-sm font-semibold text-[var(--text-ink)]">{{ $movement['title'] }}</p>
+                                                    <p class="font-sans text-xs text-[var(--text-muted)]">{{ $movement['at']->format('M d, Y h:i A') }} · {{ $movement['detail'] }}</p>
+                                                    @if (filled($movement['custody'] ?? null))
+                                                        <p class="mt-1 font-sans text-xs leading-relaxed text-[var(--text-muted)]">{{ $movement['custody'] }}</p>
+                                                    @endif
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
                             @endif
                         </section>
                     @endforeach
@@ -148,23 +138,19 @@
                                         <p class="font-mono text-sm text-[var(--text-ink)] break-all">{{ $sellerOrder->tracking_number }}</p>
                                     </div>
                                 @endif
-                                @if ($courier)
-                                    <div>
-                                        <p class="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Courier</p>
-                                        <p class="font-sans text-sm font-semibold text-[var(--text-ink)]">{{ $courier->name }}</p>
-                                        <p class="font-sans text-sm leading-relaxed text-[var(--text-muted)]">{{ $courier->phone }}</p>
-                                        <p class="font-sans text-sm text-[var(--text-muted)]">{{ ucfirst($courier->vehicle_type) }}</p>
+                                @if ($sellerOrder->status === OrderStatus::Placed)
+                                    <div class="pt-2" data-cancel-action="{{ $sellerOrder->id }}">
+                                        <button
+                                            type="button"
+                                            class="buyer-cancel-order-btn w-full rounded-xl border border-red-300 bg-transparent px-4 py-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                            data-cancel-url="{{ route('buyer.orders.cancelSellerOrder', [$order, $sellerOrder]) }}"
+                                            data-seller-order-id="{{ $sellerOrder->id }}"
+                                            data-shop-name="{{ $sellerOrder->seller?->business_name ?? 'this seller' }}"
+                                        >
+                                            Cancel Order
+                                        </button>
+                                        <p class="buyer-cancel-feedback mt-2 hidden font-sans text-sm" role="status"></p>
                                     </div>
-                                @else
-                                    <p class="font-sans text-sm leading-relaxed text-[var(--text-muted)]">
-                                        @if(in_array($sellerOrder->status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing]))
-                                            A courier will be assigned once the seller marks this order ready for pickup.
-                                        @elseif($sellerOrder->status === OrderStatus::ReadyForPickup)
-                                            Waiting for courier assignment.
-                                        @else
-                                            No courier assigned yet.
-                                        @endif
-                                    </p>
                                 @endif
                             </div>
                         </section>
@@ -197,6 +183,32 @@
         </div>
     </div>
 
+    {{-- Cancel confirmation modal --}}
+    <div id="buyer-cancel-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="buyer-cancel-modal-title">
+        <div class="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-lg sm:p-6">
+            <h2 id="buyer-cancel-modal-title" class="font-sans text-lg font-semibold text-[var(--text-ink)]">Cancel this shipment?</h2>
+            <p id="buyer-cancel-modal-copy" class="mt-2 font-sans text-sm leading-relaxed text-[var(--text-muted)]">
+                This cannot be undone. The seller will be notified and stock will be restored.
+            </p>
+            <label for="buyer-cancel-reason" class="mt-4 block font-sans text-sm font-semibold text-[var(--text-ink)]">Reason <span class="text-red-600">*</span></label>
+            <textarea
+                id="buyer-cancel-reason"
+                maxlength="500"
+                rows="3"
+                class="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 font-sans text-sm text-[var(--text-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]"
+                placeholder="Tell the seller why you are cancelling"
+            ></textarea>
+            <p id="buyer-cancel-modal-error" class="mt-2 hidden font-sans text-sm text-red-600" role="alert"></p>
+            <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button type="button" id="buyer-cancel-modal-dismiss" class="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2.5 font-sans text-sm font-semibold text-[var(--text-ink)] transition-colors hover:bg-secondary-200">
+                    Keep order
+                </button>
+                <button type="button" id="buyer-cancel-modal-confirm" class="inline-flex items-center justify-center rounded-xl bg-red-700 px-4 py-2.5 font-sans text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                    Confirm cancel
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
         document.querySelectorAll('.chat-with-seller-btn').forEach(btn => {
@@ -230,5 +242,102 @@
                 }
             });
         });
+
+        (function () {
+            const modal = document.getElementById('buyer-cancel-modal');
+            const reasonInput = document.getElementById('buyer-cancel-reason');
+            const errorEl = document.getElementById('buyer-cancel-modal-error');
+            const copyEl = document.getElementById('buyer-cancel-modal-copy');
+            const confirmBtn = document.getElementById('buyer-cancel-modal-confirm');
+            const dismissBtn = document.getElementById('buyer-cancel-modal-dismiss');
+            let activeUrl = null;
+            let activeSellerOrderId = null;
+
+            function openModal(url, sellerOrderId, shopName) {
+                activeUrl = url;
+                activeSellerOrderId = sellerOrderId;
+                reasonInput.value = '';
+                errorEl.classList.add('hidden');
+                errorEl.textContent = '';
+                copyEl.textContent = `Cancel your shipment from ${shopName}? This cannot be undone. The seller will be notified and stock will be restored.`;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                reasonInput.focus();
+            }
+
+            function closeModal() {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                activeUrl = null;
+                activeSellerOrderId = null;
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Confirm cancel';
+            }
+
+            document.querySelectorAll('.buyer-cancel-order-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    openModal(btn.dataset.cancelUrl, btn.dataset.sellerOrderId, btn.dataset.shopName || 'this seller');
+                });
+            });
+
+            dismissBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            confirmBtn.addEventListener('click', async () => {
+                if (!activeUrl || !activeSellerOrderId) {
+                    return;
+                }
+
+                const reason = reasonInput.value.trim();
+                if (reason === '') {
+                    errorEl.textContent = 'Please provide a cancellation reason.';
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Cancelling…';
+                errorEl.classList.add('hidden');
+
+                try {
+                    const response = await fetch(activeUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ reason }),
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        const message = data.message
+                            || data.errors?.reason?.[0]
+                            || 'Could not cancel this shipment. Please try again.';
+                        errorEl.textContent = message;
+                        errorEl.classList.remove('hidden');
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'Confirm cancel';
+                        return;
+                    }
+
+                    // Refresh so timeline shows “Cancelled by Buyer” with reason/timestamp
+                    // and the Cancel Order action is gone for this slice.
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Cancel failed', error);
+                    errorEl.textContent = 'Could not cancel this shipment. Please try again.';
+                    errorEl.classList.remove('hidden');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirm cancel';
+                }
+            });
+        })();
     </script>
 @endsection

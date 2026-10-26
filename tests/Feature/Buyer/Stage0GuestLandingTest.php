@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Stage 0 (guest land): migrate archive columns, real /login, footer links,
+ * Stage 0 (guest land): migrate archive columns, shared login modal, footer links,
  * and a working category grid. Guards the audit L-1 / L-3 / L-4 fixes.
  */
 class Stage0GuestLandingTest extends TestCase
@@ -26,11 +26,12 @@ class Stage0GuestLandingTest extends TestCase
         $this->get(route('buyer.products.index'))->assertOk();
     }
 
-    public function test_login_page_renders_login_form_not_register_redirect(): void
+    public function test_shared_login_modal_renders_email_form_on_landing_page(): void
     {
-        $this->get(route('login'))
+        $this->get(route('home', ['login' => 1]))
             ->assertOk()
-            ->assertViewIs('Auth.login-choice')
+            ->assertViewIs('LandingPage.index')
+            ->assertSee('id="loginModalOverlay"', false)
             ->assertSee('Welcome back', false)
             ->assertSee('name="email"', false)
             ->assertDontSee('How would you like to get started?', false);

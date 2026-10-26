@@ -2,9 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
-use App\Models\Courier;
-use App\Models\Logistics\LogisticsProvider;
+use App\Enums\ParcelReturnStatus;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\SellerOrder;
 use App\Models\StatusHistory;
 use App\Services\SellerOrderStatusService;
@@ -26,9 +27,9 @@ class OrderStatusGraphTest extends TestCase
     use LazilyRefreshDatabase;
 
     private const LEGAL = [
-        'PLACED' => ['CONFIRMED', 'READY_FOR_PICKUP'],
-        'CONFIRMED' => ['PREPARING'],
-        'PREPARING' => ['READY_FOR_PICKUP'],
+        'PLACED' => ['CONFIRMED', 'READY_FOR_PICKUP', 'CANCELLED'],
+        'CONFIRMED' => ['PREPARING', 'CANCELLED'],
+        'PREPARING' => ['READY_FOR_PICKUP', 'CANCELLED'],
         'READY_FOR_PICKUP' => ['PICKED_UP'],
         'PICKED_UP' => ['AT_SORTING_CENTER'],
         'AT_SORTING_CENTER' => ['SORTED'],
@@ -36,9 +37,10 @@ class OrderStatusGraphTest extends TestCase
         'ASSIGNED_TO_RIDER' => ['OUT_FOR_DELIVERY'],
         'OUT_FOR_DELIVERY' => ['DELIVERED', 'DELIVERY_FAILED'],
         'DELIVERED' => ['COMPLETED'],
-        'DELIVERY_FAILED' => ['RETURNED'],
-        'RETURNED' => ['COMPLETED'],
+        'DELIVERY_FAILED' => ['ASSIGNED_TO_RIDER', 'RETURNED'],
+        'RETURNED' => [],
         'COMPLETED' => [],
+        'CANCELLED' => [],
     ];
 
     private SellerOrderStatusService $service;
@@ -52,7 +54,10 @@ class OrderStatusGraphTest extends TestCase
     private function orderAt(OrderStatus $status): SellerOrder
     {
         $so = SellerOrder::factory()->create();
-        $so->forceFill(['status' => $status->value])->save();
+        $so->forceFill([
+            'status' => $status->value,
+            'delivery_attempts' => $status === OrderStatus::DeliveryFailed ? 1 : 0,
+        ])->save();
 
         return $so->fresh();
     }
@@ -66,7 +71,15 @@ class OrderStatusGraphTest extends TestCase
                 $so = $this->orderAt(OrderStatus::from($from));
                 $before = StatusHistory::count();
 
-                $result = $this->service->transition($so, OrderStatus::from($to));
+                if ($to === OrderStatus::Returned->value) {
+                    $proof = new ParcelReturn;
+                    $proof->forceFill(['seller_order_id' => $so->id, 'status' => ParcelReturnStatus::Completed,
+                        'reason' => 'Verified physical receipt fixture', 'requested_at' => now(),
+                        'seller_received_at' => now(), 'received_by_seller_id' => $so->seller_id])->save();
+                    $result = $this->service->transition($so, OrderStatus::Returned, actor: OrderActor::Seller, actorId: $so->seller_id);
+                } else {
+                    $result = $this->service->transition($so, OrderStatus::from($to));
+                }
 
                 $this->assertSame($to, $result->status->value, "legal hop {$from} → {$to}");
                 $this->assertSame($before + 1, StatusHistory::count(), "history row for {$from} → {$to}");
@@ -74,8 +87,8 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 14 legal edges in the canonical pipeline (incl. failed/return).
-        $this->assertSame(14, $checked);
+        // 17 legal edges (canonical pipeline + seller decline from packing states).
+        $this->assertSame(17, $checked);
     }
 
     public function test_every_illegal_pair_is_rejected_with_no_writes(): void
@@ -118,8 +131,8 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 13×13 = 169 pairs − 13 self-transitions − 14 legal edges = 142.
-        $this->assertSame(142, $rejected);
+        // 14×14 = 196 pairs − 14 self-transitions − 17 legal edges = 165.
+        $this->assertSame(165, $rejected);
     }
 
     /** The specific skips called out in review must all be rejected. */
@@ -159,35 +172,6 @@ class OrderStatusGraphTest extends TestCase
         $result = $this->service->transition($so, OrderStatus::Sorted);
 
         $this->assertSame(OrderStatus::Sorted, $result->status);
-        $this->assertSame(0, StatusHistory::count());
-    }
-
-    /**
-     * HTTP-level proof: no logistics route can shove a SORTED parcel straight
-     * to OUT_FOR_DELIVERY — the dispatch action refuses anything that is not
-     * ASSIGNED_TO_RIDER before the state machine is even consulted.
-     */
-    public function test_dispatch_route_rejects_a_sorted_parcel(): void
-    {
-        $provider = LogisticsProvider::factory()->create([
-            'status' => 'approved',
-            'email_verified_at' => now(),
-        ]);
-        $courier = Courier::factory()->create([
-            'logistics_provider_id' => $provider->id,
-            'is_available' => false,
-        ]);
-        $so = SellerOrder::factory()->create([
-            'status' => OrderStatus::Sorted->value,
-            'courier_id' => $courier->id,
-        ])->fresh();
-
-        $this->actingAs($provider, 'logistics')
-            ->post(route('logistics.delivery-assignments.start', $so))
-            ->assertRedirect()
-            ->assertSessionHas('error');
-
-        $this->assertSame(OrderStatus::Sorted, $so->refresh()->status);
         $this->assertSame(0, StatusHistory::count());
     }
 }

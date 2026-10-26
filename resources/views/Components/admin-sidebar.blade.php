@@ -36,6 +36,33 @@
                 @endif
             </a>
         @endif
+        @if (\Illuminate\Support\Facades\Schema::hasTable('logistics_hubs'))
+            @php
+                $hubsActive = request()->routeIs('admin.hubs.*');
+                $pendingHubsCount = \App\Models\Logistics\LogisticsHub::where('approval_status', 'pending')->count();
+            @endphp
+            <a href="{{ route('admin.hubs.index') }}" class="{{ $navLink }} {{ $hubsActive ? $navLinkActive : '' }}">
+                <i data-lucide="network" width="20" height="20" class="shrink-0"></i>
+                <span>Hub Approvals</span>
+                @if ($pendingHubsCount > 0)
+                    <span class="{{ $badgeBase }} {{ $hubsActive ? 'bg-white text-primary-800' : 'bg-secondary-300 text-neutral-950' }}">{{ $pendingHubsCount }}</span>
+                @endif
+            </a>
+        @endif
+        @if (\Illuminate\Support\Facades\Schema::hasTable('logistics_provider_links'))
+            @php
+                $partnershipsActive = request()->routeIs('admin.partnerships.*');
+                $pendingPartnershipsCount = \App\Models\Logistics\LogisticsProviderLink::where('status', \App\Models\Logistics\LogisticsProviderLink::PENDING)->count();
+            @endphp
+            <a href="{{ route('admin.returns.index') }}" class="{{ $navLink }}">Physical Return Exceptions</a>
+            <a href="{{ route('admin.partnerships.index') }}" class="{{ $navLink }} {{ $partnershipsActive ? $navLinkActive : '' }}">
+                <i data-lucide="handshake" width="20" height="20" class="shrink-0"></i>
+                <span>Partnership Approvals</span>
+                @if ($pendingPartnershipsCount > 0)
+                    <span class="{{ $badgeBase }} {{ $partnershipsActive ? 'bg-white text-primary-800' : 'bg-secondary-300 text-neutral-950' }}">{{ $pendingPartnershipsCount }}</span>
+                @endif
+            </a>
+        @endif
         <a href="{{ route('admin.users.index') }}" class="{{ $navLink }} {{ request()->routeIs('admin.users.*') ? $navLinkActive : '' }}">
             <i data-lucide="users" width="20" height="20" class="shrink-0"></i>
             <span>User Accounts</span>

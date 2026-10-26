@@ -48,7 +48,7 @@
         <div class="mt-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
                 <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_license_expiry">License Expiry Date *</label>
-                <input type="date" name="license_expiry" id="rider_license_expiry" value="{{ old('license_expiry') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                <input type="date" name="license_expiry" id="rider_license_expiry" value="{{ old('license_expiry') }}" min="{{ \App\Support\RiderValidation::today()->toDateString() }}" data-today="{{ \App\Support\RiderValidation::today()->toDateString() }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
                 @error('license_expiry')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
             </div>
             <div>
@@ -67,6 +67,56 @@
                 @error('plate_number')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
             </div>
         </div>
+        <div class="mt-4">
+            <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_station_hub_id">Station Hub *</label>
+            <select name="station_hub_id" id="rider_station_hub_id" required class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                <option value="">Select an approved, active Station Hub</option>
+                @foreach ($stations as $station)
+                    <option value="{{ $station->id }}" @selected((string) old('station_hub_id') === (string) $station->id)>
+                        {{ $station->name }} · {{ $station->municipality ?: $station->province_name }}
+                    </option>
+                @endforeach
+            </select>
+            @error('station_hub_id')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+            @if ($stations->isEmpty())
+                <p class="mt-1 font-sans text-[11px] text-[#a5333d]">Create and activate an approved Station Hub before adding riders.</p>
+            @endif
+        </div>
+        <div class="mt-6 border-t border-neutral-200 pt-5">
+            <p class="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600">Residential Address <span class="font-normal normal-case tracking-normal text-neutral-400">(optional)</span></p>
+            <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                <div>
+                    <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_province_name">Province</label>
+                    <input type="text" name="province_name" id="rider_province_name" value="{{ old('province_name') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                    @error('province_name')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+                </div>
+                <div>
+                    <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_municipality_name">City / Municipality</label>
+                    <input type="text" name="municipality_name" id="rider_municipality_name" value="{{ old('municipality_name') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                    @error('municipality_name')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+                </div>
+                <div>
+                    <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_barangay_name">Barangay</label>
+                    <input type="text" name="barangay_name" id="rider_barangay_name" value="{{ old('barangay_name') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                    @error('barangay_name')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+                </div>
+                <div>
+                    <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_street">Street</label>
+                    <input type="text" name="street" id="rider_street" value="{{ old('street') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                    @error('street')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+                </div>
+                <div>
+                    <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_house_number">House / Unit No.</label>
+                    <input type="text" name="house_number" id="rider_house_number" value="{{ old('house_number') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                    @error('house_number')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+                </div>
+                <div>
+                    <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_postal_code">Postal Code</label>
+                    <input type="text" name="postal_code" id="rider_postal_code" value="{{ old('postal_code') }}" class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
+                    @error('postal_code')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
+                </div>
+            </div>
+        </div>
         <div class="mt-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
                 <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_drivers_license">Driver's License (JPG, PNG, PDF · max 5 MB) *</label>
@@ -81,7 +131,7 @@
         </div>
         <div class="mt-6 flex gap-3">
             <a href="{{ route('logistics.riders.index') }}" class="inline-flex h-11 flex-1 cursor-pointer items-center justify-center rounded-sm border border-neutral-300 font-sans text-[12.5px] font-semibold uppercase tracking-[1.4px] text-neutral-700 transition-colors hover:bg-neutral-50">Cancel</a>
-            <button type="submit" id="riderSaveBtn" class="inline-flex h-11 flex-[2] cursor-pointer items-center justify-center rounded-sm bg-neutral-900 font-sans text-[12.5px] font-semibold uppercase tracking-[1.4px] text-white transition-colors hover:bg-[#9c5c68] disabled:opacity-60">Save Rider</button>
+            <button type="submit" id="riderSaveBtn" @disabled($stations->isEmpty()) class="inline-flex h-11 flex-[2] cursor-pointer items-center justify-center rounded-sm bg-neutral-900 font-sans text-[12.5px] font-semibold uppercase tracking-[1.4px] text-white transition-colors hover:bg-[#9c5c68] disabled:opacity-60">Save Rider</button>
         </div>
     </form>
 </section>

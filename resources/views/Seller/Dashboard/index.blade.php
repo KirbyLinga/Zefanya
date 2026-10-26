@@ -66,6 +66,12 @@
             <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Products</p>
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($productCount) }}</p>
             <p class="font-sans text-xs text-[var(--text-muted)] mt-1">{{ $activeProductCount }} active</p>
+            @if ($productsMissingWeight > 0)
+                <a href="{{ route('seller.products.index') }}"
+                   class="font-sans text-xs font-semibold text-[var(--status-warning)] mt-1 inline-block no-underline">
+                    {{ $productsMissingWeight }} {{ Str::plural('product', $productsMissingWeight) }} need{{ $productsMissingWeight === 1 ? 's' : '' }} weight
+                </a>
+            @endif
         </div>
     </section>
 

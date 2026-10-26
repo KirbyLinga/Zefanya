@@ -5,7 +5,7 @@
     }
     $pfVariants = old('variants');
     if (! is_array($pfVariants)) {
-        $pfVariants = $product->exists ? $product->variants->filter->hasOptions()->map(fn ($variant) => ['id' => $variant->id, 'values' => $variant->optionValues->pluck('value')->all(), 'sku' => $variant->sku, 'price' => $variant->price, 'stock_quantity' => $variant->stock_quantity, 'is_available' => $variant->is_available])->values()->all() : [];
+        $pfVariants = $product->exists ? $product->variants->filter->hasOptions()->map(fn ($variant) => ['id' => $variant->id, 'values' => $variant->optionValues->pluck('value')->all(), 'weight' => $variant->weight_grams, 'weight_unit' => 'g', 'sku' => $variant->sku, 'price' => $variant->price, 'stock_quantity' => $variant->stock_quantity, 'is_available' => $variant->is_available])->values()->all() : [];
     }
     $pfColorImages = [];
     $pfColorImageIds = [];
@@ -89,9 +89,17 @@
             <label for="price" class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold">Price (₱)<input name="price" id="price" type="number" step="0.01" min="0" required value="{{ old('price', $product->price ?? 0) }}" class="{{ $inputClass }}"></label>
             <label for="stock_quantity" class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold">Stock<input name="stock_quantity" id="stock_quantity" type="number" step="1" min="0" required value="{{ old('stock_quantity', $product->stock_quantity ?? 0) }}" class="{{ $inputClass }}"></label>
         </div>
+        <div data-pf-single-weight class="space-y-2">
+            <label for="weight" class="font-semibold">Weight (required)</label>
+            <div class="flex gap-2">
+                <input id="weight" name="weight" type="number" required min="1" max="100000" step="1" value="{{ old('weight', $product->weight_grams) }}" data-pf-weight class="{{ $inputClass }}">
+                <select name="weight_unit" aria-label="Weight unit" data-pf-weight-unit class="{{ $inputClass }}"><option value="g" @selected(old('weight_unit', 'g') === 'g')>g</option><option value="kg" @selected(old('weight_unit', 'g') === 'kg')>kg</option></select>
+            </div>
+            <p class="text-xs text-[var(--text-muted)]">1 g to 100 kg per item. Enter weight for each variant when variations are enabled.</p>
+        </div>
         <div data-pf-variant-inventory class="space-y-4">
             <div class="flex flex-wrap items-end gap-3 rounded-sm bg-[var(--bg-soft)] p-3"><label class="text-[var(--text-ink)] flex flex-col gap-1 text-xs">Bulk price (₱)<input type="number" min="0" step="0.01" data-pf-bulk-price class="{{ $inputClass }}" placeholder="0.00"></label><label class="text-[var(--text-ink)] flex flex-col gap-1 text-xs">Bulk stock<input type="number" min="0" step="1" data-pf-bulk-stock class="{{ $inputClass }}" placeholder="0"></label><button type="button" data-pf-apply-bulk class="{{ $buttonClass }}">Apply to all variants</button></div>
-            <p class="text-xs text-[var(--text-muted)] sm:hidden">Swipe horizontally to see price, stock, SKU and Selling. Variant names stay in view.</p><div class="max-h-[45vh] overflow-auto rounded-sm border border-[var(--border-input)]"><table class="w-full min-w-[650px] text-left text-sm"><thead class="sticky top-0 z-20 bg-[var(--bg-soft)] text-xs text-[var(--text-label)]"><tr><th class="sticky left-0 z-30 bg-[var(--bg-soft)] p-3 text-[var(--text-ink)]">Variant</th><th class="p-3">Price (₱)</th><th class="p-3">Stock</th><th class="p-3">SKU (optional)</th><th class="p-3">Selling</th></tr></thead><tbody data-pf-variant-body></tbody></table></div>
+            <p class="text-xs text-[var(--text-muted)] sm:hidden">Swipe horizontally to see price, stock, SKU and Selling. Variant names stay in view.</p><div class="max-h-[45vh] overflow-auto rounded-sm border border-[var(--border-input)]"><table class="w-full min-w-[650px] text-left text-sm"><thead class="sticky top-0 z-20 bg-[var(--bg-soft)] text-xs text-[var(--text-label)]"><tr><th class="sticky left-0 z-30 bg-[var(--bg-soft)] p-3 text-[var(--text-ink)]">Variant</th><th class="p-3">Price (₱)</th><th class="p-3">Stock</th><th class="p-3">Weight (required)</th><th class="p-3">SKU (optional)</th><th class="p-3">Selling</th></tr></thead><tbody data-pf-variant-body></tbody></table></div>
         </div>
         <div class="flex items-baseline justify-between border-y border-[var(--border-hairline)] py-4"><span class="text-[var(--text-muted)]">Total stock</span><span class="text-[var(--text-ink)] font-serif text-2xl"><strong data-pf-total-stock class="text-[var(--text-ink)]">0</strong> <span class="text-[var(--text-ink)] font-sans text-sm">pieces</span></span></div>
         <label for="low_stock_threshold" class="text-[var(--text-ink)] flex max-w-xs flex-col gap-2 font-semibold">Low-stock alert at<input name="low_stock_threshold" id="low_stock_threshold" type="number" step="1" min="0" value="{{ old('low_stock_threshold', $product->low_stock_threshold ?? 5) }}" class="{{ $inputClass }}"></label>

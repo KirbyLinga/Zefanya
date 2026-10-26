@@ -48,6 +48,9 @@ class StoreProductRequest extends FormRequest
                 'id' => $row['id'] ?? null,
                 'sku' => trim((string) ($row['sku'] ?? '')) ?: null,
                 'price' => $row['price'] ?? null,
+                'weight' => $row['weight'] ?? null,
+                'weight_unit' => $row['weight_unit'] ?? 'g',
+                'weight_grams' => $this->grams($row['weight'] ?? null, $row['weight_unit'] ?? 'g'),
                 'stock_quantity' => $row['stock_quantity'] ?? null,
                 'is_available' => $row['is_available'] ?? true,
                 'values' => $split($row['values'] ?? null),
@@ -59,6 +62,7 @@ class StoreProductRequest extends FormRequest
             ->all();
 
         $this->merge([
+            'weight_grams' => $this->grams($this->input('weight'), $this->input('weight_unit', 'g')),
             'options' => $options,
             'variants' => $variants,
         ]);
@@ -67,6 +71,11 @@ class StoreProductRequest extends FormRequest
     public function authorize(): bool
     {
         return true; // seller-guard middleware already gates access to this route
+    }
+
+    private function grams(mixed $weight, mixed $unit): mixed
+    {
+        return is_numeric($weight) ? round((float) $weight * ($unit === 'kg' ? 1000 : 1), 6) : $weight;
     }
 
     /**
@@ -261,6 +270,9 @@ class StoreProductRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'price' => ['required', 'numeric', 'min:0', 'max:9999999.99'],
+            'weight' => ['exclude_if:variants_exist,1', 'required', 'numeric'],
+            'weight_unit' => ['exclude_if:variants_exist,1', 'required', Rule::in(['g', 'kg'])],
+            'weight_grams' => ['exclude_if:variants_exist,1', 'required', 'integer', 'min:1', 'max:100000'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
             'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', Rule::in(['draft', 'active', 'inactive'])],
@@ -290,6 +302,9 @@ class StoreProductRequest extends FormRequest
             'variants' => ['required_if:variants_exist,1', 'nullable', 'array', 'max:50'],
             'variants.*.sku' => ['nullable', 'string', 'max:64'],
             'variants.*.price' => ['required_with:variants', 'numeric', 'min:0', 'max:9999999.99'],
+            'variants.*.weight' => ['required', 'numeric'],
+            'variants.*.weight_unit' => ['required', Rule::in(['g', 'kg'])],
+            'variants.*.weight_grams' => ['required', 'integer', 'min:1', 'max:100000'],
             'variants.*.stock_quantity' => ['required_with:variants', 'integer', 'min:0'],
             'variants.*.is_available' => ['nullable', 'boolean'],
             'variants.*.values' => ['required_with:variants', 'array'],
@@ -300,6 +315,8 @@ class StoreProductRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'weight_grams.*' => 'Enter a weight from 1 g to 100 kg, in whole grams.',
+            'variants.*.weight_grams.*' => 'Enter a weight from 1 g to 100 kg for each variant, in whole grams.',
             'images.required' => 'Upload at least one product photo.',
             'images.*.image' => 'Each file must be an image (JPG, PNG, or WEBP).',
             'images.*.max' => 'Each image must be smaller than 3MB.',
@@ -340,6 +357,7 @@ class StoreProductRequest extends FormRequest
                 'id' => $row['id'] ?? null,
                 'sku' => trim((string) ($row['sku'] ?? '')) ?: null,
                 'price' => $row['price'],
+                'weight_grams' => (int) $row['weight_grams'],
                 'stock_quantity' => (int) ($row['stock_quantity'] ?? 0),
                 // (bool) '0' is true in PHP — cast through filter_var so the
                 // form's '0'/'1' flags mean what they say.

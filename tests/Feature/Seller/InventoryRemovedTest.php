@@ -47,7 +47,7 @@ class InventoryRemovedTest extends TestCase
     {
         $response = $this->get(route('seller.inventory.index'));
 
-        $response->assertRedirect(route('seller.login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertStatus(302);
     }
 }

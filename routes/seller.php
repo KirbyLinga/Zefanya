@@ -5,7 +5,9 @@ use App\Http\Controllers\Seller\DashboardController;
 use App\Http\Controllers\Seller\MessageController;
 use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
+use App\Http\Controllers\Seller\ReturnController;
 use App\Http\Controllers\Seller\ShipmentController;
+use App\Http\Controllers\Seller\ShippingProviderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('seller')->name('seller.')->group(function () {
@@ -35,13 +37,23 @@ Route::prefix('seller')->name('seller.')->group(function () {
             return to_route('seller.products.index');
         })->name('inventory.index');
 
+        Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
+        Route::post('/returns/{return}/verify', [ReturnController::class, 'verify'])->name('returns.verify');
+        Route::post('/returns/{return}/receive', [ReturnController::class, 'receive'])->name('returns.receive');
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{sellerOrder}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{sellerOrder}/accept', [OrderController::class, 'acceptOrder'])->name('orders.accept');
+        Route::post('/orders/{sellerOrder}/decline', [OrderController::class, 'declineOrder'])->name('orders.decline');
         Route::post('/orders/{sellerOrder}/mark-ready', [OrderController::class, 'markReady'])->name('orders.markReady');
 
         Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
         Route::get('/shipments/{sellerOrder}/label', [ShipmentController::class, 'label'])->name('shipments.label');
+
+        Route::get('/shipping-providers', [ShippingProviderController::class, 'index'])->name('shipping-providers.index');
+        Route::post('/shipping-providers/{logistics_provider}/enable', [ShippingProviderController::class, 'enable'])
+            ->name('shipping-providers.enable');
+        Route::post('/shipping-providers/{logistics_provider}/disable', [ShippingProviderController::class, 'disable'])
+            ->name('shipping-providers.disable');
 
         Route::get('/vouchers', function () {
             return view('Seller.Vouchers.index');

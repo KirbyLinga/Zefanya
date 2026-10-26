@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
+use App\Services\RiderOperationsService;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function index(Request $request, RiderOperationsService $operations): View
     {
-        $rider = Auth::guard('rider')->user()->load('provider');
+        $rider = $request->user('rider');
+        $rider->loadMissing(['provider', 'station']);
 
-        return view('Rider.dashboard', ['rider' => $rider]);
+        return view('Rider.Dashboard.index', [
+            'rider' => $rider,
+            'stats' => $operations->dashboard($rider),
+        ]);
     }
 }

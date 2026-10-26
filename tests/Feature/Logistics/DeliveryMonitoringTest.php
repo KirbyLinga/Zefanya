@@ -107,12 +107,8 @@ class DeliveryMonitoringTest extends TestCase
         // No form may target any status-changing endpoint (the sidebar's
         // logout form is the only <form> allowed on the page).
         $transitionRoutes = [
-            route('logistics.delivery-assignments.start', $so),
-            route('logistics.delivery-assignments.delivered', $so),
-            route('logistics.delivery-assignments.failed', $so),
             route('logistics.parcel-sorting.sort', $so),
             route('logistics.parcel-sorting.assignDelivery', $so),
-            route('logistics.incoming-parcels.pickup', $so),
             route('logistics.incoming-parcels.toSortingCenter', $so),
         ];
 
@@ -129,7 +125,7 @@ class DeliveryMonitoringTest extends TestCase
         ]);
         $otherCourier = $this->courier($otherProvider);
 
-        // Other provider's claimed parcel — must not leak.
+        // Other provider's claimed parcel â€” must not leak.
         $theirs = $this->order(OrderStatus::OutForDelivery, $otherCourier, $otherCourier);
 
         // Pre-pickup statuses are not part of monitoring.
@@ -150,10 +146,10 @@ class DeliveryMonitoringTest extends TestCase
             ->assertDontSee('#'.$awaiting->id);
     }
 
-    public function test_guest_is_redirected_to_login(): void
+    public function test_guest_is_redirected_to_home_login_modal(): void
     {
         $this->get(route('logistics.delivery-monitoring.index'))
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 
     public function test_returned_parcels_are_not_monitored(): void
@@ -175,6 +171,6 @@ class DeliveryMonitoringTest extends TestCase
 
         $this->actingAs($buyer, 'buyer')
             ->get(route('logistics.delivery-monitoring.index'))
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 }

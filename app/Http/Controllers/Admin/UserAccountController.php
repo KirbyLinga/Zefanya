@@ -7,17 +7,24 @@ use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Notifications\Admin\AccountStatusChanged;
+use App\Services\ProviderProvinceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
  * Minimal user management: list approved/suspended accounts and
  * suspend or reactivate sellers, logistics providers, and buyers.
+ *
+ * On suspension, the account's existing web sessions and any outstanding
+ * remember-me token are revoked so the account cannot keep using the app
+ * until the session expires naturally.
  */
 class UserAccountController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, ProviderProvinceService $provinces): View
     {
         $type = (string) $request->query('type', 'seller');
         if (! in_array($type, ['buyer', 'seller', 'logistics'], true)) {
@@ -32,10 +39,20 @@ class UserAccountController extends Controller
             default => $this->queryAccounts(Seller::query(), $search, withBusinessName: true),
         };
 
+        $paginator = $accounts->paginate(25)->withQueryString();
+
+        $provinceBlockers = [];
+        if ($type === 'logistics') {
+            foreach ($paginator as $account) {
+                $provinceBlockers[$account->id] = $provinces->provinceChangeBlockers($account);
+            }
+        }
+
         return view('Admin.Users.index', [
-            'accounts' => $accounts->paginate(25)->withQueryString(),
+            'accounts' => $paginator,
             'type' => $type,
             'search' => $search,
+            'provinceBlockers' => $provinceBlockers,
         ]);
     }
 
@@ -46,6 +63,8 @@ class UserAccountController extends Controller
 
     public function reactivateBuyer(Buyer $buyer): RedirectResponse
     {
+        $this->revokeAccountSessionsAndRememberToken($buyer);
+
         return $this->setStatus($buyer, 'approved', 'buyer');
     }
 
@@ -56,6 +75,8 @@ class UserAccountController extends Controller
 
     public function reactivateSeller(Seller $seller): RedirectResponse
     {
+        $this->revokeAccountSessionsAndRememberToken($seller);
+
         return $this->setStatus($seller, 'approved', 'seller');
     }
 
@@ -66,10 +87,12 @@ class UserAccountController extends Controller
 
     public function reactivateLogistics(LogisticsProvider $logisticsProvider): RedirectResponse
     {
+        $this->revokeAccountSessionsAndRememberToken($logisticsProvider);
+
         return $this->setStatus($logisticsProvider, 'approved', 'logistics');
     }
 
-    private function queryAccounts($query, string $search, bool $withBusinessName = false)
+    private function queryAccounts(Builder $query, string $search, bool $withBusinessName = false): Builder
     {
         $query->whereIn('status', ['approved', 'suspended'])->orderByDesc('updated_at');
 
@@ -105,8 +128,95 @@ class UserAccountController extends Controller
         $account->forceFill(['status' => $to])->save();
         $account->notify(new AccountStatusChanged($to));
 
+        if ($to === 'suspended') {
+            $this->revokeAccountSessionsAndRememberToken($account);
+        }
+
         $verb = $to === 'suspended' ? 'suspended' : 'reactivated';
 
         return back()->with('success', "{$account->fullName()}'s {$label} account was {$verb}.");
+    }
+
+    /**
+     * Revoke every active session for the given account and cycle its
+     * remember-me token, when the session driver is the database driver.
+     */
+    private function revokeSessionsAndRememberToken(Buyer|Seller|LogisticsProvider $account): void
+    {
+        $table = config('session.table');
+
+        if (empty($table)) {
+            return;
+        }
+
+        $userId = $account->getAuthIdentifier();
+
+        if (! is_int($userId) && ! ctype_digit((string) $userId)) {
+            return;
+        }
+
+        if (config('session.driver') === 'database') {
+            DB::table($table)
+                ->where('user_id', $userId)
+                ->delete();
+        }
+
+        $rememberToken = $account->getRememberToken();
+        if ($rememberToken !== null) {
+            $account->setRememberToken(null);
+            $account->saveQuietly();
+        }
+    }
+
+    /**
+     * Clear the given seller's active database sessions and cycle its
+     * remember-me token when the session driver is the database driver.
+     */
+    private function clearSellerSessionsAndRememberToken(Seller $seller): void
+    {
+        $table = config('session.table');
+
+        if (empty($table) || config('session.driver') !== 'database') {
+            return;
+        }
+
+        $userId = $seller->getAuthIdentifier();
+
+        if (! is_int($userId) && ! ctype_digit((string) $userId)) {
+            return;
+        }
+
+        DB::table($table)->where('user_id', $userId)->delete();
+
+        if ($seller->getRememberToken() !== null) {
+            $seller->setRememberToken(null);
+            $seller->saveQuietly();
+        }
+    }
+
+    /**
+     * Clear the given logistics provider's active database sessions and cycle
+     * its remember-me token when the session driver is the database driver.
+     */
+    private function clearLogisticsSessionsAndRememberToken(LogisticsProvider $provider): void
+    {
+        $table = config('session.table');
+
+        if (empty($table) || config('session.driver') !== 'database') {
+            return;
+        }
+
+        $userId = $provider->getAuthIdentifier();
+
+        if (! is_int($userId) && ! ctype_digit((string) $userId)) {
+            return;
+        }
+
+        DB::table($table)->where('user_id', $userId)->delete();
+
+        if ($provider->getRememberToken() !== null) {
+            $provider->setRememberToken(null);
+            $provider->saveQuietly();
+        }
     }
 }

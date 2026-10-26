@@ -19,10 +19,12 @@ use App\Services\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use ReflectionMethod;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class BuyerVariantFlowTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private Buyer $buyer;
@@ -55,6 +57,17 @@ class BuyerVariantFlowTest extends TestCase
             ],
             true,
         );
+
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller]);
+    }
+
+    /** @return array<string, mixed> */
+    private function storePayload(string $token): array
+    {
+        return [
+            'checkout_token' => $token,
+            ...$this->checkoutCarrierPayload([$this->seller]),
+        ];
     }
 
     /**
@@ -158,7 +171,7 @@ class BuyerVariantFlowTest extends TestCase
             : null;
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->post(route('buyer.checkout.store'), $this->storePayload(CheckoutToken::issue($this->buyer->id)->token))
             ->assertRedirect();
 
         $order = Order::query()->sole();
@@ -233,11 +246,11 @@ class BuyerVariantFlowTest extends TestCase
         $this->assertSame(5, $legacy->fresh()->availableQuantity());
         $this->assertSame(2550, $legacy->fresh()->unitPriceCentavos());
         session([CheckoutController::SESSION_KEY => [$legacy->id]]);
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])->assertSessionMissing('error');
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload(CheckoutToken::issue($this->buyer->id)->token))->assertSessionMissing('error');
         $this->assertSame($variant->id, OrderItem::query()->sole()->variant_id);
         $this->assertSame(2550, OrderItem::query()->sole()->price_minor);
-        $this->assertSame(5100, Order::query()->sole()->total_minor);
-        $this->assertSame(5100, Payment::query()->sole()->amount_minor);
+        $this->assertSame(10000, Order::query()->sole()->total_minor);
+        $this->assertSame(10000, Payment::query()->sole()->amount_minor);
         $this->assertSame(3, $variant->fresh()->stock_quantity);
         $this->assertSame(3, $product->fresh()->stock_quantity);
     }
@@ -284,7 +297,7 @@ class BuyerVariantFlowTest extends TestCase
         $explicit = CartItem::factory()->create(['buyer_id' => $this->buyer->id, 'product_id' => $product->id, 'variant_id' => $variant->id, 'quantity' => 2]);
         $token = CheckoutToken::issue($this->buyer->id);
         session([CheckoutController::SESSION_KEY => [$legacy->id, $explicit->id]]);
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload($token->token))
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
         $this->assertDatabaseCount('orders', 0);
         $this->assertSame(0, InventoryTransaction::query()->where('reason', 'checkout')->count());

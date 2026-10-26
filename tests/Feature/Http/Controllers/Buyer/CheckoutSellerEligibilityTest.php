@@ -12,10 +12,12 @@ use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class CheckoutSellerEligibilityTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private function fixture(): array
@@ -25,6 +27,7 @@ class CheckoutSellerEligibilityTest extends TestCase
         $product = Product::factory()->create(['seller_id' => $seller->id, 'status' => 'active', 'stock_quantity' => 5]);
         $variant = $product->variants()->sole();
         $line = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $variant->id, 'quantity' => 1]);
+        $this->bootstrapCheckoutCarriers($buyer, [$seller]);
         $this->actingAs($buyer, 'buyer');
         session([CheckoutController::SESSION_KEY => [$line->id]]);
 
@@ -69,7 +72,10 @@ class CheckoutSellerEligibilityTest extends TestCase
                 DB::table('sellers')->where('id', $row->id)->update(['status' => 'suspended']);
             }
         });
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+        $this->post(route('buyer.checkout.store'), [
+            'checkout_token' => $token->token,
+            ...$this->checkoutCarrierPayload([$seller]),
+        ])
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error', fn ($message) => str_contains($message, 'seller'));
         $this->assertTrue($changed);
         $this->assertFalse($token->fresh()->used);
@@ -86,7 +92,10 @@ class CheckoutSellerEligibilityTest extends TestCase
         $this->get(route('buyer.products.show', $product))->assertOk();
         $this->assertTrue($line->fresh()->isAvailable());
         $token = CheckoutToken::issue($buyer->id);
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])->assertSessionMissing('error');
+        $this->post(route('buyer.checkout.store'), [
+            'checkout_token' => $token->token,
+            ...$this->checkoutCarrierPayload([$seller]),
+        ])->assertSessionMissing('error');
         $order = Order::query()->sole();
         $seller->update(['status' => 'suspended']);
         $this->get(route('buyer.orders.show', $order))->assertOk()->assertSee($product->name);

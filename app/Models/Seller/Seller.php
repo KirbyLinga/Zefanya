@@ -5,6 +5,7 @@ namespace App\Models\Seller;
 use App\Models\Concerns\HasEmailOtp;
 use App\Models\Concerns\HasRegistrationArchive;
 use App\Models\Conversation;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\SellerOrder;
@@ -14,6 +15,7 @@ use Database\Factories\SellerFactory;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -113,6 +115,21 @@ class Seller extends Authenticatable
     public function conversations(): HasMany
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    public function shippingProviderLinks(): HasMany
+    {
+        return $this->hasMany(SellerShippingProvider::class);
+    }
+
+    public function shippingProviders(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            LogisticsProvider::class,
+            'seller_shipping_providers',
+            'seller_id',
+            'logistics_provider_id',
+        )->withPivot(['is_enabled'])->withTimestamps();
     }
 
     public function storeInitials(): string

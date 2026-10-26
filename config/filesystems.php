@@ -33,6 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
+            // Keep signed private downloads separate from public image URLs.
+            'url' => '/private-storage',
             'serve' => true,
             'throw' => false,
             'report' => false,
@@ -41,6 +43,8 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
+            // Serve public uploads even when the web server has no storage symlink.
+            'serve' => true,
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,

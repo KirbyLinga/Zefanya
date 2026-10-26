@@ -4,15 +4,22 @@ namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Models\Courier;
+use App\Models\Logistics\Area;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Rider;
+use App\Models\Seller\Seller;
 use App\Models\SellerOrder;
 use App\Models\StatusHistory;
+use App\Services\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Support\CreatesAssignableFleet;
+use Tests\Support\IssuesLogisticsHandoff;
 use Tests\TestCase;
 
 class ParcelSortingTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use CreatesAssignableFleet, IssuesLogisticsHandoff, LazilyRefreshDatabase;
 
     private LogisticsProvider $provider;
 
@@ -24,11 +31,51 @@ class ParcelSortingTest extends TestCase
             'status' => 'approved',
             'email_verified_at' => now(),
         ]);
+        $province = LogisticsHub::query()->create([
+            'logistics_provider_id' => $this->provider->id, 'name' => 'Pampanga Hub',
+            'hub_type' => LogisticsHub::PROVINCE,
+            'region_code' => '030000000', 'province_code' => $this->provider->province_code,
+            'province_name' => 'Pampanga', 'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'active_province_slot' => 1,
+        ]);
+        $station = LogisticsHub::query()->create([
+            'logistics_provider_id' => $this->provider->id, 'parent_hub_id' => $province->id,
+            'name' => 'San Fernando Station', 'hub_type' => LogisticsHub::STATION,
+            'region_code' => '030000000', 'province_code' => $this->provider->province_code,
+            'province_name' => 'Pampanga', 'municipality' => 'San Fernando', 'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+        ]);
+        Area::query()->create([
+            'logistics_provider_id' => $this->provider->id, 'station_hub_id' => $station->id,
+            'name' => 'San Fernando', 'municipality' => 'San Fernando', 'is_active' => true,
+            'barangay_code' => '0305401001', 'barangay_name' => 'First', 'coverage_validated_at' => now(),
+        ]);
+        Rider::factory()->create([
+            'logistics_provider_id' => $this->provider->id, 'status' => 'approved', 'email_verified_at' => now(),
+            'station_hub_id' => $station->id,
+        ]);
+        // Authoritative origin Station Hub for fixture sellers (San Fernando barangay).
+        Area::query()->updateOrCreate(
+            [
+                'logistics_provider_id' => $this->provider->id,
+                'barangay_code' => '0305401001',
+            ],
+            [
+                'station_hub_id' => $station->id,
+                'name' => 'San Fernando',
+                'municipality' => 'San Fernando',
+                'barangay_name' => 'First',
+                'coverage_validated_at' => now(),
+                'is_active' => true,
+            ],
+        );
     }
 
     private function order(OrderStatus $status, ?Courier $courier = null, ?Courier $deliveryCourier = null): SellerOrder
     {
         return SellerOrder::factory()->create([
+            'seller_id' => Seller::factory()->create(['barangay_code' => '0305401001'])->id,
             'status' => $status->value,
             'courier_id' => $courier?->id,
             'delivery_courier_id' => $deliveryCourier?->id,
@@ -130,15 +177,24 @@ class ParcelSortingTest extends TestCase
         ]);
 
         $so = $this->order(OrderStatus::AtSortingCenter, $courier);
+        $so->order->update(['shipping_address' => ['municipality' => 'San Fernando', 'barangay_code' => '0305401001']]);
 
         $this->actingAs($this->provider, 'logistics')
-            ->post(route('logistics.parcel-sorting.sort', $so))
+            ->post(
+                route('logistics.parcel-sorting.sort', $so),
+                $this->withLogisticsHandoff($so, ParcelHandoffVerification::ACTION_SORT),
+            )
             ->assertRedirect()
-            ->assertSessionHas('success', 'Parcel sorted.');
+            ->assertSessionHas('success', 'Parcel sorted for San Fernando.');
 
         $so->refresh();
         $this->assertSame(OrderStatus::Sorted, $so->status);
+        $this->assertNotNull($so->destination_area_id);
         $this->assertSame(1, StatusHistory::where('seller_order_id', $so->id)->count());
+        $this->assertStringContainsString(
+            'Verified via manual tracking entry',
+            (string) StatusHistory::query()->where('seller_order_id', $so->id)->value('note'),
+        );
     }
 
     public function test_sort_rejected_if_not_at_sorting_center(): void
@@ -161,15 +217,15 @@ class ParcelSortingTest extends TestCase
         $so = $this->order(OrderStatus::Sorted, $pickupCourier);
 
         // Delivery courier with lower weight so orderBy-asc prefers it.
-        $deliveryCourier = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
+        $deliveryCourier = $this->assignableCourier($this->provider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 3000,
         ]);
 
         $order = $so->order;
-        $order->update(['shipping_address' => ['municipality' => 'Quezon City']]);
+        $order->update(['shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001']]);
+        $so->forceFill(['custody_provider_id' => $this->provider->id, 'custody_hub_id' => $deliveryCourier->rider->station_hub_id])->save();
 
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.parcel-sorting.assignDelivery', $so))
@@ -193,7 +249,7 @@ class ParcelSortingTest extends TestCase
         $so = $this->order(OrderStatus::Sorted, $pickupCourier);
 
         $order = $so->order;
-        $order->update(['shipping_address' => ['municipality' => 'Quezon City']]);
+        $order->update(['shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001']]);
 
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.parcel-sorting.assignDelivery', $so))
@@ -234,6 +290,29 @@ class ParcelSortingTest extends TestCase
             ->assertViewHas('tab', 'assigned')
             ->assertViewHas('sortingCount', 2)
             ->assertViewHas('assignedCount', 1);
+    }
+
+    public function test_assign_rider_action_opens_a_modal_listing_available_riders(): void
+    {
+        $pickupCourier = Courier::factory()->create([
+            'logistics_provider_id' => $this->provider->id,
+            'is_available' => false,
+        ]);
+        $deliveryCourier = $this->assignableCourier($this->provider, [
+            'is_available' => true,
+            'max_weight_grams' => 5000,
+        ], 'San Fernando', '030540100');
+
+        $sorted = $this->order(OrderStatus::Sorted, $pickupCourier);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.parcel-sorting.index', ['tab' => 'sorting']))
+            ->assertOk()
+            ->assertSee('data-assign-open="assign-rider-'.$sorted->id.'"', false)
+            ->assertSee('id="assign-rider-'.$sorted->id.'"', false)
+            ->assertSee('Auto-assign by area')
+            ->assertSee($deliveryCourier->name)
+            ->assertDontSee('Reason for a manual Rider choice');
     }
 
     public function test_sorting_tab_filters_out_assigned_parcels_server_side(): void

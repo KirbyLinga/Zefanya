@@ -32,17 +32,17 @@ class LogisticsDashboardTest extends TestCase
         return LogisticsProvider::factory()->pending()->create();
     }
 
-    public function test_guest_is_redirected_to_login(): void
+    public function test_guest_is_redirected_to_home_login_modal(): void
     {
         $this->get(route('logistics.dashboard'))
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 
-    public function test_non_approved_provider_is_bounced_to_login(): void
+    public function test_non_approved_provider_is_bounced_to_home_login_modal(): void
     {
         $this->actingAs($this->pendingApprovalProvider(), 'logistics')
             ->get(route('logistics.dashboard'))
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 
     public function test_dashboard_renders_for_an_approved_provider(): void
@@ -65,8 +65,8 @@ class LogisticsDashboardTest extends TestCase
 
         // Empty states are shown for every panel that has no backing data.
         $this->assertStringContainsString('No delivery data yet', $html);
-        $this->assertStringContainsString('No applications yet', $html);
-        $this->assertStringContainsString('No parcels yet', $html);
+        $this->assertStringContainsString('No pending applications', $html);
+        $this->assertStringContainsString('No shipments for this facility', $html);
 
         // Stat cards render the null placeholder, never a fabricated value.
         $this->assertStringContainsString('Parcels in hub', $html);

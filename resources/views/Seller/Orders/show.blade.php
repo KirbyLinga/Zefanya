@@ -16,6 +16,11 @@
             btn.closest('form').submit();
         }
     }
+    function confirmDecline(btn) {
+        if (confirm('Decline this order? Stock will be restored and the buyer will be notified. Other sellers on the same checkout are not affected.')) {
+            btn.closest('form').submit();
+        }
+    }
 
     // Message buyer button handler
     document.querySelectorAll('.message-buyer-btn').forEach(btn => {
@@ -98,40 +103,30 @@
         {{-- Status timeline --}}
         <section class="border border-[var(--border-strong)] rounded-lg bg-[var(--bg-surface)] p-5">
             <h2 class="font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] mb-3">Status timeline</h2>
-            @if($sellerOrder->statusHistories->isEmpty())
-                <p class="font-sans text-[12.5px] text-[var(--text-muted)]">
-                    Current status: <span class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label() }}</span>
-                </p>
-            @else
-                <ul class="space-y-3">
-                    <li class="flex items-start gap-2.5">
-                        <span class="font-sans text-[11.5px] text-[var(--text-muted)] mt-0.5">↳</span>
-                        <div>
-                            <p class="font-sans text-[12.5px] text-[var(--text-muted)]">Order created</p>
-                            <p class="font-sans text-[11px] text-[var(--text-muted)]">{{ $sellerOrder->created_at->format('M d, Y h:i A') }}</p>
-                        </div>
-                    </li>
-                    @foreach($sellerOrder->statusHistories as $hist)
-                        <li class="flex items-start gap-2.5">
-                            <span class="font-sans text-[11.5px] text-[var(--text-muted)] mt-0.5">→</span>
-                            <div>
-                                <p class="font-sans text-[12.5px] text-[var(--text-ink)] font-semibold">
-                                    {{ $hist->from_status?->label() ?? '—' }} → {{ $hist->to_status->label() }}
-                                </p>
-                                <p class="font-sans text-[11px] text-[var(--text-muted)]">
-                                    {{ $hist->created_at->format('M d, Y h:i A') }}
-                                    @isset($hist->changed_by) · <span class="font-semibold">{{ $hist->changed_by }}</span>@endisset
-                                </p>
-                                @isset($hist->note)
-                                    <p class="font-sans text-[11.5px] text-[var(--text-muted)] italic">{{ $hist->note }}</p>
-                                @endisset
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
-                <p class="mt-3 font-sans text-[12.5px] text-[var(--text-muted)]">
-                    Current: <span class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label() }}</span>
-                </p>
+            <x-shipment-tracking :shipment="$sellerOrder" />
+
+                            @php($hubMovements = $sellerOrder->manifestMovementEvents())
+            @if ($hubMovements !== [])
+                <div class="mt-5 border-t border-[var(--border-strong)] pt-4">
+                    <h3 class="font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)]">Hub movements</h3>
+                    <p class="mt-1 font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">Internal transfers do not change the parcel's delivery status.</p>
+                    <ul class="mt-3 space-y-3">
+                        @foreach ($hubMovements as $movement)
+                            <li class="flex items-start gap-2.5">
+                                <span class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border {{ $movement['type'] === 'dispatch' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' }}">
+                                    <i data-lucide="{{ $movement['type'] === 'dispatch' ? 'truck' : 'warehouse' }}" class="size-2.5"></i>
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="font-sans text-[12px] font-semibold text-[var(--text-ink)]">{{ $movement['title'] }}</p>
+                                    <p class="font-sans text-[11px] text-[var(--text-muted)]">{{ $movement['at']->format('M d, Y h:i A') }} · {{ $movement['detail'] }}</p>
+                                    @if (filled($movement['custody'] ?? null))
+                                        <p class="mt-0.5 font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">{{ $movement['custody'] }}</p>
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
         </section>
     </div>
@@ -152,36 +147,7 @@
             @if($sellerOrder->handover_at)
                 <p class="mt-3 pt-3 border-t border-[var(--border-strong)] font-sans text-[11.5px] text-[var(--text-muted)]">
                     Handed to rider {{ $sellerOrder->handover_at->format('M d, Y h:i A') }}
-                    @if($sellerOrder->courier) · {{ $sellerOrder->courier->name }}@endif
                 </p>
-            @endif
-        </section>
-
-        {{-- Courier --}}
-        <section class="border border-[var(--border-strong)] rounded-lg bg-[var(--bg-surface)] p-5">
-            <h2 class="font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] mb-3">Courier</h2>
-            @if($sellerOrder->courier)
-                <p class="font-sans text-[13.5px] font-semibold text-[var(--text-ink)]">{{ $sellerOrder->courier->name }}</p>
-                <p class="font-sans text-[12.5px] text-[var(--text-muted)]">{{ $sellerOrder->courier->phone }}</p>
-                <p class="font-sans text-[11.5px] text-[var(--text-muted)]">{{ ucfirst($sellerOrder->courier->vehicle_type) }}</p>
-                <p class="font-sans text-[10.5px] text-[var(--text-muted)] mt-1">Pickup courier</p>
-            @else
-                <p class="font-sans text-[12.5px] text-[var(--text-muted)]">
-                    @if(in_array($sellerOrder->status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing]))
-                        A courier will be assigned when a rider picks up this parcel.
-                    @elseif($sellerOrder->status === OrderStatus::ReadyForPickup)
-                        Waiting for a rider to pick up this parcel.
-                    @else
-                        No pickup courier assigned yet.
-                    @endif
-                </p>
-            @endif
-            @if($sellerOrder->deliveryCourier)
-                <div class="mt-3 pt-3 border-t border-[var(--border-strong)]">
-                    <p class="font-sans text-[13.5px] font-semibold text-[var(--text-ink)]">{{ $sellerOrder->deliveryCourier->name }}</p>
-                    <p class="font-sans text-[12.5px] text-[var(--text-muted)]">{{ $sellerOrder->deliveryCourier->phone }}</p>
-                    <p class="font-sans text-[10.5px] text-[var(--text-muted)]">Delivery courier</p>
-                </div>
             @endif
         </section>
 
@@ -198,6 +164,18 @@
                             Accept order
                         </button>
                     </form>
+                    <form method="POST" action="{{ route('seller.orders.decline', $sellerOrder) }}" class="w-full">
+                        @csrf
+                        <label class="sr-only" for="decline-reason-{{ $sellerOrder->id }}">Decline reason (optional)</label>
+                        <input type="text" name="reason" id="decline-reason-{{ $sellerOrder->id }}" maxlength="500"
+                            placeholder="Reason (optional)"
+                            class="mb-2 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-2 font-sans text-[12.5px] text-[var(--text-ink)]">
+                        <button type="button"
+                            class="w-full inline-flex items-center justify-center h-9 px-3 rounded-sm font-sans font-semibold text-[12px] tracking-[0.5px] uppercase text-primary-800 border border-primary-800 bg-transparent hover:bg-primary-50"
+                            onclick="confirmDecline(this)">
+                            Decline order
+                        </button>
+                    </form>
                 @elseif(in_array($sellerOrder->status, [OrderStatus::Confirmed, OrderStatus::Preparing]))
                     <form method="POST" action="{{ route('seller.orders.markReady', $sellerOrder) }}" class="w-full">
                         @csrf
@@ -207,12 +185,26 @@
                             Mark as ready for pickup
                         </button>
                     </form>
+                    <form method="POST" action="{{ route('seller.orders.decline', $sellerOrder) }}" class="w-full">
+                        @csrf
+                        <label class="sr-only" for="decline-reason-pack-{{ $sellerOrder->id }}">Decline reason (optional)</label>
+                        <input type="text" name="reason" id="decline-reason-pack-{{ $sellerOrder->id }}" maxlength="500"
+                            placeholder="Reason (optional)"
+                            class="mb-2 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-2 font-sans text-[12.5px] text-[var(--text-ink)]">
+                        <button type="button"
+                            class="w-full inline-flex items-center justify-center h-9 px-3 rounded-sm font-sans font-semibold text-[12px] tracking-[0.5px] uppercase text-primary-800 border border-primary-800 bg-transparent hover:bg-primary-50"
+                            onclick="confirmDecline(this)">
+                            Decline order
+                        </button>
+                    </form>
                 @else
                     <p class="font-sans text-[12.5px] text-[var(--text-muted)]">
                         @if($sellerOrder->status === OrderStatus::ReadyForPickup)
                             Waiting for a rider to pick up this parcel.
                         @elseif(in_array($sellerOrder->status, [OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery]))
                             In transit to delivery.
+                        @elseif($sellerOrder->status === OrderStatus::Cancelled)
+                            You declined this order. Stock was restored.
                         @else
                             No further action available from this step.
                         @endif

@@ -151,7 +151,11 @@ class VariantSyncService
             'dimensions' => $product->dimensions,
         ]);
 
-        $this->stock->set($default, (int) $product->stock_quantity, StockService::REASON_SELLER_ADJUSTMENT);
+        $this->stock->set(
+            $default,
+            (int) $product->stock_quantity,
+            $product->wasRecentlyCreated ? StockService::REASON_SELLER_INITIAL : StockService::REASON_SELLER_ADJUSTMENT,
+        );
     }
 
     /** Replace the product's option axes/values from the submitted payload. */
@@ -243,7 +247,11 @@ class VariantSyncService
                 'dimensions' => $product->dimensions,
             ]);
 
-            $this->stock->set($default, (int) $product->stock_quantity, StockService::REASON_SELLER_ADJUSTMENT);
+            $this->stock->set(
+                $default,
+                (int) $product->stock_quantity,
+                $product->wasRecentlyCreated ? StockService::REASON_SELLER_INITIAL : StockService::REASON_SELLER_ADJUSTMENT,
+            );
 
             return;
         }
@@ -289,6 +297,7 @@ class VariantSyncService
                     'sku' => array_key_exists('sku', $row) ? $row['sku'] : $existing->sku,
                     'price' => array_key_exists('price', $row) ? $row['price'] : $existing->price,
                     'is_available' => (bool) ($row['is_available'] ?? $existing->is_available),
+                    'weight_grams' => $row['weight_grams'] ?? null,
                 ]);
 
                 $this->stock->set(
@@ -309,7 +318,7 @@ class VariantSyncService
                 'price' => $row['price'] ?? $product->price,
                 'stock_quantity' => 0,
                 'is_available' => (bool) ($row['is_available'] ?? true),
-                'weight_grams' => null,
+                'weight_grams' => $row['weight_grams'] ?? null,
                 'dimensions' => null,
             ]);
 

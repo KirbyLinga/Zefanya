@@ -30,13 +30,13 @@ class ProductPublishingTest extends TestCase
         foreach (['Black', 'White', 'Beige'] as $color) {
             foreach (['S', 'M', 'L', 'XL'] as $size) {
                 $index = count($rows);
-                $rows[] = ['values' => [$color, $size], 'sku' => 'TEE-'.$index, 'price' => 350 + $index, 'stock_quantity' => $index < 10 ? 8 : 7, 'is_available' => '1'];
+                $rows[] = ['values' => [$color, $size], 'sku' => 'TEE-'.$index, 'price' => 350 + $index, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => $index < 10 ? 8 : 7, 'is_available' => '1'];
             }
         }
 
         return [
             'name' => 'Premium Oversized Cotton Shirt', 'description' => 'Premium cotton oversized shirt, available in multiple colors and sizes.',
-            'price' => 999, 'stock_quantity' => 0, 'status' => 'active', 'variants_exist' => '1',
+            'price' => 999, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0, 'status' => 'active', 'variants_exist' => '1',
             'images' => [$this->image('detail.png'), $this->image('cover.png')], 'cover_index' => '1',
             'options' => [['name' => 'Color', 'values' => ['Black', 'White', 'Beige']], ['name' => 'Size', 'values' => ['S', 'M', 'L', 'XL']]],
             'variants' => $rows,
@@ -129,7 +129,7 @@ class ProductPublishingTest extends TestCase
                 break;
             case 'limit':
                 $data['options'] = [['name' => 'Color', 'values' => range(1, 51)]];
-                $data['variants'] = array_map(fn ($i) => ['values' => [(string) $i], 'price' => 50, 'stock_quantity' => 1], range(1, 51));
+                $data['variants'] = array_map(fn ($i) => ['values' => [(string) $i], 'price' => 50, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 1], range(1, 51));
                 unset($data['color_images']);
                 break;
         }
@@ -183,7 +183,7 @@ class ProductPublishingTest extends TestCase
         $seller = Seller::factory()->create();
         $product = Product::factory()->create(['seller_id' => $seller->id]);
         $foreign = Product::factory()->create()->variants()->firstOrFail();
-        $data = ['name' => $product->name, 'price' => 100, 'stock_quantity' => 2, 'status' => 'active', 'variant_images' => [$foreign->id => [$this->image()]]];
+        $data = ['name' => $product->name, 'price' => 100, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 2, 'status' => 'active', 'variant_images' => [$foreign->id => [$this->image()]]];
 
         $this->actingAs($seller, 'seller')->put(route('seller.products.update', $product), $data + ['inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'))])->assertSessionHasErrors('variant_images');
 
@@ -238,7 +238,7 @@ class ProductPublishingTest extends TestCase
         unset($data['images'], $data['color_images'], $data['cover_index']);
         $data['options'][1]['values'][] = 'XXL';
         foreach (['Black', 'White', 'Beige'] as $index => $color) {
-            $data['variants'][] = ['values' => [$color, 'XXL'], 'sku' => 'EXTRA-'.$index, 'price' => 400, 'stock_quantity' => 2, 'is_available' => '1'];
+            $data['variants'][] = ['values' => [$color, 'XXL'], 'sku' => 'EXTRA-'.$index, 'price' => 400, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 2, 'is_available' => '1'];
         }
 
         $this->actingAs($seller, 'seller')->put(route('seller.products.update', $product), $data + ['inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'))])->assertSessionHasNoErrors()->assertRedirect();

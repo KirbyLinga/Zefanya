@@ -1,25 +1,100 @@
 # AGENTS.md — Zefanya
 
-> **Read the documentation first.** The project is documented in exactly four files; they are the source of truth and this file only points to them.
+## Documentation
 
-| File | Read it for |
+Read relevant documentation before working:
+
+| File | Purpose |
 |---|---|
-| [`docs/1-Context.md`](docs/1-Context.md) | Purpose, the five roles, stack/versions, how to run + test, per-module status, **known bugs**, decisions, lessons |
-| [`docs/2-Design.md`](docs/2-Design.md) | Architecture, services, DB schema, status model, auth/security, UI system, notifications |
-| [`docs/3-Folder-Structure.md`](docs/3-Folder-Structure.md) | Where everything lives, naming conventions, orphans/duplicates |
-| [`docs/4-Flow.md`](docs/4-Flow.md) | Step-by-step behaviour of every flow, connectivity, invariants |
+| `docs/1-Context.md` | Project overview, roles, stack, known bugs, decisions |
+| `docs/2-Design.md` | Architecture, database, services, security, UI |
+| `docs/3-Folder-Structure.md` | File locations, naming, duplicates |
+| `docs/4-Flow.md` | Business flows, status transitions, invariants |
 
-## Working rules
+Documentation provides context. **Current code is the final authority for implemented behavior.** Report discrepancies instead of assuming either is correct.
 
-- **Verify against the code, not old notes.** Where a claim cannot be verified, mark it *unverified*.
-- **Status changes** go only through `App\Services\SellerOrderStatusService::transition()`; **stock** only through `App\Services\StockService`.
-- **Literal routes before wildcard routes** (see the ordering comments in `routes/buyer.php` / `routes/seller.php`).
-- **Backend invariants live in services**, not controllers. `status`/`courier_id` are not mass-assignable; use `forceFill()` for controller-owned audit fields.
-- **UI:** Tailwind v4 utilities only; tokens in the `@theme` block of `resources/css/app.css`; no new plain-CSS files.
-- Run `vendor/bin/pint --dirty --format agent` after PHP edits and `npm run build` after CSS/JS edits.
-- Create tests with `php artisan make:test --phpunit <Name>`; run the narrowest set (`php artisan test --compact <path>`).
-- Do not change dependencies, run `migrate:fresh`, or rewrite unrelated code without approval.
+Read only relevant sections/files to minimize tokens.
+
+## AI Permissions
+
+### Automatically allowed — no approval required
+- Read, search, inspect, and audit project files.
+- Analyze bugs, architecture, dependencies, and flows.
+- Inspect database schema and run read-only queries.
+- Run non-destructive tests, format checks, and builds.
+- Review logs and report findings.
+- Propose changes without applying them.
+
+### Approval required
+Before modifying anything, present a concise change plan and request approval for:
+- Adding, editing, or deleting source code.
+- Creating, editing, or deleting files.
+- Modifying tests or project documentation.
+- Installing or updating dependencies.
+
+One approval covers the described change set. Do not ask again for every file or line. Request additional approval if the scope materially changes.
+
+**An explicit user instruction to implement or fix a task counts as approval for changes within that task's stated scope**, unless the user requests audit-only or review-first.
+
+### Prohibited without explicit exception
+- Modify `.env`, credentials, or secrets.
+- Modify production data or production configuration.
+- Run `migrate:fresh`, `db:wipe`, or destructive database commands.
+- Create Git branches, worktrees, commits, resets, or pushes.
+- Rewrite unrelated modules or introduce unnecessary dependencies.
+- Delete existing data or bypass authorization.
+
+## Coding Rules
+
+- Follow existing Laravel architecture and naming conventions.
+- Reuse existing services, models, routes, and components.
+- Business invariants belong in services, not controllers.
+- Status transitions: `App\Services\SellerOrderStatusService::transition()`.
+- Stock changes: `App\Services\StockService`.
+- Do not mass-assign `status` or `courier_id`; use authorized service methods and `forceFill()` where appropriate.
+- Keep literal routes before wildcard routes.
+- Use Tailwind v4 and existing `@theme` tokens in `resources/css/app.css`.
+- Do not introduce new plain-CSS files.
+- Preserve Buyer, Seller, Logistics, Rider, and Admin authorization boundaries.
+- Do not create duplicate assignment, notification, payment, or status systems.
+- Preserve existing UI unless redesign is requested.
+
+## Verification
+
+- Run the narrowest relevant tests first.
+- Create PHPUnit tests using `php artisan make:test --phpunit <Name>`.
+- Run `vendor/bin/pint --dirty --format agent` after PHP changes.
+- Run `npm run build` after frontend changes.
+- Compare test failures against the recorded baseline.
+- Never change tests merely to conceal a defect.
+- Do not claim completion without actual verification.
+- Mark unverified claims explicitly.
 
 ## Tooling
 
-This project uses **Laravel Boost** (`composer require laravel/boost --dev && php artisan boost:install`). Use its MCP tools (`database-query`, `database-schema`, `search-docs`, `get-absolute-url`, `browser-logs`, `record-rule`, …) when available.
+Use Laravel Boost MCP tools when available, including `database-query`, `database-schema`, `search-docs`, `get-absolute-url`, and `browser-logs`.
+
+Do not install or reconfigure Laravel Boost without approval.
+
+## Reporting
+
+For audits:
+- Findings and evidence.
+- Severity and affected files.
+- Recommended fixes.
+- No code changes unless authorized.
+
+For implementation:
+- Changes made and affected files.
+- Tests run and actual results.
+- New versus pre-existing failures.
+- Remaining issues.
+
+Keep responses concise. Avoid repeated explanations and unnecessary file reads.
+
+### Autonomous Implementation
+- Explicit requests such as "implement", "fix", "build", or "proceed" authorize in-scope source code, test, and UI changes.
+- Do not request repeated approval for authorized changes.
+- Read-only audits and non-destructive tests never require approval.
+- Stop and ask only when scope changes materially, destructive operations are necessary, or protected resources are involved.
+- Never modify production data, `.env`, or execute destructive database commands without separate explicit authorization.

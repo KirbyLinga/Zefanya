@@ -39,7 +39,7 @@
         <x-logistics.sidebar />
 
         {{-- ============================ MAIN ============================= --}}
-        <div class="flex-1 min-w-0 p-8 bg-[var(--bg-page)]">
+        <div class="flex-1 min-w-0 p-4 sm:p-6 xl:p-8 bg-[var(--bg-page)]">
             @yield('content')
         </div>
     </div>

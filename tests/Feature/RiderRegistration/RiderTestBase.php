@@ -3,6 +3,7 @@
 namespace Tests\Feature\RiderRegistration;
 
 use App\Models\Buyer\Buyer;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use Carbon\Carbon;
@@ -84,6 +85,40 @@ abstract class RiderTestBase extends TestCase
         return new UploadedFile($tmp, $name, null, null, true);
     }
 
+    private array $stations = [];
+
+    protected function stationFor(LogisticsProvider $provider): LogisticsHub
+    {
+        return $this->stations[$provider->id] ??= (function () use ($provider): LogisticsHub {
+            $province = LogisticsHub::query()->create([
+                'logistics_provider_id' => $provider->id,
+                'name' => 'Test Province Hub '.$provider->id,
+                'hub_type' => LogisticsHub::PROVINCE,
+                'region_code' => '030000000',
+                'region_name' => 'Region III',
+                'province_code' => '030540000',
+                'province_name' => 'Pampanga',
+                'is_active' => true,
+                'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            ]);
+
+            return LogisticsHub::query()->create([
+                'logistics_provider_id' => $provider->id,
+                'parent_hub_id' => $province->id,
+                'name' => 'Test Station Hub '.$provider->id,
+                'hub_type' => LogisticsHub::STATION,
+                'region_code' => '030000000',
+                'region_name' => 'Region III',
+                'province_code' => '030540000',
+                'province_name' => 'Pampanga',
+                'city_municipality_code' => '030540100',
+                'municipality' => 'San Fernando',
+                'is_active' => true,
+                'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            ]);
+        })();
+    }
+
     protected function validPayload(array $overrides = []): array
     {
         return array_merge([
@@ -96,6 +131,14 @@ abstract class RiderTestBase extends TestCase
             'license_expiry' => '2030-03-22',
             'vehicle_type' => 'Motorcycle',
             'plate_number' => '123ABC',
+            'address_mode' => 'api',
+            'province' => '030540000',
+            'province_name' => 'Pampanga',
+            'municipality' => '030540100',
+            'municipality_name' => 'San Fernando',
+            'barangay' => '0305401001',
+            'barangay_name' => 'Barangay 1',
+            'street' => '123 Rizal Street',
             'drivers_license' => $this->rfile('drivers_license.jpg'),
             'or_cr' => $this->rfile('or_cr.pdf'),
         ], $overrides);
@@ -103,6 +146,8 @@ abstract class RiderTestBase extends TestCase
 
     protected function postRider(LogisticsProvider $p, array $overrides = []): TestResponse
     {
+        $overrides['station_hub_id'] ??= $this->stationFor($p)->id;
+
         return $this->actingAs($p, 'logistics')
             ->post(route('logistics.riders.store'), $this->validPayload($overrides));
     }
@@ -120,6 +165,7 @@ abstract class RiderTestBase extends TestCase
             'contact_no' => '0945100'.$s, 'license_no' => "N01-23-45{$s}",
             'license_expiry' => '2030-03-22', 'vehicle_type' => 'Motorcycle',
             'plate_number' => "PND{$s}", 'status' => 'pending_activation',
+            'station_hub_id' => $this->stationFor($p)->id,
             'drivers_license_path' => 'rider-licenses/test.jpg',
             'or_cr_path' => 'rider-or-crs/test.pdf',
             'created_at' => now(), 'updated_at' => now(),

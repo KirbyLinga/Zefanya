@@ -23,4 +23,10 @@ class BuyerOrderPolicy
     {
         return $this->view($buyer, $order);
     }
+
+    /** Cancel an unaccepted seller_order slice on the buyer's own order. */
+    public function cancelSellerOrder(Buyer $buyer, Order $order): Response
+    {
+        return $this->view($buyer, $order);
+    }
 }

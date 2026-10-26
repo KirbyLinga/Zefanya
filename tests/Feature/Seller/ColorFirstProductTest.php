@@ -23,7 +23,7 @@ class ColorFirstProductTest extends TestCase
     private function payload(): array
     {
         return [
-            'name' => 'Color-first shirt', 'price' => 299, 'stock_quantity' => 0,
+            'name' => 'Color-first shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0,
             'status' => 'active', 'variants_exist' => 1, 'color_first' => 1,
             'images' => [$this->image('cover.png')],
             'options' => [
@@ -33,7 +33,7 @@ class ColorFirstProductTest extends TestCase
             'variants' => collect(['Black' => ['S', 'M', 'L'], 'Green' => ['S', 'M', 'L', 'XL'], 'Navy' => ['M', 'L', 'XL']])
                 ->flatMap(fn ($sizes, $color) => array_map(fn ($size) => [
                     'values' => [$color, $size], 'price' => $size === 'XL' ? 349 : 299,
-                    'stock_quantity' => 3, 'sku' => "$color-$size", 'is_available' => 1,
+                    'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 3, 'sku' => "$color-$size", 'is_available' => 1,
                 ], $sizes))->values()->all(),
             'color_images' => array_map(fn ($color) => ['value' => $color, 'files' => [$this->image("$color.png")]], ['Black', 'Green', 'Navy']),
         ];
@@ -54,7 +54,7 @@ class ColorFirstProductTest extends TestCase
         $data['inventory_revision'] = app(ProductPublishingService::class)->inventoryRevision($product);
         $data['variants'] = $product->variants->map(fn ($variant) => [
             'id' => $variant->id, 'values' => $product->options->map(fn ($option) => $variant->optionValues->firstWhere('product_option_id', $option->id)->value)->all(),
-            'price' => $variant->price, 'stock_quantity' => $variant->stock_quantity,
+            'price' => $variant->price, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => $variant->stock_quantity,
             'sku' => $variant->sku, 'is_available' => $variant->is_available,
         ])->all();
 
@@ -122,7 +122,7 @@ class ColorFirstProductTest extends TestCase
         $product = $this->publish($seller);
         $oldFiles = Storage::disk('public')->allFiles();
         $data = $this->editPayload($product);
-        $data['variants'][] = ['values' => ['Black', 'XL'], 'price' => 349, 'stock_quantity' => 4, 'is_available' => 1];
+        $data['variants'][] = ['values' => ['Black', 'XL'], 'price' => 349, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 4, 'is_available' => 1];
         $data['color_images'] = [['value' => 'Black', 'files' => [$this->image('new-black.png')]]];
         $this->put(route('seller.products.update', $product), $data)->assertSessionHasNoErrors();
         $this->assertSame(11, $product->variants()->count());

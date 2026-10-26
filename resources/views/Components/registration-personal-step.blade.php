@@ -1,10 +1,10 @@
 {{--
     resources/views/Components/registration-personal-step.blade.php
-    Shared Step 1 (Personal Information) for buyer, seller, and logistics registration.
+    Shared Step 1 (Personal Information) for buyer, seller, logistics, and rider registration.
     
     Usage:
     @include('Components.registration-personal-step', [
-        'role' => 'buyer|seller|logistics',
+        'role' => 'buyer|seller|logistics|rider',
         'oldBirthdayParts' => explode('-', old('birthday') ?: 'null-null-null'),
     ])
     
@@ -41,6 +41,11 @@
             'prefix' => 'logistics',
             'hasTerms' => false,
             'passwordReqsLevel' => 'basic', // only min 8 chars, no special required
+        ],
+        'rider' => [
+            'prefix' => 'rider',
+            'hasTerms' => false,
+            'passwordReqsLevel' => 'strict',
         ],
     ];
     

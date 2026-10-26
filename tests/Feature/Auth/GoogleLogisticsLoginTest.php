@@ -42,7 +42,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('logistics');
         $this->assertDatabaseCount('logistics_providers', 0);
@@ -59,7 +59,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas(
             'auth.status_message',
             'Your logistics provider registration is still awaiting administrator approval.',
@@ -81,7 +81,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas('auth.status_message');
         $this->assertGuest('logistics');
         $this->assertGuest('buyer');

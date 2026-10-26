@@ -967,7 +967,7 @@ class SellerRegistrationTest extends TestCase
 
         $response = $this->get(route('seller.dashboard'));
         // EnsureSellerApproved logs out and redirects to login (302), not 403.
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
     }
 
     // ── TC-SEL-039: New application appears in admin pending list ────────────
@@ -1130,7 +1130,7 @@ class SellerRegistrationTest extends TestCase
         $this->actingAs($seller, 'seller');
 
         $this->get(route('logistics.dashboard'))
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 
     // ── Registration resilience: failed OTP delivery ───────────────────────

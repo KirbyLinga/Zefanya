@@ -68,6 +68,22 @@ class OrderActorMapTest extends TestCase
         $this->assertSame(OrderStatus::ReadyForPickup, $so->status);
     }
 
+    public function test_seller_can_decline_a_placed_order(): void
+    {
+        $so = $this->orderAt(OrderStatus::Placed);
+
+        $result = $this->service->transition(
+            $so,
+            OrderStatus::Cancelled,
+            actor: OrderActor::Seller,
+            actorId: 11,
+            source: 'web',
+        );
+
+        $this->assertSame(OrderStatus::Cancelled, $result->status);
+        $this->assertSame(1, StatusHistory::count());
+    }
+
     // ── Seller: rejected ─────────────────────────────────────────────────────
 
     public function test_seller_cannot_perform_courier_or_sorting_hops(): void
@@ -99,11 +115,9 @@ class OrderActorMapTest extends TestCase
     {
         $so = $this->orderAt(OrderStatus::ReadyForPickup);
 
-        // New canonical flow:
-        // ReadyForPickup → PickedUp → AtSortingCenter → Sorted → AssignedToRider → OutForDelivery → Delivered
-        // Note: Sorted and AssignedToRider are Logistics hops, so we use Logistics actor for those.
+        // Canonical flow: Rider pickup → Logistics station receipt/sort/assign → Rider delivery.
         $so = $this->service->transition($so, OrderStatus::PickedUp, actor: OrderActor::Rider, source: 'simulator');
-        $so = $this->service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Rider, source: 'simulator');
+        $so = $this->service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Logistics, source: 'web');
         $so = $this->service->transition($so, OrderStatus::Sorted, actor: OrderActor::Logistics, source: 'web');
         $so = $this->service->transition($so, OrderStatus::AssignedToRider, actor: OrderActor::Logistics, source: 'web');
         $so = $this->service->transition($so, OrderStatus::OutForDelivery, actor: OrderActor::Rider, source: 'simulator');
@@ -187,7 +201,34 @@ class OrderActorMapTest extends TestCase
         $this->assertSame('buyer', StatusHistory::sole()->actor_type ?? null);
     }
 
+    public function test_buyer_can_cancel_a_placed_order(): void
+    {
+        $so = $this->orderAt(OrderStatus::Placed);
+
+        $result = $this->service->transition(
+            $so,
+            OrderStatus::Cancelled,
+            actor: OrderActor::Buyer,
+            actorId: 77,
+            source: 'web',
+        );
+
+        $this->assertSame(OrderStatus::Cancelled, $result->status);
+        $this->assertSame(1, StatusHistory::count());
+        $this->assertSame('buyer', StatusHistory::sole()->actor_type ?? null);
+    }
+
     // ── Buyer: rejected ──────────────────────────────────────────────────────
+
+    public function test_buyer_cannot_cancel_after_seller_accepts(): void
+    {
+        $so = $this->orderAt(OrderStatus::Confirmed);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('buyer role cannot');
+
+        $this->service->transition($so, OrderStatus::Cancelled, actor: OrderActor::Buyer);
+    }
 
     public function test_buyer_cannot_advance_the_shipping_pipeline(): void
     {

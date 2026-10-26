@@ -2,25 +2,13 @@
 // Shared PH address cascading dropdowns (PSGC API) + optional manual-address
 // fallback (buyer account address page only).
 //
-// Used by BOTH:
-//   - the buyer registration modal (Components/buyer-register-modal.blade.php)
-//   - the buyer account address page (Buyer/Account/address.blade.php)
-//
-// Registration modals are dropdown-only: province / municipality / barangay
-// cannot be typed. The account page may still expose #toggleManualAddress.
-//
-// Expected DOM contract (required):
-//   #province / #municipality / #barangay   cascading selects (API mode)
-//   #apiAddressFields                       API mode container
-//   #addressMode                            hidden input: 'api' | 'manual'
-//   #provinceNameField / #municipalityNameField / #barangayNameField
-// Optional (account page only):
-//   #manualAddressFields / #toggleManualAddress / #manualProvince etc.
-// Optional (registration modal only):
-//   #buyerModalOverlay                       open-modal trigger for lazy loading
+// Supports:
+//   - Region -> Province -> City/Municipality -> Barangay (when region select exists)
+//   - Province -> City/Municipality -> Barangay (when region select is omitted)
 (function () {
 
     function populateSelect(select, items, placeholder) {
+        if (!select) return;
         select.innerHTML = '';
         var ph = document.createElement('option');
         ph.value = '';
@@ -45,37 +33,81 @@
         root.dataset.lookupInit = '1';
         var PSGC_BASE = (root.dataset.psgcBase || 'https://psgc.gitlab.io/api').replace(/\/+$/, '');
 
-        var provinceSelect = root.querySelector('#province');
-        var municipalitySelect = root.querySelector('#municipality');
-        var barangaySelect = root.querySelector('#barangay');
-        var apiFields = root.querySelector('#apiAddressFields');
+        var regionSelect = root.querySelector('[data-address-region]') || root.querySelector('#region');
+        var provinceSelect = root.querySelector('[data-address-province]') || root.querySelector('#province');
+        var municipalitySelect = root.querySelector('[data-address-municipality]') || root.querySelector('#municipality');
+        var barangaySelect = root.querySelector('[data-address-barangay]') || root.querySelector('#barangay');
+
+        var apiFields = root.querySelector('[data-address-api-fields]') || root.querySelector('#apiAddressFields');
         var manualFields = root.querySelector('#manualAddressFields');
         var manualProvince = root.querySelector('#manualProvince');
         var manualMunicipality = root.querySelector('#manualMunicipality');
         var manualBarangay = root.querySelector('#manualBarangay');
         var toggleManualBtn = root.querySelector('#toggleManualAddress');
-        var addressModeField = root.querySelector('#addressMode');
-        var provinceNameField = root.querySelector('#provinceNameField');
-        var municipalityNameField = root.querySelector('#municipalityNameField');
-        var barangayNameField = root.querySelector('#barangayNameField');
+        var addressModeField = root.querySelector('[data-address-mode]') || root.querySelector('#addressMode');
+
+        var regionNameField = root.querySelector('[data-address-region-name]') || root.querySelector('#regionNameField');
+        var provinceNameField = root.querySelector('[data-address-province-name]') || root.querySelector('#provinceNameField');
+        var municipalityNameField = root.querySelector('[data-address-municipality-name]') || root.querySelector('#municipalityNameField');
+        var barangayNameField = root.querySelector('[data-address-barangay-name]') || root.querySelector('#barangayNameField');
 
         var allowManual = !!(manualFields && toggleManualBtn);
 
-        var missing = [provinceSelect, municipalitySelect, barangaySelect, apiFields,
-            addressModeField, provinceNameField, municipalityNameField, barangayNameField,
-        ].filter(function (el) { return !el; });
-        if (missing.length) return null; // not an address page
+        // Required minimal dropdowns
+        var missing = [provinceSelect, municipalitySelect, barangaySelect].filter(function (el) { return !el; });
+        if (missing.length) return null; // not an address block
 
+        var regionsLoaded = false;
         var provincesLoaded = false;
         var manualMode = false;
         var manualToggles = [];
 
-        function loadProvinces() {
-            fetch(PSGC_BASE + '/provinces/')
+        function loadRegions() {
+            if (!regionSelect) return;
+            fetch(PSGC_BASE + '/regions/')
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    data.sort(function (a, b) { return a.name.localeCompare(b.name); });
+                    populateSelect(regionSelect, data, 'Select region');
+                    regionsLoaded = true;
+                    if (api.pendingRegion) {
+                        regionSelect.value = api.pendingRegion;
+                        regionSelect.dispatchEvent(new Event('change'));
+                        api.pendingRegion = null;
+                    }
+                })
+                .catch(function () {
+                    regionSelect.innerHTML = '<option value="" disabled selected>Could not load regions</option>';
+                });
+        }
+
+        function loadProvincesForRegion(regionCode) {
+            if (!provinceSelect) return;
+            provinceSelect.disabled = true;
+            municipalitySelect.disabled = true;
+            barangaySelect.disabled = true;
+            provinceSelect.innerHTML = '<option value="" disabled selected>Loading provinces...</option>';
+            municipalitySelect.innerHTML = '<option value="" disabled selected>Select province first</option>';
+            barangaySelect.innerHTML = '<option value="" disabled selected>Select municipality first</option>';
+
+            // NCR special handling: Metro Manila has no provinces in PSGC API
+            if (regionCode === '130000000') {
+                populateSelect(provinceSelect, [{ code: '130000000', name: 'Metro Manila' }], 'Select province');
+                provinceSelect.disabled = false;
+                provinceSelect.value = '130000000';
+                if (provinceNameField) provinceNameField.value = 'Metro Manila';
+                loadCitiesForProvince('130000000', '130000000');
+                provincesLoaded = true;
+                return;
+            }
+
+            var url = regionCode ? (PSGC_BASE + '/regions/' + regionCode + '/provinces/') : (PSGC_BASE + '/provinces/');
+            fetch(url)
                 .then(function (res) { return res.json(); })
                 .then(function (data) {
                     data.sort(function (a, b) { return a.name.localeCompare(b.name); });
                     populateSelect(provinceSelect, data, 'Select province');
+                    provinceSelect.disabled = false;
                     provincesLoaded = true;
                     if (api.pendingProvince) {
                         provinceSelect.value = api.pendingProvince;
@@ -88,15 +120,18 @@
                 });
         }
 
-        provinceSelect.addEventListener('change', function () {
-            provinceNameField.value = provinceSelect.selectedOptions[0] ? provinceSelect.selectedOptions[0].textContent : '';
-            municipalityNameField.value = '';
-            barangayNameField.value = '';
+        function loadCitiesForProvince(provinceCode, regionCode) {
+            if (!municipalitySelect) return;
             municipalitySelect.disabled = true;
             barangaySelect.disabled = true;
             municipalitySelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
             barangaySelect.innerHTML = '<option value="" disabled selected>Select municipality first</option>';
-            fetch(PSGC_BASE + '/provinces/' + provinceSelect.value + '/cities-municipalities/')
+
+            var url = (provinceCode === '130000000' || regionCode === '130000000')
+                ? (PSGC_BASE + '/regions/130000000/cities-municipalities/')
+                : (PSGC_BASE + '/provinces/' + provinceCode + '/cities-municipalities/');
+
+            fetch(url)
                 .then(function (res) { return res.json(); })
                 .then(function (data) {
                     data.sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -111,14 +146,13 @@
                 .catch(function () {
                     municipalitySelect.innerHTML = '<option value="" disabled selected>Could not load</option>';
                 });
-        });
+        }
 
-        municipalitySelect.addEventListener('change', function () {
-            municipalityNameField.value = municipalitySelect.selectedOptions[0] ? municipalitySelect.selectedOptions[0].textContent : '';
-            barangayNameField.value = '';
+        function loadBarangaysForCity(cityCode) {
+            if (!barangaySelect) return;
             barangaySelect.disabled = true;
             barangaySelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-            fetch(PSGC_BASE + '/cities-municipalities/' + municipalitySelect.value + '/barangays/')
+            fetch(PSGC_BASE + '/cities-municipalities/' + cityCode + '/barangays/')
                 .then(function (res) { return res.json(); })
                 .then(function (data) {
                     data.sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -126,39 +160,76 @@
                     barangaySelect.disabled = false;
                     if (api.pendingBarangay) {
                         barangaySelect.value = api.pendingBarangay;
-                        barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
+                        if (barangayNameField) {
+                            barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
+                        }
                         api.pendingBarangay = null;
                     }
                 })
                 .catch(function () {
                     barangaySelect.innerHTML = '<option value="" disabled selected>Could not load</option>';
                 });
+        }
+
+        function loadProvinces() {
+            if (regionSelect) {
+                loadRegions();
+            } else {
+                loadProvincesForRegion(null);
+            }
+        }
+
+        if (regionSelect) {
+            regionSelect.addEventListener('change', function () {
+                if (regionNameField) {
+                    regionNameField.value = regionSelect.selectedOptions[0] ? regionSelect.selectedOptions[0].textContent : '';
+                }
+                if (provinceNameField) provinceNameField.value = '';
+                if (municipalityNameField) municipalityNameField.value = '';
+                if (barangayNameField) barangayNameField.value = '';
+                loadProvincesForRegion(regionSelect.value);
+            });
+        }
+
+        provinceSelect.addEventListener('change', function () {
+            if (provinceNameField) {
+                provinceNameField.value = provinceSelect.selectedOptions[0] ? provinceSelect.selectedOptions[0].textContent : '';
+            }
+            if (municipalityNameField) municipalityNameField.value = '';
+            if (barangayNameField) barangayNameField.value = '';
+            var rCode = regionSelect ? regionSelect.value : null;
+            loadCitiesForProvince(provinceSelect.value, rCode);
+        });
+
+        municipalitySelect.addEventListener('change', function () {
+            if (municipalityNameField) {
+                municipalityNameField.value = municipalitySelect.selectedOptions[0] ? municipalitySelect.selectedOptions[0].textContent : '';
+            }
+            if (barangayNameField) barangayNameField.value = '';
+            loadBarangaysForCity(municipalitySelect.value);
         });
 
         barangaySelect.addEventListener('change', function () {
-            barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
+            if (barangayNameField) {
+                barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
+            }
         });
 
         function setManualMode(on) {
             if (!allowManual) {
-                addressModeField.value = 'api';
+                if (addressModeField) addressModeField.value = 'api';
                 return;
             }
             manualMode = on;
-            apiFields.classList.toggle('hidden', on);
-            manualFields.classList.toggle('hidden', !on);
-            toggleManualBtn.textContent = on ? 'Use address lookup instead' : 'Enter address manually';
-            addressModeField.value = on ? 'manual' : 'api';
-            // Dropdowns required only in API mode; street is ALWAYS required (HTML required attr).
-            [provinceSelect, municipalitySelect, barangaySelect].forEach(function (el) { el.required = !on; });
-            // Mirror the manual free-text into the hidden *_name fields so the
-            // backend contract ('province_name' etc.) is identical in both modes
-            // — the *_name_manual inputs are display-only.
+            if (apiFields) apiFields.classList.toggle('hidden', on);
+            if (manualFields) manualFields.classList.toggle('hidden', !on);
+            if (toggleManualBtn) toggleManualBtn.textContent = on ? 'Use address lookup instead' : 'Enter address manually';
+            if (addressModeField) addressModeField.value = on ? 'manual' : 'api';
             if (on) {
                 var sync = function () {
-                    provinceNameField.value = manualProvince ? manualProvince.value : '';
-                    municipalityNameField.value = manualMunicipality ? manualMunicipality.value : '';
-                    barangayNameField.value = manualBarangay ? manualBarangay.value : '';
+                    if (provinceNameField) provinceNameField.value = manualProvince ? manualProvince.value : '';
+                    if (municipalityNameField) municipalityNameField.value = manualMunicipality ? manualMunicipality.value : '';
+                    if (barangayNameField) barangayNameField.value = manualBarangay ? manualBarangay.value : '';
                 };
                 [manualProvince, manualMunicipality, manualBarangay].forEach(function (el) {
                     if (el) {
@@ -173,7 +244,7 @@
 
         if (allowManual) {
             toggleManualBtn.addEventListener('click', function () { setManualMode(!manualMode); });
-        } else {
+        } else if (addressModeField) {
             addressModeField.value = 'api';
         }
 
@@ -183,34 +254,62 @@
             setManualMode: setManualMode,
             isManualMode: function () { return manualMode; },
             onManualToggle: function (fn) { manualToggles.push(fn); },
+            pendingRegion: null,
             pendingProvince: null,
             pendingMunicipality: null,
             pendingBarangay: null,
-            /**
-             * Preselect saved PSGC selections once the province list loads.
-             * Pass codes ({province, municipality, barangay}) and, when the
-             * host starts in manual mode, nothing else is needed — the manual
-             * inputs are plain server-rendered values.
-             */
             preselect: function (codes) {
                 if (!codes) return;
+                if (codes.region && regionSelect) {
+                    api.pendingRegion = codes.region;
+                }
                 if (codes.province) {
                     api.pendingProvince = codes.province;
-                    if (provincesLoaded) {
-                        provinceSelect.value = codes.province;
-                        provinceSelect.dispatchEvent(new Event('change'));
-                        api.pendingProvince = null;
-                    } else {
-                        loadProvinces();
-                    }
                 }
                 if (codes.municipality) api.pendingMunicipality = codes.municipality;
                 if (codes.barangay) api.pendingBarangay = codes.barangay;
+
+                if (regionSelect && !regionsLoaded) {
+                    loadRegions();
+                } else if (!provincesLoaded) {
+                    loadProvinces();
+                }
             },
         };
 
+        var initialMunicipality = root.dataset.selectedMunicipality || null;
+        var initialBarangay = root.dataset.selectedBarangay || null;
+
+        // If locked province is specified on root (e.g. station hub under province hub)
+        var lockedProv = root.dataset.lockedProvinceCode;
+        if (lockedProv) {
+            if (initialMunicipality) api.pendingMunicipality = initialMunicipality;
+            if (initialBarangay) api.pendingBarangay = initialBarangay;
+            loadCitiesForProvince(lockedProv, root.dataset.lockedRegionCode || null);
+        } else if (root.dataset.autoLoad !== 'false' && !root.closest('#buyerModalOverlay')) {
+            var initialRegion = root.dataset.selectedRegion || null;
+            var initialProvince = root.dataset.selectedProvince || null;
+
+            if (initialRegion) {
+                api.pendingRegion = initialRegion;
+                if (initialProvince) api.pendingProvince = initialProvince;
+                if (initialMunicipality) api.pendingMunicipality = initialMunicipality;
+                if (initialBarangay) api.pendingBarangay = initialBarangay;
+                loadRegions();
+            } else {
+                loadProvinces();
+            }
+        }
+
         return api;
     }
+
+    // Auto-init on elements with data-address-lookup
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-address-lookup]').forEach(function (el) {
+            initAddressLookup(el);
+        });
+    });
 
     window.zfAddressLookup = { init: initAddressLookup };
 })();

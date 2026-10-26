@@ -4,7 +4,7 @@ namespace Tests\Feature\Seller;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -13,6 +13,7 @@ use App\Models\SellerOrder;
 use App\Services\CourierAssignmentService;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
 
 /**
@@ -23,12 +24,13 @@ use Tests\TestCase;
  */
 class CourierPickupMunicipalityTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use CreatesAssignableFleet, LazilyRefreshDatabase;
 
     public function test_pickup_matches_the_sellers_municipality_not_the_buyers(): void
     {
         $seller = Seller::factory()->create([
             'province_name' => 'Laguna',
+            'barangay_code' => '0434110001',
             'municipality_name' => 'Los Baños',
         ]);
 
@@ -41,7 +43,7 @@ class CourierPickupMunicipalityTest extends TestCase
         // not the pickup point.
         $order = Order::factory()->create([
             'buyer_id' => Buyer::factory()->create(['municipality_name' => 'Quezon City'])->id,
-            'shipping_address' => ['municipality' => 'Quezon City'],
+            'shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001'],
         ]);
 
         $sellerOrder = SellerOrder::factory()->create([
@@ -60,11 +62,11 @@ class CourierPickupMunicipalityTest extends TestCase
             ->fresh();
 
         // The only available rider serves the SELLER's municipality.
-        $pickupCourier = Courier::factory()->create([
-            'service_area' => ['Los Baños'],
+        $provider = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now()]);
+        $pickupCourier = $this->assignableCourier($provider, [
             'is_available' => true,
             'max_weight_grams' => 5000,
-        ]);
+        ], 'Los Baños');
 
         $assigned = (new CourierAssignmentService)->assignPickup($sellerOrder);
 

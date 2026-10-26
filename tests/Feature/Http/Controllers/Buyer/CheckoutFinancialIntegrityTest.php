@@ -18,10 +18,12 @@ use App\Models\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class CheckoutFinancialIntegrityTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private function line(Buyer $buyer, string $price = '100.00'): CartItem
@@ -33,11 +35,31 @@ class CheckoutFinancialIntegrityTest extends TestCase
 
     private function prepareCheckout(Buyer $buyer, array $lines, ?string $voucher = null): CheckoutToken
     {
+        $sellers = collect($lines)
+            ->map(fn (CartItem $line) => $line->product->seller)
+            ->unique('id')
+            ->values();
+        $this->bootstrapCheckoutCarriers($buyer, $sellers);
+
         $this->actingAs($buyer, 'buyer');
         $token = CheckoutToken::issue($buyer->id);
         session([CheckoutController::SESSION_KEY => array_map(fn ($line) => $line->id, $lines), CheckoutController::TOKEN_KEY => $token->token, 'cart_voucher' => $voucher]);
 
         return $token;
+    }
+
+    /** @return array<string, mixed> */
+    private function storePayload(CheckoutToken $token, array $lines, array $extra = []): array
+    {
+        $sellers = collect($lines)
+            ->map(fn (CartItem $line) => $line->product->seller)
+            ->unique('id');
+
+        return [
+            'checkout_token' => $token->token,
+            ...$this->checkoutCarrierPayload($sellers),
+            ...$extra,
+        ];
     }
 
     public static function changedPrices(): array
@@ -60,7 +82,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
             }
         });
 
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error', fn ($message) => str_contains($message, 'price changed'));
 
         $this->assertTrue($changed);
@@ -76,13 +98,13 @@ class CheckoutFinancialIntegrityTest extends TestCase
 
         // The same unconsumed token can succeed after the buyer reviews fresh prices.
         session([CheckoutController::SESSION_KEY => [$line->id]]);
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])->assertRedirect();
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))->assertRedirect();
         $order = Order::query()->sole();
         $minor = $price === '125.99' ? 12599 : 9999;
         $discount = $price === '125.99' ? 1000 : 0;
         $this->assertSame($minor, $order->subtotal_minor);
         $this->assertSame($discount, $order->discount_minor);
-        $this->assertSame($minor - $discount, $order->total_minor);
+        $this->assertSame($minor - $discount + 4900, $order->total_minor);
         $this->assertSame($minor, OrderItem::query()->sole()->price_minor);
         $this->assertSame($order->total_minor, Payment::query()->sole()->amount_minor);
     }
@@ -95,16 +117,16 @@ class CheckoutFinancialIntegrityTest extends TestCase
         Voucher::factory()->fixed(1)->create(['code' => 'ONECENT']);
         $token = $this->prepareCheckout($buyer, [$first, $second], 'ONECENT');
 
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => $token->token, 'price' => 999, 'total_minor' => 999999])
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$first, $second], ['price' => 999, 'total_minor' => 999999]))
             ->assertSessionMissing('error')->assertRedirect();
 
         $order = Order::query()->sole();
         $this->assertSame(5, $order->subtotal_minor);
         $this->assertSame(1, $order->discount_minor);
-        $this->assertSame(4, $order->total_minor);
+        $this->assertSame(9804, $order->total_minor);
         $this->assertSame(5, (int) $order->sellerOrders()->sum('subtotal_minor'));
         $this->assertSame([3, 2], OrderItem::query()->orderBy('id')->pluck('price_minor')->all());
-        $this->assertSame([2, 2], Payment::query()->orderBy('id')->pluck('amount_minor')->all());
+        $this->assertSame([4902, 4902], Payment::query()->orderBy('id')->pluck('amount_minor')->all());
         $this->assertTrue(Payment::query()->get()->every(fn ($payment) => $payment->method === PaymentMethod::Cod));
         $this->assertSame(2, InventoryTransaction::query()->where('reason', 'checkout')->count());
     }
@@ -123,7 +145,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
             }
         });
 
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))
             ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error', fn ($message) => str_contains($message, 'voucher changed'));
 
         $this->assertDatabaseCount('orders', 0);

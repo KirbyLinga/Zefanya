@@ -59,6 +59,12 @@ class Product extends Model
         return (int) $this->weight_grams;
     }
 
+    /** A listed product with no weight cannot be rated for courier assignment. */
+    public function needsWeight(): bool
+    {
+        return (int) $this->weight_grams <= 0;
+    }
+
     public function isListedForSale(): bool
     {
         return ! $this->trashed() && $this->status === 'active'
@@ -237,11 +243,17 @@ class Product extends Model
             ? $format($minimum) : $format($minimum)."\u{2013}".$format($maximum);
     }
 
-    public function catalogImageUrl(?Collection $images = null): ?string
+    public function catalogImageUrl(?Collection $images = null, bool $requireExistingFile = true): ?string
     {
         $disk = Storage::disk('public');
         $image = ($images ?? $this->images)->sortByDesc('is_primary')
             ->first(fn (ProductImage $image): bool => $disk->exists($image->path));
+
+        // Public image URLs may be served by storage outside this PHP instance.
+        if ($image === null && ! $requireExistingFile) {
+            $image = ($images ?? $this->images)->sortByDesc('is_primary')
+                ->first(fn (ProductImage $image): bool => filled($image->path));
+        }
 
         if ($image === null) {
             return null;

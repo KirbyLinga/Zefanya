@@ -54,6 +54,11 @@ class DashboardController extends Controller
             ->where('status', 'active')
             ->count();
 
+        $productsMissingWeight = Product::query()
+            ->where('seller_id', $sellerId)
+            ->where('weight_grams', '<=', 0)
+            ->count();
+
         // ── Real order/sales figures (orders module is now live) ──────────
         $baseQuery = SellerOrder::query()
             ->where('seller_id', $sellerId)
@@ -110,6 +115,7 @@ class DashboardController extends Controller
             'pendingOrders' => $pendingOrders,
             'productCount' => $productCount,
             'activeProductCount' => $activeProductCount,
+            'productsMissingWeight' => $productsMissingWeight,
             'lowStockCount' => $lowStockCount,
             'lowStockProducts' => $lowStockProducts,
             'recentOrders' => $recentOrders,

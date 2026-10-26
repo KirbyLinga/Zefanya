@@ -60,10 +60,10 @@ class ProductVariantsTest extends TestCase
                 ['name' => 'Size', 'values' => ['M', 'L']],
             ],
             'variants' => [
-                ['values' => ['Red', 'M'], 'sku' => 'RM', 'price' => '100.00', 'stock_quantity' => '5', 'is_available' => '1'],
-                ['values' => ['Red', 'L'], 'sku' => 'RL', 'price' => '110.00', 'stock_quantity' => '6', 'is_available' => '1'],
-                ['values' => ['Blue', 'M'], 'sku' => 'BM', 'price' => '120.00', 'stock_quantity' => '7', 'is_available' => '0'],
-                ['values' => ['Blue', 'L'], 'sku' => 'BL', 'price' => '130.00', 'stock_quantity' => '8', 'is_available' => '1'],
+                ['values' => ['Red', 'M'], 'sku' => 'RM', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '100.00', 'stock_quantity' => '5', 'is_available' => '1'],
+                ['values' => ['Red', 'L'], 'sku' => 'RL', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '110.00', 'stock_quantity' => '6', 'is_available' => '1'],
+                ['values' => ['Blue', 'M'], 'sku' => 'BM', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '120.00', 'stock_quantity' => '7', 'is_available' => '0'],
+                ['values' => ['Blue', 'L'], 'sku' => 'BL', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '130.00', 'stock_quantity' => '8', 'is_available' => '1'],
             ],
         ], $overrides);
     }
@@ -78,7 +78,7 @@ class ProductVariantsTest extends TestCase
                 'price' => '100.00',
                 'stock_quantity' => '26',
                 'low_stock_threshold' => '5',
-                'status' => 'active',
+                'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
                 'images' => [$this->fakeImage()],
             ] + $this->variantPayload())
             ->assertRedirect(route('seller.products.index'));
@@ -152,13 +152,13 @@ class ProductVariantsTest extends TestCase
                 'price' => '100.00',
                 'stock_quantity' => '26',
                 'low_stock_threshold' => '5',
-                'status' => 'active',
+                'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
             ] + $this->variantPayload([
                 'variants' => [
-                    ['values' => ['Red', 'M'], 'sku' => 'RM2', 'price' => '199.00', 'stock_quantity' => '50', 'is_available' => '1'],
-                    ['values' => ['Red', 'L'], 'sku' => 'RL', 'price' => '110.00', 'stock_quantity' => '6', 'is_available' => '1'],
-                    ['values' => ['Blue', 'M'], 'sku' => 'BM', 'price' => '120.00', 'stock_quantity' => '7', 'is_available' => '1'],
-                    ['values' => ['Blue', 'L'], 'sku' => 'BL', 'price' => '130.00', 'stock_quantity' => '8', 'is_available' => '1'],
+                    ['values' => ['Red', 'M'], 'sku' => 'RM2', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '199.00', 'stock_quantity' => '50', 'is_available' => '1'],
+                    ['values' => ['Red', 'L'], 'sku' => 'RL', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '110.00', 'stock_quantity' => '6', 'is_available' => '1'],
+                    ['values' => ['Blue', 'M'], 'sku' => 'BM', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '120.00', 'stock_quantity' => '7', 'is_available' => '1'],
+                    ['values' => ['Blue', 'L'], 'sku' => 'BL', 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '130.00', 'stock_quantity' => '8', 'is_available' => '1'],
                 ],
             ]))
             ->assertRedirect(route('seller.products.index'));
@@ -193,8 +193,8 @@ class ProductVariantsTest extends TestCase
                 ['name' => 'Size', 'values' => ['M', 'L']],
             ],
             [
-                ['values' => ['Red', 'M'], 'price' => 100, 'stock_quantity' => 5, 'is_available' => true],
-                ['values' => ['Red', 'L'], 'price' => 110, 'stock_quantity' => 6, 'is_available' => true],
+                ['values' => ['Red', 'M'], 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => 100, 'stock_quantity' => 5, 'is_available' => true],
+                ['values' => ['Red', 'L'], 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => 110, 'stock_quantity' => 6, 'is_available' => true],
             ],
             true,
         );
@@ -224,7 +224,7 @@ class ProductVariantsTest extends TestCase
                 'price' => '88.00',
                 'stock_quantity' => '13',
                 'low_stock_threshold' => '5',
-                'status' => 'active',
+                'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
             ])
             ->assertRedirect(route('seller.products.index'))->assertSessionHasErrors('options');
 
@@ -254,7 +254,7 @@ class ProductVariantsTest extends TestCase
                 'price' => '45.00',
                 'stock_quantity' => '10',
                 'low_stock_threshold' => '5',
-                'status' => 'active',
+                'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
             ])
             ->assertRedirect(route('seller.products.index'));
 
@@ -282,9 +282,9 @@ class ProductVariantsTest extends TestCase
                 $product,
                 [['name' => 'Color', 'values' => ['Red', 'Blue']], ['name' => 'Size', 'values' => ['M', 'L']]],
                 [
-                    ['values' => ['Red', 'M'], 'price' => 100, 'stock_quantity' => 5, 'is_available' => true],
-                    ['values' => ['Red', 'L'], 'price' => 110, 'stock_quantity' => 6, 'is_available' => true],
-                    ['values' => ['Blue', 'L'], 'price' => 130, 'stock_quantity' => 8, 'is_available' => true],
+                    ['values' => ['Red', 'M'], 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => 100, 'stock_quantity' => 5, 'is_available' => true],
+                    ['values' => ['Red', 'L'], 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => 110, 'stock_quantity' => 6, 'is_available' => true],
+                    ['values' => ['Blue', 'L'], 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => 130, 'stock_quantity' => 8, 'is_available' => true],
                 ],
                 true,
             );
@@ -305,7 +305,7 @@ class ProductVariantsTest extends TestCase
                 'name' => 'Too Many Axes',
                 'price' => '10.00',
                 'stock_quantity' => '5',
-                'status' => 'active',
+                'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
                 'images' => [$this->fakeImage()],
             ] + $this->variantPayload([
                 'options' => [
@@ -314,7 +314,7 @@ class ProductVariantsTest extends TestCase
                     ['name' => 'Material', 'values' => ['Cotton']],
                 ],
                 'variants' => [
-                    ['values' => ['Red', 'M', 'Cotton'], 'price' => '10.00', 'stock_quantity' => '5', 'is_available' => '1'],
+                    ['values' => ['Red', 'M', 'Cotton'], 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'price' => '10.00', 'stock_quantity' => '5', 'is_available' => '1'],
                 ],
             ]))
             ->assertSessionHasErrors('options');
@@ -351,7 +351,7 @@ class ProductVariantsTest extends TestCase
             'price' => '100.00',
             'stock_quantity' => '4',
             'low_stock_threshold' => '5',
-            'status' => 'active',
+            'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
             'images' => [$this->fakeImage()],
         ] + $this->variantPayloadWithSkus($skus);
     }
@@ -417,7 +417,7 @@ class ProductVariantsTest extends TestCase
                 'price' => '100.00',
                 'stock_quantity' => '26',
                 'low_stock_threshold' => '5',
-                'status' => 'active',
+                'weight' => 250, 'weight_unit' => 'g', 'status' => 'active',
             ] + $this->variantPayload())
             ->assertRedirect(route('seller.products.index'))
             ->assertSessionHasNoErrors();

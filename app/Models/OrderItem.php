@@ -30,6 +30,15 @@ class OrderItem extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Keep the parcel weight snapshot in sync whenever lines are created,
+        // changed, or removed. Product weight edits alone do not fire this, so
+        // an in-transit parcel keeps the weight it was checked out with.
+        static::saved(fn (OrderItem $item) => $item->sellerOrder?->refreshParcelWeight());
+        static::deleted(fn (OrderItem $item) => $item->sellerOrder?->refreshParcelWeight());
+    }
+
     // ── Relationships ────────────────────────────────────────────────────────
 
     /**

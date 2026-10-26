@@ -3,7 +3,7 @@
     $product = $product ?? null;
     $url = $product ? ($url ?? route('buyer.products.show', $product->id)) : null;
     $name = $product?->name ?? 'Product coming soon';
-    $imageUrl = $product?->catalogImageUrl();
+    $imageUrl = $product?->catalogImageUrl(requireExistingFile: false);
     $seller = $product?->seller;
     $chooseVariant = $product && ($product->variants_count > 1 || $product->has_option_variants);
 @endphp

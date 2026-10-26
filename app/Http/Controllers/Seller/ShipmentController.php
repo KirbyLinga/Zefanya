@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\SellerOrder;
+use App\Services\WaybillQrCode;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -18,6 +19,10 @@ use Illuminate\View\View;
  */
 class ShipmentController extends Controller
 {
+    public function __construct(
+        private readonly WaybillQrCode $waybillQr,
+    ) {}
+
     /**
      * Parcels in the outbound pipeline (anything from a fresh order through to
      * delivered). The list is shop-scoped and read-only apart from the label.
@@ -28,7 +33,7 @@ class ShipmentController extends Controller
 
         $shipments = SellerOrder::query()
             ->where('seller_id', $seller->id)
-            ->whereNotIn('status', [OrderStatus::Returned])
+            ->whereNotIn('status', [OrderStatus::Returned, OrderStatus::Cancelled])
             ->with([
                 'order' => fn ($q) => $q->with('buyer'),
                 'orderItems',
@@ -59,8 +64,12 @@ class ShipmentController extends Controller
             'payment',
         ]);
 
+        $tracking = $sellerOrder->tracking_number;
+
         return view('Seller.Shipments.label', [
             'sellerOrder' => $sellerOrder,
+            'qrSvg' => $this->waybillQr->svg($tracking),
+            'qrPayload' => $this->waybillQr->payload($tracking),
         ]);
     }
 }

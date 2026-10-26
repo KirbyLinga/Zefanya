@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Voucher extends Model
 {
+    public const FUNDING_SELLER = 'seller';
+
+    public const FUNDING_MARKETPLACE = 'marketplace';
+
     /** @use HasFactory<VoucherFactory> */
     use HasFactory;
 
@@ -21,6 +25,7 @@ class Voucher extends Model
         'expires_at',
         'usage_limit',
         'times_used',
+        'funding_source',
     ];
 
     protected $casts = [
@@ -32,6 +37,15 @@ class Voucher extends Model
         'usage_limit' => 'integer',
         'times_used' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $voucher): void {
+            if (! in_array($voucher->funding_source, [null, self::FUNDING_SELLER, self::FUNDING_MARKETPLACE], true)) {
+                throw new \InvalidArgumentException('Voucher funding must be seller, marketplace, or unknown.');
+            }
+        });
+    }
 
     protected static function newFactory(): VoucherFactory
     {

@@ -33,6 +33,18 @@ class ProductControllerTest extends TestCase
 
     // ── Index: ownership + isolation ────────────────────────────────────────
 
+    public function test_weightless_products_are_flagged_in_the_listing(): void
+    {
+        $this->mine(['name' => 'Unweighed Cushion', 'weight_grams' => 0]);
+        $this->mine(['name' => 'Ready Cushion', 'weight_grams' => 400]);
+
+        $response = $this->actingAs($this->seller, 'seller')
+            ->get(route('seller.products.index'));
+
+        $response->assertOk()->assertSee('Unweighed Cushion')->assertSee('Needs weight');
+        $this->assertSame(1, substr_count($response->getContent(), 'Needs weight'));
+    }
+
     public function test_a_seller_sees_only_their_own_products(): void
     {
         $mine = $this->mine(['name' => 'My Walnut Desk']);
@@ -410,6 +422,6 @@ class ProductControllerTest extends TestCase
     public function test_guests_are_redirected_to_the_seller_login(): void
     {
         $this->get(route('seller.products.index'))
-            ->assertRedirect(route('seller.login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 }

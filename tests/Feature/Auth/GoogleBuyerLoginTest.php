@@ -93,7 +93,7 @@ class GoogleBuyerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('buyer');
         // No auto-registration: the role tables are untouched.
@@ -109,7 +109,7 @@ class GoogleBuyerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas(
             'auth.status_message',
             'This email is linked to more than one account type (buyer and seller). Please contact support.',
@@ -130,7 +130,7 @@ class GoogleBuyerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'buyer']));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas(
             'auth.status_message',
             'Your buyer registration is still awaiting administrator approval.',

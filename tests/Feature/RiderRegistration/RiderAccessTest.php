@@ -33,9 +33,9 @@ class RiderAccessTest extends RiderTestBase
         $this->actingAs($b, 'logistics')->get(route('logistics.riders.show', $rider['id']))->assertForbidden();
     }
 
-    public function test_tc_rid_029_public_has_no_rider_option_and_create_needs_login(): void
+    public function test_tc_rid_029_public_has_rider_option_and_logistics_create_needs_login(): void
     {
-        $this->get(route('register.type'))->assertOk()->assertDontSee('REGISTER AS RIDER', false);
+        $this->get(route('register.type'))->assertOk()->assertSee('REGISTER AS RIDER', false);
         $this->get(route('logistics.riders.create'))->assertRedirect(route('home', ['login' => 1]));
     }
 

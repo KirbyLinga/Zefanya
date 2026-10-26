@@ -20,7 +20,7 @@ class UnverifiedLoginResumeTest extends TestCase
             'approved_at' => null,
         ]);
 
-        $response = $this->from(route('login'))
+        $response = $this->from(route('home', ['login' => 1]))
             ->post(route('unified.login'), [
                 'email' => 'unverified@example.com',
                 'password' => 'password',
