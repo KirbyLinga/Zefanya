@@ -15,7 +15,7 @@ use Tests\TestCase;
  *
  * The stats must come from real queries — the dashboard previously showed a
  * broken `status = 'pending'` count (always 0, because the real statuses are
- * pending_verification / pending_approval / approved / rejected) plus two
+ * unverified / pending / approved / rejected) plus two
  * hardcoded figures ("128" and "₱12,450") that had no backing table at all.
  */
 class AdminDashboardStatsTest extends TestCase
@@ -50,9 +50,9 @@ class AdminDashboardStatsTest extends TestCase
     private function seedKnownAccounts(): void
     {
         foreach (range(1, 5) as $i) {
-            Buyer::factory()->create(['status' => 'pending_approval', 'approved_at' => null]);
+            Buyer::factory()->create(['status' => 'pending', 'approved_at' => null]);
         }
-        Buyer::factory()->create(['status' => 'pending_verification', 'email_verified_at' => null, 'approved_at' => null]);
+        Buyer::factory()->create(['status' => 'unverified', 'email_verified_at' => null, 'approved_at' => null]);
         foreach (range(1, 3) as $i) {
             Buyer::factory()->create(['status' => 'approved']);
         }
@@ -61,21 +61,21 @@ class AdminDashboardStatsTest extends TestCase
         }
 
         foreach (range(1, 2) as $i) {
-            Seller::factory()->pendingApproval()->create();
+            Seller::factory()->pending()->create();
         }
         foreach (range(1, 2) as $i) {
             Seller::factory()->create(['status' => 'approved']);
         }
 
-        LogisticsProvider::factory()->pendingApproval()->create();
+        LogisticsProvider::factory()->pending()->create();
         LogisticsProvider::factory()->create(['status' => 'approved']);
     }
 
-    public function test_pending_registrations_counts_pending_approval_across_every_role(): void
+    public function test_pending_registrations_counts_pending_across_every_role(): void
     {
         $this->seedKnownAccounts();
 
-        // 8, not 9: the pending_verification buyer and the two rejected buyers
+        // 8, not 9: the unverified buyer and the two rejected buyers
         // are NOT awaiting an admin decision, so they must not be counted.
         $this->dashboard()
             ->assertOk()

@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\InventoryTransaction;
 use App\Models\Product;
 use App\Models\ProductOption;
 use App\Models\ProductOptionValue;
 use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Applies a seller's Variant Options submission to a product.
@@ -22,18 +24,36 @@ use Illuminate\Support\Facades\DB;
  *     was rejected as over-engineering for ≤2 axes; see Phase 1 report).
  *   - Variant rows are matched back by their option-value SIGNATURE
  *     ("Red|M"), so an unchanged combination keeps its SKU/price/stock while
- *     a removed combination's row is deleted. Cart lines pointing at a
- *     dropped variant cascade away with it — the buyer re-adds survivors.
+ *     an unreferenced removed combination is deleted. Combinations with cart,
+ *     order or inventory history must be kept and disabled instead.
  *   - products.price/stock rollups are refreshed after every write.
+ *   - Every stock change goes through StockService, so each one lands in the
+ *     append-only inventory_transactions ledger (seller_initial /
+ *     seller_adjustment).
  */
 class VariantSyncService
 {
     /** Maximum option axes per product (kept deliberately small). */
     public const MAX_OPTIONS = 2;
 
+    private StockService $stock;
+
+    public function __construct(?StockService $stock = null)
+    {
+        $this->stock = $stock ?? new StockService;
+    }
+
     public function sync(Product $product, array $options, array $variants, bool $variantsExist): void
     {
+        if ($variantsExist && $options !== []) {
+            $errors = $this->configurationErrors($options, $variants, false);
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+        }
+
         DB::transaction(function () use ($product, $options, $variants, $variantsExist): void {
+            $this->assertRemovalsSafe($product, $variants, $variantsExist && $options !== []);
             if (! $variantsExist) {
                 // Legacy single-SKU mode: exactly one Default variant carrying
                 // the submitted product-level price/stock.
@@ -42,12 +62,41 @@ class VariantSyncService
                 return;
             }
 
+            // Capture signatures before replacing option values cascades their pivots.
+            $existing = [];
+            foreach ($product->variants()->with('optionValues')->get() as $variant) {
+                if ($variant->hasOptions()) {
+                    $existing[$this->signature($variant->optionValues->pluck('value')->all())] = $variant;
+                }
+            }
+
             $this->applyOptions($product, $options);
-            $this->applyVariants($product, $variants);
+            $this->applyVariants($product, $variants, $existing);
         });
 
         $product->syncVariantRollups();
         $product->refresh();
+    }
+
+    /** Reject destructive removals until a dedicated retirement state is approved. */
+    private function assertRemovalsSafe(Product $product, array $submitted, bool $withVariants): void
+    {
+        $rows = $product->variants()->with('optionValues')->orderBy('id')->lockForUpdate()->get();
+        $submittedIds = array_filter(array_column($submitted, 'id'));
+        $signatures = array_fill_keys(array_map(fn ($row) => $this->signature((array) ($row['values'] ?? [])), $submitted), true);
+        $defaultId = $withVariants ? null : $rows->first(fn ($row) => ! $row->hasOptions())?->id;
+        foreach ($rows as $row) {
+            $kept = $withVariants
+                ? $row->hasOptions() && (in_array($row->id, $submittedIds) || isset($signatures[$this->signature($row->optionValues->pluck('value')->all())]))
+                : $row->id === $defaultId;
+            if ($kept) {
+                continue;
+            }
+            if ($row->cartItems()->exists() || $row->orderItems()->exists() ||
+                InventoryTransaction::query()->where('variant_id', $row->id)->exists()) {
+                throw ValidationException::withMessages(['options' => 'This change removes a variation with cart, order or inventory history. Keep the combination and turn off Selling instead.']);
+            }
+        }
     }
 
     /**
@@ -64,6 +113,7 @@ class VariantSyncService
             ->where('product_id', $product->id)
             ->whereHas('optionValues')
             ->delete();
+        $product->options()->delete();
 
         $default = ProductVariant::query()
             ->where('product_id', $product->id)
@@ -72,15 +122,17 @@ class VariantSyncService
             ->first();
 
         if ($default === null) {
-            ProductVariant::query()->create([
+            $created = ProductVariant::query()->create([
                 'product_id' => $product->id,
                 'sku' => null,
                 'price' => $product->price,
-                'stock_quantity' => (int) $product->stock_quantity,
+                'stock_quantity' => 0,
                 'is_available' => true,
                 'weight_grams' => $product->weight_grams,
                 'dimensions' => $product->dimensions,
             ]);
+
+            $this->stock->set($created, (int) $product->stock_quantity, StockService::REASON_SELLER_INITIAL);
 
             return;
         }
@@ -94,11 +146,16 @@ class VariantSyncService
 
         $default->update([
             'price' => $product->price,
-            'stock_quantity' => (int) $product->stock_quantity,
             'is_available' => true,
             'weight_grams' => $product->weight_grams,
             'dimensions' => $product->dimensions,
         ]);
+
+        $this->stock->set(
+            $default,
+            (int) $product->stock_quantity,
+            $product->wasRecentlyCreated ? StockService::REASON_SELLER_INITIAL : StockService::REASON_SELLER_ADJUSTMENT,
+        );
     }
 
     /** Replace the product's option axes/values from the submitted payload. */
@@ -145,7 +202,7 @@ class VariantSyncService
      * written options, applying the seller's per-row SKU/price/stock/flag and
      * matching rows back by their option-value signature.
      */
-    private function applyVariants(Product $product, array $variants): void
+    private function applyVariants(Product $product, array $variants, array $existingBySignature): void
     {
         // After applyOptions(), every surviving option has ≥1 value.
         $axes = $product->options()->with('values')->get()
@@ -172,22 +229,29 @@ class VariantSyncService
                     'product_id' => $product->id,
                     'sku' => null,
                     'price' => $product->price,
-                    'stock_quantity' => (int) $product->stock_quantity,
+                    'stock_quantity' => 0,
                     'is_available' => true,
                     'weight_grams' => $product->weight_grams,
                     'dimensions' => $product->dimensions,
                 ]);
+
+                $this->stock->set($default, (int) $product->stock_quantity, StockService::REASON_SELLER_INITIAL);
             }
 
             // Mirror the freshly submitted product-level price/stock into the
             // surviving Default row (the caller updated products before sync).
             $default->update([
                 'price' => $product->price,
-                'stock_quantity' => (int) $product->stock_quantity,
                 'is_available' => true,
                 'weight_grams' => $product->weight_grams,
                 'dimensions' => $product->dimensions,
             ]);
+
+            $this->stock->set(
+                $default,
+                (int) $product->stock_quantity,
+                $product->wasRecentlyCreated ? StockService::REASON_SELLER_INITIAL : StockService::REASON_SELLER_ADJUSTMENT,
+            );
 
             return;
         }
@@ -198,6 +262,7 @@ class VariantSyncService
         ProductVariant::query()
             ->where('product_id', $product->id)
             ->whereDoesntHave('optionValues')
+            ->whereNotIn('id', collect($existingBySignature)->pluck('id'))
             ->delete();
 
         $combinations = $this->cartesian(array_column($axes, 'values'));
@@ -209,19 +274,18 @@ class VariantSyncService
             $submitted[$signature] = $row;
         }
 
-        // Existing option variants indexed by the same signature, so an edit
-        // keeps seller-entered SKU/price/stock stable across submissions.
-        $existingBySignature = [];
-        foreach ($product->variants()->with('optionValues')->get() as $existing) {
-            if ($existing->hasOptions()) {
-                $existingBySignature[$this->signature($existing->optionValues->pluck('value')->all())] = $existing;
-            }
-        }
-
         foreach ($combinations as $combination) {
             $signature = $this->signature($combination);
-            $existing = $existingBySignature[$signature] ?? null;
-            $row = $submitted[$signature] ?? [];
+            if (! array_key_exists($signature, $submitted)) {
+                continue;
+            }
+            $row = $submitted[$signature];
+            $existing = ! empty($row['id'])
+                ? collect($existingBySignature)->firstWhere('id', (int) $row['id'])
+                : ($existingBySignature[$signature] ?? null);
+            if (! empty($row['id']) && $existing === null) {
+                throw ValidationException::withMessages(['variants' => 'The saved variant no longer belongs to this combination. Reload the product.']);
+            }
 
             $valueIds = [];
             foreach ($combination as $axisIndex => $value) {
@@ -232,11 +296,18 @@ class VariantSyncService
                 $existing->update([
                     'sku' => array_key_exists('sku', $row) ? $row['sku'] : $existing->sku,
                     'price' => array_key_exists('price', $row) ? $row['price'] : $existing->price,
-                    'stock_quantity' => (int) ($row['stock_quantity'] ?? $existing->stock_quantity),
                     'is_available' => (bool) ($row['is_available'] ?? $existing->is_available),
+                    'weight_grams' => $row['weight_grams'] ?? null,
                 ]);
+
+                $this->stock->set(
+                    $existing,
+                    (int) ($row['stock_quantity'] ?? $existing->stock_quantity),
+                    StockService::REASON_SELLER_ADJUSTMENT,
+                );
+
                 $this->attachValues($existing, $valueIds);
-                unset($existingBySignature[$signature]);
+                $existingBySignature = array_filter($existingBySignature, fn ($variant) => $variant->id !== $existing->id);
 
                 continue;
             }
@@ -245,18 +316,74 @@ class VariantSyncService
                 'product_id' => $product->id,
                 'sku' => $row['sku'] ?? null,
                 'price' => $row['price'] ?? $product->price,
-                'stock_quantity' => (int) ($row['stock_quantity'] ?? 0),
+                'stock_quantity' => 0,
                 'is_available' => (bool) ($row['is_available'] ?? true),
-                'weight_grams' => null,
+                'weight_grams' => $row['weight_grams'] ?? null,
                 'dimensions' => null,
             ]);
+
+            $this->stock->set(
+                $created,
+                (int) ($row['stock_quantity'] ?? 0),
+                StockService::REASON_SELLER_INITIAL,
+            );
+
             $this->attachValues($created, $valueIds);
         }
 
         // Combinations the seller dropped (removed a value, cleared an axis).
         foreach ($existingBySignature as $stale) {
+            // Preserve photos when an unreferenced combination is removed.
+            $stale->images()->update(['variant_id' => null]);
             $stale->delete();
         }
+    }
+
+    /** Validate the combination contract for both HTTP and direct service callers. */
+    public function configurationErrors(array $options, array $variants, bool $requireComplete = true): array
+    {
+        $errors = [];
+        if ($options === [] || count($options) > self::MAX_OPTIONS) {
+            return ['options' => 'Choose one or two variation groups.'];
+        }
+        $names = [];
+        $axes = [];
+        foreach ($options as $index => $option) {
+            $name = mb_strtolower(trim((string) ($option['name'] ?? '')));
+            $values = array_values((array) ($option['values'] ?? []));
+            $folded = array_map(fn ($value) => mb_strtolower(trim((string) $value)), $values);
+            if ($name === '' || in_array($name, $names, true)) {
+                $errors["options.$index.name"] = 'Variation group names must be unique and not empty.';
+            }
+            if ($values === [] || in_array('', $folded, true) || count(array_unique($folded)) !== count($folded)) {
+                $errors["options.$index.values"] = 'Each group needs unique, non-empty values.';
+            }
+            $names[] = $name;
+            $axes[] = $values;
+        }
+        $total = array_product(array_map('count', $axes));
+        if (($requireComplete ? $total : count($variants)) > 50) {
+            $errors['variants'] = 'Use at most 50 variant combinations.';
+        }
+        if ($errors !== []) {
+            return $errors;
+        }
+        $expected = array_fill_keys(array_map(fn ($values) => $this->signature($values), $this->cartesian($axes)), true);
+        $seen = [];
+        foreach ($variants as $index => $variant) {
+            $key = $this->signature((array) ($variant['values'] ?? []));
+            if (! isset($expected[$key])) {
+                $errors["variants.$index.values"] = 'This combination does not match the variation groups.';
+            } elseif (isset($seen[$key])) {
+                $errors["variants.$index.values"] = 'Variant combinations must be unique.';
+            }
+            $seen[$key] = true;
+        }
+        if ($variants === [] || ($requireComplete && count($seen) !== count($expected))) {
+            $errors['variants'] = 'Enter price and stock for every generated combination.';
+        }
+
+        return $errors;
     }
 
     private function attachValues(ProductVariant $variant, array $valueIds): void
@@ -302,6 +429,6 @@ class VariantSyncService
     /** @param array<int, string> $values */
     private function signature(array $values): string
     {
-        return implode('|', $values);
+        return json_encode(array_values($values), JSON_THROW_ON_ERROR);
     }
 }

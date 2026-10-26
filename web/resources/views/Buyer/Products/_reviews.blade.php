@@ -1,102 +1,45 @@
-{{--
-    PDP Reviews partial.
-    Expects: $rating, $reviewCount, $ratingBreakdown (array 5→1 of percentages), $reviews
---}}
-<section id="pdp-reviews" class="mt-12 scroll-mt-20">
-  <h2 class="mb-6 font-serif text-[22px] font-semibold text-buyer-ink sm:text-[26px]">
-    Customer Experiences
-  </h2>
-
-  <div class="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
-
-    {{-- ── Summary card ── --}}
-    <div class="flex flex-col gap-5">
-      <div class="rounded-2xl border border-buyer-line bg-white p-5">
-        {{-- Big score --}}
-        <div class="mb-1 font-serif text-[52px] font-semibold leading-none text-buyer-ink">
-          {{ number_format($rating, 1) }}
-        </div>
-        {{-- Stars --}}
-        <div class="mb-2 flex items-center gap-1">
-          @for ($s = 1; $s <= 5; $s++)
-            <i class="fa-solid fa-star text-[13px] text-buyer-star"></i>
-          @endfor
-        </div>
-        <p class="text-[11.5px] text-neutral-400">
-          {{ number_format($reviewCount) }} Verified Reviews
-        </p>
-        <p class="mt-0.5 text-[11.5px] font-semibold text-tertiary-600">
-          98% Recommend this product
-        </p>
-
-        {{-- Breakdown bars --}}
-        <div class="mt-4 flex flex-col gap-2">
-          @foreach ($ratingBreakdown as $star => $pct)
-            <div class="flex items-center gap-2 text-[11px] text-neutral-400">
-              <span class="w-3 shrink-0 text-right">{{ $star }}</span>
-              <i class="fa-solid fa-star shrink-0 text-[9px] text-buyer-star"></i>
-              <div class="relative h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
-                <div class="absolute left-0 top-0 h-full rounded-full bg-primary-400 transition-all duration-500"
-                     style="width: {{ $pct }}%"></div>
-              </div>
-              <span class="w-7 shrink-0 text-right">{{ $pct }}%</span>
-            </div>
-          @endforeach
-        </div>
-      </div>
-
-      {{-- Write a review CTA --}}
-      <div class="rounded-2xl border border-buyer-line bg-secondary-50 p-5 text-center">
-        <p class="mb-1 font-serif text-[15px] font-semibold text-buyer-ink">Shared Your Fit?</p>
-        <p class="mb-4 text-[12px] text-neutral-400">Share your style and help the community</p>
-        <button
-          type="button"
-          class="w-full rounded-full border border-buyer-ink py-2.5 text-[12px] font-semibold text-buyer-ink transition-colors hover:bg-buyer-ink hover:text-white"
-        >
-          Write an Atelier Review
-        </button>
-      </div>
+<section id="reviews" class="mt-6 rounded-2xl border border-buyer-line bg-white px-5 py-4">
+    <h2 class="font-serif text-lg font-semibold text-buyer-ink">Ratings and reviews</h2>
+    <p class="mt-2 text-sm text-buyer-ink-soft">
+        @if ($product->reviews_count)
+            {{ number_format((float) $product->reviews_avg_rating, 1) }}/5 from {{ $product->reviews_count }} verified-purchase reviews
+        @else
+            No reviews yet.
+        @endif
+    </p>
+    @if (session('success'))
+        <p role="status" class="mt-3 text-sm text-buyer-ink">{{ session('success') }}</p>
+    @endif
+    @if ($canReview)
+        <form method="POST" action="{{ route('buyer.products.reviews.store', $product) }}" class="mt-4 space-y-3">
+            @csrf
+            <label class="block text-sm text-buyer-ink" for="review-rating">Your rating</label>
+            <select id="review-rating" name="rating" required class="rounded border border-buyer-line bg-cream px-3 py-2 text-buyer-ink">
+                <option value="">Choose a rating</option>
+                @foreach (range(1, 5) as $rating)
+                    <option value="{{ $rating }}" @selected((string) old('rating', $myReview?->rating) === (string) $rating)>{{ $rating }} / 5</option>
+                @endforeach
+            </select>
+            <label class="block text-sm text-buyer-ink" for="review-body">Your feedback (optional)</label>
+            <textarea id="review-body" name="body" rows="4" maxlength="2000" class="w-full rounded border border-buyer-line bg-cream px-3 py-2 text-buyer-ink">{{ old('body', $myReview?->body) }}</textarea>
+            @foreach (['rating', 'body', 'review'] as $field)
+                @error($field)<p role="alert" class="text-sm text-red-600">{{ $message }}</p>@enderror
+            @endforeach
+            <button type="submit" class="rounded bg-primary-800 px-4 py-2 text-sm font-semibold text-white">{{ $myReview ? 'Update review' : 'Submit review' }}</button>
+        </form>
+    @else
+        <p class="mt-3 text-sm text-buyer-ink-soft">Buy this product and confirm receipt to leave a review.</p>
+    @endif
+    <div class="mt-5 space-y-4">
+        @foreach ($reviews as $review)
+            <article class="border-t border-buyer-line pt-4">
+                <p class="text-sm font-semibold text-buyer-ink">Verified buyer - {{ $review->rating }}/5</p>
+                <time class="text-xs text-buyer-ink-soft">{{ $review->created_at->format('M j, Y') }}</time>
+                @if ($review->body)
+                    <p class="mt-2 whitespace-pre-line text-sm text-buyer-ink">{{ $review->body }}</p>
+                @endif
+            </article>
+        @endforeach
     </div>
-
-    {{-- ── Review cards ── --}}
-    <div class="flex flex-col gap-4">
-      @foreach ($reviews as $review)
-        <div class="rounded-2xl border border-buyer-line bg-white p-5">
-          {{-- Reviewer header --}}
-          <div class="mb-3 flex items-start justify-between gap-3">
-            <div class="flex items-center gap-3">
-              {{-- Avatar initial --}}
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary-200 font-sans text-[13px] font-semibold text-buyer-ink">
-                {{ strtoupper(substr($review['name'], 0, 1)) }}
-              </div>
-              <div>
-                <p class="text-[13px] font-semibold text-buyer-ink">{{ $review['name'] }}</p>
-                <div class="flex items-center gap-2">
-                  @if ($review['verified'])
-                    <span class="text-[10.5px] font-semibold text-tertiary-600">Verified Purchase</span>
-                    <span class="text-neutral-200">·</span>
-                  @endif
-                  <span class="text-[10.5px] text-neutral-400">{{ $review['date'] }}</span>
-                </div>
-              </div>
-            </div>
-            {{-- Stars --}}
-            <div class="flex shrink-0 items-center gap-0.5">
-              @for ($s = 1; $s <= 5; $s++)
-                <i class="fa-solid fa-star text-[10px] {{ $s <= $review['rating'] ? 'text-buyer-star' : 'text-neutral-200' }}"></i>
-              @endfor
-            </div>
-          </div>
-          <p class="text-[13px] leading-relaxed text-buyer-ink-soft">{{ $review['text'] }}</p>
-          {{-- Optional photo --}}
-          @if ($review['photo'])
-            <div class="mt-3">
-              <img src="{{ $review['photo'] }}" alt="Review photo" class="h-20 w-20 rounded-xl object-cover">
-            </div>
-          @endif
-        </div>
-      @endforeach
-    </div>
-
-  </div>
+    <div class="mt-4">{{ $reviews->withQueryString()->fragment('reviews')->links() }}</div>
 </section>

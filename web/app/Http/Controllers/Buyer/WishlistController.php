@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Models\Wishlist;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,8 @@ class WishlistController extends Controller
     {
         $buyer = auth('buyer')->user();
         $wishlistItems = $buyer->wishlist()
-            ->with(['product.images', 'product.seller', 'product.category'])
+            ->whereHas('product')
+            ->with(['product' => fn ($query) => $query->withBuyerCardData()->with(['images', 'seller', 'category'])])
             ->paginate(12);
 
         return view('Buyer.Wishlist.index', compact('wishlistItems'));
@@ -39,6 +41,8 @@ class WishlistController extends Controller
             $wishlist->delete();
             $isSaved = false;
         } else {
+            Product::query()->findOrFail($productId);
+
             Wishlist::create([
                 'buyer_id' => $buyer->id,
                 'product_id' => $productId,
@@ -49,7 +53,7 @@ class WishlistController extends Controller
         return response()->json([
             'success' => true,
             'isSaved' => $isSaved,
-            'count' => $buyer->wishlist()->count(),
+            'count' => $buyer->wishlist()->whereHas('product')->count(),
         ]);
     }
 
@@ -68,7 +72,7 @@ class WishlistController extends Controller
 
         return response()->json([
             'success' => true,
-            'count' => $buyer->wishlist()->count(),
+            'count' => $buyer->wishlist()->whereHas('product')->count(),
         ]);
     }
 }

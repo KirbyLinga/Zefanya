@@ -30,7 +30,7 @@ class LogisticsRegistrationDecision extends Notification
             return $message
                 ->greeting("Welcome, {$notifiable->fullName()}!")
                 ->line("Your logistics account for \"{$notifiable->business_name}\" has been approved.")
-                ->action('Sign in', route('login'));
+                ->action('Sign in', route('home', ['login' => 1]));
         }
 
         return $message

@@ -163,9 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Summary rendering ───────────────────────────────────────────────────
 
   function applySummary(payload) {
-    const quantity = Number(payload.selected_qty) || 0;
+    const selectedLines = Number(payload.selected_lines) || 0;
 
-    setText('#cartpage-summary-count', `${quantity} ${quantity === 1 ? 'item' : 'items'}`);
+    setText('#cartpage-summary-count', `${selectedLines} ${selectedLines === 1 ? 'item' : 'items'}`);
     setText('#cartpage-subtotal', payload.subtotal);
     setText('#cartpage-total', payload.total);
     setText('#cartpage-mobile-total', payload.total);

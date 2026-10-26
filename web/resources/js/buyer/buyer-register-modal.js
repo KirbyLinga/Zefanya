@@ -1,8 +1,11 @@
+import './address-lookup.js';
 // resources/js/buyer/buyer-register-modal.js
 // Behavior for the 4-step buyer registration modal
 // (resources/views/Components/buyer-register-modal.blade.php).
 // Pulled out of the blade file to match the buyer.js / home.js convention:
 // all page/component behavior lives in resources/js, not inline <script>.
+
+import '../registration-validation.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     var overlay = document.getElementById('buyerModalOverlay');
@@ -35,9 +38,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var provinceSelect = document.getElementById('province');
     var municipalitySelect = document.getElementById('municipality');
     var barangaySelect = document.getElementById('barangay');
-    var apiFields = document.getElementById('apiAddressFields');
-    var manualFields = document.getElementById('manualAddressFields');
-    var toggleManualBtn = document.getElementById('toggleManualAddress');
     var addressModeField = document.getElementById('addressMode');
     var provinceNameField = document.getElementById('provinceNameField');
     var municipalityNameField = document.getElementById('municipalityNameField');
@@ -57,20 +57,17 @@ document.addEventListener('DOMContentLoaded', function () {
     var backStep4 = document.getElementById('backStep4');
 
     // Bail out loudly instead of crashing silently mid-way through wiring —
-    // a single missing element used to throw and abort every listener
-    // registration after it (which is exactly why Next could stop working).
-    var required = {
-        closeBtn: closeBtn, form: form, headerIcon: headerIcon, birthdayInput: birthdayInput, ageInput: ageInput,
-        birthMonthSelect: birthMonthSelect, birthDaySelect: birthDaySelect, birthYearSelect: birthYearSelect,
-        provinceSelect: provinceSelect, municipalitySelect: municipalitySelect, barangaySelect: barangaySelect,
-        apiFields: apiFields, manualFields: manualFields, toggleManualBtn: toggleManualBtn,
-        uploadIdInput: uploadIdInput, uploadIdName: uploadIdName, passwordInput: passwordInput, confirmInput: confirmInput,
-        nextStep1: nextStep1, backStep2: backStep2, nextStep2: nextStep2, backStep3: backStep3,
-        submitRegistration: submitRegistration, backStep4: backStep4,
+    // but only for truly essential elements. Make others optional to avoid
+    // silent failures when a single element is mildly different.
+    var essentialElements = {
+        overlay: overlay, closeBtn: closeBtn, form: form, headerIcon: headerIcon,
+        birthdayInput: birthdayInput, ageInput: ageInput, passwordInput: passwordInput,
+        confirmInput: confirmInput, nextStep1: nextStep1, nextStep2: nextStep2,
+        submitRegistration: submitRegistration, uploadIdInput: uploadIdInput,
     };
-    var missing = Object.keys(required).filter(function (k) { return !required[k]; });
+    var missing = Object.keys(essentialElements).filter(function (k) { return !essentialElements[k]; });
     if (missing.length) {
-        console.error('[buyer-register-modal] missing element(s), aborting init:', missing.join(', '));
+        console.error('[buyer-register-modal] missing essential element(s), aborting init:', missing.join(', '));
         return;
     }
 
@@ -108,6 +105,10 @@ document.addEventListener('DOMContentLoaded', function () {
         headerIcon.innerHTML = '<i data-lucide="' + stepIcons[n] + '" width="20" height="20"></i>';
         if (window.lucide) lucide.createIcons();
     }
+
+    var addressLookup = window.zfAddressLookup
+        ? window.zfAddressLookup.init(document.getElementById('buyerModalOverlay') || document)
+        : null;
 
     // ===== Open / close =====
     window.openBuyerRegisterModal = function (e) {
@@ -199,40 +200,79 @@ document.addEventListener('DOMContentLoaded', function () {
     // ===== PH address cascading dropdowns (PSGC API) =====
     // Shared logic lives in resources/js/buyer/address-lookup.js (also used by
     // the account address page) — the modal just hosts the DOM contract.
-    var addressLookup = window.zfAddressLookup
-        ? window.zfAddressLookup.init(document.getElementById('buyerModalOverlay') || document)
-        : null;
+
+    var MAX_ID_BYTES = 5 * 1024 * 1024;
+    var ALLOWED_ID_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
+
+    function idFileError(file) {
+        if (!file) return 'Please upload a file.';
+        if (file.size > MAX_ID_BYTES) return 'Upload ID must be smaller than 5MB.';
+        if (file.type && ALLOWED_ID_TYPES.indexOf(file.type) === -1) {
+            return 'Upload ID must be a JPG, PNG, or PDF.';
+        }
+        return '';
+    }
 
     uploadIdInput.addEventListener('change', function () {
-        uploadIdName.textContent = uploadIdInput.files.length ? uploadIdInput.files[0].name : 'Choose a valid ID';
+        clearFieldError(uploadIdInput);
+        if (!uploadIdInput.files.length) {
+            uploadIdName.textContent = 'Choose a valid ID';
+            return;
+        }
+        var file = uploadIdInput.files[0];
+        var error = idFileError(file);
+        if (error) {
+            uploadIdInput.value = '';
+            uploadIdName.textContent = 'Choose a valid ID';
+            showFieldError(uploadIdInput, error);
+            return;
+        }
+        uploadIdName.textContent = file.name;
     });
 
-    // ===== Contact number: numeric input only =====
+    // ===== Contact number: live validation + numeric input =====
     var contactNoInput = document.getElementById('contactNo');
     if (contactNoInput) {
         contactNoInput.addEventListener('input', function () {
-            // Remove any non-digit characters
-            this.value = this.value.replace(/\D/g, '');
+            var val = this.value;
+            if (/\D/.test(val) && !/^\+?\d*$/.test(val)) {
+                showFieldError(this, 'Enter a valid mobile number (09XXXXXXXXX or +639XXXXXXXXX).');
+                return;
+            }
+            var digits = val.replace(/\D/g, '');
+            if (digits.length === 0) {
+                clearFieldError(this);
+                return;
+            }
+            if (digits.length >= 2 && !digits.startsWith('09')) {
+                showFieldError(this, 'Enter a valid mobile number (09XXXXXXXXX or +639XXXXXXXXX).');
+                return;
+            }
+            if (digits.length === 10 || digits.length > 11) {
+                showFieldError(this, 'Mobile number must be 11 digits, like 09171234567.');
+                return;
+            }
+            if (digits.length === 11) {
+                clearFieldError(this);
+                return;
+            }
+            clearFieldError(this);
         });
-        contactNoInput.addEventListener('keypress', function (e) {
-            // Prevent non-numeric characters from being typed
-            if (!/\d/.test(String.fromCharCode(e.which))) {
-                e.preventDefault();
+        contactNoInput.addEventListener('blur', function () {
+            if (!this.value) {
+                showFieldError(this, 'This field is required.');
+            } else if (!/^09\d{9}$/.test(this.value)) {
+                var msg = (this.value.length === 10 || this.value.length > 11)
+                    ? 'Mobile number must be 11 digits, like 09171234567.'
+                    : 'Enter a valid PH mobile number (09XXXXXXXXX).';
+                showFieldError(this, msg);
+            } else {
+                clearFieldError(this);
             }
         });
     }
 
-    // ===== Password visibility toggles =====
-    document.querySelectorAll('[data-toggle-visibility]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var target = document.getElementById(btn.getAttribute('data-toggle-visibility'));
-            if (!target) return;
-            var isHidden = target.type === 'password';
-            target.type = isHidden ? 'text' : 'password';
-            btn.innerHTML = '<i data-lucide="' + (isHidden ? 'eye-off' : 'eye') + '" width="16" height="16"></i>';
-            if (window.lucide) lucide.createIcons();
-        });
-    });
+    // Password visibility is handled once by registration-validation.js.
 
     // ===== Validation helpers =====
     // Every field's error <span class="field-error"> is either the field's own
@@ -272,17 +312,29 @@ document.addEventListener('DOMContentLoaded', function () {
         clearPanelErrors(panel);
         var valid = true;
         panel.querySelectorAll('[required]').forEach(function (field) {
-            if (field.offsetParent === null && field.type !== 'hidden') return;
-            if (field.type === 'checkbox') {
+            // Hidden file inputs (class="hidden") have offsetParent === null;
+            // still validate them — otherwise step 3 always looks "incomplete".
+            if (field.offsetParent === null && field.type !== 'hidden' && field.type !== 'file') return;
+            if (field.type === 'file') {
+                var file = field.files && field.files[0];
+                var fileError = idFileError(file);
+                if (fileError) {
+                    showFieldError(field, fileError);
+                    valid = false;
+                }
+            } else if (field.type === 'checkbox') {
                 if (!field.checked) {
                     showFieldError(field, 'You must accept the Terms and Privacy Policy.');
                     valid = false;
                 }
-            } else if (!field.value || (field.type === 'file' && field.files.length === 0)) {
+            } else if (!field.value) {
                 showFieldError(field, 'This field is required.');
                 valid = false;
             } else if (field.id === 'contactNo' && !/^09\d{9}$/.test(field.value)) {
-                showFieldError(field, 'Enter a valid PH mobile number (09XXXXXXXXX).');
+                var contactError = (field.value.length === 10 || field.value.length > 11)
+                    ? 'Mobile number must be 11 digits, like 09171234567.'
+                    : 'Enter a valid PH mobile number (09XXXXXXXXX).';
+                showFieldError(field, contactError);
                 valid = false;
             } else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value)) {
                 showFieldError(field, 'Enter a valid email address.');
@@ -298,12 +350,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (birthdayError) birthdayError.textContent = 'Select your full birthday.';
                 valid = false;
             }
-            if (passwordInput.value && !/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:'",.:<>?\\/])/.test(passwordInput.value)) {
-                showFieldError(passwordInput, 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.');
-                valid = false;
-            } else if (passwordInput.value && passwordInput.value.length < 8) {
-                showFieldError(passwordInput, 'Password must be at least 8 characters.');
-                valid = false;
+            // Password validation: minimum 8 characters (allow weak passwords with warning)
+            if (passwordInput.value) {
+                if (passwordInput.value.length < 8) {
+                    showFieldError(passwordInput, 'Password must be at least 8 characters.');
+                    valid = false;
+                }
+                // If >= 8 chars, password is valid even if weak
             }
             if (confirmInput.value && passwordInput.value !== confirmInput.value) {
                 showFieldError(confirmInput, 'Passwords do not match.');
@@ -313,61 +366,103 @@ document.addEventListener('DOMContentLoaded', function () {
         return valid;
     }
 
-    nextStep1.addEventListener('click', function () { if (validatePanel(1)) showPanel(2); });
+    nextStep1.addEventListener('click', function (e) { 
+        if (!validatePanel(1)) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            }
+            return;
+        }
+        showPanel(2);
+    });
     backStep2.addEventListener('click', function () { showPanel(1); });
     nextStep2.addEventListener('click', function () { if (validatePanel(2)) showPanel(3); });
     backStep3.addEventListener('click', function () { showPanel(2); });
     backStep4.addEventListener('click', function () { showPanel(3); });
 
     // ===== Step 3 "Next" = actual registration submit (fires the OTP email) =====
+    var modalEl = overlay.querySelector('.buyer-modal');
+
+    function setSubmitting(isBusy) {
+        submitRegistration.disabled = isBusy;
+        submitRegistration.textContent = isBusy ? 'Uploading...' : 'Next';
+        if (modalEl) modalEl.classList.toggle('is-busy', isBusy);
+        overlay.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    }
+
     submitRegistration.addEventListener('click', function () {
-        if (!validatePanel(3)) return;
-
-        var submitBtn = this;
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
-
-        var formData = new FormData(form);
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-            credentials: 'same-origin',
-        })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-        .then(function (res) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Next';
-            if (res.ok && res.body && res.body.buyer_id) {
-                document.getElementById('buyerOtpId').value = res.body.buyer_id;
-                document.getElementById('buyerOtpEmail').textContent = res.body.email;
-                showPanel(4);
-                setTimeout(function () {
-                    var first = document.querySelector('.buyer-otp-input[data-otp-index="0"]');
-                    if (first) first.focus();
-                }, 50);
-            } else if (res.body && res.body.errors) {
-                panels.forEach(function (p) { clearPanelErrors(p); });
-                Object.keys(res.body.errors).forEach(function (name) {
-                    var field = form.querySelector('[name="' + name + '"]');
-                    if (field) showFieldError(field, res.body.errors[name][0]);
-                    if (name === 'birthday') {
-                        [birthMonthSelect, birthDaySelect, birthYearSelect].forEach(function (s) { s.classList.add('border-[#a5333d]'); });
-                    }
-                });
-                var step1Fields = ['first_name', 'last_name', 'sex', 'email', 'password', 'contact_no', 'birthday'];
-                var step2Fields = ['province', 'municipality', 'barangay', 'street'];
-                var errKeys = Object.keys(res.body.errors);
-                if (errKeys.some(function (k) { return step1Fields.indexOf(k) !== -1; })) showPanel(1);
-                else if (errKeys.some(function (k) { return step2Fields.indexOf(k) !== -1; })) showPanel(2);
-            } else {
-                alert(res.body && res.body.message ? res.body.message : 'Registration failed. Please try again.');
+        if (!validatePanel(3)) {
+            var panel = panels.filter(function (p) { return parseInt(p.dataset.panel, 10) === 3; })[0];
+            if (panel) {
+                var errorDiv = panel.querySelector('[data-step3-error]');
+                if (!errorDiv) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.setAttribute('data-step3-error', 'true');
+                    errorDiv.className = 'mb-4 rounded-sm border border-[#e8a49c] bg-[#fbe9e7] px-4 py-3 font-sans text-[12.5px] text-[#a5333d]';
+                    panel.insertBefore(errorDiv, submitRegistration.parentElement);
+                }
+                errorDiv.textContent = 'Please complete all required fields.';
             }
-        })
-        .catch(function () {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Next';
-            alert('Network error. Please try again.');
+            return;
+        }
+
+        setSubmitting(true);
+
+        // Let the busy overlay paint before FormData + fetch block the UI.
+        window.requestAnimationFrame(function () {
+            var formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin',
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (res.ok && res.body && res.body.buyer_id) {
+                    setSubmitting(false);
+                    var otpIdInput = document.getElementById('buyerOtpId');
+                    otpIdInput.value = res.body.buyer_id;
+                    // Signed verify/resend URLs come from the server (see
+                    // SignedOtpLink); the id alone would be rejected.
+                    otpIdInput.dataset.verifyUrl = res.body.verify_url || '';
+                    otpIdInput.dataset.resendUrl = res.body.resend_url || '';
+                    document.getElementById('buyerOtpEmail').textContent = res.body.email_masked || res.body.email;
+                    showPanel(4);
+                    setTimeout(function () {
+                        var first = document.querySelector('.buyer-otp-input[data-otp-index="0"]');
+                        if (first) first.focus();
+                    }, 50);
+                    return;
+                }
+
+                setSubmitting(false);
+                if (res.body && res.body.errors) {
+                    panels.forEach(function (p) { clearPanelErrors(p); });
+                    Object.keys(res.body.errors).forEach(function (name) {
+                        var field = form.querySelector('[name="' + name + '"]');
+                        if (field) showFieldError(field, res.body.errors[name][0]);
+                        if (name === 'birthday') {
+                            [birthMonthSelect, birthDaySelect, birthYearSelect].forEach(function (s) { s.classList.add('border-[#a5333d]'); });
+                        }
+                    });
+                    var step1Fields = ['first_name', 'last_name', 'sex', 'email', 'password', 'contact_no', 'birthday'];
+                    var step2Fields = ['province', 'municipality', 'barangay', 'street', 'address_mode', 'province_name', 'municipality_name', 'barangay_name'];
+                    var step3Fields = ['upload_id', 'terms'];
+                    var errKeys = Object.keys(res.body.errors);
+                    if (errKeys.some(function (k) { return step1Fields.indexOf(k) !== -1; })) showPanel(1);
+                    else if (errKeys.some(function (k) { return step2Fields.indexOf(k) !== -1; })) showPanel(2);
+                    else if (errKeys.some(function (k) { return step3Fields.indexOf(k) !== -1; })) showPanel(3);
+                } else {
+                    alert(res.body && res.body.message ? res.body.message : 'Registration failed. Please try again.');
+                }
+            })
+            .catch(function () {
+                setSubmitting(false);
+                alert('Network error. Please try again.');
+            });
         });
     });
 
@@ -396,6 +491,24 @@ document.addEventListener('DOMContentLoaded', function () {
             otpFieldError.textContent = msg;
             otpInputs.forEach(function (i) { i.classList.add('border-[#a5333d]'); });
         }
+        // Human "try again in N" text for a rate-limit / lock response.
+        function otpWaitText(seconds) {
+            seconds = parseInt(seconds, 10);
+            if (!seconds || seconds <= 0) return '';
+            if (seconds < 60) return 'Try again in ' + seconds + ' second' + (seconds === 1 ? '' : 's') + '.';
+            var mins = Math.ceil(seconds / 60);
+            return 'Try again in ' + mins + ' minute' + (mins === 1 ? '' : 's') + '.';
+        }
+        // Prefer the server's own message (429 lock / 503 mail failure) and add
+        // the retry time when the server sends one and the message omits it.
+        function otpServerError(res, fallback) {
+            var body = (res && res.body) ? res.body : {};
+            var msg = body.message || fallback;
+            if (res && res.status === 429 && body.retry_after && !/\d+\s*(second|minute)/i.test(msg)) {
+                msg += ' ' + otpWaitText(body.retry_after);
+            }
+            return msg;
+        }
 
         otpInputs.forEach(function (input, idx) {
             input.addEventListener('input', function () {
@@ -421,38 +534,41 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         resendBtn.addEventListener('click', function () {
-            var id = buyerIdInput.value;
-            if (!id) return;
+            var resendUrl = buyerIdInput.dataset.resendUrl || '';
+            if (!resendUrl) {
+                resendStatus.textContent = 'Your verification session expired. Please reload the page.';
+                return;
+            }
             resendBtn.disabled = true;
             resendStatus.textContent = 'Sending...';
-            fetch('/register/buyer/verify-otp/' + id + '/resend', {
+            fetch(resendUrl, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
             })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
             .then(function (res) {
                 if (res.ok) {
                     otpInputs.forEach(function (i) { i.value = ''; });
                     hiddenOtp.value = '';
                     otpInputs[0].focus();
-
+                    
                     // Start countdown timer (60 seconds)
                     var secondsLeft = 60;
                     var timerInterval = setInterval(function () {
                         secondsLeft--;
                         resendStatus.textContent = secondsLeft + 's';
-
+                        
                         if (secondsLeft <= 0) {
                             clearInterval(timerInterval);
                             resendBtn.disabled = false;
                             resendStatus.textContent = '';
                         }
                     }, 1000);
-
+                    
                     resendStatus.textContent = '60s';
                 } else {
                     resendBtn.disabled = false;
-                    resendStatus.textContent = res.body.message || 'Could not resend.';
+                    resendStatus.textContent = otpServerError(res, 'Could not resend.');
                 }
             })
             .catch(function () { resendBtn.disabled = false; resendStatus.textContent = 'Network error.'; });
@@ -461,27 +577,28 @@ document.addEventListener('DOMContentLoaded', function () {
         otpForm.addEventListener('submit', function (e) {
             e.preventDefault();
             clearOtpErrors();
-            var id = buyerIdInput.value;
+            var verifyUrl = buyerIdInput.dataset.verifyUrl || '';
             var code = collectOtp();
             if (code.length !== 6) { showOtpError('Enter all 6 digits.'); return; }
+            if (!verifyUrl) { showOtpError('Your verification session expired. Please reload the page.'); return; }
             hiddenOtp.value = code;
 
             otpSubmitBtn.disabled = true;
             otpSubmitBtn.textContent = 'Verifying...';
 
-            fetch('/register/buyer/verify-otp/' + id, {
+            fetch(verifyUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
                 body: JSON.stringify({ otp: code }),
             })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
             .then(function (res) {
                 otpSubmitBtn.disabled = false;
                 otpSubmitBtn.textContent = 'Verify';
                 if (res.ok) {
                     window.location.href = res.body.redirect || '/register/buyer/pending';
                 } else {
-                    showOtpError(res.body.message || 'Verification failed.');
+                    showOtpError(otpServerError(res, 'Verification failed.'));
                 }
             })
             .catch(function () {
@@ -493,6 +610,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     showPanel(1);
+
+    // ===== Password strength meter + visibility helpers =====
+    // The shared registration-validation.js exposes these on window.__zfReg.
+    // Initialise the meter now, after the modal DOM has been rendered, and
+    // reset it on every showPanel() call so pre-filled values are reflected.
+    function initBuyerPasswordMeter() {
+        if (window.__zfReg) {
+            window.__zfReg.initPasswordMeter();
+        }
+    }
+    if (window.__zfReg) {
+        initBuyerPasswordMeter();
+    }
+    if (window.__zfReg && window.__zfReg.initPasswordToggles) {
+        window.__zfReg.initPasswordToggles();
+    }
 
     if (window.__buyerModalHasServerErrors) {
         window.openBuyerRegisterModal();

@@ -14,7 +14,7 @@
   <div class="auth-hero__intro">
     <h1 class="auth-hero__title">Verify your email</h1>
     <p class="auth-hero__subtitle">
-      We sent a 6-digit code to <strong>{{ $logisticsProvider->email }}</strong>.
+      We sent a 6-digit code to <strong>{{ $emailMasked }}</strong>.
       Enter it below to continue — your registration then goes to an administrator for approval.
     </p>
 
@@ -22,7 +22,7 @@
       <p style="color: green;">{{ session('success') }}</p>
     @endif
 
-    <form method="POST" action="{{ route('register.logistics.verify-otp.store', $logisticsProvider) }}" style="margin-top: 16px;">
+    <form method="POST" action="{{ $verifyUrl }}" style="margin-top: 16px;">
       @csrf
       <label for="otp">Verification code</label>
       <input type="text" name="otp" id="otp" inputmode="numeric" maxlength="6" required
@@ -35,7 +35,7 @@
       <button type="submit">Verify</button>
     </form>
 
-    <form method="POST" action="{{ route('register.logistics.verify-otp.resend', $logisticsProvider) }}" style="margin-top: 12px;">
+    <form method="POST" action="{{ $resendUrl }}" style="margin-top: 12px;">
       @csrf
       <button type="submit">Resend code</button>
     </form>

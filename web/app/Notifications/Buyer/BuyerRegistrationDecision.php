@@ -35,7 +35,7 @@ class BuyerRegistrationDecision extends Notification
             return $message
                 ->greeting("Welcome, {$notifiable->fullName()}!")
                 ->line('Your buyer account has been approved. You can now log in and start shopping.')
-                ->action('Log in', url('/login'));
+                ->action('Log in', route('home', ['login' => 1]));
         }
 
         return $message

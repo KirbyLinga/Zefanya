@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── 1. Gallery: thumbnail → main image swap ──────────────────────────────
   const mainImg = document.getElementById('pdp-main-img');
   const thumbBtns = document.querySelectorAll('.js-pdp-thumb');
+  const generalImage = mainImg?.getAttribute('src') || '';
+  let selectedColorImage = null;
 
   thumbBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -44,7 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let   variantsData   = [];
   let   selectedValues = [];
   let   selectedVariant = null;
-  let   baseStock      = parseInt(addCartBtn?.dataset.stock || '99', 10);
+  const basePriceText = document.getElementById('pdp-price')?.textContent || '';
+  let   baseStock      = Math.max(0, parseInt(addCartBtn?.dataset.stock || '0', 10) || 0);
 
   if (variantMode) {
     try { variantsData = JSON.parse(variantsScript.textContent || '[]'); } catch { variantsData = []; }
@@ -69,13 +72,39 @@ document.addEventListener('DOMContentLoaded', () => {
       if (label) label.textContent = value || '';
     });
 
+    // One color upload is shared by its size combinations. Color alone can preview it.
+    const colorAxis = variantsData.find((variant) => Number.isInteger(variant.color_axis))?.color_axis;
+    const colorValue = Number.isInteger(colorAxis) ? selectedValues[colorAxis] : null;
+    const imageVariant = variantsData.find((variant) =>
+      colorValue && variant.values[colorAxis] === colorValue && variant.images?.length
+    );
+    const nextImage = imageVariant?.images?.[0] || generalImage;
+    if (mainImg && selectedColorImage !== nextImage) {
+      selectedColorImage = nextImage;
+      mainImg.src = nextImage;
+      mainImg.style.opacity = nextImage ? '1' : '0';
+      thumbBtns.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.src === nextImage)));
+    }
+
     // Price + stock follow the selected variant.
     const priceEl = document.getElementById('pdp-price');
     if (selectedVariant && priceEl) {
       priceEl.textContent = '₱' + selectedVariant.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      baseStock = selectedVariant.stock;
       const hidden = document.getElementById('pdp-variant-id');
-      if (hidden) hidden.value = selectedVariant.available ? String(selectedVariant.id) : '';
+      if (hidden) hidden.value = selectedVariant.available && selectedVariant.stock > 0 ? String(selectedVariant.id) : '';
+    }
+
+    if (!selectedVariant) {
+      if (priceEl) priceEl.textContent = basePriceText;
+      const hidden = document.getElementById('pdp-variant-id');
+      if (hidden) hidden.value = '';
+    }
+
+    const availability = document.getElementById('pdp-availability');
+    if (availability) {
+      availability.textContent = selectedVariant
+        ? (selectedVariant.available && selectedVariant.stock > 0 ? selectedVariant.stock + ' unit(s) available' : 'Out of Stock')
+        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Out of Stock' : variantsScript.dataset.selectionMessage || 'Select color and size to see availability.');
     }
 
     // Sold-out styling: a value is sold out when every variant carrying it
@@ -86,19 +115,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const probe = selectedValues.map((v, i) => (i === axis ? value : v));
       const hasStock = variantsData.some((v) =>
         v.available && v.stock > 0
-        && probe.every((p, i) => p === null || p === v.values[i])
+        && probe.every((p, i) => i > axis || p === null || p === v.values[i])
         && v.values[axis] === value
       );
       btn.classList.toggle('soldout', !hasStock);
+      btn.disabled = !hasStock;
+      btn.setAttribute('aria-disabled', String(!hasStock));
+      btn.classList.toggle('selected', selectedValues[axis] === value);
+      btn.setAttribute('aria-pressed', String(selectedValues[axis] === value));
     });
 
+    pdpQty = currentStock() > 0 ? Math.max(1, Math.min(pdpQty, currentStock())) : 0;
     updateQtyDisplay();
   }
 
   document.querySelectorAll('.js-pdp-variant-value').forEach((btn) => {
     btn.addEventListener('click', () => {
       const axis = parseInt(btn.dataset.axisIndex, 10);
+      if (btn.disabled) return;
       selectedValues[axis] = btn.dataset.value;
+      selectedValues = selectedValues.map((value, i) => i > axis ? null : value);
 
       btn.closest('[role="group"]').querySelectorAll('.js-pdp-variant-value').forEach((b) => {
         b.classList.remove('selected');
@@ -114,24 +150,46 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  if (variantMode) updateVariantUi();
 
   // ── 4. Quantity stepper ──────────────────────────────────────────────────
   const qtyDisplay = document.getElementById('pdp-qty');
   const qtyUp      = document.getElementById('pdp-qty-up');
   const qtyDown    = document.getElementById('pdp-qty-down');
   let   pdpQty     = 1;
+  if (variantMode) updateVariantUi();
 
   function currentStock() {
-    return variantMode && selectedVariant ? selectedVariant.stock : baseStock;
+    return variantMode ? (selectedVariant?.available ? Math.max(0, selectedVariant.stock) : 0) : baseStock;
   }
 
   function updateQtyDisplay() {
-    if (qtyDisplay) qtyDisplay.textContent = pdpQty;
+    const stock = currentStock();
+    pdpQty = stock > 0 ? Math.max(1, Math.min(pdpQty, stock)) : 0;
+    if (qtyDisplay) {
+      qtyDisplay.value = String(pdpQty);
+      qtyDisplay.max = String(stock);
+      qtyDisplay.disabled = stock <= 0;
+    }
+    if (qtyDown) qtyDown.disabled = stock <= 0 || pdpQty <= 1;
+    if (qtyUp) qtyUp.disabled = stock <= 0 || pdpQty >= stock;
+    [addCartBtn, document.getElementById('pdp-buy-now')].forEach(button => {
+      if (button) button.disabled = stock <= 0 || button.dataset.busy === '1';
+    });
     // Dim the down button at min, up button at max
     if (qtyDown) qtyDown.style.opacity = pdpQty <= 1 ? '0.35' : '1';
     if (qtyUp)   qtyUp.style.opacity   = pdpQty >= currentStock() ? '0.35' : '1';
   }
+
+  function readTypedQuantity() {
+    const stock = currentStock();
+    const typed = Number(qtyDisplay.value);
+    pdpQty = stock > 0 ? Math.max(1, Math.min(Number.isFinite(typed) ? Math.trunc(typed) : 1, stock)) : 0;
+    // Leave an empty field editable until blur so replacing a number is easy.
+    if (qtyDisplay.value !== '') updateQtyDisplay();
+  }
+  qtyDisplay?.addEventListener('input', readTypedQuantity);
+  qtyDisplay?.addEventListener('change', () => { readTypedQuantity(); updateQtyDisplay(); });
+  qtyDisplay?.addEventListener('blur', () => { readTypedQuantity(); updateQtyDisplay(); });
 
   qtyUp?.addEventListener('click', () => {
     if (pdpQty < currentStock()) { pdpQty++; updateQtyDisplay(); }
@@ -173,149 +231,43 @@ document.addEventListener('DOMContentLoaded', () => {
     handleAddToCart(productId, pdpQty, null, addCartBtn);
   });
 
-  // Helper function to handle add-to-cart with animation
+  // Add to cart — toast is shown by buyer.js; keep a brief “Added” button state.
   function handleAddToCart(productId, quantity, variantId, button) {
-    const ANIMATION_DURATION = 650;
     const BUTTON_STATE_DURATION = 1500;
-    const DESKTOP_BREAKPOINT = 768;
-    const prefersReducedMotion = window.matchMedia('(prefers-reduce-motion: reduce)').matches;
-
-    // Disable button during animation
+    button.dataset.busy = '1';
     button.disabled = true;
     const originalHTML = button.innerHTML;
     const originalClasses = button.className;
 
-    // Start the add-to-cart request
     window.addToCart(productId, quantity, variantId)
       .then(data => {
         if (!data) {
-          // Error or 401 — revert button state
-          button.disabled = false;
+          delete button.dataset.busy;
+          updateQtyDisplay();
           return;
         }
 
-        // Get product image for animation
-        const mainImg = document.getElementById('pdp-main-img');
-        const cartIcon = document.getElementById('cartDropdownToggle');
-
-        if (!mainImg || !cartIcon) {
-          // No animation context, just show button state
-          setAddedState(button, originalHTML, BUTTON_STATE_DURATION, originalClasses);
-          return;
+        button.className = originalClasses;
+        button.classList.add('bg-buyer-ink', 'text-white', '!border-buyer-ink');
+        button.innerHTML = '<i data-lucide="check" width="15" height="15"></i> Added';
+        if (window.lucide) {
+          window.lucide.createIcons({ scope: button });
         }
 
-        const isMobile = window.innerWidth < DESKTOP_BREAKPOINT;
-
-        if (isMobile || prefersReducedMotion) {
-          // Mobile or reduced motion: just button state
-          setAddedState(button, originalHTML, BUTTON_STATE_DURATION, originalClasses);
-        } else {
-          // Desktop: fly animation + button state
-          const imgRect = mainImg.getBoundingClientRect();
-          const cartRect = cartIcon.getBoundingClientRect();
-
-          if (imgRect && cartRect) {
-            flyToCart(mainImg, imgRect, cartRect);
+        setTimeout(() => {
+          button.className = originalClasses;
+          button.innerHTML = originalHTML;
+          delete button.dataset.busy;
+          updateQtyDisplay();
+          if (window.lucide) {
+            window.lucide.createIcons({ scope: button });
           }
-
-          // Bounce badge and show button state
-          setTimeout(() => {
-            bounceBadge();
-          }, ANIMATION_DURATION * 0.5);
-
-          setAddedState(button, originalHTML, BUTTON_STATE_DURATION, originalClasses);
-        }
+        }, BUTTON_STATE_DURATION);
       })
       .catch(() => {
-        button.disabled = false;
+        delete button.dataset.busy;
+          updateQtyDisplay();
       });
-  }
-
-  // Animation helper: fly product image to cart
-  function flyToCart(sourceImg, sourceRect, targetRect) {
-    const clone = document.createElement('div');
-    clone.style.position = 'fixed';
-    clone.style.zIndex = '9999';
-    clone.style.top = sourceRect.top + 'px';
-    clone.style.left = sourceRect.left + 'px';
-    clone.style.width = sourceRect.width + 'px';
-    clone.style.height = sourceRect.height + 'px';
-    clone.style.borderRadius = '8px';
-    clone.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.2)';
-    clone.style.backgroundSize = 'cover';
-    clone.style.backgroundPosition = 'center';
-
-    if (sourceImg instanceof HTMLImageElement) {
-      clone.style.backgroundImage = `url('${sourceImg.src}')`;
-    }
-
-    document.body.appendChild(clone);
-
-    const targetCenterX = targetRect.left + targetRect.width / 2;
-    const targetCenterY = targetRect.top + targetRect.height / 2;
-
-    const animation = clone.animate(
-      [
-        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        {
-          transform: `translate(${(targetCenterX - sourceRect.left - sourceRect.width / 2) / 2}px, ${(targetCenterY - sourceRect.top - sourceRect.height / 2) / 2 - 60}px) scale(0.6)`,
-          opacity: 0.8,
-        },
-        {
-          transform: `translate(${targetCenterX - sourceRect.left - sourceRect.width / 2}px, ${targetCenterY - sourceRect.top - sourceRect.height / 2}px) scale(0.2)`,
-          opacity: 0,
-        },
-      ],
-      {
-        duration: 650,
-        easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-      }
-    );
-
-    animation.onfinish = () => {
-      clone.remove();
-    };
-  }
-
-  // Animation helper: bounce cart badge
-  function bounceBadge() {
-    const badge = document.getElementById('cartCount');
-    if (!badge) return;
-
-    badge.animate(
-      [
-        { transform: 'scale(1)' },
-        { transform: 'scale(1.3)', offset: 0.5 },
-        { transform: 'scale(1)' },
-      ],
-      {
-        duration: 400,
-        easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-      }
-    );
-  }
-
-  // Helper: set button to "Added" state
-  function setAddedState(button, originalHTML, duration, originalClasses) {
-    button.className = originalClasses;
-    button.classList.add('bg-buyer-ink', 'text-white', '!border-buyer-ink');
-    button.classList.remove('border', 'bg-transparent', 'text-buyer-ink', 'hover:bg-buyer-ink', 'hover:text-white');
-
-    button.innerHTML = '<i data-lucide="check" width="15" height="15"></i> Added';
-
-    if (window.lucide) {
-      window.lucide.createIcons({ scope: button });
-    }
-
-    setTimeout(() => {
-      button.className = originalClasses;
-      button.innerHTML = originalHTML;
-      button.disabled = false;
-
-      if (window.lucide) {
-        window.lucide.createIcons({ scope: button });
-      }
-    }, duration);
   }
 
   // ── 6. Checkout (Buy Now) — skips the cart, checks out THIS item only ────
@@ -340,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
       variantId = selectedVariant.id;
     }
 
+    buyNowBtn.dataset.busy = '1';
     buyNowBtn.disabled = true;
 
     const promise = window.buyNow(productId, pdpQty, variantId);
@@ -353,7 +306,8 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       }).finally(() => {
-        buyNowBtn.disabled = false;
+        delete buyNowBtn.dataset.busy;
+        updateQtyDisplay();
       });
     }
   });

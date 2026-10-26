@@ -61,7 +61,7 @@ class AccountController extends Controller
 
         foreach ($allOrdersForCounts as $o) {
             $statuses = $o->sellerOrders->pluck('status');
-            if ($statuses->contains(fn ($s) => $s === OrderStatus::Completed)) {
+            if ($o->computeRollupStatus() === OrderStatus::Completed) {
                 $counts['completed']++;
             } elseif ($statuses->contains(fn ($s) => in_array($s, self::TO_RECEIVE_STATUSES, true))) {
                 $counts['to_receive']++;
@@ -110,12 +110,15 @@ class AccountController extends Controller
             'province' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
             'province_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
             'municipality' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'municipality_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
+            // Required in BOTH modes — see StoreBuyerRegistrationRequest: a
+            // missing municipality breaks service-area matching at fulfillment.
+            'municipality_name' => ['required', 'string'],
             'barangay' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
             'barangay_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
             'street' => ['required', 'string', 'max:255'],
             'house_number' => ['nullable', 'string', 'max:50'],
             'address_detail' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:10'],
         ];
     }
 
@@ -253,6 +256,7 @@ class AccountController extends Controller
             'street' => $data['street'],
             'house_number' => $data['house_number'] ?? null,
             'address_detail' => $data['address_detail'] ?? null,
+            'postal_code' => $data['postal_code'] ?? null,
         ]);
 
         return redirect()

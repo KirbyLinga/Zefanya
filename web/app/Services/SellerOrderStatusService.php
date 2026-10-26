@@ -4,14 +4,24 @@ namespace App\Services;
 
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
+use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\Admin\Admin;
+use App\Models\InventoryTransaction;
 use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SellerOrder;
 use App\Models\StatusHistory;
 use App\Notifications\Buyer\CourierAssigned;
+use App\Notifications\Buyer\DeliveryFailed as BuyerDeliveryFailed;
 use App\Notifications\Buyer\OrderDelivered;
 use App\Notifications\Buyer\OrderOutForDelivery;
+use App\Notifications\Buyer\SellerOrderCancelled;
+use App\Notifications\Seller\BuyerOrderCancelled;
+use App\Notifications\Seller\DeliveryFailed as SellerDeliveryFailed;
+use App\Notifications\Seller\ParcelReturned;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,6 +36,19 @@ use Illuminate\Support\Facades\DB;
  */
 class SellerOrderStatusService
 {
+    /** Two total delivery attempts: the initial run and one retry. */
+    public const MAX_DELIVERY_ATTEMPTS = 2;
+
+    public function __construct(
+        private readonly CommissionFinalizationService $commissions = new CommissionFinalizationService,
+    ) {}
+
+    public static function canRetryDelivery(SellerOrder $parcel): bool
+    {
+        return ! $parcel->hasActiveReturn() && $parcel->status === OrderStatus::DeliveryFailed
+            && (int) $parcel->delivery_attempts === self::MAX_DELIVERY_ATTEMPTS - 1;
+    }
+
     /**
      * Legal forward transitions. A status not present here as a key has no
      * outbound transitions (terminal). The graph is forward-only: every hop
@@ -34,9 +57,9 @@ class SellerOrderStatusService
      * Role ownership of each hop lives in OrderActor::allowedTransitions().
      */
     private const ALLOWED = [
-        OrderStatus::Placed->value => [OrderStatus::Confirmed, OrderStatus::ReadyForPickup],
-        OrderStatus::Confirmed->value => [OrderStatus::Preparing],
-        OrderStatus::Preparing->value => [OrderStatus::ReadyForPickup],
+        OrderStatus::Placed->value => [OrderStatus::Confirmed, OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
+        OrderStatus::Confirmed->value => [OrderStatus::Preparing, OrderStatus::Cancelled],
+        OrderStatus::Preparing->value => [OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
         OrderStatus::ReadyForPickup->value => [OrderStatus::PickedUp],
         OrderStatus::PickedUp->value => [OrderStatus::AtSortingCenter],
         OrderStatus::AtSortingCenter->value => [OrderStatus::Sorted],
@@ -44,9 +67,10 @@ class SellerOrderStatusService
         OrderStatus::AssignedToRider->value => [OrderStatus::OutForDelivery],
         OrderStatus::OutForDelivery->value => [OrderStatus::Delivered, OrderStatus::DeliveryFailed],
         OrderStatus::Delivered->value => [OrderStatus::Completed],
-        OrderStatus::DeliveryFailed->value => [OrderStatus::Returned],
-        OrderStatus::Returned->value => [OrderStatus::Completed],
+        OrderStatus::DeliveryFailed->value => [OrderStatus::AssignedToRider, OrderStatus::Returned],
+        OrderStatus::Returned->value => [],
         OrderStatus::Completed->value => [],
+        OrderStatus::Cancelled->value => [],
     ];
 
     /**
@@ -87,13 +111,19 @@ class SellerOrderStatusService
         ?string $source = null,
         ?OrderStatus $expectedFrom = null,
     ): SellerOrder {
+        ParcelIncidentService::assertOperationsAllowed($sellerOrder);
+
         $from = $expectedFrom ?? $sellerOrder->status;
 
         if ($from === $to) {
             return $sellerOrder;
         }
 
-        $sellerOrder = DB::transaction(function () use ($sellerOrder, $from, $to, $note, $changedBy, $actor, $actorId, $source): SellerOrder {
+        // True only when this call performed the hop under the lock. Idempotent
+        // replays (already at $to) must not re-notify or re-release couriers.
+        $didTransition = false;
+
+        $sellerOrder = DB::transaction(function () use ($sellerOrder, $from, $to, $note, $changedBy, $actor, $actorId, $source, &$didTransition): SellerOrder {
             // Compare-and-swap reference: the CURRENT status under the row lock.
             $current = SellerOrder::query()
                 ->whereKey($sellerOrder->id)
@@ -107,7 +137,38 @@ class SellerOrderStatusService
                 ));
             }
 
+            ParcelIncidentService::assertOperationsAllowed($current);
+
             $currentStatus = $current->status;
+            if ($to === OrderStatus::Returned) {
+                $proof = $current->parcelReturn;
+                if ($proof === null || $proof->status !== ParcelReturnStatus::Completed || $proof->seller_received_at === null
+                    || $actor !== OrderActor::Seller || (int) $actorId !== (int) $proof->received_by_seller_id
+                    || (int) $actorId !== (int) $current->seller_id) {
+                    throw new \InvalidArgumentException('Only verified physical Seller receipt can finalize a return.');
+                }
+            }
+            if ($current->hasActiveReturn() && in_array($to, [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::Delivered], true)) {
+                throw new \InvalidArgumentException('This parcel is in the physical return workflow.');
+            }
+
+            if ($current->custody_provider_id !== null && $actor === null) {
+                throw new \InvalidArgumentException('An authorized actor is required to process a parcel in provider custody.');
+            }
+
+            // A transferred parcel cannot be advanced by its original carrier,
+            // including direct service calls with a stale model or scan token.
+            if ($current->custody_provider_id !== null && $actor === OrderActor::Logistics
+                && (int) $actorId !== $current->currentCustodyProviderId()) {
+                throw new \InvalidArgumentException('Only the current custody provider may process this parcel.');
+            }
+            if ($current->custody_provider_id !== null && $actor === OrderActor::Rider) {
+                $assigned = $current->deliveryCourier;
+                if ($assigned === null || (int) $assigned->id !== (int) $actorId
+                    || (int) $assigned->logistics_provider_id !== $current->currentCustodyProviderId()) {
+                    throw new \InvalidArgumentException('Only the current custody provider\'s assigned Rider may process this parcel.');
+                }
+            }
 
             // Idempotent replay: a concurrent request (double-click) already
             // performed exactly this hop. Do nothing, record nothing.
@@ -139,7 +200,25 @@ class SellerOrderStatusService
                 ));
             }
 
+            if (in_array($to, [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::Delivered, OrderStatus::DeliveryFailed], true)
+                && ((int) $current->delivery_attempts >= self::MAX_DELIVERY_ATTEMPTS
+                    || ($currentStatus === OrderStatus::DeliveryFailed && ! self::canRetryDelivery($current)))) {
+                throw new \InvalidArgumentException('Delivery is limited to two total attempts. Review the failure history or return the parcel to the seller.');
+            }
+
+            if ($actor === OrderActor::System && $to === OrderStatus::Completed
+                && ! AutomaticBuyerReceiptService::eligibleOrders(now()->subHours(AutomaticBuyerReceiptService::WAIT_HOURS))
+                    ->whereKey($current->getKey())->exists()) {
+                throw new \InvalidArgumentException('Automatic receipt completion requires 72 hours since delivery and no unresolved parcel issues.');
+            }
+
             $update = ['status' => $to->value];
+            if ($to === OrderStatus::PickedUp && $current->pickup_address_snapshot === null) {
+                $update['pickup_address_snapshot'] = ['full' => $current->pickupAddress(), 'barangay_code' => $current->sellerBarangayCode(), 'province_code' => $current->seller?->province_code];
+            }
+            if ($to === OrderStatus::DeliveryFailed) {
+                $update['delivery_attempts'] = (int) $current->delivery_attempts + 1;
+            }
 
             // A real shipment gets a tracking number the moment it leaves the
             // depot for pickup (becomes the courier's responsibility).
@@ -162,21 +241,48 @@ class SellerOrderStatusService
             // COD is settled when cash is collected at the door (Delivered) and
             // when the buyer confirms (Completed). Idempotent: pending-only,
             // so Deliv­ered→settles then Completed→already-paid→skip.
-            if (in_array($to, [OrderStatus::Delivered, OrderStatus::Completed], true)) {
+            // Automatic receipt completion never collects or settles a payment.
+            if ($to === OrderStatus::Delivered || ($to === OrderStatus::Completed && $actor !== OrderActor::System)) {
                 $this->settleCodPayment($current);
             }
+
+            if ($to === OrderStatus::Completed) {
+                $this->commissions->finalize($current);
+            }
+
+            // A parcel that reaches RETURNED or CANCELLED goes back to the
+            // seller's shelf (reverse of the checkout decrement).
+            if ($to === OrderStatus::Returned) {
+                $proof = $current->parcelReturn()->lockForUpdate()->firstOrFail();
+                if (config('returns.restore_verified_resellable') === true && $proof->stock_condition === 'resellable' && $proof->stock_restored_at === null) {
+                    if ($this->restoreStock($current, 'return')) {
+                        $proof->forceFill(['stock_restored_at' => now()])->save();
+                    }
+                }
+            }
+
+            if ($to === OrderStatus::Cancelled) {
+                $this->restoreStock($current, 'cancel');
+                $this->cancelPendingPayment($current);
+            }
+
+            app(ParcelReturnService::class)->ensureAfterSecondFailure($current, $actor, $actorId);
+
+            $didTransition = true;
 
             return $current->fresh();
         });
 
-        // Fire buyer-facing notifications for key milestones (synchronously,
-        // null-safe so a seller_order without a linked buyer/order never errors).
-        // Skipped on the idempotent-replay no-op (the first request notified).
-        if ($sellerOrder->status === $to) {
-            $this->maybeNotify($sellerOrder, $to);
+        // Notify / release only when THIS call advanced the row. Matching
+        // post-tx status alone re-fires on concurrent idempotent replays.
+        if ($didTransition) {
+            $this->maybeNotify($sellerOrder, $to, $actor);
 
             // Release couriers at the appropriate pipeline hand-offs.
             $this->releaseCouriers($sellerOrder, $to);
+            if (in_array($to, [OrderStatus::ReadyForPickup, OrderStatus::Sorted], true)) {
+                app(CourierAssignmentService::class)->dispatchAfterCommit($sellerOrder);
+            }
         }
 
         return $sellerOrder;
@@ -206,23 +312,130 @@ class SellerOrderStatusService
     }
 
     /**
-     * Send in-app notifications for buyer-relevant status milestones.
+     * Send in-app notifications for buyer/seller status milestones.
      * Guarded by optional relationships so tests that seed bare SellerOrders
-     * don't crash.
+     * don't crash. Cancellation notifies the counterparty of the actor.
      */
-    private function maybeNotify(SellerOrder $sellerOrder, OrderStatus $to): void
+    private function maybeNotify(SellerOrder $sellerOrder, OrderStatus $to, ?OrderActor $actor = null): void
     {
+        // Buyer-facing milestones.
         $buyer = $sellerOrder->order?->buyer;
-        if (! $buyer) {
-            return;
+
+        if ($buyer) {
+            match ($to) {
+                OrderStatus::AssignedToRider => $buyer->notify(new CourierAssigned($sellerOrder)),
+                OrderStatus::OutForDelivery => $buyer->notify(new OrderOutForDelivery($sellerOrder)),
+                OrderStatus::Delivered => $buyer->notify(new OrderDelivered($sellerOrder)),
+                OrderStatus::DeliveryFailed => $buyer->notify(new BuyerDeliveryFailed($sellerOrder)),
+                // Seller declined → tell the buyer (F1). Buyer cancel notifies the seller below.
+                OrderStatus::Cancelled => $actor !== OrderActor::Buyer
+                    ? $buyer->notify(new SellerOrderCancelled($sellerOrder))
+                    : null,
+                default => null,
+            };
         }
 
-        match ($to) {
-            OrderStatus::AssignedToRider => $buyer->notify(new CourierAssigned($sellerOrder)),
-            OrderStatus::OutForDelivery => $buyer->notify(new OrderOutForDelivery($sellerOrder)),
-            OrderStatus::Delivered => $buyer->notify(new OrderDelivered($sellerOrder)),
-            default => null,
-        };
+        // Seller-facing milestones.
+        $seller = $sellerOrder->seller;
+
+        if ($seller) {
+            if ($to === OrderStatus::DeliveryFailed) {
+                $seller->notify(new SellerDeliveryFailed($sellerOrder));
+            }
+
+            if ($to === OrderStatus::Returned) {
+                $seller->notify(new ParcelReturned($sellerOrder));
+            }
+
+            if ($to === OrderStatus::Cancelled && $actor === OrderActor::Buyer) {
+                $seller->notify(new BuyerOrderCancelled($sellerOrder));
+            }
+        }
+    }
+
+    /**
+     * Put a returned/cancelled parcel's stock back on the shelf and log it in
+     * the append-only inventory ledger. Runs inside the transition transaction.
+     *
+     * @param  'return'|'cancel'  $reason
+     */
+    public function releaseVerifiedReturnStock(SellerOrder $parcel, Admin $admin): void
+    {
+        app(ParcelReturnService::class)->admin($admin);
+        DB::transaction(function () use ($parcel): void {
+            $parcel = SellerOrder::query()->whereKey($parcel->id)->lockForUpdate()->firstOrFail();
+            $proof = $parcel->parcelReturn()->lockForUpdate()->firstOrFail();
+            if ($parcel->status !== OrderStatus::Returned || $proof->status !== ParcelReturnStatus::Completed
+                || $proof->seller_received_at === null || (int) $proof->received_by_seller_id !== (int) $parcel->seller_id
+                || $proof->stock_condition !== 'resellable' || config('returns.restore_verified_resellable') !== true) {
+                throw new \InvalidArgumentException('Stock is held until verified resellable receipt and an approved restoration policy.');
+            }
+            if ($proof->stock_restored_at !== null) {
+                return;
+            }
+            if (! $this->restoreStock($parcel, 'return')) {
+                throw new \InvalidArgumentException('Inventory requires ledger or missing-variant reconciliation before stock release.');
+            }
+            $proof->forceFill(['stock_restored_at' => now()])->save();
+        });
+    }
+
+    private function restoreStock(SellerOrder $sellerOrder, string $reason = 'return'): bool
+    {
+        $sellerOrder->loadMissing('orderItems');
+        if ($reason === 'return' && ($sellerOrder->orderItems->isEmpty() || InventoryTransaction::query()->where('seller_order_id', $sellerOrder->id)->where('reason', 'return')->exists())) {
+            return false;
+        }
+        $variants = ProductVariant::query()->whereIn('id', $sellerOrder->orderItems->pluck('variant_id')->filter()->unique())
+            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        if ($reason === 'return' && $sellerOrder->orderItems->contains(fn ($item) => ! $variants->has($item->variant_id))) {
+            return false;
+        }
+
+        foreach ($sellerOrder->orderItems as $item) {
+            $variant = $variants->get($item->variant_id);
+
+            if ($variant === null) {
+                continue;
+            }
+
+            $before = (int) $variant->stock_quantity;
+            $variant->stock_quantity = $before + (int) $item->quantity;
+            $variant->save();
+
+            InventoryTransaction::query()->create([
+                'product_id' => $variant->product_id,
+                'seller_order_id' => $sellerOrder->id,
+                'variant_id' => $variant->id,
+                'quantity_before' => $before,
+                'quantity_after' => $variant->stock_quantity,
+                'delta' => (int) $item->quantity,
+                'reason' => $reason,
+            ]);
+        }
+
+        Product::syncRollupsForProducts(
+            $sellerOrder->orderItems->pluck('product_id')->unique()->values(),
+        );
+
+        return true;
+    }
+
+    /**
+     * Void a still-pending payment when the seller cancels their slice (COD
+     * will never be collected for this seller_order).
+     */
+    private function cancelPendingPayment(SellerOrder $sellerOrder): void
+    {
+        $sellerOrder->loadMissing('payment');
+
+        if ($sellerOrder->payment
+            && $sellerOrder->payment->status === PaymentStatus::Pending
+        ) {
+            $sellerOrder->payment->forceFill([
+                'status' => PaymentStatus::Cancelled,
+            ])->save();
+        }
     }
 
     /**
@@ -233,14 +446,8 @@ class SellerOrderStatusService
      * re-queried fresh from the DB, so the rollup always reflects the true
      * current state of the whole order — not a stale in-memory snapshot.
      *
-     * Pipeline rank in OrderStatus::cases() declaration order:
-     *   Placed=0 → … → Delivered=9 → Completed=10 → DeliveryFailed=11 → Returned=12
-     *
-     * DELIVERY_FAILED (rank 11) and RETURNED (rank 12) sit AFTER Completed
-     * (rank 10) on the enum's declaration order. A problem status is never
-     * masked by a neighbour's progress: if one slice is Completed (10) and
-     * another is DeliveryFailed (11), the min-rank is 10 (Completed), which
-     * is correct — the failure slice is still in flight, not terminal.
+     * Pipeline rank uses OrderStatus::cases() declaration order. Cancelled
+     * is terminal and excluded from the active min-rank in Order::computeRollupStatus().
      */
     private function rollUpParentOrder(SellerOrder $sellerOrder): void
     {

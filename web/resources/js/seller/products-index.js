@@ -4,8 +4,8 @@
  *   - dropdown menus (row kebab + Bulk Actions): toggle, outside click, Escape
  *   - filter selects auto-submit their form; the search input submits on Enter
  *
- * Row actions (status toggle, delete) stay in public/js/seller/products-table.js,
- * which is still loaded by the view and owns the [data-actions-*] / [data-delete] /
+ * Row actions (status toggle, archive) stay in public/js/seller/products-table.js,
+ * which is still loaded by the view and owns the [data-actions-*] / [data-archive] /
  * [data-status-set] contracts.
  */
 document.addEventListener('DOMContentLoaded', function () {
@@ -122,7 +122,7 @@ function initDropdowns() {
             setOpen(root, willOpen);
         });
 
-        // Any pick inside a menu (Edit, Set Active, Delete, …) closes it; the
+        // Any pick inside a menu (Edit, Set Active, Archive, …) closes it; the
         // action itself is handled by products-table.js or by the anchor's href.
         menu.addEventListener('click', function () {
             closeAll(null);

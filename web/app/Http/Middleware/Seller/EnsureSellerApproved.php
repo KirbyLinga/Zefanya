@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware\Seller;
 
+use App\Support\SignedOtpLink;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +15,7 @@ class EnsureSellerApproved
         $seller = Auth::guard('seller')->user();
 
         if (! $seller) {
-            return redirect()->route('login');
+            return redirect()->route('home', ['login' => 1]);
         }
 
         if ($seller->status !== 'approved') {
@@ -22,12 +23,21 @@ class EnsureSellerApproved
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')->with('auth.status_message', match ($seller->status) {
-                'pending_verification' => 'Your email has not been verified yet. Please check your email for the verification code.',
-                'pending_approval' => 'Your account is still pending administrator approval.',
+            $redirect = redirect()->route('home', ['login' => 1])->with('auth.status_message', match ($seller->status) {
+                'unverified' => 'Your email has not been verified yet. Please check your email for the verification code.',
+                'pending' => 'Your account is still pending administrator approval.',
                 'rejected' => 'Your registration was not approved. Please contact support or submit a new registration.',
+                'suspended' => 'Your seller account has been suspended. Please contact support.',
                 default => 'Your account is not active.',
             });
+
+            // Unverified accounts get a direct link to resume verification.
+            if ($seller->status === 'unverified') {
+                $redirect->with('auth.resume_url', SignedOtpLink::showUrl('seller', $seller));
+                $redirect->with('auth.resume_label', 'Verify your email now');
+            }
+
+            return $redirect;
         }
 
         return $next($request);

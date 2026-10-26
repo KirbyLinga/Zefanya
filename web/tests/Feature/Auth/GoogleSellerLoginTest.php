@@ -40,7 +40,7 @@ class GoogleSellerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'seller']));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('seller');
         $this->assertDatabaseCount('sellers', 0);
@@ -48,7 +48,7 @@ class GoogleSellerLoginTest extends TestCase
 
     public function test_seller_awaiting_approval_cannot_sign_in_with_google(): void
     {
-        $seller = Seller::factory()->pendingApproval()->create([
+        $seller = Seller::factory()->pending()->create([
             'email' => 'pending-seller@gmail.com',
             'google_id' => null,
         ]);
@@ -57,7 +57,7 @@ class GoogleSellerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'seller']));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas(
             'auth.status_message',
             'Your seller account is still pending administrator approval.',

@@ -23,6 +23,8 @@
 
             {{-- ── Right Column ── --}}
             <main>
+                @include('Components.buyer.account-tabs', ['active' => 'address'])
+
                 <div class="mb-6">
                     <h1 class="font-serif text-[28px] font-normal leading-tight text-[var(--text-ink)] sm:text-[32px]">
                         Shipping Addresses
@@ -135,6 +137,15 @@
                                            placeholder="Building, unit, landmark, etc."
                                            value="{{ $val('address_detail') }}"
                                            class="{{ $inputCls }}">
+                                </div>
+                                <div>
+                                    <label class="{{ $labelCls }}" for="postalCode">Postal code</label>
+                                    <input type="text" name="postal_code" id="postalCode"
+                                           inputmode="numeric" maxlength="10"
+                                           placeholder="e.g. 4030"
+                                           value="{{ $val('postal_code') }}"
+                                           class="{{ $inputCls }}">
+                                    @error('postal_code')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                             </div>
                         </div>

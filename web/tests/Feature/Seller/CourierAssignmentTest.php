@@ -15,11 +15,12 @@ use App\Models\StatusHistory;
 use App\Services\CourierAssignmentService;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
 
 class CourierAssignmentTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use CreatesAssignableFleet, LazilyRefreshDatabase;
 
     private Seller $seller;
 
@@ -37,7 +38,7 @@ class CourierAssignmentTest extends TestCase
     {
         parent::setUp();
 
-        $this->seller = Seller::factory()->create();
+        $this->seller = Seller::factory()->create(['barangay_code' => '1374040001']);
         $this->provider = LogisticsProvider::factory()->create([
             'status' => 'approved',
             'email_verified_at' => now(),
@@ -60,7 +61,7 @@ class CourierAssignmentTest extends TestCase
             'buyer_id' => Buyer::factory()->create([
                 'municipality_name' => 'Quezon City',
             ])->id,
-            'shipping_address' => ['municipality' => 'Quezon City'],
+            'shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001'],
         ]);
 
         $so = SellerOrder::factory()->create([
@@ -89,8 +90,7 @@ class CourierAssignmentTest extends TestCase
     {
         $so = $this->makeReadyOrder();
 
-        $courier = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
+        $courier = $this->assignableCourier($this->provider, [
             'service_area' => ['Quezon City', 'Makati'],
             'is_available' => true,
             'max_weight_grams' => 5000,
@@ -116,12 +116,10 @@ class CourierAssignmentTest extends TestCase
         $so = $this->makeReadyOrder();
 
         // Courier exists but doesn't serve this municipality.
-        Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
-            'service_area' => ['Cebu City'],
+        $this->assignableCourier($this->provider, [
             'is_available' => true,
             'max_weight_grams' => 5000,
-        ]);
+        ], 'Cebu City');
 
         $result = $this->assignment->assignPickup($so);
 
@@ -136,17 +134,13 @@ class CourierAssignmentTest extends TestCase
     {
         $so = $this->makeReadyOrder();
 
-        $underweight = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
-            'service_area' => ['Quezon City'],
+        $underweight = $this->assignableCourier($this->provider, [
             'is_available' => true,
             'vehicle_type' => 'bike',
             'max_weight_grams' => 1000,
         ]);
 
-        $heavy = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
-            'service_area' => ['Quezon City'],
+        $heavy = $this->assignableCourier($this->provider, [
             'is_available' => true,
             'vehicle_type' => 'van',
             'max_weight_grams' => 20000,
@@ -160,12 +154,86 @@ class CourierAssignmentTest extends TestCase
         $this->assertSame(1000, $underweight->fresh()->max_weight_grams);
     }
 
+    public function test_pickup_eligibility_is_cumulative_across_active_pickups_and_deliveries(): void
+    {
+        $so = $this->makeReadyOrder(); // 2,000 g parcel
+
+        $courier = $this->assignableCourier($this->provider, [
+            'is_available' => true,
+            'max_weight_grams' => 10000,
+        ]);
+
+        // The Rider is already carrying a 4,000 g pickup and a 3,000 g delivery.
+        $this->activeParcel($courier, OrderStatus::PickedUp, 'courier_id', 4000);
+        $this->activeParcel($courier, OrderStatus::OutForDelivery, 'delivery_courier_id', 3000);
+
+        $this->assertSame(7000, $courier->fresh()->activeWeightGrams());
+
+        // 4,000 + 3,000 + 2,000 = 9,000 g, within the 10,000 g limit.
+        $assigned = $this->assignment->assignPickup($so, $this->provider, $courier->id);
+
+        $this->assertNotNull($assigned);
+        $this->assertSame($courier->id, $assigned->id);
+    }
+
+    public function test_parcel_weight_snapshot_does_not_change_when_the_catalog_weight_is_edited(): void
+    {
+        $so = $this->makeOrder(); // 2,000 g product
+
+        $this->assertSame(2000, (int) $so->parcel_weight_grams);
+
+        $this->product->forceFill(['weight_grams' => 9000])->save();
+        $this->product->variants()->update(['weight_grams' => 9000]);
+
+        $fresh = $so->fresh();
+        $this->assertSame(9000, $fresh->calculateParcelWeightGrams());
+        $this->assertSame(2000, $fresh->parcelWeightGrams());
+    }
+
+    public function test_pickup_eligibility_rejects_a_parcel_that_exceeds_the_cumulative_limit(): void
+    {
+        $so = $this->makeReadyOrder(); // 2,000 g parcel
+
+        $courier = $this->assignableCourier($this->provider, [
+            'is_available' => true,
+            'max_weight_grams' => 10000,
+        ]);
+
+        $this->activeParcel($courier, OrderStatus::PickedUp, 'courier_id', 5000);
+        $this->activeParcel($courier, OrderStatus::OutForDelivery, 'delivery_courier_id', 4000);
+
+        // 5,000 + 4,000 + 2,000 = 11,000 g, over the 10,000 g limit.
+        $assigned = $this->assignment->assignPickup($so, $this->provider, $courier->id);
+
+        $this->assertNull($assigned);
+        $this->assertNull($so->fresh()->courier_id);
+    }
+
+    private function activeParcel(Courier $courier, OrderStatus $status, string $column, int $grams): SellerOrder
+    {
+        $parcel = SellerOrder::factory()->create([
+            'seller_id' => $this->seller->id,
+            $column => $courier->id,
+            'status' => $status,
+        ]);
+
+        OrderItem::factory()->create([
+            'seller_order_id' => $parcel->id,
+            'product_id' => Product::factory()->create([
+                'seller_id' => $this->seller->id,
+                'weight_grams' => $grams,
+            ])->id,
+            'quantity' => 1,
+        ]);
+
+        return $parcel;
+    }
+
     public function test_assign_delivery_assigns_a_delivery_courier_and_preserves_pickup_courier(): void
     {
         $so = $this->makeReadyOrder();
 
-        $pickupCourier = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
+        $pickupCourier = $this->assignableCourier($this->provider, [
             'service_area' => ['Quezon City'],
             'is_available' => true,
             'max_weight_grams' => 5000,
@@ -185,17 +253,16 @@ class CourierAssignmentTest extends TestCase
         $so = $this->service->transition($so, OrderStatus::Sorted);
 
         // Create a NEW delivery courier AFTER the pickup courier is released.
-        // Use a lower weight so orderBy(max_weight_grams asc) prefers this one
-        // over the freed pickup courier (both serve Quezon City now).
-        $deliveryCourier = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
+        // Explicitly choose a separate delivery Rider to verify both legs
+        // independently (both Riders serve Quezon City).
+        $deliveryCourier = $this->assignableCourier($this->provider, [
             'service_area' => ['Quezon City'],
             'is_available' => true,
             'vehicle_type' => 'motorcycle',
             'max_weight_grams' => 3000,
         ]);
 
-        $assigned = $this->assignment->assignDelivery($so);
+        $assigned = $this->assignment->assignDelivery($so, preferredCourierId: $deliveryCourier->id);
 
         $this->assertNotNull($assigned);
         $this->assertSame($deliveryCourier->id, $assigned->id);
@@ -228,8 +295,7 @@ class CourierAssignmentTest extends TestCase
         ]);
 
         // Provider B has the only matching courier.
-        $otherCourier = Courier::factory()->create([
-            'logistics_provider_id' => $otherProvider->id,
+        $otherCourier = $this->assignableCourier($otherProvider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 5000,
@@ -257,8 +323,7 @@ class CourierAssignmentTest extends TestCase
 
         // Create order directly at Sorted status with a pickup courier assigned.
         // The pickup courier is from Provider A but is NOT available (busy).
-        $pickupCourier = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
+        $pickupCourier = $this->assignableCourier($this->provider, [
             'is_available' => false, // busy with pickup
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 5000,
@@ -271,8 +336,7 @@ class CourierAssignmentTest extends TestCase
         ])->save();
 
         // Provider B has the only matching delivery courier.
-        Courier::factory()->create([
-            'logistics_provider_id' => $otherProvider->id,
+        $this->assignableCourier($otherProvider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 3000,
@@ -292,8 +356,7 @@ class CourierAssignmentTest extends TestCase
         $so = $this->makeReadyOrder();
 
         // Provider A has a matching courier — they claim it first.
-        $courierA = Courier::factory()->create([
-            'logistics_provider_id' => $this->provider->id,
+        $courierA = $this->assignableCourier($this->provider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 5000,
@@ -309,8 +372,7 @@ class CourierAssignmentTest extends TestCase
             'status' => 'approved',
             'email_verified_at' => now(),
         ]);
-        $courierB = Courier::factory()->create([
-            'logistics_provider_id' => $otherProvider->id,
+        $courierB = $this->assignableCourier($otherProvider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 3000,
@@ -333,15 +395,13 @@ class CourierAssignmentTest extends TestCase
             'email_verified_at' => now(),
         ]);
 
-        Courier::factory()->create([
-            'logistics_provider_id' => $providerA->id,
+        $this->assignableCourier($providerA, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 5000,
         ]);
 
-        Courier::factory()->create([
-            'logistics_provider_id' => $providerB->id,
+        $this->assignableCourier($providerB, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 3000,

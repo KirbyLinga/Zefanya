@@ -63,7 +63,6 @@ class HomepageTest extends TestCase
         $this->getJson(route('buyer.search.suggestions', ['term' => 'coffee']))
             ->assertOk()
             ->assertJsonStructure([
-                'recent',
                 'popular',
             ]);
     }
@@ -133,6 +132,6 @@ class HomepageTest extends TestCase
     public function test_guest_cannot_access_wishlist_page(): void
     {
         $this->get(route('buyer.wishlist.index'))
-            ->assertRedirect(route('buyer.login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 }

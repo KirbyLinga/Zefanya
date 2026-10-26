@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Models\Courier;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Order;
+use App\Models\Rider;
 use App\Models\SellerOrder;
 use App\Services\CourierAssignmentService;
 use Database\Seeders\TestCouriersSeeder;
@@ -50,6 +51,9 @@ class TestCouriersSeederTest extends TestCase
         $this->assertTrue($riders->every(fn (Courier $courier): bool => $courier->is_available));
         $this->assertTrue($riders->every(fn (Courier $courier): bool => $courier->servesMunicipality('Plaridel')));
         $this->assertTrue($riders->every(fn (Courier $courier): bool => $courier->servesMunicipality('Quezon City')));
+        $this->assertTrue($riders->every(fn (Courier $courier): bool => $courier->rider !== null && $courier->isEligibleForAssignment()));
+        $this->assertTrue($riders->every(fn (Courier $courier): bool => $courier->rider->station_hub_id !== null));
+        $this->assertSame(3, Rider::where('logistics_provider_id', $provider->id)->count());
     }
 
     public function test_it_is_idempotent_on_a_second_run(): void
@@ -62,7 +66,7 @@ class TestCouriersSeederTest extends TestCase
         $this->assertSame(3, Courier::where('logistics_provider_id', $provider->id)->count());
     }
 
-    public function test_a_seeded_rider_can_be_assigned_to_a_plaridel_parcel(): void
+    public function test_legacy_seeded_coverage_cannot_assign_without_barangay_configuration(): void
     {
         $provider = $this->createOwnedProvider();
 
@@ -80,9 +84,8 @@ class TestCouriersSeederTest extends TestCase
 
         $assigned = (new CourierAssignmentService)->assignPickup($sellerOrder->fresh(), $provider);
 
-        $this->assertNotNull($assigned, 'A seeded rider should be eligible for a Plaridel parcel');
-        $this->assertSame($provider->id, $assigned->logistics_provider_id);
-        $this->assertFalse($assigned->fresh()->is_available, 'The assigned rider becomes busy');
+        $this->assertNull($assigned, 'Municipality-only seed coverage must not route new assignments');
+        $this->assertNull($sellerOrder->fresh()->courier_id);
     }
 
     public function test_re_running_does_not_free_a_rider_still_holding_a_parcel(): void

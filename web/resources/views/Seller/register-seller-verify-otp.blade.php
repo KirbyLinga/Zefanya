@@ -1,54 +1,46 @@
+{{-- resources/views/Seller/register-seller-verify-otp.blade.php
+     No-JS OTP page. The modal flow (Components/seller-register-modal.blade.php)
+     verifies the code inline via JSON; this page lets an unverified seller resume
+     verification (via the login hint link or a direct URL) without
+     re-registering. Mirrors Logistics/register-logistics-verify-otp.blade.php. --}}
 @extends('Layouts.footer')
 
 @push('styles')
-    @vite('resources/css/auth.css') {{-- adjust to however your other Auth pages include this --}}
+  @vite(['resources/css/auth.css'])
 @endpush
 
 @section('content')
-<div class="auth-hero">
-    <div class="auth-card" style="max-width: 420px; margin: 0 auto; text-align: center;">
-        <h1>Verify your email</h1>
-        <p>
-            We sent a 6-digit code to
-            <strong>{{ $seller->email }}</strong>.
-            Enter it below to continue — your registration then goes to an
-            administrator for approval.
-        </p>
 
-        @if (session('success'))
-            <p style="color: green;">{{ session('success') }}</p>
-        @endif
+<main class="auth-hero">
+  <div class="auth-hero__intro">
+    <h1 class="auth-hero__title">Verify your email</h1>
+    <p class="auth-hero__subtitle">
+      We sent a 6-digit code to <strong>{{ $emailMasked }}</strong>.
+      Enter it below to continue — your registration then goes to an administrator for approval.
+    </p>
 
-        <form method="POST" action="{{ route('register.seller.verify-otp.store', $seller) }}" novalidate>
-            @csrf
+    @if (session('success'))
+      <p style="color: green;">{{ session('success') }}</p>
+    @endif
 
-            <input
-                type="text"
-                name="otp"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                maxlength="6"
-                autocomplete="one-time-code"
-                placeholder="000000"
-                style="font-size: 28px; letter-spacing: 8px; text-align: center; width: 100%; margin: 1rem 0;"
-                required
-                autofocus
-            >
-            @error('otp')
-                <p style="color: red;">{{ $message }}</p>
-            @enderror
+    <form method="POST" action="{{ $verifyUrl }}" style="margin-top: 16px;">
+      @csrf
+      <label for="otp">Verification code</label>
+      <input type="text" name="otp" id="otp" inputmode="numeric" maxlength="6" required
+             style="display: block; width: 100%; margin: 8px 0; padding: 10px; text-align: center; letter-spacing: 4px;">
 
-            <button type="submit" class="buyer-modal__submit" style="width: 100%;">Verify</button>
-        </form>
+      @error('otp')
+        <p style="color: #a5333d;">{{ $message }}</p>
+      @enderror
 
-        <form method="POST" action="{{ route('register.seller.verify-otp.resend', $seller) }}" style="margin-top: 1rem;">
-            @csrf
-            <button type="submit" style="background: none; border: none; text-decoration: underline; cursor: pointer;">
-                Resend code
-            </button>
-        </form>
+      <button type="submit">Verify</button>
+    </form>
 
-        <p style="font-size: 0.85em; color: #666; margin-top: 1rem;">Code expires 10 minutes after it's sent.</p>
-    </div>
-</div>
+    <form method="POST" action="{{ $resendUrl }}" style="margin-top: 12px;">
+      @csrf
+      <button type="submit">Resend code</button>
+    </form>
+  </div>
+</main>
+
 @endsection

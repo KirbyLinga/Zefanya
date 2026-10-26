@@ -23,6 +23,9 @@
                 @if (session('auth.status_message'))
                     <div class="mb-6 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         {{ session('auth.status_message') }}
+                        @if (session('auth.resume_url'))
+                            <div class="mt-2"><a href="{{ session('auth.resume_url') }}" class="underline">{{ session('auth.resume_label') ?? 'Verify your email' }}</a></div>
+                        @endif
                     </div>
                 @elseif ($errors->any())
                     <div class="mb-6 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">

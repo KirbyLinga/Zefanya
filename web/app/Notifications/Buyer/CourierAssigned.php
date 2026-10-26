@@ -18,14 +18,16 @@ class CourierAssigned extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $deliveryCourier = $this->sellerOrder->deliveryCourier;
+
         return [
             'type' => 'courier_assigned',
             'seller_order_id' => $this->sellerOrder->id,
             'order_reference' => $this->sellerOrder->order?->reference,
-            'courier_name' => $this->sellerOrder->courier?->name,
-            'courier_phone' => $this->sellerOrder->courier?->phone,
+            'courier_name' => $deliveryCourier?->name,
+            'courier_phone' => $deliveryCourier?->phone,
             'tracking_number' => $this->sellerOrder->tracking_number,
-            'message' => 'A courier has been assigned to your order. Tracking: '.($this->sellerOrder->tracking_number ?? 'pending'),
+            'message' => 'A courier has been assigned to deliver your order. Tracking: '.($this->sellerOrder->tracking_number ?? 'pending'),
         ];
     }
 }

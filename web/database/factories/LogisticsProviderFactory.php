@@ -29,6 +29,12 @@ class LogisticsProviderFactory extends Factory
             'age' => 36,
             'business_name' => fake()->unique()->company(),
             'address_mode' => 'manual',
+            'province_code' => '030540000',
+            'province_name' => 'Pampanga',
+            'municipality_code' => '030540100',
+            'municipality_name' => 'San Fernando',
+            'barangay_code' => '0305401001',
+            'barangay_name' => 'Santo Rosario',
             'street' => '123 Rizal St.',
             'house_number' => '123',
             'address_detail' => null,
@@ -37,24 +43,29 @@ class LogisticsProviderFactory extends Factory
             'status' => 'approved',
             'email_verified_at' => now(),
             'approved_at' => now(),
+            'province_verified_at' => now(),
         ];
     }
 
-    public function pendingVerification(): static
+    public function unverified(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'status' => 'pending_verification',
+            'status' => 'unverified',
             'email_verified_at' => null,
             'approved_at' => null,
+            'province_verified_at' => null,
+            'province_verified_by' => null,
         ]);
     }
 
-    public function pendingApproval(): static
+    public function pending(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'status' => 'pending_approval',
+            'status' => 'pending',
             'email_verified_at' => now(),
             'approved_at' => null,
+            'province_verified_at' => null,
+            'province_verified_by' => null,
         ]);
     }
 }

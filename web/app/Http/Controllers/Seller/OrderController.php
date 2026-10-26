@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Seller;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\SellerOrder;
+use App\Notifications\Logistics\PickupRequested;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,6 +68,10 @@ class OrderController extends Controller
             'courier',
             'deliveryCourier',
             'statusHistories',
+            'parcelHandoffs', 'parcelReturn.events',
+            'manifestItems.manifest.originHub',
+            'manifestItems.manifest.destinationHub',
+            'manifestItems.manifest.provider',
         ]);
 
         return view('Seller.Orders.show', ['sellerOrder' => $sellerOrder]);
@@ -120,6 +126,66 @@ class OrderController extends Controller
     }
 
     /**
+     * Seller declines their slice of a multi-seller (or single-seller) order:
+     * packaging statuses → CANCELLED, stock restored, pending payment voided.
+     * Sibling seller_orders are untouched.
+     */
+    public function declineOrder(Request $request, SellerOrder $sellerOrder): RedirectResponse
+    {
+        $this->authorizeForUser(Auth::guard('seller')->user(), 'decline', $sellerOrder);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $service = new SellerOrderStatusService;
+
+        try {
+            DB::transaction(function () use ($sellerOrder, $service, $validated): void {
+                $current = SellerOrder::query()
+                    ->whereKey($sellerOrder->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($current === null) {
+                    abort(404);
+                }
+
+                $declinable = in_array(
+                    $current->status,
+                    [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing],
+                    true
+                );
+
+                if (! $declinable) {
+                    throw new \InvalidArgumentException(
+                        'Only orders that have not been handed to logistics can be declined.'
+                    );
+                }
+
+                $note = filled($validated['reason'] ?? null)
+                    ? 'Seller declined: '.$validated['reason']
+                    : 'Seller declined this order.';
+
+                $service->transition(
+                    $current,
+                    OrderStatus::Cancelled,
+                    note: $note,
+                    changedBy: 'seller',
+                    actor: OrderActor::Seller,
+                    actorId: (int) Auth::guard('seller')->id(),
+                    source: 'web',
+                    expectedFrom: $current->status,
+                );
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('declined', true);
+    }
+
+    /**
      * Mark a seller_order as packed / ready for pickup.
      *
      * Moves the order to READY_FOR_PICKUP. NO courier is auto-assigned here —
@@ -170,6 +236,17 @@ class OrderController extends Controller
                     source: 'web',
                     expectedFrom: $current->status,
                 );
+
+                // Notify the selected logistics provider (via carrier_provider_id from checkout)
+                if ($current->carrier_provider_id !== null) {
+                    $provider = $current->carrierProvider->fresh();
+                    if ($provider instanceof LogisticsProvider) {
+                        $provider->notify(new PickupRequested(
+                            $current->fresh(),
+                            $current->carrier_provider_id
+                        ));
+                    }
+                }
 
                 return $current->fresh();
             });

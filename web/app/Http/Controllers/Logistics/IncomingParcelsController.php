@@ -6,11 +6,16 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Courier;
+use App\Models\Logistics\Area;
+use App\Models\Seller\Seller;
 use App\Models\SellerOrder;
 use App\Services\CourierAssignmentService;
+use App\Services\LogisticsHubService;
+use App\Services\ParcelHandoffVerification;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -18,8 +23,11 @@ use Illuminate\View\View;
  * and PickedUp (in transit to the sorting center).
  *
  * Flow:
- *   ReadyForPickup  →  PickedUp            (rider assigns self as pickup courier)
- *   PickedUp        →  AtSortingCenter      (rider hands parcel to sorting center, releases courier)
+ *   ReadyForPickup  →  automatically reserved and notified (Logistics can
+ *                      override/retry), then the rider confirms collection
+ *                      with F2 verification → PickedUp
+ *   PickedUp        →  AtSortingCenter      (Logistics confirms station
+ *                      receipt, releases the pickup courier)
  */
 class IncomingParcelsController extends Controller
 {
@@ -40,82 +48,247 @@ class IncomingParcelsController extends Controller
     {
         $provider = $request->user('logistics');
 
+        $highlightedId = $request->integer('highlight') ?: $request->integer('parcel');
+
         $shipments = SellerOrder::query()
             ->whereIn('status', self::PICKUP_STATUSES)
-            ->where(function ($q) use ($provider) {
-                // Orders with a pickup courier from this provider, or not yet
-                // assigned any courier (still at ReadyForPickup).
-                $q->whereHas('courier.provider', fn ($sub) => $sub->whereKey($provider->id))
-                    ->orWhereNull('courier_id');
+            ->where(function ($q) use ($provider): void {
+                // Selected carriers and current custodians must retain visibility
+                // even if origin coverage changes before a rider is reserved.
+                $q->heldBy((int) $provider->id)
+                    ->orWhere(function ($unclaimed) use ($provider) {
+                        // Only unowned legacy parcels are offered by coverage.
+                        $unclaimed->whereNull('custody_provider_id')
+                            ->whereNull('carrier_provider_id')
+                            ->whereNull('courier_id')
+                            ->whereIn('seller_id', Seller::query()
+                                ->select('id')
+                                ->whereIn('barangay_code', Area::query()
+                                    ->where('logistics_provider_id', $provider->id)
+                                    ->operationalCoverage()
+                                    ->select('barangay_code')));
+                    });
             })
-            ->with(['courier.provider', 'deliveryCourier', 'order.buyer', 'seller', 'orderItems.product', 'orderItems.variant'])
-            ->orderBy('created_at')
-            ->get();
+            ->when($highlightedId, fn ($q) => $q->whereKey($highlightedId))
+            ->with([
+                'courier' => fn ($q) => $q->withWorkload(),
+                'deliveryAssignments.courier',
+                'originStation',
+                'deliveryCourier.rider.station',
+                'courier.provider',
+                'courier.rider.station',
+                'deliveryCourier',
+                'order.buyer',
+                'seller',
+                'orderItems.product',
+                'orderItems.variant',
+            ])
+            ->orderBy('created_at')->orderBy('id')
+            ->paginate(25)->withQueryString();
+
+        // The Station Hub that will collect each parcel: the frozen origin once a
+        // reservation exists, otherwise the coverage station for the seller's
+        // barangay. The initial Assign Rider dropdown only offers Riders from it.
+        $barangays = $shipments->getCollection()
+            ->map(fn (SellerOrder $shipment): ?string => $shipment->sellerBarangayCode())
+            ->filter()->unique()->values();
+
+        $stationByBarangay = $barangays->isEmpty() ? collect() : Area::query()
+            ->where('logistics_provider_id', $provider->id)
+            ->whereIn('barangay_code', $barangays)
+            ->operationalCoverage()
+            ->pluck('station_hub_id', 'barangay_code');
+
+        $originStationHubs = $shipments->getCollection()->mapWithKeys(function (SellerOrder $shipment) use ($stationByBarangay): array {
+            $stationId = $shipment->origin_station_hub_id
+                ?? $stationByBarangay[$shipment->sellerBarangayCode()] ?? null;
+
+            return [$shipment->id => $stationId !== null ? (int) $stationId : null];
+        });
 
         return view('Logistics.IncomingParcels.index', [
             'shipments' => $shipments,
             'provider' => $provider,
+            'highlightedId' => $highlightedId,
+            'originStationHubs' => $originStationHubs,
+            'availableCouriers' => Courier::query()->where('logistics_provider_id', $provider->id)->eligibleForAssignment()->withWorkload()->withActiveWeight()->with('rider.station')->orderBy('rider_id')->get(),
         ]);
     }
 
+    /** Retry the automatic pickup/delivery reservation after coverage or Rider availability changes. */
+    public function retryDispatch(Request $request, SellerOrder $sellerOrder, string $role): RedirectResponse
+    {
+        $provider = $request->user('logistics');
+        $this->authorizeForUser($provider, 'advance-shipment', $sellerOrder);
+
+        $result = $this->assignment->dispatch($sellerOrder, $role, $provider);
+
+        if ($role === 'pickup' && $result['status'] === 'reserved' && $result['courier'] !== null) {
+            $this->assignment->confirmPickupDispatch($sellerOrder->fresh(), $provider);
+
+            return back()->with('success', "Pickup rider {$result['courier']->name} reserved and notified.");
+        }
+
+        return back()->with(
+            in_array($result['status'], ['assigned', 'reserved'], true) ? 'success' : 'error',
+            $result['message'],
+        );
+    }
+
     /**
-     * Accept a pickup assignment: assign the pickup courier and advance
-     * the order to PickedUp. Generates a tracking number on pickup.
+     * Reserve a PICKUP rider WITHOUT advancing the parcel.
+     *
+     * The Rider then confirms the collection from their own panel. The parcel
+     * stays ReadyForPickup (and stays listed here) until the rider does, and
+     * Logistics still has to confirm receipt at the origin Station Hub before
+     * the parcel advances to sorting.
+     *
+     * If `reassign` is true, allows reassigning a parcel that already has a
+     * pickup courier (releases the old courier back to available).
      */
-    public function pickup(Request $request, SellerOrder $sellerOrder): RedirectResponse
+    public function assignPickupRider(Request $request, SellerOrder $sellerOrder, LogisticsHubService $hubs): RedirectResponse
     {
         $provider = $request->user('logistics');
 
         $this->authorizeForUser($provider, 'advance-shipment', [$sellerOrder]);
 
-        if ($sellerOrder->status !== OrderStatus::ReadyForPickup) {
-            return back()->with('error', 'This parcel is no longer available for pickup.');
+        if (($reason = $hubs->assignmentBlockReason($provider->id)) !== null) {
+            return back()->with('error', $reason);
         }
 
-        $courier = $this->assignment->assignPickup($sellerOrder, $provider);
+        $reassign = $request->boolean('reassign');
 
-        $sellerOrder = $sellerOrder->fresh();
+        if ($sellerOrder->status !== OrderStatus::ReadyForPickup && ! ($reassign && $sellerOrder->status === OrderStatus::PickedUp)) {
+            return back()->with('error', 'This parcel is no longer available for pickup assignment.');
+        }
+
+        if (! $reassign && $sellerOrder->courier_id !== null) {
+            return back()->with('error', 'This parcel already has a pickup rider. Use reassignment to change.');
+        }
+
+        $data = $request->validate([
+            'courier_id' => [$reassign ? 'nullable' : 'required', 'integer'],
+            'reason' => [$reassign ? 'required' : 'nullable', 'string', 'max:500'],
+            'expected_courier_id' => [$reassign ? 'required' : 'nullable', 'integer'],
+        ], [
+            'courier_id.required' => 'Select an eligible Rider for this pickup.',
+        ]);
+
+        $courier = $this->assignment->reservePickup(
+            $sellerOrder,
+            $provider,
+            $request->integer('courier_id') ?: null,
+            $reassign,
+            $data['reason'] ?? null,
+            isset($data['expected_courier_id']) ? (int) $data['expected_courier_id'] : null,
+            notifyRider: false,
+        );
 
         if ($courier === null) {
-            return back()->with('error', 'No available courier in your fleet serves this area.');
+            return back()->with('error', 'No eligible rider in your fleet serves this pickup area.');
         }
 
-        if ($sellerOrder->status === OrderStatus::PickedUp) {
-            return back()->with('success', "Parcel #{$sellerOrder->id} picked up and assigned to {$courier->name}.");
+        $action = $reassign ? 'reassigned' : 'assigned';
+
+        $message = $sellerOrder->status === OrderStatus::PickedUp
+            ? "Pickup {$action} to {$courier->name}. Awaiting Station Hub receipt."
+            : "Pickup {$action} to {$courier->name}. Waiting for the rider to confirm collection.";
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Confirm the reserved Rider's pickup dispatch. Reservation stays silent;
+     * this is the single action that notifies the Rider (once per assignment).
+     */
+    public function confirmPickupDispatch(Request $request, SellerOrder $sellerOrder): RedirectResponse
+    {
+        $provider = $request->user('logistics');
+
+        $this->authorizeForUser($provider, 'advance-shipment', [$sellerOrder]);
+
+        try {
+            $result = $this->assignment->confirmPickupDispatch($sellerOrder, $provider);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('error', 'Unable to assign a pickup courier right now.');
+        if ($result === null) {
+            return back()->with('error', 'Assign an eligible pickup rider before confirming the dispatch.');
+        }
+
+        return back()->with(
+            'success',
+            $result['notified']
+                ? 'Pickup dispatch confirmed. The assigned rider has been notified.'
+                : 'Pickup dispatch was already confirmed for the assigned rider.',
+        );
     }
 
     /**
      * Hand the parcel to the sorting center: advance to AtSortingCenter
      * and release the pickup courier back to available.
      */
-    public function toSortingCenter(Request $request, SellerOrder $sellerOrder): RedirectResponse
-    {
+    public function toSortingCenter(
+        Request $request,
+        SellerOrder $sellerOrder,
+        ParcelHandoffVerification $handoffVerify,
+        LogisticsHubService $hubs,
+    ): RedirectResponse {
         $provider = $request->user('logistics');
 
+        // Provider ownership before any idempotent success path.
         $this->authorizeForUser($provider, 'advance-shipment', [$sellerOrder]);
 
-        if ($sellerOrder->status !== OrderStatus::PickedUp) {
+        $sellerOrder->loadMissing(['courier.provider', 'seller']);
+        $fresh = $sellerOrder->fresh() ?? $sellerOrder;
+        $alreadyAtHub = $fresh->status === OrderStatus::AtSortingCenter;
+        $token = $request->input('verification_token');
+
+        if (! $alreadyAtHub && $fresh->status !== OrderStatus::PickedUp) {
             return back()->with('error', 'This parcel is not in the pickup phase.');
         }
 
         try {
-            $this->status->transition(
-                $sellerOrder,
-                OrderStatus::AtSortingCenter,
-                note: 'Parcel handed to sorting center.',
-                changedBy: 'system',
-                actor: OrderActor::Rider,
-                actorId: $sellerOrder->courier?->id,
-                source: 'web',
-            );
+            // Authoritative origin Station Hub (seller barangay coverage) — never guess.
+            $stationHubId = $hubs->requireOriginStationHubId((int) $provider->id, $fresh);
+
+            $method = null;
+            if (! $alreadyAtHub) {
+                $payload = $handoffVerify->assertValidForLogistics(
+                    $provider,
+                    $fresh,
+                    ParcelHandoffVerification::ACTION_STATION_RECEIPT,
+                    $token,
+                    $stationHubId,
+                );
+                $method = $payload['method'] ?? null;
+
+                $this->status->transition(
+                    $fresh,
+                    OrderStatus::AtSortingCenter,
+                    note: 'Parcel handed to sorting center.'.ParcelHandoffVerification::noteSuffix($method),
+                    changedBy: $provider->fullName(),
+                    actor: OrderActor::Logistics,
+                    actorId: $provider->id,
+                    source: 'web',
+                );
+
+                $handoffVerify->consumeAfterSuccess(fn () => $handoffVerify->consumeForLogistics(
+                    $provider,
+                    $fresh,
+                    ParcelHandoffVerification::ACTION_STATION_RECEIPT,
+                    $token,
+                    $stationHubId,
+                ));
+            }
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        $pickupCourier = $sellerOrder->courier;
+        $pickupCourier = $sellerOrder->fresh()?->courier;
         if ($pickupCourier) {
             $this->assignment->release($pickupCourier);
         }

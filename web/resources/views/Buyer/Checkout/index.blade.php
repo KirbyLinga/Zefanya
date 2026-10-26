@@ -11,11 +11,29 @@
                 <p class="mt-1 text-[13px] text-neutral-400">Enter shipping details and confirm your order.</p>
             </div>
 
+            @if (session('error'))
+                <div role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-900">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-900">
+                    <ul class="list-disc pl-4">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             @if ($summary->isEmpty())
                 {{-- Empty checkout --}}
                 @include('Buyer.Cart._empty')
             @else
-                <form method="POST" action="{{ route('buyer.checkout.store') }}" id="checkout-form">
+                <form method="POST" action="{{ route('buyer.checkout.store') }}" id="checkout-form"
+                      data-checkout-carriers
+                      data-merchandise-minor="{{ $merchandiseTotalMinor ?? $summary->totalCentavos }}">
                     @csrf
                     @isset($checkoutToken)
                         <input type="hidden" name="checkout_token" value="{{ $checkoutToken }}">
@@ -28,101 +46,151 @@
                             <section class="rounded-2xl border border-buyer-line bg-white p-5">
                                 <h2 class="font-serif text-[18px] font-semibold text-buyer-ink mb-4">Shipping Address</h2>
 
-                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div class="sm:col-span-2">
-                                        <label for="shipping_name" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Full Name <span class="text-primary-700">*</span></label>
-                                        <input type="text" id="shipping_name" name="shipping[name]" required
-                                            value="{{ old('shipping.name', $buyer->fullName() ?? '') }}"
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800">
-                                    </div>
+                                @php
+                                    $confirmParts = array_filter([
+                                        $buyer->house_number,
+                                        $buyer->street,
+                                        $buyer->barangay_name,
+                                        $buyer->municipality_name,
+                                        $buyer->province_name,
+                                        $buyer->postal_code,
+                                    ]);
+                                    $confirmFull = implode(', ', $confirmParts);
+                                    if ($buyer->address_detail) {
+                                        $confirmFull = ($confirmFull ? $confirmFull . ', ' : '') . $buyer->address_detail;
+                                    }
+                                    $addressComplete = filled($buyer->municipality_name) && filled($buyer->street);
+                                @endphp
 
-                                    <div>
-                                        <label for="shipping_phone" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Phone <span class="text-primary-700">*</span></label>
-                                        @php
-                                            $normalizedPhone = '';
-                                            if ($buyer->contact_no) {
-                                                $normalized = preg_replace('/[\s\-()]/u', '', $buyer->contact_no);
-                                                $normalizedPhone = $normalized;
-                                            }
-                                        @endphp
-                                        <input type="tel" id="shipping_phone" name="shipping[phone]" required
-                                            value="{{ old('shipping.phone', $normalizedPhone) }}"
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800">
+                                @unless ($addressComplete)
+                                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4">
+                                        <p class="text-[12.5px] font-medium text-amber-800">
+                                            Your delivery address is incomplete. Add a municipality/city and street so a rider can be assigned.
+                                        </p>
+                                        <a href="{{ route('buyer.account.address') }}" class="mt-1 inline-block text-[12.5px] font-semibold text-primary-800 underline">Update my address</a>
                                     </div>
+                                @endunless
 
-                                    <div>
-                                        <label for="shipping_email" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Email</label>
-                                        <input type="email" id="shipping_email" name="shipping[email]"
-                                            value="{{ old('shipping.email', $buyer->email ?? '') }}"
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800">
+                                <div class="rounded-xl border border-buyer-line bg-secondary-50/40 p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="text-[13.5px] font-semibold text-buyer-ink">{{ $buyer->fullName() }}</p>
+                                            <p class="mt-0.5 text-[12.5px] text-neutral-500">{{ $buyer->contact_no }}</p>
+                                            <p class="mt-2 text-[13px] text-buyer-ink">{{ $confirmFull ?: '— no address on file —' }}</p>
+                                        </div>
+                                        <a href="{{ route('buyer.account.address') }}" class="shrink-0 text-[12.5px] font-semibold text-primary-800 underline">Change</a>
                                     </div>
-
-                                    <div class="sm:col-span-2">
-                                        <label for="shipping_full" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Full Address <span class="text-primary-700">*</span></label>
-                                        @php
-                                            $addressParts = array_filter([
-                                                $buyer->house_number,
-                                                $buyer->street,
-                                                $buyer->barangay_name,
-                                            ]);
-                                            $prefillAddress = implode(', ', $addressParts);
-                                            if ($buyer->address_detail) {
-                                                $prefillAddress = ($prefillAddress ? $prefillAddress . ', ' : '') . $buyer->address_detail;
-                                            }
-                                        @endphp
-                                        <textarea id="shipping_full" name="shipping[full]" rows="3" required
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800"
-                                            placeholder="House/Building, Street, Barangay, City/Municipality, Province">{{ old('shipping.full', $prefillAddress) }}</textarea>
-                                    </div>
-
-                                    <div>
-                                        <label for="shipping_municipality" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Municipality / City <span class="text-primary-700">*</span></label>
-                                        <input type="text" id="shipping_municipality" name="shipping[municipality]" required
-                                            value="{{ old('shipping.municipality', $buyer->municipality_name ?? '') }}"
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800"
-                                            placeholder="e.g., Quezon City">
-                                    </div>
-
-                                    <div>
-                                        <label for="shipping_province" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Province <span class="text-primary-700">*</span></label>
-                                        <input type="text" id="shipping_province" name="shipping[province]" required
-                                            value="{{ old('shipping.province', $buyer->province_name ?? '') }}"
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800"
-                                            placeholder="e.g., Metro Manila">
-                                    </div>
-
-                                    <div>
-                                        <label for="shipping_postal" class="block text-[12.5px] font-medium text-buyer-ink mb-1">Postal Code</label>
-                                        <input type="text" id="shipping_postal" name="shipping[postal_code]"
-                                            value="{{ old('shipping.postal_code', '') }}"
-                                            class="w-full rounded-lg border border-buyer-line bg-white px-4 py-2.5 text-[13px] text-buyer-ink placeholder:text-neutral-400 focus:border-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-800"
-                                            placeholder="e.g., 1100">
-                                    </div>
+                                    <p class="mt-3 text-[11.5px] text-neutral-400">
+                                        Deliver to this saved address. Your order is frozen to this address once placed.
+                                    </p>
                                 </div>
                             </section>
 
-                            {{-- Payment method (COD only for now) --}}
+                            {{-- Shipping carriers (one selection per seller group) --}}
+                            <section class="rounded-2xl border border-buyer-line bg-white p-5">
+                                <h2 class="font-serif text-[18px] font-semibold text-buyer-ink mb-1">Shipping</h2>
+                                <p class="mb-4 text-[12.5px] text-neutral-400">Choose one carrier for each shop. Fees are calculated for your delivery address.</p>
+
+                                <p data-checkout-shipping-block class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900" @if($carriersAvailable ?? false) hidden @endif>
+                                    Select an available carrier for every shop, or update your delivery address, before placing the order.
+                                </p>
+
+                                <div class="flex flex-col gap-4">
+                                    @foreach (($carrierOptions ?? []) as $carrierGroup)
+                                        <div class="rounded-xl border border-buyer-line p-4"
+                                             data-carrier-group
+                                             data-seller-id="{{ $carrierGroup['seller_id'] }}"
+                                             data-available="{{ $carrierGroup['available'] ? '1' : '0' }}">
+                                            <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
+                                                <div>
+                                                    <p class="text-[13.5px] font-semibold text-buyer-ink">{{ $carrierGroup['seller_name'] }}</p>
+                                                    <p class="mt-0.5 text-[11.5px] text-neutral-400">
+                                                        @if ($carrierGroup['route'] === 'same_province')
+                                                            Same-province delivery
+                                                        @elseif ($carrierGroup['route'] === 'cross_province')
+                                                            Cross-province delivery
+                                                        @else
+                                                            Address incomplete
+                                                        @endif
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            @if (! $carrierGroup['available'])
+                                                <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12.5px] text-rose-900">
+                                                    {{ $carrierGroup['message'] }}
+                                                </div>
+                                            @else
+                                                <div class="flex flex-col gap-2">
+                                                    @foreach ($carrierGroup['carriers'] as $index => $carrier)
+                                                        @php
+                                                            $inputId = 'carrier_'.$carrierGroup['seller_id'].'_'.$carrier['id'];
+                                                            $oldKey = 'carriers.'.$carrierGroup['seller_id'];
+                                                            $oldValue = old($oldKey);
+                                                            // A malformed (non-scalar) selection must not break rendering.
+                                                            $oldValue = is_scalar($oldValue) ? (string) $oldValue : '';
+                                                            $isChecked = $oldValue !== ''
+                                                                ? $oldValue === (string) $carrier['id']
+                                                                : $index === 0;
+                                                        @endphp
+                                                        <label for="{{ $inputId }}"
+                                                               class="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-buyer-line bg-white px-3 py-2.5">
+                                                            <span class="flex min-w-0 items-center gap-2.5">
+                                                                <input type="radio"
+                                                                       id="{{ $inputId }}"
+                                                                       name="carriers[{{ $carrierGroup['seller_id'] }}]"
+                                                                       value="{{ $carrier['id'] }}"
+                                                                       data-fee-minor="{{ $carrier['fee_minor'] }}"
+                                                                       @checked($isChecked)
+                                                                       class="h-4 w-4 shrink-0 accent-primary-800">
+                                                                <span class="truncate text-[13px] font-medium text-buyer-ink">{{ $carrier['name'] }}</span>
+                                                                 @if (! empty($carrier['destination_name']))
+                                                                     <span class="ml-1 truncate text-[10.5px] text-neutral-400">via {{ $carrier['destination_name'] }}</span>
+                                                                 @endif
+                                                            </span>
+                                                            <span class="shrink-0 text-[12.5px] font-semibold text-buyer-ink">{{ $carrier['fee_formatted'] }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </section>
+
+                            {{-- Payment method --}}
                             <section class="rounded-2xl border border-buyer-line bg-white p-5">
                                 <h2 class="font-serif text-[18px] font-semibold text-buyer-ink mb-4">Payment Method</h2>
 
-                                <div class="flex items-center gap-3 rounded-xl border border-buyer-line bg-white p-4">
-                                    <input type="radio" id="payment_cod" name="payment_method" value="cod" checked
-                                        class="h-4 w-4 cursor-pointer accent-primary-800">
-                                    <div class="flex-1">
-                                        <label for="payment_cod" class="block font-semibold text-buyer-ink">Cash on Delivery (COD)</label>
-                                        <p class="text-[12.5px] text-neutral-400 mt-0.5">Pay when your order is delivered. No card needed.</p>
-                                    </div>
-                                </div>
+                                @php $paymentMethods = \App\Enums\PaymentMethod::cases(); @endphp
 
-                                <p class="mt-3 text-[12px] text-neutral-400">More payment methods coming soon.</p>
+                                <div class="flex flex-col gap-3">
+                                    @foreach ($paymentMethods as $method)
+                                        <label for="payment_{{ $method->value }}"
+                                               class="flex cursor-pointer items-start gap-3 rounded-xl border border-buyer-line bg-white p-4">
+                                            <input type="radio" id="payment_{{ $method->value }}" name="payment_method"
+                                                value="{{ $method->value }}" @checked(old('payment_method', 'cod') === $method->value)
+                                                class="mt-0.5 h-4 w-4 cursor-pointer accent-primary-800">
+                                            <div class="flex-1">
+                                                <span class="block font-semibold text-buyer-ink">{{ $method->label() }}</span>
+                                                @if ($method->isIntegrated())
+                                                    <p class="text-[12.5px] text-neutral-400 mt-0.5">Pay cash when your order is delivered. No card needed.</p>
+                                                @else
+                                                    <p class="text-[12.5px] text-amber-700 mt-0.5">Recorded as <span class="font-semibold">pending</span> — this method is not yet integrated. A representative will follow up to collect payment.</p>
+                                                @endif
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
                             </section>
 
                             {{-- Place order button --}}
                             <button type="submit"
-                                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-6 py-4 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
-                                    @disabled($summary->subtotalCentavos === 0)>
-                                <i data-lucide="lock" width="18" height="18"></i>
-                                Place Order — {{ $summary->formattedTotal() }}
+                                    data-checkout-place-order
+                                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-6 py-4 text-[14px] font-semibold text-white transition-opacity enabled:cursor-pointer enabled:hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                    @disabled($summary->subtotalCentavos === 0 || ! ($carriersAvailable ?? false))>
+                                <i data-lucide="shopping-bag" width="18" height="18" aria-hidden="true"></i>
+                                <span data-checkout-place-label class="text-white">Place Order — {{ $summary->formattedTotal() }}</span>
                             </button>
 
                             <p class="mt-3 text-center text-[11px] text-neutral-400">
@@ -133,32 +201,36 @@
                         {{-- Right column: order summary (read-only) --}}
                         <aside class="lg:sticky lg:top-6 lg:h-fit">
                             <section class="rounded-2xl border border-buyer-line bg-white p-5">
-                                <h2 class="font-serif text-[20px] font-semibold text-buyer-ink mb-4">Order Summary</h2>
+                                <h2 class="font-serif text-[20px] font-semibold text-buyer-ink mb-4">Order Summary <span class="text-[13px]">{{ $summary->selectedLineCount() }} {{ Str::plural('item', $summary->selectedLineCount()) }}</span></h2>
 
                                 {{-- Seller groups (items) --}}
                                 @foreach ($summary->sellerGroups as $group)
                                     <div class="border-b border-buyer-line pb-4 mb-4 last:border-0 last:pb-0 last:mb-0">
                                         <h3 class="font-semibold text-buyer-ink mb-2">{{ $group['seller']->business_name }}</h3>
                                         @foreach ($group['items'] as $item)
-                                            <div class="flex items-center justify-between py-2 text-[13px]">
+                                            <div data-cart-item-id="{{ $item->id }}" class="flex items-center justify-between py-2 text-[13px]">
                                                 <div class="flex items-center gap-2 min-w-0">
                                                     @php
                                                         $imageUrl = $item->product?->catalogImageUrl();
                                                     @endphp
                                                     @if ($imageUrl)
                                                         <img src="{{ $imageUrl }}"
-                                                             alt="{{ $item->product_name }}" class="h-12 w-12 rounded object-cover shrink-0">
+                                                             alt="{{ $item->product->name }}" class="h-12 w-12 rounded object-cover shrink-0">
                                                     @else
                                                         <div class="h-12 w-12 rounded bg-secondary-100 flex items-center justify-center shrink-0">
                                                             <i data-lucide="package" width="16" height="16" class="text-neutral-400"></i>
                                                         </div>
                                                     @endif
                                                     <div class="min-w-0">
-                                                        <p class="font-medium text-buyer-ink truncate">{{ $item->product_name }}</p>
+                                                        <p class="font-medium text-buyer-ink truncate">{{ $item->product->name }}</p>
+                                                        @if ($variantLabels[$item->id] !== '')
+                                                            <p class="text-[11.5px] text-neutral-400">{{ $variantLabels[$item->id] }}</p>
+                                                        @endif
                                                         <p class="text-[11.5px] text-neutral-400">Qty: {{ $item->quantity }}</p>
+                                                        <p class="text-[11.5px] text-neutral-400">Unit Price: ₱{{ number_format($item->unitPriceCentavos() / 100, 2) }}</p>
                                                     </div>
                                                 </div>
-                                                <span class="font-semibold text-buyer-ink shrink-0">{{ $item->formattedLineTotal() }}</span>
+                                                <span class="font-semibold text-buyer-ink shrink-0">Subtotal: {{ $item->formattedLineTotal() }}</span>
                                             </div>
                                         @endforeach
                                     </div>
@@ -187,13 +259,14 @@
 
                                     <div class="flex items-center justify-between text-[12.5px]">
                                         <span class="text-neutral-400">Shipping</span>
-                                        <span class="text-neutral-400">Calculated at checkout</span>
+                                        <span class="font-semibold text-buyer-ink" data-checkout-shipping-total>Select a carrier</span>
                                     </div>
 
                                     <div class="flex items-end justify-between border-t border-buyer-line pt-4 mt-2">
                                         <span class="text-[13px] font-semibold text-buyer-ink">Total</span>
-                                        <span class="font-serif text-[26px] font-semibold text-buyer-ink">{{ $summary->formattedTotal() }}</span>
+                                        <span class="font-serif text-[26px] font-semibold text-buyer-ink" data-checkout-payable-total>{{ $summary->formattedTotal() }}</span>
                                     </div>
+                                    <p class="mt-2 text-[11px] text-neutral-400">Merchandise total is charged at place-order today. Carrier assignment is saved for fulfilment in the next release.</p>
                                 </div>
 
                                 <p class="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
@@ -210,4 +283,5 @@
 @endsection
 
 @push('scripts')
+    @vite(['resources/js/buyer/checkout-carriers.js'])
 @endpush

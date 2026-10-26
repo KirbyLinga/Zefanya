@@ -24,7 +24,7 @@ use Tests\TestCase;
  *   - street max:255 is enforced (buyer + seller)
  *   - address_detail is optional (buyer + seller)
  *   - Stored row contains the submitted street value (buyer + seller)
- *   - Admin registrations view shows the full street for a buyer and seller
+ *   - Admin registrations view lists a pending buyer and seller
  */
 class RegistrationStreetTest extends TestCase
 {
@@ -59,6 +59,7 @@ class RegistrationStreetTest extends TestCase
             'barangay_name' => 'Barangay 1',
             'street' => '123 Rizal St., Purok 2',
             'upload_id' => $this->fakeId(),
+            'terms' => '1',
         ], $overrides);
     }
 
@@ -122,9 +123,9 @@ class RegistrationStreetTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrorFor('street');
     }
 
-    // ── Buyer: manual mode ────────────────────────────────────────────────
+    // ── Buyer: manual mode rejected ───────────────────────────────────────
 
-    public function test_buyer_registration_succeeds_with_street_in_manual_mode(): void
+    public function test_buyer_registration_rejects_manual_address_mode(): void
     {
         $response = $this->postJson(
             route('register.buyer.store'),
@@ -140,23 +141,7 @@ class RegistrationStreetTest extends TestCase
             ])
         );
 
-        $response->assertStatus(200)->assertJsonPath('ok', true);
-    }
-
-    public function test_buyer_registration_fails_without_street_in_manual_mode(): void
-    {
-        $response = $this->postJson(
-            route('register.buyer.store'),
-            $this->buyerPayload([
-                'address_mode' => 'manual',
-                'province' => null,
-                'municipality' => null,
-                'barangay' => null,
-                'street' => '',
-            ])
-        );
-
-        $response->assertStatus(422)->assertJsonValidationErrorFor('street');
+        $response->assertStatus(422)->assertJsonValidationErrorFor('address_mode');
     }
 
     // ── Buyer: field constraints ──────────────────────────────────────────
@@ -237,9 +222,9 @@ class RegistrationStreetTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrorFor('street');
     }
 
-    // ── Seller: manual mode ───────────────────────────────────────────────
+    // ── Seller: manual mode rejected ──────────────────────────────────────
 
-    public function test_seller_registration_succeeds_with_street_in_manual_mode(): void
+    public function test_seller_registration_rejects_manual_address_mode(): void
     {
         $response = $this->postJson(
             route('register.seller.store'),
@@ -255,23 +240,7 @@ class RegistrationStreetTest extends TestCase
             ])
         );
 
-        $response->assertStatus(201);
-    }
-
-    public function test_seller_registration_fails_without_street_in_manual_mode(): void
-    {
-        $response = $this->postJson(
-            route('register.seller.store'),
-            $this->sellerPayload([
-                'address_mode' => 'manual',
-                'province' => null,
-                'municipality' => null,
-                'barangay' => null,
-                'street' => '',
-            ])
-        );
-
-        $response->assertStatus(422)->assertJsonValidationErrorFor('street');
+        $response->assertStatus(422)->assertJsonValidationErrorFor('address_mode');
     }
 
     // ── Seller: field constraints ─────────────────────────────────────────
@@ -308,17 +277,20 @@ class RegistrationStreetTest extends TestCase
         $this->assertDatabaseHas('sellers', ['street' => $street]);
     }
 
-    // ── Admin registrations view shows full address ───────────────────────
+    // ── Admin registrations view lists pending applicants ─────────────────
 
-    public function test_admin_registrations_view_shows_street_for_buyer(): void
+    public function test_admin_registrations_view_lists_the_pending_buyer(): void
     {
         $buyer = Buyer::factory()->create([
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'email' => 'juan.'.uniqid().'@example.com',
             'street' => '55 Mabini Ave.',
             'barangay_name' => 'Brgy. Uno',
             'municipality_name' => 'Calamba',
             'province_name' => 'Laguna',
             'address_detail' => 'Near the church',
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ]);
 
         $admin = Admin::create([
@@ -327,23 +299,26 @@ class RegistrationStreetTest extends TestCase
             'password' => Hash::make('password'),
         ]);
 
+        // The reworked queue lists applicants by name + email; the old ?view=
+        // detail panel that rendered the full address was removed.
         $this->actingAs($admin, 'admin')
-            ->get(route('admin.registrations.index', ['view' => $buyer->id, 'type' => 'buyer']))
+            ->get(route('admin.registrations.index', ['type' => 'buyer']))
             ->assertOk()
-            ->assertSee('55 Mabini Ave.')
-            ->assertSee('Brgy. Uno')
-            ->assertSee('Calamba')
-            ->assertSee('Laguna');
+            ->assertSee('Juan Dela Cruz')
+            ->assertSee($buyer->email);
     }
 
-    public function test_admin_registrations_view_shows_street_for_seller(): void
+    public function test_admin_registrations_view_lists_the_pending_seller(): void
     {
         $seller = Seller::factory()->create([
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'email' => 'maria.'.uniqid().'@example.com',
             'street' => '88 Rizal Blvd.',
             'barangay_name' => 'Brgy. Dos',
             'municipality_name' => 'Batangas City',
             'province_name' => 'Batangas',
-            'status' => 'pending_approval',
+            'status' => 'pending',
         ]);
 
         $admin = Admin::create([
@@ -353,9 +328,9 @@ class RegistrationStreetTest extends TestCase
         ]);
 
         $this->actingAs($admin, 'admin')
-            ->get(route('admin.registrations.index', ['view' => $seller->id, 'type' => 'seller']))
+            ->get(route('admin.registrations.index', ['type' => 'seller']))
             ->assertOk()
-            ->assertSee('88 Rizal Blvd.')
-            ->assertSee('Batangas City');
+            ->assertSee('Maria Santos')
+            ->assertSee($seller->email);
     }
 }

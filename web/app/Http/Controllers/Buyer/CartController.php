@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Buyer;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Product;
-use App\Models\ProductVariant;
 use App\Models\Voucher;
 use App\Services\CartSummary;
+use App\Services\CartVariantResolver;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class CartController extends Controller
@@ -28,7 +30,7 @@ class CartController extends Controller
             ->cartItems()
             ->with([
                 'product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category']),
-                'variant',
+                'variant.optionValues',
             ])
             ->orderBy('created_at')
             ->orderBy('id')
@@ -140,31 +142,17 @@ class CartController extends Controller
 
         // `status = active` + the SoftDeletes default scope already excludes
         // drafts and deleted products.
-        $product = Product::where('status', 'active')
+        $product = Product::where('status', 'active')->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
             ->find($validated['product_id']);
 
         if (! $product) {
             return response()->json(['error' => 'This product is not available.'], 422);
         }
 
-        // Resolve the variant: legacy single-SKU products have exactly one
-        // auto Default variant — cart lines still target it so stock is
-        // always checked/written against a variant row.
-        $variant = ProductVariant::query()
-            ->where('product_id', $product->id)
-            ->when(
-                ! empty($validated['variant_id']),
-                fn ($q) => $q->where('id', $validated['variant_id']),
-                fn ($q) => $q->orderBy('id'),
-            )
-            ->first();
-
-        $variantId = $variant?->id;
-        $stockCeiling = $variant?->stock_quantity ?? $product->stock_quantity;
-
-        if (! $variant || ! $variant->is_available || $stockCeiling <= 0) {
-            return response()->json(['error' => 'This product is not available.'], 422);
-        }
+        $variant = app(CartVariantResolver::class)->resolve(
+            $product, isset($validated['variant_id']) ? (int) $validated['variant_id'] : null,
+        );
+        $variantId = $variant->id;
 
         $buyer = auth('buyer')->user();
 
@@ -173,32 +161,51 @@ class CartController extends Controller
         // concurrent adds.
         // NOTE: this never touches variant/product stock — a cart is not a
         // stock reservation, so no inventory_transactions row is written here.
-        $cartCount = DB::transaction(function () use ($buyer, $product, $variantId, $stockCeiling, $validated): int {
-            $existing = CartItem::where('buyer_id', $buyer->id)
-                ->where('product_id', $product->id)
-                ->where('variant_id', $variantId)
-                ->lockForUpdate()
-                ->first();
+        try {
+            // Missing-row gap locks can deadlock on concurrent first inserts.
+            // Retry the entire read/merge/write transaction, never just INSERT.
+            DB::transaction(function () use ($buyer, $product, $variantId, $validated): void {
+                $currentProduct = Product::query()->find($product->id);
+                if ($currentProduct === null) {
+                    throw ValidationException::withMessages(['product_id' => 'This product is not available.']);
+                }
+                $currentVariant = app(CartVariantResolver::class)->resolve($currentProduct, $variantId);
+                $stockCeiling = $currentVariant->stock_quantity;
 
-            $requested = (int) $validated['quantity'];
-            $newQty = min(($existing?->quantity ?? 0) + $requested, $stockCeiling);
+                $existing = CartItem::where('buyer_id', $buyer->id)
+                    ->where('product_id', $product->id)
+                    ->where('variant_id', $variantId)
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($existing !== null) {
-                $existing->update(['quantity' => $newQty]);
-            } else {
-                CartItem::create([
-                    'buyer_id' => $buyer->id,
-                    'product_id' => $product->id,
-                    'variant_id' => $variantId,
-                    'quantity' => min($requested, $stockCeiling),
-                ]);
+                $requested = (int) $validated['quantity'];
+                $newQty = min(($existing?->quantity ?? 0) + $requested, $stockCeiling);
+
+                if ($existing !== null) {
+                    $existing->update(['quantity' => $newQty]);
+                } else {
+                    CartItem::create([
+                        'buyer_id' => $buyer->id,
+                        'product_id' => $product->id,
+                        'variant_id' => $variantId,
+                        'quantity' => min($requested, $stockCeiling),
+                    ]);
+                }
+
+            }, attempts: 3);
+        } catch (QueryException $exception) {
+            if (! in_array((int) ($exception->errorInfo[1] ?? 0), [1213, 1205], true)) {
+                throw $exception;
             }
 
-            return (int) CartItem::where('buyer_id', $buyer->id)->sum('quantity');
-        });
+            return response()->json(['error' => 'Your cart is busy. Please try again.'], 503);
+        }
+
+        // Count after commit rather than using an earlier retry snapshot.
+        $cartCount = (int) CartItem::where('buyer_id', $buyer->id)->count();
 
         // Calculate price: use variant price if available, else product price
-        $priceCentavos = $variant?->price_minor ?? $product->price_minor ?? 0;
+        $priceCentavos = (int) round((float) $variant->price * 100);
         $formattedPrice = '₱'.number_format($priceCentavos / 100, 2);
 
         return response()->json([
@@ -307,19 +314,17 @@ class CartController extends Controller
         $itemsData = $items->map(fn (CartItem $item) => [
             'id' => $item->id,
             'name' => $item->product?->name ?? '(Deleted)',
-            'price' => $item->product?->formattedPrice() ?? '0.00',
-            'price_centavos' => $item->product?->price * 100 ?? 0,
+            'price' => "\u{20B1}".number_format($item->unitPriceCentavos() / 100, 2),
+            'price_centavos' => $item->unitPriceCentavos(),
             'quantity' => $item->quantity,
-            'variant' => $item->variant?->name ?? null,
-            'image_url' => $item->product?->images?->first()?->path
-                ? asset('storage/'.$item->product->images->first()->path)
-                : null,
+            'variant' => $item->cartVariantLabel(),
+            'image_url' => $item->cartImageUrl(),
             'is_available' => $item->isAvailable(),
         ]);
 
         return response()->json([
             'items' => $itemsData,
-            'count' => (int) $items->sum('quantity'),
+            'count' => (int) $items->count(),
             'subtotal' => $summary->formattedSubtotal(),
             'subtotal_centavos' => $summary->subtotalCentavos,
             'total' => $summary->formattedTotal(),
@@ -388,21 +393,15 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:99'],
         ]);
 
-        $product = Product::query()->with('variants')->find($data['product_id']);
+        $product = Product::query()->whereHas('seller', fn ($query) => $query->where('status', 'approved'))->with('variants')->find($data['product_id']);
 
-        if ($product === null || $product->status !== 'active') {
+        if ($product === null || ! $product->isListedForSale()) {
             return response()->json(['success' => false, 'message' => 'This product is no longer available.'], 422);
         }
 
-        if ($product->hasVariants()) {
-            $variant = $product->variants->firstWhere('id', $data['variant_id'] ?? 0);
-
-            if ($variant === null) {
-                return response()->json(['success' => false, 'message' => 'Please choose an option first.'], 422);
-            }
-        } else {
-            $variant = $product->variants->sortBy('id')->first();
-        }
+        $variant = app(CartVariantResolver::class)->resolve(
+            $product, isset($data['variant_id']) ? (int) $data['variant_id'] : null,
+        );
 
         $item = $buyer->cartItems()
             ->where('product_id', $product->id)
@@ -435,7 +434,7 @@ class CartController extends Controller
         return response()->json([
             'success' => true,
             'redirect' => route('buyer.checkout.index', ['items' => [$item->id]]),
-            'cart_count' => (int) CartItem::query()->where('buyer_id', $buyer->id)->sum('quantity'),
+            'cart_count' => (int) CartItem::query()->where('buyer_id', $buyer->id)->count(),
             'capped' => $item->quantity < $data['quantity'],
         ]);
     }

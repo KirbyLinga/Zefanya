@@ -5,12 +5,12 @@
 --}}
 @php
     $product  = $item->product;
-    $imageUrl = $product?->catalogImageUrl();
+    $imageUrl = $item->cartImageUrl();
     $pdpUrl   = $product ? route('buyer.products.show', $product->id) : null;
     $stock    = $item->availableQuantity();
     $catLabel = $product?->category?->label;
     $unit     = $item->unitPriceCentavos();
-    $variantLabel = $item->variant?->label();
+    $variantLabel = $item->cartVariantLabel();
 @endphp
 
 <div
@@ -68,11 +68,15 @@
          multi-quantity hint only. --}}
     <p class="mt-0.5 text-[11.5px] text-neutral-400">
       @if ($unavailable)
-        No longer available
+        @if ($item->requiresVariantReselection())
+          Choose a color or size on the product page first.
+        @else
+          No longer available
+        @endif
       @elseif ($variantLabel)
         {{ $variantLabel }}@if ($item->quantity > 1) · Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)@endif
       @elseif ($item->quantity > 1)
-        Set of {{ $item->quantity }} ({{ $product->formattedPrice() }} each)
+        Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)
       @endif
     </p>
 

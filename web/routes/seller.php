@@ -5,16 +5,20 @@ use App\Http\Controllers\Seller\DashboardController;
 use App\Http\Controllers\Seller\MessageController;
 use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
+use App\Http\Controllers\Seller\ReturnController;
+use App\Http\Controllers\Seller\ShipmentController;
+use App\Http\Controllers\Seller\ShippingProviderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('seller')->name('seller.')->group(function () {
-    Route::middleware('guest:seller')->group(function () {
-        Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-        Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+    Route::middleware('guest.role')->group(function () {
+        Route::post('/login', [AuthController::class, 'login'])
+            ->name('login.post')
+            ->middleware('throttle:login');
     });
 
     Route::middleware(['auth:seller', 'seller.approved'])->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('throttle:logout');
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -33,14 +37,23 @@ Route::prefix('seller')->name('seller.')->group(function () {
             return to_route('seller.products.index');
         })->name('inventory.index');
 
+        Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
+        Route::post('/returns/{return}/verify', [ReturnController::class, 'verify'])->name('returns.verify');
+        Route::post('/returns/{return}/receive', [ReturnController::class, 'receive'])->name('returns.receive');
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{sellerOrder}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{sellerOrder}/accept', [OrderController::class, 'acceptOrder'])->name('orders.accept');
+        Route::post('/orders/{sellerOrder}/decline', [OrderController::class, 'declineOrder'])->name('orders.decline');
         Route::post('/orders/{sellerOrder}/mark-ready', [OrderController::class, 'markReady'])->name('orders.markReady');
 
-        Route::get('/shipments', function () {
-            return view('Seller.Shipments.index');
-        })->name('shipments.index');
+        Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
+        Route::get('/shipments/{sellerOrder}/label', [ShipmentController::class, 'label'])->name('shipments.label');
+
+        Route::get('/shipping-providers', [ShippingProviderController::class, 'index'])->name('shipping-providers.index');
+        Route::post('/shipping-providers/{logistics_provider}/enable', [ShippingProviderController::class, 'enable'])
+            ->name('shipping-providers.enable');
+        Route::post('/shipping-providers/{logistics_provider}/disable', [ShippingProviderController::class, 'disable'])
+            ->name('shipping-providers.disable');
 
         Route::get('/vouchers', function () {
             return view('Seller.Vouchers.index');
@@ -56,9 +69,11 @@ Route::prefix('seller')->name('seller.')->group(function () {
 
         // Messaging routes
         Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
+        // Literal /messages/unread-count MUST come before the {conversation}
+        // wildcard, or Laravel matches it as a conversation id.
+        Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
         Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
         Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
-        Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
 
         Route::get('/chat', function () {
             return view('Seller.Chat.index');

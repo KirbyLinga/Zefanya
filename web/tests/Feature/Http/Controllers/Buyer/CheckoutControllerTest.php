@@ -8,6 +8,7 @@ use App\Enums\PaymentStatus;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
 use App\Models\CartItem;
+use App\Models\CheckoutToken;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -16,10 +17,12 @@ use App\Models\Product;
 use App\Models\Seller\Seller;
 use App\Models\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class CheckoutControllerTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private Buyer $buyer;
@@ -60,6 +63,8 @@ class CheckoutControllerTest extends TestCase
             'price' => 25.50,
             'stock_quantity' => 3,
         ]);
+
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->sellerA, $this->sellerB]);
     }
 
     /**
@@ -101,20 +106,23 @@ class CheckoutControllerTest extends TestCase
         $this->parkSelection([$cartA->id, $cartB->id], 'ZEFANYANEW');
 
         $response = $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'));
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA, $this->sellerB]),
+            ]);
 
-        // subtotal = 2×10000 + 1×2550 = 22550; discount 5000; total 17550.
+        // subtotal = 2×10000 + 1×2550 = 22550; discount 5000; shipping 9800; total 27350.
         $order = Order::query()->sole();
         $this->assertSame(22550, $order->subtotal_minor);
         $this->assertSame(5000, $order->discount_minor);
-        $this->assertSame(17550, $order->total_minor);
+        $this->assertSame(27350, $order->total_minor);
         $this->assertSame(OrderStatus::Placed, $order->status);
         $this->assertSame($this->buyer->id, $order->buyer_id);
         $this->assertMatchesRegularExpression('/^ORD-\d{8}-[A-Z0-9]{6}$/', $order->reference);
 
         // Address snapshot from the buyer's profile.
         $this->assertSame($this->buyer->fullName(), $order->shipping_address['name']);
-        $this->assertSame('123, Maple Street, Diliman, Quezon City, Metro Manila, Near the corner', $order->shipping_address['full']);
+        $this->assertSame('123, Maple Street, First, San Fernando, Pampanga, Near the corner', $order->shipping_address['full']);
         $this->assertSame($this->buyer->contact_no, $order->shipping_address['phone']);
 
         // One seller_order per shop, one per (order, seller) pair.
@@ -142,9 +150,9 @@ class CheckoutControllerTest extends TestCase
         $this->assertTrue($payments->every(fn (Payment $p): bool => $p->status === PaymentStatus::Pending));
         $this->assertTrue($payments->every(fn (Payment $p): bool => $p->method === PaymentMethod::Cod));
         $this->assertNull($payments->first()->paid_at);
-        $this->assertSame(17550, (int) $payments->sum('amount_minor'));
+        $this->assertSame(27350, (int) $payments->sum('amount_minor'));
         foreach ($payments as $payment) {
-            $this->assertLessThanOrEqual($payment->sellerOrder->subtotal_minor, $payment->amount_minor);
+            $this->assertLessThanOrEqual($payment->sellerOrder->subtotal_minor + $payment->sellerOrder->shipping_fee_minor, $payment->amount_minor);
             $this->assertGreaterThan(0, $payment->amount_minor);
         }
 
@@ -170,6 +178,50 @@ class CheckoutControllerTest extends TestCase
             ->assertSee($order->reference);
     }
 
+    public function test_checkout_snapshots_each_sellers_parcel_weight(): void
+    {
+        $this->productA->forceFill(['weight_grams' => 1200])->save();
+        $this->productA->variants()->update(['weight_grams' => 1200]);
+        $this->productB->forceFill(['weight_grams' => 300])->save();
+        $this->productB->variants()->update(['weight_grams' => 300]);
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'variant_id' => $this->productA->variants()->orderBy('id')->value('id'),
+            'quantity' => 2,
+        ]);
+        $cartB = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productB->id,
+            'variant_id' => $this->productB->variants()->orderBy('id')->value('id'),
+            'quantity' => 3,
+        ]);
+
+        $this->parkSelection([$cartA->id, $cartB->id]);
+
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$this->sellerA, $this->sellerB]),
+        ]);
+
+        $weights = Order::query()->sole()->sellerOrders()
+            ->pluck('parcel_weight_grams', 'seller_id');
+
+        $this->assertSame(2400, (int) $weights[$this->sellerA->id]);
+        $this->assertSame(900, (int) $weights[$this->sellerB->id]);
+
+        // A later catalog edit must not rewrite the parcel already checked out.
+        $this->productA->forceFill(['weight_grams' => 9000])->save();
+        $this->productA->variants()->update(['weight_grams' => 9000]);
+        $this->assertSame(
+            2400,
+            (int) Order::query()->sole()->sellerOrders()
+                ->where('seller_id', $this->sellerA->id)
+                ->value('parcel_weight_grams'),
+        );
+    }
+
     public function test_a_single_seller_order_carries_the_full_discount(): void
     {
         $cart = CartItem::factory()->create([
@@ -181,16 +233,19 @@ class CheckoutControllerTest extends TestCase
         Voucher::factory()->fixed(5000)->create(['code' => 'ZEFANYANEW']);
         $this->parkSelection([$cart->id], 'ZEFANYANEW');
 
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'));
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$this->sellerA]),
+        ]);
 
         $order = Order::query()->sole();
         $this->assertSame(10000, $order->subtotal_minor);
         $this->assertSame(5000, $order->discount_minor);
-        $this->assertSame(5000, $order->total_minor);
+        $this->assertSame(9900, $order->total_minor);
 
         // One shop: the whole discount lands on its payment.
         $this->assertSame(1, Payment::query()->count());
-        $this->assertSame(5000, (int) Payment::query()->value('amount_minor'));
+        $this->assertSame(9900, (int) Payment::query()->value('amount_minor'));
     }
 
     // ── Rejections (no partial writes) ───────────────────────────────────────
@@ -210,10 +265,11 @@ class CheckoutControllerTest extends TestCase
         ]);
         $this->parkSelection([$cartA->id, $cartB->id]);
 
-        $this->productA->update(['stock_quantity' => 1]);
+        $this->productA->variants()->sole()->update(['stock_quantity' => 1]);
+        $this->productA->syncVariantRollups();
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -238,7 +294,7 @@ class CheckoutControllerTest extends TestCase
         $cartA->delete();
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -256,7 +312,7 @@ class CheckoutControllerTest extends TestCase
         $this->productA->delete(); // soft delete → unavailable
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -273,7 +329,7 @@ class CheckoutControllerTest extends TestCase
         $this->parkSelection([$foreignItem->id]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -286,7 +342,7 @@ class CheckoutControllerTest extends TestCase
         $this->parkSelection([]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 
@@ -297,8 +353,17 @@ class CheckoutControllerTest extends TestCase
     {
         $this->parkSelection([999]);
 
-        $this->post(route('buyer.checkout.store'))
-            ->assertRedirect(route('buyer.login'));
+        $this->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('home', ['login' => 1]));
+
+        $this->assertGuest('buyer');
+        $this->get(route('home', ['login' => 1]))->assertOk()
+            ->assertSee('id="loginModalOverlay"', false)
+            ->assertSee('action="'.route('unified.login').'"', false);
+        $this->postJson(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertUnauthorized();
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('inventory_transactions', 0);
 
         $this->assertSame(0, Order::query()->count());
     }
@@ -314,13 +379,16 @@ class CheckoutControllerTest extends TestCase
         $this->parkSelection([$cart->id], 'OLDCODE');
 
         $response = $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'));
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
 
         $order = Order::query()->sole();
         $this->assertSame(10000, $order->subtotal_minor);
         $this->assertSame(0, $order->discount_minor);
-        $this->assertSame(10000, $order->total_minor);
-        $this->assertSame(10000, (int) Payment::query()->value('amount_minor'));
+        $this->assertSame(14900, $order->total_minor);
+        $this->assertSame(14900, (int) Payment::query()->value('amount_minor'));
         $response->assertSessionHas('voucher_notice');
     }
 
@@ -369,7 +437,10 @@ class CheckoutControllerTest extends TestCase
             'product_id' => $this->productA->id,
         ]);
         $this->parkSelection([$cart->id]);
-        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'));
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$this->sellerA]),
+        ]);
 
         $order = Order::query()->sole();
 

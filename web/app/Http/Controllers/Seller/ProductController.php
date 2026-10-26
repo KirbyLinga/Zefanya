@@ -7,10 +7,9 @@ use App\Http\Requests\Seller\StoreProductRequest;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\Shared\Category;
-use App\Services\VariantSyncService;
+use App\Services\ProductPublishingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -76,7 +75,7 @@ class ProductController extends Controller
         $editProduct = null;
         if (old('_modal') === 'product-edit') {
             $editProduct = Product::forSeller($sellerId)
-                ->with('images')
+                ->with(['images', 'variants.optionValues.option', 'options.values'])
                 ->find((int) old('_product_id'));
         }
 
@@ -113,25 +112,9 @@ class ProductController extends Controller
         return redirect()->route('seller.products.index', ['create' => 1]);
     }
 
-    public function store(StoreProductRequest $request)
+    public function store(StoreProductRequest $request, ProductPublishingService $publishing)
     {
-        $seller = Auth::guard('seller')->user();
-        $data = $request->validated();
-
-        $product = Product::create([
-            'seller_id' => $seller->id,
-            'category_id' => $seller->line_of_business_id,
-            'name' => $data['name'],
-            'slug' => Product::generateUniqueSlug($data['name']),
-            'description' => $data['description'] ?? null,
-            'price' => $data['price'],
-            'stock_quantity' => $data['stock_quantity'],
-            'low_stock_threshold' => $data['low_stock_threshold'] ?? 5,
-            'status' => $data['status'],
-        ]);
-
-        $this->storeImages($product, $request);
-        $this->syncVariants($product, $request);
+        $product = $publishing->save(new Product, Auth::guard('seller')->user(), $request->validated());
 
         return redirect()
             ->route('seller.products.index')
@@ -156,36 +139,12 @@ class ProductController extends Controller
         return redirect()->route('seller.products.index', ['edit' => $product->id]);
     }
 
-    public function update(StoreProductRequest $request, Product $product)
+    public function update(StoreProductRequest $request, Product $product, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
-        $data = $request->validated();
+        $publishing->save($product, Auth::guard('seller')->user(), $request->validated());
 
-        $product->update([
-            'category_id' => Auth::guard('seller')->user()->line_of_business_id,
-            'name' => $data['name'],
-            'slug' => $data['name'] !== $product->name
-                ? Product::generateUniqueSlug($data['name'])
-                : $product->slug,
-            'description' => $data['description'] ?? null,
-            'price' => $data['price'],
-            'stock_quantity' => $data['stock_quantity'],
-            'low_stock_threshold' => $data['low_stock_threshold'] ?? 5,
-            'status' => $data['status'],
-        ]);
-
-        if ($request->hasFile('images')) {
-            $this->storeImages($product, $request);
-        }
-
-        $this->syncVariants($product, $request);
-        if ($request->hasFile('variant_images')) {
-            $this->storeVariantImages($product, $request);
-        }
-
-        // Back to the products index (the modal lives there), preserving filters/page.
-        return back()
-            ->with('success', "\"{$product->name}\" was updated.");
+        return back()->with('success', "\"{$product->name}\" was updated.");
     }
 
     public function destroy(Request $request, Product $product)
@@ -195,7 +154,7 @@ class ProductController extends Controller
         $name = $product->name;
         $product->delete();
 
-        $message = "\"{$name}\" was deleted.";
+        $message = "\"{$name}\" was archived.";
 
         if ($request->wantsJson()) {
             return response()->json(['success' => true, 'message' => $message]);
@@ -204,7 +163,7 @@ class ProductController extends Controller
         return back()->with('success', $message);
     }
 
-    public function toggleStatus(Request $request, Product $product)
+    public function toggleStatus(Request $request, Product $product, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
 
@@ -212,7 +171,10 @@ class ProductController extends Controller
             'status' => ['required', 'in:active,inactive'],
         ]);
 
-        $product->update(['status' => $validated['status']]);
+        if ($validated['status'] === 'active') {
+            $publishing->assertPublishable($product);
+        }
+        $product->forceFill(['status' => $validated['status']])->save();
 
         $message = "\"{$product->name}\" was marked as {$product->status}.";
 
@@ -228,18 +190,10 @@ class ProductController extends Controller
         return back()->with('success', $message);
     }
 
-    public function deleteImage(Product $product, ProductImage $image)
+    public function deleteImage(Product $product, ProductImage $image, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
-        abort_unless($image->product_id === $product->id, 403);
-
-        Storage::disk('public')->delete($image->path);
-        $wasPrimary = $image->is_primary;
-        $image->delete();
-
-        if ($wasPrimary) {
-            $product->images()->first()?->update(['is_primary' => true]);
-        }
+        $publishing->removeImage($product, $image);
 
         return back()->with('success', 'Image removed.');
     }
@@ -247,73 +201,5 @@ class ProductController extends Controller
     private function authorizeOwnership(Product $product): void
     {
         abort_unless($product->seller_id === Auth::guard('seller')->id(), 403);
-    }
-
-    /**
-     * Apply the Variant Options submission (no-op for legacy single-SKU
-     * products). The products.price/stock rollups stay correct either way.
-     */
-    private function syncVariants(Product $product, Request $request): void
-    {
-        $payload = $request->boolean('variants_exist')
-            ? $request->variantPayload()
-            : ['options' => [], 'variants' => []];
-
-        app(VariantSyncService::class)->sync(
-            $product,
-            $payload['options'],
-            $payload['variants'],
-            $request->boolean('variants_exist'),
-        );
-    }
-
-    /**
-     * Attach uploaded photos to specific variants (variant_images[{variantId}]).
-     * Stored under the same products/{id} folder convention; a product-level
-     * image has variant_id = NULL.
-     */
-    private function storeVariantImages(Product $product, Request $request): void
-    {
-        $variantIds = $product->variants()->pluck('id')->flip();
-
-        foreach ($request->file('variant_images', []) as $variantId => $files) {
-            $variantId = (int) $variantId;
-
-            if (! $variantIds->has($variantId)) {
-                continue; // not this product's variant — ignore
-            }
-
-            foreach ((array) $files as $file) {
-                $path = $file->store('products/'.$product->id, 'public');
-
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'variant_id' => $variantId,
-                    'path' => $path,
-                    'is_primary' => false,
-                    'sort_order' => ProductImage::query()->where('product_id', $product->id)->count(),
-                ]);
-            }
-        }
-    }
-
-    private function storeImages(Product $product, Request $request): void
-    {
-        if (! $request->hasFile('images')) {
-            return;
-        }
-
-        $hasPrimaryAlready = $product->images()->where('is_primary', true)->exists();
-
-        foreach ($request->file('images') as $index => $file) {
-            $path = $file->store('products/'.$product->id, 'public');
-
-            ProductImage::create([
-                'product_id' => $product->id,
-                'path' => $path,
-                'is_primary' => ! $hasPrimaryAlready && $index === 0,
-                'sort_order' => $product->images()->count() + $index,
-            ]);
-        }
     }
 }

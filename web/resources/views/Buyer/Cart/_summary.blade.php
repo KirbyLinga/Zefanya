@@ -17,7 +17,7 @@
       .js-cartpage-checkout-btn    both checkout buttons
 --}}
 @php
-    $selectedQty = $summary->selectedQuantity();
+    $selectedLines = $summary->selectedLineCount();
     $hasVoucher  = $voucher !== null;
     $canCheckout = $summary->subtotalCentavos > 0;
 @endphp
@@ -32,7 +32,7 @@
             class="rounded-full bg-secondary-100 px-3 py-1 text-[11px] font-semibold text-buyer-ink"
             aria-live="polite"
             aria-label="Selected item count">
-        {{ $selectedQty }} {{ Str::plural('item', $selectedQty) }}
+        {{ $selectedLines }} {{ Str::plural('item', $selectedLines) }}
       </span>
     </div>
 

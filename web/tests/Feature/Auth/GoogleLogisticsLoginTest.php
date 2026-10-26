@@ -42,7 +42,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas('auth.status_message', GoogleAuthController::NO_ACCOUNT_MESSAGE);
         $this->assertGuest('logistics');
         $this->assertDatabaseCount('logistics_providers', 0);
@@ -50,7 +50,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
     public function test_provider_awaiting_approval_cannot_sign_in_with_google(): void
     {
-        $provider = LogisticsProvider::factory()->pendingApproval()->create([
+        $provider = LogisticsProvider::factory()->pending()->create([
             'email' => 'pending-logistics@gmail.com',
             'google_id' => null,
         ]);
@@ -59,7 +59,7 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('home', ['login' => 1]));
         $response->assertSessionHas(
             'auth.status_message',
             'Your logistics provider registration is still awaiting administrator approval.',
@@ -68,12 +68,11 @@ class GoogleLogisticsLoginTest extends TestCase
         $this->assertSame('google-logistics-2', $provider->fresh()->google_id);
     }
 
-    public function test_role_agnostic_callback_prefers_the_most_privileged_matching_role(): void
+    public function test_role_agnostic_callback_rejects_email_linked_to_multiple_roles(): void
     {
-        // One email in two role tables: UnifiedLoginController tries seller,
-        // logistics, buyer — the Google button must land on the same panel.
+        // One email = one role (EmailRegistry). Google must not pick a winner.
         Buyer::factory()->create(['email' => 'shared@gmail.com', 'google_id' => null]);
-        $provider = LogisticsProvider::factory()->create([
+        LogisticsProvider::factory()->create([
             'email' => 'shared@gmail.com',
             'google_id' => null,
         ]);
@@ -82,10 +81,10 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('logistics.dashboard'));
-        $this->assertAuthenticated('logistics');
+        $response->assertRedirect(route('home', ['login' => 1]));
+        $response->assertSessionHas('auth.status_message');
+        $this->assertGuest('logistics');
         $this->assertGuest('buyer');
-        $this->assertSame('google-shared-1', $provider->fresh()->google_id);
     }
 
     private function fakeGoogleUser(string $email, string $id): void

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Buyer\Buyer;
+use App\Services\CartVariantResolver;
 use Database\Factories\CartItemFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -49,11 +50,11 @@ class CartItem extends Model
 
     /**
      * Unit price in centavos for THIS line: the variant's price when the line
-     * targets a variant, otherwise the product rollup price.
+     * targets a variant or resolves to its single optionless Default.
      */
     public function unitPriceCentavos(): int
     {
-        $price = $this->variant?->price ?? $this->product?->price ?? 0;
+        $price = $this->resolvedVariant()?->price ?? $this->product?->price ?? 0;
 
         return (int) bcmul((string) $price, '100', 0);
     }
@@ -80,13 +81,11 @@ class CartItem extends Model
 
     /**
      * Stock ceiling for this line: the variant's stock when one is targeted,
-     * otherwise the product rollup.
+     * otherwise its single optionless Default (zero when ambiguous).
      */
     public function availableQuantity(): int
     {
-        $stock = $this->variant_id !== null
-            ? ($this->variant?->stock_quantity ?? 0)
-            : ($this->product?->stock_quantity ?? 0);
+        $stock = $this->resolvedVariant()?->stock_quantity ?? 0;
 
         return max(0, (int) $stock);
     }
@@ -100,16 +99,51 @@ class CartItem extends Model
     {
         $p = $this->product;
 
-        if ($p === null || $p->trashed() || $p->status !== 'active') {
+        if ($p === null || ! $p->isListedForSale()) {
             return false;
         }
 
-        if ($this->variant_id !== null) {
-            $v = $this->variant;
+        $variant = $this->resolvedVariant();
 
-            return $v !== null && $v->is_available && $v->stock_quantity > 0;
+        return $variant !== null && $variant->is_available && $variant->stock_quantity > 0;
+    }
+
+    /** Presentation only: prefer the selected variant's existing photo. */
+    public function cartImageUrl(): ?string
+    {
+        $product = $this->product;
+        if ($product === null) {
+            return null;
+        }
+        $variant = $this->resolvedVariant();
+
+        return ($variant === null ? null : $product->catalogImageUrl(
+            $product->images->where('variant_id', $variant->id),
+        )) ?? $product->catalogImageUrl();
+    }
+
+    public function cartVariantLabel(): ?string
+    {
+        $variant = $this->resolvedVariant();
+
+        return $variant?->hasOptions() ? $variant->label() : null;
+    }
+
+    public function requiresVariantReselection(): bool
+    {
+        return $this->variant_id === null && $this->product !== null
+            && app(CartVariantResolver::class)->defaultVariant($this->product) === null;
+    }
+
+    private function resolvedVariant(): ?ProductVariant
+    {
+        if ($this->product === null) {
+            return null;
+        }
+        if ($this->variant_id !== null) {
+            return $this->variant?->product_id === $this->product_id ? $this->variant : null;
         }
 
-        return $p->stock_quantity > 0;
+        return app(CartVariantResolver::class)->defaultVariant($this->product);
     }
 }

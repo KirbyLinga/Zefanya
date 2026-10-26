@@ -19,11 +19,7 @@ class DocumentController extends Controller
      */
     public function stream(Request $request, string $type, int $id, string $document): StreamedResponse|BinaryFileResponse
     {
-        $user = $request->user('admin');
-        if (! $user) {
-            abort(403);
-        }
-
+        // auth:admin + admin.role already gate this route; resolve the model next.
         $model = match ($type) {
             'seller' => Seller::findOrFail($id),
             'logistics' => LogisticsProvider::findOrFail($id),
@@ -56,7 +52,9 @@ class DocumentController extends Controller
     }
 
     /**
-     * Get the document path from the model based on document type.
+     * Map a whitelisted {document} key to a known path column.
+     * Unknown keys return null → 404. Route `where` also restricts the segment
+     * to id|business_permit|dti_permit so arbitrary column names never reach here.
      */
     private function getDocumentPath(Seller|LogisticsProvider|Buyer $model, string $document): ?string
     {

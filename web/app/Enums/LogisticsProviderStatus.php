@@ -12,27 +12,31 @@ namespace App\Enums;
 enum LogisticsProviderStatus: string
 {
     /** Just registered, the emailed OTP has not been confirmed yet. */
-    case PendingVerification = 'pending_verification';
+    case Unverified = 'unverified';
 
     /** Email confirmed, waiting on an administrator's decision. */
-    case PendingApproval = 'pending_approval';
+    case Pending = 'pending';
 
     case Approved = 'approved';
 
     case Rejected = 'rejected';
 
+    /** Admin-suspended — credentials still work for auth attempt, panel access denied. */
+    case Suspended = 'suspended';
+
     public function label(): string
     {
         return match ($this) {
-            self::PendingVerification => 'Pending email verification',
-            self::PendingApproval => 'Pending approval',
+            self::Unverified => 'Pending email verification',
+            self::Pending => 'Pending approval',
             self::Approved => 'Approved',
             self::Rejected => 'Rejected',
+            self::Suspended => 'Suspended',
         };
     }
 
     public function isDecided(): bool
     {
-        return $this === self::Approved || $this === self::Rejected;
+        return $this === self::Approved || $this === self::Rejected || $this === self::Suspended;
     }
 }

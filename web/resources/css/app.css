@@ -107,6 +107,13 @@
     --color-buyer-cream: #fbf5f3;
     --color-buyer-line: #ebddda;
 
+    /* Shared product-card outlines in both public and buyer catalogs. */
+    --color-buyer-card-outline: #cfa3ab;
+    --color-buyer-card-hover: #7a4550;
+    --color-buyer-card-focus: #7a4550;
+    --shadow-buyer-card-hover: 0 6px 18px rgb(122 69 80 / 14%);
+
+
     /* Quick-view star gold (buyer.css `.qv-rating i{color:#E0A93D}`).
        Named by purpose (no other user); chunk c. */
     --color-buyer-star: #e0a93d;
@@ -352,6 +359,10 @@ html[data-theme="dark"] .html-body {
        value and only its TEXT utilities are lifted below. */
     --color-buyer-cream: #161212;
     --color-buyer-line: #3a3132;
+    --color-buyer-card-outline: #a47680;
+    --color-buyer-card-hover: #e2b4bd;
+    --color-buyer-card-focus: #e2b4bd;
+
     --color-buyer-ink-soft: #b3a9a9;
     --color-buyer-primary-dark: #e2b4bd;
     --color-buyer-tertiary-dark: #adc7ad;
@@ -417,3 +428,120 @@ html[data-theme="dark"] .html-body .bg-buyer-ink\/25 {
     background-color: rgba(244, 230, 228, 0.25);
 }
 
+
+
+/* ===== Scrollbar Utilities ===== */
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari, Opera */
+}
+
+/* ===== In-panel session-expired banner ===== */
+.app-session-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 10px 14px;
+    background-color: var(--color-error);
+    color: #fff;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-error) 82%, #000 18%);
+}
+
+.app-session-banner[hidden] {
+    display: none;
+}
+
+.app-session-banner .sp-banner__inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.app-session-banner .sp-banner__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.app-session-banner .sp-banner__text {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.app-session-banner .sp-banner__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 120ms ease;
+}
+
+.app-session-banner .sp-banner__close:hover,
+.app-session-banner .sp-banner__close:focus-visible {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.app-session-banner .sp-banner__close svg {
+    pointer-events: none;
+}
+
+/* ===== Wishlist add pop (product-card heart) ===== */
+@keyframes wishlist-pop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.28); }
+    65% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+}
+
+@keyframes wishlist-heart-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.wishlist-pop {
+    animation: wishlist-pop 420ms cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.wishlist-heart-pop {
+    animation: wishlist-heart-pop 420ms cubic-bezier(0.34, 1.45, 0.64, 1);
+    transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wishlist-pop,
+    .wishlist-heart-pop {
+        animation: none;
+    }
+}
+
+/* One Tailwind utility shared by every buyer product/store card. */
+@utility buyer-product-card {
+    @apply overflow-hidden rounded-2xl border-[1.5px] border-solid border-buyer-card-outline transition-colors duration-150;
+
+    &:hover {
+        @apply border-buyer-card-hover shadow-buyer-card-hover;
+    }
+
+    &:focus-visible,
+    &:has(:focus-visible) {
+        @apply outline-2 outline-solid -outline-offset-2 outline-buyer-card-focus;
+    }
+}

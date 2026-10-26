@@ -17,6 +17,7 @@ use App\Models\Seller\Seller;
 use App\Models\SellerOrder;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
@@ -204,15 +205,12 @@ class BuyerOrderLifecycleTest extends TestCase
             OrderStatus::Delivered,
         );
 
-        // The stranded scenario: a sibling slice is already Completed, so the
-        // old "all slices Delivered" gate hid the button and locked slice B out.
-        // Assert on the confirm section's unique copy (not the words "Confirm
-        // Received", which also appear in the still-in-transit fallback text).
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertSee('Please confirm receipt to complete the order')
-            ->assertDontSee('still in transit');
+            ->assertSee('Confirm this shipment received')
+            ->assertSee('name="seller_order_id" value="'.$sliceB->id.'"', false)
+            ->assertDontSee('name="seller_order_id" value="'.$sliceA->id.'"', false);
 
         $this->actingAs($this->buyer, 'buyer')
             ->post(route('buyer.orders.confirmReceived', $order))
@@ -231,7 +229,8 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertDontSee('Please confirm receipt to complete the order');
+            ->assertDontSee('Confirm this shipment received')
+            ->assertDontSee('name="seller_order_id"', false);
     }
 
     public function test_confirm_received_is_hidden_when_no_slice_is_delivered(): void
@@ -244,7 +243,8 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertDontSee('Please confirm receipt to complete the order');
+            ->assertDontSee('Confirm this shipment received')
+            ->assertDontSee('name="seller_order_id"', false);
     }
 
     public function test_confirm_received_transitions_delivered_to_completed_and_fires_notification(): void
@@ -265,7 +265,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $service = new SellerOrderStatusService;
         // Walk the full pipeline with correct actors:
         $so = $service->transition($so, OrderStatus::PickedUp, actor: OrderActor::Rider, note: 'sim');
-        $so = $service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Rider, note: 'sim');
+        $so = $service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Logistics, note: 'sim');
         $so = $service->transition($so, OrderStatus::Sorted, actor: OrderActor::Logistics, note: 'sim');
         $so = $service->transition($so, OrderStatus::AssignedToRider, actor: OrderActor::Logistics, note: 'sim');
         $so = $service->transition($so, OrderStatus::OutForDelivery, actor: OrderActor::Rider, note: 'sim');
@@ -512,26 +512,50 @@ class BuyerOrderLifecycleTest extends TestCase
 
     // ── Confirm gate: rejected when a slice is still in transit ────────
 
-    public function test_confirm_received_rejected_when_slice_before_delivered(): void
+    public function test_confirm_received_completes_delivered_slice_while_sibling_is_in_transit(): void
     {
         [$order, $sliceA, $sliceB] = $this->twoSellerOrder(
             OrderStatus::OutForDelivery,
             OrderStatus::Delivered,
         );
 
-        $this->assertFalse($order->fresh()->load('sellerOrders')->canBeConfirmed());
+        $this->assertTrue($order->fresh()->load('sellerOrders')->canBeConfirmed());
 
         $this->actingAs($this->buyer, 'buyer')
             ->post(route('buyer.orders.confirmReceived', $order))
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHas('success');
 
-        // No state change.
+        // The in-transit sibling is never advanced.
         $this->assertSame(OrderStatus::OutForDelivery, $sliceA->fresh()->status);
-        $this->assertSame(OrderStatus::Delivered, $sliceB->fresh()->status);
+        $this->assertSame(OrderStatus::Completed, $sliceB->fresh()->status);
     }
 
     // ── COD settlement on Delivered (cash-at-door) ──────────────────────
+
+    public function test_confirm_received_rejects_selected_in_transit_shipment_without_changing_delivered_sibling(): void
+    {
+        [$order, $inTransit, $delivered] = $this->twoSellerOrder(
+            OrderStatus::OutForDelivery,
+            OrderStatus::Delivered,
+        );
+        $payments = Payment::factory()->createMany([
+            ['seller_order_id' => $inTransit->id],
+            ['seller_order_id' => $delivered->id],
+        ]);
+        $beforePayments = $payments->map(fn ($payment) => $payment->fresh()->getAttributes())->all();
+        $historyCount = DB::table('status_histories')->count();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.orders.confirmReceived', $order), ['seller_order_id' => $inTransit->id])
+            ->assertRedirect()
+            ->assertSessionHasErrors('shipment');
+
+        $this->assertSame(OrderStatus::OutForDelivery, $inTransit->fresh()->status);
+        $this->assertSame(OrderStatus::Delivered, $delivered->fresh()->status);
+        $this->assertSame($beforePayments, $payments->map(fn ($payment) => $payment->fresh()->getAttributes())->all());
+        $this->assertDatabaseCount('status_histories', $historyCount);
+    }
 
     public function test_cod_payment_settled_on_delivered_transition(): void
     {
@@ -629,7 +653,7 @@ class BuyerOrderLifecycleTest extends TestCase
 
     public function test_another_buyers_order_returns_404_on_confirm(): void
     {
-        [$order] = $this->twoSellerOrder(
+        [$order, $sliceA, $sliceB] = $this->twoSellerOrder(
             OrderStatus::Delivered,
             OrderStatus::Delivered,
         );
@@ -640,8 +664,15 @@ class BuyerOrderLifecycleTest extends TestCase
         ]);
 
         $this->actingAs($otherBuyer, 'buyer')
+            ->get(route('buyer.orders.show', $order))
+            ->assertNotFound();
+
+        $this->actingAs($otherBuyer, 'buyer')
             ->post(route('buyer.orders.confirmReceived', $order))
             ->assertNotFound();
+
+        $this->assertSame(OrderStatus::Delivered, $sliceA->fresh()->status);
+        $this->assertSame(OrderStatus::Delivered, $sliceB->fresh()->status);
     }
 
     // ── Transaction rollback ─────────────────────────────────────────────
@@ -716,5 +747,56 @@ class BuyerOrderLifecycleTest extends TestCase
 
         // Rollback: seller_order stays Delivered.
         $this->assertSame(OrderStatus::Delivered, $so->fresh()->status);
+    }
+
+    public function test_cancelled_tab_counts_and_lists_seller_declined_orders(): void
+    {
+        $order = $this->fullOrder();
+        $order->sellerOrders->first()->forceFill(['status' => OrderStatus::Cancelled->value])->save();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index', ['tab' => 'cancelled']))
+            ->assertOk()
+            ->assertSee($order->reference)
+            ->assertSee('Cancelled', false);
+    }
+
+    public function test_mixed_cancelled_and_active_siblings_count_as_to_ship_not_cancelled(): void
+    {
+        $sellerA = Seller::factory()->create(['status' => 'approved']);
+        $sellerB = Seller::factory()->create(['status' => 'approved']);
+
+        $order = Order::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'shipping_address' => ['municipality' => 'Quezon City'],
+        ]);
+
+        SellerOrder::factory()->create([
+            'order_id' => $order->id,
+            'seller_id' => $sellerA->id,
+            'status' => OrderStatus::Cancelled->value,
+        ]);
+        SellerOrder::factory()->create([
+            'order_id' => $order->id,
+            'seller_id' => $sellerB->id,
+            'status' => OrderStatus::Placed->value,
+        ]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index'))
+            ->assertOk()
+            ->assertSee($order->reference);
+
+        // Active PLACED sibling keeps the order in to_ship.
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index', ['tab' => 'to_ship']))
+            ->assertOk()
+            ->assertSee($order->reference);
+
+        // Cancelled sibling also makes it match the cancelled filter.
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.orders.index', ['tab' => 'cancelled']))
+            ->assertOk()
+            ->assertSee($order->reference);
     }
 }

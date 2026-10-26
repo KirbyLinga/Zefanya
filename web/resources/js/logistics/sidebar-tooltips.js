@@ -121,6 +121,8 @@
     });
 
     window.addEventListener('scroll', hideTip, { passive: true });
+    sidebar.addEventListener('scroll', hideTip, { passive: true, capture: true });
+    window.addEventListener('resize', hideTip);
 
     // Hide when the sidebar expands (MutationObserver on class list).
     var observer = new MutationObserver(function () {

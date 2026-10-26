@@ -11,4 +11,7 @@ enum PaymentStatus: string
     case Pending = 'pending';
 
     case Paid = 'paid';
+
+    /** Seller declined / slice cancelled — COD will not be collected. */
+    case Cancelled = 'cancelled';
 }

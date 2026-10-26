@@ -31,7 +31,7 @@ class LogisticsLoginFlowTest extends TestCase
         $this->get(route('logistics.dashboard'))->assertOk();
     }
 
-    public function test_logistics_guard_tried_before_buyer_guard_with_same_email(): void
+    public function test_shared_email_is_rejected_without_authenticating_either_role(): void
     {
         $provider = LogisticsProvider::factory()->create([
             'email' => 'shared@example.com',
@@ -49,8 +49,11 @@ class LogisticsLoginFlowTest extends TestCase
             'password' => 'password',
         ]);
 
-        $response->assertRedirect(route('logistics.dashboard'));
-        $this->assertAuthenticated('logistics');
+        $response->assertRedirect();
+        $response->assertSessionHasErrors([
+            'email' => 'This email is linked to more than one account type (buyer and logistics provider). Please contact support.',
+        ]);
+        $this->assertGuest('logistics');
         $this->assertGuest('buyer');
     }
 }

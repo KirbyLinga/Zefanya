@@ -24,12 +24,12 @@ class CartControllerTest extends TestCase
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 2])
             ->assertOk()
-            ->assertJsonPath('cart_count', 2);
+            ->assertJsonPath('cart_count', 1);
 
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 3])
             ->assertOk()
-            ->assertJsonPath('cart_count', 5);
+            ->assertJsonPath('cart_count', 1);
 
         $this->assertSame(1, CartItem::where('buyer_id', $buyer->id)->count());
         $this->assertSame(5, CartItem::where('buyer_id', $buyer->id)->value('quantity'));
@@ -47,7 +47,7 @@ class CartControllerTest extends TestCase
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 50])
             ->assertOk()
-            ->assertJsonPath('cart_count', 4);
+            ->assertJsonPath('cart_count', 1);
 
         $this->assertSame(4, CartItem::where('buyer_id', $buyer->id)->value('quantity'));
     }
@@ -101,8 +101,9 @@ class CartControllerTest extends TestCase
             ->assertJsonPath('quantity', 3)
             ->assertJsonPath('subtotal', '₱30.00')
             ->assertJsonPath('total', '₱30.00')
-            ->assertJsonPath('selected_qty', 3)
-            ->assertJsonPath('cart_count', 3);
+            ->assertJsonPath('selected_qty', 1)
+            ->assertJsonPath('selected_lines', 1)
+            ->assertJsonPath('cart_count', 1);
 
         $this->assertSame(3, $item->fresh()->quantity);
     }
@@ -365,7 +366,11 @@ class CartControllerTest extends TestCase
             ->getJson(route('buyer.cart.summary'))
             ->assertOk()
             ->assertJsonPath('subtotal', '₱100.00')
-            ->assertJsonPath('selected_qty', 2);
+            ->assertJsonPath('selected_qty', 1)
+            ->assertJsonPath('selected_lines', 1)
+            ->assertJsonPath('cart_count', 1);
+
+        $this->assertSame(2, CartItem::where('buyer_id', $buyer->id)->sole()->quantity);
     }
 
     // ── Page ────────────────────────────────────────────────────────────────
@@ -485,5 +490,41 @@ class CartControllerTest extends TestCase
             [$mine->id, $alsoMine->id],
             session('checkout_item_ids'),
         );
+    }
+
+    public function test_line_counts_and_selected_quantities_stay_consistent_across_cart_and_checkout(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $product = Product::factory()->create(['price' => '10.00', 'stock_quantity' => 10]);
+        $firstVariant = $product->variants()->sole();
+        $secondVariant = $product->variants()->create(['price' => '20.00', 'stock_quantity' => 10, 'is_available' => true]);
+        $first = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $firstVariant->id, 'quantity' => 3]);
+        $second = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $secondVariant->id, 'quantity' => 2]);
+        $unavailable = Product::factory()->draft()->create();
+        CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $unavailable->id, 'quantity' => 4]);
+
+        $this->actingAs($buyer, 'buyer')->getJson(route('buyer.cart.summary'))
+            ->assertOk()->assertJsonPath('cart_count', 3)
+            ->assertJsonPath('available_lines', 2)->assertJsonPath('selected_lines', 2)
+            ->assertJsonPath('selected_qty', 2)->assertJsonPath('subtotal_raw', 7000)->assertJsonPath('total_raw', 7000);
+
+        $this->getJson(route('buyer.cart.summary', ['selected_ids' => [$second->id]]))
+            ->assertOk()->assertJsonPath('cart_count', 3)
+            ->assertJsonPath('available_lines', 2)->assertJsonPath('selected_lines', 1)
+            ->assertJsonPath('selected_qty', 1)->assertJsonPath('total_raw', 4000);
+
+        $this->getJson(route('buyer.cart.summary').'?selected_ids[]=')
+            ->assertOk()->assertJsonPath('cart_count', 3)->assertJsonPath('available_lines', 2)
+            ->assertJsonPath('selected_qty', 0)->assertJsonPath('selected_lines', 0)->assertJsonPath('total_raw', 0);
+
+        $this->get(route('buyer.cart.index'))->assertOk()->assertSee('id="cartCount">3</span>', false);
+        $this->get(route('buyer.checkout.index', ['items' => [$first->id, $second->id]]))
+            ->assertOk()->assertViewHas('summary', fn ($summary) => $summary->selectedLineCount() === 2 && $summary->totalCentavos === 7000)
+            ->assertSee('Qty: 3')->assertSee('Qty: 2')->assertSee('id="cartCount">3</span>', false);
+
+        $this->assertSame(3, $first->fresh()->quantity);
+        $this->assertSame(2, $second->fresh()->quantity);
+        $this->assertSame(10, $firstVariant->fresh()->stock_quantity);
+        $this->assertSame(10, $secondVariant->fresh()->stock_quantity);
     }
 }

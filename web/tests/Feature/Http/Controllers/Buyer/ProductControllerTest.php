@@ -26,4 +26,28 @@ class ProductControllerTest extends TestCase
             ->assertSee('Line two', false)
             ->assertDontSee('<script>alert(1)</script>', false);
     }
+
+    public function test_shop_index_hides_out_of_stock_products(): void
+    {
+        $seller = Seller::factory()->create(['status' => 'approved']);
+
+        Product::factory()->create([
+            'seller_id' => $seller->id,
+            'status' => 'active',
+            'stock_quantity' => 5,
+            'name' => 'In Stock Widget',
+        ]);
+
+        Product::factory()->create([
+            'seller_id' => $seller->id,
+            'status' => 'active',
+            'stock_quantity' => 0,
+            'name' => 'Out Of Stock Widget',
+        ]);
+
+        $this->get(route('buyer.products.index'))
+            ->assertOk()
+            ->assertSee('In Stock Widget', false)
+            ->assertDontSee('Out Of Stock Widget', false);
+    }
 }

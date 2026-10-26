@@ -75,80 +75,20 @@
 
   </div>
 
-  {{-- Global overlay widgets — present on every buyer page.
-      TOGGLE-CLASS CONTRACT (buyer.js owns ALL of these):
-        `open` → cart drawer + overlay (toggleCart)
-        `show` → toast (showToast, 1800ms timeout) --}}
-
-  {{-- Overlay (behind cart drawer) --}}
-  <div class="js-overlay pointer-events-none fixed inset-0 z-[60] bg-buyer-ink/35 opacity-0 transition-opacity duration-200 [&.open]:pointer-events-auto [&.open]:opacity-100" id="overlay"></div>
-
-  {{-- Cart drawer --}}
-  <aside class="flex h-full w-[400px] max-w-[92vw] translate-x-full flex-col bg-white shadow-[-14px_0_40px_rgba(58,37,41,0.25)] transition-transform duration-200 ease-out fixed top-0 right-0 z-[61] [&.open]:translate-x-0" id="cartDrawer">
-    <div class="flex items-center justify-between border-b border-buyer-line px-[22px] py-5"><h3 class="m-0 font-serif text-[19px]">Your cart</h3><button class="js-cart-toggle border-0 bg-transparent text-[18px] text-neutral-500"><i class="fa-solid fa-xmark"></i></button></div>
-    <div class="flex flex-1 flex-col gap-4 overflow-y-auto px-[22px] py-[18px]">
-      <div class="flex gap-3">
-        <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-[10px] bg-linear-[135deg] from-secondary-300 to-primary-300 text-white"><i class="fa-solid fa-mug-hot"></i></div>
-        <div class="flex-1">
-          <div class="mb-[3px] text-[13px] font-semibold">Ceramic Mug Set (4pc)</div>
-          <div class="mb-2 text-[11px] text-neutral-500">Color: Sage · Set of 4</div>
-          <div class="inline-flex items-center rounded-full border border-buyer-line"><button class="h-[26px] w-[26px] border-0 bg-transparent text-[13px] text-buyer-ink-soft">-</button><span class="w-6 text-center text-[12.5px] font-semibold">1</span><button class="h-[26px] w-[26px] border-0 bg-transparent text-[13px] text-buyer-ink-soft">+</button></div>
-        </div>
-        <div class="text-[13px] font-bold whitespace-nowrap">Rp185.000</div>
+  {{-- Added-to-cart confirmation (stays on page; cart icon goes to /buyer/cart) --}}
+  <div class="pointer-events-none fixed bottom-4 right-4 z-[80] w-80 max-w-[calc(100vw-2rem)] translate-y-10 opacity-0 transition-all duration-200 [&.show]:translate-y-0 [&.show]:opacity-100 [&.show]:pointer-events-auto" id="toast" role="status" aria-live="polite">
+    <div class="rounded-lg border border-buyer-line bg-white p-4 shadow-lg">
+      <div class="mb-3 flex items-start gap-2">
+        <i class="fa-solid fa-circle-check mt-0.5 flex-shrink-0 text-green-500"></i>
+        <p class="text-sm font-semibold text-buyer-ink">Added to cart</p>
       </div>
-      <div class="flex gap-3">
-        <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-[10px] bg-linear-[135deg] from-secondary-300 to-primary-300 text-white"><i class="fa-solid fa-couch"></i></div>
-        <div class="flex-1">
-          <div class="mb-[3px] text-[13px] font-semibold">Linen Blend Throw Pillow</div>
-          <div class="mb-2 text-[11px] text-neutral-500">Color: Blush · 45x45cm</div>
-          <div class="inline-flex items-center rounded-full border border-buyer-line"><button class="h-[26px] w-[26px] border-0 bg-transparent text-[13px] text-buyer-ink-soft">-</button><span class="w-6 text-center text-[12.5px] font-semibold">2</span><button class="h-[26px] w-[26px] border-0 bg-transparent text-[13px] text-buyer-ink-soft">+</button></div>
-        </div>
-        <div class="text-[13px] font-bold whitespace-nowrap">Rp250.000</div>
+      <div class="mb-3 border-b border-buyer-line pb-3">
+        <p class="text-sm font-semibold text-buyer-ink" id="toastProductName">Product</p>
+        <p class="mt-1 text-xs text-buyer-ink-soft" id="toastProductPrice">Price</p>
       </div>
-
-      <div>
-        <div class="mb-2 text-[11.5px] font-bold tracking-[0.03em] text-buyer-ink-soft">VOUCHER</div>
-        <div class="flex gap-2"><input class="min-w-0 flex-1 rounded-lg border border-buyer-line px-3 py-2.5 font-sans text-[12.5px]" type="text" placeholder="Enter voucher code"><button class="rounded-lg border-0 bg-buyer-ink px-4 text-xs font-semibold text-white">Apply</button></div>
-      </div>
-
-      <div>
-        <div class="mb-2 text-[11.5px] font-bold tracking-[0.03em] text-buyer-ink-soft">PAYMENT METHOD</div>
-        <div class="flex flex-col gap-2">
-          <label class="flex items-center gap-2.5 rounded-lg border border-buyer-line px-3 py-2.5 text-[12.5px]"><input class="accent-buyer-primary-dark" type="radio" name="pay" checked> Bank transfer</label>
-          <label class="flex items-center gap-2.5 rounded-lg border border-buyer-line px-3 py-2.5 text-[12.5px]"><input class="accent-buyer-primary-dark" type="radio" name="pay"> E-wallet</label>
-          <label class="flex items-center gap-2.5 rounded-lg border border-buyer-line px-3 py-2.5 text-[12.5px]"><input class="accent-buyer-primary-dark" type="radio" name="pay"> Cash on delivery</label>
-        </div>
-      </div>
-    </div>
-    <div class="border-t border-buyer-line px-[22px] py-[18px]">
-      <div class="mb-1.5 flex justify-between text-[12.5px] text-buyer-ink-soft"><span>Subtotal</span><span>Rp685.000</span></div>
-      <div class="mb-1.5 flex justify-between text-[12.5px] text-buyer-ink-soft"><span>Voucher discount</span><span>−Rp50.000</span></div>
-      <div class="mt-2 flex justify-between text-[15px] font-bold text-buyer-ink"><span>Total</span><span>Rp635.000</span></div>
-      <a href="{{ route('buyer.checkout.index') }}" class="mt-3 block w-full rounded-full border-0 bg-buyer-ink p-[14px] text-center text-[13.5px] font-semibold text-white no-underline">Place order</a>
-    </div>
-  </aside>
-
-  {{-- Toast / Confirmation Card --}}
-  <div class="pointer-events-none fixed bottom-4 right-4 z-[80] w-80 max-w-[calc(100vw-2rem)] translate-y-10 opacity-0 transition-all duration-200 [&.show]:translate-y-0 [&.show]:opacity-100 [&.show]:pointer-events-auto" id="toast">
-    <div class="bg-white rounded-lg shadow-lg border border-buyer-line p-4">
-      <div class="flex items-start gap-2 mb-3">
-        <i class="fa-solid fa-circle-check text-green-500 flex-shrink-0 mt-0.5"></i>
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold text-buyer-ink text-sm">Added to cart</p>
-        </div>
-      </div>
-      <div class="mb-3 pb-3 border-b border-buyer-line">
-        <p class="font-semibold text-buyer-ink text-sm" id="toastProductName">Product</p>
-        <p class="text-buyer-ink-soft text-xs mt-1" id="toastProductPrice">Price</p>
-      </div>
-      <div class="flex gap-2">
-        <button type="button" id="toastContinueBtn" class="flex-1 px-3 py-2 border border-buyer-ink text-buyer-ink text-xs font-semibold rounded hover:bg-buyer-ink hover:text-white transition-colors">
-          Continue Shopping
-        </button>
-        <a href="{{ route('buyer.cart.index') }}" id="toastViewCartBtn" class="flex-1 px-3 py-2 bg-buyer-ink text-white text-xs font-semibold rounded hover:bg-opacity-90 transition-colors text-center no-underline">
-          View Cart
-        </a>
-      </div>
+      <button type="button" id="toastContinueBtn" class="w-full rounded border border-buyer-ink px-3 py-2 text-xs font-semibold text-buyer-ink transition-colors hover:bg-buyer-ink hover:text-white">
+        Continue Shopping
+      </button>
     </div>
   </div>
 
@@ -166,6 +106,7 @@
   {{-- Light/dark toggle behaviour --}}
   @vite('resources/js/seller/theme-toggle.js')
 
-  @stack('scripts')
+  @include('Components.buyer.wishlist-config')
+@stack('scripts')
   </body>
   </html>

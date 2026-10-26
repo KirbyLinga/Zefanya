@@ -4,7 +4,9 @@ namespace Tests\Feature\BuyerRegistration;
 
 use App\Models\Buyer\Buyer;
 use App\Notifications\Buyer\BuyerVerifyOtp;
+use App\Support\SignedOtpLink;
 use Carbon\Carbon;
+use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -76,7 +78,7 @@ class BuyerRegistrationTest extends TestCase
 
     private function verifyOtp(Buyer $buyer, string $otp): TestResponse
     {
-        return $this->postJson(route('register.buyer.verify-otp', $buyer), ['otp' => $otp]);
+        return $this->postJson(SignedOtpLink::verifyUrl('buyer', $buyer), ['otp' => $otp]);
     }
 
     private function createUnverifiedBuyer(array $overrides = []): Buyer
@@ -103,9 +105,9 @@ class BuyerRegistrationTest extends TestCase
             'barangay_name' => 'Barangay 1',
             'street' => '123 Rizal St.',
             'upload_id_path' => 'ids/test.pdf',
-            'email_verification_code' => hash('sha256', $otp),
+            'email_verification_code' => Buyer::hashOtp($otp),
             'email_verification_expires_at' => now()->addMinutes(10),
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ], $overrides));
     }
 
@@ -122,7 +124,7 @@ class BuyerRegistrationTest extends TestCase
             ->assertJsonPath('ok', true)
             ->assertJsonPath('email', $buyer->email);
 
-        $this->assertSame('pending_verification', $buyer->fresh()->status);
+        $this->assertSame('unverified', $buyer->fresh()->status);
         $this->assertNull($buyer->fresh()->email_verified_at);
 
         Notification::assertSentTo($buyer, BuyerVerifyOtp::class);
@@ -146,6 +148,7 @@ class BuyerRegistrationTest extends TestCase
         $this->assertArrayHasKey('address_mode', $errors);
         $this->assertArrayHasKey('street', $errors);
         $this->assertArrayHasKey('upload_id', $errors);
+        $this->assertArrayHasKey('terms', $errors);
 
         $this->assertSame(0, Buyer::count());
     }
@@ -360,7 +363,7 @@ class BuyerRegistrationTest extends TestCase
             'street' => 'Test St.',
             'upload_id_path' => 'ids/test.pdf',
             'email_verification_code' => null,
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $response = $this->registerBuyer(['email' => 'juanmiguel.delacruz@example.com']);
@@ -387,7 +390,7 @@ class BuyerRegistrationTest extends TestCase
             'barangay_name' => 'Test',
             'street' => 'Test St.',
             'upload_id_path' => 'ids/test.pdf',
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $response = $this->registerBuyer([
@@ -481,7 +484,7 @@ class BuyerRegistrationTest extends TestCase
             'barangay_name' => 'Test',
             'street' => 'Test St.',
             'upload_id_path' => 'ids/test.pdf',
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $response = $this->registerBuyer(['contact_no' => '09171234567']);
@@ -509,7 +512,7 @@ class BuyerRegistrationTest extends TestCase
             'barangay_name' => 'Test',
             'street' => 'Test St.',
             'upload_id_path' => 'ids/test.pdf',
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $response = $this->registerBuyer(['contact_no' => '+639171234567']);
@@ -608,9 +611,42 @@ class BuyerRegistrationTest extends TestCase
 
     public function test_buy_021_terms_not_accepted(): void
     {
-        // The form now has a required 'terms' checkbox
         $response = $this->registerBuyer(['terms' => '']);
-        $response->assertStatus(422)->assertJsonValidationErrorFor('terms');
+        $response->assertStatus(422)
+            ->assertJsonValidationErrorFor('terms')
+            ->assertJsonPath('errors.terms.0', 'You must accept the Terms and Privacy Policy.');
+        $this->assertSame(0, Buyer::count());
+    }
+
+    public function test_registration_rejects_missing_terms_field(): void
+    {
+        $payload = $this->basePayload();
+        unset($payload['terms']);
+
+        $this->postJson(route('register.buyer.store'), $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('terms');
+
+        $this->assertSame(0, Buyer::count());
+    }
+
+    public function test_registration_rejects_unaccepted_terms_value(): void
+    {
+        $this->registerBuyer(['terms' => '0'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('terms');
+
+        $this->assertSame(0, Buyer::count());
+    }
+
+    public function test_buyer_register_modal_renders_unchecked_terms_checkbox(): void
+    {
+        $html = $this->get(route('register.type'))->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('/<input\b[^>]*\bname="terms"[^>]*>/', $html, $matches));
+        $input = $matches[0];
+        $this->assertStringContainsString('type="checkbox"', $input);
+        $this->assertDoesNotMatchRegularExpression('/\bchecked\b/', $input);
     }
 
     // ── TC-BUY-022: Double registration / rapid clicking ─────────────────────
@@ -638,7 +674,7 @@ class BuyerRegistrationTest extends TestCase
     {
         [$buyer, $otp, $regResponse] = $this->registerAndCaptureOtp();
 
-        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertSame('unverified', $buyer->status);
         $this->assertNull($buyer->email_verified_at);
 
         $verifyResponse = $this->verifyOtp($buyer, $otp);
@@ -647,7 +683,7 @@ class BuyerRegistrationTest extends TestCase
         $buyer->refresh();
         $this->assertNotNull($buyer->email_verified_at);
         $this->assertNull($buyer->email_verification_code);
-        $this->assertSame('pending_approval', $buyer->status);
+        $this->assertSame('pending', $buyer->status);
     }
 
     // ── TC-BUY-024: Verify with incorrect OTP ────────────────────────────────
@@ -655,7 +691,7 @@ class BuyerRegistrationTest extends TestCase
     public function test_buy_024_verify_with_incorrect_otp(): void
     {
         [$buyer, $otp] = $this->registerAndCaptureOtp();
-        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertSame('unverified', $buyer->status);
 
         $wrongOtp = '000000';
         if ($otp === '000000') {
@@ -666,7 +702,7 @@ class BuyerRegistrationTest extends TestCase
         $response->assertStatus(422)->assertJsonPath('ok', false);
 
         $buyer->refresh();
-        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertSame('unverified', $buyer->status);
         $this->assertNull($buyer->email_verified_at);
     }
 
@@ -710,7 +746,7 @@ class BuyerRegistrationTest extends TestCase
     {
         Carbon::setTestNow('2026-10-08 12:00:00');
         [$buyer, $otp] = $this->registerAndCaptureOtp();
-        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertSame('unverified', $buyer->status);
 
         // The OTP expires at now()->addMinutes(10), so we need to move time
         // past the 10-minute expiry. Move to 12:10:01 (10 minutes + 1 second).
@@ -723,7 +759,7 @@ class BuyerRegistrationTest extends TestCase
         $response->assertStatus(422)->assertJsonPath('ok', false);
 
         $buyer->refresh();
-        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertSame('unverified', $buyer->status);
         $this->assertNull($buyer->email_verified_at);
     }
 
@@ -735,10 +771,10 @@ class BuyerRegistrationTest extends TestCase
         Notification::fake();
 
         [$buyer, $firstOtp] = $this->registerAndCaptureOtp();
-        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertSame('unverified', $buyer->status);
 
         // Resend OTP
-        $resendResponse = $this->postJson(route('register.buyer.verify-otp.resend', $buyer));
+        $resendResponse = $this->postJson(SignedOtpLink::resendUrl('buyer', $buyer));
         $resendResponse->assertOk();
 
         // Capture the new OTP
@@ -751,7 +787,7 @@ class BuyerRegistrationTest extends TestCase
         $buyer->refresh();
         $firstOtpResponse = $this->verifyOtp($buyer, $firstOtp);
         $firstOtpResponse->assertStatus(422);
-        $this->assertSame('pending_verification', $buyer->fresh()->status);
+        $this->assertSame('unverified', $buyer->fresh()->status);
 
         // Second OTP should succeed
         $secondOtpResponse = $this->verifyOtp($buyer, $secondOtp);
@@ -759,7 +795,7 @@ class BuyerRegistrationTest extends TestCase
 
         $buyer->refresh();
         $this->assertNotNull($buyer->email_verified_at);
-        $this->assertSame('pending_approval', $buyer->status);
+        $this->assertSame('pending', $buyer->status);
     }
 
     // ── TC-BUY-028: Login before verifying email ─────────────────────────────
@@ -781,7 +817,7 @@ class BuyerRegistrationTest extends TestCase
             'barangay_name' => 'Test',
             'street' => 'Test St.',
             'upload_id_path' => 'ids/test.pdf',
-            'status' => 'pending_verification',
+            'status' => 'unverified',
         ]);
 
         $response = $this->post(route('unified.login'), [
@@ -790,7 +826,7 @@ class BuyerRegistrationTest extends TestCase
         ]);
 
         // The UnifiedLoginController tries seller guard first, then logistics, then buyer.
-        // For a buyer with status 'pending_verification', the buyer guard will attempt
+        // For a buyer with status 'unverified', the buyer guard will attempt
         // to authenticate (password matches), but then status !== 'approved' triggers
         // logout. The user should NOT be logged in.
         $this->assertFalse(Auth::guard('buyer')->check());
@@ -875,5 +911,125 @@ class BuyerRegistrationTest extends TestCase
             $response->getStatusCode(),
             $this->logicalOr($this->equalTo(403), $this->equalTo(302))
         );
+    }
+
+    // ── Registration resilience: failed OTP delivery ───────────────────────
+
+    /**
+     * Install a controllable notification dispatcher so a test can simulate a
+     * mail outage while still inspecting the codes that were "delivered".
+     */
+    private function fakeNotifier(): object
+    {
+        $notifier = new class implements Dispatcher
+        {
+            public bool $fail = false;
+
+            /** @var array<int, object> */
+            public array $sent = [];
+
+            public function send($notifiables, $notification)
+            {
+                if ($this->fail) {
+                    throw new \RuntimeException('SMTP connection refused');
+                }
+
+                $this->sent[] = $notification;
+            }
+
+            public function sendNow($notifiables, $notification, ?array $channels = null)
+            {
+                if ($this->fail) {
+                    throw new \RuntimeException('SMTP connection refused');
+                }
+
+                $this->sent[] = $notification;
+            }
+
+            public function lastCode(): ?string
+            {
+                $sent = $this->sent;
+                $last = end($sent);
+
+                return $last ? $last->code : null;
+            }
+        };
+
+        $this->app->instance(Dispatcher::class, $notifier);
+
+        return $notifier;
+    }
+
+    public function test_buy_030_failed_otp_email_releases_the_email_for_a_clean_retry(): void
+    {
+        $notifier = $this->fakeNotifier();
+        $notifier->fail = true;
+
+        $payload = $this->basePayload();
+
+        $this->postJson(route('register.buyer.store'), $payload)->assertStatus(503);
+
+        // The half-finished attempt must not keep the email/mobile reserved.
+        $this->assertDatabaseMissing('buyers', ['email' => $payload['email']]);
+
+        // A plain retry (mail back up) now succeeds with the same details.
+        $notifier->fail = false;
+
+        $this->postJson(route('register.buyer.store'), $this->basePayload([
+            'email' => $payload['email'],
+            'contact_no' => $payload['contact_no'],
+        ]))->assertStatus(200);
+
+        $buyer = Buyer::where('email', $payload['email'])->sole();
+
+        $this->assertSame('unverified', $buyer->status);
+        $this->assertCount(1, $notifier->sent);
+    }
+
+    public function test_buy_031_a_verified_account_still_blocks_duplicate_registration(): void
+    {
+        $existing = $this->createUnverifiedBuyer(['status' => 'pending']);
+
+        $this->registerBuyer(['email' => $existing->email])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('email');
+
+        $this->assertSame(1, Buyer::where('email', $existing->email)->count());
+    }
+
+    public function test_buy_032_failed_resend_keeps_the_previous_code_valid(): void
+    {
+        $notifier = $this->fakeNotifier();
+
+        $this->postJson(route('register.buyer.store'), $this->basePayload())->assertStatus(200);
+
+        $buyer = Buyer::query()->latest('id')->firstOrFail();
+        $originalOtp = $notifier->lastCode();
+
+        $notifier->fail = true;
+        $this->postJson(SignedOtpLink::resendUrl('buyer', $buyer))->assertStatus(503);
+        $notifier->fail = false;
+
+        // The code the user already received must still work.
+        $this->verifyOtp($buyer, $originalOtp)->assertStatus(200);
+    }
+
+    public function test_buy_033_successful_resend_invalidates_the_previous_code(): void
+    {
+        $notifier = $this->fakeNotifier();
+
+        $this->postJson(route('register.buyer.store'), $this->basePayload())->assertStatus(200);
+
+        $buyer = Buyer::query()->latest('id')->firstOrFail();
+        $oldOtp = $notifier->lastCode();
+
+        $this->postJson(SignedOtpLink::resendUrl('buyer', $buyer))->assertStatus(200);
+        $newOtp = $notifier->lastCode();
+
+        $this->assertNotSame($oldOtp, $newOtp);
+
+        // Only the newest code is accepted.
+        $this->verifyOtp($buyer, $oldOtp)->assertStatus(422);
+        $this->verifyOtp($buyer, $newOtp)->assertStatus(200);
     }
 }

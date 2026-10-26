@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\AuthRole;
+use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Support\EmailRegistry;
+use App\Support\SignedOtpLink;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,18 +31,21 @@ use Laravel\Socialite\Two\InvalidStateException;
  */
 class GoogleAuthController extends Controller
 {
+    use ClearsOtherGuards;
+
     /** Shown when the Google email matches no row in any role table. */
     public const NO_ACCOUNT_MESSAGE = 'No account found for this Google email. Please register first.';
 
     /**
-     * Resolution order for the role-agnostic button, most privileged role
-     * first — the same order UnifiedLoginController uses, so one email that
-     * exists in several role tables always lands on the same panel no matter
-     * which sign-in method was used.
+     * Google loginable roles (string values of AuthRole::publicOrder()).
+     * Never includes admin — admins use /admin/login.
      *
-     * @var list<string>
+     * @return list<string>
      */
-    public const ROLES = ['seller', 'logistics', 'buyer'];
+    public static function roles(): array
+    {
+        return AuthRole::publicGuards();
+    }
 
     /**
      * Session guard, model and landing route per role.
@@ -104,6 +111,16 @@ class GoogleAuthController extends Controller
             return $this->failed('Google did not share an email address. Please sign in with your password.');
         }
 
+        // Ignore admins here: the same email may exist in `admins` for
+        // /admin/login, but Google must only consider AuthRole::publicOrder().
+        $roles = array_values(array_intersect(EmailRegistry::rolesFor($email), self::roles()));
+
+        if (count($roles) > 1) {
+            return $this->failed(
+                'This email is linked to more than one account type ('.EmailRegistry::labelList($roles).'). Please contact support.'
+            );
+        }
+
         $role ??= $this->resolveRole($email);
 
         if ($role === null || ! isset(self::ROLE_MAP[$role])) {
@@ -140,13 +157,30 @@ class GoogleAuthController extends Controller
         $statusMessage = $this->statusMessage($role, $account);
 
         if ($statusMessage !== null) {
-            return $this->failed($statusMessage);
+            $status = match (true) {
+                is_string($account->status) => $account->status,
+                $account->status instanceof \BackedEnum => $account->status->value,
+                default => '',
+            };
+
+            $extra = [];
+
+            if ($status === 'unverified') {
+                $extra['auth.resume_url'] = SignedOtpLink::showUrl($role, $account);
+                $extra['auth.resume_label'] = 'Verify your email now';
+            }
+
+            return $this->failed($statusMessage, $extra);
         }
 
         Auth::guard(self::ROLE_MAP[$role]['guard'])->login($account);
-        $request->session()->regenerate();
 
-        return redirect()->intended(route(self::ROLE_MAP[$role]['home']));
+        // One account per browser: end every other role's session and stash the
+        // suppressed session so a later same-guard login (password reset, etc.)
+        // can restore it.
+        $this->clearOtherGuards(self::ROLE_MAP[$role]['guard']);
+
+        return redirect()->route(AuthRole::from($role)->dashboardRoute());
     }
 
     /**
@@ -158,9 +192,7 @@ class GoogleAuthController extends Controller
     private function linkGoogleAccount(Model $account, string $googleId): ?string
     {
         if ($account->google_id === null) {
-            $alreadyLinked = $account->newQuery()->where('google_id', $googleId)->exists();
-
-            if ($alreadyLinked) {
+            if ($account->newQuery()->where('google_id', $googleId)->exists()) {
                 return 'That Google account is already linked to another Zefanya account.';
             }
 
@@ -181,7 +213,8 @@ class GoogleAuthController extends Controller
      */
     private function resolveRole(string $email): ?string
     {
-        foreach (self::ROLES as $role) {
+        foreach (AuthRole::publicOrder() as $authRole) {
+            $role = $authRole->value;
             $model = self::ROLE_MAP[$role]['model'];
 
             if ($model::query()->where('email', $email)->exists()) {
@@ -209,25 +242,47 @@ class GoogleAuthController extends Controller
         }
 
         return match ([$role, $status]) {
-            ['seller', 'pending_verification'] => 'Your email has not been verified yet. Please check your email for the verification code.',
-            ['seller', 'pending_approval'] => 'Your seller account is still pending administrator approval.',
+            ['seller', 'unverified'] => 'Your email has not been verified yet. Please check your email for the verification code.',
+            ['seller', 'pending'] => 'Your seller account is still pending administrator approval.',
             ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.',
-            ['logistics', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
-            ['logistics', 'pending_approval'] => 'Your logistics provider registration is still awaiting administrator approval.',
+            ['logistics', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
+            ['logistics', 'pending'] => 'Your logistics provider registration is still awaiting administrator approval.',
             ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.',
-            ['buyer', 'pending_verification'] => 'Please verify your email before logging in. Check your inbox for the code.',
-            ['buyer', 'pending_approval'] => 'Your buyer registration is still awaiting administrator approval.',
+            ['buyer', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
+            ['buyer', 'pending'] => 'Your buyer registration is still awaiting administrator approval.',
             ['buyer', 'rejected'] => 'Your buyer registration was not approved.',
             default => 'Your account is not active.',
         };
     }
 
     /**
-     * Back to the register page with the reason when no account is found.
-     * For other errors, redirect to register page with message.
+     * Back to the login screen with the reason whenever Google sign-in cannot
+     * proceed (unknown email, link conflict, or the approval gate). Matches the
+     * class docblock and the redirect the approval middleware uses.
+     *
+     * @param  array<string, mixed>  $extra
      */
-    private function failed(string $message): RedirectResponse
+    private function failed(string $message, array $extra = []): RedirectResponse
     {
-        return redirect()->route('register.type')->with('auth.status_message', $message);
+        $redirect = redirect()->route('home', ['login' => 1])->with('auth.status_message', $message);
+
+        foreach ($extra as $key => $value) {
+            $redirect->with($key, $value);
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * Log out from every guard and redirect to the home page.
+     */
+    public function logout(Request $request): RedirectResponse
+    {
+        $this->clearAllGuards();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('home');
     }
 }

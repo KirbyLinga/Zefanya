@@ -70,13 +70,13 @@
                 <div class="rounded-2xl bg-white border border-buyer-line p-6">
                     <h3 class="font-serif text-[18px] text-buyer-ink mb-4">Resources</h3>
                     <div class="space-y-2">
-                        <a href="{{ route('pages.shipping-returns') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('buyer.pages.shipping-returns') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Shipping & Returns →
                         </a>
-                        <a href="{{ route('pages.privacy-policy') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('buyer.pages.privacy-policy') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Privacy Policy →
                         </a>
-                        <a href="{{ route('pages.terms-of-service') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('buyer.pages.terms-of-service') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Terms of Service →
                         </a>
                     </div>

@@ -17,11 +17,12 @@ use App\Models\StatusHistory;
 use App\Services\CourierAssignmentService;
 use App\Services\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
 
 class FulfillmentLifecycleTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use CreatesAssignableFleet, LazilyRefreshDatabase;
 
     private Buyer $buyer;
 
@@ -39,7 +40,7 @@ class FulfillmentLifecycleTest extends TestCase
             'municipality_name' => 'Quezon City',
         ]);
 
-        $this->seller = Seller::factory()->create(['status' => 'approved']);
+        $this->seller = Seller::factory()->create(['status' => 'approved', 'barangay_code' => '1374040001']);
 
         $this->logisticsProvider = LogisticsProvider::factory()->create([
             'status' => 'approved',
@@ -57,7 +58,7 @@ class FulfillmentLifecycleTest extends TestCase
 
         $order = Order::factory()->create([
             'buyer_id' => $this->buyer->id,
-            'shipping_address' => ['municipality' => 'Quezon City'],
+            'shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001'],
         ]);
 
         $sellerOrder = SellerOrder::factory()->create([
@@ -92,8 +93,7 @@ class FulfillmentLifecycleTest extends TestCase
         $this->assertSame(3, StatusHistory::where('seller_order_id', $sellerOrder->id)->count());
 
         // ── 4. Rider picks up (ReadyForPickup → PickedUp, assigns pickup courier) ─
-        $pickupCourier = Courier::factory()->create([
-            'logistics_provider_id' => $this->logisticsProvider->id,
+        $pickupCourier = $this->assignableCourier($this->logisticsProvider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'max_weight_grams' => 5000,
@@ -126,15 +126,14 @@ class FulfillmentLifecycleTest extends TestCase
         $this->assertSame(6, StatusHistory::where('seller_order_id', $sellerOrder->id)->count());
 
         // ── 7. Sorting center assigns delivery courier (Sorted → AssignedToRider) ─
-        $deliveryCourier = Courier::factory()->create([
-            'logistics_provider_id' => $this->logisticsProvider->id,
+        $deliveryCourier = $this->assignableCourier($this->logisticsProvider, [
             'is_available' => true,
             'service_area' => ['Quezon City'],
             'vehicle_type' => 'motorcycle',
             'max_weight_grams' => 3000,
         ]);
 
-        $assignedDelivery = $assignment->assignDelivery($sellerOrder);
+        $assignedDelivery = $assignment->assignDelivery($sellerOrder, preferredCourierId: $deliveryCourier->id);
         $this->assertNotNull($assignedDelivery);
         $this->assertSame($deliveryCourier->id, $assignedDelivery->id);
         $this->assertFalse($deliveryCourier->fresh()->is_available);

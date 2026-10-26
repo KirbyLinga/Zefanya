@@ -42,6 +42,11 @@
                     <tr class="group">
                         <td class="px-4 py-2.5">
                             <p class="font-sans text-[12.5px] font-semibold text-[var(--text-ink)]">#{{ $shipment->id }}</p>
+                            @if ($shipment->handover_at !== null && ! in_array($shipment->status, [\App\Enums\OrderStatus::Delivered, \App\Enums\OrderStatus::Completed, \App\Enums\OrderStatus::Returned, \App\Enums\OrderStatus::Cancelled], true))
+                                @can('advance-shipment', $shipment)
+                                    <a href="{{ route('logistics.delivery-monitoring.show', $shipment) }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">Report incident</a>
+                                @endcan
+                            @endif
                         </td>
                         <td class="px-4 py-2.5">
                             <p class="font-sans text-[12.5px] text-[var(--text-ink)]">{{ $shipment->seller?->name ?? '—' }}</p>
@@ -52,14 +57,14 @@
                             <p class="font-sans text-[11px] text-[var(--text-muted)]">{{ $addr['municipality'] ?? '—' }}</p>
                         </td>
                         <td class="px-4 py-2.5">
-                            @if ($shipment->courier)
+                            @if ($shipment->courier && (int) $shipment->courier->logistics_provider_id === (int) request()->user('logistics')->id)
                                 <p class="font-sans text-[12.5px] text-[var(--text-ink)]">{{ $shipment->courier->name }}</p>
                             @else
                                 <span class="font-sans text-[11.5px] text-[var(--text-muted)]">—</span>
                             @endif
                         </td>
                         <td class="px-4 py-2.5">
-                            @if ($shipment->deliveryCourier)
+                            @if ($shipment->deliveryCourier && (int) $shipment->deliveryCourier->logistics_provider_id === (int) request()->user('logistics')->id)
                                 <p class="font-sans text-[12.5px] text-[var(--text-ink)]">{{ $shipment->deliveryCourier->name }}</p>
                                 <p class="font-sans text-[11px] text-[var(--text-muted)]">{{ ucfirst($shipment->deliveryCourier->vehicle_type) }}</p>
                             @else

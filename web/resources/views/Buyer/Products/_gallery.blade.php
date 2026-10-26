@@ -5,19 +5,18 @@
 --}}
 @php
     $mainImg   = $galleryImages[0] ?? null;
-    $thumbImgs = array_values(array_filter($galleryImages, fn ($img) => $img !== null));
 @endphp
 
 <div class="flex flex-col gap-3">
 
   {{-- Main image --}}
   <div class="relative mx-auto w-full max-w-[480px] overflow-hidden rounded-3xl bg-secondary-100">
-    <div class="aspect-[4/3] max-h-[900px]">
+    <div class="aspect-[4/5]">
       <img
         id="pdp-main-img"
         src="{{ $mainImg ?? '' }}"
         alt="{{ $product->name }}"
-        class="h-full w-full object-cover transition-opacity duration-200 {{ $mainImg ? '' : 'opacity-0' }}"
+        class="h-full w-full object-cover object-top transition-opacity duration-200 {{ $mainImg ? '' : 'opacity-0' }}"
       />
       {{-- Placeholder shown when no image --}}
       @if (!$mainImg)
@@ -38,32 +37,5 @@
     </button>
   </div>
 
-  {{-- Thumbnail strip — only when there is more than one real image --}}
-  @if (count($thumbImgs) > 1)
-    <div class="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Product images">
-      @foreach ($thumbImgs as $i => $thumb)
-        <button
-          type="button"
-          class="pdp-thumb js-pdp-thumb shrink-0 overflow-hidden rounded-xl border-2 transition-all duration-150
-            {{ $i === 0 ? 'border-buyer-ink' : 'border-transparent' }}
-            hover:border-primary-400"
-          data-src="{{ $thumb }}"
-          data-index="{{ $i }}"
-          aria-label="Image {{ $i + 1 }}"
-          aria-pressed="{{ $i === 0 ? 'true' : 'false' }}"
-          role="listitem"
-        >
-          <img src="{{ $thumb }}" alt="Thumbnail {{ $i + 1 }}" class="h-full w-full object-cover">
-        </button>
-      @endforeach
-    </div>
-  @endif
-
-  {{-- Product description (under image, left side) --}}
-  @if ($product->description)
-    <p class="mt-4 text-[14px] leading-relaxed text-buyer-ink-soft">
-      {{ $product->description }}
-    </p>
-  @endif
 
 </div>

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Http\Controllers\Seller;
 
+use App\Models\InventoryTransaction;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
@@ -30,6 +32,18 @@ class ProductControllerTest extends TestCase
     }
 
     // ── Index: ownership + isolation ────────────────────────────────────────
+
+    public function test_weightless_products_are_flagged_in_the_listing(): void
+    {
+        $this->mine(['name' => 'Unweighed Cushion', 'weight_grams' => 0]);
+        $this->mine(['name' => 'Ready Cushion', 'weight_grams' => 400]);
+
+        $response = $this->actingAs($this->seller, 'seller')
+            ->get(route('seller.products.index'));
+
+        $response->assertOk()->assertSee('Unweighed Cushion')->assertSee('Needs weight');
+        $this->assertSame(1, substr_count($response->getContent(), 'Needs weight'));
+    }
 
     public function test_a_seller_sees_only_their_own_products(): void
     {
@@ -354,9 +368,60 @@ class ProductControllerTest extends TestCase
         $this->assertDatabaseHas('products', ['id' => $foreign->id, 'deleted_at' => null]);
     }
 
+    public function test_seller_prices_include_paused_and_sold_out_variants(): void
+    {
+        $product = $this->mine(['price' => 120]);
+        $product->variants()->first()->update(['price' => 120, 'stock_quantity' => 0]);
+        $product->variants()->create(['sku' => 'PAUSED-RANGE', 'price' => 250, 'stock_quantity' => 0, 'is_available' => false]);
+
+        $this->actingAs($this->seller, 'seller')
+            ->get(route('seller.products.index'))
+            ->assertOk()
+            ->assertSee("\u{20B1}120.00\u{2013}\u{20B1}250.00")
+            ->assertSee('Archive')
+            ->assertDontSee('Delete Selected');
+    }
+
+    public function test_equal_variant_prices_show_one_price(): void
+    {
+        $product = $this->mine(['price' => 120]);
+        $product->variants()->create(['sku' => 'EQUAL-RANGE', 'price' => 120, 'stock_quantity' => 0, 'is_available' => false]);
+
+        $this->actingAs($this->seller, 'seller')
+            ->get(route('seller.products.index'))
+            ->assertSee("\u{20B1}120.00")
+            ->assertDontSee("\u{20B1}120.00\u{2013}");
+    }
+
+    public function test_archiving_preserves_inventory_and_historical_product_links(): void
+    {
+        $product = $this->mine(['name' => 'Archived Clock']);
+        $variant = $product->variants()->first();
+        $item = OrderItem::factory()->create(['product_id' => $product->id, 'variant_id' => $variant->id]);
+        $entry = InventoryTransaction::create(['product_id' => $product->id, 'variant_id' => $variant->id, 'quantity_before' => 0, 'quantity_after' => $variant->stock_quantity, 'delta' => $variant->stock_quantity, 'reason' => 'restock']);
+
+        $this->actingAs($this->seller, 'seller')
+            ->deleteJson(route('seller.products.destroy', $product))
+            ->assertOk()
+            ->assertJsonPath('message', '"Archived Clock" was archived.');
+
+        $this->assertSoftDeleted($product);
+        $this->assertModelExists($variant);
+        $this->assertModelExists($item);
+        $this->assertModelExists($entry);
+        $this->assertTrue($item->fresh()->product->is($product));
+        $this->assertTrue($entry->fresh()->product->is($product));
+        $this->assertSame($variant->stock_quantity, $variant->fresh()->stock_quantity);
+
+        $this->get(route('seller.products.index'))->assertDontSee('Archived Clock');
+        $archived = Product::withTrashed()->findOrFail($product->id);
+        $archived->restore();
+        $this->assertSame($product->id, Product::findOrFail($product->id)->id);
+    }
+
     public function test_guests_are_redirected_to_the_seller_login(): void
     {
         $this->get(route('seller.products.index'))
-            ->assertRedirect(route('seller.login'));
+            ->assertRedirect(route('home', ['login' => 1]));
     }
 }

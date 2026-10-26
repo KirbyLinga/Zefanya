@@ -38,10 +38,7 @@ class DeliveryMonitoringController extends Controller
 
         $shipments = SellerOrder::query()
             ->whereIn('status', self::MONITORED_STATUSES)
-            ->where(function ($q) use ($provider): void {
-                $q->whereHas('courier.provider', fn ($sub) => $sub->whereKey($provider->id))
-                    ->orWhereHas('deliveryCourier.provider', fn ($sub) => $sub->whereKey($provider->id));
-            })
+            ->visibleToProvider((int) $provider->id)
             ->with(['courier.provider', 'deliveryCourier.provider', 'order.buyer', 'seller'])
             ->orderBy('created_at')
             ->get();

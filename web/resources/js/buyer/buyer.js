@@ -1,11 +1,7 @@
 // resources/js/buyer/buyer.js
-// Shared across every Buyer page: cart drawer and toast — both live in the
-// layout (Buyer/Layouts/app.blade.php), so their behaviour belongs here
-// rather than in a page-specific file like home.js.
+// Shared across every Buyer page (cart add, buy-now, guest pending actions).
 
 function closeAllPanels() {
-  document.getElementById('cartDrawer').classList.remove('open');
-  document.getElementById('overlay').classList.remove('open');
   document.getElementById('accountDropdown')?.classList.remove('open');
 }
 
@@ -13,28 +9,9 @@ function toggleAccount() {
   document.getElementById('accountDropdown')?.classList.toggle('open');
 }
 
-function toggleCart() {
-  document.getElementById('cartDrawer').classList.toggle('open');
-  document.getElementById('overlay').classList.toggle('open');
-}
-
 // Expose globally so navbar inline handlers and other scripts can call them.
 window.toggleAccount  = toggleAccount;
-window.toggleCart     = toggleCart;
 window.closeAllPanels = closeAllPanels;
-
-
-// Wire up layout buttons on DOMContentLoaded.
-// NOTE: the account dropdown (.js-account-toggle) is owned by the navbar
-// component's own inline script so it works on every layout. Do NOT add a
-// second listener here — it would double-toggle and cancel out.
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.js-cart-toggle').forEach(el =>
-    el.addEventListener('click', toggleCart)
-  );
-
-  document.querySelector('.js-overlay')?.addEventListener('click', closeAllPanels);
-});
 
 // ── Cart ─────────────────────────────────────────────────────────────────────
 // Real server-side count, rendered into the navbar badge by the
@@ -121,7 +98,9 @@ function addToCart(productId, quantity = 1, variantId = null, sourceButton = nul
       }
       return null;
     }
-    if (!res.ok) throw new Error('Cart add failed: ' + res.status);
+    if (!res.ok) return res.json().then(data => {
+      throw new Error(Object.values(data.errors || {}).flat()[0] || data.error || data.message || 'Unable to add this item.');
+    });
     return res.json();
   })
   .then(data => {
@@ -131,20 +110,57 @@ function addToCart(productId, quantity = 1, variantId = null, sourceButton = nul
       const el = document.getElementById('cartCount');
       if (el) el.textContent = cartCount;
     }
-    // Pass product details to toast
-    if (data.product_name && data.product_price) {
-      showToast(data.product_name, data.product_price);
-    } else {
-      showToast();
-    }
-    return data; // truthy — callers can use this to confirm success
+    showToast(data.product_name, data.product_price);
+    return data;
   })
   .catch(err => {
-    console.error('Add to cart failed:', err);
+    showToast(err.message, '', 'Unable to add to cart');
     return null;
   });
 
   return promise;
+}
+
+/**
+ * Brief “Added to cart” confirmation. Cart icon in the navbar goes to the
+ * cart page; this toast only confirms the add and stays put.
+ */
+function showToast(productName, productPrice, heading = 'Added to cart') {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  const headingEl = toast.querySelector('p');
+  if (headingEl) headingEl.textContent = heading;
+
+  const nameEl = document.getElementById('toastProductName');
+  const priceEl = document.getElementById('toastProductPrice');
+
+  if (nameEl) {
+    nameEl.textContent = productName || 'Item';
+  }
+  if (priceEl) {
+    priceEl.textContent = productPrice || '';
+    priceEl.style.display = productPrice ? '' : 'none';
+  }
+
+  if (toast.dismissTimeout) {
+    clearTimeout(toast.dismissTimeout);
+  }
+
+  toast.classList.add('show');
+
+  if (!toast.continueButtonWired) {
+    const continueBtn = document.getElementById('toastContinueBtn');
+    if (continueBtn) {
+      continueBtn.addEventListener('click', () => {
+        toast.classList.remove('show');
+      });
+    }
+    toast.continueButtonWired = true;
+  }
+
+  toast.dismissTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 4000);
 }
 
 /**
@@ -178,68 +194,29 @@ function buyNow(productId, quantity = 1, variantId = null) {
       }
       return null;
     }
-    if (!res.ok) throw new Error('Buy Now failed: ' + res.status);
+    if (!res.ok) return res.json().then(data => {
+      throw new Error(Object.values(data.errors || {}).flat()[0] || data.error || data.message || 'Unable to buy this item.');
+    });
     return res.json();
   })
   .then(data => {
     if (!data) return null; // 401 path — modal already opened
+    if (data.cart_count !== undefined) {
+      cartCount = data.cart_count;
+      const badge = document.getElementById('cartCount');
+      if (badge) badge.textContent = cartCount;
+    }
     if (data.success && data.redirect) {
       window.location.href = data.redirect;
     }
     return data;
   })
   .catch(err => {
-    console.error('Buy Now failed:', err);
+    showToast(err.message, '', 'Unable to continue');
     return null;
   });
 
   return promise;
-}
-
-/**
- * Show the global toast/confirmation card with product details.
- *
- * @param {string} productName  Product name to display
- * @param {string} productPrice Formatted price to display
- */
-function showToast(productName, productPrice) {
-  const toast = document.getElementById('toast');
-  if (!toast) return;
-
-  // Update product details
-  const nameEl = document.getElementById('toastProductName');
-  const priceEl = document.getElementById('toastProductPrice');
-
-  if (nameEl && productName) {
-    nameEl.textContent = productName;
-  }
-  if (priceEl && productPrice) {
-    priceEl.textContent = productPrice;
-  }
-
-  // Reset auto-dismiss timeout
-  if (toast.dismissTimeout) {
-    clearTimeout(toast.dismissTimeout);
-  }
-
-  // Show the toast
-  toast.classList.add('show');
-
-  // Wire up close button if not already wired
-  if (!toast.continueButtonWired) {
-    const continueBtn = document.getElementById('toastContinueBtn');
-    if (continueBtn) {
-      continueBtn.addEventListener('click', () => {
-        toast.classList.remove('show');
-      });
-    }
-    toast.continueButtonWired = true;
-  }
-
-  // Auto-dismiss after 8 seconds
-  toast.dismissTimeout = setTimeout(() => {
-    toast.classList.remove('show');
-  }, 8000);
 }
 
 /**
@@ -260,10 +237,64 @@ function retryPendingCartAction() {
         return;
     }
 
-    addToCart(action.productId || action.product_id, action.quantity);
+    addToCart(action.productId || action.product_id, action.quantity, action.variantId);
 }
 
 window.addToCart              = addToCart;
 window.buyNow                 = buyNow;
+window.showToast              = showToast;
 window.retryPendingCartAction = retryPendingCartAction;
 window.clearPendingAction     = clearPendingAction;
+
+// Shared shop grid/list switch, loaded with the buyer layout.
+(function () {
+            // Grid and list reuse the same card and its padded text block.
+            const productGrid = document.querySelector('[data-products-grid]');
+            const gridClasses = ['grid-cols-2', 'sm:grid-cols-3', 'lg:grid-cols-4', 'xl:grid-cols-5'];
+            document.querySelectorAll('[data-products-view]').forEach(button => {
+                button.addEventListener('click', () => {
+                    if (!productGrid) return;
+                    const layout = button.dataset.productsView;
+                    productGrid.dataset.layout = layout;
+                    gridClasses.forEach(name => productGrid.classList.toggle(name, layout === 'grid'));
+                    productGrid.classList.toggle('grid-cols-1', layout === 'list');
+                    document.querySelectorAll('[data-products-view]').forEach(toggle => {
+                        const active = toggle === button;
+                        toggle.setAttribute('aria-pressed', String(active));
+                        toggle.classList.toggle('bg-primary-800', active);
+                        toggle.classList.toggle('text-white', active);
+                        toggle.classList.toggle('text-buyer-ink-soft', !active);
+                    });
+                });
+            });
+
+})();
+
+// Category sorting submits one native GET form and retains its price filters.
+(function () {
+    const form = document.querySelector('[data-category-sort-form]');
+    if (!form || form.dataset.sortInitialized) return;
+    const toggle = form.querySelector('[data-category-sort-toggle]');
+    const menu = form.querySelector('[data-category-sort-menu]');
+    if (!toggle || !menu) return;
+    form.dataset.sortInitialized = 'true';
+    const setOpen = open => {
+        menu.classList.toggle('hidden', !open);
+        toggle.setAttribute('aria-expanded', String(open));
+    };
+    toggle.addEventListener('click', () => {
+        setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+    });
+    form.addEventListener('change', event => {
+        if (event.target.matches('input[name="sort"]')) form.requestSubmit();
+    });
+    document.addEventListener('click', event => {
+        if (!form.contains(event.target)) setOpen(false);
+    });
+    form.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            setOpen(false);
+            toggle.focus();
+        }
+    });
+})();

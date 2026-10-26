@@ -3,9 +3,14 @@
 namespace App\Models\Buyer;
 
 use App\Models\CartItem;
+use App\Models\Concerns\HasEmailOtp;
+use App\Models\Concerns\HasRegistrationArchive;
 use App\Models\Conversation;
 use App\Models\Wishlist;
+use Carbon\Carbon;
 use Database\Factories\BuyerFactory;
+use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -13,7 +18,7 @@ use Illuminate\Notifications\Notifiable;
 
 class Buyer extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use CanResetPassword, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -35,11 +40,13 @@ class Buyer extends Authenticatable
         'street',
         'house_number',
         'address_detail',
+        'postal_code',
         'upload_id_path',
         'email_verification_code',
         'email_verification_expires_at',
         'status',
         'settings',
+        'otp_attempts',
     ];
 
     protected $hidden = [
@@ -55,9 +62,24 @@ class Buyer extends Authenticatable
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
             'approved_at' => 'datetime',
+            'archived_at' => 'datetime',
             'password' => 'hashed',
             'settings' => 'json',
         ];
+    }
+
+    /**
+     * Age is derived from birthday so a stored column cannot go stale.
+     */
+    protected function age(): Attribute
+    {
+        return Attribute::get(function (): ?int {
+            if ($this->birthday === null) {
+                return null;
+            }
+
+            return Carbon::parse($this->birthday)->age;
+        });
     }
 
     public function fullName(): string
@@ -107,7 +129,7 @@ class Buyer extends Authenticatable
 
     /**
      * Marks the email verified and moves the buyer into the admin queue.
-     * Called by VerifyBuyerEmailController once the token checks out.
+     * Called by VerifyBuyerOtpController once the token checks out.
      */
     public function markEmailVerified(): void
     {
@@ -115,7 +137,8 @@ class Buyer extends Authenticatable
             'email_verified_at' => now(),
             'email_verification_code' => null,
             'email_verification_expires_at' => null,
-            'status' => 'pending_approval',
+            'status' => 'pending',
+            'otp_attempts' => 0,
         ])->save();
     }
 }

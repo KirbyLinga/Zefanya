@@ -22,7 +22,7 @@ class SellerRegistrationController extends Controller
             abort(404, 'The sellers table hasn\'t been created yet — this feature isn\'t available.');
         }
 
-        $pending = Seller::where('status', 'pending_approval')
+        $pending = Seller::where('status', 'pending')
             ->orderBy('created_at')
             ->get();
 
@@ -37,12 +37,15 @@ class SellerRegistrationController extends Controller
 
     public function approve(Seller $seller)
     {
-        $seller->update([
+        // forceFill: approved_by / approved_at / rejection_reason are NOT in
+        // Seller::$fillable, so Model::update() would silently drop them.
+        // This is controller-owned audit data, never request-fillable.
+        $seller->forceFill([
             'status' => 'approved',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => null,
-        ]);
+        ])->save();
 
         $seller->notify(new SellerRegistrationDecision('approved'));
 
@@ -55,12 +58,14 @@ class SellerRegistrationController extends Controller
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $seller->update([
+        // forceFill: same reason as approve() — Seller::$fillable omits the
+        // audit columns, so a plain update() would drop them.
+        $seller->forceFill([
             'status' => 'rejected',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => $request->rejection_reason,
-        ]);
+        ])->save();
 
         $seller->notify(new SellerRegistrationDecision('rejected', $request->rejection_reason));
 

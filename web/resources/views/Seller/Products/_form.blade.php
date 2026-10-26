@@ -1,206 +1,113 @@
 @php
-    // ── Variant Options state ────────────────────────────────────────────
-    // Server-rendered from old() (failed POST) or the product's persisted
-    // options/variants (edit mode); JS regenerates the variant table on
-    // demand. Values are comma-joined strings throughout.
     $pfOptions = old('options');
     if (! is_array($pfOptions)) {
-        $pfOptions = $product->exists
-            ? $product->options->map(fn ($o) => [
-                'name' => $o->name,
-                'values' => $o->values->pluck('value')->implode(','),
-            ])->all()
-            : [];
+        $pfOptions = $product->exists ? $product->options->map(fn ($option) => ['name' => $option->name, 'values' => $option->values->pluck('value')->all()])->all() : [];
     }
-
     $pfVariants = old('variants');
     if (! is_array($pfVariants)) {
-        $pfVariants = $product->exists
-            ? $product->variants->filter->hasOptions()->map(fn ($v) => [
-                'values' => $v->optionValues->pluck('value')->implode(','),
-                'sku' => $v->sku,
-                'price' => $v->price,
-                'stock_quantity' => $v->stock_quantity,
-                'is_available' => $v->is_available,
-            ])->values()->all()
-            : [];
+        $pfVariants = $product->exists ? $product->variants->filter->hasOptions()->map(fn ($variant) => ['id' => $variant->id, 'values' => $variant->optionValues->pluck('value')->all(), 'weight' => $variant->weight_grams, 'weight_unit' => 'g', 'sku' => $variant->sku, 'price' => $variant->price, 'stock_quantity' => $variant->stock_quantity, 'is_available' => $variant->is_available])->values()->all() : [];
     }
-
-    $pfHasVariants = old('variants_exist', ($product->exists && $product->hasVariants()) ? '1' : '0');
+    $pfColorImages = [];
+    $pfColorImageIds = [];
+    if ($product->exists) {
+        $colorOption = $product->options->first(fn ($option) => in_array(strtolower(trim($option->name)), ['color', 'colour']));
+        if ($colorOption) {
+            foreach ($product->variants as $variant) {
+                $color = $variant->optionValues->firstWhere('product_option_id', $colorOption->id)?->value;
+                if ($color) {
+                    foreach ($product->images->where('variant_id', $variant->id) as $image) {
+                        $pfColorImageIds[$color][Storage::disk('public')->url($image->path)] = $image->id;
+                    }
+                    $pfColorImages[$color] = array_values(array_unique(array_merge($pfColorImages[$color] ?? [], $product->images->where('variant_id', $variant->id)->map(fn ($image) => Storage::disk('public')->url($image->path))->all())));
+                }
+            }
+        }
+    }
+    $pfColorFirst = (bool) old('color_first', ! $product->exists || $pfOptions === [] || ($pfOptions !== [] && count($pfOptions) === 2 && in_array(strtolower($pfOptions[0]['name']), ['color', 'colour']) && strtolower($pfOptions[1]['name']) === 'size'));
+    $pfInitial = ['options' => $pfOptions, 'variants' => $pfVariants, 'colorImages' => $pfColorImages, 'colorImageIds' => $pfColorImageIds];
+    $pfHasVariants = (string) old('variants_exist', ($product->exists && $product->hasVariants()) ? '1' : '0');
+    $inputClass = 'w-full rounded-sm border border-[var(--border-input)] bg-[var(--bg-surface)] px-3 py-2.5 text-sm text-[var(--text-ink)] focus:border-[var(--brand)] focus:outline-none';
+    $buttonClass = 'rounded-sm border border-[var(--border-input)] px-3 py-2 text-xs font-semibold text-[var(--text-ink)] transition-colors hover:bg-[var(--bg-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]';
 @endphp
 @csrf
-@if($product->exists) @method('PUT') @endif
-<input type="hidden" name="variants_exist" data-pf-variants-exist value="{{ $pfHasVariants }}">
-
-@if ($errors->any())
-    <div class="px-3 py-3 bg-[var(--pill-danger-bg)] border border-[var(--pill-danger-border)] rounded-sm font-sans text-[12.5px] text-[var(--status-danger)]">{{ $errors->first() }}</div>
+@if($product->exists)
+    @method('PUT')
+    <input type="hidden" name="inventory_revision" value="{{ old('inventory_revision', app(\App\Services\ProductPublishingService::class)->inventoryRevision($product)) }}">
 @endif
-
-{{-- ═══════════════ STEP 1 · BASIC INFO ═══════════════ --}}
-<div data-pf-step="1">
-    <div class="flex gap-4 max-sm:flex-col">
-        <div class="flex flex-col flex-1">
-            <label for="name" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Product name *</label>
-            <input type="text" name="name" id="name" required value="{{ old('name', $product->name) }}" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-            @error('name') <span class="font-sans text-[11.5px] text-[var(--status-danger)] mt-1.5">{{ $message }}</span> @enderror
+<div data-pf-root data-pf-color-first="{{ $pfColorFirst ? '1' : '0' }}" data-pf-edit="{{ $product->exists ? '1' : '0' }}" class="flex flex-col gap-6 font-sans text-sm text-[var(--text-ink)]">
+    <script type="application/json" data-pf-initial>@json($pfInitial)</script>
+    <input type="hidden" name="color_first" value="{{ $pfColorFirst ? '1' : '0' }}">
+    <input type="hidden" name="variants_exist" data-pf-variants-exist value="{{ $pfHasVariants }}">
+    <input type="hidden" name="cover_index" data-pf-cover-index value="0" @disabled($product->exists)>
+    @if($errors->any())
+        <div data-pf-error-summary role="alert" class="rounded-sm border border-[var(--pill-danger-border)] bg-[var(--pill-danger-bg)] p-4 text-[var(--status-danger)]">
+            <strong>Please check your product details.</strong>
+            <ul class="mt-2 list-inside list-disc">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            <p class="mt-2">For your privacy, please select any new photo uploads again.</p>
         </div>
-        <div class="flex flex-col flex-[0_0_180px] max-sm:flex-1">
-            <label class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Category</label>
-            <div class="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-soft)] border border-[var(--border-input)] rounded-sm text-[var(--text-label)] font-sans text-[13.5px]">
-                <i data-lucide="lock" width="14" height="14" class="text-primary-800 flex-shrink-0"></i>
-                <span>{{ $lockedCategory->name ?? 'Uncategorized' }}</span>
+    @endif
+    <ol aria-label="Product setup progress" class="grid grid-cols-5 gap-1 border-b border-[var(--border-hairline)] pb-5">
+        @foreach(['Information', 'Variations', 'Color images', 'Inventory', 'Publish'] as $label)
+            <li data-pf-progress="{{ $loop->iteration }}" class="flex flex-col gap-2 text-center text-[10px] text-[var(--text-muted)] sm:text-xs">
+                <span data-pf-number class="text-[var(--text-ink)] mx-auto flex size-7 items-center justify-center rounded-full border border-[var(--border-input)] text-xs">{{ $loop->iteration }}</span>{{ $label }}
+            </li>
+        @endforeach
+    </ol>
+    <p data-pf-error role="alert" hidden class="rounded-sm bg-[var(--pill-danger-bg)] p-3 text-[var(--status-danger)]"></p>
+    <section data-pf-step="1" class="space-y-5">
+        <div><p class="text-xs uppercase tracking-widest text-[var(--text-muted)]">Step 01 / Product information</p><h3 class="text-[var(--text-ink)] mt-1 font-serif text-2xl">Start with the essentials</h3><p class="mt-2 text-[var(--text-muted)]">One product listing. Every color and size in one place.</p></div>
+        <div class="grid gap-5 sm:grid-cols-[1fr_230px]">
+            <label class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold" for="name">Product name <span class="text-[var(--text-ink)] sr-only">required</span><input id="name" name="name" maxlength="255" required value="{{ old('name', $product->name) }}" class="{{ $inputClass }}" placeholder="e.g. Premium cotton oversized shirt"></label>
+            <div class="flex flex-col gap-2"><span class="text-[var(--text-ink)] font-semibold">Category</span><p data-pf-category class="rounded-sm border border-[var(--border-input)] bg-[var(--bg-soft)] px-3 py-2.5">{{ $lockedCategory->label ?? 'Uncategorized' }}</p><p class="text-xs text-[var(--text-muted)]">Set by your seller registration.</p></div>
+        </div>
+        <label for="description" class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold">Product description<textarea id="description" name="description" rows="4" maxlength="5000" class="{{ $inputClass }}" placeholder="Premium cotton oversized shirt, available in multiple colors and sizes.">{{ old('description', $product->description) }}</textarea></label>
+        <div class="space-y-3"><div><h4 class="text-[var(--text-ink)] font-semibold">Product images</h4><p class="mt-1 text-xs text-[var(--text-muted)]">Add up to 6 JPG, PNG or WebP photos, 3 MB each. Choose the cover buyers see first.</p></div>
+            @if($product->exists)
+                <div class="flex flex-wrap gap-3" data-pf-existing-images>
+                    @foreach($product->images->whereNull('variant_id') as $image)<figure class="w-20"><img src="{{ Storage::disk('public')->url($image->path) }}" alt="Existing product photo" class="aspect-square w-full rounded-sm border border-[var(--border-input)] object-cover">@if($image->is_primary)<figcaption class="mt-1 text-xs text-[var(--text-muted)]">Current cover</figcaption>@endif</figure>@endforeach
+                </div>
+            @endif
+            <label for="images" class="text-[var(--text-ink)] flex cursor-pointer flex-col items-center gap-2 rounded-sm border border-dashed border-[var(--border-input)] bg-[var(--bg-soft)] p-6 text-center hover:border-[var(--brand)]"><span class="text-[var(--text-ink)] font-semibold">+ Choose product photos</span><span class="text-xs text-[var(--text-muted)]">{{ $product->exists ? 'New photos are added to your gallery. Choose a new cover only if needed.' : 'The first selected photo becomes your cover.' }}</span><input id="images" name="images[]" type="file" accept="image/jpeg,image/png,image/webp" multiple data-pf-gallery-files class="max-w-full text-xs"></label>
+            <div data-pf-gallery class="grid grid-cols-2 gap-3 sm:grid-cols-6"></div>
+        </div>
+    </section>
+    <section data-pf-step="2" hidden class="space-y-5">
+        <div><p class="text-xs uppercase tracking-widest text-[var(--text-muted)]">Step 02 / Product variations</p><h3 class="text-[var(--text-ink)] mt-1 font-serif text-2xl">Give buyers their options</h3><p class="mt-2 text-[var(--text-muted)]">Add each color with its own uploaded photo and available sizes. Existing option groups remain editable.</p></div>
+        <label class="text-[var(--text-ink)] flex items-center gap-3 rounded-sm border border-[var(--border-input)] bg-[var(--bg-soft)] p-4 font-semibold"><input type="checkbox" data-pf-variants-toggle @checked($pfHasVariants === '1') class="size-4 accent-[var(--brand)]">Enable Variations</label>
+        <div data-pf-options-area class="space-y-4">
+            @if($pfColorFirst)<h4 class="font-semibold">Color Variants</h4><button type="button" data-pf-add-color class="{{ $buttonClass }}">+ Add Another Color</button><div data-pf-colors class="space-y-4"></div>@endif<div data-pf-options class="space-y-4"></div><button type="button" data-pf-add-option @if($pfColorFirst) hidden @endif class="{{ $buttonClass }}">+ Add variation group</button><p data-pf-combo-summary class="font-semibold text-[var(--text-label)]" aria-live="polite"></p></div>
+        <p data-pf-single-message class="text-[var(--text-muted)]">Selling a single item? Continue to enter its price and stock.</p>
+    </section>
+    <section data-pf-step="3" hidden class="space-y-5">
+        <div><p class="text-xs uppercase tracking-widest text-[var(--text-muted)]">Step 03 / Color images</p><h3 class="text-[var(--text-ink)] mt-1 font-serif text-2xl">Show every color</h3><p class="mt-2 text-[var(--text-muted)]">Each color needs an explicitly uploaded photo. Return to Variations to add or replace color photos; all sizes share the same color image.</p></div>
+        <p data-pf-no-colors class="rounded-sm bg-[var(--bg-soft)] p-4 text-[var(--text-muted)]">Add a Color or Colour variation to upload photos by color. General product photos will otherwise appear for every variant.</p>
+        @unless($pfColorFirst)<div data-pf-colors class="grid gap-4 sm:grid-cols-3"></div>@endunless
+    </section>
+    <section data-pf-step="4" hidden class="space-y-5">
+        <div><p class="text-xs uppercase tracking-widest text-[var(--text-muted)]">Step 04 / Variant inventory</p><h3 class="text-[var(--text-ink)] mt-1 font-serif text-2xl">Set price and stock</h3><p class="mt-2 text-[var(--text-muted)]">Each combination has its own inventory. Uncheck Selling to pause a variant.</p></div>
+        <div data-pf-single-inventory class="grid gap-4 sm:grid-cols-2">
+            <label for="price" class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold">Price (₱)<input name="price" id="price" type="number" step="0.01" min="0" required value="{{ old('price', $product->price ?? 0) }}" class="{{ $inputClass }}"></label>
+            <label for="stock_quantity" class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold">Stock<input name="stock_quantity" id="stock_quantity" type="number" step="1" min="0" required value="{{ old('stock_quantity', $product->stock_quantity ?? 0) }}" class="{{ $inputClass }}"></label>
+        </div>
+        <div data-pf-single-weight class="space-y-2">
+            <label for="weight" class="font-semibold">Weight (required)</label>
+            <div class="flex gap-2">
+                <input id="weight" name="weight" type="number" required min="1" max="100000" step="1" value="{{ old('weight', $product->weight_grams) }}" data-pf-weight class="{{ $inputClass }}">
+                <select name="weight_unit" aria-label="Weight unit" data-pf-weight-unit class="{{ $inputClass }}"><option value="g" @selected(old('weight_unit', 'g') === 'g')>g</option><option value="kg" @selected(old('weight_unit', 'g') === 'kg')>kg</option></select>
             </div>
-            <span class="font-sans text-[10.5px] italic text-[var(--text-label)] mt-1.5">Set by your seller registration — not editable per product.</span>
+            <p class="text-xs text-[var(--text-muted)]">1 g to 100 kg per item. Enter weight for each variant when variations are enabled.</p>
         </div>
-    </div>
-
-    <div class="flex flex-col flex-1">
-        <label for="description" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Description</label>
-        <textarea name="description" id="description" rows="4" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">{{ old('description', $product->description) }}</textarea>
-    </div>
-
-    <div class="flex gap-4 max-sm:flex-col">
-        <div class="flex flex-col flex-1">
-            <label for="price" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Price (₱) *</label>
-            <input type="number" name="price" id="price" step="0.01" min="0" required value="{{ old('price', $product->price) }}" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-            <span class="font-sans text-[10.5px] italic text-[var(--text-label)] mt-1.5 hidden" data-pf-rollup-hint-price>Auto — cheapest variant</span>
-            @error('price') <span class="font-sans text-[11.5px] text-[var(--status-danger)] mt-1.5">{{ $message }}</span> @enderror
+        <div data-pf-variant-inventory class="space-y-4">
+            <div class="flex flex-wrap items-end gap-3 rounded-sm bg-[var(--bg-soft)] p-3"><label class="text-[var(--text-ink)] flex flex-col gap-1 text-xs">Bulk price (₱)<input type="number" min="0" step="0.01" data-pf-bulk-price class="{{ $inputClass }}" placeholder="0.00"></label><label class="text-[var(--text-ink)] flex flex-col gap-1 text-xs">Bulk stock<input type="number" min="0" step="1" data-pf-bulk-stock class="{{ $inputClass }}" placeholder="0"></label><button type="button" data-pf-apply-bulk class="{{ $buttonClass }}">Apply to all variants</button></div>
+            <p class="text-xs text-[var(--text-muted)] sm:hidden">Swipe horizontally to see price, stock, SKU and Selling. Variant names stay in view.</p><div class="max-h-[45vh] overflow-auto rounded-sm border border-[var(--border-input)]"><table class="w-full min-w-[650px] text-left text-sm"><thead class="sticky top-0 z-20 bg-[var(--bg-soft)] text-xs text-[var(--text-label)]"><tr><th class="sticky left-0 z-30 bg-[var(--bg-soft)] p-3 text-[var(--text-ink)]">Variant</th><th class="p-3">Price (₱)</th><th class="p-3">Stock</th><th class="p-3">Weight (required)</th><th class="p-3">SKU (optional)</th><th class="p-3">Selling</th></tr></thead><tbody data-pf-variant-body></tbody></table></div>
         </div>
-        <div class="flex flex-col flex-1">
-            <label for="stock_quantity" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Stock quantity *</label>
-            <input type="number" name="stock_quantity" id="stock_quantity" min="0" required value="{{ old('stock_quantity', $product->stock_quantity) }}" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-            <span class="font-sans text-[10.5px] italic text-[var(--text-label)] mt-1.5 hidden" data-pf-rollup-hint-stock>Auto — all variants</span>
-        </div>
-        <div class="flex flex-col flex-1">
-            <label for="low_stock_threshold" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Low-stock alert at</label>
-            <input type="number" name="low_stock_threshold" id="low_stock_threshold" min="0" value="{{ old('low_stock_threshold', $product->low_stock_threshold) }}" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-        </div>
-    </div>
-
-    <div class="flex flex-col flex-1">
-        <label for="status" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Status *</label>
-        <select name="status" id="status" required class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-            <option value="draft" {{ old('status', $product->status) === 'draft' ? 'selected' : '' }}>Draft (not visible to buyers)</option>
-            <option value="active" {{ old('status', $product->status) === 'active' ? 'selected' : '' }}>Active</option>
-            <option value="inactive" {{ old('status', $product->status) === 'inactive' ? 'selected' : '' }}>Inactive</option>
-        </select>
-    </div>
-
-    <div class="flex flex-col flex-1">
-        <label for="images" class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Product photos {{ $product->exists ? '(add more)' : '*' }}</label>
-        <div class="flex items-center gap-3">
-            <label for="images" class="inline-flex items-center gap-2 h-10 px-4 bg-[var(--bg-surface)] border border-[var(--btn-accent)] rounded-sm text-[var(--btn-accent)] font-sans font-semibold text-[11.5px] cursor-pointer whitespace-nowrap hover:bg-[var(--btn-accent)] hover:text-[var(--btn-accent-contrast)] transition-colors duration-200">
-                <i data-lucide="upload" width="16" height="16"></i>
-                <span>Choose photos</span>
-            </label>
-            <input type="file" name="images[]" id="images" accept="image/*" multiple class="absolute w-px h-px overflow-hidden">
-            <span class="font-sans text-[12.5px] text-[var(--text-label)]" id="spFileName">No files selected</span>
-        </div>
-        @error('images') <span class="font-sans text-[11.5px] text-[var(--status-danger)] mt-1.5">{{ $message }}</span> @enderror
-        @error('images.*') <span class="font-sans text-[11.5px] text-[var(--status-danger)] mt-1.5">{{ $message }}</span> @enderror
-    </div>
-
-    <div class="flex justify-end">
-        <button type="button" data-pf-next="2"
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-sm border-none bg-[var(--btn-primary-bg)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-primary-text)] cursor-pointer transition-colors hover:bg-[var(--btn-primary-bg-hover-soft)]">
-            Next: Variant Options
-            <i data-lucide="arrow-right" width="14" height="14"></i>
-        </button>
-    </div>
-</div>
-
-{{-- ═══════════════ STEP 2 · VARIANT OPTIONS ═══════════════ --}}
-<div data-pf-step="2" {{ $pfHasVariants === '1' ? '' : 'hidden' }}>
-    <p class="font-sans text-[12.5px] text-[var(--text-label)]">
-        Add up to two option axes (e.g. Color, Size). Leave empty to sell this product as a single item.
-    </p>
-
-    <div data-pf-options class="flex flex-col gap-4">
-        @forelse ($pfOptions as $i => $option)
-            <div class="flex gap-4 max-sm:flex-col" data-pf-option-row>
-                <div class="flex flex-col flex-1">
-                    <label class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Option {{ $i + 1 }} name</label>
-                    <input type="text" name="options[{{ $i }}][name]" data-pf-option-name maxlength="50" value="{{ $option['name'] ?? '' }}" placeholder="e.g. Color" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-                </div>
-                <div class="flex flex-col flex-[2]">
-                    <label class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Values (comma-separated)</label>
-                    <input type="text" name="options[{{ $i }}][values]" data-pf-option-values value="{{ $option['values'] ?? '' }}" placeholder="e.g. Red, Blue, Green" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-                </div>
-            </div>
-        @empty
-            <div class="flex gap-4 max-sm:flex-col" data-pf-option-row>
-                <div class="flex flex-col flex-1">
-                    <label class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Option 1 name</label>
-                    <input type="text" name="options[0][name]" data-pf-option-name maxlength="50" value="" placeholder="e.g. Color" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-                </div>
-                <div class="flex flex-col flex-[2]">
-                    <label class="font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[var(--text-label)] mb-2">Values (comma-separated)</label>
-                    <input type="text" name="options[0][values]" data-pf-option-values value="" placeholder="e.g. Red, Blue, Green" class="px-3 py-2.5 border border-[var(--border-input)] rounded-sm font-sans text-[13.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]">
-                </div>
-            </div>
-        @endforelse
-    </div>
-
-    <button type="button" data-pf-add-option
-            class="mt-3 inline-flex items-center gap-1.5 font-sans text-[12px] font-semibold text-[var(--link)] cursor-pointer bg-transparent border-none p-0 hover:underline">
-        <i data-lucide="plus" width="14" height="14"></i>
-        Add second option
-    </button>
-
-    <p class="mt-3 font-sans text-[12.5px] text-[var(--text-label)]" data-pf-combo-summary hidden></p>
-    <p class="mt-2 font-sans text-[11.5px] text-[var(--status-danger)]" data-pf-options-error hidden></p>
-
-    <div class="flex justify-between mt-2">
-        <button type="button" data-pf-back="1"
-                class="inline-flex h-10 items-center justify-center rounded-sm border border-[var(--border-cancel)] bg-[var(--bg-surface)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-cancel-text)] cursor-pointer transition-colors hover:bg-[var(--bg-raised)]">
-            Back
-        </button>
-        <button type="button" data-pf-generate
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-sm border-none bg-[var(--btn-primary-bg)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-primary-text)] cursor-pointer transition-colors hover:bg-[var(--btn-primary-bg-hover-soft)]">
-            <span data-pf-generate-label>Save product</span>
-            <i data-lucide="arrow-right" width="14" height="14"></i>
-        </button>
-    </div>
-</div>
-
-{{-- ═══════════════ STEP 3 · VARIANT TABLE ═══════════════ --}}
-<div data-pf-step="3" hidden>
-    <p class="font-sans text-[12.5px] text-[var(--text-label)]">
-        One row per combination. Untick a row to disable that combination without deleting it.
-    </p>
-
-    <div class="overflow-x-auto mt-2">
-        <table class="w-full border-collapse font-sans text-[12.5px]">
-            <thead>
-                <tr class="text-left text-[var(--text-label)] border-b border-[var(--border-input)]">
-                    <th class="py-2 pr-3 font-semibold">Variant</th>
-                    <th class="py-2 pr-3 font-semibold">SKU</th>
-                    <th class="py-2 pr-3 font-semibold">Price (₱)</th>
-                    <th class="py-2 pr-3 font-semibold">Stock</th>
-                    <th class="py-2 font-semibold">Selling</th>
-                </tr>
-            </thead>
-            <tbody data-pf-variant-body>
-                @foreach ($pfVariants as $i => $row)
-                    <tr data-pf-variant-row>
-                        <input type="hidden" name="variants[{{ $i }}][values]" value="{{ $row['values'] }}">
-                        <input type="hidden" name="variants[{{ $i }}][is_available]" value="{{ ($row['is_available'] ?? true) ? '1' : '0' }}" data-pf-available>
-                        <td class="py-2 pr-3 font-semibold text-[var(--text-ink)]" data-pf-combo-label>{{ str_replace(',', ' / ', $row['values']) }}</td>
-                        <td class="py-2 pr-3"><input type="text" name="variants[{{ $i }}][sku]" maxlength="64" value="{{ $row['sku'] ?? '' }}" class="w-28 px-2 py-1.5 border border-[var(--border-input)] rounded-sm text-[12.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]"></td>
-                        <td class="py-2 pr-3"><input type="number" step="0.01" min="0" name="variants[{{ $i }}][price]" value="{{ $row['price'] ?? '' }}" required class="w-24 px-2 py-1.5 border border-[var(--border-input)] rounded-sm text-[12.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]"></td>
-                        <td class="py-2 pr-3"><input type="number" min="0" name="variants[{{ $i }}][stock_quantity]" value="{{ $row['stock_quantity'] ?? 0 }}" required class="w-20 px-2 py-1.5 border border-[var(--border-input)] rounded-sm text-[12.5px] text-[var(--text-ink)] focus:outline-none focus:border-[var(--brand)]"></td>
-                        <td class="py-2"><input type="checkbox" data-pf-enabled {{ ($row['is_available'] ?? true) ? 'checked' : '' }} class="cursor-pointer" aria-label="Selling this combination"></td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-        <p class="font-sans text-[11.5px] text-[var(--status-danger)] mt-2" data-pf-variant-empty hidden></p>
-    </div>
-
-    <div class="flex justify-between mt-4">
-        <button type="button" data-pf-back="2"
-                class="inline-flex h-10 items-center justify-center rounded-sm border border-[var(--border-cancel)] bg-[var(--bg-surface)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-cancel-text)] cursor-pointer transition-colors hover:bg-[var(--bg-raised)]">
-            Back to options
-        </button>
-    </div>
+        <div class="flex items-baseline justify-between border-y border-[var(--border-hairline)] py-4"><span class="text-[var(--text-muted)]">Total stock</span><span class="text-[var(--text-ink)] font-serif text-2xl"><strong data-pf-total-stock class="text-[var(--text-ink)]">0</strong> <span class="text-[var(--text-ink)] font-sans text-sm">pieces</span></span></div>
+        <label for="low_stock_threshold" class="text-[var(--text-ink)] flex max-w-xs flex-col gap-2 font-semibold">Low-stock alert at<input name="low_stock_threshold" id="low_stock_threshold" type="number" step="1" min="0" value="{{ old('low_stock_threshold', $product->low_stock_threshold ?? 5) }}" class="{{ $inputClass }}"></label>
+    </section>
+    <section data-pf-step="5" hidden class="space-y-5">
+        <div><p class="text-xs uppercase tracking-widest text-[var(--text-muted)]">Step 05 / Review & publish</p><h3 class="text-[var(--text-ink)] mt-1 font-serif text-2xl">Ready for your storefront</h3><p class="mt-2 text-[var(--text-muted)]">Review the details before making this product available to buyers.</p></div>
+        <div class="flex gap-5 rounded-sm border border-[var(--border-input)] bg-[var(--bg-soft)] p-5"><img data-pf-review-cover hidden alt="Selected product cover" class="size-24 shrink-0 rounded-sm object-cover"><div class="min-w-0 space-y-2"><h4 data-pf-review-name class="text-[var(--text-ink)] break-words font-serif text-xl"></h4><p data-pf-review-category class="text-xs text-[var(--text-muted)]"></p><p data-pf-review-options class="text-xs text-[var(--text-ink)]"></p><p data-pf-review-summary class="font-semibold text-[var(--text-ink)]"></p></div></div>
+        <label for="status" class="text-[var(--text-ink)] flex flex-col gap-2 font-semibold">Publication status<select id="status" name="status" class="{{ $inputClass }}"><option value="active" @selected(old('status', $product->exists ? $product->status : 'active') === 'active')>Publish — visible to buyers</option><option value="draft" @selected(old('status', $product->exists ? $product->status : 'active') === 'draft')>Save as draft — only visible to you</option><option value="inactive" @selected(old('status', $product->status) === 'inactive')>Inactive — hidden from buyers</option></select></label>
+        <p class="text-xs text-[var(--text-muted)]">Buyers see one listing and choose the available variation before purchasing.</p>
+    </section>
 </div>

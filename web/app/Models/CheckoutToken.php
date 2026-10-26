@@ -58,7 +58,7 @@ class CheckoutToken extends Model
      */
     public static function claim(int $buyerId, ?string $token): bool
     {
-        if ($token === null || $token === '') {
+        if ($token === null || preg_match('/\A[0-9a-f]{64}\z/', $token) !== 1) {
             return false;
         }
 
@@ -66,7 +66,7 @@ class CheckoutToken extends Model
             ->where('buyer_id', $buyerId)
             ->where('token', $token)
             ->where('used', false)
-            ->where('expires_at', '>=', now())
+            ->where('expires_at', '>', now())
             ->update(['used' => true]);
 
         return $claimed === 1;

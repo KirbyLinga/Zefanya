@@ -16,21 +16,21 @@
       POST /register/logistics/verify-otp/{provider}           -> { redirect, message } | 422 { message }
       POST /register/logistics/verify-otp/{provider}/resend    -> { message }
 --}}
-<div class="buyer-modal-overlay fixed inset-0 z-[999] hidden items-center justify-center bg-black/55 p-4 backdrop-blur-[2px] [&.is-open]:flex" id="logisticsModalOverlay" aria-hidden="true">
-    <div class="relative max-h-[92vh] w-full max-w-[640px] overflow-y-auto rounded-lg border border-neutral-200 bg-white pb-8 pt-10 px-8 shadow-[0_24px_60px_rgba(15,23,42,0.25)] max-sm:px-6 max-sm:pt-8" role="dialog" aria-modal="true" aria-labelledby="logisticsModalTitle">
+<div class="logistics-modal-overlay" id="logisticsModalOverlay" data-psgc-base="{{ url('https://psgc.gitlab.io/api') }}" aria-hidden="true">
+    <div class="logistics-modal" role="dialog" aria-modal="true" aria-labelledby="logisticsModalTitle">
 
-        <button type="button" class="absolute right-4 top-4 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-[#F6DEE2] hover:text-[#7a4550]" id="logisticsModalClose" aria-label="Close registration form">
+        <button type="button" class="logistics-modal__close" id="logisticsModalClose" aria-label="Close registration form">
             <i data-lucide="x" width="18" height="18"></i>
         </button>
 
         {{-- ===== Brand + header ===== --}}
-        <div class="mb-5 flex justify-center">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[#F7D6D0] text-[#7a4550] shadow-sm" id="logisticsModalIcon">
+        <div class="logistics-modal__header">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[#F7D6D0] text-[#7a4550] shadow-sm mx-auto" id="logisticsModalIcon">
                 <i data-lucide="truck" width="20" height="20"></i>
             </div>
         </div>
-        <h2 class="text-center font-serif text-[26px] font-normal text-neutral-900" id="logisticsModalTitle">Register as Logistics</h2>
-        <p class="mt-2 text-center font-sans text-[13.5px] text-neutral-500">Manage courier operations for the Zefanya marketplace.</p>
+        <h2 class="logistics-modal__title" id="logisticsModalTitle">Create Your Logistics Account</h2>
+        <p class="logistics-modal__subtitle">Manage courier operations for the Zefanya marketplace.</p>
 
         @if ($errors->any())
             <div class="mt-4 rounded-sm border border-[#e8a49c] bg-[#fbe9e7] px-4 py-3 font-sans text-[12.5px] text-[#a5333d]">{{ $errors->first() }}</div>
@@ -68,127 +68,11 @@
             <input type="hidden" name="municipality_name" id="logisticsMunicipalityNameField" value="{{ old('municipality_name') }}">
             <input type="hidden" name="barangay_name" id="logisticsBarangayNameField" value="{{ old('barangay_name') }}">
 
-            {{-- ---- Panel 1: Personal ---- --}}
-            <section class="logistics-panel mt-6" data-panel="1">
-                <p class="mb-4 font-sans text-[11px] font-semibold uppercase tracking-[1px] text-neutral-500">Personal information</p>
-
-                <div class="mb-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsLastName">Last name *</label>
-                        <input type="text" name="last_name" id="logisticsLastName" required value="{{ old('last_name') }}"
-                               class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
-                    </div>
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsFirstName">First name *</label>
-                        <input type="text" name="first_name" id="logisticsFirstName" required value="{{ old('first_name') }}"
-                               class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
-                    </div>
-                </div>
-
-                <div class="mb-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsMiddleInitial">Middle initial</label>
-                        <input type="text" name="middle_initial" id="logisticsMiddleInitial" maxlength="2" value="{{ old('middle_initial') }}"
-                               class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                    </div>
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsSex">Sex *</label>
-                        <select name="sex" id="logisticsSex" required
-                                class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            <option value="" disabled {{ old('sex') ? '' : 'selected' }}>Select</option>
-                            <option value="male" {{ old('sex') === 'male' ? 'selected' : '' }}>Male</option>
-                            <option value="female" {{ old('sex') === 'female' ? 'selected' : '' }}>Female</option>
-                        </select>
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
-                    </div>
-                </div>
-
-                <div class="mb-4">
-                    <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsEmail">Email *</label>
-                    <input type="email" name="email" id="logisticsEmail" required value="{{ old('email') }}"
-                           class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-email"></span>
-                </div>
-
-                <div class="mb-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsPassword">Password *</label>
-                        <div class="relative">
-                            <input type="password" name="password" id="logisticsPassword" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password"
-                                   class="h-11 w-full rounded-sm border border-neutral-300 px-4 pr-11 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-[#7a4550]" data-toggle-visibility="logisticsPassword" aria-label="Show password">
-                                <i data-lucide="eye" width="16" height="16"></i>
-                            </button>
-                        </div>
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
-                    </div>
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsPasswordConfirmation">Confirm password *</label>
-                        <div class="relative">
-                            <input type="password" name="password_confirmation" id="logisticsPasswordConfirmation" placeholder="Re-enter your password" required autocomplete="new-password"
-                                   class="h-11 w-full rounded-sm border border-neutral-300 px-4 pr-11 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-[#7a4550]" data-toggle-visibility="logisticsPasswordConfirmation" aria-label="Show password">
-                                <i data-lucide="eye" width="16" height="16"></i>
-                            </button>
-                        </div>
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
-                    </div>
-                </div>
-
-                <div class="mb-6 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsContactNo">Contact no. *</label>
-                        <input type="tel" name="contact_no" id="logisticsContactNo" placeholder="09XXXXXXXXX" required value="{{ old('contact_no') }}" inputmode="numeric" pattern="[0-9]*"
-                               class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                        <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
-                    </div>
-                    <div>
-                        <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsAge">Age</label>
-                        {{-- Display only: no `name` attribute, so it is never submitted. --}}
-                        <input type="text" id="logisticsAge" readonly placeholder="—"
-                               class="h-11 w-full rounded-sm border border-neutral-200 bg-neutral-50 px-3 text-center font-sans text-sm text-neutral-500">
-                    </div>
-                </div>
-
-                <div class="mb-6">
-                    @php
-                        $oldLogisticsBirthday = old('birthday') ? explode('-', old('birthday')) : [null, null, null];
-                    @endphp
-
-                    <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600">Birthday *</label>
-                    <div class="grid grid-cols-[1.6fr_0.5fr_0.8fr] gap-2">
-                        <select id="logisticsBirthMonth" aria-label="Birth month"
-                                class="h-11 w-full min-w-0 rounded-sm border border-neutral-300 px-2 font-sans text-[13px] text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            <option value="" disabled selected>Month</option>
-                            @foreach(['January','February','March','April','May','June','July','August','September','October','November','December'] as $logisticsMonthIndex => $logisticsMonthName)
-                                <option value="{{ sprintf('%02d', $logisticsMonthIndex + 1) }}" {{ ($oldLogisticsBirthday[1] ?? null) === sprintf('%02d', $logisticsMonthIndex + 1) ? 'selected' : '' }}>{{ $logisticsMonthName }}</option>
-                            @endforeach
-                        </select>
-                        <select id="logisticsBirthDay" aria-label="Birth day"
-                                class="h-11 w-full min-w-0 rounded-sm border border-neutral-300 px-2 font-sans text-[13px] text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            <option value="" disabled selected>Day</option>
-                            @for ($logisticsDay = 1; $logisticsDay <= 31; $logisticsDay++)
-                                <option value="{{ $logisticsDay }}" {{ (int) ($oldLogisticsBirthday[2] ?? 0) === $logisticsDay ? 'selected' : '' }}>{{ $logisticsDay }}</option>
-                            @endfor
-                        </select>
-                        <select id="logisticsBirthYear" aria-label="Birth year"
-                                class="h-11 w-full min-w-0 rounded-sm border border-neutral-300 px-2 font-sans text-[13px] text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            <option value="" disabled selected>Year</option>
-                            @for ($logisticsYear = (int) date('Y'); $logisticsYear >= 1900; $logisticsYear--)
-                                <option value="{{ $logisticsYear }}" {{ (int) ($oldLogisticsBirthday[0] ?? 0) === $logisticsYear ? 'selected' : '' }}>{{ $logisticsYear }}</option>
-                            @endfor
-                        </select>
-                    </div>
-                    <input type="hidden" name="birthday" id="logisticsBirthday" value="{{ old('birthday') }}">
-                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="logisticsBirthdayError"></span>
-                </div>
-
-                <button type="button" id="logisticsNextStep1" class="h-11 w-full cursor-pointer rounded-sm bg-neutral-900 font-sans text-[12.5px] font-semibold uppercase tracking-[1.4px] text-white transition-colors hover:bg-[#9c5c68]">
-                    Next
-                </button>
-            </section>
+            {{-- ---- Panel 1: Personal (shared partial) ---- --}}
+            @php
+                $oldBirthdayParts = old('birthday') ? explode('-', old('birthday')) : [null, null, null];
+            @endphp
+            @include('Components.registration-personal-step', ['role' => 'logistics', 'oldBirthdayParts' => $oldBirthdayParts])
 
             {{-- ---- Panel 2: Address ---- --}}
             <section class="logistics-panel mt-6 hidden" data-panel="2">
@@ -196,10 +80,7 @@
                 <p class="mb-4 font-sans text-xs text-neutral-500">Choose your location, then add your exact street address.</p>
 
                 <div class="rounded-lg border border-[#ADC7AD]/50 bg-[#F4F8F4] p-6">
-                    <div class="mb-3 flex justify-end">
-                        <button type="button" class="font-sans text-xs font-semibold text-[#9c5c68] hover:text-[#7a4550]" id="logisticsToggleManualAddress">Enter address manually</button>
-                    </div>
-
+                    {{-- Province / municipality / barangay: dropdowns only (no free-text). --}}
                     <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1" id="logisticsApiAddressFields">
                         <div>
                             <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsProvince">Province *</label>
@@ -224,29 +105,7 @@
                         </div>
                     </div>
 
-                    {{-- Manual-only fallback: text inputs (no `name`; they are copied into the
-                         hidden *_name fields by the JS) when the PSGC API is unreachable. --}}
-                    <div class="mt-4 hidden grid grid-cols-1 gap-4" id="logisticsManualAddressFields">
-                        <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                            <div>
-                                <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsManualProvince">Province</label>
-                                <input type="text" id="logisticsManualProvince" placeholder="Province name" value="{{ old('province_name') }}"
-                                       class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            </div>
-                            <div>
-                                <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsManualMunicipality">Municipality / City</label>
-                                <input type="text" id="logisticsManualMunicipality" placeholder="Municipality or city" value="{{ old('municipality_name') }}"
-                                       class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsManualBarangay">Barangay</label>
-                            <input type="text" id="logisticsManualBarangay" placeholder="Barangay name" value="{{ old('barangay_name') }}"
-                                   class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                        </div>
-                    </div>
-
-                    {{-- Street / house number — always visible in BOTH modes. --}}
+                    {{-- Street / house number — free text only for these fields. --}}
                     <div class="mt-4 grid grid-cols-1 gap-4">
                         <div>
                             <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsStreet">Street *</label>
@@ -270,6 +129,15 @@
                                 <input type="text" name="address_detail" id="logisticsAddressDetail"
                                        placeholder="Building, unit, landmark, etc."
                                        value="{{ old('address_detail') }}"
+                                       class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
+                                <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
+                            </div>
+                            <div>
+                                <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsPostalCode">Postal code</label>
+                                <input type="text" name="postal_code" id="logisticsPostalCode"
+                                       inputmode="numeric" maxlength="10"
+                                       placeholder="e.g. 4030"
+                                       value="{{ old('postal_code') }}"
                                        class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                                 <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]"></span>
                             </div>
@@ -331,12 +199,10 @@
                     <button type="button" id="submitLogisticsRegistration" class="h-11 flex-[2] cursor-pointer rounded-sm bg-neutral-900 font-sans text-[12.5px] font-semibold uppercase tracking-[1.4px] text-white transition-colors hover:bg-[#9c5c68]">Submit</button>
                 </div>
             </section>
-
-
-
-
         </form>
+
         {{-- ---- Panel 4: OTP (separate small form — registration already submitted by here) ---- --}}
+        <section class="logistics-panel mt-6 hidden" data-panel="4">
         <section class="logistics-panel mt-6 hidden" data-panel="4">
             <p class="mb-1 font-sans text-[11px] font-semibold uppercase tracking-[1px] text-neutral-500">Verify your email</p>
             <p class="mb-5 font-sans text-xs text-neutral-500">We sent a 6-digit code to <strong class="text-neutral-700" id="logisticsOtpEmail">your email</strong>.</p>
@@ -370,7 +236,7 @@
 
 
 
-        <p class="mt-6 text-center font-sans text-[13px] text-neutral-500">Already have an account? <a href="{{ route('login') }}" class="font-semibold text-[#9c5c68] hover:text-[#7a4550]">Sign in</a></p>
+        <p class="mt-6 text-center font-sans text-[13px] text-neutral-500">Already have an account? <a href="{{ route('home', ['login' => 1]) }}" class="font-semibold text-[#9c5c68] hover:text-[#7a4550]">Sign in</a></p>
     </div>
 </div>
 

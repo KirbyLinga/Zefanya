@@ -11,12 +11,14 @@
 
         {{-- Wishlist items or empty state --}}
         @if ($wishlistItems->isNotEmpty())
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div data-wishlist-list class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 @foreach ($wishlistItems as $item)
+                    <div data-wishlist-item="{{ $item->product_id }}">
                     @include('Components.buyer.product-card', [
                         'product' => $item->product,
-                        'url' => route('buyer.products.show', $item->product->id),
+                        'url' => $item->product->isListedForSale() ? route('buyer.products.show', $item->product->id) : false,
                     ])
+                    </div>
                 @endforeach
             </div>
 

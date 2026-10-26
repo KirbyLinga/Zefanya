@@ -17,6 +17,7 @@ class Wishlist extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        // Saved products remain visible and removable after seller archiving.
+        return $this->belongsTo(Product::class)->withTrashed();
     }
 }

@@ -2,122 +2,192 @@
 
 namespace App\Http\Controllers\Seller;
 
+use App\Http\Controllers\Concerns\VerifiesEmailOtp;
 use App\Http\Controllers\Controller;
 use App\Models\Seller\Seller;
 use App\Notifications\Seller\SellerRegistrationOtp;
-use Illuminate\Http\JsonResponse;
+use App\Support\EmailMask;
+use App\Support\SignedOtpLink;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class VerifySellerOtpController extends Controller
 {
+    use VerifiesEmailOtp;
+
     /**
-     * POST /register/seller/verify-otp
-     * Body: { otp: '123456' }
-     * Finds seller from session, verifies OTP, returns 200 or 422 JSON.
-     * No page view — modal-only flow.
+     * GET /register/seller/verify-otp/{seller}
+     * No-JS / deep-link OTP page so an unverified seller can resume
+     * verification without re-registering (mirrors the logistics page).
      */
-    public function verify(Request $request): JsonResponse
+    public function show(Seller $seller)
+    {
+        if ($seller->status !== 'unverified') {
+            return redirect()->route('register.seller.pending');
+        }
+
+        return view('Seller.register-seller-verify-otp', [
+            'seller' => $seller,
+            'emailMasked' => EmailMask::mask($seller->email),
+            'verifyUrl' => SignedOtpLink::verifyUrl('seller', $seller),
+            'resendUrl' => SignedOtpLink::resendUrl('seller', $seller),
+        ]);
+    }
+
+    /**
+     * POST /register/seller/verify-otp/{seller}
+     * Body: { otp: '123456' }
+     * Finds seller via model binding, verifies OTP, returns JSON for the modal;
+     * a plain form submit is redirected back (see respond()).
+     *
+     * Rate limited: route throttle (10/min per IP) plus a per-ACCOUNT lock — 5
+     * wrong codes lock verification for 15 minutes (survives a resend).
+     */
+    public function verify(Request $request, Seller $seller)
     {
         $data = $request->validate([
             'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
         ]);
 
-        $sellerId = session('seller_registration_id');
-        Log::warning('OTP verify attempt', [
-            'seller_registration_id_from_session' => $sellerId,
-            'session_keys' => array_keys(session()->all()),
-        ]);
-
-        if (! $sellerId) {
-            return response()->json([
-                'message' => 'Session expired. Please register again.',
-            ], 422);
+        if ($this->otpIsLocked('seller', $seller->email)) {
+            return $this->lockedResponse($request, $seller);
         }
 
-        $seller = Seller::find($sellerId);
-        if (! $seller) {
-            return response()->json([
-                'message' => 'Invalid registration session.',
-            ], 422);
-        }
-
-        // Only allow OTP verification if seller is in pending_verification status
-        if ($seller->status !== 'pending_verification') {
-            return response()->json([
-                'message' => 'Invalid registration session. Your account is '.$seller->status.'.',
+        // Only allow OTP verification if seller is in unverified status
+        if ($seller->status !== 'unverified') {
+            return $this->respond($request, [
+                'ok' => false,
+                'message' => 'Invalid registration session. Your account is already verified.',
             ], 422);
         }
 
         // Check if OTP has expired before comparing
         if ($seller->isOtpExpired()) {
-            return response()->json([
+            return $this->respond($request, [
+                'ok' => false,
                 'message' => 'This code has expired. Please request a new one.',
                 'expired' => true,
             ], 422);
         }
 
-        $incoming = hash('sha256', $data['otp']);
+        if (! $seller->otpMatches($data['otp'])) {
+            $seller->increment('otp_attempts');
+            $remaining = $this->registerOtpFailure('seller', $seller->email);
 
-        if ($seller->email_verification_code === null
-            || ! hash_equals($seller->email_verification_code, $incoming)) {
-            return response()->json([
+            if ($this->otpIsLocked('seller', $seller->email)) {
+                return $this->lockedResponse($request, $seller);
+            }
+
+            return $this->respond($request, [
+                'ok' => false,
                 'message' => 'That code doesn\'t match. Please try again.',
+                'attempts_remaining' => $remaining,
             ], 422);
         }
 
-        $seller->markEmailVerified();
-        session()->forget('seller_registration_id');
+        // Wrap in transaction: set status to pending atomically
+        DB::transaction(function () use ($seller) {
+            $seller->markEmailVerified();
+        });
 
-        return response()->json([
+        // Only a SUCCESS clears the failure window.
+        $this->clearOtpFailures('seller', $seller->email);
+
+        return $this->respond($request, [
+            'ok' => true,
+            'redirect' => route('register.seller.pending'),
             'message' => 'Email verified successfully.',
         ], 200);
     }
 
     /**
-     * POST /register/seller/verify-otp/resend
-     * Finds seller from session, generates fresh OTP, emails it.
-     * Throttled at route level.
+     * POST /register/seller/verify-otp/{seller}/resend
+     * Finds seller via model binding, generates fresh OTP, emails it.
+     *
+     * Per-ACCOUNT limit: 3 resends per 10 minutes. A resend does NOT reset the
+     * failure counter and never clears the lock.
      */
-    public function resend(Request $request): JsonResponse
+    public function resend(Request $request, Seller $seller)
     {
-        $sellerId = session('seller_registration_id');
-        if (! $sellerId) {
-            return response()->json([
-                'message' => 'Session expired. Please register again.',
+        // Only allow resend if seller is in unverified status
+        if ($seller->status !== 'unverified') {
+            return $this->respond($request, [
+                'ok' => false,
+                'message' => 'Invalid registration session. Your account is already verified.',
             ], 422);
         }
 
-        $seller = Seller::find($sellerId);
-        if (! $seller) {
-            return response()->json([
-                'message' => 'Invalid registration session.',
-            ], 422);
+        if ($this->otpResendIsLimited('seller', $seller->email)) {
+            return $this->respond($request, [
+                'ok' => false,
+                'message' => 'You have requested too many codes. Please wait before requesting another one.',
+                'retry_after' => $this->otpResendSecondsRemaining('seller', $seller->email),
+            ], 429);
         }
 
-        // Only allow resend if seller is in pending_verification status
-        if ($seller->status !== 'pending_verification') {
-            return response()->json([
-                'message' => 'Invalid registration session. Your account is '.$seller->status.'.',
-            ], 422);
+        // Prepare the replacement code but only commit it after delivery, so a
+        // delivery failure leaves the code the user already has valid.
+        $otp = $seller->generateOtp();
+
+        try {
+            $seller->notify(new SellerRegistrationOtp($otp));
+        } catch (\Throwable $e) {
+            Log::error('Failed to resend seller OTP email', [
+                'seller_id' => $seller->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->respond($request, [
+                'ok' => false,
+                'message' => 'We could not send a new code right now. Please try again shortly.',
+            ], 503);
         }
 
-        $code = (string) random_int(100000, 999999);
+        $seller->commitOtp($otp);
+        $this->registerOtpResend('seller', $seller->email);
 
-        $seller->forceFill([
-            'email_verification_code' => hash('sha256', $code),
-            'email_verification_expires_at' => now()->addMinutes(10),
-        ])->save();
-
-        $seller->notify(new SellerRegistrationOtp($code));
-
-        Log::warning('Seller OTP verification code resent', [
+        Log::info('Seller OTP verification code resent', [
             'seller_id' => $seller->id,
-            'email' => $seller->email,
         ]);
 
-        return response()->json([
+        return $this->respond($request, [
+            'ok' => true,
             'message' => 'A new code has been sent to your email.',
         ], 200);
+    }
+
+    /**
+     * "Too many wrong codes" answer. JSON requests get HTTP 429; a normal form
+     * submit gets a validation-style error.
+     */
+    private function lockedResponse(Request $request, Seller $seller)
+    {
+        return $this->respond($request, [
+            'ok' => false,
+            'locked' => true,
+            'retry_after' => $this->otpLockSecondsRemaining('seller', $seller->email),
+            'message' => $this->otpLockedMessage('seller', $seller->email),
+        ], 429);
+    }
+
+    /**
+     * JSON for fetch()/XHR callers, a redirect for a normal form submit.
+     */
+    private function respond(Request $request, array $json, int $status = 200)
+    {
+        if ($request->wantsJson()) {
+            return response()->json($json, $status);
+        }
+
+        if ($status >= 400) {
+            return back()->withErrors(['otp' => $json['message'] ?? 'Something went wrong.']);
+        }
+
+        if (isset($json['redirect'])) {
+            return redirect($json['redirect'])->with('success', $json['message'] ?? null);
+        }
+
+        return back()->with('success', $json['message'] ?? 'Done.');
     }
 }

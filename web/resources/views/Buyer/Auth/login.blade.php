@@ -16,6 +16,9 @@
         @if (session('auth.status_message'))
             <div class="auth-card__error">
                 {{ session('auth.status_message') }}
+                @if (session('auth.resume_url'))
+                    <div><a href="{{ session('auth.resume_url') }}" style="text-decoration: underline;">{{ session('auth.resume_label') ?? 'Verify your email' }}</a></div>
+                @endif
             </div>
         @elseif ($errors->any())
             <div class="auth-card__error">

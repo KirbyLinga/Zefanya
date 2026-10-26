@@ -47,7 +47,7 @@ return [
     |
     */
 
-    'encrypt' => env('SESSION_ENCRYPT', false),
+    'encrypt' => filter_var(env('SESSION_ENCRYPT', env('APP_ENV') === 'production'), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------
@@ -169,7 +169,9 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE') === null
+        ? env('APP_ENV') === 'production'
+        : filter_var(env('SESSION_SECURE_COOKIE'), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------

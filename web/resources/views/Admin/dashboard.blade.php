@@ -6,7 +6,7 @@
     {{-- admin-page-title / admin-page-subtitle → utilities (ADMIN-b):
          Playfair 28px / Montserrat 14px, margins from design-system
          (h1 margin 0 = preflight; subtitle margin 8px 0 0 = mt-2). --}}
-    <h1 class="font-serif font-normal text-[28px] text-neutral-950">Welcome, {{ $admin->name }}</h1>
+    <h1 class="font-serif font-normal text-[28px] text-neutral-950">Welcome, {{ $admin?->name ?? 'Admin' }}</h1>
     <p class="font-sans font-normal text-sm text-neutral-600 mt-2">Here's what's happening across Zefanya today.</p>
 
     {{-- dash-summary-strip → utilities (ADMIN-b). admin.css used its own

@@ -72,7 +72,7 @@ class BuyNowTest extends TestCase
         $this->assertSame(1, $lines->first()->quantity);
     }
 
-    public function test_cart_count_is_the_quantity_sum(): void
+    public function test_cart_count_is_the_line_count_while_quantities_are_preserved(): void
     {
         $seller = Seller::factory()->create(['status' => 'approved']);
         $buyer = Buyer::factory()->create();
@@ -90,7 +90,10 @@ class BuyNowTest extends TestCase
         $this->actingAs($buyer, 'buyer')
             ->postJson('/buyer/checkout/buy-now', ['product_id' => $product->id, 'quantity' => 3])
             ->assertOk()
-            ->assertJsonPath('cart_count', 5);
+            ->assertJsonPath('cart_count', 2);
+
+        $this->assertDatabaseHas('cart_items', ['buyer_id' => $buyer->id, 'product_id' => $product->id, 'quantity' => 3]);
+        $this->assertDatabaseHas('cart_items', ['buyer_id' => $buyer->id, 'product_id' => $anotherProduct->id, 'quantity' => 2]);
     }
 
     public function test_it_rejects_inactive_products(): void

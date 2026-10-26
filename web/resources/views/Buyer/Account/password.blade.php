@@ -27,6 +27,8 @@
 
             {{-- ── Right Column ── --}}
             <main>
+                @include('Components.buyer.account-tabs', ['active' => 'password'])
+
                 <div class="mb-6">
                     <h1 class="font-serif text-[28px] font-normal leading-tight text-[var(--text-ink)] sm:text-[32px]">
                         Password &amp; Security

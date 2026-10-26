@@ -2,19 +2,28 @@
 
 namespace App\Models\Seller;
 
+use App\Models\Concerns\HasEmailOtp;
+use App\Models\Concerns\HasRegistrationArchive;
 use App\Models\Conversation;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Product;
+use App\Models\Review;
 use App\Models\SellerOrder;
 use App\Models\Shared\Category;
+use Carbon\Carbon;
 use Database\Factories\SellerFactory;
+use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class Seller extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use CanResetPassword, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -36,11 +45,13 @@ class Seller extends Authenticatable
         'street',
         'house_number',
         'address_detail',
+        'postal_code',
         'business_name',
         'line_of_business_id',
         'upload_id_path',
         'business_permit_path',
         'status',
+        'otp_attempts',
     ];
 
     protected $hidden = [
@@ -56,6 +67,7 @@ class Seller extends Authenticatable
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
             'approved_at' => 'datetime',
+            'archived_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -65,9 +77,26 @@ class Seller extends Authenticatable
         return SellerFactory::new();
     }
 
+    /** Age is always derived from birthday. */
+    protected function age(): Attribute
+    {
+        return Attribute::get(function (): ?int {
+            if ($this->birthday === null) {
+                return null;
+            }
+
+            return Carbon::parse($this->birthday)->age;
+        });
+    }
+
     public function lineOfBusiness()
     {
         return $this->belongsTo(Category::class, 'line_of_business_id');
+    }
+
+    public function reviews(): HasManyThrough
+    {
+        return $this->hasManyThrough(Review::class, Product::class);
     }
 
     public function products(): HasMany
@@ -86,6 +115,21 @@ class Seller extends Authenticatable
     public function conversations(): HasMany
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    public function shippingProviderLinks(): HasMany
+    {
+        return $this->hasMany(SellerShippingProvider::class);
+    }
+
+    public function shippingProviders(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            LogisticsProvider::class,
+            'seller_shipping_providers',
+            'seller_id',
+            'logistics_provider_id',
+        )->withPivot(['is_enabled'])->withTimestamps();
     }
 
     public function storeInitials(): string
@@ -116,37 +160,14 @@ class Seller extends Authenticatable
         return $this->status === 'approved';
     }
 
-    public function isOtpExpired(): bool
-    {
-        return $this->email_verification_expires_at !== null
-            && $this->email_verification_expires_at->isPast();
-    }
-
-    public function issueOtp(): string
-    {
-        $otp = (string) random_int(100000, 999999);
-
-        $this->forceFill([
-            'email_verification_code' => hash('sha256', $otp),
-            'email_verification_expires_at' => now()->addMinutes(10),
-        ])->save();
-
-        return $otp;
-    }
-
-    public function otpMatches(string $submitted): bool
-    {
-        return $this->email_verification_code !== null
-            && hash_equals($this->email_verification_code, hash('sha256', $submitted));
-    }
-
     public function markEmailVerified(): void
     {
         $this->forceFill([
             'email_verified_at' => now(),
             'email_verification_code' => null,
             'email_verification_expires_at' => null,
-            'status' => 'pending_approval',
+            'status' => 'pending',
+            'otp_attempts' => 0,
         ])->save();
     }
 }

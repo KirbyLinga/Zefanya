@@ -20,7 +20,7 @@
         for (var i = 0; i < buttons.length; i++) {
             buttons[i].setAttribute('aria-pressed', dark ? 'true' : 'false');
             buttons[i].setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-
+            
             // Update label text to show what mode you can SWITCH TO
             var label = buttons[i].querySelector('.theme-label');
             if (label) {

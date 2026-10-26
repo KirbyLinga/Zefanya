@@ -4,18 +4,25 @@ namespace Database\Seeders;
 
 use App\Enums\OrderStatus;
 use App\Models\Courier;
+use App\Models\Logistics\Area;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Rider;
 use App\Models\SellerOrder;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds assignable test couriers onto a developer's own logistics account so
+ * Seeds assignable test riders onto a developer's own logistics account so
  * the logistics pipeline (claim → sort → assign delivery) always has an
  * eligible rider in the fleet to hand a parcel to.
  *
- * Idempotent: riders are keyed by phone, so re-running keeps exactly the
- * planned set. An idle rider is (re)made available; a rider still holding a
- * parcel stays busy, so the seeder is safe to run at any time.
+ * Each rider owns one Courier fleet record (the assignment entity), an
+ * approved active Station Hub, and municipality coverage for every seeded
+ * service area.
+ *
+ * Idempotent: riders/couriers are keyed by phone, so re-running keeps exactly
+ * the planned set. An idle rider is (re)made available; a rider still holding
+ * a parcel stays busy, so the seeder is safe to run at any time.
  *
  * Dev-only. Run with:
  *   php artisan db:seed --class=TestCouriersSeeder
@@ -33,6 +40,10 @@ class TestCouriersSeeder extends Seeder
      * @var list<string>
      */
     public const SERVICE_AREA = ['Plaridel', 'Quezon City'];
+
+    public const STATION_NAME = 'Test Rider Station Hub';
+
+    public const PROVINCE_NAME = 'Bulacan';
 
     /**
      * Statuses during which a rider is still holding a parcel and must stay
@@ -91,15 +102,50 @@ class TestCouriersSeeder extends Seeder
             return;
         }
 
-        foreach (self::plannedRiders() as $rider) {
-            $courier = Courier::firstOrNew(['phone' => $rider['phone']]);
+        $station = $this->stationFor($provider);
+        $areas = collect(self::SERVICE_AREA)
+            ->mapWithKeys(fn (string $municipality): array => [
+                $municipality => $this->coverageFor($provider, $station, $municipality),
+            ]);
+
+        foreach (self::plannedRiders() as $index => $planned) {
+            $courier = Courier::firstOrNew(['phone' => $planned['phone']]);
+            $rider = $courier->rider_id !== null
+                ? Rider::find($courier->rider_id)
+                : null;
+            $rider ??= Rider::firstOrNew(['contact_no' => $planned['phone']]);
+
+            $nameParts = explode(' ', $planned['name'], 2);
+
+            $rider->fill([
+                'first_name' => $nameParts[0],
+                'last_name' => $nameParts[1] ?? 'Rider',
+                'birthday' => '1995-03-22',
+                'email' => 'test.rider.'.($index + 1).'@example.com',
+                'contact_no' => $planned['phone'],
+                'license_no' => 'TST-00-00000'.($index + 1),
+                'license_expiry' => '2030-03-22',
+                'vehicle_type' => ucfirst($planned['vehicle_type']),
+                'plate_number' => 'TSTR'.($index + 1),
+                'drivers_license_path' => 'rider-licenses/test.jpg',
+                'or_cr_path' => 'rider-or-crs/test.pdf',
+            ]);
+            $rider->forceFill([
+                'logistics_provider_id' => $provider->getKey(),
+                'station_hub_id' => $station->id,
+                'status' => Rider::STATUS_APPROVED,
+                'email_verified_at' => now(),
+                'status_changed_at' => now(),
+            ])->save();
 
             $courier->fill([
                 'logistics_provider_id' => $provider->getKey(),
-                'name' => $rider['name'],
+                'rider_id' => $rider->id,
+                'area_id' => $areas->first()?->id,
+                'name' => $planned['name'],
                 'service_area' => self::SERVICE_AREA,
-                'vehicle_type' => $rider['vehicle_type'],
-                'max_weight_grams' => $rider['max_weight_grams'],
+                'vehicle_type' => $planned['vehicle_type'],
+                'max_weight_grams' => $planned['max_weight_grams'],
             ]);
 
             // Idle riders are (re)made available; a rider mid-run is left busy.
@@ -109,6 +155,55 @@ class TestCouriersSeeder extends Seeder
         }
 
         $this->command?->info('Test couriers seeded for '.self::PROVIDER_EMAIL.'.');
+    }
+
+    private function stationFor(LogisticsProvider $provider): LogisticsHub
+    {
+        $provinceCode = (string) ($provider->province_code ?: '030140000');
+        $provinceName = (string) ($provider->province_name ?: self::PROVINCE_NAME);
+
+        $province = LogisticsHub::firstOrCreate([
+            'logistics_provider_id' => $provider->getKey(),
+            'hub_type' => LogisticsHub::PROVINCE,
+            'name' => $provinceName.' Province Hub',
+        ], [
+            'region_code' => '030000000',
+            'region_name' => 'Region III',
+            'province_code' => $provinceCode,
+            'province_name' => $provinceName,
+            'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'approved_at' => now(),
+            'active_province_slot' => 1,
+        ]);
+
+        return LogisticsHub::firstOrCreate([
+            'logistics_provider_id' => $provider->getKey(),
+            'hub_type' => LogisticsHub::STATION,
+            'name' => self::STATION_NAME,
+        ], [
+            'parent_hub_id' => $province->id,
+            'region_code' => '030000000',
+            'region_name' => 'Region III',
+            'province_code' => $provinceCode,
+            'province_name' => $provinceName,
+            'municipality' => 'Quezon City',
+            'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'approved_at' => now(),
+        ]);
+    }
+
+    private function coverageFor(LogisticsProvider $provider, LogisticsHub $station, string $municipality): Area
+    {
+        return Area::firstOrCreate([
+            'logistics_provider_id' => $provider->getKey(),
+            'municipality' => $municipality,
+        ], [
+            'station_hub_id' => $station->id,
+            'name' => $municipality,
+            'is_active' => true,
+        ]);
     }
 
     /**

@@ -8,7 +8,10 @@ use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Notifications\Logistics\LogisticsRegistrationOtp;
+use App\Support\EmailMask;
+use App\Support\SignedOtpLink;
 use Carbon\Carbon;
+use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -95,12 +98,12 @@ class LogisticsRegistrationTest extends TestCase
 
     public function test_otp_verification_page_renders_for_an_unverified_provider(): void
     {
-        $provider = LogisticsProvider::factory()->pendingVerification()->create();
+        $provider = LogisticsProvider::factory()->unverified()->create();
 
-        $this->get(route('register.logistics.verify-otp', $provider))
+        $this->get(SignedOtpLink::showUrl('logistics', $provider))
             ->assertOk()
             ->assertSee('Verify your email')
-            ->assertSee($provider->email);
+            ->assertSee(EmailMask::mask($provider->email));
     }
 
     // ── Store: happy path ─────────────────────────────────────────────────
@@ -114,7 +117,7 @@ class LogisticsRegistrationTest extends TestCase
 
         $provider = LogisticsProvider::query()->latest('id')->firstOrFail();
 
-        $this->assertSame(LogisticsProviderStatus::PendingVerification, $provider->status);
+        $this->assertSame(LogisticsProviderStatus::Unverified, $provider->status);
         $this->assertSame(Carbon::parse('1995-06-20')->age, $provider->age);
         $this->assertSame('123', $provider->house_number);
         $this->assertSame('Near the plaza', $provider->address_detail);
@@ -122,9 +125,9 @@ class LogisticsRegistrationTest extends TestCase
         $this->assertStringStartsWith('logistics-permits/', $provider->dti_permit_path);
     }
 
-    public function test_logistics_registration_succeeds_in_manual_mode(): void
+    public function test_logistics_registration_rejects_manual_address_mode(): void
     {
-        $response = $this->postJson(route('register.logistics.store'), $this->logisticsPayload([
+        $this->postJson(route('register.logistics.store'), $this->logisticsPayload([
             'address_mode' => 'manual',
             'province' => null,
             'province_name' => 'Batangas',
@@ -134,15 +137,9 @@ class LogisticsRegistrationTest extends TestCase
             'barangay_name' => 'Barangay 1',
             'house_number' => null,
             'address_detail' => null,
-        ]));
-
-        $response->assertStatus(201);
-
-        $this->assertDatabaseHas('logistics_providers', [
-            'address_mode' => 'manual',
-            'house_number' => null,
-            'address_detail' => null,
-        ]);
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('address_mode');
     }
 
     public function test_logistics_registration_stores_the_submitted_street(): void
@@ -160,19 +157,6 @@ class LogisticsRegistrationTest extends TestCase
     public function test_logistics_registration_fails_without_street_in_api_mode(): void
     {
         $this->postJson(route('register.logistics.store'), $this->logisticsPayload(['street' => '']))
-            ->assertStatus(422)
-            ->assertJsonValidationErrorFor('street');
-    }
-
-    public function test_logistics_registration_fails_without_street_in_manual_mode(): void
-    {
-        $this->postJson(route('register.logistics.store'), $this->logisticsPayload([
-            'address_mode' => 'manual',
-            'province' => null,
-            'municipality' => null,
-            'barangay' => null,
-            'street' => '',
-        ]))
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('street');
     }
@@ -242,7 +226,7 @@ class LogisticsRegistrationTest extends TestCase
 
     // ── OTP ───────────────────────────────────────────────────────────────
 
-    public function test_otp_verification_moves_the_provider_to_pending_approval(): void
+    public function test_otp_verification_moves_the_provider_to_pending(): void
     {
         Notification::fake();
 
@@ -258,13 +242,13 @@ class LogisticsRegistrationTest extends TestCase
         });
         $this->assertNotNull($otp, 'No OTP notification was sent.');
 
-        $this->postJson(route('register.logistics.verify-otp.store', $provider), ['otp' => $otp])
+        $this->postJson(SignedOtpLink::verifyUrl('logistics', $provider), ['otp' => $otp])
             ->assertOk()
             ->assertJsonPath('redirect', route('register.logistics.pending'));
 
         $provider->refresh();
 
-        $this->assertSame(LogisticsProviderStatus::PendingApproval, $provider->status);
+        $this->assertSame(LogisticsProviderStatus::Pending, $provider->status);
         $this->assertNotNull($provider->email_verified_at);
         $this->assertNull($provider->email_verification_code);
     }
@@ -277,41 +261,41 @@ class LogisticsRegistrationTest extends TestCase
 
         $provider = LogisticsProvider::query()->latest('id')->firstOrFail();
 
-        $this->postJson(route('register.logistics.verify-otp.store', $provider), ['otp' => '000000'])
+        $this->postJson(SignedOtpLink::verifyUrl('logistics', $provider), ['otp' => '000000'])
             ->assertStatus(422);
 
-        $this->assertSame(LogisticsProviderStatus::PendingVerification, $provider->fresh()->status);
+        $this->assertSame(LogisticsProviderStatus::Unverified, $provider->fresh()->status);
     }
 
     // ── Admin approval ────────────────────────────────────────────────────
 
     public function test_unauthenticated_visitor_cannot_approve_a_logistics_registration(): void
     {
-        $provider = LogisticsProvider::factory()->pendingApproval()->create();
+        $provider = LogisticsProvider::factory()->pending()->create();
 
         $this->post(route('admin.registrations.logistics.approve', $provider))
             ->assertRedirect(route('admin.login'));
 
-        $this->assertSame(LogisticsProviderStatus::PendingApproval, $provider->fresh()->status);
+        $this->assertSame(LogisticsProviderStatus::Pending, $provider->fresh()->status);
     }
 
     public function test_a_signed_in_buyer_cannot_approve_a_logistics_registration(): void
     {
-        $provider = LogisticsProvider::factory()->pendingApproval()->create();
+        $provider = LogisticsProvider::factory()->pending()->create();
         $buyer = Buyer::factory()->create();
 
         $this->actingAs($buyer, 'buyer')
             ->post(route('admin.registrations.logistics.approve', $provider))
             ->assertRedirect(route('admin.login'));
 
-        $this->assertSame(LogisticsProviderStatus::PendingApproval, $provider->fresh()->status);
+        $this->assertSame(LogisticsProviderStatus::Pending, $provider->fresh()->status);
     }
 
     public function test_admin_can_approve_a_logistics_registration(): void
     {
         Notification::fake();
 
-        $provider = LogisticsProvider::factory()->pendingApproval()->create();
+        $provider = LogisticsProvider::factory()->pending()->create();
 
         $this->actingAs($this->admin(), 'admin')
             ->post(route('admin.registrations.logistics.approve', $provider))
@@ -322,13 +306,15 @@ class LogisticsRegistrationTest extends TestCase
         $this->assertSame(LogisticsProviderStatus::Approved, $provider->status);
         $this->assertNotNull($provider->approved_at);
         $this->assertNotNull($provider->approved_by);
+        $this->assertNotNull($provider->province_verified_at);
+        $this->assertNotNull($provider->province_code);
     }
 
     public function test_admin_can_reject_a_logistics_registration_with_a_reason(): void
     {
         Notification::fake();
 
-        $provider = LogisticsProvider::factory()->pendingApproval()->create();
+        $provider = LogisticsProvider::factory()->pending()->create();
 
         $this->actingAs($this->admin(), 'admin')
             ->post(route('admin.registrations.logistics.reject', $provider), [
@@ -344,19 +330,136 @@ class LogisticsRegistrationTest extends TestCase
 
     public function test_admin_registrations_view_lists_a_pending_logistics_application(): void
     {
-        $provider = LogisticsProvider::factory()->pendingApproval()->create([
+        $provider = LogisticsProvider::factory()->pending()->create([
+            'first_name' => 'Ramos',
+            'last_name' => 'Cargo',
             'business_name' => 'Ramos Cargo Movers',
+            'email' => 'ramos.'.uniqid().'@example.com',
             'street' => '88 Rizal Blvd.',
             'house_number' => '88',
             'municipality_name' => 'Batangas City',
             'province_name' => 'Batangas',
         ]);
 
+        // The reworked registration queue lists applicants by name + email with
+        // an account-type badge; the old ?view= detail panel no longer exists.
         $this->actingAs($this->admin(), 'admin')
-            ->get(route('admin.registrations.index', ['view' => $provider->id, 'type' => 'logistics']))
+            ->get(route('admin.registrations.index', ['type' => 'logistics']))
             ->assertOk()
-            ->assertSee('Ramos Cargo Movers')
-            ->assertSee('88 Rizal Blvd.')
-            ->assertSee('View DTI permit');
+            ->assertSee('Ramos Cargo')
+            ->assertSee($provider->email)
+            ->assertSee('Logistics');
+    }
+
+    // ── Registration resilience: failed OTP delivery ───────────────────────
+
+    /**
+     * Install a controllable notification dispatcher so a test can simulate a
+     * mail outage while still inspecting the codes that were "delivered".
+     */
+    private function fakeNotifier(): object
+    {
+        $notifier = new class implements Dispatcher
+        {
+            public bool $fail = false;
+
+            /** @var array<int, object> */
+            public array $sent = [];
+
+            public function send($notifiables, $notification)
+            {
+                if ($this->fail) {
+                    throw new \RuntimeException('SMTP connection refused');
+                }
+
+                $this->sent[] = $notification;
+            }
+
+            public function sendNow($notifiables, $notification, ?array $channels = null)
+            {
+                if ($this->fail) {
+                    throw new \RuntimeException('SMTP connection refused');
+                }
+
+                $this->sent[] = $notification;
+            }
+
+            public function lastCode(): ?string
+            {
+                $sent = $this->sent;
+                $last = end($sent);
+
+                return $last ? $last->otp : null;
+            }
+        };
+
+        $this->app->instance(Dispatcher::class, $notifier);
+
+        return $notifier;
+    }
+
+    public function test_logistics_failed_otp_email_releases_the_email_for_a_clean_retry(): void
+    {
+        $notifier = $this->fakeNotifier();
+        $notifier->fail = true;
+
+        $payload = $this->logisticsPayload();
+
+        $this->postJson(route('register.logistics.store'), $payload)->assertStatus(503);
+
+        // The half-finished attempt must not keep the email/mobile reserved.
+        $this->assertDatabaseMissing('logistics_providers', ['email' => $payload['email']]);
+
+        // A plain retry (mail back up) now succeeds with the same details.
+        $notifier->fail = false;
+
+        $this->postJson(route('register.logistics.store'), $this->logisticsPayload([
+            'email' => $payload['email'],
+            'contact_no' => $payload['contact_no'],
+        ]))->assertStatus(201);
+
+        $provider = LogisticsProvider::where('email', $payload['email'])->sole();
+
+        $this->assertSame(LogisticsProviderStatus::Unverified, $provider->status);
+        $this->assertCount(1, $notifier->sent);
+    }
+
+    public function test_logistics_failed_resend_keeps_the_previous_code_valid(): void
+    {
+        $notifier = $this->fakeNotifier();
+
+        $this->postJson(route('register.logistics.store'), $this->logisticsPayload())->assertStatus(201);
+
+        $provider = LogisticsProvider::query()->latest('id')->firstOrFail();
+        $originalOtp = $notifier->lastCode();
+
+        $notifier->fail = true;
+        $this->postJson(SignedOtpLink::resendUrl('logistics', $provider))->assertStatus(503);
+        $notifier->fail = false;
+
+        // The code the user already received must still work.
+        $this->postJson(SignedOtpLink::verifyUrl('logistics', $provider), ['otp' => $originalOtp])
+            ->assertOk();
+    }
+
+    public function test_logistics_successful_resend_invalidates_the_previous_code(): void
+    {
+        $notifier = $this->fakeNotifier();
+
+        $this->postJson(route('register.logistics.store'), $this->logisticsPayload())->assertStatus(201);
+
+        $provider = LogisticsProvider::query()->latest('id')->firstOrFail();
+        $oldOtp = $notifier->lastCode();
+
+        $this->postJson(SignedOtpLink::resendUrl('logistics', $provider))->assertOk();
+        $newOtp = $notifier->lastCode();
+
+        $this->assertNotSame($oldOtp, $newOtp);
+
+        // Only the newest code is accepted.
+        $this->postJson(SignedOtpLink::verifyUrl('logistics', $provider), ['otp' => $oldOtp])
+            ->assertStatus(422);
+        $this->postJson(SignedOtpLink::verifyUrl('logistics', $provider), ['otp' => $newOtp])
+            ->assertOk();
     }
 }

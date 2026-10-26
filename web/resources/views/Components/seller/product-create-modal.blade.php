@@ -34,7 +34,7 @@
      data-update-template="{{ route('seller.products.update', ['product' => '__ID__']) }}"
      aria-hidden="true">
     <div role="dialog" aria-modal="true" aria-labelledby="productModalTitle"
-         class="flex max-h-[90vh] w-full max-w-[680px] flex-col overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[0_24px_60px_rgba(15,23,42,0.25)] max-sm:max-h-[94vh]">
+         class="flex max-h-[90vh] w-full max-w-[1000px] flex-col overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[0_24px_60px_rgba(15,23,42,0.25)] max-sm:max-h-[94vh]">
 
         <header class="relative shrink-0 border-b border-[var(--border-hairline)] px-8 pb-4 pt-7 max-sm:px-5">
             <button type="button" id="productModalClose" aria-label="Close product form"
@@ -43,14 +43,14 @@
             </button>
 
             <h2 id="productModalTitle" class="font-serif text-[24px] font-normal text-[var(--text-ink)]">
-                {{ $editMode ? 'Edit Product' : 'Add Product' }}
+                {{ $editMode ? 'Edit Product' : 'Add New Product' }}
             </h2>
             <p id="productModalSubtitle" class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">
-                {{ $editMode ? $productModalProduct->name : 'List a new item in your store.' }}
+                {{ $editMode ? $productModalProduct->name : 'Seller Center / Product catalog' }}
             </p>
         </header>
 
-        <form id="productModalForm" method="POST" enctype="multipart/form-data"
+        <form id="productModalForm" method="POST" novalidate enctype="multipart/form-data"
               action="{{ $editMode ? route('seller.products.update', $productModalProduct) : route('seller.products.store') }}"
               class="flex min-h-0 flex-1 flex-col">
             <input type="hidden" name="_modal" id="productModalFlag" value="{{ $editMode ? 'product-edit' : 'product-create' }}">
@@ -64,15 +64,16 @@
 
         {{-- Sticky footer: the submit button lives outside the scroll area and is
             associated with the form through the form="" attribute. --}}
-        <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-[var(--border-hairline)] px-8 py-4 max-sm:px-5">
+        <footer class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--border-hairline)] px-8 py-4 max-sm:px-5">
             <button type="button" data-modal-cancel
                     class="inline-flex h-10 items-center justify-center rounded-sm border border-[var(--border-cancel)] bg-[var(--bg-surface)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-cancel-text)] transition-colors hover:bg-[var(--bg-raised)]">
                 Cancel
             </button>
-            <button type="submit" form="productModalForm"
+            <div class="ml-auto flex items-center gap-3"><button type="button" data-pf-back class="rounded-sm border border-[var(--border-input)] px-4 py-2.5 text-xs font-semibold text-[var(--text-ink)] hover:bg-[var(--bg-soft)]">Back</button><button type="button" data-pf-next class="rounded-sm bg-[var(--btn-primary-bg)] px-5 py-2.5 text-xs font-semibold text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-bg-hover-soft)]">Continue →</button><button id="productModalSubmit" type="submit" form="productModalForm" hidden disabled
                     class="inline-flex h-10 items-center justify-center gap-2 rounded-sm border-none bg-[var(--btn-primary-bg)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-primary-text)] cursor-pointer transition-colors hover:bg-[var(--btn-primary-bg-hover-soft)]">
-                <span id="productModalSubmitLabel">{{ $editMode ? 'Save Changes' : 'Create Product' }}</span>
+                <span id="productModalSubmitLabel" class="text-[var(--btn-primary-text)]">{{ $editMode ? 'Save Changes' : 'Publish Product' }}</span>
             </button>
+            </div>
         </footer>
     </div>
 </div>

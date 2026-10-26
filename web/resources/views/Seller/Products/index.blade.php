@@ -72,8 +72,8 @@
                     <button type="button" role="menuitem" class="sp-dropdown__item" data-bulk-action="inactivate">
                         <i data-lucide="circle-pause" width="14" height="14"></i>Set Inactive
                     </button>
-                    <button type="button" role="menuitem" class="sp-dropdown__item sp-dropdown__item--danger" data-bulk-action="delete">
-                        <i data-lucide="trash-2" width="14" height="14"></i>Delete Selected
+                    <button type="button" role="menuitem" class="sp-dropdown__item sp-dropdown__item--danger" data-bulk-action="archive">
+                        <i data-lucide="archive" width="14" height="14"></i>Archive Selected
                     </button>
                 </div>
             </div>
@@ -179,7 +179,7 @@
                             </th>
                             <th scope="col">Product</th>
                             <th scope="col" class="sp-col--category">Category</th>
-                            <th scope="col" class="sp-table__num">Price</th>
+                            <th scope="col" class="text-left whitespace-nowrap">Price</th>
                             <th scope="col">Stock</th>
                             <th scope="col">Status</th>
                             <th scope="col" class="sp-table__actions"><span class="sp-visually-hidden">Actions</span></th>
@@ -222,11 +222,16 @@
                                         @else
                                             <span class="sp-product__thumb sp-product__thumb--empty"><i data-lucide="package" width="16" height="16"></i></span>
                                         @endif
-                                        <span class="sp-product__name">{{ $product->name }}</span>
+                                        <span class="sp-product__name">
+                                            {{ $product->name }}
+                                            @if ($product->needsWeight())
+                                                <span class="sp-pill sp-pill--amber ml-2 align-middle" title="Add a weight so a courier can be assigned.">Needs weight</span>
+                                            @endif
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="sp-col--category sp-product__category">{{ $product->category->label ?? '—' }}</td>
-                                <td class="sp-table__num"><span class="sp-mono">{{ $product->formattedPrice() }}</span></td>
+                                <td class="text-left whitespace-nowrap"><span class="sp-mono">{{ $product->formattedSellerPriceRange() }}</span></td>
                                 <td><span class="sp-pill {{ $stockPillClass }}">{{ $stockLabel }}</span></td>
                                 <td>
                                     <span class="sp-status sp-tone-{{ $statusTone }}" data-status-badge="{{ $product->id }}">
@@ -270,10 +275,10 @@
                                                     </button>
                                                 @endif
                                                 <button type="button" role="menuitem" class="sp-dropdown__item sp-dropdown__item--danger"
-                                                        data-delete="{{ $product->id }}"
+                                                        data-archive="{{ $product->id }}"
                                                         data-url="{{ route('seller.products.destroy', $product) }}"
                                                         data-name="{{ $product->name }}">
-                                                    <i data-lucide="trash-2" width="14" height="14"></i>Delete
+                                                    <i data-lucide="archive" width="14" height="14"></i>Archive
                                                 </button>
                                             </div>
                                         </div>

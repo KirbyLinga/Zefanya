@@ -11,9 +11,11 @@ use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
- * Admin registration queue: the registry filter (?filter=buyer|seller|logistics),
- * the free-text search (?q=…) and the legacy detail-selection params
- * (?view=&type=) which must keep working alongside both.
+ * Admin registration queue (reworked registration-management page): the
+ * account-type filter (?type=buyer|seller|logistics), the status filter
+ * (?status=pending|approved|rejected), the free-text search (?search=…), the
+ * date-range + pagination controls, and the stat-card totals rendered above
+ * the list.
  */
 class AdminRegistrationsFilterTest extends TestCase
 {
@@ -44,25 +46,25 @@ class AdminRegistrationsFilterTest extends TestCase
             'last_name' => 'Queuewalker',
             'email' => 'zelda.'.uniqid().'@example.com',
             'contact_no' => '09170000001',
-            'status' => 'pending_approval',
+            'status' => 'pending',
             'approved_at' => null,
         ]);
 
-        $this->pendingSeller = Seller::factory()->pendingApproval()->create([
+        $this->pendingSeller = Seller::factory()->pending()->create([
             'first_name' => 'Marcus',
             'last_name' => 'Queuewright',
             'email' => 'marcus.'.uniqid().'@example.com',
             'business_name' => 'Queue Mart '.uniqid(),
         ]);
 
-        $this->pendingLogistics = LogisticsProvider::factory()->pendingApproval()->create([
+        $this->pendingLogistics = LogisticsProvider::factory()->pending()->create([
             'first_name' => 'Rosa',
             'last_name' => 'Queuemover',
             'email' => 'rosa.'.uniqid().'@example.com',
             'business_name' => 'Queue Haulage '.uniqid(),
         ]);
 
-        // Approved applicants must never appear in the pending queue.
+        // Approved applicants must never appear in the default (pending) queue.
         $this->approvedBuyer = Buyer::factory()->create([
             'first_name' => 'Approved',
             'last_name' => 'Queuegone',
@@ -81,33 +83,34 @@ class AdminRegistrationsFilterTest extends TestCase
     {
         $this->getQueue()
             ->assertOk()
+            ->assertViewHas('status', 'pending')
             ->assertSee('Zelda Queuewalker')
             ->assertSee('Marcus Queuewright')
             ->assertSee('Rosa Queuemover')
             ->assertDontSee('Approved Queuegone');
     }
 
-    public function test_filter_shows_only_the_selected_registry(): void
+    public function test_type_filter_shows_only_the_selected_registry(): void
     {
-        $this->getQueue(['filter' => 'buyer'])
+        $this->getQueue(['type' => 'buyer'])
             ->assertOk()
             ->assertSee('Zelda Queuewalker')
             ->assertDontSee('Marcus Queuewright')
             ->assertDontSee('Rosa Queuemover');
     }
 
-    public function test_filter_logistics_shows_only_logistics(): void
+    public function test_type_filter_logistics_shows_only_logistics(): void
     {
-        $this->getQueue(['filter' => 'logistics'])
+        $this->getQueue(['type' => 'logistics'])
             ->assertOk()
             ->assertSee('Rosa Queuemover')
             ->assertDontSee('Zelda Queuewalker')
             ->assertDontSee('Marcus Queuewright');
     }
 
-    public function test_unknown_filter_falls_back_to_every_registry(): void
+    public function test_unknown_type_falls_back_to_every_registry(): void
     {
-        $this->getQueue(['filter' => 'horses'])
+        $this->getQueue(['type' => 'horses'])
             ->assertOk()
             ->assertSee('Zelda Queuewalker')
             ->assertSee('Marcus Queuewright')
@@ -116,23 +119,23 @@ class AdminRegistrationsFilterTest extends TestCase
 
     public function test_search_matches_name_email_contact_and_business_name(): void
     {
-        $this->getQueue(['q' => 'Queuewalker'])
+        $this->getQueue(['search' => 'Queuewalker'])
             ->assertOk()
             ->assertSee('Zelda Queuewalker')
             ->assertDontSee('Marcus Queuewright');
 
-        $this->getQueue(['q' => $this->pendingSeller->email])
+        $this->getQueue(['search' => $this->pendingSeller->email])
             ->assertOk()
             ->assertSee('Marcus Queuewright')
             ->assertDontSee('Zelda Queuewalker');
 
-        $this->getQueue(['q' => $this->pendingBuyer->contact_no])
+        $this->getQueue(['search' => $this->pendingBuyer->contact_no])
             ->assertOk()
             ->assertSee('Zelda Queuewalker')
             ->assertDontSee('Rosa Queuemover');
 
         // Business names only exist on the seller/logistics tables.
-        $this->getQueue(['q' => 'Queue Haulage'])
+        $this->getQueue(['search' => 'Queue Haulage'])
             ->assertOk()
             ->assertSee('Rosa Queuemover')
             ->assertDontSee('Zelda Queuewalker');
@@ -140,77 +143,100 @@ class AdminRegistrationsFilterTest extends TestCase
 
     public function test_search_never_reaches_non_pending_applicants(): void
     {
-        $this->getQueue(['q' => 'Queuegone'])
+        $this->getQueue(['search' => 'Queuegone'])
             ->assertOk()
-            ->assertSee('No pending registrations match')
+            ->assertSee('No registrations found')
             ->assertDontSee('Approved Queuegone');
     }
 
-    public function test_search_combines_with_the_registry_filter(): void
+    public function test_search_combines_with_the_type_filter(): void
     {
         // The term matches a buyer, but the filter is sellers → nothing.
-        $this->getQueue(['filter' => 'seller', 'q' => 'Queuewalker'])
+        $this->getQueue(['type' => 'seller', 'search' => 'Queuewalker'])
             ->assertOk()
-            ->assertSee('No pending registrations match')
+            ->assertSee('No registrations found')
             ->assertDontSee('Zelda Queuewalker');
 
-        $this->getQueue(['filter' => 'seller', 'q' => 'Queuewright'])
+        $this->getQueue(['type' => 'seller', 'search' => 'Queuewright'])
             ->assertOk()
             ->assertSee('Marcus Queuewright')
             ->assertDontSee('Rosa Queuemover');
     }
 
-    public function test_empty_registry_filter_shows_its_own_empty_message(): void
+    public function test_status_filter_lists_approved_applicants(): void
     {
-        Seller::query()->delete();
-
-        $this->getQueue(['filter' => 'seller'])
+        $this->getQueue(['status' => 'approved'])
             ->assertOk()
-            ->assertSee('No pending seller registrations right now.');
+            ->assertViewHas('status', 'approved')
+            ->assertSee('Approved Queuegone')
+            ->assertDontSee('Zelda Queuewalker');
     }
 
-    public function test_chips_count_the_matches_per_registry_under_the_search(): void
+    public function test_empty_queue_shows_the_empty_state(): void
+    {
+        Seller::query()->delete();
+        LogisticsProvider::query()->delete();
+        Buyer::query()->where('status', 'pending')->delete();
+
+        $this->getQueue()
+            ->assertOk()
+            ->assertSee('No registrations found');
+    }
+
+    public function test_stat_cards_count_every_status_across_all_registries(): void
     {
         $this->getQueue()
             ->assertOk()
-            ->assertViewHas('counts', fn (array $counts) => $counts === [
-                'buyer' => 1,
-                'seller' => 1,
-                'logistics' => 1,
-            ])
-            // The "All" chip renders the summed total as its badge (1+1+1).
-            ->assertSee('>3</span>', false);
-
-        $this->getQueue(['q' => 'Queuewright'])
-            ->assertOk()
-            ->assertViewHas('counts', fn (array $counts) => $counts['buyer'] === 0
-                && $counts['seller'] === 1
-                && $counts['logistics'] === 0);
+            ->assertViewHas('pendingCount', 3)
+            ->assertViewHas('approvedCount', 1)
+            ->assertViewHas('rejectedCount', 0);
     }
 
-    public function test_search_box_keeps_the_filter_and_list_links_carry_both_params(): void
+    public function test_per_page_accepts_the_allowed_sizes_and_rejects_anything_else(): void
     {
-        $this->getQueue(['filter' => 'seller', 'q' => 'Queuewright'])
+        $this->getQueue(['per_page' => 10])
             ->assertOk()
-            // Hidden input re-submits the active registry with the new term.
-            ->assertSee('name="filter"', false)
-            ->assertSee('value="seller"', false)
-            // Every applicant link keeps both params so the next click
-            // doesn't drop the admin back to the unfiltered queue.
-            ->assertSee('filter=seller', false)
-            ->assertSee('q=Queuewright', false);
+            ->assertViewHas('perPage', 10);
+
+        $this->getQueue(['per_page' => 999])
+            ->assertOk()
+            ->assertViewHas('perPage', 25);
     }
 
-    public function test_detail_panel_still_opens_with_filter_and_search_active(): void
+    public function test_default_date_range_is_all_time_so_old_pending_stays_visible(): void
     {
-        $this->getQueue([
-            'filter' => 'buyer',
-            'q' => 'Queuewalker',
-            'view' => $this->pendingBuyer->id,
-            'type' => 'buyer',
-        ])
+        // Older than 7 days — still pending, must stay on the default queue
+        // (stat cards count it; the list must match).
+        $this->pendingBuyer->forceFill(['created_at' => now()->subDays(30)])->save();
+
+        $this->getQueue()
             ->assertOk()
-            ->assertSee($this->pendingBuyer->email)
+            ->assertViewHas('dateRange', 0)
+            ->assertSee('Zelda Queuewalker')
+            ->assertSee('Marcus Queuewright');
+    }
+
+    public function test_date_range_narrows_the_queue_by_recency(): void
+    {
+        $this->pendingBuyer->forceFill(['created_at' => now()->subDays(30)])->save();
+
+        $this->getQueue(['date_range' => 7])
+            ->assertOk()
+            ->assertViewHas('dateRange', 7)
+            ->assertDontSee('Zelda Queuewalker')
+            ->assertSee('Marcus Queuewright');
+
+        $this->getQueue(['date_range' => 90])
+            ->assertOk()
             ->assertSee('Zelda Queuewalker');
+    }
+
+    public function test_view_details_button_is_wired_with_applicant_data(): void
+    {
+        $this->getQueue()
+            ->assertOk()
+            ->assertSee('data-detail-name="Zelda Queuewalker"', false)
+            ->assertSee('openDetailModal(this)', false)
+            ->assertSee('id="detailModal"', false);
     }
 }

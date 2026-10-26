@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class OrdersResyncCommand extends Command
 {
-    protected $signature = 'orders:resync {--dry-run : Print what would change without writing}';
+    protected $signature = 'orders:resync {--dry-run : Print what would change without writing} {--statuses-only : Recompute parent statuses without changing payments}';
 
     protected $description = 'Roll up orders.status from seller_orders and settle pending COD payments';
 
@@ -41,6 +41,10 @@ class OrdersResyncCommand extends Command
                         } else {
                             $order->forceFill(['status' => $newStatus])->save();
                         }
+                    }
+
+                    if ($this->option('statuses-only')) {
+                        continue;
                     }
 
                     foreach ($order->sellerOrders as $sellerOrder) {

@@ -36,11 +36,6 @@
     $showRegisterModal = $showRegisterModal ?? false;
     $variant           = $variant           ?? 'landing';
 
-    // Suppress the login modal trigger on dedicated auth pages.
-    if (request()->is('login', 'buyer/login', 'seller/login')) {
-        $showLoginModal = false;
-    }
-
     // ── Buyer auth state (buyer variant ONLY) ────────────────────────────────
     $buyerUser = null;
     if ($variant === 'buyer') {
@@ -166,29 +161,17 @@
             </div>
 
             {{-- Mega-category panel (CSS-only, peer-checked) --}}
-            <div class="absolute top-[calc(100%+6px)] left-0 z-50 hidden w-full min-w-[600px] gap-6 rounded-2xl border border-line bg-white p-5 shadow-xl peer-checked:flex max-lg:min-w-full max-lg:flex-col">
-                {{-- Categories grid: split into columns, max 2-3 per column --}}
-                @foreach ($categories->chunk(ceil($categories->count() / 2)) as $column)
-                    <div class="flex-1">
-                        @foreach ($column as $index => $category)
-                            @if ($index === 0)
-                                <div class="mb-3 flex items-center gap-2">
-                                    <span class="h-2 w-2 rounded-full bg-primary-800"></span>
-                                    <a href="{{ route('buyer.categories.show', $category->id) }}" class="text-[11px] font-bold uppercase tracking-[0.06em] text-neutral-700 hover:text-primary-800">
-                                        {{ $category->label }}
-                                    </a>
-                                </div>
-                            @else
-                                <div class="mb-3 flex items-center gap-2">
-                                    <span class="h-2 w-2 rounded-full" style="background-color: var(--primary-color, #c07a85); opacity: 0.6;"></span>
-                                    <a href="{{ route('buyer.categories.show', $category->id) }}" class="text-[11px] font-bold uppercase tracking-[0.06em] text-neutral-700 hover:text-primary-800">
-                                        {{ $category->label }}
-                                    </a>
-                                </div>
-                            @endif
-                        @endforeach
-                    </div>
-                @endforeach
+            <div class="absolute top-[calc(100%+6px)] left-0 z-50 hidden w-72 rounded-2xl border border-line bg-white p-4 shadow-xl peer-checked:flex flex-col max-lg:w-full">
+                {{-- Categories list: single scrollable column with icons --}}
+                <div class="flex flex-col gap-0.5 max-h-96 overflow-y-auto">
+                    @foreach ($categories as $category)
+                        <a href="{{ route('buyer.categories.show', $category->id) }}" 
+                           class="flex items-center gap-3 px-4 py-3 rounded-lg text-[13px] font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-900 transition-colors group">
+                            <i data-lucide="{{ $category->icon }}" width="18" height="18" class="shrink-0 text-neutral-500 group-hover:text-primary-800"></i>
+                            <span class="flex-1">{{ $category->label }}</span>
+                        </a>
+                    @endforeach
+                </div>
             </div>
         </div>
 
@@ -209,26 +192,21 @@
 
             {{-- Cart + Wishlist + Notifications icons --}}
             <div class="flex items-center gap-1">
-                <button type="button" id="cartDropdownToggle"
+                <a href="{{ route('buyer.cart.index') }}" id="cartDropdownToggle"
                    class="relative inline-flex h-10 w-10 items-center justify-center rounded text-neutral-500 transition-colors hover:text-primary-800"
-                   aria-label="Cart"
-                   aria-haspopup="true" aria-expanded="false">
+                   aria-label="Cart">
                     <i data-lucide="shopping-cart" width="22" height="22"></i>
                     <span class="absolute top-0 right-0 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-primary-800 px-1 font-sans text-[10px] font-bold leading-none text-white" id="cartCount">{{ $cartCount }}</span>
-                </button>
-
-                {{-- Mini cart dropdown --}}
-                @include('Components.buyer.mini-cart')
+                </a>
 
                 {{-- Wishlist icon --}}
                 @if ($buyerUser)
-                    <button type="button" data-wishlist-toggle
+                    <a href="{{ route('buyer.wishlist.index') }}"
                             class="relative inline-flex h-10 w-10 items-center justify-center rounded text-neutral-500 transition-colors hover:text-primary-800"
-                            aria-label="Wishlist"
-                            data-product-id="">
+                            aria-label="Wishlist">
                         <i data-lucide="heart" width="22" height="22"></i>
                         <span class="absolute top-0 right-0 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-primary-800 px-1 font-sans text-[10px] font-bold leading-none text-white" id="wishlistCount">{{ $wishlistCount }}</span>
-                    </button>
+                    </a>
                 @endif
 
                 {{-- Messages icon --}}
@@ -350,14 +328,14 @@
                 {{-- Guest: plain text Login | Register with a divider between — identical on landing and buyer pages --}}
                 <div class="flex items-center gap-5">
                     @if ($showLoginModal)
-                        <a href="#"
+                        <a href="{{ route('home', ['login' => 1]) }}"
                            data-login-trigger
                            @if ($hideGuestInLogin) data-hide-guest="true" @endif
                            class="font-sans text-[14px] font-medium tracking-[0.3px] text-neutral-600 transition-colors hover:text-primary-800">
                             Login
                         </a>
                     @else
-                        <a href="{{ Route::has('buyer.login') ? route('buyer.login') : (Route::has('login') ? route('login') : '#') }}"
+                        <a href="{{ route('home', ['login' => 1]) }}"
                            class="font-sans text-[14px] font-medium tracking-[0.3px] text-neutral-600 transition-colors hover:text-primary-800">
                             Login
                         </a>

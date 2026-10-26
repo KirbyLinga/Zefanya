@@ -2,21 +2,29 @@
 
 namespace Tests\Feature\Http\Controllers\Buyer;
 
+use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
 use App\Models\CartItem;
+use App\Models\CheckoutToken;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Seller\Seller;
+use App\Services\CartSummary;
 use App\Services\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use ReflectionMethod;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class BuyerVariantFlowTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
     private Buyer $buyer;
@@ -49,6 +57,17 @@ class BuyerVariantFlowTest extends TestCase
             ],
             true,
         );
+
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller]);
+    }
+
+    /** @return array<string, mixed> */
+    private function storePayload(string $token): array
+    {
+        return [
+            'checkout_token' => $token,
+            ...$this->checkoutCarrierPayload([$this->seller]),
+        ];
     }
 
     /**
@@ -152,7 +171,7 @@ class BuyerVariantFlowTest extends TestCase
             : null;
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), $this->storePayload(CheckoutToken::issue($this->buyer->id)->token))
             ->assertRedirect();
 
         $order = Order::query()->sole();
@@ -186,33 +205,129 @@ class BuyerVariantFlowTest extends TestCase
         $this->assertSame(0, CartItem::query()->count());
     }
 
-    public function test_pre_variant_cart_lines_still_checkout_through_the_default_variant(): void
+    public function test_ambiguous_legacy_cart_line_requires_reselection_and_preserves_other_items(): void
     {
-        // Legacy line: created before variants, no variant_id.
-        $legacy = CartItem::factory()->create([
-            'buyer_id' => $this->buyer->id,
-            'product_id' => $this->product->id,
-            'variant_id' => null,
-            'quantity' => 1,
-        ]);
+        $legacy = $this->legacyLine($this->product);
+        $other = CartItem::factory()->create(['buyer_id' => $this->buyer->id, 'product_id' => $this->product->id, 'variant_id' => $this->variant('Red,L')->id, 'quantity' => 2]);
+        $before = $this->product->variants()->orderBy('id')->pluck('stock_quantity')->all();
+        $this->assertFalse($legacy->fresh()->isAvailable());
+        $this->assertSame(0, $legacy->fresh()->availableQuantity());
+        $this->actingAs($this->buyer, 'buyer')->get(route('buyer.cart.index'))->assertOk()->assertSee('Choose a color or size on the product page first.');
+        $this->rejectLegacy($legacy);
+        $this->assertSame($before, $this->product->variants()->orderBy('id')->pluck('stock_quantity')->all());
+        $this->assertSame(2, $other->fresh()->quantity);
+        $this->assertNull($legacy->fresh()->variant_id);
+        foreach (['buyer.cart.add', 'buyer.checkout.buy-now'] as $route) {
+            $this->postJson(route($route), ['product_id' => $this->product->id, 'quantity' => 1])
+                ->assertUnprocessable()->assertJsonValidationErrors('variant_id');
+        }
+    }
 
-        // The normalization in placeOrder() points it at the Default variant
-        // (lowest id) — for this product that's 'Red,M' (first generated).
-        $default = ProductVariant::query()->where('product_id', $this->product->id)->orderBy('id')->first();
+    public function test_one_remaining_option_bearing_variant_still_requires_explicit_selection(): void
+    {
+        $this->variant('Red,L')->delete();
+        $this->rejectLegacy($this->legacyLine($this->product));
+    }
 
+    public function test_one_available_variant_among_multiple_does_not_allow_legacy_fallback(): void
+    {
+        $this->variant('Red,L')->update(['is_available' => false]);
+        $this->rejectLegacy($this->legacyLine($this->product));
+    }
+
+    public function test_genuine_optionless_default_legacy_line_uses_variant_price_and_stock(): void
+    {
+        $product = Product::factory()->create(['seller_id' => $this->seller->id, 'price' => '25.50', 'stock_quantity' => 5]);
+        $variant = $product->variants()->sole();
+        $legacy = $this->legacyLine($product, 2);
+        // Rollups are advisory: legacy lines must read the actual Default SKU.
+        DB::table('products')->where('id', $product->id)->update(['price' => '1.00', 'stock_quantity' => 99]);
+        $this->assertTrue($legacy->fresh()->isAvailable());
+        $this->assertSame(5, $legacy->fresh()->availableQuantity());
+        $this->assertSame(2550, $legacy->fresh()->unitPriceCentavos());
         session([CheckoutController::SESSION_KEY => [$legacy->id]]);
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload(CheckoutToken::issue($this->buyer->id)->token))->assertSessionMissing('error');
+        $this->assertSame($variant->id, OrderItem::query()->sole()->variant_id);
+        $this->assertSame(2550, OrderItem::query()->sole()->price_minor);
+        $this->assertSame(10000, Order::query()->sole()->total_minor);
+        $this->assertSame(10000, Payment::query()->sole()->amount_minor);
+        $this->assertSame(3, $variant->fresh()->stock_quantity);
+        $this->assertSame(3, $product->fresh()->stock_quantity);
+    }
 
-        $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
-            ->assertRedirect();
+    public function test_disabled_or_missing_default_cannot_fallback_to_product_rollup(): void
+    {
+        $product = Product::factory()->create(['seller_id' => $this->seller->id, 'stock_quantity' => 5]);
+        $variant = $product->variants()->sole();
+        $variant->update(['is_available' => false]);
+        $legacy = $this->legacyLine($product);
+        $this->rejectLegacy($legacy, false);
+        $variant->delete();
+        $this->rejectLegacy($legacy);
+    }
 
-        $default->refresh();
-        $this->assertSame(3, $default->stock_quantity, '4 − 1 through the Default variant');
+    public function test_new_variant_between_precheck_and_locks_rejects_legacy_line(): void
+    {
+        $product = Product::factory()->create(['seller_id' => $this->seller->id, 'stock_quantity' => 5]);
+        $variant = $product->variants()->sole();
+        $legacy = $this->legacyLine($product);
+        // Stage the exact pre-lock snapshot then introduce another SKU.
+        $items = CartItem::query()->whereKey($legacy->id)->with(['product.seller', 'product.variants.optionValues', 'variant'])->get();
+        $summary = new CartSummary($items);
+        DB::table('product_variants')->insert(['product_id' => $product->id, 'price' => '100.00', 'stock_quantity' => 5, 'is_available' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $token = CheckoutToken::issue($this->buyer->id);
+        try {
+            (new ReflectionMethod(CheckoutController::class, 'placeOrder'))->invoke(app(CheckoutController::class), $this->buyer, $items, $summary, $token->token);
+            $this->fail('Ambiguity under the lock must reject checkout.');
+        } catch (CheckoutException $exception) {
+            $this->assertStringContainsString('Choose a color or size', $exception->getMessage());
+        }
+        $this->assertFalse($token->fresh()->used);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame(0, InventoryTransaction::query()->where('reason', 'checkout')->count());
+        $this->assertSame(5, $variant->fresh()->stock_quantity);
+        $this->assertModelExists($legacy);
+    }
 
-        $this->assertSame(
-            $default->id,
-            OrderItem::query()->sole()->variant_id,
-        );
+    public function test_legacy_and_explicit_default_lines_cannot_combined_oversell(): void
+    {
+        $product = Product::factory()->create(['seller_id' => $this->seller->id, 'stock_quantity' => 3]);
+        $variant = $product->variants()->sole();
+        $legacy = $this->legacyLine($product, 2);
+        $explicit = CartItem::factory()->create(['buyer_id' => $this->buyer->id, 'product_id' => $product->id, 'variant_id' => $variant->id, 'quantity' => 2]);
+        $token = CheckoutToken::issue($this->buyer->id);
+        session([CheckoutController::SESSION_KEY => [$legacy->id, $explicit->id]]);
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload($token->token))
+            ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame(0, InventoryTransaction::query()->where('reason', 'checkout')->count());
+        $this->assertSame(3, $variant->fresh()->stock_quantity);
+        $this->assertFalse($token->fresh()->used);
+        $this->assertModelExists($legacy);
+        $this->assertModelExists($explicit);
+    }
+
+    private function legacyLine(Product $product, int $quantity = 1): CartItem
+    {
+        return CartItem::factory()->create(['buyer_id' => $this->buyer->id, 'product_id' => $product->id, 'variant_id' => null, 'quantity' => $quantity]);
+    }
+
+    private function rejectLegacy(CartItem $line, bool $reselection = true): void
+    {
+        $this->assertFalse($line->fresh()->isAvailable());
+        $token = CheckoutToken::issue($this->buyer->id);
+        session([CheckoutController::SESSION_KEY => [$line->id]]);
+        $response = $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), ['checkout_token' => $token->token])
+            ->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error');
+        if ($reselection) {
+            $response->assertSessionHas('error', fn ($message) => str_contains($message, 'choose a color or size'));
+        }
+        foreach (['orders', 'order_items', 'payments'] as $table) {
+            $this->assertDatabaseCount($table, 0);
+        }
+        $this->assertSame(0, InventoryTransaction::query()->where('reason', 'checkout')->count());
+        $this->assertFalse($token->fresh()->used);
+        $this->assertModelExists($line);
     }
 
     public function test_variant_going_out_of_stock_mid_checkout_is_rejected(): void
@@ -232,7 +347,7 @@ class BuyerVariantFlowTest extends TestCase
         session([CheckoutController::SESSION_KEY => [CartItem::query()->sole()->id]]);
 
         $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'))
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
             ->assertRedirect(route('buyer.cart.index'))
             ->assertSessionHas('error');
 

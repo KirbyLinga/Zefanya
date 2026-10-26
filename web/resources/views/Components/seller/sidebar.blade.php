@@ -36,6 +36,7 @@
         [
             'label' => 'Sales',
             'items' => [
+                ['route' => 'seller.returns.index', 'icon' => 'undo-2', 'label' => 'Incoming Returns'],
                 ['route' => 'seller.orders.index', 'icon' => 'shopping-bag', 'label' => 'Orders'],
                 ['route' => 'seller.shipments.index', 'icon' => 'truck', 'label' => 'Shipments'],
                 ['route' => 'seller.reports.index', 'icon' => 'bar-chart-3', 'label' => 'Reports'],
@@ -51,6 +52,7 @@
         [
             'label' => 'Settings',
             'items' => [
+                ['route' => 'seller.shipping-providers.index', 'icon' => 'network', 'label' => 'Shipping Providers'],
                 ['route' => 'seller.account.index', 'icon' => 'user', 'label' => 'Account'],
             ],
         ],

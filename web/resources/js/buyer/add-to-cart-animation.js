@@ -1,18 +1,25 @@
 /**
- * Add-to-cart button state manager and cross-page animation coordinator.
- * Handles button disabled state, "Added" state display, and ensures cart count
- * updates are always from the server (never fabricated client-side).
+ * Product-card Add to Cart wiring + brief “Added” button state.
+ * Toast confirmation lives in buyer.js; cart icon navigates to /buyer/cart.
  */
 
 (function () {
   const BUTTON_STATE_DURATION = 1500; // ms
-  const DESKTOP_BREAKPOINT = 768; // px
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /**
-   * For non-PDP contexts (product cards, wishlist, etc.) that may add to cart,
-   * we provide a helper to manage button state without full animation context.
-   */
+  document.addEventListener('click', function (event) {
+    const button = event.target.closest('.add-to-cart-btn');
+    if (!button || button.disabled) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const productId = Number(button.dataset.productId);
+    if (!productId || typeof window.addToCart !== 'function') return;
+
+    window.handleAddToCartSimple(button, productId);
+  });
+
   window.handleAddToCartSimple = function (button, productId, quantity = 1, variantId = null) {
     if (!button) return;
 
@@ -26,24 +33,6 @@
           button.disabled = false;
           return;
         }
-
-        // Show toast (existing behavior)
-        if (window.innerWidth < DESKTOP_BREAKPOINT) {
-          // Already shown by addToCart, but ensure cart link is available
-          const toast = document.getElementById('toast');
-          if (toast && !toast.querySelector('[data-view-cart]')) {
-            const link = document.createElement('a');
-            link.href = '/buyer/cart';
-            link.textContent = ' View';
-            link.style.color = 'inherit';
-            link.style.textDecoration = 'underline';
-            link.style.marginLeft = '6px';
-            link.dataset.viewCart = '1';
-            toast.appendChild(link);
-          }
-        }
-
-        // Set button to "Added" state
         setButtonAdded(button, originalHTML, originalClasses);
       })
       .catch(() => {
@@ -51,12 +40,8 @@
       });
   };
 
-  /**
-   * Set button to "Added" state (green checkmark + maroon background).
-   */
   function setButtonAdded(button, originalHTML, originalClasses) {
     if (prefersReducedMotion) {
-      // Skip animation, just disable temporarily
       setTimeout(() => {
         button.disabled = false;
         button.innerHTML = originalHTML;
@@ -69,7 +54,6 @@
     button.className = originalClasses;
     button.classList.add('bg-buyer-ink', 'text-white');
     button.classList.remove('border', 'bg-transparent', 'text-buyer-ink', 'hover:bg-buyer-ink', 'hover:text-white');
-
     button.innerHTML = '<i data-lucide="check" width="15" height="15"></i> Added';
 
     if (window.lucide) {
@@ -80,7 +64,6 @@
       button.className = originalClasses;
       button.innerHTML = originalHTML;
       button.disabled = false;
-
       if (window.lucide) {
         window.lucide.createIcons({ scope: button });
       }

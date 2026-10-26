@@ -30,7 +30,7 @@ class SellerRegistrationDecision extends Notification
             return $message
                 ->greeting("Welcome, {$notifiable->fullName()}!")
                 ->line("Your seller account for \"{$notifiable->business_name}\" has been approved.")
-                ->action('Log in', route('seller.login'));
+                ->action('Log in', route('home', ['login' => 1]));
         }
 
         return $message

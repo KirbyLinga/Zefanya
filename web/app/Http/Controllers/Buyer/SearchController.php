@@ -16,25 +16,28 @@ class SearchController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = $request->query('q', '');
+        $query = (string) $request->query('q', '');
         $query = trim($query);
 
         $products = collect();
         $categories = collect();
 
         if (strlen($query) >= 2) {
-            $products = Product::query()
-                ->where('status', 'active')
+            $products = Product::query()->withBuyerCardData()
+                ->activeInStock()
+                ->when($request->filled('category'), fn ($q) => $q->where('category_id', $request->integer('category')))
+                ->when($request->filled('seller'), fn ($q) => $q->where('seller_id', $request->integer('seller')))
                 ->where(function ($q) use ($query) {
-                    $q->where('name', 'ilike', "%{$query}%")
-                        ->orWhere('description', 'ilike', "%{$query}%");
+                    $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($query).'%'])
+                        ->orWhereRaw('LOWER(description) LIKE ?', ['%'.strtolower($query).'%']);
                 })
                 ->with(['images', 'seller', 'category'])
                 ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
-                ->paginate(12);
+                ->withBuyerPriceFilters($request->only(['min_price', 'max_price', 'sort']))
+                ->paginate(12)->withQueryString();
 
             $categories = Category::query()
-                ->where('label', 'ilike', "%{$query}%")
+                ->whereRaw('LOWER(label) LIKE ?', ['%'.strtolower($query).'%'])
                 ->get();
         }
 
@@ -43,36 +46,35 @@ class SearchController extends Controller
 
     /**
      * GET /buyer/search/suggestions — AJAX endpoint for search suggestions
-     * Returns recent searches (for users) and popular products
+     * Returns products matching the search term
      */
     public function suggestions(Request $request): JsonResponse
     {
         $term = trim($request->query('term', ''));
-        $buyer = auth('buyer')->user();
 
-        $recent = collect();
         $popular = collect();
 
-        // Fetch popular (best-selling) products
+        // Fetch matching products
         if (strlen($term) >= 1) {
-            $popular = Product::query()
-                ->where('status', 'active')
+            $popular = Product::query()->withBuyerCardData()
+                ->activeInStock()
                 ->where(function ($q) use ($term) {
-                    $q->where('name', 'ilike', "%{$term}%");
+                    $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($term).'%'])
+                        ->orWhereRaw('LOWER(description) LIKE ?', ['%'.strtolower($term).'%']);
                 })
-                ->with(['images'])
+                ->with(['images', 'seller'])
                 ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
                 ->limit(5)
                 ->get()
                 ->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
-                    'image' => $p->images->first()?->path ? asset('storage/'.$p->images->first()->path) : null,
+                    'price' => $p->formattedPriceRange(),
+                    'image' => $p->catalogImageUrl(),
                 ]);
         }
 
         return response()->json([
-            'recent' => $recent,
             'popular' => $popular,
         ]);
     }

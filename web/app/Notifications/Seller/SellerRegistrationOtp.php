@@ -4,29 +4,21 @@ namespace App\Notifications\Seller;
 
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 
 class SellerRegistrationOtp extends Notification
 {
     // Send synchronously (not queued) — registration OTP must arrive immediately.
 
-    public function __construct(public string $otp)
-    {
-        Log::debug('SellerRegistrationOtp notification created', ['otp' => $this->otp]);
-    }
+    public function __construct(public string $otp) {}
 
     public function via(object $notifiable): array
     {
-        Log::debug('SellerRegistrationOtp via() called for', ['email' => $notifiable->email]);
-
         return ['mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        Log::debug('SellerRegistrationOtp toMail() called', ['email' => $notifiable->email]);
-
         return (new MailMessage)
             ->subject('Your Zefanya seller verification code')
             ->greeting("Hi {$notifiable->fullName()},")

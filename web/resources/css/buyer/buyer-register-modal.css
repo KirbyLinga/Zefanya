@@ -42,6 +42,58 @@
   transform: translateY(0) scale(1);
 }
 
+.html-body .buyer-modal__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: inherit;
+}
+
+.html-body .buyer-modal.is-busy .buyer-modal__busy {
+  display: flex;
+}
+
+.html-body .buyer-modal__busy-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.html-body .buyer-modal__spinner {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+  border: 2px solid #ead4d8;
+  border-top-color: #9c5c68;
+  border-radius: 50%;
+  animation: buyer-modal-spin 0.7s linear infinite;
+}
+
+@keyframes buyer-modal-spin {
+  to { transform: rotate(360deg); }
+}
+
+.html-body .buyer-modal__busy-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.html-body .buyer-modal__busy-copy {
+  max-width: 280px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
 .html-body .buyer-modal__close {
   all: unset;
   position: absolute;
@@ -73,6 +125,7 @@
   font-weight: 400;
   font-size: 26px;
   color: var(--text-primary);
+  text-align: center;
 }
 
 .html-body .buyer-modal__subtitle {
@@ -80,6 +133,7 @@
   font-family: var(--font-sans);
   font-size: 13.5px;
   color: var(--text-secondary);
+  text-align: center;
 }
 
 .html-body .buyer-modal__error-summary {

@@ -8,36 +8,53 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
-    {{-- ADMIN-d: app.css only. admin.css was DELETED — every class it defined
-         (shell/sidebar/dash-summary/admin-login) became unused once its views
-         converted in ADMIN-b/c, and its design-system import was already gone
-         (ADMIN-b Hazard #1 fix). --}}
     @vite(['resources/css/app.css'])
 
     @stack('styles')
 </head>
-{{-- admin-body → utilities (ADMIN-b): margin 0 = preflight, min-height 100vh,
-     background var(--bg-page) = --color-primary-50. --}}
 <body class="min-h-screen bg-primary-50">
 
-    {{-- admin-shell → utilities: display:flex, min-height:100vh --}}
     <div class="flex min-h-screen">
 
         @include('Components.admin-sidebar')
 
-        {{-- admin-main → utilities: flex column, flex:1, min-width:0 --}}
         <div class="flex flex-1 min-w-0 flex-col">
-            {{-- admin-topbar → utilities: padding var(--space-4) var(--space-8),
-                 bg-surface = #fff, border-bottom 1px var(--border-light) =
-                 neutral-200 --}}
+            {{-- Admin Top Bar --}}
             <header class="flex items-center justify-between px-8 py-4 bg-white border-b border-neutral-200">
-                <span class="font-sans font-semibold text-[15px] tracking-[0.5px] uppercase text-neutral-950">@yield('title', 'Dashboard')</span>
-                @if (Auth::guard('admin')->check())
-                    <span class="font-sans font-medium text-[13px] text-neutral-600">{{ Auth::guard('admin')->user()->name }}</span>
-                @endif
+                {{-- Left: Global Search --}}
+                <div class="flex-1 max-w-md">
+                    <input type="text" placeholder="Search accounts, email or user ID…"
+                           class="w-full h-10 px-4 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" />
+                </div>
+
+                {{-- Right: Notifications, Help, User --}}
+                <div class="flex items-center gap-6">
+                    {{-- Notifications Bell --}}
+                    <button class="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-neutral-100 transition-colors">
+                        <i data-lucide="bell" class="w-5 h-5 text-neutral-600"></i>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+
+                    {{-- Help Icon --}}
+                    <button class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-neutral-100 transition-colors">
+                        <i data-lucide="help-circle" class="w-5 h-5 text-neutral-600"></i>
+                    </button>
+
+                    {{-- User Block --}}
+                    <button class="flex items-center gap-3 pl-4 pr-2 py-2 rounded-lg hover:bg-neutral-100 transition-colors">
+                        <div class="flex flex-col items-end">
+                            <span class="text-sm font-semibold text-neutral-950">Zefanya Admin</span>
+                            <span class="text-xs text-neutral-600">Super Admin</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-primary-200 flex items-center justify-center">
+                            <i data-lucide="user" class="w-4 h-4 text-primary-800"></i>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-600"></i>
+                    </button>
+                </div>
             </header>
 
-            {{-- admin-content → utilities: flex:1, padding var(--space-8) --}}
+            {{-- Main Content --}}
             <main class="flex-1 p-8">
                 @yield('content')
             </main>

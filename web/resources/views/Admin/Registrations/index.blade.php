@@ -1,293 +1,477 @@
 @extends('Admin.Layouts.app')
 
-@section('title', 'Manage Registrations')
+@section('title', 'Registration Management')
 
 @section('content')
 
-{{-- Registrations review — converted to Tailwind utilities in ADMIN-c.
-     Source of truth was resources/css/admin/admin-registration.css (DELETED in
-     this chunk). All values 1:1. Legacy quirk preserved: that file's
-     `.reg-detail__section:last-of-type` border removal targeted the last DIV
-     child (the reject/empty panel), never a section, so every section keeps
-     its bottom border — reproduced by plain `border-b` on all sections.
-     `.reg-detail__documents` never had a CSS rule; its div stays bare. --}}
 @php
-    // Shared reg-* styling, 1:1 from admin-registration.css.
-    $regItem = 'flex items-center gap-3 p-3 rounded-md no-underline transition-colors duration-200 hover:bg-blush';
-    $regItemActive = 'bg-secondary-300';
-    $regAvatar = 'shrink-0 w-[38px] h-[38px] rounded-full bg-blush text-primary-800 flex items-center justify-center font-sans font-bold text-[12.5px]';
-    $regBadge = 'shrink-0 px-2.5 py-1 rounded-full font-sans font-semibold text-[10.5px] tracking-[0.4px] uppercase bg-[#fdf1de] text-[#9a6a1f]';
-    $regSection = 'py-5 border-b border-[#e8e2e0]';
-    $regSectionH4 = 'font-sans font-semibold text-[11px] tracking-[0.8px] uppercase text-primary-800 mb-3.5';
-    $regGrid = 'grid grid-cols-2 gap-4';
-    $regGridCell = 'flex flex-col gap-1';
-    $regGridLabel = 'font-sans text-[11px] text-muted-ink';
-    $regGridValue = 'font-sans font-semibold text-[13.5px] text-neutral-950';
-    $regIdLink = 'inline-flex items-center gap-2 font-sans font-semibold text-[13px] text-primary-800 underline';
-    $regBtn = 'inline-flex items-center justify-center gap-2 h-11 px-6 rounded-sm font-sans font-semibold text-[12.5px] tracking-[1px] cursor-pointer transition-colors duration-200';
+    // Status colors and labels (updated for new status values)
+    $statusColors = [
+        'pending' => ['bg' => 'bg-orange-50', 'text' => 'text-orange-700', 'label' => 'Pending'],
+        'approved' => ['bg' => 'bg-green-50', 'text' => 'text-green-700', 'label' => 'Approved'],
+        'rejected' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'label' => 'Rejected'],
+        'suspended' => ['bg' => 'bg-neutral-100', 'text' => 'text-neutral-700', 'label' => 'Suspended'],
+    ];
 
-    // Registry filter chips (All / Buyer / Seller / Logistics) + search box.
-    // Active and idle chips get DIFFERENT complete class strings so no two
-    // same-property utilities (e.g. two hover:text-*) ever compete.
-    $regChip = 'inline-flex items-center gap-1.5 rounded-full border px-2 py-1.5 font-sans text-[10.5px] font-semibold uppercase tracking-[0.5px] no-underline transition-colors duration-150';
-    $regChipIdle = 'border-[#e8e2e0] text-muted-ink hover:bg-blush hover:text-primary-800';
-    $regChipActive = 'border-primary-800 bg-primary-800 text-white';
-    $regChipCount = 'inline-flex min-w-[16px] h-4 items-center justify-center rounded-full px-1 font-sans text-[10px] font-bold';
-    $regChipCountIdle = 'bg-blush text-primary-800';
-    $regChipCountActive = 'bg-white/25 text-white';
+    // Account type badge colors
+    $typeColors = [
+        'buyer' => ['bg' => 'bg-blue-50', 'text' => 'text-blue-700', 'label' => 'Buyer'],
+        'seller' => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'label' => 'Seller'],
+        'logistics' => ['bg' => 'bg-green-50', 'text' => 'text-green-700', 'label' => 'Logistics'],
+    ];
 
-    // Carried by every link in the left panel so clicking a chip, a search
-    // result or an applicant never drops the admin back to the unfiltered
-    // queue. (Changing filter/search resets the open detail panel on purpose —
-    // you then pick from the list you just asked for.)
-    $listParams = array_filter([
-        'filter' => $filter === 'all' ? null : $filter,
-        'q' => $q !== '' ? $q : null,
-    ]);
-    $total = array_sum($counts);
+    // Prefer controller-passed values (defaults: status=pending, date_range=0 all-time).
+    $searchQuery = $searchQuery ?? request('search', '');
+    $accountType = $accountType ?? request('type', '');
+    $status = $status ?? request('status', 'pending');
+    $dateRange = $dateRange ?? request('date_range', 0);
+    $perPage = $perPage ?? request('per_page', 25);
 @endphp
 
+{{-- Success message --}}
 @if (session('success'))
-  {{-- reg-toast → utilities: mb 20px, p 12px/16px, bg #eaf3ec, border
-       #a8cdb0, radius 4px, Montserrat 13px, #2f5c3a. --}}
-  <div class="mb-5 py-3 px-4 bg-[#eaf3ec] border border-[#a8cdb0] rounded-sm font-sans text-[13px] text-[#2f5c3a]">{{ session('success') }}</div>
+    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+        {{ session('success') }}
+    </div>
 @endif
 
-{{-- reg-layout → utilities: 340px/1fr grid, gap 24px, align-items:start;
-     the file's own 1024px breakpoint kept as an arbitrary variant. --}}
-<div class="grid grid-cols-[340px_1fr] gap-6 items-start max-[1024px]:grid-cols-1">
+{{-- Page Header --}}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-neutral-950 mb-1">Registration Management</h1>
+    <p class="text-base text-neutral-600">Review and manage new user registrations based on your verification process.</p>
+</div>
 
-    {{-- ===== Left: pending list ===== --}}
-    <div class="flex flex-col gap-1.5 bg-white border border-[#e8e2e0] rounded-lg p-5">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="font-serif font-normal text-[18px] text-neutral-950">Pending Registrations</h2>
-            <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 bg-primary-800 text-white font-sans font-bold text-[11.5px] rounded-full">{{ $pending->count() }}</span>
-        </div>
-
-        {{-- Search — plain GET form (?q=), no JS. The hidden filter input keeps
-             the active registry when the term is resubmitted. --}}
-        <form method="GET" action="{{ route('admin.registrations.index') }}" class="mb-3">
-            @if ($filter !== 'all')
-                <input type="hidden" name="filter" value="{{ $filter }}">
-            @endif
-
-            <div class="flex items-center gap-2">
-                <div class="relative flex-1">
-                    <i data-lucide="search" width="14" height="14" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-ink"></i>
-                    <input type="search" name="q" id="registrationSearch" value="{{ $q }}"
-                           placeholder="Search name, email, contact…"
-                           aria-label="Search pending registrations"
-                           class="h-9 w-full rounded-sm border border-[#e8e2e0] bg-white pl-8 pr-3 font-sans text-[12.5px] text-neutral-950 placeholder:text-muted-ink focus:border-primary-400 focus:outline-none" />
-                </div>
-                <button type="submit" class="h-9 shrink-0 rounded-sm bg-neutral-950 px-3.5 font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-white transition-colors duration-150 hover:bg-primary-800">Search</button>
+{{-- Stat Cards Grid (2x2 on tablet, 1 row on desktop) --}}
+<div class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    {{-- Pending Stat Card --}}
+    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <i data-lucide="clock" class="w-6 h-6 text-orange-600"></i>
             </div>
-
-            @if ($q !== '')
-                <a href="{{ route('admin.registrations.index', array_filter(['filter' => $filter === 'all' ? null : $filter])) }}"
-                   class="mt-2 inline-flex items-center gap-1 font-sans text-[11px] text-primary-800 underline">
-                    <i data-lucide="x" width="12" height="12"></i>
-                    Clear search
-                </a>
-            @endif
-        </form>
-
-        {{-- Registry filter chips (?filter=buyer|seller|logistics) with the
-             match count per registry under the current search. --}}
-        <div class="mb-3 flex flex-wrap gap-1.5">
-            @foreach (['all' => 'All', 'buyer' => 'Buyer', 'seller' => 'Seller', 'logistics' => 'Logistics'] as $chipKey => $chipLabel)
-                <a href="{{ route('admin.registrations.index', array_filter([
-                        'filter' => $chipKey === 'all' ? null : $chipKey,
-                        'q' => $q !== '' ? $q : null,
-                    ])) }}"
-                   class="{{ $filter === $chipKey ? "$regChip $regChipActive" : "$regChip $regChipIdle" }}">
-                    {{ $chipLabel }}
-                    <span class="{{ $regChipCount }} {{ $filter === $chipKey ? $regChipCountActive : $regChipCountIdle }}">{{ $chipKey === 'all' ? $total : $counts[$chipKey] }}</span>
-                </a>
-            @endforeach
+            <div class="flex-1">
+                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Pending Review</p>
+                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ $pendingCount ?? 0 }}</p>
+            </div>
         </div>
-
-        @forelse ($pending as $applicant)
-            <a href="{{ route('admin.registrations.index', array_merge(['view' => $applicant->id, 'type' => $applicant->type], $listParams)) }}"
-               class="{{ $regItem }} {{ $selected && $selected->id == $applicant->id && $selectedType === $applicant->type ? $regItemActive : '' }}">
-                <div class="{{ $regAvatar }}">
-                    {{ strtoupper(substr($applicant->model->first_name, 0, 1)) }}{{ strtoupper(substr($applicant->model->last_name, 0, 1)) }}
-                </div>
-                <div class="flex-1 min-w-0 flex flex-col">
-                    <span class="font-sans font-semibold text-[13.5px] text-neutral-950 truncate">{{ $applicant->name }}</span>
-                    <span class="font-sans text-[11.5px] text-muted-ink">{{ ucfirst($applicant->type) }} &middot; {{ $applicant->created_at->diffForHumans() }}</span>
-                </div>
-                <span class="{{ $regBadge }}">Pending</span>
-            </a>
-        @empty
-            {{-- my-[13px] re-states the UA `margin: 1em 0` the preflight
-                 removes (13px font) — fidelity, not decoration. --}}
-            <p class="px-2 py-6 text-center font-sans text-[13px] text-muted-ink my-[13px]">
-                @if ($q !== '')
-                    No pending registrations match &ldquo;{{ $q }}&rdquo;.
-                @elseif ($filter !== 'all')
-                    No pending {{ $filter }} registrations right now.
-                @else
-                    No pending registrations right now.
-                @endif
+        @if (isset($pendingTrend))
+            <p class="text-[13px] {{ $pendingTrend >= 0 ? 'text-orange-600' : 'text-green-600' }}">
+                {{ $pendingTrend >= 0 ? '↑' : '↓' }} {{ abs($pendingTrend) }}% vs. last 7 days
             </p>
-        @endforelse
-    </div>
-
-    {{-- ===== Right: detail panel ===== --}}
-    {{-- reg-detail → utilities: bg white, border #e8e2e0, radius 8px, p 28px --}}
-    <div class="bg-white border border-[#e8e2e0] rounded-lg p-7">
-        @if ($selected)
-            @php
-                $isSeller = $selectedType === 'seller';
-                $isLogistics = $selectedType === 'logistics';
-                $typeLabel = match ($selectedType) {
-                    'seller' => 'Seller',
-                    'logistics' => 'Logistics',
-                    default => 'Buyer',
-                };
-                $approveRoute = match ($selectedType) {
-                    'seller' => 'admin.registrations.seller.approve',
-                    'logistics' => 'admin.registrations.logistics.approve',
-                    default => 'admin.registrations.buyer.approve',
-                };
-                $rejectRoute = match ($selectedType) {
-                    'seller' => 'admin.registrations.seller.reject',
-                    'logistics' => 'admin.registrations.logistics.reject',
-                    default => 'admin.registrations.buyer.reject',
-                };
-            @endphp
-
-            {{-- reg-detail__header → utilities: gap 16px, pb 20px, border-bottom.
-                 The header's status badge carries `.reg-detail__header
-                 .reg-status-badge { margin-left: auto }` → ml-auto. --}}
-            <div class="flex items-center gap-4 pb-5 border-b border-[#e8e2e0]">
-                <div class="shrink-0 w-[52px] h-[52px] rounded-full bg-blush text-primary-800 flex items-center justify-center font-sans font-bold text-base">
-                    {{ strtoupper(substr($selected->first_name, 0, 1)) }}{{ strtoupper(substr($selected->last_name, 0, 1)) }}
-                </div>
-                <div>
-                    <h3 class="font-serif font-normal text-[20px] text-neutral-950">{{ $selected->fullName() }}</h3>
-                    <span class="font-sans text-[12.5px] text-muted-ink">{{ $selected->email }}</span>
-                </div>
-                <span class="{{ $regBadge }} ml-auto">{{ $typeLabel }} &middot; Pending Review</span>
-            </div>
-
-            @if ($isSeller || $isLogistics)
-                <div class="{{ $regSection }}">
-                    <h4 class="{{ $regSectionH4 }}">Business Information</h4>
-                    <div class="{{ $regGrid }}">
-                        <div class="{{ $regGridCell }}"><span class="{{ $regGridLabel }}">Business Name</span><strong class="{{ $regGridValue }}">{{ $selected->business_name }}</strong></div>
-                        @if ($isSeller)
-                            <div class="{{ $regGridCell }}"><span class="{{ $regGridLabel }}">Line of Business</span><strong class="{{ $regGridValue }}">{{ $selected->lineOfBusiness?->label ?? 'Not specified' }}</strong></div>
-                        @endif
-                    </div>
-                </div>
-            @endif
-
-            <div class="{{ $regSection }}">
-                <h4 class="{{ $regSectionH4 }}">Personal Information</h4>
-                <div class="{{ $regGrid }}">
-                    <div class="{{ $regGridCell }}"><span class="{{ $regGridLabel }}">Sex</span><strong class="{{ $regGridValue }}">{{ ucfirst($selected->sex) }}</strong></div>
-                    <div class="{{ $regGridCell }}"><span class="{{ $regGridLabel }}">Contact No.</span><strong class="{{ $regGridValue }}">{{ $selected->contact_no }}</strong></div>
-                    <div class="{{ $regGridCell }}"><span class="{{ $regGridLabel }}">Birthday</span><strong class="{{ $regGridValue }}">{{ $selected->birthday->format('M d, Y') }}</strong></div>
-                    <div class="{{ $regGridCell }}"><span class="{{ $regGridLabel }}">Age</span><strong class="{{ $regGridValue }}">{{ $selected->age }}</strong></div>
-                </div>
-            </div>
-
-            <div class="{{ $regSection }}">
-                <h4 class="{{ $regSectionH4 }}">Address</h4>
-                {{-- my-[13.5px] re-states the UA `margin: 1em 0` (13.5px font)
-                     removed by preflight. --}}
-                <p class="font-sans text-[13.5px] text-neutral-950 leading-[1.6] my-[13.5px]">
-                    @php
-                        // Logistics collects house number separately from street,
-                        // so fold it into the street part for their applicants only.
-                        $streetPart = trim($selected->street ?? '');
-                        if ($isLogistics) {
-                            $streetPart = trim(implode(' ', array_filter([
-                                trim($selected->house_number ?? ''),
-                                $streetPart,
-                            ])));
-                        }
-                        $locationPart = collect([
-                            $selected->barangay_name,
-                            $selected->municipality_name,
-                            $selected->province_name,
-                        ])->filter()->implode(', ');
-                        $detailPart = trim($selected->address_detail ?? '');
-                        $addressLine = implode('', array_filter([
-                            $streetPart,
-                            $locationPart ? ($streetPart ? ', ' : '') . $locationPart : '',
-                            $detailPart   ? ' — ' . $detailPart : '',
-                        ]));
-                    @endphp
-                    {{ $addressLine ?: 'No address on record' }}
-                </p>
-            </div>
-
-            <div class="{{ $regSection }}">
-                <h4 class="{{ $regSectionH4 }}">{{ $isSeller || $isLogistics ? 'Submitted Documents' : 'Submitted ID' }}</h4>
-                {{-- Bare div: `.reg-detail__documents` never had a CSS rule. --}}
-                @if ($isSeller || $isLogistics)
-                    <div>
-                        <a href="{{ route('admin.documents.stream', ['type' => $selectedType, 'id' => $selected->id, 'document' => 'id']) }}" target="_blank" class="{{ $regIdLink }}">
-                            <i data-lucide="file-text" width="16" height="16"></i>
-                            View uploaded ID
-                        </a>
-                        @if ($isSeller)
-                            <a href="{{ route('admin.documents.stream', ['type' => 'seller', 'id' => $selected->id, 'document' => 'business_permit']) }}" target="_blank" class="{{ $regIdLink }}">
-                                <i data-lucide="file-text" width="16" height="16"></i>
-                                View business permit
-                            </a>
-                        @else
-                            <a href="{{ route('admin.documents.stream', ['type' => 'logistics', 'id' => $selected->id, 'document' => 'dti_permit']) }}" target="_blank" class="{{ $regIdLink }}">
-                                <i data-lucide="file-text" width="16" height="16"></i>
-                                View DTI permit
-                            </a>
-                        @endif
-                    </div>
-                @else
-                    <a href="{{ route('admin.documents.stream', ['type' => 'buyer', 'id' => $selected->id, 'document' => 'id']) }}" target="_blank" class="{{ $regIdLink }}">
-                        <i data-lucide="file-text" width="16" height="16"></i>
-                        View uploaded ID
-                    </a>
-                @endif
-            </div>
-
-            <div class="flex gap-3 mt-6">
-                <form method="POST" action="{{ route($approveRoute, $selected) }}">
-                    @csrf
-                    <button type="submit" class="{{ $regBtn }} bg-neutral-950 text-white hover:bg-[#2f5c3a]">
-                        <i data-lucide="check" width="16" height="16"></i>
-                        Approve
-                    </button>
-                </form>
-
-                <button type="button" class="{{ $regBtn }} bg-transparent text-[#a5333d] border border-[#a5333d] hover:bg-[#a5333d] hover:text-white" onclick="document.getElementById('rejectPanel').hidden = false">
-                    <i data-lucide="x" width="16" height="16"></i>
-                    Reject
-                </button>
-            </div>
-
-            {{-- reg-reject-panel → utilities: mt 16px, p 16px, bg #fbe9e7,
-                 radius 6px; label 11px 600 uppercase #a5333d mb 8px;
-                 textarea w-full, p 10px/12px, border #e8a49c, radius 4px,
-                 13px #1e1b1b, resize:vertical. --}}
-            <div id="rejectPanel" class="mt-4 p-4 bg-[#fbe9e7] rounded-md" hidden>
-                <form method="POST" action="{{ route($rejectRoute, $selected) }}">
-                    @csrf
-                    <label for="rejection_reason" class="block font-sans font-semibold text-[11px] tracking-[0.6px] uppercase text-[#a5333d] mb-2">Reason for rejection</label>
-                    <textarea name="rejection_reason" id="rejection_reason" rows="3" required class="w-full px-3 py-2.5 border border-[#e8a49c] rounded-sm font-sans text-[13px] text-neutral-950 resize-y"></textarea>
-                    <button type="submit" class="mt-3 h-10 px-5 bg-[#a5333d] text-white rounded-sm font-sans font-semibold text-xs tracking-[1px] cursor-pointer">Confirm Rejection</button>
-                </form>
-            </div>
-        @else
-            <div class="flex flex-col items-center justify-center gap-3 py-20 px-5 text-muted-ink text-center">
-                <i data-lucide="inbox" width="32" height="32"></i>
-                <p class="font-sans text-[13.5px] my-[13.5px]">Select a registration from the list to review it.</p>
-            </div>
         @endif
     </div>
 
+    {{-- Approved Stat Card --}}
+    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <i data-lucide="check-circle" class="w-6 h-6 text-green-600"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Approved</p>
+                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ $approvedCount ?? 0 }}</p>
+            </div>
+        </div>
+        @if (isset($approvedTrend))
+            <p class="text-[13px] {{ $approvedTrend >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                {{ $approvedTrend >= 0 ? '↑' : '↓' }} {{ abs($approvedTrend) }}% vs. last 7 days
+            </p>
+        @endif
+    </div>
+
+    {{-- Rejected Stat Card --}}
+    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <i data-lucide="x-circle" class="w-6 h-6 text-red-600"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Rejected</p>
+                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ $rejectedCount ?? 0 }}</p>
+            </div>
+        </div>
+        @if (isset($rejectedTrend))
+            <p class="text-[13px] {{ $rejectedTrend >= 0 ? 'text-red-600' : 'text-green-600' }}">
+                {{ $rejectedTrend >= 0 ? '↑' : '↓' }} {{ abs($rejectedTrend) }}% vs. last 7 days
+            </p>
+        @endif
+    </div>
+
+    {{-- Total Stat Card --}}
+    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <i data-lucide="users" class="w-6 h-6 text-purple-600"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Total Registrations</p>
+                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ ($pendingCount ?? 0) + ($approvedCount ?? 0) + ($rejectedCount ?? 0) }}</p>
+            </div>
+        </div>
+        <p class="text-[13px] text-neutral-500">All time</p>
+    </div>
 </div>
+
+{{-- Compact Filter Bar --}}
+<div class="mb-6 bg-white border border-neutral-200 rounded-lg p-5">
+    <form method="GET" action="{{ route('admin.registrations.index') }}" class="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-3">
+        {{-- Search input (takes remaining width on desktop) --}}
+        <div class="flex-1 lg:flex-1">
+            <label for="search" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Search</label>
+            <input type="text" name="search" id="search" value="{{ $searchQuery }}" placeholder="Name, email, contact…"
+                   class="w-full h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent" />
+        </div>
+
+        {{-- Account Type filter --}}
+        <div class="lg:flex-0">
+            <label for="type" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Account Type</label>
+            <select name="type" id="type" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent">
+                <option value="">All Types</option>
+                <option value="buyer" {{ $accountType === 'buyer' ? 'selected' : '' }}>Buyer</option>
+                <option value="seller" {{ $accountType === 'seller' ? 'selected' : '' }}>Seller</option>
+                <option value="logistics" {{ $accountType === 'logistics' ? 'selected' : '' }}>Logistics</option>
+            </select>
+        </div>
+
+        {{-- Status filter --}}
+        <div class="lg:flex-0">
+            <label for="status" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Status</label>
+            <select name="status" id="status" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent">
+                <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>Pending</option>
+                <option value="approved" {{ $status === 'approved' ? 'selected' : '' }}>Approved</option>
+                <option value="rejected" {{ $status === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                <option value="suspended" {{ $status === 'suspended' ? 'selected' : '' }}>Suspended</option>
+            </select>
+        </div>
+
+        {{-- Date Range filter (default All Time so pending older than 7 days stays visible) --}}
+        <div class="lg:flex-0">
+            <label for="date_range" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Date Range</label>
+            <select name="date_range" id="date_range" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent">
+                <option value="0" {{ (int) $dateRange === 0 ? 'selected' : '' }}>All Time</option>
+                <option value="7" {{ (int) $dateRange === 7 ? 'selected' : '' }}>Last 7 days</option>
+                <option value="30" {{ (int) $dateRange === 30 ? 'selected' : '' }}>Last 30 days</option>
+                <option value="90" {{ (int) $dateRange === 90 ? 'selected' : '' }}>Last 90 days</option>
+            </select>
+        </div>
+
+        {{-- Filter button --}}
+        <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors flex items-center justify-center gap-2 lg:mt-0">
+            <i data-lucide="filter" class="w-4 h-4"></i>
+            Filter
+        </button>
+    </form>
+</div>
+
+{{-- Role Tabs --}}
+<div class="mb-6 flex flex-wrap gap-2 items-center justify-between">
+    <div class="flex flex-wrap gap-2">
+        @php
+            $types = ['' => 'All', 'buyer' => 'Buyer', 'seller' => 'Seller', 'logistics' => 'Logistics'];
+        @endphp
+        @foreach ($types as $typeVal => $typeLabel)
+            @php
+                $isActive = ($accountType === $typeVal);
+            @endphp
+            <a href="{{ route('admin.registrations.index', array_merge(request()->query(), ['type' => $typeVal, 'page' => 1])) }}"
+               class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {{ $isActive ? 'bg-primary-800 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200' }}">
+                {{ $typeLabel }}
+            </a>
+        @endforeach
+    </div>
+    <div class="text-sm text-neutral-600">
+        Showing <span class="font-semibold">{{ $pendingCount }}</span> {{ $status === 'pending' ? 'pending' : ($status === 'approved' ? 'approved' : 'rejected') }} registrations
+    </div>
+</div>
+
+{{-- Data table --}}
+<div class="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+    @if ($registrations && $registrations->count() > 0)
+        <table class="w-full text-base">
+            <thead class="bg-neutral-50 border-b border-neutral-200">
+                <tr>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Name</th>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Email</th>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Account Type</th>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Registration Date</th>
+                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Status</th>
+                    <th class="px-6 py-4 text-center font-semibold text-neutral-700 text-base">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-200">
+                @foreach ($registrations as $registration)
+                    @php
+                        $model = $registration->model;
+                        $type = $registration->type;
+                        $statusValue = $registration->status;
+                        $statusInfo = $statusColors[$statusValue] ?? $statusColors['pending'];
+                        $typeInfo = $typeColors[$type] ?? $typeColors['buyer'];
+                    @endphp
+                    <tr class="hover:bg-neutral-50 transition-colors">
+                        {{-- Applicant name with initials --}}
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-800 flex items-center justify-center font-semibold text-sm">
+                                    {{ strtoupper(substr($model->first_name ?? 'U', 0, 1)) }}{{ strtoupper(substr($model->last_name ?? '', 0, 1)) }}
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-neutral-950">{{ $model->first_name }} {{ $model->last_name }}</p>
+                                    <p class="text-xs text-neutral-500">ID: ZF-{{ $model->id }}</p>
+                                </div>
+                            </div>
+                        </td>
+
+                        {{-- Email --}}
+                        <td class="px-6 py-4 text-neutral-700">
+                            {{ $model->email }}
+                        </td>
+
+                        {{-- Account type badge --}}
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $typeInfo['bg'] }} {{ $typeInfo['text'] }}">
+                                {{ $typeInfo['label'] }}
+                            </span>
+                        </td>
+
+                        {{-- Registration date --}}
+                        <td class="px-6 py-4 text-neutral-700">
+                            {{ $model->created_at?->format('d M Y, g:i A') ?? 'N/A' }}
+                        </td>
+
+                        {{-- Status badge --}}
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $statusInfo['bg'] }} {{ $statusInfo['text'] }}">
+                                {{ $statusInfo['label'] }}
+                            </span>
+                        </td>
+
+                        {{-- Actions --}}
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-center gap-2">
+                                {{-- Approve button (only for pending) --}}
+                                @if ($statusValue === 'pending')
+                                    <form method="POST" 
+                                          action="{{ route(match ($type) {
+                                              'seller' => 'admin.registrations.seller.approve',
+                                              'logistics' => 'admin.registrations.logistics.approve',
+                                              default => 'admin.registrations.buyer.approve',
+                                          }, $model) }}"
+                                          class="inline"
+                                          onsubmit="return confirm('Approve this registration?');">
+                                        @csrf
+                                        <button type="submit" 
+                                                class="inline-flex items-center justify-center w-8 h-8 rounded-md text-green-600 hover:bg-green-50 transition-colors"
+                                                title="Approve">
+                                            <i data-lucide="check" class="w-4 h-4"></i>
+                                        </button>
+                                    </form>
+
+                                    {{-- Reject button (only for pending) --}}
+                                    <button type="button" 
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-red-600 hover:bg-red-50 transition-colors"
+                                            title="Reject"
+                                            onclick="openRejectModal({{ $model->id }}, '{{ $type }}', '{{ $model->first_name }} {{ $model->last_name }}')">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                    </button>
+                                @endif
+
+                                {{-- View details (wired modal — C22) --}}
+                                <button type="button"
+                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md text-neutral-600 hover:bg-neutral-100 transition-colors"
+                                        title="View details"
+                                        data-detail-name="{{ e($model->first_name.' '.$model->last_name) }}"
+                                        data-detail-email="{{ e($model->email) }}"
+                                        data-detail-type="{{ e($typeInfo['label']) }}"
+                                        data-detail-status="{{ e($statusInfo['label']) }}"
+                                        data-detail-contact="{{ e($model->contact_no ?? '') }}"
+                                        data-detail-business="{{ e($model->business_name ?? '') }}"
+                                        data-detail-address="{{ e(trim(collect([$model->street, $model->house_number, $model->barangay_name, $model->municipality_name, $model->province_name, $model->postal_code])->filter()->implode(', '))) }}"
+                                        data-detail-id-url="{{ $model->upload_id_path ? route('admin.documents.stream', ['type' => $type, 'id' => $model->id, 'document' => 'id']) : '' }}"
+                                        data-detail-permit-url="{{ $type === 'seller' && $model->business_permit_path ? route('admin.documents.stream', ['type' => 'seller', 'id' => $model->id, 'document' => 'business_permit']) : ($type === 'logistics' && ($model->dti_permit_path ?? null) ? route('admin.documents.stream', ['type' => 'logistics', 'id' => $model->id, 'document' => 'dti_permit']) : '') }}"
+                                        data-detail-permit-label="{{ $type === 'seller' ? 'Business permit' : ($type === 'logistics' ? 'DTI permit' : '') }}"
+                                        onclick="openDetailModal(this)">
+                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        {{-- Pagination --}}
+        <div class="px-6 py-4 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-base text-neutral-600">
+                Show <select name="per_page" id="footer_per_page" onchange="window.location.href = '{{ route('admin.registrations.index') }}?' + Object.keys({...new URLSearchParams(window.location.search), per_page: this.value}).map(k => k + '=' + (k === 'per_page' ? this.value : new URLSearchParams(window.location.search).get(k) || '')).join('&')"
+                        class="px-2 py-1 border border-neutral-300 rounded text-base">
+                    <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                    <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                    <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                </select> per page
+            </div>
+            <div class="flex gap-1">
+                @if ($registrations->onFirstPage())
+                    <button disabled class="px-3 py-2 border border-neutral-300 rounded-lg text-neutral-400 cursor-not-allowed">«</button>
+                @else
+                    <a href="{{ $registrations->previousPageUrl() }}" class="px-3 py-2 border border-neutral-300 rounded-lg text-neutral-700 hover:bg-neutral-50 transition-colors">«</a>
+                @endif
+
+                {{-- Page numbers --}}
+                @for ($i = 1; $i <= $registrations->lastPage(); $i++)
+                    @if ($i == $registrations->currentPage())
+                        <button disabled class="px-3 py-2 bg-primary-800 text-white rounded-lg font-semibold">{{ $i }}</button>
+                    @elseif ($i == 1 || $i == $registrations->lastPage() || abs($i - $registrations->currentPage()) <= 1)
+                        <a href="{{ $registrations->url($i) }}" class="px-3 py-2 border border-neutral-300 rounded-lg text-neutral-700 hover:bg-neutral-50 transition-colors">{{ $i }}</a>
+                    @elseif ($i == 2 || $i == $registrations->lastPage() - 1)
+                        <span class="px-3 py-2 text-neutral-500">…</span>
+                    @endif
+                @endfor
+
+                @if ($registrations->hasMorePages())
+                    <a href="{{ $registrations->nextPageUrl() }}" class="px-3 py-2 border border-neutral-300 rounded-lg text-neutral-700 hover:bg-neutral-50 transition-colors">»</a>
+                @else
+                    <button disabled class="px-3 py-2 border border-neutral-300 rounded-lg text-neutral-400 cursor-not-allowed">»</button>
+                @endif
+            </div>
+        </div>
+    @else
+        {{-- Empty state --}}
+        <div class="px-6 py-16 text-center">
+            <i data-lucide="inbox" class="w-12 h-12 text-neutral-400 mx-auto mb-4"></i>
+            <p class="text-neutral-700 font-semibold text-base mb-2">No registrations found</p>
+            <p class="text-neutral-500 text-base">Try adjusting your filters or search terms</p>
+        </div>
+    @endif
+</div>
+
+{{-- Detail Modal (C22) --}}
+<div id="detailModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-start justify-between mb-4">
+            <h3 class="text-lg font-bold text-neutral-950">Registration details</h3>
+            <button type="button" onclick="closeDetailModal()" class="text-neutral-500 hover:text-neutral-800" aria-label="Close">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <dl class="space-y-3 text-sm">
+            <div><dt class="text-neutral-500">Name</dt><dd id="detailName" class="font-semibold text-neutral-950"></dd></div>
+            <div><dt class="text-neutral-500">Email</dt><dd id="detailEmail" class="text-neutral-800"></dd></div>
+            <div><dt class="text-neutral-500">Contact</dt><dd id="detailContact" class="text-neutral-800"></dd></div>
+            <div><dt class="text-neutral-500">Type / Status</dt><dd class="text-neutral-800"><span id="detailType"></span> · <span id="detailStatus"></span></dd></div>
+            <div id="detailBusinessWrap" class="hidden"><dt class="text-neutral-500">Business</dt><dd id="detailBusiness" class="text-neutral-800"></dd></div>
+            <div><dt class="text-neutral-500">Address</dt><dd id="detailAddress" class="text-neutral-800"></dd></div>
+            <div class="flex flex-wrap gap-2 pt-2">
+                <a id="detailIdLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200">View ID</a>
+                <a id="detailPermitLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200"></a>
+            </div>
+        </dl>
+    </div>
+</div>
+
+{{-- Reject Modal --}}
+<div id="rejectModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-bold text-neutral-950 mb-4">Reject Registration</h3>
+        <p class="text-gray-600 mb-4">Are you sure you want to reject <span id="rejectApplicantName" class="font-medium"></span>'s registration?</p>
+
+        <form id="rejectForm" method="POST" class="space-y-4">
+            @csrf
+            <div>
+                <label for="rejection_reason" class="block text-sm font-medium text-gray-700 mb-1">Reason for rejection</label>
+                <textarea name="rejection_reason" id="rejection_reason" rows="4" required 
+                          placeholder="Please provide a reason for rejecting this registration…"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent"></textarea>
+            </div>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="closeRejectModal()" 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="flex-1 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors">
+                    Confirm Rejection
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openDetailModal(btn) {
+        document.getElementById('detailName').textContent = btn.dataset.detailName || '';
+        document.getElementById('detailEmail').textContent = btn.dataset.detailEmail || '';
+        document.getElementById('detailContact').textContent = btn.dataset.detailContact || '—';
+        document.getElementById('detailType').textContent = btn.dataset.detailType || '';
+        document.getElementById('detailStatus').textContent = btn.dataset.detailStatus || '';
+        document.getElementById('detailAddress').textContent = btn.dataset.detailAddress || '—';
+
+        const business = btn.dataset.detailBusiness || '';
+        const businessWrap = document.getElementById('detailBusinessWrap');
+        if (business) {
+            businessWrap.classList.remove('hidden');
+            document.getElementById('detailBusiness').textContent = business;
+        } else {
+            businessWrap.classList.add('hidden');
+        }
+
+        const idLink = document.getElementById('detailIdLink');
+        if (btn.dataset.detailIdUrl) {
+            idLink.href = btn.dataset.detailIdUrl;
+            idLink.classList.remove('hidden');
+        } else {
+            idLink.classList.add('hidden');
+        }
+
+        const permitLink = document.getElementById('detailPermitLink');
+        if (btn.dataset.detailPermitUrl) {
+            permitLink.href = btn.dataset.detailPermitUrl;
+            permitLink.textContent = btn.dataset.detailPermitLabel || 'View permit';
+            permitLink.classList.remove('hidden');
+        } else {
+            permitLink.classList.add('hidden');
+        }
+
+        document.getElementById('detailModal').classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    document.getElementById('detailModal')?.addEventListener('click', function (e) {
+        if (e.target === this) closeDetailModal();
+    });
+
+    function openRejectModal(id, type, applicantName) {
+        document.getElementById('rejectApplicantName').textContent = applicantName;
+        
+        // Build the reject route URL based on type
+        let routeUrl = '';
+        if (type === 'seller') {
+            routeUrl = '{{ route("admin.registrations.seller.reject", ":id") }}'.replace(':id', id);
+        } else if (type === 'logistics') {
+            routeUrl = '{{ route("admin.registrations.logistics.reject", ":id") }}'.replace(':id', id);
+        } else {
+            routeUrl = '{{ route("admin.registrations.buyer.reject", ":id") }}'.replace(':id', id);
+        }
+        
+        document.getElementById('rejectForm').action = routeUrl;
+        document.getElementById('rejection_reason').value = '';
+        document.getElementById('rejectModal').classList.remove('hidden');
+    }
+
+    function closeRejectModal() {
+        document.getElementById('rejectModal').classList.add('hidden');
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('rejectModal')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeRejectModal();
+        }
+    });
+</script>
 
 @endsection

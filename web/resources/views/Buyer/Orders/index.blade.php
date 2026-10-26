@@ -111,11 +111,11 @@
                                         'label' => 'Delivered',
                                         'color' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
                                     ],
-                                    $statuses->contains(fn ($s) => $s === OrderStatus::Completed) => [
+                                    $order->computeRollupStatus() === OrderStatus::Completed => [
                                         'label' => 'Completed',
                                         'color' => 'border-neutral-200 bg-neutral-100 text-neutral-700',
                                     ],
-                                    $statuses->contains(fn ($s) => $s === OrderStatus::DeliveryFailed || $s === OrderStatus::Returned) => [
+                                    $statuses->contains(fn ($s) => $s === OrderStatus::DeliveryFailed || $s === OrderStatus::Returned || $s === OrderStatus::Cancelled) => [
                                         'label' => 'Cancelled / Returned',
                                         'color' => 'border-red-200 bg-red-50 text-red-700',
                                     ],
@@ -165,6 +165,9 @@
                                                             {{ $item->product_name }}
                                                         </p>
                                                         <p class="mt-0.5 truncate font-sans text-[11.5px] text-[var(--text-muted)]">
+                                                            @if ($item->variantDescription() !== '')
+                                                                {{ $item->variantDescription() }}<br>
+                                                            @endif
                                                             Qty: {{ $item->quantity }} · {{ $sellerOrder->seller?->business_name ?? 'Shop item' }}
                                                         </p>
                                                     </div>

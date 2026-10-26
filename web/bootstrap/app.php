@@ -1,7 +1,13 @@
 <?php
 
+use App\Enums\AuthRole;
 use App\Http\Middleware\Admin\EnsureAdminRole;
+use App\Http\Middleware\AuthenticateRoleSession;
+use App\Http\Middleware\Buyer\EnsureBuyerActive;
+use App\Http\Middleware\EnforceSingleBrowserAccount;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
+use App\Http\Middleware\RedirectIfAuthenticatedRole;
+use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -11,6 +17,7 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
@@ -20,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/admin.php'));
             Route::middleware('web')->group(base_path('routes/seller.php'));
             Route::middleware('web')->group(base_path('routes/logistics.php'));
+            Route::middleware('web')->group(base_path('routes/rider.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -30,53 +38,31 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
+            'guest.role' => RedirectIfAuthenticatedRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
+            'rider.active' => EnsureRiderActive::class,
             'seller.approved' => EnsureSellerApproved::class,
+            'buyer.active' => EnsureBuyerActive::class,
+        ]);
+
+        // Single-account-per-browser net + password-change session guard, on
+        // every web request (buyer/seller/logistics/admin routes all use it).
+        $middleware->web(append: [
+            EnforceSingleBrowserAccount::class,
+            AuthenticateRoleSession::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {
-            $path = $request->path();
-
-            if (str_starts_with($path, 'logistics/')) {
-                return route('login');
-            }
-
-            if (str_starts_with($path, 'seller/')) {
-                return route('seller.login');
-            }
-
-            if (str_starts_with($path, 'admin/')) {
+            if ($request->is('admin', 'admin/*')) {
                 return route('admin.login');
             }
 
-            if (str_starts_with($path, 'buyer/')) {
-                return route('buyer.login');
-            }
-
-            return route('login');
+            return route('home', ['login' => 1]);
         });
 
-        $middleware->redirectUsersTo(function (Request $request) {
-            $path = $request->path();
-
-            if (str_starts_with($path, 'logistics/')) {
-                return route('logistics.dashboard');
-            }
-
-            if (str_starts_with($path, 'seller/')) {
-                return route('seller.dashboard');
-            }
-
-            if (str_starts_with($path, 'admin/')) {
-                return route('admin.dashboard');
-            }
-
-            if (str_starts_with($path, 'buyer/')) {
-                return route('buyer.home');
-            }
-
-            return route('home');
-        });
+        $middleware->redirectUsersTo(
+            fn (): string => AuthRole::current()?->dashboardUrl() ?? '/',
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -2,9 +2,14 @@
 // Behavior for the seller registration modal (Components/seller-register-modal.blade.php).
 // Mirrors resources/js/buyer/buyer-register-modal.js.
 
+import '../registration-validation.js';
+
 document.addEventListener('DOMContentLoaded', function () {
     var overlay = document.getElementById('sellerModalOverlay');
     if (!overlay) return;
+    // Initialize before a direct-link auto-open can request provinces.
+    var PSGC_BASE = (overlay.dataset.psgcBase || 'https://psgc.gitlab.io/api').replace(/\/+$/, '');
+
 
     if (overlay.dataset.jsInit === '1') {
         console.warn('[seller-register-modal] duplicate modal found on this page — only the first instance is wired up.');
@@ -35,15 +40,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var municipalitySelect = document.getElementById('sellerMunicipality');
     var barangaySelect = document.getElementById('sellerBarangay');
     var apiFields = document.getElementById('sellerApiAddressFields');
-    var manualFields = document.getElementById('sellerManualAddressFields');
-    var toggleManualBtn = document.getElementById('sellerToggleManualAddress');
     var addressModeField = document.getElementById('sellerAddressMode');
     var provinceNameField = document.getElementById('sellerProvinceNameField');
     var municipalityNameField = document.getElementById('sellerMunicipalityNameField');
     var barangayNameField = document.getElementById('sellerBarangayNameField');
-    var manualProvinceInput = document.getElementById('sellerManualProvince');
-    var manualMunicipalityInput = document.getElementById('sellerManualMunicipality');
-    var manualBarangayInput = document.getElementById('sellerManualBarangay');
     var streetTextarea = document.getElementById('sellerStreet');
     var addressError = document.getElementById('sellerAddressError');
 
@@ -55,13 +55,12 @@ document.addEventListener('DOMContentLoaded', function () {
     var uploadIdInput = document.getElementById('sellerUploadId');
     var uploadIdName = document.getElementById('sellerUploadIdName');
     var uploadIdWrapper = uploadIdInput ? uploadIdInput.previousElementSibling : null;
-
+    
     var businessPermitInput = document.getElementById('sellerBusinessPermit');
     var businessPermitName = document.getElementById('sellerBusinessPermitName');
     var businessPermitWrapper = businessPermitInput ? businessPermitInput.previousElementSibling : null;
 
     var provincesLoaded = false;
-    var manualMode = addressModeField && addressModeField.value === 'manual';
 
     var requiredElements = {
         closeBtn: closeBtn, form: form, headerIcon: headerIcon,
@@ -69,8 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
         birthMonthSelect: birthMonthSelect, birthDaySelect: birthDaySelect, birthYearSelect: birthYearSelect,
         passwordInput: passwordInput, confirmInput: confirmInput, nextStep1: nextStep1,
         provinceSelect: provinceSelect, municipalitySelect: municipalitySelect, barangaySelect: barangaySelect,
-        apiFields: apiFields, manualFields: manualFields, toggleManualBtn: toggleManualBtn,
-        addressModeField: addressModeField, provinceNameField: provinceNameField,
+        apiFields: apiFields, addressModeField: addressModeField, provinceNameField: provinceNameField,
         municipalityNameField: municipalityNameField, barangayNameField: barangayNameField,
         streetTextarea: streetTextarea, backStep2: backStep2, nextStep2: nextStep2,
     };
@@ -161,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
-        if (!provincesLoaded && !manualMode) {
+        if (!provincesLoaded) {
             fetchProvinces();
         }
     };
@@ -243,20 +241,9 @@ document.addEventListener('DOMContentLoaded', function () {
         ageInput.value = calculateAge(birthdayInput.value);
     }
 
-    // ===== Password visibility toggles =====
-    document.querySelectorAll('#sellerRegisterForm [data-toggle-visibility]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var target = document.getElementById(btn.getAttribute('data-toggle-visibility'));
-            if (!target) return;
-            var isHidden = target.type === 'password';
-            target.type = isHidden ? 'text' : 'password';
-            btn.innerHTML = '<i data-lucide="' + (isHidden ? 'eye-off' : 'eye') + '" width="16" height="16"></i>';
-            if (window.lucide) lucide.createIcons();
-        });
-    });
+    // Password visibility is handled once by registration-validation.js.
 
     // ===== PH address cascading dropdowns (PSGC API) =====
-    var PSGC_BASE = 'https://psgc.gitlab.io/api';
 
     function populateSelect(select, items, placeholder) {
         select.innerHTML = '';
@@ -284,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 provincesLoaded = true;
             })
             .catch(function () {
-                provinceSelect.innerHTML = '<option value="" disabled selected>Could not load — try manual entry</option>';
+                provinceSelect.innerHTML = '<option value="" disabled selected>Could not load provinces</option>';
             });
     }
 
@@ -341,59 +328,7 @@ document.addEventListener('DOMContentLoaded', function () {
         barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
     });
 
-    // ===== Manual Address Track & Toggle =====
-    function syncManualAddressFields() {
-        if (manualProvinceInput) {
-            manualProvinceInput.addEventListener('input', function () {
-                if (manualMode) provinceNameField.value = this.value;
-            });
-        }
-        if (manualMunicipalityInput) {
-            manualMunicipalityInput.addEventListener('input', function () {
-                if (manualMode) municipalityNameField.value = this.value;
-            });
-        }
-        if (manualBarangayInput) {
-            manualBarangayInput.addEventListener('input', function () {
-                if (manualMode) barangayNameField.value = this.value;
-            });
-        }
-    }
-    syncManualAddressFields();
-
-    function setAddressMode(isManual) {
-        manualMode = isManual;
-        apiFields.classList.toggle('hidden', manualMode);
-        manualFields.classList.toggle('hidden', !manualMode);
-        toggleManualBtn.textContent = manualMode ? 'Use address lookup instead' : 'Enter address manually';
-        addressModeField.value = manualMode ? 'manual' : 'api';
-
-        // Dropdowns required only in API mode; street is ALWAYS required (HTML required attr).
-        [provinceSelect, municipalitySelect, barangaySelect].forEach(function (el) {
-            el.required = !manualMode;
-        });
-
-        if (manualMode) {
-            if (manualProvinceInput) provinceNameField.value = manualProvinceInput.value;
-            if (manualMunicipalityInput) municipalityNameField.value = manualMunicipalityInput.value;
-            if (manualBarangayInput) barangayNameField.value = manualBarangayInput.value;
-        } else {
-            provinceNameField.value = provinceSelect.selectedOptions[0] ? provinceSelect.selectedOptions[0].textContent : '';
-            municipalityNameField.value = municipalitySelect.selectedOptions[0] ? municipalitySelect.selectedOptions[0].textContent : '';
-            barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
-            if (!provincesLoaded) {
-                fetchProvinces();
-            }
-        }
-    }
-
-    toggleManualBtn.addEventListener('click', function () {
-        setAddressMode(!manualMode);
-    });
-
-    if (manualMode) {
-        setAddressMode(true);
-    }
+    addressModeField.value = 'api';
 
     // ===== Validation helpers =====
     function findFieldError(field) {
@@ -428,11 +363,17 @@ document.addEventListener('DOMContentLoaded', function () {
         var valid = true;
 
         panel.querySelectorAll('[required]').forEach(function (field) {
-            if (field.offsetParent === null && field.type !== 'hidden') return;
-            if (!field.value || (field.type === 'file' && field.files.length === 0)) {
+            if (field.offsetParent === null && field.type !== 'hidden' && field.type !== 'file') return;
+            if (field.type === 'file') {
+                // For file inputs, check if any file is selected
+                if (!field.files || field.files.length === 0) {
+                    showFieldError(field, 'Please upload a file.');
+                    valid = false;
+                }
+            } else if (!field.value) {
                 showFieldError(field, 'This field is required.');
                 valid = false;
-            } else if (field.id === 'contactNo' && !/^09\d{9}$/.test(field.value)) {
+            } else if (field.id === 'sellerContactNo' && !/^09\d{9}$/.test(field.value)) {
                 showFieldError(field, 'Enter a valid PH mobile number (09XXXXXXXXX).');
                 valid = false;
             } else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value)) {
@@ -448,30 +389,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (birthdayError) birthdayError.textContent = 'Select your full birthday.';
                 valid = false;
             }
-            if (passwordInput.value && passwordInput.value.length < 8) {
-                showFieldError(passwordInput, 'Password must be at least 8 characters.');
-                valid = false;
+            // Password validation: minimum 8 characters (allow weak passwords with warning)
+            if (passwordInput.value) {
+                if (passwordInput.value.length < 8) {
+                    showFieldError(passwordInput, 'Password must be at least 8 characters.');
+                    valid = false;
+                }
+                // If >= 8 chars, password is valid even if weak
             }
             if (confirmInput.value && passwordInput.value !== confirmInput.value) {
                 showFieldError(confirmInput, 'Passwords do not match.');
                 valid = false;
             }
         } else if (n === 2) {
-            if (!manualMode) {
-                if (!provinceSelect.value) {
-                    showFieldError(provinceSelect, 'Select a province, or switch to manual address entry.');
-                    valid = false;
-                }
-                if (!municipalitySelect.value) {
-                    showFieldError(municipalitySelect, 'Select a municipality/city.');
-                    valid = false;
-                }
-                if (!barangaySelect.value) {
-                    showFieldError(barangaySelect, 'Select a barangay.');
-                    valid = false;
-                }
+            if (!provinceSelect.value) {
+                showFieldError(provinceSelect, 'Select a province.');
+                valid = false;
             }
-            // Street is required in BOTH modes.
+            if (!municipalitySelect.value) {
+                showFieldError(municipalitySelect, 'Select a municipality/city.');
+                valid = false;
+            }
+            if (!barangaySelect.value) {
+                showFieldError(barangaySelect, 'Select a barangay.');
+                valid = false;
+            }
             if (!streetTextarea.value || !streetTextarea.value.trim()) {
                 showFieldError(streetTextarea, 'Street / house number is required.');
                 valid = false;
@@ -485,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function () {
     nextStep1.addEventListener('click', function () {
         if (validatePanel(1)) {
             showPanel(2);
-            if (!provincesLoaded && !manualMode) {
+            if (!provincesLoaded) {
                 fetchProvinces();
             }
         }
@@ -511,7 +453,22 @@ document.addEventListener('DOMContentLoaded', function () {
     var sellerSubmitRegistration = document.getElementById('submitSellerRegistration');
     if (sellerSubmitRegistration) {
         sellerSubmitRegistration.addEventListener('click', function () {
-            if (!validatePanel(3)) return;
+            if (!validatePanel(3)) {
+                console.error('[seller-register-modal] Step 3 validation failed');
+                // Show a visible error message for Step 3
+                var panel = panels.filter(function (p) { return parseInt(p.dataset.panel, 10) === 3; })[0];
+                if (panel) {
+                    var errorDiv = panel.querySelector('[data-step3-error]');
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.setAttribute('data-step3-error', 'true');
+                        errorDiv.className = 'mb-4 rounded-sm border border-[#e8a49c] bg-[#fbe9e7] px-4 py-3 font-sans text-[12.5px] text-[#a5333d]';
+                        panel.insertBefore(errorDiv, sellerSubmitRegistration.parentElement);
+                    }
+                    errorDiv.textContent = 'Please complete all required fields.';
+                }
+                return;
+            }
 
             var submitBtn = this;
             var originalText = submitBtn.textContent;
@@ -519,6 +476,20 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.textContent = 'Submitting...';
 
             var formData = new FormData(form);
+            console.log('[seller-register-modal] Form data keys:', Array.from(formData.keys()));
+            console.log('[seller-register-modal] Form data:', {
+                email: formData.get('email'),
+                contact_no: formData.get('contact_no'),
+                birthday: formData.get('birthday'),
+                password: formData.get('password') ? '***' : 'missing',
+                password_confirmation: formData.get('password_confirmation') ? '***' : 'missing',
+                province: formData.get('province'),
+                municipality: formData.get('municipality'),
+                barangay: formData.get('barangay'),
+                street: formData.get('street'),
+                upload_id: formData.get('upload_id') ? 'present' : 'missing',
+                business_permit: formData.get('business_permit') ? 'present' : 'missing',
+            });
             // Multipart: upload_id and business_permit are files.
             fetch(form.action, {
                 method: 'POST',
@@ -530,9 +501,14 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (res) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
+                console.log('[seller-register-modal] Response:', res.ok, res.body);
                 if (res.ok && res.body && res.body.seller_id) {
-                    document.getElementById('sellerOtpId').value = res.body.seller_id;
-                    document.getElementById('sellerOtpEmail').textContent = res.body.email;
+                    var otpIdInput = document.getElementById('sellerOtpId');
+                    otpIdInput.value = res.body.seller_id;
+                    // Signed verify/resend URLs from the server.
+                    otpIdInput.dataset.verifyUrl = res.body.verify_url || '';
+                    otpIdInput.dataset.resendUrl = res.body.resend_url || '';
+                    document.getElementById('sellerOtpEmail').textContent = res.body.email_masked || res.body.email;
                     showPanel(4);
                     setTimeout(function () {
                         var first = document.querySelector('.seller-otp-input[data-otp-index="0"]');
@@ -552,12 +528,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     else if (errKeys.some(function (k) { return step2Fields.indexOf(k) !== -1; })) showPanel(2);
                     else if (errKeys.some(function (k) { return step3Fields.indexOf(k) !== -1; })) showPanel(3);
                 } else {
+                    console.error('[seller-register-modal] Unexpected response:', res.body);
                     alert(res.body && res.body.message ? res.body.message : 'Registration failed. Please try again.');
                 }
             })
-            .catch(function () {
+            .catch(function (err) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
+                console.error('[seller-register-modal] Fetch error:', err);
                 alert('Network error. Please try again.');
             });
         });
@@ -586,7 +564,25 @@ document.addEventListener('DOMContentLoaded', function () {
         function showOtpError(msg) {
             otpErrorSummary.classList.remove('hidden'); otpErrorSummary.textContent = msg;
             otpFieldError.textContent = msg;
-            otpInputs.forEach(function (i) { i.classList.add('border-[#a5333d'); });
+            otpInputs.forEach(function (i) { i.classList.add('border-[#a5333d]'); });
+        }
+        // Human "try again in N" text for a rate-limit / lock response.
+        function otpWaitText(seconds) {
+            seconds = parseInt(seconds, 10);
+            if (!seconds || seconds <= 0) return '';
+            if (seconds < 60) return 'Try again in ' + seconds + ' second' + (seconds === 1 ? '' : 's') + '.';
+            var mins = Math.ceil(seconds / 60);
+            return 'Try again in ' + mins + ' minute' + (mins === 1 ? '' : 's') + '.';
+        }
+        // Prefer the server's own message (429 lock / 503 mail failure) and add
+        // the retry time when the server sends one and the message omits it.
+        function otpServerError(res, fallback) {
+            var body = (res && res.body) ? res.body : {};
+            var msg = body.message || fallback;
+            if (res && res.status === 429 && body.retry_after && !/\d+\s*(second|minute)/i.test(msg)) {
+                msg += ' ' + otpWaitText(body.retry_after);
+            }
+            return msg;
         }
 
         otpInputs.forEach(function (input, idx) {
@@ -613,36 +609,41 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         resendBtn.addEventListener('click', function () {
+            var resendUrl = sellerIdInput.dataset.resendUrl || '';
+            if (!resendUrl) {
+                resendStatus.textContent = 'Your verification session expired. Please reload the page.';
+                return;
+            }
             resendBtn.disabled = true;
             resendStatus.textContent = 'Sending...';
-            fetch('/register/seller/verify-otp/resend', {
+            fetch(resendUrl, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
             })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
             .then(function (res) {
                 if (res.ok) {
                     otpInputs.forEach(function (i) { i.value = ''; });
                     hiddenOtp.value = '';
                     otpInputs[0].focus();
-
+                    
                     // Start countdown timer (60 seconds)
                     var secondsLeft = 60;
                     var timerInterval = setInterval(function () {
                         secondsLeft--;
                         resendStatus.textContent = secondsLeft + 's';
-
+                        
                         if (secondsLeft <= 0) {
                             clearInterval(timerInterval);
                             resendBtn.disabled = false;
                             resendStatus.textContent = '';
                         }
                     }, 1000);
-
+                    
                     resendStatus.textContent = '60s';
                 } else {
                     resendBtn.disabled = false;
-                    resendStatus.textContent = res.body.message || 'Could not resend.';
+                    resendStatus.textContent = otpServerError(res, 'Could not resend.');
                 }
             })
             .catch(function () { resendBtn.disabled = false; resendStatus.textContent = 'Network error.'; });
@@ -653,12 +654,14 @@ document.addEventListener('DOMContentLoaded', function () {
             clearOtpErrors();
             var code = collectOtp();
             if (code.length !== 6) { showOtpError('Enter all 6 digits.'); return; }
+            var verifyUrl = sellerIdInput.dataset.verifyUrl || '';
+            if (!verifyUrl) { showOtpError('Your verification session expired. Please reload the page.'); return; }
             hiddenOtp.value = code;
 
             otpSubmitBtn.disabled = true;
             otpSubmitBtn.textContent = 'Verifying...';
 
-            fetch('/register/seller/verify-otp', {
+            fetch(verifyUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
                 body: JSON.stringify({ otp: code }),
@@ -671,11 +674,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Success: close modal and show message
                     closeModal();
                     alert('Your seller registration is complete! Awaiting admin approval.');
-                } else if (res.status === 422) {
-                    // Validation error: show in modal, stay open
-                    showOtpError(res.body.message || 'Invalid or expired code.');
                 } else {
-                    showOtpError(res.body.message || 'Verification failed.');
+                    // 422 validation / 429 lock / 503 mail failure: show the
+                    // server's own message (+ retry time for a rate limit).
+                    showOtpError(otpServerError(res, res.status === 422 ? 'Invalid or expired code.' : 'Verification failed.'));
                 }
             })
             .catch(function (err) {
@@ -687,5 +689,21 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     showPanel(1);
+
+    // ===== Password strength meter + visibility helpers =====
+    // The shared registration-validation.js exposes these on window.__zfReg.
+    // Initialise the meter now, after the modal DOM has been rendered, and
+    // reset it on every showPanel() call so pre-filled values are reflected.
+    function initSellerPasswordMeter() {
+        if (window.__zfReg) {
+            window.__zfReg.initPasswordMeter();
+        }
+    }
+    if (window.__zfReg) {
+        initSellerPasswordMeter();
+    }
+    if (window.__zfReg && window.__zfReg.initPasswordToggles) {
+        window.__zfReg.initPasswordToggles();
+    }
 });
 

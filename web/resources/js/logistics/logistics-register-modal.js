@@ -8,9 +8,14 @@
 // seller modals share generic ids on the register-type page, so a third modal using
 // getElementById('birthday') would bind to the first modal's node.
 
+import '../registration-validation.js';
+
 document.addEventListener('DOMContentLoaded', function () {
     var overlay = document.getElementById('logisticsModalOverlay');
     if (!overlay) return; // component not included on this page
+    // Initialize before a direct-link auto-open can request provinces.
+    var PSGC_BASE = (overlay.dataset.psgcBase || 'https://psgc.gitlab.io/api').replace(/\/+$/, '');
+
 
     if (overlay.dataset.jsInit === '1') {
         console.warn('[logistics-register-modal] duplicate modal found on this page — only the first instance is wired up.');
@@ -40,15 +45,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var municipalitySelect = document.getElementById('logisticsMunicipality');
     var barangaySelect = document.getElementById('logisticsBarangay');
     var apiFields = document.getElementById('logisticsApiAddressFields');
-    var manualFields = document.getElementById('logisticsManualAddressFields');
-    var toggleManualBtn = document.getElementById('logisticsToggleManualAddress');
     var addressModeField = document.getElementById('logisticsAddressMode');
     var provinceNameField = document.getElementById('logisticsProvinceNameField');
     var municipalityNameField = document.getElementById('logisticsMunicipalityNameField');
     var barangayNameField = document.getElementById('logisticsBarangayNameField');
-    var manualProvinceInput = document.getElementById('logisticsManualProvince');
-    var manualMunicipalityInput = document.getElementById('logisticsManualMunicipality');
-    var manualBarangayInput = document.getElementById('logisticsManualBarangay');
     var streetInput = document.getElementById('logisticsStreet');
     var backStep2 = document.getElementById('logisticsBackStep2');
     var nextStep2 = document.getElementById('logisticsNextStep2');
@@ -63,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var backStep4 = document.getElementById('logisticsBackStep4');
 
     var provincesLoaded = false;
-    var manualMode = addressModeField && addressModeField.value === 'manual';
 
     // Bail out loudly instead of crashing silently mid-way through wiring.
     var required = {
@@ -72,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
         birthMonthSelect: birthMonthSelect, birthDaySelect: birthDaySelect, birthYearSelect: birthYearSelect,
         passwordInput: passwordInput, confirmInput: confirmInput, nextStep1: nextStep1,
         provinceSelect: provinceSelect, municipalitySelect: municipalitySelect, barangaySelect: barangaySelect,
-        apiFields: apiFields, manualFields: manualFields, toggleManualBtn: toggleManualBtn, addressModeField: addressModeField,
+        apiFields: apiFields, addressModeField: addressModeField,
         provinceNameField: provinceNameField, municipalityNameField: municipalityNameField, barangayNameField: barangayNameField,
         streetInput: streetInput, backStep2: backStep2, nextStep2: nextStep2,
         uploadIdInput: uploadIdInput, uploadIdName: uploadIdName,
@@ -121,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
-        if (!provincesLoaded && !manualMode) loadProvinces();
+        if (!provincesLoaded) loadProvinces();
     };
 
     function closeModal() {
@@ -194,7 +193,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ===== PH address cascading dropdowns (PSGC API) =====
-    var PSGC_BASE = 'https://psgc.gitlab.io/api';
 
     function populateSelect(select, items, placeholder) {
         select.innerHTML = '';
@@ -217,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 populateSelect(provinceSelect, data, 'Select province');
                 provincesLoaded = true;
             })
-            .catch(function () { provinceSelect.innerHTML = '<option value="" disabled selected>Could not load — try manual entry</option>'; });
+            .catch(function () { provinceSelect.innerHTML = '<option value="" disabled selected>Could not load provinces</option>'; });
     }
 
     provinceSelect.addEventListener('change', function () {
@@ -255,55 +253,7 @@ document.addEventListener('DOMContentLoaded', function () {
         barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
     });
 
-    // ===== Manual address fallback =====
-    function syncManualAddressFields() {
-        if (manualProvinceInput) {
-            manualProvinceInput.addEventListener('input', function () {
-                if (manualMode) provinceNameField.value = this.value;
-            });
-        }
-        if (manualMunicipalityInput) {
-            manualMunicipalityInput.addEventListener('input', function () {
-                if (manualMode) municipalityNameField.value = this.value;
-            });
-        }
-        if (manualBarangayInput) {
-            manualBarangayInput.addEventListener('input', function () {
-                if (manualMode) barangayNameField.value = this.value;
-            });
-        }
-    }
-    syncManualAddressFields();
-
-    function setAddressMode(isManual) {
-        manualMode = isManual;
-        apiFields.classList.toggle('hidden', manualMode);
-        manualFields.classList.toggle('hidden', !manualMode);
-        toggleManualBtn.textContent = manualMode ? 'Use address lookup instead' : 'Enter address manually';
-        addressModeField.value = manualMode ? 'manual' : 'api';
-
-        // Dropdowns required only in API mode; street is ALWAYS required.
-        [provinceSelect, municipalitySelect, barangaySelect].forEach(function (el) {
-            el.required = !manualMode;
-        });
-
-        if (manualMode) {
-            if (manualProvinceInput) provinceNameField.value = manualProvinceInput.value;
-            if (manualMunicipalityInput) municipalityNameField.value = manualMunicipalityInput.value;
-            if (manualBarangayInput) barangayNameField.value = manualBarangayInput.value;
-        } else {
-            provinceNameField.value = provinceSelect.selectedOptions[0] ? provinceSelect.selectedOptions[0].textContent : '';
-            municipalityNameField.value = municipalitySelect.selectedOptions[0] ? municipalitySelect.selectedOptions[0].textContent : '';
-            barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
-            if (!provincesLoaded) loadProvinces();
-        }
-    }
-
-    toggleManualBtn.addEventListener('click', function () { setAddressMode(!manualMode); });
-
-    if (manualMode) {
-        setAddressMode(true);
-    }
+    addressModeField.value = 'api';
 
     // ===== Upload filename display =====
     uploadIdInput.addEventListener('change', function () {
@@ -328,17 +278,29 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ===== Password visibility toggles =====
-    document.querySelectorAll('#logisticsRegisterForm [data-toggle-visibility]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var target = document.getElementById(btn.getAttribute('data-toggle-visibility'));
-            if (!target) return;
-            var isHidden = target.type === 'password';
-            target.type = isHidden ? 'text' : 'password';
-            btn.innerHTML = '<i data-lucide="' + (isHidden ? 'eye-off' : 'eye') + '" width="16" height="16"></i>';
-            if (window.lucide) lucide.createIcons();
+    // ===== Name fields: letters only =====
+    var nameFields = document.querySelectorAll('input[name="first_name"], input[name="last_name"], input[name="middle_initial"]');
+    nameFields.forEach(function (field) {
+        // Rider names use shared Unicode validation; preserve spaces and punctuation.
+        if (field.closest('#riderRegisterForm')) return;
+        field.addEventListener('input', function () {
+            // Remove any non-letter characters (basic Latin letters only)
+            this.value = this.value.replace(/[^a-zA-Z]/g, '');
         });
     });
+
+    // ===== Name fields: letters only =====
+    var nameFields = document.querySelectorAll('input[name="first_name"], input[name="last_name"], input[name="middle_initial"]');
+    nameFields.forEach(function (field) {
+        // Rider names use shared Unicode validation; preserve spaces and punctuation.
+        if (field.closest('#riderRegisterForm')) return;
+        field.addEventListener('input', function () {
+            // Remove any non-letter characters (keep Unicode letters via \p{L})
+            this.value = this.value.replace(/[^a-zA-ZÀ-ÿ\u0100-\u017F\u0180-\u024F\u0250-\u0277\u0278-\u029C\u029D-\u02B8\u0386\u0388-\u038A\u038C\u038E-\u03A1\u03A3-\u03F5\u03F6-\u03FF\u0400-\u0484\u0487-\u052F\u0531-\u0556\u0559\u0560-\u0588]/g, '');
+        });
+    });
+
+    // Password visibility is handled once by registration-validation.js.
 
     // ===== Validation helpers =====
     // Every field's error <span class="field-error"> is either the field's own next
@@ -370,12 +332,17 @@ document.addEventListener('DOMContentLoaded', function () {
         var valid = true;
 
         panel.querySelectorAll('[required]').forEach(function (field) {
-            var isFile = field.type === 'file';
             // File inputs are visually hidden on purpose, so they must not be
             // skipped by the off-screen check the other fields rely on.
-            if (!isFile && field.offsetParent === null && field.type !== 'hidden') return;
+            if (field.offsetParent === null && field.type !== 'hidden' && field.type !== 'file') return;
 
-            if (isFile ? field.files.length === 0 : !field.value) {
+            if (field.type === 'file') {
+                // For file inputs, check if any file is selected
+                if (!field.files || field.files.length === 0) {
+                    showFieldError(field, 'Please upload a file.');
+                    valid = false;
+                }
+            } else if (!field.value) {
                 showFieldError(field, 'This field is required.');
                 valid = false;
             } else if (field.id === 'logisticsContactNo' && !/^09\d{9}$/.test(field.value)) {
@@ -401,9 +368,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 showFieldError(confirmInput, 'Passwords do not match.');
                 valid = false;
             }
-        } else if (n === 2 && !manualMode) {
+        } else if (n === 2) {
             if (!provinceSelect.value) {
-                showFieldError(provinceSelect, 'Select a province, or switch to manual address entry.');
+                showFieldError(provinceSelect, 'Select a province.');
                 valid = false;
             }
             if (!municipalitySelect.value) {
@@ -423,13 +390,21 @@ document.addEventListener('DOMContentLoaded', function () {
     nextStep1.addEventListener('click', function () {
         if (validatePanel(1)) {
             showPanel(2);
-            if (!provincesLoaded && !manualMode) loadProvinces();
+            if (!provincesLoaded) loadProvinces();
         }
     });
     backStep2.addEventListener('click', function () { showPanel(1); });
     nextStep2.addEventListener('click', function () {
         if (validatePanel(2)) showPanel(3);
     });
+
+    // ===== Password strength meter + visibility helpers =====
+    if (window.__zfReg) {
+        window.__zfReg.initPasswordMeter();
+        if (window.__zfReg.initPasswordToggles) {
+            window.__zfReg.initPasswordToggles();
+        }
+    }
     backStep3.addEventListener('click', function () { showPanel(2); });
     backStep4.addEventListener('click', function () { showPanel(3); });
 
@@ -441,15 +416,45 @@ document.addEventListener('DOMContentLoaded', function () {
     var csrf = csrfTokenInput ? csrfTokenInput.value : (csrfMeta ? csrfMeta.getAttribute('content') : '');
 
     submitRegistration.addEventListener('click', function () {
-        if (!validatePanel(3)) return;
+        if (!validatePanel(3)) {
+            console.error('[logistics-register-modal] Step 3 validation failed');
+            // Show a visible error message for Step 3
+            var panel = panels.filter(function (p) { return parseInt(p.dataset.panel, 10) === 3; })[0];
+            if (panel) {
+                var errorDiv = panel.querySelector('[data-step3-error]');
+                if (!errorDiv) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.setAttribute('data-step3-error', 'true');
+                    errorDiv.className = 'mb-4 rounded-sm border border-[#e8a49c] bg-[#fbe9e7] px-4 py-3 font-sans text-[12.5px] text-[#a5333d]';
+                    panel.insertBefore(errorDiv, submitRegistration.parentElement);
+                }
+                errorDiv.textContent = 'Please complete all required fields.';
+            }
+            return;
+        }
 
         var submitBtn = this;
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
 
+        var formData = new FormData(form);
+        console.log('[logistics-register-modal] Form data keys:', Array.from(formData.keys()));
+        console.log('[logistics-register-modal] Form data:', {
+            email: formData.get('email'),
+            contact_no: formData.get('contact_no'),
+            birthday: formData.get('birthday'),
+            password: formData.get('password') ? '***' : 'missing',
+            password_confirmation: formData.get('password_confirmation') ? '***' : 'missing',
+            province: formData.get('province'),
+            municipality: formData.get('municipality'),
+            barangay: formData.get('barangay'),
+            street: formData.get('street'),
+            upload_id: formData.get('upload_id') ? 'present' : 'missing',
+            dti_permit_upload: formData.get('dti_permit_upload') ? 'present' : 'missing',
+        });
         fetch(form.action, {
             method: 'POST',
-            body: new FormData(form),
+            body: formData,
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
             credentials: 'same-origin',
         })
@@ -457,10 +462,15 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(function (res) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit';
+            console.log('[logistics-register-modal] Response:', res.ok, res.body);
 
             if (res.ok && res.body && res.body.logistics_provider_id) {
-                document.getElementById('logisticsOtpId').value = res.body.logistics_provider_id;
-                document.getElementById('logisticsOtpEmail').textContent = res.body.email;
+                var otpIdInput = document.getElementById('logisticsOtpId');
+                otpIdInput.value = res.body.logistics_provider_id;
+                // Signed verify/resend URLs from the server.
+                otpIdInput.dataset.verifyUrl = res.body.verify_url || '';
+                otpIdInput.dataset.resendUrl = res.body.resend_url || '';
+                document.getElementById('logisticsOtpEmail').textContent = res.body.email_masked || res.body.email;
                 showPanel(4);
                 setTimeout(function () {
                     var first = document.querySelector('.logistics-otp-input[data-otp-index="0"]');
@@ -487,6 +497,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 var errKeys = Object.keys(res.body.errors);
                 if (errKeys.some(function (k) { return step1Fields.indexOf(k) !== -1; })) {
                     showPanel(1);
+
+    // ===== Password strength meter + visibility helpers =====
+    // The shared registration-validation.js exposes these on window.__zfReg.
+    // Initialise the meter now, after the modal DOM has been rendered, and
+    // reset it on every showPanel() call so pre-filled values are reflected.
+    function initLogisticsPasswordMeter() {
+        if (window.__zfReg) {
+            window.__zfReg.initPasswordMeter();
+        }
+    }
+    if (window.__zfReg) {
+        initLogisticsPasswordMeter();
+    }
+    if (window.__zfReg && window.__zfReg.initPasswordToggles) {
+        window.__zfReg.initPasswordToggles();
+    }
                 } else if (errKeys.some(function (k) { return step2Fields.indexOf(k) !== -1; })) {
                     showPanel(2);
                 } else if (errKeys.some(function (k) { return step3Fields.indexOf(k) !== -1; })) {
@@ -495,11 +521,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            console.error('[logistics-register-modal] Unexpected response:', res.body);
             alert(res.body && res.body.message ? res.body.message : 'Registration failed. Please try again.');
         })
-        .catch(function () {
+        .catch(function (err) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit';
+            console.error('[logistics-register-modal] Fetch error:', err);
             alert('Network error. Please try again.');
         });
     });
@@ -527,6 +555,24 @@ document.addEventListener('DOMContentLoaded', function () {
             otpFieldError.textContent = msg;
             otpInputs.forEach(function (i) { i.classList.add('border-[#a5333d]'); });
         };
+        // Human "try again in N" text for a rate-limit / lock response.
+        function otpWaitText(seconds) {
+            seconds = parseInt(seconds, 10);
+            if (!seconds || seconds <= 0) return '';
+            if (seconds < 60) return 'Try again in ' + seconds + ' second' + (seconds === 1 ? '' : 's') + '.';
+            var mins = Math.ceil(seconds / 60);
+            return 'Try again in ' + mins + ' minute' + (mins === 1 ? '' : 's') + '.';
+        }
+        // Prefer the server's own message (429 lock / 503 mail failure) and add
+        // the retry time when the server sends one and the message omits it.
+        function otpServerError(res, fallback) {
+            var body = (res && res.body) ? res.body : {};
+            var msg = body.message || fallback;
+            if (res && res.status === 429 && body.retry_after && !/\d+\s*(second|minute)/i.test(msg)) {
+                msg += ' ' + otpWaitText(body.retry_after);
+            }
+            return msg;
+        }
 
         otpInputs.forEach(function (input, idx) {
             input.addEventListener('input', function () {
@@ -552,18 +598,23 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         resendBtn.addEventListener('click', function () {
-            var id = logisticsIdInput.value;
-            if (!id) return;
+            var resendUrl = logisticsIdInput.dataset.resendUrl || '';
+            if (!resendUrl) {
+                resendStatus.textContent = 'Your verification session expired. Please reload the page.';
+                return;
+            }
             resendBtn.disabled = true;
             resendStatus.textContent = 'Sending...';
-            fetch('/register/logistics/verify-otp/' + id + '/resend', {
+            fetch(resendUrl, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
             })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
             .then(function (res) {
                 resendBtn.disabled = false;
-                resendStatus.textContent = res.body.message || (res.ok ? 'Sent.' : 'Could not resend.');
+                resendStatus.textContent = res.ok
+                    ? (res.body.message || 'Sent.')
+                    : otpServerError(res, 'Could not resend.');
                 if (res.ok) {
                     otpInputs.forEach(function (i) { i.value = ''; });
                     hiddenOtp.value = '';
@@ -576,27 +627,28 @@ document.addEventListener('DOMContentLoaded', function () {
         otpForm.addEventListener('submit', function (e) {
             e.preventDefault();
             clearOtpErrors();
-            var id = logisticsIdInput.value;
             var code = collectOtp();
             if (code.length !== 6) { showOtpError('Enter all 6 digits.'); return; }
+            var verifyUrl = logisticsIdInput.dataset.verifyUrl || '';
+            if (!verifyUrl) { showOtpError('Your verification session expired. Please reload the page.'); return; }
             hiddenOtp.value = code;
 
             otpSubmitBtn.disabled = true;
             otpSubmitBtn.textContent = 'Verifying...';
 
-            fetch('/register/logistics/verify-otp/' + id, {
+            fetch(verifyUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
                 body: JSON.stringify({ otp: code }),
             })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
             .then(function (res) {
                 otpSubmitBtn.disabled = false;
                 otpSubmitBtn.textContent = 'Verify';
                 if (res.ok) {
                     window.location.href = res.body.redirect || '/register/logistics/pending';
                 } else {
-                    showOtpError(res.body.message || 'Verification failed.');
+                    showOtpError(otpServerError(res, 'Verification failed.'));
                 }
             })
             .catch(function () {
@@ -609,7 +661,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     showPanel(1);
 
+    // ===== Password strength meter + visibility helpers =====
+    // The shared registration-validation.js exposes these on window.__zfReg.
+    // Initialise the meter now, after the modal DOM has been rendered, and
+    // reset it on every showPanel() call so pre-filled values are reflected.
+    function initLogisticsPasswordMeter() {
+        if (window.__zfReg) {
+            window.__zfReg.initPasswordMeter();
+        }
+    }
+    if (window.__zfReg) {
+        initLogisticsPasswordMeter();
+    }
+    if (window.__zfReg && window.__zfReg.initPasswordToggles) {
+        window.__zfReg.initPasswordToggles();
+    }
+
     if (window.__logisticsModalHasServerErrors) {
         window.openLogisticsRegisterModal();
     }
 });
+
+

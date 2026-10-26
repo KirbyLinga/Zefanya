@@ -32,6 +32,9 @@
                         <li class="flex items-center justify-between py-2 text-sm">
                             <span class="text-neutral-700">
                                 {{ $item->product_name }}
+                                @if ($item->variantDescription() !== '')
+                                    ({{ $item->variantDescription() }})
+                                @endif
                                 <span class="text-neutral-400">&times;{{ $item->quantity }}</span>
                             </span>
                             <span class="font-medium text-[#0a0a0a]">{{ $item->formattedLineTotal() }}</span>

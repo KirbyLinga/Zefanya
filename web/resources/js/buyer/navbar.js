@@ -58,32 +58,6 @@
         });
     }
 
-    // Wishlist toggle button in navbar (simple link, not a product card wishlist)
-    function initWishlistToggle() {
-        const wishlistBtn = document.querySelector('[data-wishlist-toggle]');
-        if (!wishlistBtn) return;
-
-        // Click redirects to wishlist page for navbar button (or login if guest)
-        wishlistBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            // Check if buyer is authenticated by looking for avatar or account dropdown
-            const isAuthenticated = document.querySelector('.js-account-toggle') !== null;
-            if (!isAuthenticated) {
-                // Guest: trigger login modal
-                const loginTrigger = document.querySelector('[data-login-trigger]');
-                if (loginTrigger) {
-                    loginTrigger.click();
-                } else {
-                    // Fallback: redirect to login
-                    window.location.href = '/buyer/login';
-                }
-            } else {
-                // Authenticated: go to wishlist page
-                window.location.href = '/buyer/wishlist';
-            }
-        });
-    }
-
     // Notifications dropdown
     function initNotifications() {
         const notifBtn = document.getElementById('notificationToggle');
@@ -213,139 +187,14 @@
         }
     }
 
-    // Mini cart dropdown
-    function initMiniCart() {
-        const cartBtn = document.getElementById('cartDropdownToggle');
-        const miniCartDropdown = document.getElementById('miniCartDropdown');
-        const miniCartItems = document.getElementById('miniCartItems');
-
-        if (!cartBtn || !miniCartDropdown) return;
-
-        cartBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            toggleDropdownExclusive(cartBtn, 'miniCartDropdown');
-            if (miniCartDropdown.classList.contains('open')) {
-                loadMiniCart();
-            }
-        });
-
-        document.addEventListener('click', function (e) {
-            if (!cartBtn.contains(e.target) && !miniCartDropdown.contains(e.target)) {
-                miniCartDropdown.classList.remove('open');
-                cartBtn.setAttribute('aria-expanded', 'false');
-            }
-        });
-
-        function loadMiniCart() {
-            fetch('/buyer/cart/mini', {
-                headers: {
-                    'Accept': 'application/json',
-                },
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.items && data.items.length > 0) {
-                        miniCartItems.innerHTML = data.items
-                            .map(item => `
-                                <div class="flex gap-3 border-b border-line p-3 hover:bg-gray-50">
-                                    ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" class="h-16 w-16 rounded object-cover bg-gray-100">` : '<div class="h-16 w-16 rounded bg-gray-100"></div>'}
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-[12px] font-semibold text-buyer-ink truncate">${item.name}</p>
-                                        ${item.variant ? `<p class="text-[10px] text-buyer-ink-soft">${item.variant}</p>` : ''}
-                                        <p class="text-[11px] font-semibold text-buyer-ink mt-1">${item.price}</p>
-                                        <div class="mt-2 flex items-center gap-2">
-                                            <button class="px-2 py-0.5 text-[11px] text-buyer-ink-soft hover:text-buyer-ink" onclick="updateCartQty(${item.id}, ${Math.max(1, item.quantity - 1)})">−</button>
-                                            <span class="text-[11px] font-semibold text-buyer-ink">${item.quantity}</span>
-                                            <button class="px-2 py-0.5 text-[11px] text-buyer-ink-soft hover:text-buyer-ink" onclick="updateCartQty(${item.id}, ${item.quantity + 1})">+</button>
-                                            <button class="ml-auto text-[10px] text-primary-800 hover:text-primary-900 font-semibold" onclick="removeFromCart(${item.id})">Remove</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            `)
-                            .join('');
-                    } else {
-                        miniCartItems.innerHTML = `
-                            <div class="flex flex-col items-center justify-center h-full gap-2 p-6">
-                                <i data-lucide="shopping-bag" width="32" height="32" class="text-buyer-ink-soft"></i>
-                                <p class="text-[13px] font-semibold text-buyer-ink">Your cart is empty</p>
-                                <p class="text-[12px] text-buyer-ink-soft">Start shopping to add items</p>
-                            </div>
-                        `;
-                        lucide.createIcons();
-                    }
-
-                    document.getElementById('miniCartSubtotal').textContent = data.subtotal;
-                    document.getElementById('miniCartTotal').textContent = data.total;
-                    lucide.createIcons();
-                })
-                .catch(err => console.error('Error loading mini cart:', err));
-        }
-    }
-
-    window.updateCartQty = function(itemId, qty) {
-        if (qty < 1) {
-            window.removeFromCart(itemId);
-            return;
-        }
-
-        fetch(`/buyer/cart/${itemId}`, {
-            method: 'PATCH',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ quantity: qty }),
-        })
-            .then(res => res.json())
-            .then(() => {
-                document.getElementById('cartDropdownToggle').click();
-                document.getElementById('cartDropdownToggle').click();
-                window.updateCartBadge();
-            })
-            .catch(err => console.error('Error updating cart:', err));
-    };
-
-    window.removeFromCart = function(itemId) {
-        fetch(`/buyer/cart/${itemId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(res => res.json())
-            .then(() => {
-                document.getElementById('cartDropdownToggle').click();
-                document.getElementById('cartDropdownToggle').click();
-                window.updateCartBadge();
-            })
-            .catch(err => console.error('Error removing from cart:', err));
-    };
-
-    window.updateCartBadge = function() {
-        fetch('/buyer/cart/summary', {
-            headers: {
-                'Accept': 'application/json',
-            },
-        })
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('cartCount').textContent = data.count;
-            });
-    };
-
     // Initialize all on DOM ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {
             initAccountDropdown();
-            initWishlistToggle();
             initNotifications();
-            initMiniCart();
         });
     } else {
         initAccountDropdown();
-        initWishlistToggle();
         initNotifications();
-        initMiniCart();
     }
 })();

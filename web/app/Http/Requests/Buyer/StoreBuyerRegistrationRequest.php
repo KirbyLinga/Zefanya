@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Buyer;
 
+use App\Models\Buyer\Buyer;
+use App\Support\EmailRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -40,20 +42,49 @@ class StoreBuyerRegistrationRequest extends FormRequest
 
             $email = $this->input('email');
             if ($email) {
+                // Block only a live registration. A REJECTED applicant (or an
+                // abandoned unverified one) must be able to retry with the same
+                // email — otherwise a rejection is a permanent dead end.
                 $exists = DB::table('buyers')
                     ->whereRaw('LOWER(email) = ?', [strtolower($email)])
+                    ->whereNotIn('status', ['unverified', 'rejected'])
                     ->exists();
 
                 if ($exists) {
                     $validator->errors()->add('email', 'The email has already been registered.');
+                } elseif ($foreign = EmailRegistry::otherRolesFor($email, 'buyer')) {
+                    // One email = one role across every account table.
+                    $validator->errors()->add(
+                        'email',
+                        'This email is already registered as a '.EmailRegistry::labelList($foreign).'. Use a different email.'
+                    );
+                } else {
+                    // Never let a newcomer replace a registration that is still
+                    // inside its 10-minute verification window.
+                    $stale = Buyer::whereRaw('LOWER(email) = ?', [strtolower($email)])
+                        ->where('status', 'unverified')
+                        ->first();
+
+                    if ($stale && ! $stale->isAbandonedRegistration()) {
+                        $validator->errors()->add(
+                            'email',
+                            'This email is currently awaiting verification. Please finish verifying it, then try again later.'
+                        );
+                    }
                 }
             }
 
-            // Custom rule: unique mobile number check (both formats)
+            // Live contact numbers must be unique. Skip the same-email
+            // unverified/rejected row — store() archives it and nulls contact_no.
             $contactNo = $this->input('contact_no');
             if ($contactNo) {
                 $exists = DB::table('buyers')
                     ->where('contact_no', $contactNo)
+                    ->whereNull('archived_at')
+                    ->where(function ($query) use ($email) {
+                        $query->whereRaw('LOWER(email) != ?', [strtolower((string) $email)])
+                            ->orWhereNotIn('status', ['unverified', 'rejected']);
+                    })
                     ->exists();
 
                 if ($exists) {
@@ -78,8 +109,6 @@ class StoreBuyerRegistrationRequest extends FormRequest
 
     public function rules(): array
     {
-        $isManual = $this->input('address_mode') === 'manual';
-
         return [
             'last_name' => ['required', 'string', 'regex:/^[\p{L}\s\-\']+$/u', 'min:2', 'max:50'],
             'first_name' => ['required', 'string', 'regex:/^[\p{L}\s\-\']+$/u', 'min:2', 'max:50'],
@@ -87,25 +116,31 @@ class StoreBuyerRegistrationRequest extends FormRequest
             'sex' => ['required', Rule::in(['male', 'female'])],
 
             'email' => ['required', 'string', 'email', 'max:255', 'regex:/^[^\s@]+@[^\s@]+\.[^\s@]+$/'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:\'",.<>?\\/]).{8,}$/'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*\p{Lu})(?=.*\p{Ll})(?=.*\p{N})(?=.*[\p{Z}\p{S}\p{P}]).+$/u'],
 
             'contact_no' => ['required', 'regex:/^09\d{9}$/'],
             'birthday' => ['required', 'date', 'before:today', 'before_or_equal:-18 years'],
 
-            'address_mode' => ['required', Rule::in(['api', 'manual'])],
+            // Registration: province / municipality / barangay from dropdowns only.
+            'address_mode' => ['required', Rule::in(['api'])],
 
-            'province' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'province_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'municipality' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'municipality_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'barangay' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'barangay_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
+            'province' => ['required', 'string'],
+            'province_name' => ['required', 'string'],
+            'municipality' => ['required', 'string'],
+            // Without a municipality the order's shipping-address snapshot has
+            // none, CourierAssignmentService cannot match a service area, and
+            // no rider is ever assigned.
+            'municipality_name' => ['required', 'string'],
+            'barangay' => ['required', 'string'],
+            'barangay_name' => ['required', 'string'],
 
             'street' => ['required', 'string', 'max:255'],
             'house_number' => ['nullable', 'string', 'max:50'],
             'address_detail' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:10'],
 
             'upload_id' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+
             'terms' => ['required', 'accepted'],
         ];
     }
@@ -124,10 +159,11 @@ class StoreBuyerRegistrationRequest extends FormRequest
             'contact_no.regex' => 'Enter a valid PH mobile number (09XXXXXXXXX).',
             'contact_no.unique' => 'This mobile number is already in use.',
             'birthday.before_or_equal' => 'You must be at least 18 years old.',
+            'upload_id.uploaded' => 'Upload ID failed to upload. Use a JPG, PNG, or PDF under 5MB.',
             'upload_id.mimes' => 'Upload ID must be a JPG, PNG, or PDF.',
             'upload_id.max' => 'Upload ID must be smaller than 5MB.',
             'street.required' => 'Street / house number is required.',
-            'province.required' => 'Select a province, or switch to manual address entry.',
+            'province.required' => 'Select a province.',
             'terms.required' => 'You must accept the Terms and Privacy Policy.',
             'terms.accepted' => 'You must accept the Terms and Privacy Policy.',
         ];

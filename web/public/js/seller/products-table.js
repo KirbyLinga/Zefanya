@@ -1,5 +1,5 @@
 /*
- * Seller Products table — row actions (menus, status toggle, delete).
+ * Seller Products table — row actions (menus, status toggle, archive).
  * Static asset loaded via @push('scripts'); no build step required.
  */
 (function () {
@@ -153,10 +153,10 @@
             });
     });
 
-    /* ---------- Delete ---------- */
+    /* ---------- Archive ---------- */
 
     document.addEventListener('click', function (event) {
-        var button = event.target.closest('[data-delete]');
+        var button = event.target.closest('[data-archive]');
         if (!button) {
             return;
         }
@@ -164,15 +164,15 @@
         closeOpenMenu();
 
         var name = button.getAttribute('data-name') || 'this product';
-        if (!window.confirm('Delete "' + name + '"? This cannot be undone.')) {
+        if (!window.confirm('Archive "' + name + '"? It will be hidden from your listings. Product and inventory records will be preserved.')) {
             return;
         }
 
-        var productId = button.getAttribute('data-delete');
+        var productId = button.getAttribute('data-archive');
         var url = button.getAttribute('data-url');
         if (!url) {
-            var desktopDelete = document.querySelector('[data-actions-root="' + productId + '"] [data-delete]');
-            url = desktopDelete ? desktopDelete.getAttribute('data-url') : null;
+            var desktopArchive = document.querySelector('[data-actions-root="' + productId + '"] [data-archive]');
+            url = desktopArchive ? desktopArchive.getAttribute('data-url') : null;
         }
         if (!url) {
             return;
@@ -201,10 +201,10 @@
                 if (card) {
                     card.remove();
                 }
-                toast(data.message || ('"' + name + '" was deleted.'));
+                toast(data.message || ('"' + name + '" was archived.'));
             })
             .catch(function () {
-                toast('Could not delete the product.');
+                toast('Could not archive the product.');
             });
     });
 })();

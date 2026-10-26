@@ -16,7 +16,7 @@ class HomeControllerTest extends TestCase
         $response = $this->get(route('buyer.home'));
 
         $response->assertOk();
-        $response->assertSee('Limited Time Offer');
+        $response->assertSee('Discover Zefanya');
         $response->assertSee('Flash Sale');
         $response->assertSee('Todays For You!');
         $response->assertSee('Best Selling Store');
@@ -78,7 +78,7 @@ class HomeControllerTest extends TestCase
 
     public function test_home_omits_unapproved_sellers_from_best_selling_stores(): void
     {
-        $pending = Seller::factory()->pendingApproval()->create([
+        $pending = Seller::factory()->pending()->create([
             'business_name' => 'Pending Boutique',
         ]);
 

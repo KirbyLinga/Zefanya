@@ -42,44 +42,34 @@ class Order extends Model
     // ── Status rollup ────────────────────────────────────────────────────────
 
     /**
-     * Compute the parent order's status from its seller_orders WITHOUT saving.
-     *
-     * - All seller_orders Completed → Completed.
-     * - Otherwise → the least-advanced (bottleneck) status among the
-     *   non-Completed seller_orders. Completed siblings are excluded so they
-     *   never mask a slice that is still in flight or in the failure sub-pipeline.
-     *
-     * Pipeline rank = position in OrderStatus::cases() declaration order:
-     *   Placed=0 → Confirmed=1 → … → Delivered=9 → Completed=10
-     *   → DeliveryFailed=11 → Returned=12
-     *
-     * DELIVERY_FAILED (11) and RETURNED (12) sit AFTER Completed (10) on the
-     * enum's declaration order. Because we exclude Completed from the min,
-     * these ranks ensure a problem slice is never masked by a Completed sibling.
-     * Against a Delivered sibling (rank 9), DeliveryFailed (11) ranks higher —
-     * this is a known limitation: in the failure sub-pipeline a failed delivery
-     * is arguably "less progressed" than a successful one, but the rank-based
-     * approach still surfaces Delivered as the bottleneck, which is correct for
-     * the common multi-seller case (some delivered, some still shipping).
+     * Returned / cancelled shipments are resolved without becoming completed.
+     * A fully resolved mixed order is Completed; an all-returned order is Returned;
+     * an all-cancelled order is Cancelled.
      */
     public function computeRollupStatus(): ?OrderStatus
     {
         $statuses = $this->sellerOrders->pluck('status')->filter()->values();
-
         if ($statuses->isEmpty()) {
             return null;
         }
+        $resolved = [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled];
+        $unresolved = $statuses->reject(fn (OrderStatus $status): bool => in_array($status, $resolved, true));
+        if ($unresolved->isEmpty()) {
+            if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Returned)) {
+                return OrderStatus::Returned;
+            }
+            if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Cancelled)) {
+                return OrderStatus::Cancelled;
+            }
 
-        if ($statuses->every(fn (OrderStatus $s): bool => $s === OrderStatus::Completed)) {
             return OrderStatus::Completed;
         }
+        if ($unresolved->contains(OrderStatus::DeliveryFailed)) {
+            return OrderStatus::DeliveryFailed;
+        }
+        $ranks = array_flip(array_map(fn (OrderStatus $status): string => $status->value, OrderStatus::cases()));
 
-        // Exclude Completed: a completed sibling must not hide an in-progress slice.
-        $ranks = array_flip(array_map(fn (OrderStatus $s): string => $s->value, OrderStatus::cases()));
-        $nonCompleted = $statuses->filter(fn (OrderStatus $s): bool => $s !== OrderStatus::Completed);
-        $minRank = $nonCompleted->map(fn (OrderStatus $s) => $ranks[$s->value])->min();
-
-        return OrderStatus::cases()[$minRank];
+        return $unresolved->sortBy(fn (OrderStatus $status): int => $ranks[$status->value])->first();
     }
 
     /**
@@ -98,29 +88,10 @@ class Order extends Model
         return $this;
     }
 
-    /**
-     * Whether the buyer can confirm receipt of this order right now.
-     *
-     * True only when EVERY seller_order is at Delivered or Completed AND
-     * at least one is still at Delivered (i.e. there is at least one slice
-     * the buyer hasn't confirmed yet, and no slice is left stuck behind on
-     * an earlier pipeline state).
-     */
+    /** Any delivered shipment may be confirmed independently of its siblings. */
     public function canBeConfirmed(): bool
     {
-        $statuses = $this->sellerOrders->pluck('status')->filter()->values();
-
-        if ($statuses->isEmpty()) {
-            return false;
-        }
-
-        // At least one slice must still be awaiting confirmation.
-        if (! $statuses->contains(OrderStatus::Delivered)) {
-            return false;
-        }
-
-        // No slice may be left behind on the pre-delivery pipeline.
-        return $statuses->every(fn (OrderStatus $s): bool => in_array($s, [OrderStatus::Delivered, OrderStatus::Completed], true));
+        return $this->sellerOrders->contains('status', OrderStatus::Delivered);
     }
 
     // ── Reference generation ─────────────────────────────────────────────────

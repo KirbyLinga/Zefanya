@@ -6,14 +6,12 @@
       - lineOfBusiness relation
 --}}
 @php
-    // Deterministic "star rating" derived from active product count so it
-    // looks realistic without a real rating system yet.
-    $count      = $store->active_products_count ?? 0;
-    $starRating = $count >= 20 ? '4.9' : ($count >= 10 ? '4.7' : ($count >= 5 ? '4.5' : '4.3'));
+    $count = $store->active_products_count ?? 0;
+    $starRating = $store->reviews_count ? number_format((float) $store->reviews_avg_rating, 1) : null;
     $fullStars  = (int) floor((float) $starRating);
     $hasHalf    = ((float) $starRating - $fullStars) >= 0.5;
 @endphp
-<div class="overflow-hidden rounded-2xl border border-buyer-line/80 bg-white">
+<div class="buyer-product-card h-full bg-white">
     {{-- Store header --}}
     <div class="flex items-center gap-3 px-4 pt-4 pb-3">
         {{-- Avatar --}}
@@ -43,7 +41,7 @@
                         @endif
                     @endfor
                 </div>
-                <span class="text-[10.5px] font-semibold text-buyer-ink-soft">{{ $starRating }}</span>
+                <span class="text-[10.5px] font-semibold text-buyer-ink-soft">{{ $starRating ? $starRating.'/5 ('.$store->reviews_count.' reviews)' : 'No reviews yet' }}</span>
                 <span class="text-[10px] text-neutral-400">· {{ $count }} listed</span>
             </div>
         </div>
@@ -58,11 +56,12 @@
     {{-- Product thumbnails --}}
     <div class="grid grid-cols-3 gap-px bg-buyer-line/60">
         @forelse ($store->products as $product)
-            <div class="aspect-square overflow-hidden bg-secondary-100">
+            <div class="relative aspect-square overflow-hidden bg-secondary-100">
+                @include('Components.buyer.wishlist-heart')
                 @if ($product->catalogImageUrl())
                     <img src="{{ $product->catalogImageUrl() }}"
                          alt="{{ $product->name }}"
-                         class="h-full w-full object-cover transition-transform duration-200 hover:scale-105">
+                         class="h-full w-full object-cover object-top">
                 @endif
             </div>
         @empty

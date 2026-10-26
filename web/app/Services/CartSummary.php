@@ -103,12 +103,6 @@ final class CartSummary
         return $this->availableItems->whereIn('id', $this->selectedIds)->values();
     }
 
-    /** Total quantity of the SELECTED items (the "N items" pill). */
-    public function selectedQuantity(): int
-    {
-        return (int) $this->selectedItems()->sum('quantity');
-    }
-
     /** Number of distinct SELECTED cart lines. */
     public function selectedLineCount(): int
     {
@@ -122,12 +116,12 @@ final class CartSummary
     }
 
     /**
-     * Total quantity of EVERY line, available or not — this is the navbar badge,
+     * Number of EVERY cart line, available or not — this is the navbar badge,
      * so the shopper still sees items that went out of stock.
      */
-    public function cartQuantity(): int
+    public function cartLineCount(): int
     {
-        return (int) $this->allItems->sum('quantity');
+        return $this->allItems->count();
     }
 
     public function isEmpty(): bool
@@ -196,10 +190,11 @@ final class CartSummary
             'subtotal_raw' => $this->subtotalCentavos,
             'discount_raw' => $this->discountCentavos,
             'total_raw' => $this->totalCentavos,
-            'selected_qty' => $this->selectedQuantity(),
+            // Legacy key retained for clients; item counts are cart lines.
+            'selected_qty' => $this->selectedLineCount(),
             'selected_lines' => $this->selectedLineCount(),
             'available_lines' => $this->availableLineCount(),
-            'cart_count' => $this->cartQuantity(),
+            'cart_count' => $this->cartLineCount(),
             'line_totals' => $this->lineTotals(),
             'has_voucher' => $this->voucher !== null,
             'voucher_code' => $this->voucher?->code,

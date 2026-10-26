@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Buyer\Buyer;
 use App\Models\Order;
+use Illuminate\Auth\Access\Response;
 
 /**
  * Authorization for BUYER order actions: a buyer may only view/confirm THEIR
@@ -11,12 +12,20 @@ use App\Models\Order;
  */
 class BuyerOrderPolicy
 {
-    public function view(Buyer $buyer, Order $order): bool
+    public function view(Buyer $buyer, Order $order): Response
     {
-        return $order->buyer_id === $buyer->getKey();
+        return $order->buyer_id === $buyer->getKey()
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 
-    public function confirmReceived(Buyer $buyer, Order $order): bool
+    public function confirmReceived(Buyer $buyer, Order $order): Response
+    {
+        return $this->view($buyer, $order);
+    }
+
+    /** Cancel an unaccepted seller_order slice on the buyer's own order. */
+    public function cancelSellerOrder(Buyer $buyer, Order $order): Response
     {
         return $this->view($buyer, $order);
     }

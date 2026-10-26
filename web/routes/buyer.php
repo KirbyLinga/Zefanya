@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\Buyer\AccountController;
 use App\Http\Controllers\Buyer\CartController;
 use App\Http\Controllers\Buyer\CategoryController;
@@ -7,12 +8,12 @@ use App\Http\Controllers\Buyer\ChatController;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Http\Controllers\Buyer\HelpController;
 use App\Http\Controllers\Buyer\HomeController;
-use App\Http\Controllers\Buyer\LoginController;
 use App\Http\Controllers\Buyer\MessageController;
 use App\Http\Controllers\Buyer\NotificationController;
 use App\Http\Controllers\Buyer\OrderController;
 use App\Http\Controllers\Buyer\PageController;
 use App\Http\Controllers\Buyer\ProductController;
+use App\Http\Controllers\Buyer\ReviewController;
 use App\Http\Controllers\Buyer\SearchController;
 use App\Http\Controllers\Buyer\SettingsController;
 use App\Http\Controllers\Buyer\WishlistController;
@@ -29,14 +30,6 @@ use App\Http\Controllers\Buyer\WishlistController;
 // ── Guest-accessible browsing ──────────────────────────────
 Route::prefix('buyer')->name('buyer.')->group(function () {
 
-    // Auth entry points (must stay outside auth:buyer)
-    Route::middleware('guest:buyer')->group(function () {
-        Route::get('/login', [LoginController::class, 'show'])->name('login');
-        Route::post('/login', [LoginController::class, 'login'])
-            ->name('login.submit')
-            ->middleware('throttle:5,1');
-    });
-
     // Catalog browsing — open to guests AND logged-in buyers
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/home', [HomeController::class, 'index']);
@@ -51,10 +44,15 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
     Route::get('/pages/terms-of-service', [PageController::class, 'termsOfService'])->name('pages.terms-of-service');
     Route::get('/pages/about', [PageController::class, 'about'])->name('pages.about');
     Route::get('/pages/contact', [PageController::class, 'contact'])->name('pages.contact');
+    // Help is public — the landing footer and guest shop both link here.
+    Route::get('/help', [HelpController::class, 'index'])->name('help.index');
 
     // ── Login required from here down ──────────────────────
-    Route::middleware('auth:buyer')->group(function () {
-        Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+    Route::middleware(['auth:buyer', 'buyer.active'])->group(function () {
+        Route::post('/products/{product}/reviews', [ReviewController::class, 'store'])
+            ->middleware('throttle:10,1')->name('products.reviews.store');
+
+        Route::post('/logout', [UnifiedLoginController::class, 'logout'])->name('logout');
 
         Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
         Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
@@ -80,6 +78,8 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/confirm-received', [OrderController::class, 'confirmReceived'])->name('orders.confirmReceived');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/cancel', [OrderController::class, 'cancelSellerOrder'])
+            ->name('orders.cancelSellerOrder');
 
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
         Route::get('/chat/{id}', [ChatController::class, 'show'])->name('chat.show');
@@ -101,17 +101,15 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::post('/settings/delete-account', [SettingsController::class, 'deleteAccount'])->name('settings.deleteAccount');
 
-        Route::get('/help', [HelpController::class, 'index'])->name('help.index');
-
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/count', [NotificationController::class, 'count'])->name('notifications.count');
         Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.markRead');
         Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.markAllRead');
 
         Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
+        Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
         Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
         Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
         Route::post('/messages/get-or-create', [MessageController::class, 'getOrCreateConversation'])->name('messages.getOrCreate');
-        Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
     });
 });

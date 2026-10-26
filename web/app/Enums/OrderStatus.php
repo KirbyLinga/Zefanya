@@ -38,6 +38,9 @@ enum OrderStatus: string
 
     case Returned = 'RETURNED';
 
+    /** Seller declined their slice before handover (terminal; stock restored). */
+    case Cancelled = 'CANCELLED';
+
     public function label(): string
     {
         return match ($this) {
@@ -54,6 +57,7 @@ enum OrderStatus: string
             self::Completed => 'Completed',
             self::DeliveryFailed => 'Delivery failed',
             self::Returned => 'Returned',
+            self::Cancelled => 'Cancelled',
         };
     }
 
@@ -68,7 +72,7 @@ enum OrderStatus: string
             self::AssignedToRider, self::PickedUp, self::AtSortingCenter,
             self::Sorted, self::OutForDelivery => 'shipped',
             self::Delivered, self::Completed,
-            self::DeliveryFailed, self::Returned => 'delivered',
+            self::DeliveryFailed, self::Returned, self::Cancelled => 'delivered',
         };
     }
 }

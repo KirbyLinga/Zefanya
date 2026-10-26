@@ -23,7 +23,7 @@
     </nav>
 
     {{-- ── Two-column hero ── --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px] xl:grid-cols-2">
+    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_420px] xl:grid-cols-2">
       @include('Buyer.Products._gallery')
       @include('Buyer.Products._buybox')
     </div>
@@ -31,10 +31,11 @@
     {{-- ── Seller strip ── --}}
     @include('Buyer.Products._seller-strip')
 
-    {{-- ── Product details --}}
-    @include('Buyer.Products._tabs')
+    @include('Buyer.Products._tabs', ['description' => $product->description])
 
     {{-- ── Related products carousel --}}
+    @include('Buyer.Products._reviews')
+
     @include('Buyer.Products._related')
 
   </div>

@@ -1,188 +1,162 @@
-/**
- * Buyer search interactions: suggestions dropdown, recent searches, debounced API calls
- */
-
+// One owner for buyer navbar submissions and product suggestions.
 (function () {
-    let debounceTimer;
-    const DEBOUNCE_DELAY = 300; // ms
+    function initialize() {
+        document.querySelectorAll('.zf-search-wrap').forEach((wrap, index) => {
+            const input = wrap.querySelector('.zf-search-input');
+            const button = wrap.querySelector('.zf-search-btn');
+            if (!input || !button || wrap.dataset.searchInitialized === '1') return;
+            wrap.dataset.searchInitialized = '1';
 
-    function initSearch() {
-        const searchInput = document.querySelector('.zf-search-input');
-        const searchBtn = document.querySelector('.zf-search-btn');
-        const catMenuToggle = document.getElementById('catMenuToggle');
-
-        if (!searchInput || !searchBtn) return;
-
-        // Submit search on button click
-        searchBtn.addEventListener('click', function () {
-            const query = searchInput.value.trim();
-            if (query.length >= 1) {
-                savSearchTerm(query);
-                window.location.href = `/buyer/search?q=${encodeURIComponent(query)}`;
+            const currentUrl = new URL(window.location.href);
+            input.value = currentUrl.searchParams.get('q') || input.value;
+            input.style.textTransform = 'none';
+            let dropdown = wrap.querySelector('[data-search-suggestions]');
+            if (!dropdown) {
+                dropdown = document.createElement('div');
+                dropdown.setAttribute('data-search-suggestions', '');
+                dropdown.className = 'absolute top-[calc(100%+6px)] left-0 right-0 z-50 hidden bg-white rounded-lg border border-line shadow-xl overflow-hidden';
+                wrap.appendChild(dropdown);
             }
-        });
+            dropdown.id = 'buyer-search-suggestions-' + index;
+            dropdown.setAttribute('role', 'listbox');
+            input.setAttribute('role', 'combobox');
+            input.setAttribute('aria-autocomplete', 'list');
+            input.setAttribute('aria-controls', dropdown.id);
+            input.setAttribute('aria-expanded', 'false');
+            let timer;
+            let revision = 0;
+            let options = [];
+            let active = -1;
 
-        // Submit search on Enter key
-        searchInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const query = searchInput.value.trim();
-                if (query.length >= 1) {
-                    saveSearchTerm(query);
-                    window.location.href = `/buyer/search?q=${encodeURIComponent(query)}`;
+            function close() {
+                clearTimeout(timer);
+                revision++;
+                dropdown.classList.add('hidden');
+                input.setAttribute('aria-expanded', 'false');
+                input.removeAttribute('aria-activedescendant');
+                active = -1;
+            }
+
+            function searchUrl() {
+                const current = new URL(window.location.href);
+                const destination = new URL('/buyer/products', current);
+                ['category', 'seller', 'sort', 'min_price', 'max_price'].forEach(key => {
+                    if (current.searchParams.has(key)) destination.searchParams.set(key, current.searchParams.get(key));
+                });
+                const category = current.pathname.match(/^\/buyer\/categories\/(\d+)\/?$/)?.[1];
+                if (category && !destination.searchParams.has('category')) destination.searchParams.set('category', category);
+                const term = input.value.trim();
+                if (term) destination.searchParams.set('q', term);
+                destination.searchParams.set('page', '1');
+                return destination.pathname + destination.search;
+            }
+
+            function submit() {
+                const term = input.value.trim();
+                if (term) {
+                    try {
+                        const stored = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+                        const recent = Array.isArray(stored) ? stored.filter(value => typeof value === 'string' && value !== term) : [];
+                        localStorage.setItem('recentSearches', JSON.stringify([term, ...recent].slice(0, 10)));
+                    } catch { /* Search also works when browser storage is unavailable. */ }
                 }
-            }
-        });
-
-        // Debounced search suggestions as user types
-        searchInput.addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            const query = searchInput.value.trim();
-
-            if (query.length < 1) {
-                // Hide suggestions if empty
-                hideSuggestions();
-                return;
+                const destination = searchUrl();
+                close();
+                window.location.assign(destination);
             }
 
-            debounceTimer = setTimeout(function () {
-                fetchSearchSuggestions(query);
-            }, DEBOUNCE_DELAY);
-        });
+            function show(products) {
+                dropdown.replaceChildren();
+                options = [];
+                active = -1;
+                input.removeAttribute('aria-activedescendant');
+                products.filter(product => /^\d+$/.test(String(product.id))).slice(0, 5).forEach(product => {
+                    const link = document.createElement('a');
+                    link.href = '/buyer/products/' + product.id;
+                    link.id = dropdown.id + '-option-' + options.length;
+                    link.setAttribute('role', 'option');
+                    link.setAttribute('aria-selected', 'false');
+                    link.className = 'flex items-center gap-3 px-4 py-3 border-b border-line last:border-b-0 hover:bg-primary-50 transition-colors';
+                    const image = document.createElement(product.image ? 'img' : 'div');
+                    image.className = 'h-12 w-12 object-contain rounded bg-gray-100';
+                    if (product.image) {
+                        image.src = product.image;
+                        image.alt = '';
+                    }
+                    const content = document.createElement('div');
+                    content.className = 'flex-1 min-w-0';
+                    const name = document.createElement('div');
+                    name.className = 'text-[13px] font-medium text-buyer-ink truncate';
+                    name.textContent = product.name;
+                    const price = document.createElement('div');
+                    price.className = 'text-[12px] text-buyer-ink-soft';
+                    price.textContent = product.price || '';
+                    content.appendChild(name);
+                    content.appendChild(price);
+                    link.appendChild(image);
+                    link.appendChild(content);
+                    dropdown.appendChild(link);
+                    options.push(link);
+                });
+                if (!options.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'px-4 py-3 text-center text-[13px] text-buyer-ink-soft';
+                    empty.setAttribute('role', 'status');
+                    empty.textContent = 'No results found';
+                    dropdown.appendChild(empty);
+                }
+                dropdown.classList.remove('hidden');
+                input.setAttribute('aria-expanded', 'true');
+            }
 
-        // Close suggestions when category menu opens
-        if (catMenuToggle) {
-            catMenuToggle.addEventListener('change', function () {
-                if (this.checked) {
-                    hideSuggestions();
+            function suggest() {
+                close();
+                const term = input.value.trim();
+                if (!term) return;
+                const requestRevision = revision;
+                timer = setTimeout(async () => {
+                    try {
+                        const response = await fetch('/buyer/search/suggestions?term=' + encodeURIComponent(term), { headers: { Accept: 'application/json' } });
+                        if (!response.ok) throw new Error('Search suggestions unavailable');
+                        const data = await response.json();
+                        if (revision !== requestRevision || input.value.trim() !== term) return;
+                        show(Array.isArray(data.popular) ? data.popular : []);
+                    } catch {
+                        if (revision === requestRevision) close();
+                    }
+                }, 250);
+            }
+
+            button.addEventListener('click', event => { event.preventDefault(); submit(); });
+            input.addEventListener('input', suggest);
+            input.addEventListener('focus', suggest);
+            input.addEventListener('keydown', event => {
+                if (event.isComposing) return;
+                if (event.key === 'Escape') { close(); return; }
+                if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !dropdown.classList.contains('hidden') && options.length) {
+                    event.preventDefault();
+                    active = (active + (event.key === 'ArrowDown' ? 1 : (active < 0 ? 0 : -1)) + options.length) % options.length;
+                    options.forEach((option, i) => {
+                        option.setAttribute('aria-selected', String(i === active));
+                        option.classList.toggle('bg-primary-50', i === active);
+                    });
+                    input.setAttribute('aria-activedescendant', options[active].id);
+                    options[active].scrollIntoView({ block: 'nearest' });
+                }
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (active >= 0 && !dropdown.classList.contains('hidden')) {
+                        const destination = options[active].getAttribute('href');
+                        close();
+                        window.location.assign(destination);
+                    } else submit();
                 }
             });
-        }
-
-        // Close suggestions on outside click
-        document.addEventListener('click', function (e) {
-            if (!searchInput.contains(e.target) && !document.querySelector('.zf-search-suggestions')?.contains(e.target)) {
-                hideSuggestions();
-            }
+            document.addEventListener('click', event => { if (!wrap.contains(event.target)) close(); });
+            wrap.querySelector('#catMenuToggle')?.addEventListener('change', event => { if (event.target.checked) close(); });
         });
     }
 
-    function fetchSearchSuggestions(term) {
-        fetch(`/buyer/search/suggestions?term=${encodeURIComponent(term)}`, {
-            headers: {
-                'Accept': 'application/json',
-            },
-        })
-            .then(res => res.json())
-            .then(data => {
-                displaySuggestions(term, data);
-            })
-            .catch(err => console.error('Error fetching search suggestions:', err));
-    }
-
-    function displaySuggestions(term, data) {
-        const searchInput = document.querySelector('.zf-search-input');
-        const searchWrap = document.querySelector('.zf-search-wrap');
-
-        // Remove existing suggestions if present
-        const existing = document.querySelector('.zf-search-suggestions');
-        if (existing) {
-            existing.remove();
-        }
-
-        // Create suggestions container
-        const container = document.createElement('div');
-        container.className = 'zf-search-suggestions absolute top-[calc(100%+6px)] left-0 right-0 z-50 rounded-lg border border-line bg-white shadow-lg overflow-hidden';
-
-        let html = '';
-
-        // Render recent searches (if any)
-        if (data.recent && data.recent.length > 0) {
-            html += '<div class="border-b border-line">';
-            html += '<div class="px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-neutral-500">Recent Searches</div>';
-            data.recent.forEach(item => {
-                html += `
-                    <button type="button" class="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2" data-search-term="${item}">
-                        <i data-lucide="clock" width="14" height="14" class="text-neutral-400"></i>
-                        <span class="text-[13px] text-buyer-ink">${escapeHtml(item)}</span>
-                    </button>
-                `;
-            });
-            html += '</div>';
-        }
-
-        // Render popular/matching products
-        if (data.popular && data.popular.length > 0) {
-            html += '<div>';
-            html += '<div class="px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-neutral-500">Popular Products</div>';
-            data.popular.forEach(product => {
-                html += `
-                    <a href="/buyer/products/${product.id}" class="block px-4 py-2 hover:bg-gray-50 flex items-center gap-2 border-b border-line last:border-0">
-                        ${product.image ? `<img src="${product.image}" alt="" class="h-8 w-8 rounded object-cover bg-gray-100">` : '<div class="h-8 w-8 rounded bg-gray-100"></div>'}
-                        <span class="text-[13px] text-buyer-ink truncate">${escapeHtml(product.name)}</span>
-                    </a>
-                `;
-            });
-            html += '</div>';
-        }
-
-        if (html === '') {
-            html = '<div class="px-4 py-3 text-center"><p class="text-[12px] text-buyer-ink-soft">No results found</p></div>';
-        }
-
-        container.innerHTML = html;
-        searchWrap.appendChild(container);
-
-        // Wire up recent search clicks
-        container.querySelectorAll('[data-search-term]').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                const term = this.dataset.searchTerm;
-                saveSearchTerm(term);
-                window.location.href = `/buyer/search?q=${encodeURIComponent(term)}`;
-            });
-        });
-
-        // Render lucide icons in suggestions
-        lucide.createIcons();
-    }
-
-    function hideSuggestions() {
-        const suggestions = document.querySelector('.zf-search-suggestions');
-        if (suggestions) {
-            suggestions.remove();
-        }
-    }
-
-    function saveSearchTerm(term) {
-        // Save to localStorage (for recent searches)
-        try {
-            let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
-            // Remove duplicates and limit to 10
-            recentSearches = recentSearches.filter(s => s !== term);
-            recentSearches.unshift(term);
-            recentSearches = recentSearches.slice(0, 10);
-            localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
-        } catch (e) {
-            console.error('Error saving search term:', e);
-        }
-    }
-
-    function escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;',
-        };
-        return text.replace(/[&<>"']/g, m => map[m]);
-    }
-
-    // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSearch);
-    } else {
-        initSearch();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize);
+    else initialize();
 })();

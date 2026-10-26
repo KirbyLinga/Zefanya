@@ -22,6 +22,9 @@
         @if (session('auth.status_message'))
             <div class="login-modal__error">
                 {{ session('auth.status_message') }}
+                @if (session('auth.resume_url'))
+                    <div><a href="{{ session('auth.resume_url') }}" style="text-decoration: underline;">{{ session('auth.resume_label') ?? 'Verify your email' }}</a></div>
+                @endif
             </div>
         @elseif ($errors->any())
             <div class="login-modal__error">
@@ -169,6 +172,12 @@
             toggleBtn.innerHTML = '<i data-lucide="' + (isPassword ? 'eye-off' : 'eye') + '" width="18" height="18"></i>';
             if (window.lucide) lucide.createIcons();
         });
+    }
+
+    // Direct links, auth redirects and failed submissions all use this modal.
+    if (@json(request()->boolean('login') || session('auth.open_login_modal') || session('auth.status_message'))) {
+        openModal();
+        if (window.lucide) window.lucide.createIcons();
     }
 
     // Success callback — called after successful login/register.

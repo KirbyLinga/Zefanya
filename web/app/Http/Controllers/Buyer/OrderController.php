@@ -6,7 +6,10 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\SellerOrder;
+use App\Services\BuyerShipmentConfirmation;
 use App\Services\SellerOrderStatusService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,10 +40,11 @@ class OrderController extends Controller
     private const CANCELLED_STATUSES = [
         OrderStatus::DeliveryFailed,
         OrderStatus::Returned,
+        OrderStatus::Cancelled,
     ];
 
     public function __construct(
-        private readonly SellerOrderStatusService $status = new SellerOrderStatusService,
+        private readonly BuyerShipmentConfirmation $confirmations,
     ) {}
 
     /**
@@ -85,7 +89,7 @@ class OrderController extends Controller
 
         foreach ($allOrdersForCounts as $o) {
             $statuses = $o->sellerOrders->pluck('status');
-            if ($statuses->contains(fn ($s) => $s === OrderStatus::Completed)) {
+            if ($o->computeRollupStatus() === OrderStatus::Completed) {
                 $counts['completed']++;
             } elseif ($statuses->contains(fn ($s) => in_array($s, self::TO_RECEIVE_STATUSES, true))) {
                 $counts['to_receive']++;
@@ -106,10 +110,9 @@ class OrderController extends Controller
                 'sellerOrders',
                 fn ($q) => $q->whereIn('status', self::TO_RECEIVE_STATUSES)
             ),
-            'completed' => $baseQuery->whereHas(
-                'sellerOrders',
-                fn ($q) => $q->where('status', OrderStatus::Completed)
-            ),
+            'completed' => $baseQuery
+                ->whereHas('sellerOrders', fn ($q) => $q->where('status', OrderStatus::Completed))
+                ->whereDoesntHave('sellerOrders', fn ($q) => $q->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled])),
             'cancelled' => $baseQuery->whereHas(
                 'sellerOrders',
                 fn ($q) => $q->whereIn('status', self::CANCELLED_STATUSES)
@@ -144,7 +147,17 @@ class OrderController extends Controller
 
         $order->load([
             'sellerOrders' => fn ($q) => $q
-                ->with('courier', 'orderItems.product', 'statusHistories', 'payment'),
+                ->with(
+                    'seller',
+                    'courier',
+                    'orderItems.product',
+                    'statusHistories',
+                    'parcelHandoffs', 'parcelReturn.events',
+                    'payment',
+                    'manifestItems.manifest.originHub',
+                    'manifestItems.manifest.destinationHub',
+                    'manifestItems.manifest.provider',
+                ),
         ]);
 
         return view('Buyer.Orders.show', [
@@ -153,51 +166,87 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * Buyer confirms receipt → each Delivered seller_order becomes Completed.
-     *
-     * Gate: canBeConfirmed() ensures every slice is Delivered or Completed with
-     * at least one Delivered — the buyer cannot partially confirm an order that
-     * still has slices in transit.
-     */
+    /** Confirm a selected delivered shipment, or all delivered shipments. */
     public function confirmReceived(Order $order, Request $request): RedirectResponse
     {
         $buyer = $request->user('buyer');
-
-        // Another buyer's order → 404 (avoid leaking existence).
-        abort_unless($order->buyer_id === $buyer->id, 404);
-
-        // Policy: a buyer may only confirm receipt of their own order.
         $this->authorizeForUser($buyer, 'confirmReceived', $order);
+        $data = $request->validate(['seller_order_id' => ['nullable', 'integer', 'min:1']]);
+        $this->confirmations->confirm(
+            $order, $buyer, isset($data['seller_order_id']) ? (int) $data['seller_order_id'] : null,
+        );
 
-        $order->load('sellerOrders');
+        return back()->with('success', 'Delivered shipment confirmed. Thank you!');
+    }
 
-        if (! $order->canBeConfirmed()) {
-            return back()->with('error', 'There are no delivered items to confirm right now.');
+    /**
+     * Buyer cancels one seller_order slice while it is still PLACED (before
+     * the seller accepts). Stock/payment side effects run through the shared
+     * status service (same path as F1 seller decline).
+     */
+    public function cancelSellerOrder(
+        Order $order,
+        SellerOrder $sellerOrder,
+        Request $request,
+    ): RedirectResponse|JsonResponse {
+        $buyer = $request->user('buyer');
+        $this->authorizeForUser($buyer, 'cancelSellerOrder', $order);
+
+        if ((int) $sellerOrder->order_id !== (int) $order->id) {
+            abort(404);
         }
 
-        $delivered = $order->sellerOrders
-            ->where('status', OrderStatus::Delivered)
-            ->values();
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
 
-        // ONE transaction: either all Delivered slices advance to Completed or
-        // none do. SellerOrderStatusService::transition() also runs the parent
-        // rollup + COD settlement inside ITS transaction — the outer transaction
-        // here is a savepoint, so a throw rolls everything back.
-        return DB::transaction(function () use ($delivered, $buyer): RedirectResponse {
-            foreach ($delivered as $sellerOrder) {
-                $this->status->transition(
-                    $sellerOrder,
-                    OrderStatus::Completed,
-                    note: 'Confirmed received by buyer.',
-                    changedBy: $buyer->fullName(),
+        $service = new SellerOrderStatusService;
+
+        try {
+            DB::transaction(function () use ($sellerOrder, $service, $validated, $buyer): void {
+                $current = SellerOrder::query()
+                    ->whereKey($sellerOrder->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($current === null) {
+                    abort(404);
+                }
+
+                if ($current->status !== OrderStatus::Placed) {
+                    throw new \InvalidArgumentException(
+                        'This shipment can no longer be cancelled — the seller has already started preparing it.'
+                    );
+                }
+
+                $service->transition(
+                    $current,
+                    OrderStatus::Cancelled,
+                    note: 'Buyer cancelled: '.$validated['reason'],
+                    changedBy: 'buyer',
                     actor: OrderActor::Buyer,
-                    actorId: $buyer->id,
+                    actorId: (int) $buyer->id,
                     source: 'web',
+                    expectedFrom: OrderStatus::Placed,
                 );
+            });
+        } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
             }
 
-            return back()->with('success', 'Order marked as received. Thank you!');
-        });
+            return back()->withErrors(['reason' => $e->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'status' => OrderStatus::Cancelled->value,
+                'status_label' => OrderStatus::Cancelled->label(),
+                'message' => 'Shipment cancelled. The seller has been notified.',
+            ]);
+        }
+
+        return back()->with('success', 'Shipment cancelled. The seller has been notified.');
     }
 }
