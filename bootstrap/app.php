@@ -2,6 +2,7 @@
 
 use App\Enums\AuthRole;
 use App\Http\Middleware\Admin\EnsureAdminRole;
+use App\Http\Middleware\ApiRole;
 use App\Http\Middleware\AuthenticateRoleSession;
 use App\Http\Middleware\Buyer\EnsureBuyerActive;
 use App\Http\Middleware\EnforceSingleBrowserAccount;
@@ -9,11 +10,13 @@ use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
 use App\Http\Middleware\RedirectIfAuthenticatedRole;
 use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -74,7 +77,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // On API requests render authentication failures as a consistent JSON
         // body (success, message, data, errors) instead of the framework's
         // default HTML "Unauthenticated." page or string.
-        $exceptions->renderable(function (\Illuminate\Auth\AuthenticationException $e, Request $request): \Symfony\Component\HttpFoundation\Response {
+        $exceptions->renderable(function (AuthenticationException $e, Request $request): ?Response {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
             $message = $e->getMessage() ?? 'Unauthenticated.';
 
             $guards = $e->guards();
