@@ -30,7 +30,7 @@ class OrderStatusGraphTest extends TestCase
         'PLACED' => ['CONFIRMED', 'READY_FOR_PICKUP', 'CANCELLED'],
         'CONFIRMED' => ['PREPARING', 'CANCELLED'],
         'PREPARING' => ['READY_FOR_PICKUP', 'CANCELLED'],
-        'READY_FOR_PICKUP' => ['PICKED_UP'],
+        'READY_FOR_PICKUP' => ['PICKED_UP', 'CANCELLED'],
         'PICKED_UP' => ['AT_SORTING_CENTER'],
         'AT_SORTING_CENTER' => ['SORTED'],
         'SORTED' => ['ASSIGNED_TO_RIDER'],
@@ -87,8 +87,9 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 17 legal edges (canonical pipeline + seller decline from packing states).
-        $this->assertSame(17, $checked);
+        // 18 legal edges (canonical pipeline + seller decline from packing
+        // states + rider cancellation after a second failed pickup).
+        $this->assertSame(18, $checked);
     }
 
     public function test_every_illegal_pair_is_rejected_with_no_writes(): void
@@ -131,8 +132,8 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 14×14 = 196 pairs − 14 self-transitions − 17 legal edges = 165.
-        $this->assertSame(165, $rejected);
+        // 14×14 = 196 pairs − 14 self-transitions − 18 legal edges = 164.
+        $this->assertSame(164, $rejected);
     }
 
     /** The specific skips called out in review must all be rejected. */

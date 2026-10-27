@@ -9,6 +9,7 @@ use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Buyer\Buyer;
+use App\Models\CodRemittance;
 use App\Models\Courier;
 use App\Models\IncidentEvents;
 use App\Models\Incidents;
@@ -25,6 +26,7 @@ use App\Models\SellerSettlement;
 use App\Models\StatusHistory;
 use App\Models\Voucher;
 use App\Services\AutomaticBuyerReceiptService;
+use App\Services\CodRemittanceService;
 use App\Services\RiderOperationsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -147,18 +149,28 @@ class AutomaticBuyerReceiptTest extends TestCase
     {
         $this->sellerOrder->forceFill(['status' => OrderStatus::Delivered->value])->save();
 
-        StatusHistory::query()->create([
-            'seller_order_id' => $this->sellerOrder->id,
-            'from_status' => OrderStatus::OutForDelivery->value,
-            'to_status' => OrderStatus::Delivered->value,
-            'changed_by' => 'Rider',
-            'note' => 'Parcel delivered to buyer.',
-            'actor_type' => 'rider',
-            'actor_id' => $this->rider->id,
-            'source' => 'web',
-            'created_at' => $deliveredAt,
-            'updated_at' => $deliveredAt,
-        ]);
+        $history = StatusHistory::query()
+            ->where('seller_order_id', $this->sellerOrder->id)
+            ->where('to_status', OrderStatus::Delivered->value)
+            ->latest('id')
+            ->first();
+
+        if ($history === null) {
+            $history = StatusHistory::query()->create([
+                'seller_order_id' => $this->sellerOrder->id,
+                'from_status' => OrderStatus::OutForDelivery->value,
+                'to_status' => OrderStatus::Delivered->value,
+                'changed_by' => 'Rider',
+                'note' => 'Parcel delivered to buyer.',
+                'actor_type' => 'rider',
+                'actor_id' => $this->rider->id,
+                'source' => 'web',
+            ]);
+        }
+
+        // created_at is not mass-assignable, so back-date it explicitly. This
+        // also rewrites the real delivery event when the rider flow created it.
+        $history->forceFill(['created_at' => $deliveredAt])->saveQuietly();
     }
 
     /** Helper: complete automatic receipt for this seller order. */
@@ -374,9 +386,9 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_completed_order_creates_settlement_with_finalized_commission(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
-
-        // First complete delivery to create COD remittance and settlement.
+        // Deliver through the real rider flow first: the parcel is still Out
+        // for Delivery at this point, so the proof + COD + settlement records
+        // are created exactly as in production.
         $operations = app(RiderOperationsService::class);
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
@@ -384,13 +396,24 @@ class AutomaticBuyerReceiptTest extends TestCase
             'cod_amount_minor' => 8500,
         ]);
 
+        $this->sellerOrder->refresh();
+        $this->assertSame(OrderStatus::Delivered, $this->sellerOrder->status);
+
+        // Logistics confirms the cash it received; that is what creates the
+        // Seller settlement (still pending commission at this point).
+        $remittance = CodRemittance::query()
+            ->where('seller_order_id', $this->sellerOrder->id)
+            ->firstOrFail();
+        app(CodRemittanceService::class)->confirmReceipt($remittance, $this->provider, 8500);
+
         // Verify settlement exists in pending state.
         $settlement = SellerSettlement::where('seller_order_id', $this->sellerOrder->id)->first();
         $this->assertNotNull($settlement);
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->status);
         $this->assertNull($settlement->commission_bps);
 
-        // Now auto-complete the receipt (72+ hours since delivery).
+        // Back-date the real delivery event, then auto-complete the receipt
+        // (72+ hours since delivery).
         $this->deliverAt(CarbonImmutable::now()->subHours(73));
         $this->autoComplete();
 

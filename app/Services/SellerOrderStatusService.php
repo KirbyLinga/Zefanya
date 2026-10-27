@@ -60,7 +60,7 @@ class SellerOrderStatusService
         OrderStatus::Placed->value => [OrderStatus::Confirmed, OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
         OrderStatus::Confirmed->value => [OrderStatus::Preparing, OrderStatus::Cancelled],
         OrderStatus::Preparing->value => [OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
-        OrderStatus::ReadyForPickup->value => [OrderStatus::PickedUp],
+        OrderStatus::ReadyForPickup->value => [OrderStatus::PickedUp, OrderStatus::Cancelled],
         OrderStatus::PickedUp->value => [OrderStatus::AtSortingCenter],
         OrderStatus::AtSortingCenter->value => [OrderStatus::Sorted],
         OrderStatus::Sorted->value => [OrderStatus::AssignedToRider],
@@ -292,11 +292,12 @@ class SellerOrderStatusService
      * Release couriers when their run concludes:
      *  - AtSortingCenter → the pickup courier is done (parcel is now at the hub).
      *  - Delivered / DeliveryFailed → the delivery courier is done.
+     *  - Cancelled → any reserved pickup courier is done (second pickup failure).
      * Idempotent: setting is_available = true twice is harmless.
      */
     private function releaseCouriers(SellerOrder $sellerOrder, OrderStatus $to): void
     {
-        if ($to === OrderStatus::AtSortingCenter) {
+        if (in_array($to, [OrderStatus::AtSortingCenter, OrderStatus::Cancelled], true)) {
             $pickupCourier = $sellerOrder->courier;
             if ($pickupCourier) {
                 $pickupCourier->forceFill(['is_available' => true])->save();

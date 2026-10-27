@@ -24,7 +24,7 @@
     />
 
     {{-- ========================== STAT CARDS =========================== --}}
-    <section class="grid grid-cols-4 gap-5 mb-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+    <section class="grid grid-cols-3 gap-5 mb-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
         <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-primary-500 text-[#fff8f7]">
                 <i data-lucide="wallet" class="w-[18px] h-[18px]"></i>
@@ -39,6 +39,18 @@
             </p>
         </div>
 
+        <div data-net-earnings class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+            <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-primary-500 text-[#fff8f7]">
+                <i data-lucide="banknote" class="w-[18px] h-[18px]"></i>
+            </div>
+            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Net Earnings</p>
+            <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">₱{{ number_format($netEarningsMinor / 100, 2) }}</p>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">After commission and seller-funded discounts; excludes shipping.</p>
+            @if ($earningsPendingCount > 0)
+                <p class="font-sans text-xs text-[var(--text-muted)] mt-1">{{ number_format($earningsPendingCount) }} completed {{ Str::plural('order', $earningsPendingCount) }} awaiting finalized earnings.</p>
+            @endif
+        </div>
+
         <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-secondary-700 text-[#fff8f7]">
                 <i data-lucide="shopping-bag" class="w-[18px] h-[18px]"></i>
@@ -47,6 +59,14 @@
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">
                 {{ is_null($totalOrders) ? '—' : number_format($totalOrders) }}
             </p>
+        </div>
+
+        <div data-completed-orders class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+            <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-secondary-700 text-[#fff8f7]">
+                <i data-lucide="circle-check" class="w-[18px] h-[18px]"></i>
+            </div>
+            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Completed Orders</p>
+            <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($completedOrders) }}</p>
         </div>
 
         <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
@@ -186,7 +206,7 @@
                          <tr>
                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">#{{ $sellerOrder->id }}</td>
                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $order?->buyer?->fullName() ?? '—' }}</td>
-                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->status->label }}</td>
+                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->status->label() }}</td>
                               <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->created_at->format('M d, Y') }}</td>
                               <td class="px-3 border-b border-neutral-200">
                                   @if($sellerOrder->status === OrderStatus::Placed)

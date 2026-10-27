@@ -6,8 +6,6 @@ use App\Models\Buyer\Buyer;
 use App\Models\Rider;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Illuminate\Http\Session\Store;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -17,79 +15,55 @@ class LoginSessionRevocationTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function buyer_login_clears_other_role_sessions(): void
+    public function another_role_must_log_out_before_a_second_role_can_sign_in(): void
     {
         $seller = Seller::factory()->create(['status' => 'approved']);
         $buyer = Buyer::factory()->create(['status' => 'approved']);
-
-        DB::table('sessions')->insert([
-            'id' => 'seller-session-before',
-            'user_id' => $seller->getAuthIdentifier(),
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'test',
-            'payload' => '{}',
-            'last_activity' => time(),
-        ]);
-
-        $this->actingAs($seller, 'seller')->post(route('home', ['login' => 1]));
-
-        $this->actingAs($buyer, 'buyer')
-            ->post(route('unified.login'), [
-                'email' => $buyer->email,
-                'password' => 'password',
-            ])
-            ->assertRedirect(route('buyer.home'));
-
-        $this->assertDatabaseMissing('sessions', ['id' => 'seller-session-before']);
-
-        // Rider in the first path makes the single-account rule symmetric across
-        // all loginable guards.
         $rider = Rider::factory()->create(['status' => 'approved']);
 
-        DB::table('sessions')->insert([
-            'id' => 'rider-session-before',
-            'user_id' => $rider->getAuthIdentifier(),
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'test',
-            'payload' => '{}',
-            'last_activity' => time(),
-        ]);
+        $this->actingAs($seller, 'seller');
+        $this->actingAs($rider, 'rider');
 
-        $this->actingAs($rider, 'rider')->post(route('home', ['login' => 1]));
+        // Guest-only login: while another role is still signed in, the login
+        // request is redirected to that role's dashboard instead of opening a
+        // second role session in the same browser.
+        $this->post(route('unified.login'), [
+            'email' => $buyer->email,
+            'password' => 'password',
+        ])->assertRedirect(route('seller.dashboard'));
 
-        $this->actingAs($buyer, 'buyer')
-            ->post(route('unified.login'), [
-                'email' => $buyer->email,
-                'password' => 'password',
-            ])
-            ->assertRedirect(route('buyer.home'));
+        $this->assertGuest('buyer');
 
-        $this->assertDatabaseMissing('sessions', ['id' => 'rider-session-before']);
+        // Explicit logout ends every guard, after which the buyer can sign in
+        // on its own and no other role stays authenticated.
+        $this->post(route('unified.logout'))->assertRedirect(route('home'));
+
+        $this->assertGuest('seller');
+        $this->assertGuest('rider');
+
+        $this->post(route('unified.login'), [
+            'email' => $buyer->email,
+            'password' => 'password',
+        ])->assertRedirect(route('buyer.home'));
+
+        $this->assertAuthenticated('buyer');
+        $this->assertGuest('seller');
+        $this->assertGuest('rider');
     }
 
     #[Test]
-    public function buyer_login_restores_a_previously_suppressed_session_after_password_reset(): void
+    public function buyer_login_does_not_touch_a_different_browsers_session(): void
     {
+        $this->useDatabaseSessions();
+
         $buyer = Buyer::factory()->create(['status' => 'approved', 'google_id' => null]);
 
-        // Seed a non-`test` user-agent so the default `test` session the test
-        // harness sets on `$this->actingAs($buyer)` does not collide with the
-        // one we will later create and then restore.
-        DB::table('sessions')->insert([
-            'id' => 'buyer-existing-session',
-            'user_id' => $buyer->getAuthIdentifier(),
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'restored-session',
-            'payload' => '{}',
-            'last_activity' => time(),
-        ]);
+        $this->seedSession($buyer->getAuthIdentifier(), 'buyer-existing-session', 'other-browser');
 
-        $this->actingAs($buyer, 'buyer')
-            ->post(route('unified.login'), [
-                'email' => $buyer->email,
-                'password' => 'password',
-            ])
-            ->assertRedirect(route('buyer.home'));
+        $this->post(route('unified.login'), [
+            'email' => $buyer->email,
+            'password' => 'password',
+        ])->assertRedirect(route('buyer.home'));
 
         $this->assertDatabaseHas('sessions', ['id' => 'buyer-existing-session']);
     }
@@ -97,21 +71,14 @@ class LoginSessionRevocationTest extends TestCase
     #[Test]
     public function buyer_login_suppresses_the_existing_session_on_second_login(): void
     {
+        $this->useDatabaseSessions();
+
         $buyer = Buyer::factory()->create(['status' => 'approved', 'google_id' => null]);
 
-        // Seed a non-`test` user-agent so the default `test` session the test
-        // harness sets on `$this->actingAs($buyer)` does not collide with the
-        // one we will later create and then restore.
-        DB::table('sessions')->insert([
-            'id' => 'buyer-existing-session',
-            'user_id' => $buyer->getAuthIdentifier(),
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'restored-session',
-            'payload' => '{}',
-            'last_activity' => time(),
-        ]);
+        // Same browser means the same IP + User-Agent fingerprint.
+        $this->seedSession($buyer->getAuthIdentifier(), 'buyer-existing-session', 'same-browser');
 
-        $this->actingAs($buyer, 'buyer')
+        $this->withHeader('User-Agent', 'same-browser')
             ->post(route('unified.login'), [
                 'email' => $buyer->email,
                 'password' => 'password',
@@ -126,11 +93,10 @@ class LoginSessionRevocationTest extends TestCase
     {
         $buyer = Buyer::factory()->create(['status' => 'approved', 'google_id' => null]);
 
-        $response = $this->actingAs($buyer, 'buyer')
-            ->post(route('unified.login'), [
-                'email' => $buyer->email,
-                'password' => 'password',
-            ]);
+        $response = $this->post(route('unified.login'), [
+            'email' => $buyer->email,
+            'password' => 'password',
+        ]);
 
         $response->assertRedirect(route('buyer.home'));
 
@@ -138,39 +104,46 @@ class LoginSessionRevocationTest extends TestCase
     }
 
     #[Test]
-    public function buyer_login_suppresses_an_already_present_trace_session_for_the_same_email(): void
+    public function buyer_login_deletes_a_session_recorded_as_suppressed_for_the_same_account(): void
     {
-        // Create a fake request the suppression path can read so the assertion
-        // does not depend on the test harness session.
-        $fakeRequest = Request::create(route('unified.login'), 'POST', [
-            'email' => 'trace-buyer@example.test',
+        $this->useDatabaseSessions();
+
+        $buyer = Buyer::factory()->create(['status' => 'approved', 'google_id' => null]);
+
+        // Deliberately a different fingerprint from the login request so the
+        // normal same-browser sweep cannot match it; only the suppressed-id
+        // branch may delete this row.
+        $this->seedSession($buyer->getAuthIdentifier(), 'trace-session-before', 'trace-browser-old');
+
+        $this->withSession([
+            'session.ip_address' => '127.0.0.1',
+            'session.user_agent' => 'trace-browser-current',
+            'session.suppressed_session_id' => 'trace-session-before',
+        ])->post(route('unified.login'), [
+            'email' => $buyer->email,
             'password' => 'password',
+        ])->assertRedirect(route('buyer.home'));
+
+        $this->assertDatabaseMissing('sessions', ['id' => 'trace-session-before']);
+    }
+
+    private function useDatabaseSessions(): void
+    {
+        config([
+            'session.driver' => 'database',
+            'session.table' => 'sessions',
         ]);
+    }
 
-        $fakeRequest->setSession(new Store('trace-store'));
-
-        $fakeRequest->session()->set('session.ip_address', '127.0.0.1');
-        $fakeRequest->session()->set('session.user_agent', 'trace-test');
-        $fakeRequest->session()->set('session.suppressed_session_id', 'trace-session-before');
-
-        $seller = Seller::factory()->create(['status' => 'approved']);
-
+    private function seedSession(int|string $userId, string $sessionId, string $userAgent): void
+    {
         DB::table('sessions')->insert([
-            'id' => 'trace-session-before',
-            'user_id' => $seller->getAuthIdentifier(),
+            'id' => $sessionId,
+            'user_id' => $userId,
             'ip_address' => '127.0.0.1',
-            'user_agent' => 'trace-test',
+            'user_agent' => $userAgent,
             'payload' => '{}',
             'last_activity' => time(),
         ]);
-
-        $this->actingAs($seller, 'seller')
-            ->call('post', route('unified.login'), [
-                'email' => 'trace-buyer@example.test',
-                'password' => 'password',
-            ])
-            ->assertRedirect(route('buyer.home'));
-
-        $this->assertDatabaseMissing('sessions', ['id' => 'trace-session-before']);
     }
 }

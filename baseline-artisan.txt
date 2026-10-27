@@ -1,0 +1,1044 @@
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Unit\Admin\UserAccountControllerSessionRevocationTest[39m
+  [31;1m⨯[39;22m[90m [39m[90msuspending a buyer deletes its active database sessions[39m[90m                                                     [39m [90m0.91s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a buyer clears a present remember token[39m[90m                                                          [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a buyer without remember token does not fail[39m[90m                                                     [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a buyer with a non integer id is safe[39m[90m                                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuspending a buyer when session driver is not database is safe[39m[90m                                              [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mreactivating a buyer clears leftover sessions and remember token[39m[90m                                            [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a seller clears its database sessions and remember token[39m[90m                                         [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a logistics provider clears its database sessions and remember token[39m[90m                             [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a seller without remember token clears sessions only[39m[90m                                             [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuspending a logistics provider without remember token clears sessions only[39m[90m                                 [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\AuthRoleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdetection order is admin seller logistics buyer[39m[90m                                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic order excludes admin[39m[90m                                                                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery dashboard route is registered[39m[90m                                                                         [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\ExampleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthat true is true[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\RiderValidationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mnormalize email trims and lowercases[39m
+  [32;1m✓[39;22m[90m [39m[90mnormalize mobile plus63 and separators[39m
+  [32;1m✓[39;22m[90m [39m[90mnormalize plate and license uppercase[39m
+  [32;1m✓[39;22m[90m [39m[90mis adult boundary manila[39m
+  [32;1m✓[39;22m[90m [39m[90mis expiry valid boundary manila[39m
+  [32;1m✓[39;22m[90m [39m[90mlicense format constant[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminDashboardStatsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpending registrations counts pending across every role[39m[90m                                                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mactive users counts approved accounts across every role[39m[90m                                                     [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdashboard shows no fabricated stats[39m[90m                                                                         [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminDocumentStreamingTest[39m
+  [32;1m✓[39;22m[90m [39m[90madmin can stream logistics id and dti permit[39m[90m                                                                [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can stream seller and buyer documents[39m[90m                                                                 [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest is denied[39m[90m                                                                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon admin roles are denied[39m[90m                                                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstream response carries nosniff[39m[90m                                                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown model returns 404[39m[90m                                                                                   [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong document for type returns 404[39m[90m                                                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing file on disk returns 404[39m[90m                                                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdocuments are not reachable on the public disk[39m[90m                                                              [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminRegistrationAuditTest[39m
+  [32;1m✓[39;22m[90m [39m[90mapproving a buyer records the reviewing admin and timestamp[39m[90m                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejecting a buyer records the reason and reviewer[39m[90m                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproving a seller records the reviewing admin and timestamp[39m[90m                                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejecting a seller records the reason and reviewer[39m[90m                                                          [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminRegistrationsFilterTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdefault queue lists every pending registry and hides approved[39m[90m                                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtype filter shows only the selected registry[39m[90m                                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtype filter logistics shows only logistics[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown type falls back to every registry[39m[90m                                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msearch matches name email contact and business name[39m[90m                                                         [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90msearch never reaches non pending applicants[39m[90m                                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msearch combines with the type filter[39m[90m                                                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstatus filter lists approved applicants[39m[90m                                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty queue shows the empty state[39m[90m                                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstat cards count every status across all registries[39m[90m                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mper page accepts the allowed sizes and rejects anything else[39m[90m                                                [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdefault date range is all time so old pending stays visible[39m[90m                                                 [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdate range narrows the queue by recency[39m[90m                                                                     [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mview details button is wired with applicant data[39m[90m                                                            [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminUserAccountTest[39m
+  [32;1m✓[39;22m[90m [39m[90madmin can paginate each account type with and without search[39m[90m                                                [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can list and suspend an approved seller[39m[90m                                                               [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can reactivate a suspended seller[39m[90m                                                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mregistration decision notifications use mail[39m[90m                                                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuspended seller cannot open the seller panel[39m[90m                                                               [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminRoleAccessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mguests are redirected to admin login[39m[90m                                                                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mallowed roles can open the registration queue[39m[90m                                                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90msupport role is forbidden from the registration queue[39m[90m                                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msupport role is forbidden from approving registrations[39m[90m                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90msupport role is forbidden from private documents[39m[90m                                                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery admin role can open the dashboard[39m[90m                                                                     [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Admin\AdminSeederTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit refuses to run without a seed password[39m[90m                                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit refuses to run when the seed password is empty[39m[90m                                                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not create an admin when it refuses[39m[90m                                                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates the super admin with the configured password[39m[90m                                                     [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Admin\HubApprovalTest[39m
+  [32;1m✓[39;22m[90m [39m[90madmin hub queue lists pending station applications[39m[90m                                                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can approve station without activating it[39m[90m                                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved station requires coverage before activation[39m[90m                                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can reject station with reason and notifies provider[39m[90m                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejection requires a reason[39m[90m                                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstation cannot be approved twice[39m[90m                                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstation cannot be approved when parent province is inactive[39m[90m                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can approve location change without changing hub status[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can reject location change and current location remains[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocation change cannot be approved twice[39m[90m                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocation change rejection requires a reason[39m[90m                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstation location change approval keeps station operational[39m[90m                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90msupport role cannot manage hub approvals[39m[90m                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguests are redirected from hub approvals[39m[90m                                                                    [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Admin\InvalidAdminRoleTest[39m
+  [32;1m✓[39;22m[90m [39m[90msaving an unknown admin role is rejected[39m[90m                                                                    [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Admin\PartnershipApprovalTest[39m
+  [32;1m✓[39;22m[90m [39m[90madmin can approve an accepted link with priority and activate it[39m[90m                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can change the priority of a pending or active link[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can revoke an active link without deleting its history[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevocation requires a reason and active status[39m[90m                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproval and priority inputs are validated[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproval revalidates destination operational coverage[39m[90m                                                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly pending links can be approved[39m[90m                                                                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin queue lists pending active rejected and revoked links[39m[90m                                                 [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin queue warns that destination acceptance is required[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msupport admin cannot access partnership approvals[39m[90m                                                           [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\CrossRoleEmailRegistrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer registration rejects an email already used by a seller[39m[90m                                                [39m [90m0.07s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\GoogleBuyerLoginTest[39m
+  [32;1m✓[39;22m[90m [39m[90mgoogle login links the account and signs the buyer in[39m[90m                                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgoogle buyer callback ignores stale admin intended url[39m[90m                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgoogle buyer login ignores matching admin email[39m[90m                                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown google email is sent back to login with an error[39m[90m                                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgoogle login refuses an email that belongs to two roles[39m[90m                                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer awaiting approval is linked but cannot sign in with google[39m[90m                                            [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\GoogleLogisticsLoginTest[39m
+  [32;1m✓[39;22m[90m [39m[90mgoogle login links the account and signs the provider in[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown google email is sent back to login with an error[39m[90m                                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovider awaiting approval cannot sign in with google[39m[90m                                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrole agnostic callback rejects email linked to multiple roles[39m[90m                                               [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\GoogleSellerLoginTest[39m
+  [32;1m✓[39;22m[90m [39m[90mgoogle login links the account and signs the seller in[39m[90m                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown google email is sent back to login with an error[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller awaiting approval cannot sign in with google[39m[90m                                                         [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\GuestOnlyRoutesTest[39m
+  [32;1m✓[39;22m[90m [39m[90msigned in role is redirected from every guest only page with data set #0[39m[90m                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msigned in role is redirected from every guest only page with data set #1[39m[90m                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msigned in role is redirected from every guest only page with data set #2[39m[90m                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msigned in role is redirected from every guest only page with data set #3[39m[90m                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer cannot open another roles login or registration[39m[90m                                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost login while signed in does not switch accounts[39m[90m                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mjson requests get 409 with redirect target[39m[90m                                                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest can open registration page[39m[90m                                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest can open shared login modal[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mafter logout guest pages open again with data set #0[39m[90m                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mafter logout guest pages open again with data set #1[39m[90m                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mafter logout guest pages open again with data set #2[39m[90m                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mafter logout guest pages open again with data set #3[39m[90m                                                        [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\LoginRateLimitTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe sixth wrong admin login attempt is throttled[39m[90m                                                            [39m [90m1.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe sixth wrong seller login attempt is throttled[39m[90m                                                           [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma second email from the same ip is not locked by the first email[39m[90m                                            [39m [90m4.94s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\OtpLockTest[39m
+  [32;1m✓[39;22m[90m [39m[90man unsigned buyer otp verify request is rejected with 403[39m[90m                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfive wrong buyer codes lock verification and resend does not unlock[39m[90m                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer otp lock survives archive and re registration[39m[90m                                                         [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\OtpSecurityTest[39m
+  [32;1m✓[39;22m[90m [39m[90munsigned buyer otp get and resend are forbidden and send no mail[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munsigned wrong codes cannot lock a buyer otp[39m[90m                                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munsigned seller and logistics otp posts are forbidden[39m[90m                                                       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer otp notification uses the mail channel[39m[90m                                                                [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller and logistics otp notifications use the mail channel[39m[90m                                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msigned buyer otp show page renders[39m[90m                                                                          [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\PasswordResetBrokerIsolationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer and seller reset tokens for the same email live in separate tables[39m[90m                                    [39m [90m0.45s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\SingleBrowserAccountTest[39m
+  [32;1m✓[39;22m[90m [39m[90mvisiting a buyer page ends a stale seller session in the same browser[39m[90m                                       [39m [90m0.07s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\UnverifiedLoginResumeTest[39m
+  [32;1m✓[39;22m[90m [39m[90munverified buyer login does not open a session and offers an otp resume link[39m[90m                                [39m [90m0.67s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\BuyerRegistration\BuyerRegistrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuy 001 register with all valid data[39m[90m                                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 002 submit empty form[39m[90m                                                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 first name blank[39m[90m                                                                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 last name blank[39m[90m                                                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 email blank[39m[90m                                                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 mobile blank[39m[90m                                                                                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 dob blank[39m[90m                                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 password blank[39m[90m                                                                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 003 confirm password blank[39m[90m                                                                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 004 name with numbers or symbols[39m[90m                                                                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 005 name with ñ and punctuation[39m[90m                                                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 006 1 char first name rejected[39m[90m                                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 006 2 char first name accepted[39m[90m                                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 006 50 char first name accepted[39m[90m                                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 006 51 char first name rejected[39m[90m                                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 007 born 10 08 2008 17 years old rejected[39m[90m                                                               [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 007 born 10 07 2008 turns 18 accepted[39m[90m                                                                   [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 007 born 10 06 2008 18 and 1 day accepted[39m[90m                                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 008 dob tomorrow rejected[39m[90m                                                                               [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 009 email without at[39m[90m                                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 009 email no domain[39m[90m                                                                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 009 email no name[39m[90m                                                                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 009 email no tld[39m[90m                                                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 009 email with space[39m[90m                                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 010 email already registered[39m[90m                                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 011 email uppercase duplicate[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 012 email with spaces trimmed[39m[90m                                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 013 mobile with letters[39m[90m                                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 013 mobile with symbols too short[39m[90m                                                                       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 013 mobile not starting with 09[39m[90m                                                                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 013 landline number[39m[90m                                                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 014 10 digit phone rejected[39m[90m                                                                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 014 11 digit phone accepted[39m[90m                                                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 014 12 digit phone rejected[39m[90m                                                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 015 mobile already registered[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 016 mobile plus 63 format[39m[90m                                                                               [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 017 7 char password rejected[39m[90m                                                                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 017 8 char password accepted[39m[90m                                                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 018 no uppercase[39m[90m                                                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 018 no lowercase[39m[90m                                                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 018 no number[39m[90m                                                                                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 018 no special char[39m[90m                                                                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 019 password mismatch[39m[90m                                                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 020 password hidden by default[39m[90m                                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 021 terms not accepted[39m[90m                                                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mregistration rejects missing terms field[39m[90m                                                                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mregistration rejects unaccepted terms value[39m[90m                                                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer register modal renders unchecked terms checkbox[39m[90m                                                       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 022 multiple rapid submissions single account[39m[90m                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 023 verify with correct otp[39m[90m                                                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 024 verify with incorrect otp[39m[90m                                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 025 otp 5 digits rejected[39m[90m                                                                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 025 otp 7 digits rejected[39m[90m                                                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 025 otp letters rejected[39m[90m                                                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 025 otp blank rejected[39m[90m                                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 026 otp expired[39m[90m                                                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 027 resend otp[39m[90m                                                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 028 login before email verification[39m[90m                                                                     [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 029 login with verified approved account[39m[90m                                                                [39m [90m0.46s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 030 seller dashboard denied[39m[90m                                                                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 030 failed otp email releases the email for a clean retry[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 031 a verified account still blocks duplicate registration[39m[90m                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 032 failed resend keeps the previous code valid[39m[90m                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy 033 successful resend invalidates the previous code[39m[90m                                                     [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\BuyerAccountPagesTest[39m
+  [32;1m✓[39;22m[90m [39m[90mprofile page renders shared header tabs and card[39m[90m                                                            [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90maccount views use only theme color tokens[39m[90m                                                                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90maddress page uses the shared tabs with active address book[39m[90m                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpassword page uses the shared tabs with active password security[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpreferences tab is not a link[39m[90m                                                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprofile update persists fields and derives age[39m[90m                                                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprofile update rejects bad input[39m[90m                                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90maddress update persists codes and names in api mode[39m[90m                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90maddress update accepts manual mode without codes[39m[90m                                                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90maddress update requires street and codes in api mode[39m[90m                                                        [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\BuyerCatalogEligibilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcatalog search categories and details use only purchasable variants with data set "disabled cheaper"[39m[90m        [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalog search categories and details use only purchasable variants with data set "sold-out cheaper"[39m[90m        [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalog search categories and details use only purchasable variants with data set "available range"[39m[90m         [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalog search categories and details use only purchasable variants with data set "all disabled"[39m[90m            [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalog search categories and details use only purchasable variants with data set "all sold out"[39m[90m            [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfilters and sorting share the advertised starting price with data set #0[39m[90m                                    [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfilters and sorting share the advertised starting price with data set #1[39m[90m                                    [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfilters and sorting share the advertised starting price with data set #2[39m[90m                                    [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuspension draft and archiving hide otherwise purchasable products[39m[90m                                          [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90moptionless details and cards use default variant availability with data set #0[39m[90m                              [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90moptionless details and cards use default variant availability with data set #1[39m[90m                              [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90moptionless details and cards use default variant availability with data set #2[39m[90m                              [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mzero price and missing variants are handled without rollup fallback[39m[90m                                         [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshop pagination counts only eligible products and preserves price filters[39m[90m                                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalog query count is bounded as result count grows[39m[90m                                                        [39m [90m0.15s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\BuyerOrderCancelTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer can cancel placed slice restoring stock and notifying seller[39m[90m                                          [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreplayed cancel restores stock and notifies once[39m[90m                                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcancel requires a reason[39m[90m                                                                                    [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest cannot cancel an order[39m[90m                                                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcancel after seller accepts is rejected[39m[90m                                                                     [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign buyer cannot cancel another buyers order[39m[90m                                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller order must belong to parent order[39m[90m                                                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmulti seller cancel leaves confirmed sibling untouched[39m[90m                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshow page offers cancel only while placed[39m[90m                                                                   [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\BuyerOrderLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer can see their order in the index[39m[90m                                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer can see order detail with timeline and tracking[39m[90m                                                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer cannot see other buyers orders[39m[90m                                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mindex renders reference design shell with real buyer info[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mindex tab filter only returns matching orders[39m[90m                                                               [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mindex search matches reference and product name[39m[90m                                                             [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirm received is offered when one slice is completed and another delivered[39m[90m                               [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirm received is hidden when every slice is completed[39m[90m                                                    [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirm received is hidden when no slice is delivered[39m[90m                                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirm received transitions delivered to completed and fires notification[39m[90m                                  [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparent order rolls up to completed when all seller orders confirm received[39m[90m                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparent order status reflects bottleneck when only one of two completes[39m[90m                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcod payment is settled when buyer confirms received[39m[90m                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcod payment not re settled when already paid[39m[90m                                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcod payment not settled for non cod method if any[39m[90m                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtwo seller rollup delivered plus out for delivery then both delivered[39m[90m                                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmixed completed and delivered confirms and settles all payments[39m[90m                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirm received completes delivered slice while sibling is in transit[39m[90m                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirm received rejects selected in transit shipment without changing delivered sibling[39m[90m                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcod payment settled on delivered transition[39m[90m                                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcod settlement on delivered not changed by completed[39m[90m                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing payment does not crash on delivered[39m[90m                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90manother buyers order returns 404 on confirm[39m[90m                                                                 [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrollback when cod settlement throws[39m[90m                                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrollback when rollup throws[39m[90m                                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcancelled tab counts and lists seller declined orders[39m[90m                                                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmixed cancelled and active siblings count as to ship not cancelled[39m[90m                                          [39m [90m0.08s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\BuyerSearchAssetsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer pages load one search owner and keep the shared controls with data set #0[39m[90m                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer pages load one search owner and keep the shared controls with data set #1[39m[90m                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer pages load one search owner and keep the shared controls with data set #2[39m[90m                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer pages load one search owner and keep the shared controls with data set #3[39m[90m                             [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\CartVariantDisplayTest[39m
+  [32;1m✓[39;22m[90m [39m[90mboth carts show the selected image label price and quantity with data set "color and size"[39m[90m                  [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts show the selected image label price and quantity with data set "color only"[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts show the selected image label price and quantity with data set "size only"[39m[90m                       [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts show the selected image label price and quantity with data set "optionless"[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts share safe image fallbacks with data set "no variant image"[39m[90m                                      [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts share safe image fallbacks with data set "missing variant file"[39m[90m                                  [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts share safe image fallbacks with data set "missing primary with valid variant alternative"[39m[90m        [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts share safe image fallbacks with data set "no image records"[39m[90m                                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mboth carts share safe image fallbacks with data set "all variant files missing"[39m[90m                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy optionless line uses default price without a fake label[39m[90m                                              [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmultiple variants remain distinct through quantity updates and removal[39m[90m                                      [39m [90m0.10s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\CategoryControlsTest[39m
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #0[39m[90m                                    [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #1[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #2[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #3[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #4[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #5[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #6[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90madvertised sorts render the correct order and selection with data set #7[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprice sort uses only purchasable variants and preserves eligibility[39m[90m                                         [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpagination retains category filters sort and deterministic ties with data set #0[39m[90m                            [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpagination retains category filters sort and deterministic ties with data set #1[39m[90m                            [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpagination retains category filters sort and deterministic ties with data set #2[39m[90m                            [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpagination retains category filters sort and deterministic ties with data set #3[39m[90m                            [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpagination retains category filters sort and deterministic ties with data set #4[39m[90m                            [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty category and unknown sort have safe controls[39m[90m                                                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcategory cards retain working cart and wishlist actions[39m[90m                                                     [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\CheckoutCarrierPersistenceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmulti seller checkout persists independent carriers and authoritative fees[39m[90m                                  [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mroute disabled after initial quote rolls back checkout and token[39m[90m                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshipping fee and address are recalculated inside transaction[39m[90m                                                [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90moverlapping provider cannot claim selected parcel and legacy remains unowned[39m[90m                                [39m [90m0.08s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\CheckoutCarrierSelectionTest[39m
+  [32;1m✓[39;22m[90m [39m[90msame province checkout lists eligible enabled carriers with fees[39m[90m                                            [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province route is unavailable without provider links[39m[90m                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mno carrier blocks checkout with a clear message[39m[90m                                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmulti seller cart requires one carrier per seller[39m[90m                                                           [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfee is free when group subtotal meets threshold[39m[90m                                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged shipping price fields are rejected[39m[90m                                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged carrier id is rejected[39m[90m                                                                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdisabled carrier is not offered[39m[90m                                                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcarrier without seller origin coverage is not offered[39m[90m                                                       [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province submission is blocked even with an enabled carrier[39m[90m                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmulti seller fees are calculated per group[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90marray carrier payload is rejected[39m[90m                                                                           [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvalidate selection never trusts submitted fees[39m[90m                                                              [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\CheckoutItemDisplayTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "cart color size"[39m[90m                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "cart color"[39m[90m                              [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "cart size"[39m[90m                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "cart optionless"[39m[90m                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "buy now color size"[39m[90m                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "buy now color"[39m[90m                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "buy now size"[39m[90m                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout renders selected product options and money with data set "buy now optionless"[39m[90m                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmultiple variants and sellers keep their own labels and prices[39m[90m                                              [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mselected checkout line keeps its options and excludes other variants and sellers with data set #0[39m[90m           [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mselected checkout line keeps its options and excludes other variants and sellers with data set #1[39m[90m           [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cart selection is not replaced by another variant with data set #0[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cart selection is not replaced by another variant with data set #1[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cart selection is not replaced by another variant with data set #2[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cart selection is not replaced by another variant with data set #3[39m[90m                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cart selection is not replaced by another variant with data set #4[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cart selection is not replaced by another variant with data set #5[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy now rejects invalid selection without creating a fallback line with data set #0[39m[90m                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy now rejects invalid selection without creating a fallback line with data set #1[39m[90m                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy now rejects invalid selection without creating a fallback line with data set #2[39m[90m                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy now rejects invalid selection without creating a fallback line with data set #3[39m[90m                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuy now rejects invalid selection without creating a fallback line with data set #4[39m[90m                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable product is explained while valid legacy optionless line still renders[39m[90m                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout escapes product names and option values[39m[90m                                                            [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\CrossProvinceCheckoutTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcross province checkout displays the enabled origin and its approved destination[39m[90m                            [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province route is unavailable without an approved destination partner[39m[90m                                 [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province route is blocked when no rate is configured[39m[90m                                                  [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province order saves origin carrier and destination without transferring custody[39m[90m                      [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province route is revalidated against locked links before order creation[39m[90m                              [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpriority orders the destination partner[39m[90m                                                                     [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross province submission rejects client supplied fees[39m[90m                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmulti seller cross province checkout keeps per seller ownership and fees[39m[90m                                    [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid cross province fees never become a zero or truncated rate[39m[90m                                           [39m [90m0.07s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\HomepageTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer home page loads[39m[90m                                                                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90msearch page displays results[39m[90m                                                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msearch suggestions returns popular products[39m[90m                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated buyer can access mini cart[39m[90m                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated buyer can toggle wishlist[39m[90m                                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mall page routes exist[39m[90m                                                                                       [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest cannot access wishlist page[39m[90m                                                                           [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\ManualAddressMunicipalityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mregistration rejects manual address mode[39m[90m                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual address update requires a municipality[39m[90m                                                               [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\NavbarProfileButtonTest[39m
+  [32;1m✓[39;22m[90m [39m[90mprofile button and dropdown present for authenticated buyer[39m[90m                                                 [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90maccount dropdown not present for guest[39m[90m                                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnavbar js included[39m[90m                                                                                          [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\ProductAvailabilityDisplayTest[39m
+  [32;1m✓[39;22m[90m [39m[90mvariant page does not present total stock as selected availability[39m[90m                                          [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon variant product keeps its normal stock display[39m[90m                                                          [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\ProductCardImagesTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpages render image urls even when local storage cannot see the file[39m[90m                                         [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mproduct detail uses public image urls when the default disk is private[39m[90m                                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mproduct detail prefers an existing image over a missing primary upload[39m[90m                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcards show a placeholder without image records[39m[90m                                                              [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\PurchasedVariantSnapshotTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcheckout saves selected options with unchanged financial and inventory snapshots[39m[90m                            [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlater catalog changes do not rewrite saved purchase details with data set #0[39m[90m                                [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlater catalog changes do not rewrite saved purchase details with data set #1[39m[90m                                [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlater catalog changes do not rewrite saved purchase details with data set #2[39m[90m                                [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlater catalog changes do not rewrite saved purchase details with data set #3[39m[90m                                [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlater catalog changes do not rewrite saved purchase details with data set #4[39m[90m                                [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlater catalog changes do not rewrite saved purchase details with data set #5[39m[90m                                [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmultiple variants of the same product keep distinct snapshots[39m[90m                                               [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmulti seller checkout preserves each sellers purchased options[39m[90m                                              [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90moptionless product has no invented default color or size[39m[90m                                                    [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistorical missing snapshots never infer options from a live variant[39m[90m                                        [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistorical item with no product or variant still renders[39m[90m                                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout captures current locked options instead of stale preloaded values[39m[90m                                  [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mother named options are preserved without fake color or size[39m[90m                                                [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90madditive migration retains legacy data without backfilling live options[39m[90m                                     [39m [90m0.10s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\RejectedBuyerOtpTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma rejected buyer cannot verify with an otp[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma rejected buyer cannot request a new otp[39m[90m                                                                   [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\SearchPaginationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mrendered links keep supported parameters and pages are deterministic with data set #0[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrendered links keep supported parameters and pages are deterministic with data set #1[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrendered links keep supported parameters and pages are deterministic with data set #2[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrendered links keep supported parameters and pages are deterministic with data set #3[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrendered links keep supported parameters and pages are deterministic with data set #4[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcategory seller price and t09 eligibility remain applied on page two[39m[90m                                        [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty or short searches on later pages are safe with data set #0[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty or short searches on later pages are safe with data set #1[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty or short searches on later pages are safe with data set #2[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty or short searches on later pages are safe with data set #3[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munmatched and out of range pages render safely[39m[90m                                                              [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\Stage0GuestLandingTest[39m
+  [32;1m✓[39;22m[90m [39m[90mbuyer home and products load after archive columns exist[39m[90m                                                    [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshared login modal renders email form on landing page[39m[90m                                                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic footer links point at real pages[39m[90m                                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcategories index renders category grid[39m[90m                                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhelp center is reachable by guests[39m[90m                                                                          [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\VoucherUsageTest[39m
+  [32;1m✓[39;22m[90m [39m[90mplacing an order increments the vouchers times used[39m[90m                                                         [39m [90m0.07s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Buyer\WishlistAvailabilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #0[39m[90m                                 [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #1[39m[90m                                 [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #2[39m[90m                                 [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #3[39m[90m                                 [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #4[39m[90m                                 [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #5[39m[90m                                 [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved cards reuse catalog eligibility and preserve records with data set #6[39m[90m                                 [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable saved product cannot bypass cart or checkout and recovers with data set #0[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable saved product cannot bypass cart or checkout and recovers with data set #1[39m[90m                      [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable saved product cannot bypass cart or checkout and recovers with data set #2[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable saved product cannot bypass cart or checkout and recovers with data set #3[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable saved product cannot bypass cart or checkout and recovers with data set #4[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable saved product cannot bypass cart or checkout and recovers with data set #5[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90moptionless saved product uses the same card and becomes disabled when sold out[39m[90m                              [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwishlist is private and mutations only affect the authenticated buyer[39m[90m                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90marchived saved records are counted and can be explicitly removed[39m[90m                                            [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer can toggle an archived saved product off[39m[90m                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguests cannot read or mutate wishlists[39m[90m                                                                      [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Components\NavbarTest[39m
+  [32;1m✓[39;22m[90m [39m[90mguests see login and register links on the landing page[39m[90m                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated buyer is redirected from landing to buyer home[39m[90m                                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest sees no account dropdown on landing page when a buyer row exists[39m[90m                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated seller sees guest nav on landing page[39m[90m                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer can log out and landing page returns to guest nav[39m[90m                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated buyer sees account dropdown on buyer home[39m[90m                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer home shows buyer navbar and no login links[39m[90m                                                            [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Console\OrdersResyncCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdry run does not change anything[39m[90m                                                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreal run fixes stale order and settles payments[39m[90m                                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresync is idempotent[39m[90m                                                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresync sets parent to completed when all slices completed[39m[90m                                                   [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\DemoRidersSeederTest[39m
+  [32;1m✓[39;22m[90m [39m[90mseeder creates the expected riders per provider[39m[90m                                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseeder is idempotent on a second run[39m[90m                                                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable rider is not offered by the assignment query[39m[90m                                                    [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\ExampleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe application returns a successful response[39m[90m                                                               [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\F2HandoffAuthorizationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcorrect station hub receipt is allowed[39m[90m                                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong station hub token is rejected[39m[90m                                                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing authoritative station hub is rejected[39m[90m                                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpickup rider without station linkage uses coverage routing[39m[90m                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthorized rider retry of completed pickup is rejected[39m[90m                                                    [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthorized logistics retry of completed receipt is rejected[39m[90m                                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong provider cannot sort foreign parcel[39m[90m                                                                   [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized idempotent receipt retry has no duplicate side effects[39m[90m                                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mscan required sort still works with authoritative station[39m[90m                                                   [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpod cod token is preserved after invalid amount[39m[90m                                                             [39m [90m0.08s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\F2OriginStationPersistenceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mreserve pickup persists origin station hub[39m[90m                                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcoverage change does not redirect persisted origin station[39m[90m                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90massign origin station never overwrites existing[39m[90m                                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing origin station without unambiguous legacy is rejected[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthorized provider cannot use persisted station[39m[90m                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreceipt uses persisted station after rider station cleared[39m[90m                                                  [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale parcel cannot overwrite a station persisted by another caller[39m[90m                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcurrent rider station and matching coverage do not prove legacy origin[39m[90m                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrider station change does not redirect a routed parcel[39m[90m                                                      [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\F2ScanEnforcedLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mscan enforced lifecycle from seller ready to buyer confirm[39m[90m                                                  [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired logistics token is rejected[39m[90m                                                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong station hub token is rejected[39m[90m                                                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong rider cannot confirm pickup with foreign token[39m[90m                                                        [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconcurrent station receipt confirmations do not double transition[39m[90m                                           [39m [90m0.07s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FulfillmentLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcomplete order lifecycle from placed to completed[39m[90m                                                           [39m [90m0.13s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\BuyNowTest[39m
+  [32;1m✓[39;22m[90m [39m[90mguests are rejected[39m[90m                                                                                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit scopes checkout to a single line[39m[90m                                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit sets rather than adds quantity[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcart count is the line count while quantities are preserved[39m[90m                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects inactive products[39m[90m                                                                                [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit caps quantity at stock[39m[90m                                                                                   [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\BuyerVariantFlowTest[39m
+  [32;1m✓[39;22m[90m [39m[90madd to cart targets the chosen variant[39m[90m                                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcart line price uses the variant price[39m[90m                                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcart quantity is capped at variant stock[39m[90m                                                                    [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdisabled combination cannot be added[39m[90m                                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout decrements variant stock and snapshots variant price[39m[90m                                               [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mambiguous legacy cart line requires reselection and preserves other items[39m[90m                                   [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone remaining option bearing variant still requires explicit selection[39m[90m                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone available variant among multiple does not allow legacy fallback[39m[90m                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgenuine optionless default legacy line uses variant price and stock[39m[90m                                         [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdisabled or missing default cannot fallback to product rollup[39m[90m                                               [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnew variant between precheck and locks rejects legacy line[39m[90m                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy and explicit default lines cannot combined oversell[39m[90m                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvariant going out of stock mid checkout is rejected[39m[90m                                                         [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\CartControllerTest[39m
+  [32;1m✓[39;22m[90m [39m[90madd merges quantity for the same product[39m[90m                                                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madd caps the quantity at available stock[39m[90m                                                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madd rejects products that are not purchaseable[39m[90m                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90madd requires a positive quantity[39m[90m                                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate changes the quantity and returns the new line total[39m[90m                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate rejects quantity below one and caps above stock[39m[90m                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate rejects an item whose product is no longer available[39m[90m                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdestroy removes the line and reports an empty cart[39m[90m                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk destroy removes only the given ids[39m[90m                                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma buyer cannot update or delete another buyers cart item[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk destroy is forbidden when any id belongs to another buyer[39m[90m                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguests get a 401 json response from every cart endpoint[39m[90m                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma voucher can be applied and removed[39m[90m                                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown inactive expired and below minimum vouchers are rejected[39m[90m                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma voucher is dropped when the selected subtotal falls below its minimum[39m[90m                                     [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90man empty selection reports zero totals[39m[90m                                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90man absent selection covers every available item[39m[90m                                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe cart page groups items by seller and excludes unavailable lines[39m[90m                                         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe cart page shows the empty state when there are no items[39m[90m                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe navbar badge shows the real cart quantity[39m[90m                                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout accepts only the buyers own selected items[39m[90m                                                         [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mline counts and selected quantities stay consistent across cart and checkout[39m[90m                                [39m [90m0.10s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\CheckoutControllerTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma buyer places an order across two sellers[39m[90m                                                                  [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout snapshots each sellers parcel weight[39m[90m                                                               [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma single seller order carries the full discount[39m[90m                                                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90minsufficient stock rejects the order without partial writes[39m[90m                                                 [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90man item removed from the cart after parking rejects the order[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90man item that became unavailable after parking rejects the order[39m[90m                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma tampered selection cannot check out another buyers line[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90man empty selection redirects back to the cart[39m[90m                                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguests cannot place orders[39m[90m                                                                                  [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90man invalid parked voucher is dropped and the order still places[39m[90m                                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma selection of only invalid ids redirects back to the cart with an error[39m[90m                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma selection of only foreign ids redirects back to the cart with an error[39m[90m                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma partially invalid selection keeps the valid items without error[39m[90m                                           [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90manother buyer cannot open someone elses confirmation[39m[90m                                                        [39m [90m0.08s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\CheckoutDoubleSubmitTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma second submit with a consumed token does not create a second order[39m[90m                                        [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe token is consumed inside the order transaction[39m[90m                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstock is decremented exactly once across a double submit[39m[90m                                                    [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma fresh token from a new checkout page still works[39m[90m                                                          [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckout page renders the token field[39m[90m                                                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #0[39m[90m                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #1[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #2[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #3[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #4[39m[90m                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #5[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #6[39m[90m                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #7[39m[90m                                        [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #8[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid tokens create no financial or stock records with data set #9[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing token table fails closed[39m[90m                                                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed placement rolls back the token claim[39m[90m                                                                 [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\CheckoutFinancialIntegrityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mprice change between cart read and lock requires reconfirmation with data set "increase"[39m[90m                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprice change between cart read and lock requires reconfirmation with data set "decrease below voucher minim[39m[90m…[39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller subtotals discounts lines and cod payments reconcile to the centavo[39m[90m                                  [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma voucher revoked between resolution and lock cannot be consumed[39m[90m                                            [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\CheckoutSellerEligibilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mineligible seller blocks all purchase entry points and preserves cart with data set #0[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible seller blocks all purchase entry points and preserves cart with data set #1[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible seller blocks all purchase entry points and preserves cart with data set #2[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible seller blocks all purchase entry points and preserves cart with data set #3[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible seller blocks all purchase entry points and preserves cart with data set #4[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible seller blocks all purchase entry points and preserves cart with data set #5[39m[90m                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuspension between precheck and lock rolls back claim and order[39m[90m                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved seller checkout succeeds and history survives suspension[39m[90m                                           [39m [90m0.12s[39m  
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\CheckoutStockConcurrencyTest[39m
+  [32;1m✓[39;22m[90m [39m[90mstale pre lock variant read cannot oversell[39m[90m                                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtwo buyers racing for the last unit only one wins[39m[90m                                                           [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnormal checkout decrements locked stock and ledgers correct values[39m[90m                                          [39m [90m0.06s[39m  
+  [33;1m-[39;22m[90m [39m[90mtrue concurrent checkouts do not oversell[39m[90m [39m[33m→ Needs MySQL: SQLite ignores row locks, so lockForUpdate() is a[39m[90m… [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\HomeControllerTest[39m
+  [32;1m✓[39;22m[90m [39m[90mguests can view the buyer home page layout[39m[90m                                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhome lists active in stock products and hides unavailable ones[39m[90m                                              [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhome escapes product and store names in html[39m[90m                                                                [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhome omits unapproved sellers from best selling stores[39m[90m                                                      [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Buyer\ProductControllerTest[39m
+  [32;1m✓[39;22m[90m [39m[90mproduct page renders description[39m[90m                                                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshop index hides out of stock products[39m[90m                                                                      [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Seller\ProductControllerTest[39m
+  [32;1m✓[39;22m[90m [39m[90mweightless products are flagged in the listing[39m[90m                                                              [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma seller sees only their own products[39m[90m                                                                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msoft deleted products never appear[39m[90m                                                                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msearch filters by name[39m[90m                                                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstatus filter shows only that status[39m[90m                                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msort orders by price ascending[39m[90m                                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpagination defaults to ten per page and keeps the query string[39m[90m                                              [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mper page accepts the allowed sizes and rejects anything else[39m[90m                                                [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcategory filter limits the listing to that category[39m[90m                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid sort and status values are ignored[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe listing renders the header filters and table shell[39m[90m                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mout of stock rows render the out of stock status[39m[90m                                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe empty state offers a reset link when filters are applied[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe products page hosts the add product modal closed[39m[90m                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe modal auto opens for the create query flag[39m[90m                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe create url redirects to the modal on the index[39m[90m                                                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe create flag is not carried into pagination links[39m[90m                                                        [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed store flashes the modal marker and errors[39m[90m                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe modal reopens with errors and old input[39m[90m                                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtoggle status sets a draft product active[39m[90m                                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtoggle status sets a product inactive[39m[90m                                                                       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma seller cannot toggle another sellers product[39m[90m                                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtoggle status rejects unknown statuses[39m[90m                                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete soft deletes the sellers own product[39m[90m                                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma seller cannot delete another sellers product[39m[90m                                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller prices include paused and sold out variants[39m[90m                                                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mequal variant prices show one price[39m[90m                                                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90marchiving preserves inventory and historical product links[39m[90m                                                  [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguests are redirected to the seller login[39m[90m                                                                   [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Seller\ProductPublishingTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpublishing saves one listing twelve combinations and shared color images[39m[90m                                    [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "duplicate combination"[39m[90m                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "missing combination"[39m[90m                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "foreign value"[39m[90m                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "duplicate option value"[39m[90m                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "negative price"[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "negative stock"[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "fractional stock"[39m[90m                                [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "unknown color upload"[39m[90m                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "cover outside upload list"[39m[90m                       [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid inventory does not create a listing with data set "more than fifty combinations"[39m[90m                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90medits preserve variant ids cart lines images and existing cover[39m[90m                                             [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting one color image keeps the shared file for other sizes[39m[90m                                              [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvariant uploads cannot reference another sellers product[39m[90m                                                    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcolor uploads reject non image content[39m[90m                                                                      [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed image persistence rolls back listing inventory and files[39m[90m                                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnew sizes inherit existing color photos without reupload[39m[90m                                                    [39m [90m0.15s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Seller\ProductVariantsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcreating a product with option combinations[39m[90m                                                                 [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery created product gets a default variant even without options[39m[90m                                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdisabled combination is not purchaseable but keeps stock[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mediting price and stock per variant is independent[39m[90m                                                          [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mremoving an option value drops its combinations[39m[90m                                                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclearing options cannot destroy existing inventory history[39m[90m                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mproducts created before variants still work[39m[90m                                                                 [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdropping a referenced variant is rejected[39m[90m                                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmore than two option axes are rejected[39m[90m                                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtwo different sellers can use the same sku[39m[90m                                                                  [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller cannot reuse a sku on another of their products[39m[90m                                                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mediting a product and resubmitting its own skus is not a duplicate[39m[90m                                          [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate skus within one payload are rejected[39m[90m                                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mblank skus on multiple variants are allowed[39m[90m                                                                 [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Http\Controllers\Seller\ProductWeightTest[39m
+  [32;1m✓[39;22m[90m [39m[90mkilograms are saved as grams for the product and default variant[39m[90m                                            [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "missing"[39m[90m                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "zero"[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "negative"[39m[90m                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "subgram"[39m[90m                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "over maximum"[39m[90m                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "invalid unit"[39m[90m                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid product weights cannot be published with data set "not numeric"[39m[90m                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90meach variant requires its own weight and edits preserve it[39m[90m                                                  [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstatus toggle blocks an existing weightless product[39m[90m                                                         [39m [90m0.03s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\Http\Controllers\Seller\SellerStockLedgerTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mcreating a product logs its opening stock[39m[90m                                                                   [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mediting stock logs an adjustment and keeps rollups in sync[39m[90m                                                  [39m [90m0.04s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msaving without changing stock writes no ledger row[39m[90m                                                          [39m [90m0.04s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mnew option variants log their opening stock[39m[90m                                                                 [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\HttpsUrlGenerationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mnamed routes start with https in production[39m[90m                                                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe url generator is not scheme forced outside production[39m[90m                                                   [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\InternalManifestDatabaseTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmanifest tables and columns exist[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanifest belongs to one provider and identifies both hubs[39m[90m                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanifest item links parcel and snapshots tracking number[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate active manifest membership is rejected[39m[90m                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreceipt releases membership and preserves historical items[39m[90m                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpartial receipt is tracked per item and status is auditable[39m[90m                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhubs from another provider are rejected by foreign key[39m[90m                                                      [39m [90m0.04s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\LoginSessionRevocationTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mbuyer login clears other role sessions[39m[90m                                                                      [39m [90m1.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer login restores a previously suppressed session after password reset[39m[90m                                   [39m [90m0.03s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mbuyer login suppresses the existing session on second login[39m[90m                                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbuyer login without a previous session is still fully accepted[39m[90m                                              [39m [90m0.03s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mbuyer login suppresses an already present trace session for the same email[39m[90m                                  [39m [90m0.03s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\LogisticsDashboardTest[39m
+  [32;1m✓[39;22m[90m [39m[90mguest is redirected to home login modal[39m[90m                                                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon approved provider is bounced to home login modal[39m[90m                                                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdashboard renders for an approved provider[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdashboard shows honest empty states without fake numbers[39m[90m                                                    [39m [90m0.06s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msidebar links only to wired routes without fake badges[39m[90m                                                      [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\LogisticsFlowTestSeederTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdry run plans same province coverage without writing and apply is idempotent[39m[90m                                [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\LogisticsLoginFlowTest[39m
+  [32;1m✓[39;22m[90m [39m[90mapproved logistics provider redirects to dashboard after login[39m[90m                                              [39m [90m0.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshared email is rejected without authenticating either role[39m[90m                                                 [39m [90m0.24s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\LogisticsRegistrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mget register logistics redirects to the register type modal[39m[90m                                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mregister type page renders the logistics modal and trigger[39m[90m                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics pending page renders[39m[90m                                                                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90motp verification page renders for an unverified provider[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration succeeds in api mode[39m[90m                                                                 [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration rejects manual address mode[39m[90m                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration stores the submitted street[39m[90m                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration fails without street in api mode[39m[90m                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration rejects an email used by a buyer[39m[90m                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration rejects an email used by a seller[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics registration rejects a duplicate logistics email[39m[90m                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupload id must be an image or pdf[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdti permit must be smaller than five megabytes[39m[90m                                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdti permit is required[39m[90m                                                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90motp verification moves the provider to pending[39m[90m                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90man incorrect otp is rejected and leaves the status unchanged[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated visitor cannot approve a logistics registration[39m[90m                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma signed in buyer cannot approve a logistics registration[39m[90m                                                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can approve a logistics registration[39m[90m                                                                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can reject a logistics registration with a reason[39m[90m                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin registrations view lists a pending logistics application[39m[90m                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics failed otp email releases the email for a clean retry[39m[90m                                             [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics failed resend keeps the previous code valid[39m[90m                                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogistics successful resend invalidates the previous code[39m[90m                                                   [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\AreaManagementTest[39m
+  [32;1m✓[39;22m[90m [39m[90mrider can link multiple barangays without replacing existing links or duplicates[39m[90m                            [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign area in a batch is rejected without adding any links[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive coverage cannot be linked[39m[90m                                                                          [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign rider cannot be linked[39m[90m                                                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrider cannot link barangays in a different station[39m[90m                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanging station clears all previous station links[39m[90m                                                          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmigration preserves existing single area links[39m[90m                                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpage and dispatch use existing links when the pivot migration is pending[39m[90m                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpending migration blocks new links and allows unlinking the existing link[39m[90m                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munlink keeps other barangays and existing parcel assignments[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mremoval still blocks coverage with linked riders[39m[90m                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdispatch can use a second linked barangay[39m[90m                                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcoverage name is optional and success explains the next step[39m[90m                                                [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpage shows linked barangays status workload and impact confirmation[39m[90m                                         [39m [90m0.06s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\Logistics\AutomaticBuyerReceiptTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mdelivered older than 72 hours is completed automatically[39m[90m                                                    [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivered less than 72 hours remains delivered[39m[90m                                                              [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mdelivered exactly 72 hours is eligible[39m[90m                                                                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mopen incident prevents completion[39m[90m                                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mterminal lost resolution prevents completion[39m[90m                                                                [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mphysical return prevents completion[39m[90m                                                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90munresolved handoff exception prevents completion[39m[90m                                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing delivery timestamp prevents completion[39m[90m                                                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mambiguous delivery timestamp prevents completion[39m[90m                                                            [39m [90m0.04s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mrepeated execution does not duplicate completion[39m[90m                                                            [39m [90m0.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90msuccessful completion records system source[39m[90m                                                                 [39m [90m0.04s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mcompleted order creates settlement with finalized commission[39m[90m                                                [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\AutomaticDispatchTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmark ready automatically reserves and notifies a pickup rider[39m[90m                                               [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpickup reservation still requires f2 confirmation[39m[90m                                                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale available flag does not allow an overloaded rider[39m[90m                                                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mties use rider id after provider station and coverage filtering[39m[90m                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuspended inactive and pending riders are excluded[39m[90m                                                          [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong station is excluded even when an area covers the same barangay[39m[90m                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma riders explicit assigned barangay must cover the parcel[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate dispatch is idempotent and a second parcel cannot overload the same rider[39m[90m                         [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable pickup dispatch is visible and retry recovers[39m[90m                                                   [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery reservation requires sorting and physical destination station arrival[39m[90m                              [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery reservation cannot run during an active manifest[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual reassignment requires reason and records previous rider actor and time[39m[90m                               [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign provider cannot retry or reassign dispatch[39m[90m                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mverified pickup cannot be reassigned to a different collector[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross provider delivery is reserved only after verified destination receipt[39m[90m                                 [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90minternal station receipt retries a waiting delivery reservation[39m[90m                                             [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovider pagination never includes a foreign carriers parcels[39m[90m                                               [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretry reports an unavailable reserved rider without creating another assignment[39m[90m                             [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreassigned delivery reservations notify the new rider only after dispatch confirmation[39m[90m                      [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mouter transaction rollback never dispatches or leaves an assignment[39m[90m                                         [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\BarangayCoverageTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmultiple barangays and stations share municipality without changing physical address[39m[90m                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid or missing barangay is rejected with data set #0[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid or missing barangay is rejected with data set #1[39m[90m                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpsgc outage never accepts submitted names[39m[90m                                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconflicting claim is rejected without reassigning existing area[39m[90m                                             [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdatabase constraint rejects a competing write bypassing validation[39m[90m                                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompanies can cover the same barangay but cannot edit each others coverage[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstation activation requires coverage and approval[39m[90m                                                           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mactive station cannot lose last coverage[39m[90m                                                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpickup and delivery route to different stations in same city[39m[90m                                                [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible rider cannot receive assignments with data set #0[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible rider cannot receive assignments with data set #1[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mineligible rider cannot receive assignments with data set #2[39m[90m                                                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy municipality rows do not route new parcels[39m[90m                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing address codes block new assignments even with coverage[39m[90m                                              [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy delivery can continue without new coverage[39m[90m                                                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconcurrent connections produce exactly one active claim[39m[90m                                                     [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpopulated legacy schema upgrades without inventing barangays and rolls back[39m[90m                                 [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrollback refuses to merge multiple barangays in one municipality[39m[90m                                            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpending station can have coverage but cannot activate or route[39m[90m                                              [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbulk selection is atomic when one barangay conflicts[39m[90m                                                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive claim can coexist but cannot be reactivated over existing claim[39m[90m                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed pickup reassignment keeps previous rider busy[39m[90m                                                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcoverage page flags areas without riders and legacy rows[39m[90m                                                    [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy conversion uses validated coverage and preserves the row id[39m[90m                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy conversion form cannot open another providers area[39m[90m                                                   [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcoverage page lists claims and searchable barangay selection[39m[90m                                                [39m [90m0.06s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\BarangayReadinessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mactive uncovered station warns without deactivating or stranding existing delivery[39m[90m                          [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mready station requires validated active coverage[39m[90m                                                            [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90munapplied schema shows guidance instead of unknown column errors[39m[90m                                            [39m [90m0.12s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\CodRemittanceCreationTest[39m
+  [32;1m✓[39;22m[90m [39m[90msuccessful cod delivery creates exactly one pending remittance[39m[90m                                              [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrepeated delivery confirmation does not create duplicate remittance[39m[90m                                         [39m [90m0.09s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\CodRemittanceFinancialWorkflowTest[39m
+  [32;1m✓[39;22m[90m [39m[90mauthorized logistics confirms exact cod receipt[39m[90m                                                             [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90manother logistics provider cannot confirm[39m[90m                                                                   [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate confirmation does not create duplicate records[39m[90m                                                    [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirmed remittance creates one settlement[39m[90m                                                                 [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompleted order finalizes 10 percent commission[39m[90m                                                             [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseller funded and marketplace funded voucher allocations[39m[90m                                                    [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpayout blocked if financial data is incomplete[39m[90m                                                              [39m [90m0.12s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\CrossProviderHandoffQrTest[39m
+  [32;1m✓[39;22m[90m [39m[90monly the origin can dispatch an accepted handoff[39m[90m                                                            [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdispatch requires a valid single use scan and does not transfer custody[39m[90m                                     [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged tracking numbers and tokens are rejected[39m[90m                                                             [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired scan tokens are rejected[39m[90m                                                                            [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdispatch token cannot be replayed on receiving side[39m[90m                                                         [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly destination verified receipt transfers custody and preserves status[39m[90m                                    [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreplayed receiving token cannot transfer custody twice[39m[90m                                                      [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong hub binding is rejected even with a valid token[39m[90m                                                       [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreceiving scan is bound to the destination provider[39m[90m                                                         [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mverification token is bound to one handoff[39m[90m                                                                  [39m [90m0.10s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\CrossProviderHandoffTest[39m
+  [32;1m✓[39;22m[90m [39m[90morigin requests handoff for its own parcel and priority selects destination[39m[90m                                 [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovider cannot request handoff for another providers parcel[39m[90m                                                [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive or revoked links are never selectable[39m[90m                                                              [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdestination accepts its own request without custody transfer[39m[90m                                                [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90munrelated provider cannot accept or reject the request[39m[90m                                                      [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejection advances to the next priority partner and keeps custody[39m[90m                                           [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mno eligible partner creates an admin visible exception[39m[90m                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate active requests are idempotent but a second destination is blocked[39m[90m                                [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejection without another partner opens an exception and keeps custody[39m[90m                                      [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrestoring a partner automatically resolves the open exception[39m[90m                                               [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can see open handoff exceptions[39m[90m                                                                       [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhttp endpoints scope acceptance to the destination[39m[90m                                                          [39m [90m0.09s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\CrossProviderOperationsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlaguna to quezon verified receipt allows sort assign and cod delivery[39m[90m                                       [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90macceptance and dispatch never authorize destination operations[39m[90m                                              [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90morigin loses backend control but keeps handoff history after receipt[39m[90m                                        [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdestination can use internal manifests without rewriting the origin route[39m[90m                                   [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtracking shows chronological handoffs without private actor or notes[39m[90m                                        [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin exception resolution is audited and cannot transfer custody[39m[90m                                           [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtransferred parcels cannot bypass actor authorization with a null actor[39m[90m                                     [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90munrelated provider cannot see handoffs or received parcel data[39m[90m                                              [39m [90m0.14s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\DeliveryAssignmentsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mindex lists assigned to rider and out for delivery shipments[39m[90m                                                [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mindex shows real station rider weight proof and cod details[39m[90m                                                 [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mother provider is forbidden on sort assign reschedule and return[39m[90m                                            [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreschedule fails when retry limit reached[39m[90m                                                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreturn action requests physical transport without completing the return[39m[90m                                     [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\DeliveryAttemptPolicyTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfirst failure allows one retry and second failure allows return only[39m[90m                                        [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretry rejected without changing assignment or history with data set "missing failure history"[39m[90m               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretry rejected without changing assignment or history with data set "second failure"[39m[90m                        [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretry rejected without changing assignment or history with data set "legacy excess failures"[39m[90m                [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstatus service itself prevents third attempt[39m[90m                                                                [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretry checks locked failure count instead of stale caller[39m[90m                                                   [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuccessful delivery does not increment failed attempt counter[39m[90m                                               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreassignment cannot restart an exhausted delivery[39m[90m                                                           [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuccessful second attempt retains one recorded failure[39m[90m                                                      [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrider ui distinguishes final retry from return required[39m[90m                                                     [39m [90m0.08s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Logistics\DeliveryMonitoringTest[39m
+  [32;1m✓[39;22m[90m [39m[90mindex lists claimed parcels with status and riders[39m[90m                                                          [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed parcel shows reason label and notes[39m[90m                                                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy failed row without reason renders fallback[39m[90m                                                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpage is read only with no transition forms[39m[90m                                                                  [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexcludes unclaimed and other providers parcels[39m[90m                                                              [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90mguest is redirected to home login modal[39m[90m                                                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreturned parcels are not monitored[39m[90m                                                                          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon logistics guard is denied[39m[90m                                                                               [39m [90m0.04s[39m  
+
+Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 548864 bytes) in C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php on line 259
+Stack trace:
+#0 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(259): preg_replace('#^<pre.*?>\\s*<c...', '\\1', '<pre><code styl...')
+#1 C:\Web\Zefanya\vendor\symfony\error-handler\Resources\views\trace.html.php(36): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->fileExcerpt('C:\\Web\\Zefanya\\...', 1318, 5)
+#2 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(335): include('C:\\Web\\Zefanya\\...')
+#3 C:\Web\Zefanya\vendor\symfony\error-handler\Resources\views\traces.html.php(48): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->include('views/trace.htm...', Array)
+#4 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(335): include('C:\\Web\\Zefanya\\...')
+#5 C:\Web\Zefanya\vendor\symfony\error-handler\Resources\views\exception.html.php(54): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->include('views/traces.ht...', Array)
+#6 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(335): include('C:\\Web\\Zefanya\\...')
+#7 C:\Web\Zefanya\vendor\symfony\error-handler\Resources\views\exception_full.html.php(35): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->include('views/exception...', Array)
+#8 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(335): include('C:\\Web\\Zefanya\\...')
+#9 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(140): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->include('views/exception...', Array)
+#10 C:\Web\Zefanya\vendor\symfony\error-handler\ErrorRenderer\HtmlErrorRenderer.php(72): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->renderException(Object(Symfony\Component\ErrorHandler\Exception\FlattenException))
+#11 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Renderer\Renderer.php(88): Symfony\Component\ErrorHandler\ErrorRenderer\HtmlErrorRenderer->render(Object(Symfony\Component\ErrorHandler\Exception\FlattenException))
+#12 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Handler.php(982): Illuminate\Foundation\Exceptions\Renderer\Renderer->render(Object(Illuminate\Http\Request), Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#13 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Handler.php(963): Illuminate\Foundation\Exceptions\Handler->renderExceptionContent(Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#14 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Handler.php(1042): Illuminate\Foundation\Exceptions\Handler->convertExceptionToResponse(Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#15 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Handler.php(950): Illuminate\Foundation\Exceptions\Handler->renderHttpException(Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#16 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Handler.php(833): Illuminate\Foundation\Exceptions\Handler->prepareResponse(Object(Illuminate\Http\Request), Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#17 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Exceptions\Handler.php(720): Illuminate\Foundation\Exceptions\Handler->renderExceptionResponse(Object(Illuminate\Http\Request), Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#18 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Routing\Pipeline.php(51): Illuminate\Foundation\Exceptions\Handler->render(Object(Illuminate\Http\Request), Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#19 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(182): Illuminate\Routing\Pipeline->handleException(Object(Illuminate\Http\Request), Object(Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException))
+#20 C:\Web\Zefanya\vendor\laravel\mcp\src\Server\Middleware\AddWwwAuthenticateHeader.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#21 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Laravel\Mcp\Server\Middleware\AddWwwAuthenticateHeader->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#25 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#26 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#27 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#29 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(110): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#31 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#32 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#33 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#34 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#35 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#36 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#37 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#38 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#39 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#40 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#41 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#42 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#43 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(638): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#44 C:\Web\Zefanya\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(397): Illuminate\Foundation\Testing\TestCase->call('POST', '/logistics/hubs...', Array, Array, Array, Array)
+#45 C:\Web\Zefanya\tests\Feature\Logistics\HubsTest.php(184): Illuminate\Foundation\Testing\TestCase->post('/logistics/hubs...', Array)
+#46 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestCase.php(1318): Tests\Feature\Logistics\HubsTest->test_province_hubs_can_no_longer_be_self_service_created()
+#47 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestCase.php(1355): PHPUnit\Framework\TestCase->invokeTestMethod('test_province_h...', Array)
+#48 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestCase.php(521): PHPUnit\Framework\TestCase->runTest()
+#49 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#50 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestCase.php(361): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\Logistics\HubsTest))
+#51 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#52 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#53 C:\Web\Zefanya\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#54 C:\Web\Zefanya\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#55 C:\Web\Zefanya\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#56 C:\Web\Zefanya\vendor\phpunit\phpunit\phpunit(104): PHPUnit\TextUI\Application->run(Array)
+#57 {main}
+Fatal error: Premature end of PHP process when running Tests\Feature\Logistics\HubsTest::test_province_hubs_can_no_longer_be_self_service_created.

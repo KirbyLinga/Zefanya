@@ -136,6 +136,24 @@ class OrderActorMapTest extends TestCase
         $this->assertSame(OrderStatus::DeliveryFailed, $result->status);
     }
 
+    public function test_rider_can_cancel_after_a_second_failed_pickup(): void
+    {
+        $so = $this->orderAt(OrderStatus::ReadyForPickup);
+
+        $result = $this->service->transition(
+            $so,
+            OrderStatus::Cancelled,
+            changedBy: 'Rider',
+            actor: OrderActor::Rider,
+            actorId: 5,
+            source: 'web',
+        );
+
+        $this->assertSame(OrderStatus::Cancelled, $result->status);
+        $this->assertSame(1, StatusHistory::count());
+        $this->assertSame('rider', StatusHistory::sole()->actor_type);
+    }
+
     // ── Rider: rejected ──────────────────────────────────────────────────────
 
     public function test_rider_cannot_pack_or_complete(): void
@@ -240,12 +258,14 @@ class OrderActorMapTest extends TestCase
         $this->service->transition($so, OrderStatus::AtSortingCenter, actor: OrderActor::Buyer);
     }
 
-    // ── System: no direct transitions in the canonical flow ───────────────────────
+    // ── System: automatic receipt completion only ───────────────────────
     // CourierAssignmentService handles assignments with the proper actor.
 
-    public function test_system_has_no_direct_transitions(): void
+    public function test_system_can_only_complete_delivered_orders(): void
     {
-        $this->assertSame([], OrderActor::allowedTransitions(OrderActor::System));
+        $this->assertSame([
+            [OrderStatus::Delivered, OrderStatus::Completed],
+        ], OrderActor::allowedTransitions(OrderActor::System));
     }
 
     // ── Missing graph edges from the spec are present and reachable ──────────

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Enums\LogisticsProviderStatus;
 use App\Models\Logistics\LogisticsProvider;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
@@ -81,9 +83,21 @@ class LogisticsDashboardTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        // The one wired route renders as a real link; future areas stay inert.
-        $this->assertStringContainsString(route('logistics.dashboard'), $html);
-        $this->assertStringContainsString('Courier Applications', $html);
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+
+        foreach (['logistics.dashboard' => 'Dashboard', 'logistics.riders.index' => 'Riders'] as $name => $label) {
+            $this->assertSame(1, $xpath->query('//*[@id="logisticsNav"]//a[@href="'.route($name).'" and normalize-space(.)="'.$label.'"]')->length);
+        }
+
+        foreach ($xpath->query('//*[@id="logisticsNav"]//a') as $link) {
+            $href = $link->getAttribute('href');
+            $matchedRoute = Route::getRoutes()->match(Request::create($href, 'GET'));
+
+            $this->assertTrue(str_starts_with($matchedRoute->getName() ?? '', 'logistics.'), $href);
+            $this->assertSame(route($matchedRoute->getName()), $href);
+        }
 
         // The old stub's fabricated nav badges are gone.
         $this->assertStringNotContainsString('8 new', $html);

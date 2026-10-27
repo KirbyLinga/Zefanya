@@ -15,10 +15,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class Buyer extends Authenticatable
 {
-    use CanResetPassword, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable;
+    use CanResetPassword, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable, HasApiTokens;
 
     protected $fillable = [
         'last_name',

@@ -45,6 +45,8 @@ enum OrderActor: string
             // Station receipt (PickedUp → AtSortingCenter) is Logistics custody.
             self::Rider => [
                 [OrderStatus::ReadyForPickup, OrderStatus::PickedUp],
+                // The second failed pickup attempt cancels the parcel.
+                [OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
                 [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery],
                 [OrderStatus::OutForDelivery, OrderStatus::Delivered],
                 [OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed],

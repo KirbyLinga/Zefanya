@@ -56,7 +56,9 @@ class HubsUiTest extends TestCase
         $province = $this->province($provider);
         $xpath = $this->document($provider);
 
-        $this->assertSame(0, $xpath->query('//details[@open]')->length);
+        // Scope to the hubs page: the active "Team & network" sidebar group is
+        // intentionally expanded and is not a hub form.
+        $this->assertSame(0, $xpath->query('//*[@data-hubs-page]//details[@open]')->length);
         $this->assertSame(0, $xpath->query('//*[@data-province-create]')->length, 'province self-service creation removed');
         $stationForm = $xpath->query('//*[@data-station-create]//form')->item(0);
         $this->assertSame(route('logistics.hubs.stations.store', $province), $stationForm->getAttribute('action'));
@@ -130,6 +132,6 @@ class HubsUiTest extends TestCase
         $xpath = $this->document($provider, ['is_active' => '1'], ['is_active' => 'Only approved hubs can be activated.']);
 
         $this->assertSame(1, $xpath->query('//*[@role="alert" and contains(., "Only approved hubs can be activated.")]')->length);
-        $this->assertSame(0, $xpath->query('//details[@open]')->length);
+        $this->assertSame(0, $xpath->query('//*[@data-hubs-page]//details[@open]')->length);
     }
 }

@@ -12,10 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class Rider extends Authenticatable
 {
-    use HasEmailOtp, HasFactory, Notifiable;
+    use HasEmailOtp, HasFactory, Notifiable, HasApiTokens;
 
     public const STATUS_UNVERIFIED = 'unverified';
 
@@ -94,6 +95,11 @@ class Rider extends Authenticatable
     public function isApprovedOrActive(): bool
     {
         return in_array($this->status, self::ASSIGNABLE_STATUSES, true);
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 
     /**

@@ -460,6 +460,21 @@ class RiderOperationsService
     }
 
     /**
+     * Release the rider's pickup reservation after a first failed attempt.
+     *
+     * The courier is made available again but remains recorded on the parcel
+     * so the same rider can make the one allowed retry; a second failure then
+     * cancels the order through SellerOrderStatusService.
+     */
+    public function releasePickupReservation(SellerOrder $sellerOrder, Rider $rider): void
+    {
+        $courier = $this->operationalCourier($rider);
+        $this->assertPickupOwnership($courier, $sellerOrder);
+
+        $this->assignment->release($courier);
+    }
+
+    /**
      * Assignment check for controllers: must run before any idempotent success
      * response so unauthorized actors never see a completed-handoff flash.
      */

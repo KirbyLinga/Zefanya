@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Seller\AccountController;
 use App\Http\Controllers\Seller\AuthController;
 use App\Http\Controllers\Seller\DashboardController;
 use App\Http\Controllers\Seller\MessageController;
@@ -79,8 +80,7 @@ Route::prefix('seller')->name('seller.')->group(function () {
             return view('Seller.Chat.index');
         })->name('chat.index');
 
-        Route::get('/account', function () {
-            return view('Seller.Account.index');
-        })->name('account.index');
+        Route::get('/account', [AccountController::class, 'index'])->name('account.index');
+        Route::patch('/account', [AccountController::class, 'update'])->name('account.update');
     });
 });

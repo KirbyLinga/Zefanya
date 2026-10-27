@@ -254,9 +254,9 @@
                                             </button>
                                             <div class="sp-dropdown__menu sp-dropdown__menu--right" data-dropdown-menu role="menu" hidden>
                                                 <a href="{{ route('seller.products.edit', $product) }}" role="menuitem" class="sp-dropdown__item"
-   data-product-edit-open="{{ $product->id }}"
+   data-product-edit-open="{{ $product->id }}" data-product-stock-open
    data-update-url="{{ route('seller.products.update', $product) }}">
-                                                    <i data-lucide="pencil" width="14" height="14"></i>Edit
+                                                    <i data-lucide="package-plus" width="14" height="14"></i>Add stock
                                                 </a>
                                                 @if ($product->status !== 'active')
                                                     <button type="button" role="menuitem" class="sp-dropdown__item"

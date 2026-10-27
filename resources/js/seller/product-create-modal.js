@@ -408,7 +408,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const html = await response.text();
             if (token !== fetchToken) return;
             apply('edit', html, trigger?.dataset.updateUrl || overlay.dataset.updateTemplate.replace('__ID__', id), id);
-            q('#name')?.focus();
+            if (trigger?.hasAttribute('data-product-stock-open')) {
+                title.textContent = 'Add Stock';
+                showStep(4);
+                (enabled() ? q('[data-pf-stock]:not(:disabled)') : q('#stock_quantity'))?.focus();
+            } else {
+                q('#name')?.focus();
+            }
         } catch {
             if (token === fetchToken) body.replaceChildren(node('p', 'Could not load this product. Close and try again.', 'p-6 text-[var(--status-danger)]'));
         }

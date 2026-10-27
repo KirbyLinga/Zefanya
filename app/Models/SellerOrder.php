@@ -210,6 +210,14 @@ class SellerOrder extends Model
     }
 
     /**
+     * Rider pickup attempts (one row per failed attempt, max two).
+     */
+    public function pickupAttempts(): HasMany
+    {
+        return $this->hasMany(PickupAttempt::class)->orderBy('attempt_number');
+    }
+
+    /**
      * Total parcel weight in grams. This is the checkout snapshot when one
      * exists; legacy rows fall back to the line items until the backfill runs.
      * A later catalog weight edit must not change an in-transit parcel.
