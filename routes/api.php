@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\Buyer\LogoutController;
 use App\Http\Controllers\Api\Rider\LoginController as RiderLoginController;
 use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
 use App\Http\Controllers\Api\Rider\LogoutController as RiderLogoutController;
+use App\Http\Controllers\Rider\ParcelIncidentController;
+use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
 /* --------------------------------------------------------------------------
