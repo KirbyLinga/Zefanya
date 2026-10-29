@@ -39,18 +39,33 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/chat_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/chat_validation.dart';
+import '../../utils/image_picker_helper.dart';
 import '../../utils/motion.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../widgets/pressable_scale.dart';
 
 /// Wide corners vs the short "anchor" corner nearest the speaker.
 const double _bubbleWide = 24;
 const double _bubbleAnchor = 6;
 
+typedef ChatAttachmentPicker =
+    Future<ChatAttachment?> Function(BuildContext context);
+
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.contactName, required this.contactRole});
+  const ChatScreen({
+    super.key,
+    required this.contactName,
+    required this.contactRole,
+    this.attachmentPicker,
+  });
 
   final String contactName;
   final String contactRole;
+
+  /// Test seam. Production uses the gallery/camera sheet; a test can return an
+  /// oversized or unsupported file without touching a platform channel.
+  final ChatAttachmentPicker? attachmentPicker;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -61,6 +76,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   bool _isTyping = false;
   bool _hasText = false;
+  ChatAttachment? _pendingAttachment;
+  bool _isPickingAttachment = false;
+
+  bool get _canSend => _hasText || _pendingAttachment != null;
 
   @override
   void initState() {
@@ -73,9 +92,13 @@ class _ChatScreenState extends State<ChatScreen> {
     // opened — no-op if there's already history (incl. from a
     // previous session, since ChatState is persisted).
     context.read<ChatState>().seedIfEmpty(
-          widget.contactName,
-          const ChatMessage(text: 'Hi! Thanks for reaching out — how can I help?', isMe: false, time: '10:02 AM'),
-        );
+      widget.contactName,
+      const ChatMessage(
+        text: 'Hi! Thanks for reaching out — how can I help?',
+        isMe: false,
+        time: '10:02 AM',
+      ),
+    );
   }
 
   @override
@@ -85,24 +108,95 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  Future<ChatAttachment?> _pickWithPicker() async {
+    final picked = await pickAndSaveImage(context, filenamePrefix: 'chat');
+    if (picked == null) return null;
+    return ChatAttachment(
+      name: picked.uri.pathSegments.last,
+      sizeBytes: await picked.length(),
+      path: picked.path,
+    );
+  }
+
+  Future<void> _pickAttachment() async {
+    if (_isPickingAttachment) return;
+    if (!context.read<ChatState>().supportsAttachments) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text('Attachments are not available on this server yet.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isPickingAttachment = true);
+    try {
+      final picked =
+          await (widget.attachmentPicker?.call(context) ?? _pickWithPicker());
+      if (!mounted || picked == null) return;
+      final problem = validateChatAttachment(picked);
+      if (problem != null) {
+        showTimedSnackBar(
+          context,
+          SnackBar(content: Text(chatAttachmentProblemMessage(problem))),
+        );
+        return;
+      }
+      setState(() => _pendingAttachment = picked);
+    } catch (_) {
+      if (!mounted) return;
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Could not open that file.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isPickingAttachment = false);
+    }
+  }
+
   void _send() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    final text = _controller.text;
+    final problem = validateChatMessage(
+      text,
+      hasAttachment: _pendingAttachment != null,
+    );
+    if (problem != null) {
+      showTimedSnackBar(context, SnackBar(content: Text(problem)));
+      return;
+    }
 
     final chat = context.read<ChatState>();
-    chat.addMessage(widget.contactName, ChatMessage(text: text, isMe: true, time: 'Now'));
+    final attachment = _pendingAttachment;
+    chat.addMessage(
+      widget.contactName,
+      ChatMessage(
+        text: text.trim(),
+        isMe: true,
+        time: 'Now',
+        attachment: attachment,
+      ),
+    );
     _controller.clear();
-    setState(() => _isTyping = true);
+    setState(() => _pendingAttachment = null);
     _scrollToBottom();
 
-    // Simulated reply so this reads as a live thread rather than a
-    // dead-end form — remove once a real backend sends real replies.
+    // A live thread gets the other side's messages from the server; only the
+    // mock has to invent a reply to keep the thread from looking like a dead end.
+    if (!chat.simulatesReplies) return;
+
+    // Mock mode: simulate a reply so the thread doesn't look like a dead end.
+    setState(() => _isTyping = true);
     Future.delayed(const Duration(milliseconds: 1100), () {
       if (!mounted) return;
       setState(() => _isTyping = false);
       chat.addMessage(
         widget.contactName,
-        const ChatMessage(text: 'Got it — I\'ll check and get back to you shortly.', isMe: false, time: 'Now'),
+        const ChatMessage(
+          text: 'Got it — I\'ll check and get back to you shortly.',
+          isMe: false,
+          time: 'Now',
+        ),
       );
       _scrollToBottom();
     });
@@ -122,18 +216,31 @@ class _ChatScreenState extends State<ChatScreen> {
   // Deterministic per-contact color so different threads are visually
   // distinguishable instead of every avatar being the same flat sage
   // circle regardless of who you're talking to.
-  static const _avatarPalette = [AppColors.tertiary, AppColors.primary, AppColors.primaryDark, AppColors.secondary];
+  // Four mode-invariant pastels, because the initial on top of them is
+  // dark ink now: a light fill needs a dark initial. primaryDark used to
+  // be in this list, and it's a *dark* fill — so whichever thread hashed
+  // to it had near-white initials at 1.6:1 in light mode, and would have
+  // had near-black ones at the same ratio in dark.
+  static List<Color> get _avatarPalette => [
+    AppColors.tertiary,
+    AppColors.primary,
+    AppColors.secondary,
+    Color.lerp(AppColors.secondary, AppColors.tertiary, 0.5)!,
+  ];
 
-  Color _avatarColorFor(String name) => _avatarPalette[name.hashCode.abs() % _avatarPalette.length];
+  Color _avatarColorFor(String name) =>
+      _avatarPalette[name.hashCode.abs() % _avatarPalette.length];
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final messages = context.watch<ChatState>().messagesFor(widget.contactName);
     final avatarColor = _avatarColorFor(widget.contactName);
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+      backgroundColor:
+          Colors.transparent, // the app-wide gradient in main.dart paints this
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
@@ -143,16 +250,30 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 38,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                // Lightened, not darkened. The old gradient lerped toward
+                // black, which ate exactly the contrast the dark initial
+                // needs; a sheen toward white keeps the dimension and helps
+                // the ink instead of fighting it.
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [avatarColor, Color.lerp(avatarColor, Colors.black, 0.3)!],
+                  colors: [
+                    Color.lerp(avatarColor, Colors.white, 0.3)!,
+                    avatarColor,
+                  ],
                 ),
               ),
               alignment: Alignment.center,
               child: Text(
-                widget.contactName.isNotEmpty ? widget.contactName[0].toUpperCase() : '?',
-                style: const TextStyle(color: AppColors.textOnDark, fontWeight: FontWeight.w700),
+                widget.contactName.isNotEmpty
+                    ? widget.contactName[0].toUpperCase()
+                    : '?',
+                // Dark ink, because every colour in _avatarPalette is a
+                // light pastel — see the note there.
+                style: TextStyle(
+                  color: AppColors.textOnLight,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -166,7 +287,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   // thing itself".
                   Text(
                     widget.contactRole.toUpperCase(),
-                    style: AppType.eyebrow.copyWith(fontSize: 9, letterSpacing: 2.0),
+                    style: AppType.eyebrow.copyWith(letterSpacing: 1.2),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
@@ -182,13 +303,16 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Call ${widget.contactName}',
             onPressed: () {
               // clearSnackBars() first — this icon has no cooldown, so
               // mashing it queued a fresh 4s "Calling..." behind each
               // previous one instead of just restarting the one shown.
               ScaffoldMessenger.of(context)
                 ..clearSnackBars()
-                ..showSnackBar(SnackBar(content: Text('Calling ${widget.contactName}...')));
+                ..showSnackBar(
+                  SnackBar(content: Text('Calling ${widget.contactName}...')),
+                );
             },
             icon: const Icon(Icons.call_outlined),
           ),
@@ -211,8 +335,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 // timestamp and the gap before the next speaker.
                 final next = i + 1 < messages.length ? messages[i + 1] : null;
                 final nextIsTyping = _isTyping && i == messages.length - 1;
-                final isRunEnd = nextIsTyping || next == null || next.isMe != message.isMe;
-                return _Bubble(theme: theme, message: message, isRunEnd: isRunEnd);
+                final isRunEnd =
+                    nextIsTyping || next == null || next.isMe != message.isMe;
+                return _Bubble(
+                  theme: theme,
+                  message: message,
+                  isRunEnd: isRunEnd,
+                );
               },
             ),
           ),
@@ -227,42 +356,111 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: const Border(top: BorderSide(color: AppColors.divider)),
+        border: Border(top: BorderSide(color: AppColors.divider)),
         boxShadow: [
-          BoxShadow(color: AppColors.neutral.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, -3)),
+          BoxShadow(
+            color: AppColors.neutral.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
         ],
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                decoration: const InputDecoration(hintText: 'Type a message...'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Fades to 40% opacity when the field is empty — communicates
-            // "nothing to send" without a separate disabled state.
-            AnimatedOpacity(
-              opacity: _hasText ? 1.0 : 0.4,
-              duration: const Duration(milliseconds: 150),
-              child: PressableScale(
-                onTap: _send,
+            if (_pendingAttachment != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryDark,
-                    shape: BoxShape.circle,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
                   ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.send_rounded, size: 18, color: AppColors.textOnDark),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.attach_file,
+                        size: 16,
+                        color: AppColors.primaryDark,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          _pendingAttachment!.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => setState(() => _pendingAttachment = null),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _isPickingAttachment ? null : _pickAttachment,
+                  tooltip: 'Attach file',
+                  icon: Icon(
+                    Icons.attach_file,
+                    size: 20,
+                    color: _isPickingAttachment
+                        ? AppColors.textSecondary
+                        : AppColors.primaryDark,
+                  ),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message...',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Fades to 40% opacity when there is nothing to send — a
+                // pending attachment counts, not only typed text.
+                AnimatedOpacity(
+                  opacity: _canSend ? 1.0 : 0.4,
+                  duration: const Duration(milliseconds: 150),
+                  child: PressableScale(
+                    onTap: _send,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryDark,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.send_rounded,
+                        size: 18,
+                        color: AppColors.textOnDark,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -274,7 +472,11 @@ class _ChatScreenState extends State<ChatScreen> {
 /// One message. The short corner is always on the speaker's side, so
 /// the silhouette alone says who's talking.
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.theme, required this.message, required this.isRunEnd});
+  const _Bubble({
+    required this.theme,
+    required this.message,
+    required this.isRunEnd,
+  });
 
   final ThemeData theme;
   final ChatMessage message;
@@ -282,6 +484,7 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final isMe = message.isMe;
 
     final radius = BorderRadius.only(
@@ -296,22 +499,64 @@ class _Bubble extends StatelessWidget {
       // makes a thread scannable without any extra chrome.
       padding: EdgeInsets.only(bottom: isRunEnd ? 14 : 3),
       child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.74,
+            ),
             decoration: BoxDecoration(
               color: isMe ? AppColors.primaryDark : AppColors.surfaceMuted,
               borderRadius: radius,
               border: isMe ? null : Border.all(color: AppColors.divider),
             ),
-            child: Text(
-              message.text,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.35,
-                color: isMe ? AppColors.textOnDark : AppColors.textPrimary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.attachment != null) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        size: 16,
+                        color: isMe
+                            ? AppColors.textOnDark
+                            : AppColors.primaryDark,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          message.attachment!.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isMe
+                                ? AppColors.textOnDark
+                                : AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (message.text.isNotEmpty) const SizedBox(height: 5),
+                ],
+                if (message.text.isNotEmpty)
+                  Text(
+                    message.text,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      height: 1.35,
+                      color: isMe
+                          ? AppColors.textOnDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+              ],
             ),
           ),
           // One timestamp per run, outside the bubble. Previously every
@@ -322,7 +567,7 @@ class _Bubble extends StatelessWidget {
               padding: const EdgeInsets.only(top: 5, left: 4, right: 4),
               child: Text(
                 message.time.toUpperCase(),
-                style: AppType.eyebrow.copyWith(fontSize: 9, letterSpacing: 1.6),
+                style: AppType.eyebrow.copyWith(letterSpacing: 1.2),
               ),
             ),
         ],
@@ -346,7 +591,8 @@ class _TypingIndicator extends StatefulWidget {
   State<_TypingIndicator> createState() => _TypingIndicatorState();
 }
 
-class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerProviderStateMixin {
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
@@ -372,6 +618,7 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -397,7 +644,10 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
                     child: Container(
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryDark),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primaryDark,
+                      ),
                     ),
                   ),
                 ),
@@ -411,7 +661,9 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
                       // Each dot is a third of a cycle behind the last, so
                       // the pulse travels left to right.
                       final phase = (_controller.value - i * 0.18) % 1.0;
-                      final lift = phase < 0.4 ? Curves.easeInOut.transform(phase / 0.4) : 0.0;
+                      final lift = phase < 0.4
+                          ? Curves.easeInOut.transform(phase / 0.4)
+                          : 0.0;
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2.5),
                         child: Transform.translate(

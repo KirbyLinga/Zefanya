@@ -13,6 +13,7 @@
 import 'package:flutter/material.dart';
 import '../../../state/courier_state.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
 
 class DeliveryJobCard extends StatelessWidget {
@@ -39,25 +40,29 @@ class DeliveryJobCard extends StatelessWidget {
     DeliveryMilestone.returnToSender:  'Returning',
   };
 
-  static const _statusColors = {
-    DeliveryMilestone.accepted:        AppColors.neutral,
-    DeliveryMilestone.arrivedAtSeller: AppColors.primary,
-    DeliveryMilestone.pickedUp:        AppColors.secondary,
-    DeliveryMilestone.atSortingCenter: AppColors.warning,
-    DeliveryMilestone.sorted:          AppColors.tertiary,
-    DeliveryMilestone.assignedToRider: AppColors.tertiary,
-    DeliveryMilestone.inTransit:       AppColors.primaryDark,
-    DeliveryMilestone.delivered:       AppColors.tertiary,
-    DeliveryMilestone.failedDelivery:  AppColors.danger,
-    DeliveryMilestone.returnToSender:  AppColors.danger,
-  };
+  // Resolved per call rather than cached in a `static const` map: several
+  // of these tokens (warning, primaryDark, danger) differ per mode, and a
+  // const map would freeze whichever mode loaded first.
+  static Map<DeliveryMilestone, Color> get _statusColors => {
+        DeliveryMilestone.accepted:        AppColors.neutral,
+        DeliveryMilestone.arrivedAtSeller: AppColors.primary,
+        DeliveryMilestone.pickedUp:        AppColors.secondary,
+        DeliveryMilestone.atSortingCenter: AppColors.warning,
+        DeliveryMilestone.sorted:          AppColors.tertiary,
+        DeliveryMilestone.assignedToRider: AppColors.tertiary,
+        DeliveryMilestone.inTransit:       AppColors.primaryDark,
+        DeliveryMilestone.delivered:       AppColors.tertiary,
+        DeliveryMilestone.failedDelivery:  AppColors.danger,
+        DeliveryMilestone.returnToSender:  AppColors.danger,
+      };
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final job = assignedJob.job;
     final statusColor = _statusColors[assignedJob.milestone]!;
-    final shape = editorialRadius(index, big: 28, small: 8);
+    final shape = editorialRadius(index, ShapeTier.card);
 
     return InkWell(
       onTap: onTap,
@@ -79,7 +84,7 @@ class DeliveryJobCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: radiusOf(ShapeTier.pill),
                   ),
                   child: Text(
                     _statusLabels[assignedJob.milestone]!,
@@ -95,6 +100,13 @@ class DeliveryJobCard extends StatelessWidget {
             _iconLine(theme, Icons.location_on_outlined, 'Deliver to', '${job.buyerName} — ${job.deliveryArea}'),
             const SizedBox(height: 6),
             _iconLine(theme, Icons.inventory_2_outlined, 'Package', job.packageSize),
+            const SizedBox(height: 6),
+            _iconLine(
+              theme,
+              job.hasCod ? Icons.payments_outlined : Icons.verified_outlined,
+              job.hasCod ? 'Collect COD' : 'Payment',
+              job.hasCod ? formatPeso(job.codAmount) : job.paymentLabel,
+            ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -106,7 +118,7 @@ class DeliveryJobCard extends StatelessWidget {
                 // treatment, applied to whatever number matters most on
                 // this screen. Was titleSmall/w700, same weight as the
                 // shop name above it.
-                Text('\u20b1${job.fee.toStringAsFixed(0)}', style: AppType.priceNumeral(26)),
+                Text(formatPeso(job.fee), style: AppType.priceNumeral(26)),
               ],
             ),
           ],
@@ -132,7 +144,7 @@ class DeliveryJobCard extends StatelessWidget {
             text: TextSpan(
               style: theme.textTheme.bodySmall,
               children: [
-                TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                TextSpan(text: '$label: ', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 TextSpan(text: value),
               ],
             ),

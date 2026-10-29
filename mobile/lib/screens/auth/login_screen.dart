@@ -19,11 +19,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/dev_flags.dart';
+import '../../data/api/api_exception.dart';
+import '../../services/google_sign_in_service.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/timed_snackbar.dart';
 import 'registration_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
+import '../../widgets/google_mark.dart';
+import '../../widgets/google_role_sheet.dart';
+import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 
@@ -40,53 +46,174 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
+  final _passwordFocus = FocusNode();
 
-  // TEMP: with no backend yet, there's no server response to read a
-  // role from, so the tester picks which role this login simulates.
-  // Remove this selector once real auth returns the user's role.
-  UserRole _loginAsRole = UserRole.buyer;
+  bool get _isBusy => _isSubmitting || _isGoogleSubmitting;
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Now a real repository call (see AuthState.login), so the artificial
+    // 600ms delay that used to stand in for it is gone for the same reason it
+    // was removed at checkout: it was simulating the thing that now actually
+    // happens, and it would add 600ms to every real sign-in. In mock mode the
+    // call resolves locally, which is the honest behaviour.
     setState(() => _isSubmitting = true);
 
-    // TODO: replace with a real auth call (Laravel API) once wired up,
-    // and pass the role/name/email the API returns to login() below.
-    await Future.delayed(const Duration(milliseconds: 600));
+    // With no backend yet, there's no server response to read a role or
+    // a name from, so the tester's selector supplies the role and the
+    // display name is the sample one. Both are *arguments* to the call
+    // below, and the status comes back from the repository — remove this
+    // stub once real auth returns all three.
+    try {
+      await context.read<AuthState>().login(
+        email: _identifierController.text.trim(),
+        password: _passwordController.text,
+      );
+      TextInput.finishAutofillContext();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      // A refused sign-in normally ends here: say what the server said and leave
+      // the person on a form they can still correct.
+      //
+      // The email gate is the exception, and it is the *server* that says so.
+      // `PENDING_VERIFICATION` means the credentials were accepted and the only
+      // thing missing is the code already sent to that address — and the refusal
+      // arrives carrying the handle that code can be confirmed against. Showing
+      // a sentence here and stopping would strand someone told to confirm an
+      // email with no way to do it.
+      final gate = e is PendingApprovalException && e.canConfirmEmail
+          ? e
+          : null;
+      if (gate != null) {
+        await context.read<AuthState>().beginEmailVerification(
+          
+          email: _identifierController.text.trim(),
+          verificationId: gate.verificationId!,
+        );
+        if (!mounted) return;
+        // AuthGate rebuilds onto PendingApprovalScreen, whose "Enter Code"
+        // button is live now that the handle arrived with the refusal.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+
+      // Only reachable in a live build, where there is no API to sign in
+      // against yet: say so rather than appearing to have signed someone in.
+      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    context.read<AuthState>().login(
-          role: _loginAsRole,
-          name: 'Tristan Araneta',
-          email: _identifierController.text.trim(),
-        );
-
     // AuthGate (in main.dart) rebuilds to the right shell once the
-    // state changes above — this just unwinds back to that root route.
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // state changes above — this unwinds back to that root route
+    // through our signature CloudTransition screen hand-off.
+    await CloudTransition.run(
+      context,
+      swap: () {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      },
+    );
+  }
+
+  /// Google is an alternative *sign-in*, not a second registration form.
+  ///
+  /// The repository answers one of two things. An existing account is already
+  /// applied by [AuthState.signInWithGoogle], so this only unwinds to AuthGate
+  /// and lets it choose the shell. A `needs_role` answer is still a success:
+  /// Google proved the identity, but there is no Zefanya account to sign in
+  /// to, so the sheet asks the one question the server could not answer and
+  /// registration opens with the name and email already filled in.
+  Future<void> _continueWithGoogle() async {
+    if (_isBusy) return;
+    setState(() => _isGoogleSubmitting = true);
+
+    try {
+      final outcome = await context.read<AuthState>().signInWithGoogle();
+      if (!mounted) return;
+
+      if (outcome.result != null) {
+        TextInput.finishAutofillContext();
+        await CloudTransition.run(
+          context,
+          swap: () {
+            if (mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
+        );
+        return;
+      }
+
+      final role = await showGoogleRoleSheet(
+        context,
+        email: outcome.identity.email,
+      );
+      if (role == null || !mounted) return;
+
+      await Navigator.of(context).push(
+        AppPageRoute(
+          builder: (_) => RegistrationScreen(
+            initialRole: role,
+            googleIdentity: outcome.identity,
+          ),
+        ),
+      );
+    } on GoogleSignInFailure catch (e) {
+      // Cancellation is a decision, not an error: the person closed Google's
+      // sheet and should be returned to the form without a snackbar.
+      if (!mounted || e.cancelled) return;
+      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text(
+            'Google sign-in could not be completed. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleSubmitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+      backgroundColor:
+          Colors.transparent, // the app-wide gradient in main.dart paints this
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
           child: Form(
             key: _formKey,
+            // Errors appear after first interaction (focus loss / typing),
+            // not only on submit — the fields already chain focus, so a
+            // person tabbing through sees what's wrong as they go.
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -104,85 +231,135 @@ class _LoginScreenState extends State<LoginScreen> {
                 // gradient the way every other content surface does.
                 StaggeredReveal(
                   index: 1,
-                  child: _Panel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text('Email or Phone Number', style: theme.textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _identifierController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            hintText: 'you@example.com or 09XXXXXXXXX',
-                            prefixIcon: Icon(Icons.person_outline),
+                  child: AutofillGroup(
+                    child: _Panel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Email or Phone Number',
+                            style: theme.textTheme.labelLarge,
                           ),
-                          validator: (value) {
-                            // TODO: swap for a real email-or-phone regex check.
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Enter your email or phone number';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        Text('Password', style: theme.textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined),
-                              onPressed: () =>
-                                  setState(() => _obscurePassword = !_obscurePassword),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _identifierController,
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [
+                              AutofillHints.email,
+                              AutofillHints.telephoneNumber,
+                            ],
+                            textInputAction: TextInputAction.next,
+                            onFieldSubmitted: (_) =>
+                                _passwordFocus.requestFocus(),
+                            decoration: const InputDecoration(
+                              hintText: 'you@example.com or 09XXXXXXXXX',
+                              prefixIcon: Icon(Icons.person_outline),
                             ),
-                          ),
-                          validator: (value) {
-                            // TODO: enforce real password rules server-side.
-                            if (value == null || value.isEmpty) return 'Enter your password';
-                            return null;
-                          },
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              // TODO: forgot-password flow
+                            validator: (value) {
+                              // TODO: swap for a real email-or-phone regex check.
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Enter your email or phone number';
+                              }
+                              return null;
                             },
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.textSecondary,
-                              textStyle: theme.textTheme.bodySmall,
-                            ),
-                            child: const Text('Forgot password?'),
                           ),
-                        ),
-                        if (kShowDevTools) ...[
-                          const SizedBox(height: 4),
-                          _buildLoginAsSelector(theme),
+                          const SizedBox(height: 20),
+                          Text('Password', style: theme.textTheme.labelLarge),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _passwordController,
+                            focusNode: _passwordFocus,
+                            obscureText: _obscurePassword,
+                            autofillHints: const [AutofillHints.password],
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) {
+                              if (!_isSubmitting) _login();
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Enter your password',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                tooltip: _obscurePassword
+                                    ? 'Show password'
+                                    : 'Hide password',
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              // TODO: enforce real password rules server-side.
+                              if (value == null || value.isEmpty) {
+                                return 'Enter your password';
+                              }
+                              return null;
+                            },
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                // TODO: forgot-password flow
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                textStyle: theme.textTheme.bodySmall,
+                              ),
+                              child: const Text('Forgot password?'),
+                            ),
+                          ),
+                          if (kShowDevTools) ...[
+                            const SizedBox(height: 4),
+                            
+                          ],
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: _isSubmitting ? null : _login,
+                            child: _isSubmitting
+                                ? ZefanyaLoader(
+                                    size: 18,
+                                    color: AppColors.textOnDark,
+                                    strokeWidth: 4,
+                                  )
+                                : const Text('Login'),
+                          ),
                         ],
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: _isSubmitting ? null : _login,
-                          child: _isSubmitting
-                              ? const ZefanyaLoader(
-                                  size: 18, color: AppColors.textOnDark, strokeWidth: 4)
-                              : const Text('Login'),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-
+                const SizedBox(height: 14),
+                StaggeredReveal(
+                  index: 2,
+                  child: OutlinedButton(
+                    key: const ValueKey('login-google-button'),
+                    onPressed: _isBusy ? null : _continueWithGoogle,
+                    child: _isGoogleSubmitting
+                        ? ZefanyaLoader(
+                            size: 18,
+                            color: AppColors.textPrimary,
+                            strokeWidth: 4,
+                          )
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GoogleMark(size: 18),
+                              SizedBox(width: 10),
+                              Text('Continue with Google'),
+                            ],
+                          ),
+                  ),
+                ),
                 const SizedBox(height: 28),
-                const StaggeredReveal(index: 2, child: _OrDivider()),
+                const StaggeredReveal(index: 3, child: _OrDivider()),
                 const SizedBox(height: 18),
                 StaggeredReveal(
-                  index: 3,
+                  index: 4,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -190,14 +367,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       // reads as the main path, not one of two equal options.
                       ElevatedButton(
                         onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(builder: (_) => RegistrationScreen(initialRole: UserRole.buyer)),
+                          AppPageRoute(
+                            builder: (_) =>
+                                RegistrationScreen(initialRole: UserRole.buyer),
+                          ),
                         ),
                         child: const Text('Create a Buyer Account'),
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton(
                         onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(builder: (_) => RegistrationScreen(initialRole: UserRole.courier)),
+                          AppPageRoute(
+                            builder: (_) => RegistrationScreen(
+                              initialRole: UserRole.courier,
+                            ),
+                          ),
                         ),
                         child: const Text('Register as Courier'),
                       ),
@@ -212,27 +396,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildLoginAsSelector(ThemeData theme) {
-    return Row(
-      children: [
-        Text('Login as:', style: theme.textTheme.bodySmall),
-        const SizedBox(width: 10),
-        Expanded(
-          child: SegmentedButton<UserRole>(
-            segments: const [
-              ButtonSegment(value: UserRole.buyer, label: Text('Buyer')),
-              ButtonSegment(value: UserRole.courier, label: Text('Courier')),
-            ],
-            selected: {_loginAsRole},
-            onSelectionChanged: (selection) {
-              HapticFeedback.selectionClick();
-              setState(() => _loginAsRole = selection.first);
-            },
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 /// The wordmark, constructed identically to Home's (buyer_shell.dart).
@@ -243,6 +406,7 @@ class _LoginMasthead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -257,7 +421,7 @@ class _LoginMasthead extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6),
               child: ZefanyaMark(
                 size: 20,
-                color: AppColors.primaryDark.withValues(alpha: 0.75),
+                color: AppColors.textPrimary.withValues(alpha: 0.45),
               ),
             ),
           ],
@@ -277,11 +441,12 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(0),
+        borderRadius: editorialRadius(0, ShapeTier.card),
         boxShadow: [
           BoxShadow(
             color: AppColors.neutral.withValues(alpha: 0.16),
@@ -300,6 +465,7 @@ class _OrDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return Row(
       children: [
         const Expanded(child: Divider()),

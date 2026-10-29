@@ -37,13 +37,21 @@ import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../state/recently_viewed_state.dart';
+import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
+import '../../utils/money_format.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
-import '../buyer/widgets/product_card.dart' show ProductImage, productTint;
+import '../buyer/widgets/product_card.dart' show ProductImage;
+import 'account_security_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
+import '../../widgets/motion/cloud_transition.dart';
+import '../../widgets/motion/ease_in_frame.dart';
+import '../../widgets/theme_toggle.dart';
+import '../buyer/address_book_screen.dart';
+import '../courier/rider_profile_section.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
 /// name/email/phone/address from the shared AuthState and edits them
@@ -67,10 +75,16 @@ class ProfileScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
           children: [
-            _buildHeroCard(context, theme, ext, auth, isCourier),
+            EaseInFrame(
+              index: 0,
+              child: _buildHeroCard(context, theme, ext, auth, isCourier),
+            ),
             const SizedBox(height: 26),
             if (!isCourier) ...[
-              const _RecentlyLookedAt(),
+              const EaseInFrame(
+                index: 1,
+                child: _RecentlyLookedAt(),
+              ),
             ],
             // Curve transitions from the hero into the record zone —
             // without it the drop from the gradient card to the plain
@@ -81,22 +95,83 @@ class ProfileScreen extends StatelessWidget {
               height: 36,
             ),
             const SizedBox(height: 8),
-            Text('ACCOUNT DETAILS', style: AppType.eyebrow),
-            const SizedBox(height: 12),
-            _LedgerCard(
-              rows: [
-                _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
-                _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
-                _LedgerRow(Icons.location_on_outlined, 'Address', auth.addressSummary),
-              ],
+            EaseInFrame(
+              index: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ACCOUNT DETAILS', style: AppType.eyebrow),
+                  const SizedBox(height: 12),
+                  _LedgerCard(
+                    rows: [
+                      _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
+                      _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
+                      _LedgerRow(
+                        Icons.location_on_outlined,
+                        'Address',
+                        auth.defaultAddress?.summary ?? auth.addressSummary,
+                      ),
+                    ],
+                  ),
+                  if (!isCourier) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('manage-addresses'),
+                        onPressed: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => const AddressBookScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.location_city_outlined, size: 18),
+                        label: const Text('Manage Addresses'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('account-security'),
+                        onPressed: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => const AccountSecurityScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.shield_outlined, size: 18),
+                        label: const Text('Account & Security'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (isCourier) ...[
+              const SizedBox(height: 26),
+              const EaseInFrame(index: 3, child: RiderProfileSection()),
+            ],
+            const SizedBox(height: 26),
+            EaseInFrame(
+              index: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('APPEARANCE', style: AppType.eyebrow),
+                  const SizedBox(height: 12),
+                  const ThemeToggle(),
+                ],
+              ),
             ),
             const SizedBox(height: 26),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _logout(context),
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Log Out'),
+            EaseInFrame(
+              index: 4,
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _logout(context),
+                  icon: const Icon(Icons.logout, size: 18),
+                  label: const Text('Log Out'),
+                ),
               ),
             ),
           ],
@@ -116,7 +191,7 @@ class ProfileScreen extends StatelessWidget {
       // Asymmetric corners instead of the old uniform heroRadius — the
       // one feature surface on this screen picks up the same "leaf"
       // shape language as Home's cover story and feature tiles.
-      borderRadius: editorialRadius(0, big: ext.heroRadius * 1.4, small: 8),
+      borderRadius: editorialRadiusRaw(0, big: ext.heroRadius * 1.4, small: 8),
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
         decoration: BoxDecoration(
@@ -189,7 +264,7 @@ class ProfileScreen extends StatelessWidget {
                       onPressed: () => Navigator.of(context).push(
                         AppPageRoute(builder: (_) => const EditProfileScreen()),
                       ),
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.textOnDark),
+                      icon: Icon(Icons.edit_outlined, color: AppColors.textOnDark),
                       tooltip: 'Edit Profile',
                     ),
                   ],
@@ -243,8 +318,8 @@ class ProfileScreen extends StatelessWidget {
             bottom: -4,
             child: Container(
               padding: const EdgeInsets.all(5),
-              decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-              child: const Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
+              decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+              child: Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
             ),
           ),
         ],
@@ -254,26 +329,100 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _placeholderAvatar(AuthState auth) {
-    // Same "placeholder, not a licensing shortcut" caveat as
-    // ProductImage in widgets/product_card.dart — shown only until the
-    // user picks a real photo via the camera badge above.
-    final seed = auth.email ?? auth.name ?? 'guest';
-    return Image.network(
-      'https://picsum.photos/seed/$seed/160/200',
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: AppColors.tertiary,
+    // A monogram, not a stranger's face. The old Picsum portrait put an
+    // unrelated stock photograph on the most personal surface in the app;
+    // the initial is honest, on-brand, and cannot fail to load.
+    final source = (auth.name ?? auth.email ?? '').trim();
+    final initial = source.isEmpty
+        ? 'Z'
+        : String.fromCharCode(source.runes.first).toUpperCase();
+    return Semantics(
+      image: true,
+      label: 'Profile photo placeholder',
+      excludeSemantics: true,
+      child: Container(
+        color: AppColors.secondary,
         alignment: Alignment.center,
-        child: const Icon(Icons.person, color: AppColors.textOnDark, size: 30),
+        child: Text(
+          initial,
+          style: AppType.masthead.copyWith(
+            fontSize: 34,
+            height: 1,
+            color: AppColors.textPrimary,
+          ),
+        ),
       ),
     );
   }
 
-  void _logout(BuildContext context) {
-    context.read<AuthState>().logout();
-    // AuthGate (in main.dart) rebuilds to LoginScreen once the state
-    // changes — this just unwinds back to that root route.
-    Navigator.of(context).popUntil((route) => route.isFirst);
+  Future<void> _logout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        AppColors.watch(dialogContext);
+        final dialogTheme = Theme.of(dialogContext);
+        return Dialog(
+          shape: editorialShape(0, ShapeTier.card),
+          backgroundColor: AppColors.surface,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('LOG OUT?', style: AppType.eyebrow),
+                const SizedBox(height: 10),
+                Text('Log out of Zefanya?', style: dialogTheme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  'You will need to sign back in to shop and track orders.',
+                  style: dialogTheme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: const Text('Stay'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.danger,
+                          foregroundColor: AppColors.textOnDark,
+                        ),
+                        child: const Text('Log out'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    await CloudTransition.run(
+      context,
+      swap: () {
+        // A rider signing out is no longer available for work, even though the
+        // job already picked up stays with them when they sign back in.
+        if (context.read<AuthState>().role == UserRole.courier) {
+          context.read<CourierState>().goOffline();
+        }
+        context.read<AuthState>().logout();
+        // AuthGate (in main.dart) rebuilds to LoginScreen once the state
+        // changes — this just unwinds back to that root route.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      },
+    );
   }
 }
 
@@ -301,23 +450,27 @@ class _StatStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final String primaryValue;
     final String primaryLabel;
     final String secondValue;
     final String secondLabel;
+    String? followingCount;
 
     if (isCourier) {
       final courier = context.watch<CourierState>();
       primaryValue = '${courier.completedJobs.length}';
       primaryLabel = 'DELIVERIES DONE';
-      secondValue = '\u20b1${courier.totalEarnings.toStringAsFixed(0)}';
+      secondValue = formatPeso(courier.totalEarnings);
       secondLabel = 'EARNED';
     } else {
       final viewed = context.watch<RecentlyViewedState>().items.length;
+      final following = context.watch<WishlistState>().followedSellers.length;
       primaryValue = '${context.watch<OrderState>().orders.length}';
       primaryLabel = 'ORDERS PLACED';
       secondValue = '$viewed';
       secondLabel = 'PIECES VIEWED';
+      followingCount = '$following';
     }
 
     return Row(
@@ -342,6 +495,10 @@ class _StatStrip extends StatelessWidget {
                 _stat(secondLabel, secondValue, 20),
                 const SizedBox(height: 12),
                 _stat('MEMBER SINCE', _memberSinceLabel(auth.memberSince), 20),
+                if (followingCount != null) ...[
+                  const SizedBox(height: 12),
+                  _stat('FOLLOWING', followingCount, 20),
+                ],
               ],
             ),
           ),
@@ -358,7 +515,7 @@ class _StatStrip extends StatelessWidget {
           label,
           style: AppType.eyebrow.copyWith(
             color: AppColors.textOnDark.withValues(alpha: 0.65),
-            letterSpacing: 2.0,
+            letterSpacing: 1.2,
           ),
         ),
         const SizedBox(height: 6),
@@ -383,12 +540,20 @@ class _StatStrip extends StatelessWidget {
 /// Buyer-only. Same rule RecentlyViewedRail set: if there's no real
 /// history, this renders nothing rather than showing a placeholder —
 /// an empty "here's what you've been up to" is worse than no section.
+///
+/// Deliberately does NOT filter out what's already been bought, unlike
+/// Home's "pick up where you left off" rail (see `unpurchased` in
+/// recently_viewed_rail.dart). This one is a *record* of what this person
+/// looked at; a record that quietly edited out the purchases would be a
+/// worse lie than a slightly redundant strip. The merchandising surface
+/// filters because it's making a suggestion. A history doesn't.
 class _RecentlyLookedAt extends StatelessWidget {
   const _RecentlyLookedAt();
 
   @override
   Widget build(BuildContext context) {
     final products = context.watch<RecentlyViewedState>().items;
+    AppColors.watch(context);
     if (products.isEmpty) return const SizedBox.shrink();
 
     final shown = products.take(8).toList(growable: false);
@@ -415,15 +580,11 @@ class _RecentlyLookedAt extends StatelessWidget {
                   // Alternating lean, same as any other row of these —
                   // a line of identical shapes is a uniform pattern
                   // again, which is what editorialRadius exists to break.
-                  borderRadius: editorialRadius(i, big: 20, small: 5),
+                  borderRadius: editorialRadius(i, ShapeTier.accent),
                   child: SizedBox(
                     width: 74,
                     height: 96,
-                    child: ProductImage(
-                      productId: product.id,
-                      tint: productTint(product.category),
-                      iconSize: 24,
-                    ),
+                    child: ProductImage(product: product, iconSize: 24),
                   ),
                 ),
               );
@@ -458,9 +619,10 @@ class _LedgerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    AppColors.watch(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(left: BorderSide(color: AppColors.divider, width: 2)),
       ),
       child: Column(
@@ -469,7 +631,7 @@ class _LedgerCard extends StatelessWidget {
           for (var i = 0; i < rows.length; i++) ...[
             _rowTile(theme, rows[i]),
             if (i < rows.length - 1)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 14),
                 child: Divider(height: 1, color: AppColors.divider),
               ),

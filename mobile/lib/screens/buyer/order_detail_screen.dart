@@ -16,13 +16,23 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart';
+import '../../state/cart_state.dart';
+import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
+import '../../state/order_state.dart';
+import '../../state/return_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/copy_id.dart';
+import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
+import 'widgets/review_button.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../shared/chat_screen.dart';
+import 'cart_screen.dart';
 import 'courier_tracker_screen.dart';
+import 'return_screen.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   const OrderDetailScreen({super.key, required this.order});
@@ -36,20 +46,40 @@ class OrderDetailScreen extends StatelessWidget {
     OrderStatus.toRate: 'Delivered',
   };
 
-  static const _statusColors = {
-    OrderStatus.toShip: AppColors.neutral,
-    OrderStatus.inTransit: AppColors.warning,
-    OrderStatus.outForDelivery: AppColors.primaryDark,
-    OrderStatus.toRate: AppColors.tertiary,
-  };
+  // Resolved per call rather than cached in a `static const` map: warning
+  // and primaryDark have a different value in each mode, and a const map
+  // would freeze whichever mode happened to be active at first touch.
+  static Map<OrderStatus, Color> get _statusColors => {
+        OrderStatus.toShip: AppColors.neutral,
+        OrderStatus.inTransit: AppColors.warning,
+        OrderStatus.outForDelivery: AppColors.primaryDark,
+        OrderStatus.toRate: AppColors.tertiary,
+      };
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
-    final statusColor = _statusColors[order.status]!;
+    final orderState = context.watch<OrderState>();
+    final returnRequest = orderState.returns.latestForOrder(order.id);
+    final courier = context.watch<CourierState>();
+    final deliveredAt =
+        order.deliveredAt ?? courier.completedAtForOrder(order.id);
+    final statusColor = order.cancelled
+        ? AppColors.danger
+        : returnRequest != null
+            ? _returnStatusColor(returnRequest.status)
+            : _statusColors[order.status]!;
+    final statusLabel = order.cancelled
+        ? 'Cancelled'
+        : order.buyerConfirmed
+            ? 'Completed'
+            : returnRequest != null
+                ? returnRequest.orderLabel
+                : _statusLabels[order.status]!;
     final textColor = Color.lerp(statusColor, Colors.black, 0.40)!;
     // Pull live courier milestone if available
-    final milestone = context.watch<CourierState>().milestoneForOrder(order.id);
+    final milestone = courier.milestoneForOrder(order.id);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -61,7 +91,7 @@ class OrderDetailScreen extends StatelessWidget {
           children: [
             // ---- Receipt card ------------------------------------
             ClipRRect(
-              borderRadius: editorialRadius(0, tier: EditorialTier.card),
+              borderRadius: editorialRadius(0, ShapeTier.card),
               child: Container(
                 color: AppColors.surfaceMuted,
                 child: Column(
@@ -72,9 +102,9 @@ class OrderDetailScreen extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                       child: Row(
                         children: [
-                          const CircleAvatar(
+                          CircleAvatar(
                             radius: 18,
-                            backgroundColor: AppColors.secondary,
+                            backgroundColor: AppColors.surface,
                             child: Icon(Icons.storefront_outlined,
                                 size: 18, color: AppColors.primaryDark),
                           ),
@@ -95,10 +125,10 @@ class OrderDetailScreen extends StatelessWidget {
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: radiusOf(ShapeTier.pill),
                             ),
                             child: Text(
-                              _statusLabels[order.status]!,
+                              statusLabel,
                               style: theme.textTheme.labelSmall?.copyWith(
                                   color: textColor, fontWeight: FontWeight.w700),
                             ),
@@ -115,14 +145,25 @@ class OrderDetailScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Reference number
-                          Text(order.id, style: AppType.eyebrow),
+                          InkWell(
+                            onTap: () => copyId(context, order.id),
+                            child: Semantics(button: true, label: 'Copy order ID', excludeSemantics: true, child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(order.id, style: AppType.eyebrow),
+                                const SizedBox(width: 6),
+                                Icon(Icons.copy_outlined, size: 13, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
+                          ),
                           const SizedBox(height: 10),
                           // Item summary
                           _receiptLine(theme, 'Items', order.itemSummary),
                           const SizedBox(height: 6),
                           // ETA
                           _receiptLine(theme, 'Estimated Arrival', order.eta,
-                              valueColor: AppColors.primaryDark,
+                              valueColor: AppColors.accent,
                               valueBold: true),
                           if (milestone != null) ...[
                             const SizedBox(height: 6),
@@ -146,8 +187,15 @@ class OrderDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
+            // ---- Return / refund status --------------------------
+            if (returnRequest != null)
+              ReturnStatusCard(request: returnRequest),
             // ---- Actions ----------------------------------------
-            _ActionCard(order: order),
+            _ActionCard(
+              order: order,
+              returnRequest: returnRequest,
+              deliveredAt: deliveredAt,
+            ),
             const SizedBox(height: 20),
             // ---- Timeline (milestone progress) ------------------
             if (milestone != null)
@@ -194,28 +242,232 @@ class OrderDetailScreen extends StatelessWidget {
         DeliveryMilestone.failedDelivery  => 'Delivery failed — retry pending',
         DeliveryMilestone.returnToSender  => 'Returning to seller',
       };
+
+  static Color _returnStatusColor(ReturnStatus status) => switch (status) {
+        ReturnStatus.submitted => AppColors.warning,
+        ReturnStatus.rejected => AppColors.danger,
+        ReturnStatus.escalated => AppColors.primaryDark,
+        ReturnStatus.refunded => AppColors.tertiary,
+      };
 }
 
 // ---------------------------------------------------------------------------
 
 class _ActionCard extends StatelessWidget {
-  const _ActionCard({required this.order});
+  const _ActionCard({
+    required this.order,
+    required this.returnRequest,
+    required this.deliveredAt,
+  });
 
   final Order order;
+  final ReturnRequest? returnRequest;
+  final DateTime? deliveredAt;
+
+  /// Adds every resolvable product from this order back to the cart.
+  ///
+  /// Products that are no longer in the catalogue (id not found) are
+  /// silently skipped — CatalogState.products() only contains active listings,
+  /// so a delisted product is genuinely unavailable, not a bug.
+  void _buyAgain(BuildContext context) {
+    final catalog = context.read<CatalogState>();
+    final cart = context.read<CartState>();
+    final byId = {for (final p in catalog.products) p.id: p};
+
+    var added = 0;
+    for (final id in order.productIds) {
+      final product = byId[id];
+      if (product == null) continue;
+      cart.addItem(product);
+      added++;
+    }
+
+    if (added == 0) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('These items are no longer available')),
+      );
+      return;
+    }
+
+    showTimedSnackBar(
+      context,
+      SnackBar(
+        content: Text('$added item${added == 1 ? '' : 's'} added to cart'),
+        action: SnackBarAction(
+          label: 'View Cart',
+          onPressed: () => Navigator.of(context).push(
+            AppPageRoute(builder: (_) => const CartScreen()),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmReceived(BuildContext context) async {
+    try {
+      final error =
+          await context.read<OrderState>().confirmOrderReceived(order);
+      if (!context.mounted) return;
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            error ?? 'Order marked as received. You can rate it now.',
+          ),
+        ),
+      );
+      if (error == null) Navigator.of(context).maybePop();
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      showTimedSnackBar(context, SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _startReturn(BuildContext context) async {
+    await Navigator.of(context).push(
+      AppPageRoute(
+        builder: (_) => ReturnScreen(
+          order: order,
+          deliveredAt: deliveredAt,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelOrder(BuildContext context) async {
+    final state = context.read<OrderState>();
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
+      builder: (sheetContext) {
+        String? selected;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final theme = Theme.of(sheetContext);
+            return SafeArea(
+              top: false,
+              child: RadioGroup<String>(
+                groupValue: selected,
+                onChanged: (value) => setSheetState(() => selected = value),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                      child: Text(
+                        'Cancel ${order.id}?',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      child: Text(
+                        'The seller is notified and the item returns to stock. '
+                        'This cannot be undone.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    for (final option in OrderState.cancellationReasons)
+                      RadioListTile<String>(
+                        value: option,
+                        title: Text(option),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      child: ElevatedButton(
+                        onPressed: selected == null
+                            ? null
+                            : () => Navigator.of(sheetContext).pop(selected),
+                        child: const Text('Cancel order'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (reason == null || !context.mounted) return;
+
+    try {
+      final error = await state.cancelOrder(order, reason);
+      if (!context.mounted) return;
+      showTimedSnackBar(
+        context,
+        SnackBar(content: Text(error ?? 'Order cancelled.')),
+      );
+      if (error == null) Navigator.of(context).maybePop();
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      showTimedSnackBar(context, SnackBar(content: Text(error.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final returns = context.watch<OrderState>().returns;
+    final returnOpen = returnRequest?.isOpen ?? false;
+    final canReturn = returnRequest == null &&
+        returns.returnRefusal(order, deliveredAt: deliveredAt) == null;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(1, tier: EditorialTier.card),
+        borderRadius: editorialRadius(1, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('ACTIONS', style: AppType.eyebrow),
           const SizedBox(height: 12),
+          if (returnOpen) ...[
+            Text(
+              'This order has an open return request. Order Received is '
+              'unavailable until it is resolved.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+          ] else if (order.cancelled) ...[
+            Text(
+              'This order was cancelled${order.cancellationReason == null ? '' : ': ${order.cancellationReason}'}.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+          ] else if (returnRequest == null && order.canConfirmReceived) ...[
+            ElevatedButton.icon(
+              onPressed: () => _confirmReceived(context),
+              icon: const Icon(Icons.inventory_2_outlined, size: 16),
+              label: const Text('Order Received'),
+            ),
+            const SizedBox(height: 10),
+          ] else if (order.canCancel) ...[
+            OutlinedButton.icon(
+              onPressed: () => _cancelOrder(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.danger,
+                side: BorderSide(color: AppColors.danger),
+              ),
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Cancel order'),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (canReturn) ...[
+            OutlinedButton.icon(
+              onPressed: () => _startReturn(context),
+              icon: const Icon(Icons.assignment_return_outlined, size: 16),
+              label: const Text('Return / Refund'),
+            ),
+            const SizedBox(height: 8),
+          ],
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(AppPageRoute(
               builder: (_) => ChatScreen(
@@ -224,12 +476,31 @@ class _ActionCard extends StatelessWidget {
             icon: const Icon(Icons.chat_bubble_outline, size: 16),
             label: const Text('Contact Seller'),
           ),
-          if (order.status == OrderStatus.toRate) ...[
+          const SizedBox(height: 8),
+          // Copies the reference number AND opens the seller thread in
+          // one tap: the thing a buyer pastes first when asking about
+          // an order is its ID, so hand it over with the chat.
+          OutlinedButton.icon(
+            onPressed: () {
+              copyId(context, order.id);
+              Navigator.of(context).push(AppPageRoute(
+                builder: (_) => ChatScreen(
+                    contactName: order.shopName, contactRole: 'Seller'),
+              ));
+            },
+            icon: const Icon(Icons.copy_outlined, size: 16),
+            label: const Text('Copy ID & Chat with Seller'),
+          ),
+          if (order.status == OrderStatus.toRate && !returnOpen) ...[
             const SizedBox(height: 10),
+            ReviewButton(order: order),
+            const SizedBox(height: 10),
+            // "Buy Again" on delivered orders: re-adds items to cart,
+            // resolving product ids through the live catalogue.
             ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.star_border, size: 16),
-              label: const Text('Leave a Review'),
+              onPressed: () => _buyAgain(context),
+              icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+              label: const Text('Buy Again'),
             ),
           ],
           if (order.status == OrderStatus.inTransit ||
@@ -271,6 +542,7 @@ class _MilestoneTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final currentIdx = _steps.indexWhere((s) => s.$1 == milestone);
 
@@ -278,7 +550,7 @@ class _MilestoneTimeline extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(0, tier: EditorialTier.card),
+        borderRadius: editorialRadius(0, ShapeTier.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,7 +597,7 @@ class _MilestoneTimeline extends StatelessWidget {
                     ),
                   ),
                   child: done && !active
-                      ? const Icon(Icons.check,
+                      ? Icon(Icons.check,
                           size: 8, color: AppColors.textOnDark)
                       : null,
                 ),
@@ -370,6 +642,7 @@ class _PerforationLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       height: 1,
       child: CustomPaint(

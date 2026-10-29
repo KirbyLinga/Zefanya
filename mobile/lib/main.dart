@@ -1,21 +1,38 @@
 // lib/main.dart
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'config/dev_flags.dart';
+import 'data/ph_address_catalog.dart';
+import 'data/repositories/repositories.dart';
 import 'theme/app_theme.dart';
 import 'state/auth_state.dart';
 import 'state/cart_state.dart';
+import 'state/catalog_state.dart';
 import 'state/chat_state.dart';
 import 'state/courier_state.dart';
+import 'state/notification_state.dart';
 import 'state/order_state.dart';
 import 'state/recently_viewed_state.dart';
+import 'state/return_state.dart';
+import 'state/review_state.dart';
+import 'state/startup_state.dart';
+import 'state/theme_state.dart';
 import 'state/wishlist_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/pending_approval_screen.dart';
 import 'screens/buyer/buyer_shell.dart';
+import 'screens/buyer/product_link_screen.dart';
 import 'screens/courier/courier_shell.dart';
 import 'screens/landing_screen.dart';
 import 'utils/motion.dart';
+import 'utils/product_link.dart';
 import 'widgets/app_atmosphere.dart';
+import 'widgets/app_page_route.dart';
+import 'widgets/startup_notice.dart';
+import 'widgets/zefanya_mark.dart';
 
 void main() async {
   // Needed because we're awaiting async work (state.load()) before
@@ -23,91 +40,285 @@ void main() async {
   // aren't guaranteed ready yet.
   WidgetsFlutterBinding.ensureInitialized();
 
-  final authState = AuthState();
-  final cartState = CartState();
-  final chatState = ChatState();
-  final courierState = CourierState();
-  final orderState = OrderState();
-  final recentlyViewedState = RecentlyViewedState();
-  final wishlistState = WishlistState();
-  // Restore any saved session/cart/chat/courier-job state before the
-  // first frame, so nothing flashes empty then jumps to the real state,
-  // and so AuthGate below has a real AccountStatus to gate the landing
-  // screen on rather than a placeholder.
-  await Future.wait([
-    authState.load(),
-    cartState.load(),
-    chatState.load(),
-    courierState.load(),
-    orderState.load(),
-    recentlyViewedState.load(),
-    wishlistState.load(),
-  ]);
+  // The one place the mock/real decision is made.
+  final repositories = Repositories.forMode(
+    useLive: kUseLiveApi,
+    baseUrl: kApiBaseUrl,
+  );
+
+  final authState = AuthState(
+    repository: repositories.auth,
+    accountSecurity: repositories.accountSecurity,
+    googleAuth: repositories.googleAuth,
+    googleSignIn: repositories.googleSignIn,
+  );
+  final cartState = CartState(
+    catalog: repositories.catalog,
+    vouchers: repositories.cart,
+  );
+  final catalogState = CatalogState(repository: repositories.catalog);
+  final chatState = ChatState(repository: repositories.chat);
+  final courierState = CourierState(repository: repositories.courier);
+  final notificationState = NotificationState();
+  final returnState = ReturnState(repository: repositories.returns);
+  final orderState = OrderState(
+    repository: repositories.order,
+    returns: returnState,
+  );
+  final recentlyViewedState = RecentlyViewedState(
+    catalog: repositories.catalog,
+  );
+  final reviewState = ReviewState(repository: repositories.review);
+  final wishlistState = WishlistState(catalog: repositories.catalog);
+  final themeState = ThemeState();
+  final startupState = StartupState();
+
+  // Fire runApp immediately — before the loads finish — so the person
+  // sees the app's own loading state instead of just the native splash.
+  // The ValueNotifier flips once Future.wait resolves, and the
+  // BootSplash widget below swaps itself out for the real app at that
+  // moment. The architecture is unchanged: every state is still loaded
+  // before the shell becomes visible.
+  final booted = ValueNotifier<bool>(false);
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<Repositories>.value(value: repositories),
         ChangeNotifierProvider.value(value: authState),
+        ChangeNotifierProvider.value(value: startupState),
         ChangeNotifierProvider.value(value: cartState),
+        ChangeNotifierProvider.value(value: catalogState),
         ChangeNotifierProvider.value(value: chatState),
         ChangeNotifierProvider.value(value: courierState),
+        ChangeNotifierProvider.value(value: notificationState),
         ChangeNotifierProvider.value(value: orderState),
         ChangeNotifierProvider.value(value: recentlyViewedState),
+        ChangeNotifierProvider.value(value: reviewState),
         ChangeNotifierProvider.value(value: wishlistState),
+        ChangeNotifierProvider.value(value: themeState),
       ],
-      child: const MarketplaceApp(),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: booted,
+        builder: (context, ready, child) =>
+            ready ? const MarketplaceApp() : const _BootSplash(),
+      ),
     ),
   );
+
+  await Future.wait([
+    startupState.guard('your account', authState.load),
+    startupState.guard('your appearance settings', themeState.load),
+    // Non-fatal: if the bundled asset cannot be read, the address screens
+    // show their own Retry card instead of blocking the whole shell.
+    startupState.guard('the Philippine address list', () async {
+      await PhAddressCatalog.load();
+    }),
+  ]);
+
+  await Future.wait([
+    startupState.guard('the store catalogue', catalogState.load),
+    startupState.guard('your cart', cartState.load),
+    startupState.guard('your chats', chatState.load),
+    startupState.guard('your delivery jobs', courierState.load),
+    startupState.guard('your notifications', notificationState.load),
+    startupState.guard('your orders', orderState.load),
+    startupState.guard('your recently viewed items', recentlyViewedState.load),
+    startupState.guard('your reviews', reviewState.load),
+    startupState.guard('your saved items', wishlistState.load),
+  ]);
+
+  booted.value = true;
 }
 
 /// Widest the app's content column gets before it stops stretching.
 const double kMaxContentWidth = 560;
 
-class MarketplaceApp extends StatelessWidget {
-  const MarketplaceApp({super.key});
+/// In-app loading state shown while `main()`'s nine loads run.
+/// so the person sees something in Flutter's own rendering rather than
+/// just the native splash screen. The design deliberately matches the
+/// atmosphere and mark that are already in the app so the transition
+/// from this screen to the real shell is seamless rather than jarring.
+///
+/// Brightness: `ThemeState` hasn't loaded yet, so we initialize the
+/// palette to light mode here. This is the same default the palette
+/// has before any call to `AppColors.apply`, so there is no flicker —
+/// it simply stays at the mode it would have been in anyway.
+class _BootSplash extends StatelessWidget {
+  const _BootSplash();
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Marketplace',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      // Paints the app's background once, here, instead of every Scaffold
-      // repeating a flat fill. The stack itself lives in
-      // widgets/app_atmosphere.dart so the landing screen can render the
-      // same thing with the glows drifting, without a second copy of the
-      // gradient existing anywhere.
-      builder: (context, child) {
-        // App-wide responsiveness guards (apply to every screen):
-        //  1. Cap the OS font-size setting. Big system text is the #1 cause
-        //     of "RIGHT OVERFLOWED BY n PIXELS" on real phones. 1.3x still
-        //     honors larger-text users without breaking fixed-size layouts.
-        //  2. Cap content width and center it, so Chrome / tablets / desktop
-        //     windows show a phone-width column instead of stretched layouts.
-        //     MediaQuery.size is overridden to match, so screens that read
-        //     it (e.g. chat bubbles) agree with the constrained width.
-        final mq = MediaQuery.of(context);
-        final width = mq.size.width < kMaxContentWidth ? mq.size.width : kMaxContentWidth;
-        return MediaQuery(
-          data: mq.copyWith(
-            textScaler: mq.textScaler.clamp(minScaleFactor: 0.85, maxScaleFactor: 1.3),
-            size: Size(width, mq.size.height),
+    // Do NOT call AppColors.watch or AppColors.apply here — _BootSplash is
+    // shown before AppPaletteScope is in the tree (it replaces MarketplaceApp
+    // which wraps that scope). AppColors starts at its light default.
+    return Directionality(
+      // Required by Stack and other widgets below MaterialApp.
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const AppAtmosphere(),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ZefanyaMark(size: 48, strokeWidth: 6),
+                const SizedBox(height: 28),
+                ZefanyaLoader(size: 28, strokeWidth: 4),
+              ],
+            ),
           ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              const AppAtmosphere(),
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: kMaxContentWidth),
-                  child: SizedBox.expand(child: child!),
-                ),
+        ],
+      ),
+    );
+  }
+}
+
+class MarketplaceApp extends StatefulWidget {
+  const MarketplaceApp({super.key});
+
+  @override
+  State<MarketplaceApp> createState() => _MarketplaceAppState();
+}
+
+class _MarketplaceAppState extends State<MarketplaceApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<Uri>? _linkSubscription;
+  AuthState? _auth;
+  Uri? _pendingLink;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenForAppLinks();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.read<AuthState>();
+    if (!identical(auth, _auth)) {
+      _auth?.removeListener(_onAuthChanged);
+      _auth = auth;
+      _auth!.addListener(_onAuthChanged);
+    }
+    _tryOpenPendingLink();
+  }
+
+  @override
+  void dispose() {
+    _auth?.removeListener(_onAuthChanged);
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _onAuthChanged() => _tryOpenPendingLink();
+
+  Future<void> _listenForAppLinks() async {
+    try {
+      final appLinks = AppLinks();
+      final initial = await appLinks.getInitialLink();
+      if (initial != null) _queueLink(initial);
+      _linkSubscription = appLinks.uriLinkStream.listen(
+        _queueLink,
+        onError: (_) {
+          // A malformed link must not take down the app. It is simply ignored;
+          // the web page remains the fallback for whatever sent it.
+        },
+      );
+    } catch (_) {
+      // No app-links implementation (unit tests, unsupported platform). The
+      // rest of the app must boot normally.
+    }
+  }
+
+  void _queueLink(Uri uri) {
+    if (productIdFromLink(uri) == null) return;
+    _pendingLink = uri;
+    _tryOpenPendingLink();
+  }
+
+  void _tryOpenPendingLink() {
+    final uri = _pendingLink;
+    if (uri == null || !mounted) return;
+    final auth = _auth;
+    // The buyer shell is the only place a product route makes sense. If the
+    // person is logged out, keep the link pending until auth becomes active
+    // rather than dropping them on an empty route.
+    if (auth == null || !auth.isLoggedIn || auth.role != UserRole.buyer) return;
+    final productId = productIdFromLink(uri);
+    if (productId == null) {
+      _pendingLink = null;
+      return;
+    }
+    _pendingLink = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navigatorKey.currentState?.push(
+        AppPageRoute(builder: (_) => ProductLinkScreen(productId: productId)),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final themeState = context.watch<ThemeState>();
+    // Apply once here so any widget above the Navigator (e.g. _BootSplash
+    // sibling, AppAtmosphere in builder) already has the right palette.
+    AppColors.apply(themeState.brightness);
+
+    // _AppPaletteScope sits above MaterialApp's Navigator. When brightness
+    // changes, Flutter marks every element that called
+    // _AppPaletteScope.of(context) as dirty — including every screen inside
+    // the Navigator — without recreating the Navigator or resetting the
+    // route stack. _PaletteRepaint in the builder registers that dependency
+    // once per frame so every route's subtree repaints with the new palette.
+    return AppPaletteScope(
+      brightness: themeState.brightness,
+      child: MaterialApp(
+        navigatorKey: _navigatorKey,
+        title: 'Zefanya',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeState.mode,
+        themeAnimationDuration: Duration.zero,
+        builder: (context, child) {
+          // Register palette dependency so this builder context rebuilds
+          // when brightness changes — which propagates to child below.
+          AppColors.watch(context);
+          final mq = MediaQuery.of(context);
+          final width = mq.size.width < kMaxContentWidth
+              ? mq.size.width
+              : kMaxContentWidth;
+          return MediaQuery(
+            data: mq.copyWith(
+              textScaler: mq.textScaler.clamp(
+                minScaleFactor: 0.85,
+                maxScaleFactor: 1.3,
               ),
-            ],
-          ),
-        );
-      },
-      home: const AuthGate(),
+              size: Size(width, mq.size.height),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const AppAtmosphere(),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: kMaxContentWidth,
+                    ),
+                    child: SizedBox.expand(child: child!),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        home: const AuthGate(),
+      ),
     );
   }
 }
@@ -172,6 +383,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     if (!_introDone) {
       return LandingScreen(
         reduceMotion: reduceMotion(context),
@@ -185,7 +397,20 @@ class _AuthGateState extends State<AuthGate> {
 
     switch (auth.status) {
       case AccountStatus.active:
-        return auth.role == UserRole.courier ? const CourierShell() : const BuyerShell();
+        // The startup notice sits above the shell rather than inside either one:
+        // a single place covers both roles, and it only matters once there is
+        // something to look at — a cart that failed to load says nothing useful
+        // on the login screen, and nothing at all on the landing screen.
+        return Column(
+          children: [
+            const StartupNotice(),
+            Expanded(
+              child: auth.role == UserRole.courier
+                  ? const CourierShell()
+                  : const BuyerShell(),
+            ),
+          ],
+        );
       case AccountStatus.pendingApproval:
         return const PendingApprovalScreen();
       case AccountStatus.loggedOut:

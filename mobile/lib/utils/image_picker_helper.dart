@@ -14,31 +14,61 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/editorial_shapes.dart';
 
 /// Shows a bottom sheet to pick Camera or Gallery, then returns the
 /// picked image copied into permanent app storage — or null if the
 /// user cancelled at any point.
-Future<File?> pickAndSaveImage(BuildContext context, {required String filenamePrefix}) async {
+Future<File?> pickAndSaveImage(
+  BuildContext context, {
+  required String filenamePrefix,
+  bool cameraOnly = false,
+}) async {
+  if (cameraOnly) {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return null;
+    return _savePicked(picked, filenamePrefix);
+  }
+
   final source = await showModalBottomSheet<ImageSource>(
     context: context,
     backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(ShapeTier.hero.symmetric),
+      ),
     ),
     builder: (context) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 8),
-          Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(999))),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.divider,
+              borderRadius: radiusOf(ShapeTier.pill),
+            ),
+          ),
           const SizedBox(height: 12),
           ListTile(
-            leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primaryDark),
+            leading: Icon(
+              Icons.photo_camera_outlined,
+              color: AppColors.primaryDark,
+            ),
             title: const Text('Take a Photo'),
             onTap: () => Navigator.of(context).pop(ImageSource.camera),
           ),
           ListTile(
-            leading: const Icon(Icons.photo_library_outlined, color: AppColors.primaryDark),
+            leading: Icon(
+              Icons.photo_library_outlined,
+              color: AppColors.primaryDark,
+            ),
             title: const Text('Choose from Gallery'),
             onTap: () => Navigator.of(context).pop(ImageSource.gallery),
           ),
@@ -50,12 +80,19 @@ Future<File?> pickAndSaveImage(BuildContext context, {required String filenamePr
 
   if (source == null) return null;
 
-  final picked = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+  final picked = await ImagePicker().pickImage(
+    source: source,
+    maxWidth: 1600,
+    imageQuality: 85,
+  );
   if (picked == null) return null;
+  return _savePicked(picked, filenamePrefix);
+}
 
+Future<File> _savePicked(XFile picked, String filenamePrefix) async {
   final docsDir = await getApplicationDocumentsDirectory();
   final ext = picked.path.split('.').last;
-  final filename = '${filenamePrefix}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-  final savedFile = await File(picked.path).copy('${docsDir.path}/$filename');
-  return savedFile;
+  final filename =
+      '${filenamePrefix}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+  return File(picked.path).copy('${docsDir.path}/$filename');
 }

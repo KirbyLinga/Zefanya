@@ -1,0 +1,81 @@
+# Known limitations
+
+Zefanya currently runs against a mock repository bundle by default. The app is
+honest about the boundary: anything below is either local-only, explicitly
+unwired, or cannot be verified in a widget test. None of these are hidden behind
+fake success copy.
+
+Last reviewed: 29 October 2026 (Flutter 3.44.0, Windows).
+
+## Google sign-in
+
+- Real Google accounts use `NativeGoogleSignInService`, which needs a Google
+  Cloud OAuth client ID for the platform (`kGoogleServerClientId` /
+  `kGoogleIosClientId`). Without one it refuses before opening the account
+  sheet rather than pretending to sign in.
+- Android also needs the app's SHA-1 (debug and release) registered on that
+  OAuth client. A debug build on another machine will not authenticate until its
+  fingerprint is added.
+- The app posts the Google `id_token` to `POST /auth/google`; the server must
+  verify that token's signature, audience and issuer. The mobile app cannot do
+  that verification and does not trust the token on its own.
+- Courier registration through Google is explicitly `notWired`
+  (`POST /auth/google (courier registration)`). First-time Google couriers
+  therefore land on the pending-approval gate; they do not get a shell.
+- Mock mode uses `MockGoogleSignInService` (the `zefanya.mockGoogleEmail`
+  identity) and never opens a native account picker.
+
+## Delivery and COD confirmation
+
+- The courier's delivery-code and cash-on-delivery checks are implemented in
+  `CourierState` with mock/local persistence. There is no verified server-side
+  issuance of the buyer's 6-digit code and no server-side COD settlement yet.
+- Milestone updates are sent fire-and-forget to `MockCourierRepository`. A live
+  endpoint failure is swallowed so the courier's screen stays authoritative;
+  the buyer's tracker can therefore show a stale milestone until the next
+  successful sync.
+- Buyer "Order Received" writes through `PATCH /orders/{sellerOrder}/buyer-state`,
+  which is still `notWired` in the live order repository. Delivery completion
+  in live mode depends on the server implementing that route.
+- COD remittance, outstanding balances and collection history are local mock
+  state; they are not reconciled against a logistics backend.
+
+## Notifications
+
+- There is no notifications endpoint in the Laravel API. The inbox is seeded
+  fixture data (`kSeedNotifications`); only read/unread ids persist locally.
+- Push delivery, notification permissions, deep links from the OS, and
+  server-originated order updates are not wired.
+- The bell badge reflects the local fixture list, not unread server events.
+
+## Camera and QR scanning
+
+- The courier receiving flow uses `mobile_scanner`. Widget tests exercise the
+  permission-denied, manual-entry and error paths with fakes; they cannot prove
+  a real camera opens, focuses, or scans a physical QR code.
+- Camera permission prompts and the "Open Settings" recovery path need a
+  physical Android/iOS device. An emulator with a synthetic camera is not
+  sufficient evidence for the scanning flow.
+- Manual code entry remains the fallback when the camera is unavailable or
+  permission is denied. The fallback is always on screen, including while the
+  camera is still starting.
+- The buyer's delivery-pass QR is generated on the phone from the same 6-digit
+  code the courier validates. It is not a signed server token, so it proves
+  only that the two phones exchanged the code; the server remains responsible
+  for verifying the handover. A photographed pass for another order is refused
+  locally because the payload carries the job id.
+- Live jobs arrive with an empty on-device delivery code (the server keeps only
+  its hash), so the buyer's pass card is hidden in live mode until the buyer
+  order endpoint exposes the code.
+
+## Other mocked or unwired seams
+
+- Returns use `MockReturnRepository` locally; the live `GET /returns`,
+  `POST /orders/{sellerOrder}/returns` and `POST /returns/{return}/escalate`
+  routes are `notWired`.
+- Profile edits, addresses and wishlist/shortlist data are local state. Address
+  validation uses the bundled PSGC catalogue; no server address book exists yet.
+- Vouchers, reviews, chat and order placement run through mock repositories
+  unless the app is built with the live flag and a configured API base URL.
+- Golden tests cover the main buyer/courier screens only. Checkout, the address
+  form and registration steps have widget tests but no golden baselines.
