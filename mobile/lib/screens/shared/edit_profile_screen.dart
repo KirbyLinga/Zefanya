@@ -200,88 +200,166 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 title: 'Edit Profile',
                 padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
               ),
-              _labeledField(
-                theme,
-                'Last Name',
-                TextFormField(
-                  controller: _lastNameController,
-                  decoration: const InputDecoration(hintText: 'Dela Cruz'),
-                  validator: (v) => validatePersonName(v, label: 'Last name'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _labeledField(
-                theme,
-                'First Name',
-                TextFormField(
-                  controller: _firstNameController,
-                  decoration: const InputDecoration(hintText: 'Juan'),
-                  validator: (v) => validatePersonName(v, label: 'First name'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _labeledField(
-                theme,
-                'Middle Initial',
-                TextFormField(
-                  controller: _middleInitialController,
-                  maxLength: 2,
-                  decoration: const InputDecoration(
-                    hintText: 'D  (optional)',
-                    counterText: '',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _labeledField(
-                theme,
-                'Sex',
-                DropdownButtonFormField<String>(
-                  initialValue: _sex,
-                  decoration: const InputDecoration(hintText: 'Select sex'),
-                  items: const [
-                    DropdownMenuItem(value: 'Male', child: Text('Male')),
-                    DropdownMenuItem(value: 'Female', child: Text('Female')),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _sex = v),
-                  validator: (v) => v == null ? 'Select sex' : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('PERSONAL INFORMATION', style: AppType.eyebrow),
+                    const SizedBox(height: 16),
+                    _labeledField(
+                      theme,
+                      'Last Name',
+                      TextFormField(
+                        controller: _lastNameController,
+                        style: TextStyle(
+                          fontFamily: kBodyFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(hintText: 'Dela Cruz'),
+                        validator: (v) => validatePersonName(v, label: 'Last name'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _labeledField(
+                      theme,
+                      'First Name',
+                      TextFormField(
+                        controller: _firstNameController,
+                        style: TextStyle(
+                          fontFamily: kBodyFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(hintText: 'Juan'),
+                        validator: (v) => validatePersonName(v, label: 'First name'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _labeledField(
+                      theme,
+                      'Middle Initial',
+                      TextFormField(
+                        controller: _middleInitialController,
+                        maxLength: 2,
+                        style: TextStyle(
+                          fontFamily: kBodyFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'D  (optional)',
+                          counterText: '',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _labeledField(
+                      theme,
+                      'Sex',
+                      DropdownButtonFormField<String>(
+                        initialValue: _sex,
+                        style: TextStyle(
+                          fontFamily: kBodyFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(hintText: 'Select sex'),
+                        items: const [
+                          DropdownMenuItem(value: 'Male', child: Text('Male')),
+                          DropdownMenuItem(value: 'Female', child: Text('Female')),
+                        ],
+                        onChanged: (v) => setState(() => _sex = v),
+                        validator: (v) => v == null ? 'Select sex' : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _labeledField(
+                      theme,
+                      'Phone Number',
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        style: TextStyle(
+                          fontFamily: kBodyFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(hintText: '09XXXXXXXXX'),
+                        validator: (v) {
+                          final value =
+                              v?.trim().replaceAll(RegExp(r'[\s-]'), '') ?? '';
+                          if (value.isEmpty) {
+                            return null; // optional here — required at registration only
+                          }
+                          if (!_phPhoneRegex.hasMatch(value)) {
+                            return 'Enter a valid PH number (09XXXXXXXXX)';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              _labeledField(
-                theme,
-                'Phone Number',
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(hintText: '09XXXXXXXXX'),
-                  validator: (v) {
-                    final value =
-                        v?.trim().replaceAll(RegExp(r'[\s-]'), '') ?? '';
-                    if (value.isEmpty) {
-                      return null; // optional here — required at registration only
-                    }
-                    if (!_phPhoneRegex.hasMatch(value)) {
-                      return 'Enter a valid PH number (09XXXXXXXXX)';
-                    }
-                    return null;
-                  },
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text('Address', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 12),
-              _buildAddressPicker(theme),
-              const SizedBox(height: 16),
-              _labeledField(
-                theme,
-                'Street / Detailed Address',
-                TextFormField(
-                  controller: _streetController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    hintText: 'House no., street, subdivision',
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ADDRESS DETAILS', style: AppType.eyebrow),
+                    const SizedBox(height: 16),
+                    _buildAddressPicker(theme),
+                    const SizedBox(height: 16),
+                    _labeledField(
+                      theme,
+                      'Street / Detailed Address',
+                      TextFormField(
+                        controller: _streetController,
+                        maxLines: 2,
+                        style: TextStyle(
+                          fontFamily: kBodyFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'House no., street, subdivision',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 32),
@@ -354,7 +432,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelLarge),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: kBodyFontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
         const SizedBox(height: 8),
         field,
       ],

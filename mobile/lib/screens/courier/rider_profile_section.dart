@@ -19,20 +19,20 @@ import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
-import '../../widgets/editorial_shapes.dart';
 import 'rider_vehicle_screen.dart';
 
 class RiderProfileSection extends StatelessWidget {
   const RiderProfileSection({super.key});
 
-  static String _date(DateTime? value) {
-    if (value == null) return '—';
+  static String? _date(DateTime? value) {
+    if (value == null) return null;
     return '${value.month.toString().padLeft(2, '0')}/'
         '${value.day.toString().padLeft(2, '0')}/${value.year}';
   }
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final auth = context.watch<AuthState>();
     final courier = context.watch<CourierState>();
@@ -45,22 +45,59 @@ class RiderProfileSection extends StatelessWidget {
         Text('RIDER PROFILE', style: AppType.eyebrow),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: editorialRadius(0, ShapeTier.card),
+            color: AppColors.surface, // Opaque surface token behind data rows
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.divider),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cardShadow,
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             children: [
-              _row(theme, 'Company', auth.riderCompany ?? '—'),
-              _row(theme, 'Vehicle', auth.riderVehicleType ?? '—'),
-              _row(theme, 'Plate number', auth.riderPlate ?? '—'),
-              _row(theme, 'Licence number', auth.riderLicenseNumber ?? '—'),
-              _row(theme, 'Licence expiry', _date(auth.riderLicenseExpiry)),
               _row(
-                theme,
-                'Verification',
-                auth.riderReverificationRequired
+                context,
+                label: 'Company',
+                value: auth.riderCompany,
+                emptyPrompt: 'Add company',
+              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              _row(
+                context,
+                label: 'Vehicle',
+                value: auth.riderVehicleType,
+                emptyPrompt: 'Add vehicle',
+              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              _row(
+                context,
+                label: 'Plate number',
+                value: auth.riderPlate,
+                emptyPrompt: 'Add plate number',
+              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              _row(
+                context,
+                label: 'Licence number',
+                value: auth.riderLicenseNumber,
+                emptyPrompt: 'Add licence number',
+              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              _row(
+                context,
+                label: 'Licence expiry',
+                value: _date(auth.riderLicenseExpiry),
+                emptyPrompt: 'Add licence expiry',
+              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              _row(
+                context,
+                label: 'Verification',
+                value: auth.riderReverificationRequired
                     ? 'For re-verification'
                     : status,
                 valueColor: courier.isSuspended
@@ -81,7 +118,7 @@ class RiderProfileSection extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -120,37 +157,70 @@ class RiderProfileSection extends StatelessWidget {
   }
 
   Widget _row(
-    ThemeData theme,
-    String label,
-    String value, {
+    BuildContext context, {
+    required String label,
+    required String? value,
+    String? emptyPrompt,
     Color? valueColor,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+    final val = value;
+    final hasValue = val != null && val.trim().isNotEmpty && val != '—';
+    final prompt = emptyPrompt ?? 'Add ${label.toLowerCase()}';
+
+    final rowWidget = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Text(
               label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary, // 12sp muted
               ),
             ),
           ),
           const SizedBox(width: 12),
           Flexible(
             child: Text(
-              value,
+              hasValue ? val : prompt,
               textAlign: TextAlign.right,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: valueColor ?? AppColors.textPrimary,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600, // 15sp semi-bold
+                color: hasValue
+                    ? (valueColor ?? AppColors.textPrimary)
+                    : AppColors.accent,
+                decoration: hasValue ? null : TextDecoration.underline,
               ),
             ),
           ),
         ],
       ),
+    );
+
+    if (!hasValue) {
+      return Semantics(
+        label: prompt,
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.of(context).push(
+            AppPageRoute(builder: (_) => const RiderVehicleScreen()),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: rowWidget,
+          ),
+        ),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
+      child: rowWidget,
     );
   }
 
@@ -183,8 +253,7 @@ class RiderProfileSection extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ClipRRect(
-                    borderRadius:
-                        editorialRadius(0, ShapeTier.card),
+                    borderRadius: BorderRadius.circular(12),
                     child: Image.file(
                       File(path),
                       key: ValueKey('document-preview-$label'),

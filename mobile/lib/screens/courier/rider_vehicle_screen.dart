@@ -165,68 +165,193 @@ class _RiderVehicleScreenState extends State<RiderVehicleScreen> {
                 ),
               ),
             ),
-          TextField(
-            controller: _companyController,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Company'),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _vehicleType,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Vehicle type'),
-            items: courierVehicleTypes
-                .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                .toList(),
-            onChanged: (value) => setState(() => _vehicleType = value),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const ValueKey('rider-plate-field'),
-            controller: _plateController,
-            textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(labelText: 'Plate number'),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const ValueKey('rider-license-field'),
-            controller: _licenseController,
-            textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(labelText: 'Licence number'),
-          ),
-          const SizedBox(height: 16),
-          InkWell(
-            key: const ValueKey('rider-expiry-field'),
-            onTap: _pickExpiry,
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Licence expiry',
-                errorText: _expiryError,
-              ),
-              child: Text(
-                _licenseExpiry == null
-                    ? 'Select expiry'
-                    : '${_licenseExpiry!.month.toString().padLeft(2, '0')}/'
-                          '${_licenseExpiry!.day.toString().padLeft(2, '0')}/'
-                          '${_licenseExpiry!.year}',
-              ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('VEHICLE DETAILS', style: AppType.eyebrow),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _companyController,
+                  textCapitalization: TextCapitalization.words,
+                  style: TextStyle(
+                    fontFamily: kBodyFontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Company',
+                    labelStyle: TextStyle(
+                      fontFamily: kBodyFontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _vehicleType,
+                  isExpanded: true,
+                  style: TextStyle(
+                    fontFamily: kBodyFontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Vehicle type',
+                    labelStyle: TextStyle(
+                      fontFamily: kBodyFontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  items: courierVehicleTypes
+                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _vehicleType = value),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const ValueKey('rider-plate-field'),
+                  controller: _plateController,
+                  textCapitalization: TextCapitalization.characters,
+                  style: TextStyle(
+                    fontFamily: kBodyFontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Plate number',
+                    labelStyle: TextStyle(
+                      fontFamily: kBodyFontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const ValueKey('rider-license-field'),
+                  controller: _licenseController,
+                  textCapitalization: TextCapitalization.characters,
+                  style: TextStyle(
+                    fontFamily: kBodyFontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Licence number',
+                    labelStyle: TextStyle(
+                      fontFamily: kBodyFontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  key: const ValueKey('rider-expiry-field'),
+                  onTap: _pickExpiry,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Licence expiry',
+                      labelStyle: TextStyle(
+                        fontFamily: kBodyFontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                      errorText: _expiryError,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _licenseExpiry == null
+                                ? 'Add expiry date'
+                                : '${_licenseExpiry!.month.toString().padLeft(2, '0')}/'
+                                      '${_licenseExpiry!.day.toString().padLeft(2, '0')}/'
+                                      '${_licenseExpiry!.year}',
+                            style: TextStyle(
+                              fontFamily: kBodyFontFamily,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _licenseExpiry == null
+                                  ? AppColors.accent
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                          color: _licenseExpiry == null
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          Text('Documents', style: AppType.eyebrow),
-          const SizedBox(height: 10),
-          _documentRow(
-            key: const ValueKey('rider-license-upload'),
-            label: 'Licence document',
-            path: _licensePath,
-            onPick: () => _pickDocument(license: true),
-          ),
-          const SizedBox(height: 10),
-          _documentRow(
-            key: const ValueKey('rider-orcr-upload'),
-            label: 'OR/CR document',
-            path: _orCrPath,
-            onPick: () => _pickDocument(license: false),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('DOCUMENTS', style: AppType.eyebrow),
+                const SizedBox(height: 12),
+                _documentRow(
+                  key: const ValueKey('rider-license-upload'),
+                  label: 'Licence document',
+                  path: _licensePath,
+                  onPick: () => _pickDocument(license: true),
+                ),
+                const SizedBox(height: 12),
+                _documentRow(
+                  key: const ValueKey('rider-orcr-upload'),
+                  label: 'OR/CR document',
+                  path: _orCrPath,
+                  onPick: () => _pickDocument(license: false),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -246,14 +371,34 @@ class _RiderVehicleScreenState extends State<RiderVehicleScreen> {
     required VoidCallback onPick,
   }) {
     final present = path != null && File(path).existsSync();
-    return OutlinedButton.icon(
-      key: key,
-      onPressed: onPick,
-      icon: Icon(
-        present ? Icons.check_circle_outline : Icons.upload_file_outlined,
-        size: 18,
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton.icon(
+        key: key,
+        onPressed: onPick,
+        style: OutlinedButton.styleFrom(
+          alignment: Alignment.centerLeft,
+          side: BorderSide(
+            color: present ? AppColors.tertiary : AppColors.divider,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        icon: Icon(
+          present ? Icons.check_circle_outline : Icons.upload_file_outlined,
+          size: 18,
+          color: present ? AppColors.tertiary : AppColors.accent,
+        ),
+        label: Text(
+          present ? '$label · attached' : 'Add $label',
+          style: TextStyle(
+            fontFamily: kBodyFontFamily,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: present ? AppColors.textPrimary : AppColors.accent,
+          ),
+        ),
       ),
-      label: Text(present ? '$label · attached' : 'Attach $label'),
     );
   }
 }

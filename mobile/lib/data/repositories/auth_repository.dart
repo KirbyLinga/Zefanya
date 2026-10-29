@@ -198,8 +198,13 @@ class MockAuthRepository implements AuthRepository {
     required UserRole role,
     required String email,
     required String password,
-  }) async =>
-      AuthResult(role: role, status: AccountStatus.active, email: email);
+  }) async {
+    final lower = email.trim().toLowerCase();
+    final resolvedRole = lower.contains('courier') || lower.contains('rider')
+        ? UserRole.courier
+        : (lower.contains('buyer') ? UserRole.buyer : role);
+    return AuthResult(role: resolvedRole, status: AccountStatus.active, email: email);
+  }
 
   /// [password] is ignored here for the same reason the login one is: the mock
   /// has no accounts to check it against. What changed is that it is now a real

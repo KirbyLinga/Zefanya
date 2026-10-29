@@ -69,6 +69,26 @@ void main() {
         });
       });
 
+      test('account details labels, values, and prompt ink clear AA on surface', () {
+        _inMode(mode, () {
+          expect(
+            contrast(AppColors.textSecondary, AppColors.surface),
+            greaterThanOrEqualTo(aa),
+            reason: '12sp label on surface ($label)',
+          );
+          expect(
+            contrast(AppColors.textPrimary, AppColors.surface),
+            greaterThanOrEqualTo(aa),
+            reason: '15sp value on surface ($label)',
+          );
+          expect(
+            contrast(AppColors.accent, AppColors.surface),
+            greaterThanOrEqualTo(aa),
+            reason: 'empty prompt ink on surface ($label)',
+          );
+        });
+      });
+
       test('a tinted fill is distinguishable from the card it sits on', () {
         _inMode(mode, () {
           for (final category in categories) {

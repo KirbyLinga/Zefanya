@@ -5,20 +5,10 @@
 //   -> theme lives at lib/theme/app_theme.dart        => '../../theme/app_theme.dart'
 //   -> auth state lives at lib/state/auth_state.dart  => '../../state/auth_state.dart'
 //   -> registration lives at lib/screens/auth/...      => 'registration_screen.dart' (same folder)
-//
-// Design-pass note (auth flow):
-// This screen used to render the wordmark at theme.textTheme.displaySmall
-// — plain Material default — while Home rendered the exact same four
-// letters at AppType.masthead. The first screen anyone ever sees
-// typeset the brand differently from the screen they landed on two
-// seconds later. The lockup below is now byte-for-byte the same
-// construction Home uses (eyebrow / masthead / monogram), so the logo
-// looks like the logo everywhere.
 
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../config/dev_flags.dart';
 import '../../data/api/api_exception.dart';
 import '../../services/google_sign_in_service.dart';
 import '../../state/auth_state.dart';
@@ -47,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _isGoogleSubmitting = false;
+  bool _isRiderMode = false;
   final _passwordFocus = FocusNode();
 
   bool get _isBusy => _isSubmitting || _isGoogleSubmitting;
@@ -62,19 +53,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Now a real repository call (see AuthState.login), so the artificial
-    // 600ms delay that used to stand in for it is gone for the same reason it
-    // was removed at checkout: it was simulating the thing that now actually
-    // happens, and it would add 600ms to every real sign-in. In mock mode the
-    // call resolves locally, which is the honest behaviour.
     setState(() => _isSubmitting = true);
 
-    // With no backend yet, there's no server response to read a role or
-    // a name from, so the tester's selector supplies the role and the
-    // display name is the sample one. Both are *arguments* to the call
-    // below, and the status comes back from the repository — remove this
-    // stub once real auth returns all three.
     try {
+      // The mode is never sent as the role: the server/repository decides role
+      // from the account credentials.
       await context.read<AuthState>().login(
         email: _identifierController.text.trim(),
         password: _passwordController.text,
@@ -84,33 +67,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
 
-      // A refused sign-in normally ends here: say what the server said and leave
-      // the person on a form they can still correct.
-      //
-      // The email gate is the exception, and it is the *server* that says so.
-      // `PENDING_VERIFICATION` means the credentials were accepted and the only
-      // thing missing is the code already sent to that address — and the refusal
-      // arrives carrying the handle that code can be confirmed against. Showing
-      // a sentence here and stopping would strand someone told to confirm an
-      // email with no way to do it.
       final gate = e is PendingApprovalException && e.canConfirmEmail
           ? e
           : null;
       if (gate != null) {
         await context.read<AuthState>().beginEmailVerification(
-          
           email: _identifierController.text.trim(),
           verificationId: gate.verificationId!,
         );
         if (!mounted) return;
-        // AuthGate rebuilds onto PendingApprovalScreen, whose "Enter Code"
-        // button is live now that the handle arrived with the refusal.
         Navigator.of(context).popUntil((route) => route.isFirst);
         return;
       }
 
-      // Only reachable in a live build, where there is no API to sign in
-      // against yet: say so rather than appearing to have signed someone in.
       showTimedSnackBar(context, SnackBar(content: Text(e.message)));
       return;
     }
@@ -118,9 +87,22 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    // AuthGate (in main.dart) rebuilds to the right shell once the
-    // state changes above — this unwinds back to that root route
-    // through our signature CloudTransition screen hand-off.
+    // If credentials belong to the other role, sign in normally, route by the real
+    // role from the server, and show a one-time snackbar.
+    final actualRole = context.read<AuthState>().role;
+    if (_isRiderMode && actualRole == UserRole.buyer) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Signed in as a buyer account')),
+      );
+    } else if (!_isRiderMode && actualRole == UserRole.courier) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Signed in as a rider account')),
+      );
+    }
+
+    // AuthGate routes to the shell matching the actual role.
     await CloudTransition.run(
       context,
       swap: () {
@@ -131,14 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Google is an alternative *sign-in*, not a second registration form.
-  ///
-  /// The repository answers one of two things. An existing account is already
-  /// applied by [AuthState.signInWithGoogle], so this only unwinds to AuthGate
-  /// and lets it choose the shell. A `needs_role` answer is still a success:
-  /// Google proved the identity, but there is no Zefanya account to sign in
-  /// to, so the sheet asks the one question the server could not answer and
-  /// registration opens with the name and email already filled in.
   Future<void> _continueWithGoogle() async {
     if (_isBusy) return;
     setState(() => _isGoogleSubmitting = true);
@@ -148,6 +122,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (outcome.result != null) {
+        final actualRole = context.read<AuthState>().role;
+        if (_isRiderMode && actualRole == UserRole.buyer) {
+          showTimedSnackBar(
+            context,
+            const SnackBar(content: Text('Signed in as a buyer account')),
+          );
+        } else if (!_isRiderMode && actualRole == UserRole.courier) {
+          showTimedSnackBar(
+            context,
+            const SnackBar(content: Text('Signed in as a rider account')),
+          );
+        }
+
         TextInput.finishAutofillContext();
         await CloudTransition.run(
           context,
@@ -156,6 +143,20 @@ class _LoginScreenState extends State<LoginScreen> {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           },
+        );
+        return;
+      }
+
+      // New Google identity:
+      if (_isRiderMode) {
+        // Google in rider mode leads directly to the rider application, never an active rider.
+        await Navigator.of(context).push(
+          AppPageRoute(
+            builder: (_) => RegistrationScreen(
+              initialRole: UserRole.courier,
+              googleIdentity: outcome.identity,
+            ),
+          ),
         );
         return;
       }
@@ -175,8 +176,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } on GoogleSignInFailure catch (e) {
-      // Cancellation is a decision, not an error: the person closed Google's
-      // sheet and should be returned to the form without a snackbar.
       if (!mounted || e.cancelled) return;
       showTimedSnackBar(context, SnackBar(content: Text(e.message)));
     } on ApiException catch (e) {
@@ -201,34 +200,79 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
+    final isRider = _isRiderMode;
 
     return Scaffold(
-      backgroundColor:
-          Colors.transparent, // the app-wide gradient in main.dart paints this
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
           child: Form(
             key: _formKey,
-            // Errors appear after first interaction (focus loss / typing),
-            // not only on submit — the fields already chain focus, so a
-            // person tabbing through sees what's wrong as they go.
             autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ---- Wordmark lockup --------------------------------
-                // Left-aligned, like Home. The old centered treatment
-                // was the other half of the inconsistency: same letters,
-                // different size AND different alignment.
-                const StaggeredReveal(index: 0, child: _LoginMasthead()),
-                const SizedBox(height: 26),
+                StaggeredReveal(
+                  index: 0,
+                  child: _LoginMasthead(isRiderMode: isRider),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isRider
+                      ? 'Sign in to accept jobs and deliver parcels'
+                      : 'Sign in to browse, shop, and track your orders',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ---- Labeled Switch Link -----------------------------
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Semantics(
+                    label: isRider
+                        ? 'Back to shopper sign in'
+                        : 'Are you a rider? Sign in here',
+                    button: true,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: 48,
+                        minWidth: 48,
+                      ),
+                      child: TextButton(
+                        key: const ValueKey('role-mode-switch-link'),
+                        onPressed: () => setState(() => _isRiderMode = !_isRiderMode),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 12,
+                          ),
+                          alignment: Alignment.centerLeft,
+                        ),
+                        child: Text(
+                          isRider
+                              ? 'Back to shopper sign in'
+                              : 'Are you a rider? Sign in here',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: isRider
+                                ? (AppColors.isDark
+                                    ? AppColors.tertiary
+                                    : AppColors.sageIcon)
+                                : AppColors.primaryDark,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
 
                 // ---- Credentials panel ------------------------------
-                // The fields used to float loose on the background. One
-                // surface with an editorial (asymmetric) radius gives
-                // the form an actual shape and lets it lift off the
-                // gradient the way every other content surface does.
                 StaggeredReveal(
                   index: 1,
                   child: AutofillGroup(
@@ -256,7 +300,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: Icon(Icons.person_outline),
                             ),
                             validator: (value) {
-                              // TODO: swap for a real email-or-phone regex check.
                               if (value == null || value.trim().isEmpty) {
                                 return 'Enter your email or phone number';
                               }
@@ -293,7 +336,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             validator: (value) {
-                              // TODO: enforce real password rules server-side.
                               if (value == null || value.isEmpty) {
                                 return 'Enter your password';
                               }
@@ -313,12 +355,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: const Text('Forgot password?'),
                             ),
                           ),
-                          if (kShowDevTools) ...[
-                            const SizedBox(height: 4),
-                            
-                          ],
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           ElevatedButton(
+                            style: isRider
+                                ? ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.isDark
+                                        ? AppColors.tertiary
+                                        : AppColors.sageIcon,
+                                    foregroundColor: AppColors.textOnDark,
+                                  )
+                                : null,
                             onPressed: _isSubmitting ? null : _login,
                             child: _isSubmitting
                                 ? ZefanyaLoader(
@@ -326,7 +372,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: AppColors.textOnDark,
                                     strokeWidth: 4,
                                   )
-                                : const Text('Login'),
+                                : Text(isRider ? 'Login as Rider' : 'Login'),
                           ),
                         ],
                       ),
@@ -363,28 +409,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Buyer is the primary CTA — filled button so it
-                      // reads as the main path, not one of two equal options.
-                      ElevatedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(
-                            builder: (_) =>
-                                RegistrationScreen(initialRole: UserRole.buyer),
-                          ),
-                        ),
-                        child: const Text('Create a Buyer Account'),
-                      ),
-                      const SizedBox(height: 10),
-                      OutlinedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(
-                            builder: (_) => RegistrationScreen(
-                              initialRole: UserRole.courier,
+                      if (!isRider)
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).push(
+                            AppPageRoute(
+                              builder: (_) => const RegistrationScreen(
+                                initialRole: UserRole.buyer,
+                              ),
                             ),
                           ),
+                          child: const Text('Create a Buyer Account'),
+                        )
+                      else
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.isDark
+                                ? AppColors.tertiary
+                                : AppColors.sageIcon,
+                            foregroundColor: AppColors.textOnDark,
+                          ),
+                          onPressed: () => Navigator.of(context).push(
+                            AppPageRoute(
+                              builder: (_) => const RegistrationScreen(
+                                initialRole: UserRole.courier,
+                              ),
+                            ),
+                          ),
+                          child: const Text('Apply as a Rider'),
                         ),
-                        child: const Text('Register as Courier'),
-                      ),
                     ],
                   ),
                 ),
@@ -395,14 +447,13 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
 }
 
-/// The wordmark, constructed identically to Home's (buyer_shell.dart).
-/// If that lockup ever changes, change both — or pull them into one
-/// shared widget; they are the same object.
+/// The wordmark lockup, matching the app's editorial brand style.
 class _LoginMasthead extends StatelessWidget {
-  const _LoginMasthead();
+  const _LoginMasthead({required this.isRiderMode});
+
+  final bool isRiderMode;
 
   @override
   Widget build(BuildContext context) {
@@ -410,19 +461,33 @@ class _LoginMasthead extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('WELCOME BACK', style: AppType.eyebrow),
+        Text(
+          isRiderMode ? 'RIDER PORTAL' : 'WELCOME BACK',
+          style: AppType.eyebrow,
+        ),
         const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text('Zefanya', style: AppType.masthead),
+            Text(
+              isRiderMode ? 'Zefanya Rider' : 'Zefanya',
+              style: AppType.masthead,
+            ),
             const SizedBox(width: 10),
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: ZefanyaMark(
-                size: 20,
-                color: AppColors.textPrimary.withValues(alpha: 0.45),
-              ),
+              child: isRiderMode
+                  ? Icon(
+                      Icons.two_wheeler_outlined,
+                      size: 22,
+                      color: AppColors.isDark
+                          ? AppColors.tertiary
+                          : AppColors.sageIcon,
+                    )
+                  : ZefanyaMark(
+                      size: 20,
+                      color: AppColors.textPrimary.withValues(alpha: 0.45),
+                    ),
             ),
           ],
         ),
@@ -431,9 +496,6 @@ class _LoginMasthead extends StatelessWidget {
   }
 }
 
-/// Surface for the credential fields — asymmetric corners so it reads
-/// as a deliberate shape rather than the default box, and the same
-/// lift (white fill + soft shadow) cards get elsewhere.
 class _Panel extends StatelessWidget {
   const _Panel({required this.child});
 
@@ -471,9 +533,6 @@ class _OrDivider extends StatelessWidget {
         const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          // eyebrow, not bodySmall — the tiny all-caps kicker is the
-          // app's own "small type" voice, and it's what makes the
-          // masthead above read as big.
           child: Text('OR', style: AppType.eyebrow),
         ),
         const Expanded(child: Divider()),

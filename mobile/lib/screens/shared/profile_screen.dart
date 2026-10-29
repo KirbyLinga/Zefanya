@@ -104,12 +104,36 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   _LedgerCard(
                     rows: [
-                      _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
-                      _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
+                      _LedgerRow(
+                        Icons.phone_outlined,
+                        'Phone',
+                        auth.phone,
+                        emptyPrompt: 'Add phone',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(builder: (_) => const EditProfileScreen()),
+                        ),
+                      ),
+                      _LedgerRow(
+                        Icons.wc_outlined,
+                        'Sex',
+                        auth.sex,
+                        emptyPrompt: 'Add sex',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(builder: (_) => const EditProfileScreen()),
+                        ),
+                      ),
                       _LedgerRow(
                         Icons.location_on_outlined,
                         'Address',
                         auth.defaultAddress?.summary ?? auth.addressSummary,
+                        emptyPrompt: 'Add address',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => isCourier
+                                ? const EditProfileScreen()
+                                : const AddressBookScreen(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -602,15 +626,22 @@ class _RecentlyLookedAt extends StatelessWidget {
 // ---------------------------------------------------------------------
 
 class _LedgerRow {
-  const _LedgerRow(this.icon, this.label, this.value);
+  const _LedgerRow(
+    this.icon,
+    this.label,
+    this.value, {
+    this.onTap,
+    this.emptyPrompt,
+  });
   final IconData icon;
   final String label;
   final String? value;
+  final VoidCallback? onTap;
+  final String? emptyPrompt;
 }
 
-/// A record card, not a merchandising band: a thin left spine ties the
-/// rows together like entries on a form, each icon sitting on the
-/// spine instead of floating loose in front of its own text.
+/// Opaque surface token card hosting account details rows.
+/// Meets WCAG AA contrast (>=4.5:1) in both light and dark modes.
 class _LedgerCard extends StatelessWidget {
   const _LedgerCard({required this.rows});
 
@@ -618,54 +649,104 @@ class _LedgerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     AppColors.watch(context);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: AppColors.divider, width: 2)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < rows.length; i++) ...[
-            _rowTile(theme, rows[i]),
+            _rowTile(context, rows[i]),
             if (i < rows.length - 1)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14),
-                child: Divider(height: 1, color: AppColors.divider),
-              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
           ],
         ],
       ),
     );
   }
 
-  Widget _rowTile(ThemeData theme, _LedgerRow row) {
-    final hasValue = row.value != null && row.value!.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  Widget _rowTile(BuildContext context, _LedgerRow row) {
+    final hasValue = row.value != null && row.value!.trim().isNotEmpty;
+    final prompt = row.emptyPrompt ?? "Add ${row.label.toLowerCase()}";
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(row.icon, size: 18, color: AppColors.textSecondary),
-          const SizedBox(width: 12),
+          Icon(row.icon, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(row.label, style: theme.textTheme.labelSmall),
                 Text(
-                  hasValue ? row.value! : 'Not set',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: hasValue ? AppColors.textPrimary : AppColors.textSecondary,
+                  row.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
                   ),
                 ),
+                const SizedBox(height: 3),
+                if (hasValue)
+                  Text(
+                    row.value!,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  )
+                else
+                  Text(
+                    prompt,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
               ],
             ),
           ),
+          if (!hasValue && row.onTap != null)
+            Icon(Icons.add_circle_outline, size: 18, color: AppColors.accent),
         ],
       ),
+    );
+
+    if (!hasValue && row.onTap != null) {
+      return Semantics(
+        label: prompt,
+        button: true,
+        child: InkWell(
+          onTap: row.onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
+      child: content,
     );
   }
 }
