@@ -36,3 +36,14 @@ This file records deviations from the repository's baseline instructions or deci
 5. **Delivery Handover Gate**:
    - Preserved server-side delivery verification: OTP stored as hash (bcrypt/sha256), rate limiting after 5 wrong attempts (423 for 15 mins), and COD exact centavo check on `PATCH /api/courier/jobs/{job}/milestone`.
 
+
+
+## Phase D: End-to-End Acceptance
+
+1. **Seller Order Transitions**:
+   - Added `confirm()` and `ready($trackingNumber)` actions to `web/app/Http/Controllers/Seller/OrderController.php` and mapped them to `PATCH /seller/orders/{order}/confirm` and `PATCH /seller/orders/{order}/ready` so sellers can confirm orders and issue tracking numbers through the standard seller interface.
+   - Enhanced `SellerOrder::assignCourier($courier, $feeMinor, $area, ?OrderStatus $status = null)` to allow assigning couriers without prematurely overriding orders that are in `READY_FOR_PICKUP` state.
+
+2. **Multi-Role Acceptance Coverage**:
+   - Automated end-to-end integration test `web/tests/Feature/EndToEndAcceptanceTest.php` covers the 15-step story across Buyer, Seller, Rider, and Admin.
+   - Comprehensive checklist documented in `docs/acceptance.md` including physical device verification guidelines (Camera, Barcode/QR scanner, GPS, Google OAuth).

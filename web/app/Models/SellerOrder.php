@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class SellerOrder extends Model
 {
@@ -92,5 +93,41 @@ class SellerOrder extends Model
     public function formattedSubtotal(): string
     {
         return '₱'.number_format($this->subtotal_minor / 100, 2);
+    }
+
+    // ── Pipeline Transition Helpers ──────────────────────────────────────────
+
+    public function confirm(): bool
+    {
+        return $this->forceFill(['status' => OrderStatus::Confirmed])->save();
+    }
+
+    public function markPreparing(): bool
+    {
+        return $this->forceFill(['status' => OrderStatus::Preparing])->save();
+    }
+
+    public function markReadyForPickup(?string $trackingNumber = null): bool
+    {
+        $tracking = $trackingNumber ?? ('ZEF-'.now()->format('ymd').'-'.strtoupper(Str::random(4)));
+
+        return $this->forceFill([
+            'status' => OrderStatus::ReadyForPickup,
+            'tracking_number' => $tracking,
+        ])->save();
+    }
+
+    public function assignCourier(LogisticsProvider $courier, int $feeMinor = 8500, ?string $area = null, ?OrderStatus $status = null): bool
+    {
+        $payload = [
+            'assigned_courier_id' => $courier->id,
+            'delivery_fee_minor' => $feeMinor,
+            'delivery_area' => $area ?? ($this->order?->shipping_address['province'] ?? 'Metro Manila'),
+        ];
+        if ($status !== null) {
+            $payload['status'] = $status;
+        }
+
+        return $this->forceFill($payload)->save();
     }
 }

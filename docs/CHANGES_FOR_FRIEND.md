@@ -47,3 +47,15 @@ This document tracks all new tables, columns, enum values, routes, and service c
 - **Account Security**: `POST /api/account/password`, `POST /api/account/email`, `POST /api/account/email/verify`, `POST /api/account/phone`, `POST /api/account/phone/verify`
 - Parallel `v1/` routes matching all endpoints.
 
+
+
+## Phase D: End-to-End Acceptance
+
+### 1. New Controllers & Routes
+- `Seller\OrderController.php`:
+  - `PATCH /seller/orders/{order}/confirm` (`seller.orders.confirm`)
+  - `PATCH /seller/orders/{order}/ready` (`seller.orders.ready`)
+
+### 2. New Tests & Documentation
+- `web/tests/Feature/EndToEndAcceptanceTest.php`: 15-step multi-role lifecycle feature test (56 assertions).
+- `docs/acceptance.md`: Verification checklist and physical device testing guide.

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Seller\AuthController;
 use App\Http\Controllers\Seller\DashboardController;
+use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,8 @@ Route::prefix('seller')->name('seller.')->group(function () {
         Route::get('/orders', function () {
             return view('Seller.Orders.index');
         })->name('orders.index');
+        Route::patch('/orders/{sellerOrder}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
+        Route::patch('/orders/{sellerOrder}/ready', [OrderController::class, 'ready'])->name('orders.ready');
 
         Route::get('/shipments', function () {
             return view('Seller.Shipments.index');
