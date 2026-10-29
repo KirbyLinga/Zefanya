@@ -266,41 +266,50 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     if (categories.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+      padding: const EdgeInsets.fromLTRB(0, AppSpacing.s4, 0, AppSpacing.s16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('CATEGORIES', style: AppType.eyebrow),
-                GestureDetector(
-                  onTap: widget.onBrowseCategories,
-                  child: Text(
-                    'See all categories',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.w600,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: AppSpacing.s48),
+                  child: Container(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onBrowseCategories,
+                      child: Text(
+                        'See all categories',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.s12),
           SizedBox(
-            height: 112,
+            height: 124,
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               scrollDirection: Axis.horizontal,
               itemCount: categories.length,
-              separatorBuilder: (_, index) => const SizedBox(width: 12),
+              separatorBuilder: (_, index) => const SizedBox(width: AppSpacing.s12),
               itemBuilder: (context, i) {
                 final cat = categories[i];
                 final icon = categoryIcons[cat] ?? Icons.category_outlined;
                 return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => Navigator.of(context).push(
                     AppPageRoute(builder: (_) => CategoryProductsScreen(category: cat)),
                   ),
@@ -317,9 +326,9 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                         ),
                         child: Icon(icon, size: 24, color: AppColors.primaryDark),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.s8),
                       SizedBox(
-                        width: 56,
+                        width: 64,
                         child: Text(
                           cat,
                           textAlign: TextAlign.center,
@@ -328,6 +337,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w500,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -376,7 +386,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               child: EaseInFrame(
                 index: 0,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 4),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s12, AppSpacing.s4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -385,7 +395,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(greeting, style: AppType.eyebrow),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: AppSpacing.s8),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
@@ -396,9 +406,9 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                                     child: Text('Zefanya', style: AppType.masthead),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: AppSpacing.s8),
                                 Padding(
-                                  padding: const EdgeInsets.only(top: 6),
+                                  padding: const EdgeInsets.only(top: AppSpacing.s8),
                                   child: ZefanyaMark(
                                     size: 20,
                                     color: AppColors.primaryDark.withValues(alpha: 0.6),
@@ -410,7 +420,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                         ),
                       ),
                       const NotificationBell(),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSpacing.s4),
                       const CartButton(),
                     ],
                   ),
@@ -422,11 +432,11 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               child: EaseInFrame(
                 index: 1,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s12),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
+                    constraints: const BoxConstraints(minHeight: AppSpacing.s48),
                     child: Container(
-                      height: 48,
+                      constraints: const BoxConstraints(minHeight: AppSpacing.s48),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(ext.pillRadius),
@@ -467,7 +477,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               child: EaseInFrame(
                 index: 2,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, AppSpacing.s16),
                   child: PromoCarousel(
                     autoAdvance: widget.isActive,
                     onTapSlide: _onPromoTap,
@@ -480,7 +490,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               child: EaseInFrame(
                 index: 3,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s16),
                   child: Row(
                     children: [
                       Expanded(
@@ -529,13 +539,13 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                 ),
               )
             else if (catalogProducts.isEmpty)
-              SliverToBoxAdapter(child: _buildEmptyState(theme))
+              SliverToBoxAdapter(child: _buildEmptyState(context, theme))
             else ...[
               // ---- "The Shelf" product grid (renamed "Just for you") ----
               SliverToBoxAdapter(
                 child: Padding(
                   key: _shelfKey,
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s8, AppSpacing.s20, AppSpacing.s16),
                   child: Text('Just for you', style: AppType.sectionDisplay),
                 ),
               ),
@@ -744,11 +754,27 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return const EmptyState(
+  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
+    final catalog = context.watch<CatalogState>();
+    if (catalog.loadFailure != null) {
+      return EmptyState(
+        icon: Icons.wifi_off_outlined,
+        title: 'Could not load products',
+        subtitle: 'Please check your connection and try again.',
+        action: OutlinedButton(
+          onPressed: () => context.read<CatalogState>().refresh(),
+          child: const Text('Try again'),
+        ),
+      );
+    }
+    return EmptyState(
       icon: Icons.inventory_2_outlined,
       title: 'No products yet',
-      subtitle: 'Check back soon',
+      subtitle: 'Check back soon for curated local crafts.',
+      action: OutlinedButton(
+        onPressed: () => context.read<CatalogState>().refresh(),
+        child: const Text('Refresh'),
+      ),
     );
   }
 }
@@ -780,7 +806,7 @@ class _FlashSaleSectionState extends State<_FlashSaleSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -788,16 +814,25 @@ class _FlashSaleSectionState extends State<_FlashSaleSection> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('FLASH SALE', style: AppType.eyebrow.copyWith(color: AppColors.danger)),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s4),
                   Text('Ends soon', style: theme.textTheme.titleMedium?.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
                 ],
               ),
-              TextButton(onPressed: () {}, child: Text('See all deals', style: theme.textTheme.labelSmall?.copyWith(color: AppColors.primaryDark))),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: AppSpacing.s48),
+                child: Container(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: Text('See all deals', style: theme.textTheme.labelSmall?.copyWith(color: AppColors.primaryDark, fontSize: 12)),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
         SizedBox(
-          height: 200,
+          height: 268,
           child: _FlashSaleProductList(
             saleItems: saleItems,
             saleEnds: _saleEnds,
@@ -825,9 +860,10 @@ class _FlashSaleProductList extends StatelessWidget {
     final ext = theme.extension<AppThemeExtension>()!;
 
     return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
       scrollDirection: Axis.horizontal,
       itemCount: saleItems.length,
-      separatorBuilder: (_, i) => const SizedBox(width: 12),
+      separatorBuilder: (_, i) => const SizedBox(width: AppSpacing.s12),
       itemBuilder: (context, i) {
         final product = saleItems[i];
         final originalPrice = product.compareAtPrice ?? product.price;
@@ -840,136 +876,144 @@ class _FlashSaleProductList extends StatelessWidget {
         final minutes = timeLeft.inMinutes.remainder(60).toString().padLeft(2, '0');
         final seconds = timeLeft.inSeconds.remainder(60).toString().padLeft(2, '0');
 
-        return Container(
-          width: 170,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(ext.cardRadius),
-            border: Border.all(color: AppColors.divider),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.of(context).push(
+            AppPageRoute(builder: (_) => ProductDetailsScreen(product: product, heroTag: 'flash-${product.id}')),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Countdown timer
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.timer, size: 12, color: AppColors.danger),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$hours:$minutes:$seconds',
+          child: Container(
+            width: 180,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(ext.cardRadius),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Countdown timer
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s12, AppSpacing.s8, AppSpacing.s12, AppSpacing.s4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.timer, size: 14, color: AppColors.danger),
+                      const SizedBox(width: AppSpacing.s4),
+                      Text(
+                        '$hours:$minutes:$seconds',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Discount badge
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s12, 0, AppSpacing.s12, AppSpacing.s8),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.s8, AppSpacing.s4, AppSpacing.s8, AppSpacing.s4),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppSpacing.s8),
+                    ),
+                    child: Text(
+                      '-$discountPct%',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: AppColors.danger,
                         fontWeight: FontWeight.w700,
-                        fontSize: 10,
+                        fontSize: 12,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              // Discount badge
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
                   ),
+                ),
+                // Product image
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.s12, 0, AppSpacing.s12, AppSpacing.s8),
+                    child: ProductImage(product: product),
+                  ),
+                ),
+                // Product name
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s12, 0, AppSpacing.s12, AppSpacing.s4),
                   child: Text(
-                    '-$discountPct%',
+                    product.name,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-              // Product image
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: ProductImage(product: product),
-                ),
-              ),
-              // Product name
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                child: Text(
-                  product.name,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.textPrimary,
+                // Price row
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s12, 0, AppSpacing.s12, AppSpacing.s4),
+                  child: Row(
+                    children: [
+                      Text(
+                        formatPeso(product.price),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.s8),
+                      Text(
+                        formatPeso(originalPrice),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          decoration: TextDecoration.lineThrough,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              // Price row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                child: Row(
-                  children: [
-                    Text(
-                      formatPeso(product.price),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      formatPeso(originalPrice),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        decoration: TextDecoration.lineThrough,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Sold progress bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${product.soldCount} sold',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: 10,
+                // Sold progress bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.s12, 0, AppSpacing.s12, AppSpacing.s12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${product.soldCount} sold',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                        Text(
-                          '${(soldProgress * 100).round()}%',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: 10,
+                          Text(
+                            '${(soldProgress * 100).round()}%',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: soldProgress,
-                        minHeight: 6,
-                        backgroundColor: AppColors.divider,
-                        valueColor: AlwaysStoppedAnimation(AppColors.tertiary),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: AppSpacing.s4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppSpacing.s4),
+                        child: LinearProgressIndicator(
+                          value: soldProgress,
+                          minHeight: AppSpacing.s8,
+                          backgroundColor: AppColors.divider,
+                          valueColor: AlwaysStoppedAnimation(AppColors.tertiary),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -991,16 +1035,17 @@ class _VoucherStrip extends StatelessWidget {
     if (vouchers.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: 110,
+      height: 128,
       child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
         scrollDirection: Axis.horizontal,
         itemCount: vouchers.length,
-        separatorBuilder: (_, i) => const SizedBox(width: 12),
+        separatorBuilder: (_, i) => const SizedBox(width: AppSpacing.s12),
         itemBuilder: (context, i) {
           final voucher = vouchers[i];
           return Container(
-            width: 210,
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            width: 220,
+            padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
               color: AppColors.surfaceMuted,
               borderRadius: BorderRadius.circular(ext.cardRadius),
@@ -1008,47 +1053,55 @@ class _VoucherStrip extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      voucher.title.isNotEmpty ? voucher.title : voucher.code,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        voucher.title.isNotEmpty ? voucher.title : voucher.code,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(width: AppSpacing.s8),
                     Container(
-                      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.s8, AppSpacing.s4, AppSpacing.s8, AppSpacing.s4),
                       decoration: BoxDecoration(
                         color: AppColors.tertiary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(AppSpacing.s8),
                       ),
                       child: Text(
                         voucher.discountLabel,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: AppColors.tertiary,
                           fontWeight: FontWeight.w700,
+                          fontSize: 12,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s8),
                 Text(
                   'Min spend ${formatPeso(voucher.minSpend)}',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.s4),
                 Text(
                   voucher.expiryLabel,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
               ],

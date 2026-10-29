@@ -142,7 +142,7 @@ class _PromoCarouselState extends State<PromoCarousel> {
     return Column(
       children: [
         SizedBox(
-          height: 152,
+          height: 160,
           child: Listener(
             onPointerDown: (_) => _setFingerDown(true),
             onPointerUp: (_) => _setFingerDown(false),
@@ -315,6 +315,7 @@ class _TextLeftLayout extends StatelessWidget {
                     color: slide.foreground.withValues(alpha: 0.72),
                   ),
                   maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -534,6 +535,7 @@ class _IconSplitLayout extends StatelessWidget {
                     color: slide.foreground.withValues(alpha: 0.72),
                   ),
                   maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
