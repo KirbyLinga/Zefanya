@@ -17,3 +17,22 @@ This file records deviations from the repository's baseline instructions or deci
 3. **Backend Test Environment Fix (`HttpsUrlGenerationTest.php`)**:
    - `HttpsUrlGenerationTest::test_named_routes_start_with_https_in_production` failed because `config()->set('app.env', 'production')` does not update `$this->app['env']` in Laravel 11 container.
    - Added `$this->app['env'] = 'production'` before booting `AppServiceProvider` and restored it in `finally`, preserving test expectation.
+
+## Phase C: Backend Vertical Slices
+
+1. **Rule 3 Compliance in `live_auth_test.dart`**:
+   - Preserved `the courier role names the missing endpoint instead of posting` by throwing `notWired('POST /register/logistics')` when registration profile lacks rider credentials/plate, and calling live multipart endpoint when rider plate is present.
+
+2. **PSGC Hierarchy & Province-less NCR**:
+   - Seeded Philippine Standard Geographic Code tables (`psgc_regions`, `psgc_provinces`, `psgc_cities`, `psgc_barangays`) from `mobile/assets/data/ph_psgc.json` via chunked upserts. NCR localities have null `province_code`, using fallback label "Metro Manila".
+   - Immutable shipping address snapshot is captured on `Order` checkout via `BuyerAddress::toSnapshot()`.
+
+3. **Restoration of Historical Migrations**:
+   - Re-aligned migrations with dev database schema for `reviews`, `assigned_courier`, `chat_messages`, `maker_note`, and `promotions` using original definitions from commit `8ff3826`.
+
+4. **Shared `OrderPlacer` Service**:
+   - Shared business rules across web checkout and mobile `POST /orders` via `OrderPlacer` service (id-ordered stock locking, integer centavos, largest-remainder discount allocation).
+
+5. **Delivery Handover Gate**:
+   - Preserved server-side delivery verification: OTP stored as hash (bcrypt/sha256), rate limiting after 5 wrong attempts (423 for 15 mins), and COD exact centavo check on `PATCH /api/courier/jobs/{job}/milestone`.
+

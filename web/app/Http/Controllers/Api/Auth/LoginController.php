@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
+use App\Models\Logistics\LogisticsProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -67,21 +68,27 @@ class LoginController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        $buyer = $request->user();
+        $user = $request->user();
 
-        // `auth:sanctum` accepts any tokenable; only buyers can hold a token
-        // today. This is the guard for the day that stops being true.
+        if ($user instanceof LogisticsProvider) {
+            $courierController = app(\App\Http\Controllers\Api\Courier\CourierLoginController::class);
+            if ($gate = $courierController->gateResponse($user)) {
+                return $gate;
+            }
+            return response()->json(['ok' => true] + $courierController->courierPayload($user));
+        }
+
         abort_unless(
-            $buyer instanceof Buyer,
+            $user instanceof Buyer,
             403,
             'This token belongs to a different kind of account.',
         );
 
-        if ($gate = $this->gateResponse($buyer)) {
+        if ($gate = $this->gateResponse($user)) {
             return $gate;
         }
 
-        return response()->json(['ok' => true] + $this->buyerPayload($buyer));
+        return response()->json(['ok' => true] + $this->buyerPayload($user));
     }
 
     /**

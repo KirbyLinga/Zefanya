@@ -21,6 +21,8 @@ enum LogisticsProviderStatus: string
 
     case Rejected = 'rejected';
 
+    case Suspended = 'suspended';
+
     public function label(): string
     {
         return match ($this) {
@@ -28,6 +30,7 @@ enum LogisticsProviderStatus: string
             self::PendingApproval => 'Pending approval',
             self::Approved => 'Approved',
             self::Rejected => 'Rejected',
+            self::Suspended => 'Suspended',
         };
     }
 

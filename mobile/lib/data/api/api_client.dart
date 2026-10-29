@@ -116,6 +116,14 @@ class ApiClient {
   }) =>
       _send('POST', path, authenticated: authenticated, body: body);
 
+  /// `PUT [path]` with a JSON body.
+  Future<Map<String, Object?>> putJson(
+    String path, {
+    Object? body,
+    bool authenticated = true,
+  }) =>
+      _send('PUT', path, authenticated: authenticated, body: body);
+
   /// `PATCH [path]` with a JSON body.
   ///
   /// `PATCH` rather than `PUT` is the app's default for updates because every

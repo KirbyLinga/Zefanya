@@ -234,6 +234,33 @@ class RegistrationProfile {
   /// and Google is the credential. The repository adds `id_token` and the role
   /// the person chose after the server answered `needs_role`.
   Map<String, Object?> toGoogleFields() => toProfileFields();
+
+  /// Courier/Rider registration fields including vehicle and license details.
+  Map<String, Object?> toCourierFields({
+    required String email,
+    required String password,
+  }) => {
+    ...toCourierProfileFields(),
+    'email': email.trim(),
+    'password': password,
+    'password_confirmation': password,
+  };
+
+  /// The courier-specific profile fields shared by password and Google auth.
+  Map<String, Object?> toCourierProfileFields() => {
+    ...toProfileFields(),
+    if (_present(riderCompany)) 'company': riderCompany!.trim(),
+    if (_present(riderCompany)) 'business_name': riderCompany!.trim(),
+    'vehicle_type': riderVehicleType?.trim() ?? 'Motorcycle',
+    'plate_number': riderPlate?.trim() ?? '',
+    'license_number': riderLicenseNumber?.trim() ?? '',
+    if (riderLicenseExpiry != null)
+      'license_expiry': formatWireDate(riderLicenseExpiry!),
+    if (_present(riderHub)) 'hub': riderHub!.trim(),
+  };
+
+  /// Courier fields sent when registering via Google.
+  Map<String, Object?> toGoogleCourierFields() => toCourierProfileFields();
 }
 
 /// `YYYY-MM-DD` — the date-only shape the server's `date` rule reads.

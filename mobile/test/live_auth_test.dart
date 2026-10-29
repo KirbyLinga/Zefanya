@@ -593,4 +593,50 @@ void main() {
     expect(live.server.paths.single, '/logout/courier');
     expect(await live.tokens.read(), isNull);
   });
+
+  test('courier registration posts to /register/courier as multipart with files',
+      () async {
+    final live = _Live([
+      _json({
+        'ok': true,
+        'role': 'courier',
+        'email': 'rider@example.com',
+        'registration_status': 'pending_approval',
+      }, 201),
+    ]);
+
+    final riderProfile = RegistrationProfile(
+      lastName: 'Dela Cruz',
+      firstName: 'Juan',
+      middleInitial: 'D',
+      sex: 'Male',
+      phone: '0917 123 4567',
+      birthday: DateTime(1995, 5, 15),
+      province: 'Metro Manila',
+      municipality: 'Quezon City',
+      barangay: 'Diliman',
+      street: '123 Katipunan Ave',
+      govIdPath: idPath,
+      riderCompany: 'Express Logistics',
+      riderVehicleType: 'Motorcycle',
+      riderPlate: 'ABC-1234',
+      riderLicenseNumber: 'N01-12-345678',
+      riderLicenseExpiry: DateTime(2028, 5, 15),
+      riderLicensePath: idPath,
+      riderOrCrPath: idPath,
+    );
+
+    final result = await live.repository.register(
+      role: UserRole.courier,
+      email: 'rider@example.com',
+      password: 'Password1!',
+      profile: riderProfile,
+    );
+
+    expect(live.server.methods.single, 'POST');
+    expect(live.server.paths.single, '/register/courier');
+    expect(result.role, UserRole.courier);
+    expect(result.status, AccountStatus.pendingApproval);
+    expect(result.registrationStatus, RemoteRegistrationStatus.pendingApproval);
+  });
 }

@@ -58,10 +58,14 @@ class ProductResource extends JsonResource
             // is an unexplained absence, and the app has no stock UI to explain
             // it with. It is a fact either way; the app simply does not read it.
             'in_stock' => ! $this->isOutOfStock(),
+            'stock' => (int) $this->stock_quantity,
+            'rating_avg' => round((float) ($this->reviews()->avg('stars') ?? 0), 1),
+            'rating_count' => (int) ($this->reviews()->count()),
             'seller' => [
                 // `products.seller_id` is NOT NULL with a cascading foreign key,
                 // so a product without a seller is not a state this can be in.
                 'name' => $this->seller?->business_name ?? '',
+                'maker_note' => $this->seller?->maker_note,
             ],
             'images' => $this->imagesCoverFirst(),
         ];

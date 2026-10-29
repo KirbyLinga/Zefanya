@@ -27,8 +27,14 @@ class Buyer extends Authenticatable
         'middle_initial',
         'sex',
         'email',
+        'pending_email',
+        'pending_email_code',
+        'pending_email_expires_at',
         'password',
         'contact_no',
+        'pending_phone',
+        'pending_phone_code',
+        'pending_phone_expires_at',
         'birthday',
         'age',
         'address_mode',
@@ -51,6 +57,8 @@ class Buyer extends Authenticatable
         'password',
         'remember_token',
         'email_verification_code',
+        'pending_email_code',
+        'pending_phone_code',
     ];
 
     protected function casts(): array
@@ -59,6 +67,8 @@ class Buyer extends Authenticatable
             'birthday' => 'date',
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
+            'pending_email_expires_at' => 'datetime',
+            'pending_phone_expires_at' => 'datetime',
             'approved_at' => 'datetime',
             'password' => 'hashed',
         ];
@@ -91,6 +101,16 @@ class Buyer extends Authenticatable
     public function cartItems(): HasMany
     {
         return $this->hasMany(CartItem::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(BuyerAddress::class);
+    }
+
+    public function defaultAddress(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BuyerAddress::class)->where('is_default', true);
     }
 
     public function isVerificationLinkExpired(): bool
@@ -169,6 +189,86 @@ class Buyer extends Authenticatable
         }
 
         return hash_equals($this->email_verification_code, hash('sha256', $code));
+    }
+
+    /**
+     * Issues a code for a *change* of email, not for registration.
+     */
+    public function issuePendingEmailCode(string $email): string
+    {
+        $code = (string) random_int(100000, 999999);
+
+        $this->forceFill([
+            'pending_email' => $email,
+            'pending_email_code' => hash('sha256', $code),
+            'pending_email_expires_at' => now()->addMinutes(10),
+        ])->save();
+
+        return $code;
+    }
+
+    public function verifyPendingEmailCode(string $code): bool
+    {
+        if ($this->pending_email_code === null) {
+            return false;
+        }
+
+        return hash_equals($this->pending_email_code, hash('sha256', $code));
+    }
+
+    public function isPendingEmailExpired(): bool
+    {
+        return $this->pending_email_expires_at === null
+            || $this->pending_email_expires_at->isPast();
+    }
+
+    public function applyPendingEmail(): void
+    {
+        $this->forceFill([
+            'email' => $this->pending_email,
+            'email_verified_at' => now(),
+            'pending_email' => null,
+            'pending_email_code' => null,
+            'pending_email_expires_at' => null,
+        ])->save();
+    }
+
+    public function issuePendingPhoneCode(string $phone): string
+    {
+        $code = (string) random_int(100000, 999999);
+
+        $this->forceFill([
+            'pending_phone' => $phone,
+            'pending_phone_code' => hash('sha256', $code),
+            'pending_phone_expires_at' => now()->addMinutes(10),
+        ])->save();
+
+        return $code;
+    }
+
+    public function verifyPendingPhoneCode(string $code): bool
+    {
+        if ($this->pending_phone_code === null) {
+            return false;
+        }
+
+        return hash_equals($this->pending_phone_code, hash('sha256', $code));
+    }
+
+    public function isPendingPhoneExpired(): bool
+    {
+        return $this->pending_phone_expires_at === null
+            || $this->pending_phone_expires_at->isPast();
+    }
+
+    public function applyPendingPhone(): void
+    {
+        $this->forceFill([
+            'contact_no' => $this->pending_phone,
+            'pending_phone' => null,
+            'pending_phone_code' => null,
+            'pending_phone_expires_at' => null,
+        ])->save();
     }
 
     /**

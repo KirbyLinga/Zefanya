@@ -7,10 +7,11 @@ use Database\Factories\LogisticsProviderFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class LogisticsProvider extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -23,6 +24,10 @@ class LogisticsProvider extends Authenticatable
         'birthday',
         'age',
         'business_name',
+        'vehicle_type',
+        'plate_number',
+        'license_number',
+        'license_expiry',
         'address_mode',
         'province_code',
         'province_name',
@@ -33,9 +38,14 @@ class LogisticsProvider extends Authenticatable
         'street',
         'house_number',
         'address_detail',
+        'hub',
         'upload_id_path',
+        'license_path',
+        'or_cr_path',
         'dti_permit_path',
         'status',
+        'is_online',
+        'reverification_required',
         // Set only by the admin approval/rejection actions (never from request
         // data — RegistrationController writes these explicitly). Without them in
         // the allow-list Model::update() silently drops the decision metadata.
@@ -54,6 +64,9 @@ class LogisticsProvider extends Authenticatable
     {
         return [
             'birthday' => 'date',
+            'license_expiry' => 'date',
+            'is_online' => 'boolean',
+            'reverification_required' => 'boolean',
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -82,6 +95,26 @@ class LogisticsProvider extends Authenticatable
     public function isApproved(): bool
     {
         return $this->status === LogisticsProviderStatus::Approved;
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->status === LogisticsProviderStatus::Rejected;
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->status === LogisticsProviderStatus::Suspended;
+    }
+
+    public function isPendingApproval(): bool
+    {
+        return $this->status === LogisticsProviderStatus::PendingApproval;
+    }
+
+    public function isPastEmailVerification(): bool
+    {
+        return $this->status !== LogisticsProviderStatus::PendingVerification;
     }
 
     public function isOtpExpired(): bool

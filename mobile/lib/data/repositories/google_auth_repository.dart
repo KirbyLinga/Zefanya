@@ -189,10 +189,41 @@ class LiveGoogleAuthRepository extends LiveRepository
     required UserRole role,
     required RegistrationProfile profile,
   }) async {
-    // The courier registration form still has no live wire mapping (see
-    // auth_repository.dart and registration_payload.dart). Returning an
-    // endpoint name is more honest than sending a payload the server cannot
-    // read, and mock mode still demonstrates the flow.
+    if (role == UserRole.courier) {
+      if (!client.isConfigured) throw const ApiNotConfiguredException();
+
+      final idPath = profile.govIdPath;
+      if (idPath == null || idPath.trim().isEmpty) {
+        throw const ValidationException(
+          fieldErrors: {'upload_id': 'Upload a photo or PDF of your ID.'},
+        );
+      }
+
+      final files = <String, String>{'upload_id': idPath};
+      if (profile.riderLicensePath != null && profile.riderLicensePath!.trim().isNotEmpty) {
+        files['license_doc'] = profile.riderLicensePath!.trim();
+      }
+      if (profile.riderOrCrPath != null && profile.riderOrCrPath!.trim().isNotEmpty) {
+        files['or_cr_doc'] = profile.riderOrCrPath!.trim();
+      }
+
+      final body = await client.postMultipart(
+        '/auth/google',
+        authenticated: false,
+        fields: {
+          'id_token': identity.idToken,
+          'role': 'courier',
+          ...profile.toGoogleCourierFields().map(
+            (key, value) => MapEntry(key, '$value'),
+          ),
+        },
+        files: files,
+      );
+      final payload = unwrapMap(body);
+      await _adoptToken(payload);
+      return authResultFrom(payload, role: role);
+    }
+
     if (role != UserRole.buyer) {
       return notWired('POST /auth/google (courier registration)');
     }

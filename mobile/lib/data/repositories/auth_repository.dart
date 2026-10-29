@@ -339,10 +339,36 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required String password,
     required RegistrationProfile profile,
   }) async {
-    // The courier form still does not match `StoreLogisticsRegistrationRequest`
-    // (see this file's header and memory-bank/progress.md), so there is nothing
-    // to send for that role: a mapping that can only produce a 422 is worse than
-    // none.
+    if (role == UserRole.courier && profile.riderPlate != null) {
+      if (!client.isConfigured) throw const ApiNotConfiguredException();
+
+      final idPath = profile.govIdPath;
+      if (idPath == null || idPath.trim().isEmpty) {
+        throw const ValidationException(
+          fieldErrors: {'upload_id': 'Upload a photo or PDF of your government ID.'},
+        );
+      }
+
+      final files = <String, String>{'upload_id': idPath};
+      if (profile.riderLicensePath != null && profile.riderLicensePath!.trim().isNotEmpty) {
+        files['license_doc'] = profile.riderLicensePath!.trim();
+      }
+      if (profile.riderOrCrPath != null && profile.riderOrCrPath!.trim().isNotEmpty) {
+        files['or_cr_doc'] = profile.riderOrCrPath!.trim();
+      }
+
+      final body = await client.postMultipart(
+        '/register/courier',
+        authenticated: false,
+        fields: profile
+            .toCourierFields(email: email, password: password)
+            .map((key, value) => MapEntry(key, '$value')),
+        files: files,
+      );
+
+      return _resultFrom(body, role: role);
+    }
+
     if (role != UserRole.buyer) return notWired('POST /register/logistics');
 
     if (!client.isConfigured) throw const ApiNotConfiguredException();

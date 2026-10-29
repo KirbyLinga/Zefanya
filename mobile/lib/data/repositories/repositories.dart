@@ -36,6 +36,7 @@ import '../../services/google_sign_in_service.dart';
 import '../api/api_client.dart';
 import '../api/token_store.dart';
 import 'account_security_repository.dart';
+import 'address_repository.dart';
 import 'auth_repository.dart';
 import 'cart_repository.dart';
 import 'catalog_repository.dart';
@@ -64,11 +65,13 @@ class Repositories {
     required this.chat,
     required this.courier,
     required this.returns,
+    AddressRepository? address,
     this.client,
-  });
+  }) : address = address ?? const MockAddressRepository();
 
   final AuthRepository auth;
   final AccountSecurityRepository accountSecurity;
+  final AddressRepository address;
 
   /// The server exchange for a Google identity, separate from [auth] because
   /// it answers "which role is this?" rather than taking a role as an argument.
@@ -106,6 +109,7 @@ class Repositories {
     googleSignIn: const MockGoogleSignInService(),
     catalog: const MockCatalogRepository(),
     cart: const MockCartRepository(),
+    address: const MockAddressRepository(),
     // These two are not `const`, and can't be: each holds the mutable,
     // persisted collection it is the data source for (`MockOrderRepository`
     // owns the placed-order list, `MockChatRepository` owns the threads).
@@ -129,6 +133,7 @@ class Repositories {
     googleSignIn: NativeGoogleSignInService(),
     catalog: LiveCatalogRepository(client),
     cart: LiveCartRepository(client),
+    address: LiveAddressRepository(client),
     order: LiveOrderRepository(client),
     review: LiveReviewRepository(client),
     returns: LiveReturnRepository(client),

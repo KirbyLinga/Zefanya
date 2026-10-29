@@ -55,6 +55,11 @@ class Product extends Model
         return $this->hasMany(CartItem::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
     public function scopeForSeller(Builder $query, int $sellerId): Builder
     {
         return $query->where('seller_id', $sellerId);
@@ -68,6 +73,11 @@ class Product extends Model
     public function formattedPrice(): string
     {
         return '₱'.number_format((float) $this->price, 2);
+    }
+
+    public function priceCentavos(): int
+    {
+        return (int) bcmul((string) $this->price, '100', 0);
     }
 
     public function catalogImageUrl(): ?string

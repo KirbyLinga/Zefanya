@@ -29,12 +29,23 @@
 // the same address had been counted against the same bucket. A prefix gives
 // each route its own counter, verified against this app's real traffic.
 
+use App\Http\Controllers\Api\Auth\GoogleAuthController;
 use App\Http\Controllers\Api\Auth\LoginController;
+use App\Http\Controllers\Api\Buyer\AccountSecurityController;
+use App\Http\Controllers\Api\Buyer\AddressController;
 use App\Http\Controllers\Api\Buyer\RegisterBuyerController;
 use App\Http\Controllers\Api\Buyer\VerifyBuyerOtpController;
+use App\Http\Controllers\Api\Buyer\WishlistController;
 use App\Http\Controllers\Api\Cart\VoucherController;
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
+use App\Http\Controllers\Api\Courier\CourierJobController;
+use App\Http\Controllers\Api\Courier\CourierLoginController;
+use App\Http\Controllers\Api\Courier\CourierMilestoneController;
+use App\Http\Controllers\Api\Courier\CourierRegistrationController;
+use App\Http\Controllers\Api\Order\OrderController;
+use App\Http\Controllers\Api\Psgc\PsgcController;
+use App\Http\Controllers\Api\Review\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 // ── Registration (public: there is no session to require yet) ───────────────
@@ -51,17 +62,33 @@ Route::post('/register/buyer/verify-otp/{buyer}/resend', [VerifyBuyerOtpControll
     ->name('api.register.buyer.verify-otp.resend')
     ->middleware('throttle:3,5,api-otp-resend');
 
+Route::post('/register/courier', [CourierRegistrationController::class, 'store'])
+    ->name('api.register.courier.store')
+    ->middleware('throttle:5,1,api-register');
+
+Route::post('/register/logistics', [CourierRegistrationController::class, 'store'])
+    ->name('api.register.logistics.store')
+    ->middleware('throttle:5,1,api-register');
+
 // ── Signing in (public: this is where a token comes from) ───────────────────
 
-// One path per role, because one guard is one provider: buyers and logistics
-// providers are different tables with different credential rules, and a single
-// endpoint with a `role` field would have to decide which one it means *after*
-// accepting a password. Courier sign-in is deliberately absent rather than
-// stubbed — `logistics_providers` has no API surface yet, and a route that
-// always answers "not built yet" is worse than a route that isn't there.
 Route::post('/login/buyer', [LoginController::class, 'store'])
     ->name('api.login.buyer')
     ->middleware('throttle:5,1,api-login');
+
+Route::post('/login/courier', [CourierLoginController::class, 'store'])
+    ->name('api.login.courier')
+    ->middleware('throttle:5,1,api-login');
+
+Route::post('/login/logistics', [CourierLoginController::class, 'store'])
+    ->name('api.login.logistics')
+    ->middleware('throttle:5,1,api-login');
+
+// ── Federated / Social Auth ──────────────────────────────────────────────────
+
+Route::post('/auth/google', [GoogleAuthController::class, 'handle'])
+    ->name('api.auth.google')
+    ->middleware('throttle:15,1,api-auth-google');
 
 // ── The catalogue (public: browsing needs no account) ───────────────────────
 //
@@ -88,6 +115,12 @@ Route::get('/vouchers', [VoucherController::class, 'index'])
     ->name('api.vouchers.index')
     ->middleware('throttle:60,1,api-vouchers');
 
+// ── PSGC Reference Data (public) ───────────────────────────────────────────
+Route::get('/psgc/regions', [PsgcController::class, 'regions'])->name('api.psgc.regions')->middleware('throttle:60,1,api-psgc');
+Route::get('/psgc/provinces', [PsgcController::class, 'provinces'])->name('api.psgc.provinces')->middleware('throttle:60,1,api-psgc');
+Route::get('/psgc/cities', [PsgcController::class, 'cities'])->name('api.psgc.cities')->middleware('throttle:60,1,api-psgc');
+Route::get('/psgc/barangays', [PsgcController::class, 'barangays'])->name('api.psgc.barangays')->middleware('throttle:60,1,api-psgc');
+
 // ── Authenticated ───────────────────────────────────────────────────────────
 
 // Exists so the token has something to prove itself against: everything else
@@ -99,4 +132,106 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [LoginController::class, 'destroy'])
         ->name('api.logout');
+
+    Route::get('/me/courier', [CourierLoginController::class, 'show'])
+        ->name('api.me.courier');
+
+    Route::post('/logout/courier', [CourierLoginController::class, 'destroy'])
+        ->name('api.logout.courier');
+
+    // Account security
+    Route::post('/account/password', [AccountSecurityController::class, 'changePassword'])
+        ->name('api.account.password')
+        ->middleware('throttle:5,1,api-account-password');
+
+    Route::post('/account/email', [AccountSecurityController::class, 'requestEmailChange'])
+        ->name('api.account.email.request')
+        ->middleware('throttle:3,5,api-account-email-request');
+
+    Route::post('/account/email/verify', [AccountSecurityController::class, 'confirmEmailChange'])
+        ->name('api.account.email.verify')
+        ->middleware('throttle:10,1,api-account-email-verify');
+
+    Route::post('/account/phone', [AccountSecurityController::class, 'requestPhoneChange'])
+        ->name('api.account.phone.request')
+        ->middleware('throttle:3,5,api-account-phone-request');
+
+    Route::post('/account/phone/verify', [AccountSecurityController::class, 'confirmPhoneChange'])
+        ->name('api.account.phone.verify')
+        ->middleware('throttle:10,1,api-account-phone-verify');
+
+    // Buyer delivery addresses
+    Route::get('/buyer/addresses', [AddressController::class, 'index'])->name('api.buyer.addresses.index');
+    Route::post('/buyer/addresses', [AddressController::class, 'store'])->name('api.buyer.addresses.store');
+    Route::get('/buyer/addresses/{address}', [AddressController::class, 'show'])->name('api.buyer.addresses.show');
+    Route::match(['put', 'patch'], '/buyer/addresses/{address}', [AddressController::class, 'update'])->name('api.buyer.addresses.update');
+    Route::delete('/buyer/addresses/{address}', [AddressController::class, 'destroy'])->name('api.buyer.addresses.destroy');
+    Route::patch('/buyer/addresses/{address}/default', [AddressController::class, 'makeDefault'])->name('api.buyer.addresses.default');
+
+    // Reviews
+    Route::get('/reviews/mine', [ReviewController::class, 'index'])->name('api.reviews.mine');
+    Route::patch('/orders/{sellerOrder}/items/{product}/review', [ReviewController::class, 'upsert'])->name('api.reviews.upsert');
+
+    // Wishlist
+    Route::get('/buyer/wishlist', [WishlistController::class, 'index'])->name('api.buyer.wishlist.index');
+    Route::post('/buyer/wishlist/{product}', [WishlistController::class, 'store'])->name('api.buyer.wishlist.store');
+    Route::delete('/buyer/wishlist/{product}', [WishlistController::class, 'destroy'])->name('api.buyer.wishlist.destroy');
+
+    // Orders
+    Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
+    Route::post('/orders', [OrderController::class, 'store'])->name('api.orders.store');
+    Route::get('/orders/{sellerOrder}/milestone', [OrderController::class, 'milestone'])->name('api.orders.milestone');
+
+    // Courier
+    Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.courier.jobs.index');
+    Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.courier.jobs.milestone');
+});
+
+// ── Versioned v1 Surface ──────────────────────────────────────────────────
+Route::prefix('v1')->group(function () {
+    // Auth
+    Route::post('/auth/google', [GoogleAuthController::class, 'handle'])->name('api.v1.auth.google');
+
+    // PSGC
+    Route::get('/psgc/regions', [PsgcController::class, 'regions'])->name('api.v1.psgc.regions');
+    Route::get('/psgc/provinces', [PsgcController::class, 'provinces'])->name('api.v1.psgc.provinces');
+    Route::get('/psgc/cities', [PsgcController::class, 'cities'])->name('api.v1.psgc.cities');
+    Route::get('/psgc/barangays', [PsgcController::class, 'barangays'])->name('api.v1.psgc.barangays');
+
+    // Buyer
+    Route::post('/buyer/register', [RegisterBuyerController::class, 'store'])->name('api.v1.buyer.register');
+    Route::post('/buyer/login', [LoginController::class, 'store'])->name('api.v1.buyer.login');
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/buyer/me', [LoginController::class, 'show'])->name('api.v1.buyer.me');
+        Route::post('/buyer/logout', [LoginController::class, 'destroy'])->name('api.v1.buyer.logout');
+
+        Route::get('/buyer/addresses', [AddressController::class, 'index'])->name('api.v1.buyer.addresses.index');
+        Route::post('/buyer/addresses', [AddressController::class, 'store'])->name('api.v1.buyer.addresses.store');
+        Route::get('/buyer/addresses/{address}', [AddressController::class, 'show'])->name('api.v1.buyer.addresses.show');
+        Route::match(['put', 'patch'], '/buyer/addresses/{address}', [AddressController::class, 'update'])->name('api.v1.buyer.addresses.update');
+        Route::delete('/buyer/addresses/{address}', [AddressController::class, 'destroy'])->name('api.v1.buyer.addresses.destroy');
+        Route::patch('/buyer/addresses/{address}/default', [AddressController::class, 'makeDefault'])->name('api.v1.buyer.addresses.default');
+
+        Route::get('/buyer/reviews/mine', [ReviewController::class, 'index'])->name('api.v1.buyer.reviews.mine');
+        Route::patch('/buyer/orders/{sellerOrder}/items/{product}/review', [ReviewController::class, 'upsert'])->name('api.v1.buyer.reviews.upsert');
+
+        Route::get('/buyer/wishlist', [WishlistController::class, 'index'])->name('api.v1.buyer.wishlist.index');
+        Route::post('/buyer/wishlist/{product}', [WishlistController::class, 'store'])->name('api.v1.buyer.wishlist.store');
+        Route::delete('/buyer/wishlist/{product}', [WishlistController::class, 'destroy'])->name('api.v1.buyer.wishlist.destroy');
+
+        Route::get('/buyer/orders', [OrderController::class, 'index'])->name('api.v1.buyer.orders.index');
+        Route::post('/buyer/orders', [OrderController::class, 'store'])->name('api.v1.buyer.orders.store');
+        Route::get('/buyer/orders/{sellerOrder}/milestone', [OrderController::class, 'milestone'])->name('api.v1.buyer.orders.milestone');
+    });
+
+    // Courier
+    Route::post('/courier/register', [CourierRegistrationController::class, 'store'])->name('api.v1.courier.register');
+    Route::post('/courier/login', [CourierLoginController::class, 'store'])->name('api.v1.courier.login');
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/courier/me', [CourierLoginController::class, 'show'])->name('api.v1.courier.me');
+        Route::post('/courier/logout', [CourierLoginController::class, 'destroy'])->name('api.v1.courier.logout');
+
+        Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.v1.courier.jobs.index');
+        Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.v1.courier.jobs.milestone');
+    });
 });

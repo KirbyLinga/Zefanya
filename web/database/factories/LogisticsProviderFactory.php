@@ -57,4 +57,19 @@ class LogisticsProviderFactory extends Factory
             'approved_at' => null,
         ]);
     }
+
+    public function rejected(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => 'rejected',
+            'rejection_reason' => 'Invalid vehicle documents.',
+        ]);
+    }
+
+    public function suspended(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => 'suspended',
+        ]);
+    }
 }
