@@ -215,3 +215,29 @@
 4. **Phase D (End-to-End Acceptance)**: Automated & manual end-to-end verification across real database & HTTP API.
 5. **Phase E (Design Polish)**: Screen-by-screen editorial token fidelity.
 6. **Phase F (Features Polish)**: Photo reviews UI, voucher wallet, home category grid, motion polish.
+
+---
+
+## 9. Comparison: `web-api` vs `web-api-master`
+
+### Commit Inventory
+- **Commits unique to `web-api`**:
+  - ceb34b (2026-10-04 18:55:23 +0800, Sharmy): *Server (web/): the catalogue API: products, categories, vouchers*
+  - c6e640a (2026-10-04 18:55:04 +0800, Sharmy): *Server (web/): the auth API a phone can register and sign in against*
+  - c7a805a (2026-09-30 22:09:09 +0800, Sharmy): *Mobile: the OTP screen, so the email gate has an action in it*
+  - d004e3 (2026-09-30 21:22:41 +0800, Sharmy): *Mobile: registration collects a password, pending screen knows which gate*
+  - 62ea55e (2026-09-29 21:12:08 +0800, Sharmy): *Mobile: repository-backed data layer with a mock/live switch (Phase 1)*
+  - 6d783e0 (2026-09-29 21:11:46 +0800, Sharmy): *Add the mobile memory bank*
+  - b6c494 (2026-09-29 21:11:33 +0800, Sharmy): *Add a root .gitignore for local-only files*
+- **Commits unique to `web-api-master`**:
+  - 4e2cb05 (2026-10-04 19:06:31 +0800, Sharmy): *Server (web/): the catalogue API: products, categories, vouchers*
+  - 2cdc0dc (2026-10-04 19:06:31 +0800, Sharmy): *Server (web/): the auth API a phone can register and sign in against*
+  - 39a60fa (2026-09-25 22:25:44 +0800, KirbyLinga): *Merge pull request #1 from KirbyLinga/mobile-dev*
+
+### Shared & Differing Files
+- **Backend (web/)**: git diff web-api web-api-master -- web produces **0 diff**. The two branches carry an identical backend API surface and code implementation.
+- **Mobile (mobile/)**: web-api carried an earlier intermediate mobile checkpoint (from Sept 29-30) and memory-bank docs, whereas web-api-master retained the PR merge from mobile-dev. Both were superseded by wip/phases-1-4.
+
+### Active Development Assessment
+- Both branches share the same backend authors (Sharmy, KirbyLinga).
+- web-api-master has the newest commit timestamp (2026-10-04 19:06:31 vs 2026-10-04 18:55:23), where the server API commits were applied on top of the merged master tree. Neither branch was merged into the other; web-api-master was selected as the clean integration base per instructions.
