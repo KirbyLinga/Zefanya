@@ -1,4 +1,4 @@
-// lib/screens/shared/profile_screen.dart
+﻿// lib/screens/shared/profile_screen.dart
 //
 // Path check: lives at lib/screens/shared/profile_screen.dart
 //   -> theme      => '../../theme/app_theme.dart'
@@ -73,13 +73,13 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s24),
           children: [
             EaseInFrame(
               index: 0,
               child: _buildHeroCard(context, theme, ext, auth, isCourier),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: AppSpacing.s24),
             if (!isCourier) ...[
               const EaseInFrame(
                 index: 1,
@@ -94,14 +94,14 @@ class ProfileScreen extends StatelessWidget {
               color: AppColors.surfaceMuted.withValues(alpha: 0.7),
               height: 36,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.s8),
             EaseInFrame(
               index: 2,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('ACCOUNT DETAILS', style: AppType.eyebrow),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.s12),
                   _LedgerCard(
                     rows: [
                       _LedgerRow(
@@ -138,7 +138,7 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                   if (!isCourier) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.s12),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -152,7 +152,7 @@ class ProfileScreen extends StatelessWidget {
                         label: const Text('Manage Addresses'),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.s12),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -171,22 +171,22 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             if (isCourier) ...[
-              const SizedBox(height: 26),
+              const SizedBox(height: AppSpacing.s24),
               const EaseInFrame(index: 3, child: RiderProfileSection()),
             ],
-            const SizedBox(height: 26),
+            const SizedBox(height: AppSpacing.s24),
             EaseInFrame(
               index: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('APPEARANCE', style: AppType.eyebrow),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.s12),
                   const ThemeToggle(),
                 ],
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: AppSpacing.s24),
             EaseInFrame(
               index: 4,
               child: SizedBox(
@@ -217,7 +217,7 @@ class ProfileScreen extends StatelessWidget {
       // shape language as Home's cover story and feature tiles.
       borderRadius: editorialRadiusRaw(0, big: ext.heroRadius * 1.4, small: 8),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s16, AppSpacing.s16, AppSpacing.s16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -252,10 +252,10 @@ class ProfileScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildAvatar(context, auth),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.s16),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.only(top: AppSpacing.s4),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -265,7 +265,7 @@ class ProfileScreen extends StatelessWidget {
                                 color: AppColors.secondary,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.s8),
                             Text(
                               auth.name ?? 'Guest',
                               style: theme.textTheme.titleLarge?.copyWith(
@@ -273,7 +273,7 @@ class ProfileScreen extends StatelessWidget {
                                 height: 1.15,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s4),
                             Text(
                               auth.email ?? '',
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -293,9 +293,9 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.s16),
                 Divider(color: AppColors.textOnDark.withValues(alpha: 0.18), height: 1),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.s16),
                 _StatStrip(isCourier: isCourier, auth: auth),
               ],
             ),
@@ -341,7 +341,7 @@ class ProfileScreen extends StatelessWidget {
             right: -4,
             bottom: -4,
             child: Container(
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(AppSpacing.s4),
               decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
               child: Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
             ),
@@ -389,22 +389,22 @@ class ProfileScreen extends StatelessWidget {
           shape: editorialShape(0, ShapeTier.card),
           backgroundColor: AppColors.surface,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.s16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('LOG OUT?', style: AppType.eyebrow),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s8),
                 Text('Log out of Zefanya?', style: dialogTheme.textTheme.titleMedium),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.s8),
                 Text(
                   'You will need to sign back in to shop and track orders.',
                   style: dialogTheme.textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
                 Row(
                   children: [
                     Expanded(
@@ -413,7 +413,7 @@ class ProfileScreen extends StatelessWidget {
                         child: const Text('Stay'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.s12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -512,15 +512,15 @@ class _StatStrip extends StatelessWidget {
         Expanded(
           flex: 4,
           child: Padding(
-            padding: const EdgeInsets.only(left: 16),
+            padding: const EdgeInsets.only(left: AppSpacing.s16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _stat(secondLabel, secondValue, 20),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.s12),
                 _stat('MEMBER SINCE', _memberSinceLabel(auth.memberSince), 20),
                 if (followingCount != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.s12),
                   _stat('FOLLOWING', followingCount, 20),
                 ],
               ],
@@ -542,7 +542,7 @@ class _StatStrip extends StatelessWidget {
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.s4),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
@@ -586,14 +586,14 @@ class _RecentlyLookedAt extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('RECENTLY LOOKED AT', style: AppType.eyebrow),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.s12),
         SizedBox(
           height: 96,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
             itemCount: shown.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.s8),
             itemBuilder: (context, i) {
               final product = shown[i];
               return GestureDetector(
@@ -615,7 +615,7 @@ class _RecentlyLookedAt extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(height: 26),
+        const SizedBox(height: AppSpacing.s24),
       ],
     );
   }
@@ -681,12 +681,12 @@ class _LedgerCard extends StatelessWidget {
     final prompt = row.emptyPrompt ?? "Add ${row.label.toLowerCase()}";
 
     final content = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(row.icon, size: 20, color: AppColors.textSecondary),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -700,7 +700,7 @@ class _LedgerCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: AppSpacing.s4),
                 if (hasValue)
                   Text(
                     row.value!,

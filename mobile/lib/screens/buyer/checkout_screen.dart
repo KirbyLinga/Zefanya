@@ -314,12 +314,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, 120),
         children: [
           const EditorialHeader(
             eyebrow: 'ALMOST THERE',
             title: 'Checkout',
-            padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+            padding: EdgeInsets.fromLTRB(0, AppSpacing.s12, 0, AppSpacing.s16),
           ),
           StaggeredReveal(
             index: 0,
@@ -328,7 +328,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: _buildAddressSection(context, theme, ext),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.s20),
           StaggeredReveal(
             index: 1,
             child: KeyedSubtree(
@@ -341,7 +341,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.s20),
           StaggeredReveal(
             index: 2,
             child: KeyedSubtree(
@@ -349,9 +349,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: _buildNotesSection(theme, ext),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.s20),
           StaggeredReveal(index: 3, child: _buildPaymentSection(theme, ext)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.s16),
           StaggeredReveal(
             index: 4,
             child: KeyedSubtree(
@@ -376,7 +376,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         // Alternating asymmetric corners — same shape language as
@@ -407,34 +407,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: InkWell(
         onTap: () => setState(() => _summaryExpanded = !_summaryExpanded),
         borderRadius: radiusOf(ShapeTier.control),
-        child: Row(
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 18,
-              color: AppColors.primaryDark,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text('Order Summary', style: theme.textTheme.titleSmall),
-            ),
-            Text(
-              '$count item${count == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: AppSpacing.s48),
+          child: Row(
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 18,
+                color: AppColors.primaryDark,
               ),
-            ),
-            const SizedBox(width: 2),
-            AnimatedRotation(
-              turns: _summaryExpanded ? 0.5 : 0,
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                Icons.expand_more,
-                size: 20,
-                color: AppColors.textSecondary,
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Text('Order Summary', style: theme.textTheme.titleSmall),
               ),
-            ),
-          ],
+              Text(
+                '$count item${count == 1 ? '' : 's'}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s4),
+              AnimatedRotation(
+                turns: _summaryExpanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  Icons.expand_more,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -449,7 +452,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Row(
       children: [
         Icon(icon, size: 18, color: AppColors.primaryDark),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.s8),
         Expanded(child: Text(title, style: theme.textTheme.titleSmall)),
         if (onEdit != null)
           TextButton(onPressed: onEdit, child: const Text('Change')),
@@ -489,7 +492,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   )
                 : null,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s8),
           if (hasAddress) ...[
             Text(
               [
@@ -498,7 +501,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ].where((v) => v != null && v.isNotEmpty).join('  •  '),
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.s4),
             Text(
               summary,
               style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
@@ -514,12 +517,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     Container(
                       key: ValueKey('checkout-address-label'),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
+                        horizontal: AppSpacing.s8,
+                        vertical: AppSpacing.s4,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(AppSpacing.s20),
                         border: Border.all(color: AppColors.divider),
                       ),
                       child: Text(
@@ -542,7 +545,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             size: 14,
                             color: AppColors.primaryDark,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.s4),
                           Text(
                             'Pinned location',
                             style: theme.textTheme.labelSmall?.copyWith(
@@ -568,7 +571,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.s12),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(
                 context,
@@ -578,11 +581,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
           if (hasError) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s8),
             Row(
               children: [
                 Icon(Icons.error_outline, size: 16, color: AppColors.danger),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s4),
                 Expanded(
                   child: Text(
                     _addressError!,
@@ -625,11 +628,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           _summaryHeader(theme, quote.total, items.length),
           if (hasError) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s8),
             Row(
               children: [
                 Icon(Icons.error_outline, size: 16, color: AppColors.danger),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s4),
                 Expanded(
                   child: Text(
                     _itemsError!,
@@ -643,7 +646,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
           if (_summaryExpanded) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s8),
             if (items.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -737,7 +740,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Icons.edit_note_outlined,
             'Delivery Note (optional)',
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s8),
           TextField(
             controller: _notesController,
             maxLines: 2,
@@ -776,7 +779,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionHeader(theme, Icons.payments_outlined, 'Payment Method'),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           RadioGroup<PaymentMethod>(
             groupValue: _selectedMethod,
             onChanged: (v) => setState(() => _selectedMethod = v!),
@@ -789,7 +792,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   title: 'Cash on Delivery',
                   subtitle: 'Pay when your order arrives',
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s8),
                 _paymentTile(
                   theme,
                   method: PaymentMethod.eWallet,
@@ -817,7 +820,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return PressableScale(
       onTap: () => setState(() => _selectedMethod = method),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.s12),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(ext.utilityRadius),
@@ -829,7 +832,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Row(
           children: [
             Icon(icon, size: 20, color: AppColors.textPrimary),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.s12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -869,7 +872,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           width: 1.5,
         ),
       ),
-      padding: hasError ? const EdgeInsets.all(8) : EdgeInsets.zero,
+      padding: hasError ? const EdgeInsets.all(AppSpacing.s8) : EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -891,7 +894,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 14),
+                    padding: const EdgeInsets.only(top: AppSpacing.s12),
                     child: Text(
                       'I agree to the Terms of Service and Return Policy.',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -908,11 +911,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           if (hasError) ...[
             Padding(
-              padding: const EdgeInsets.only(left: 12, bottom: 6, top: 2),
+              padding: const EdgeInsets.only(left: AppSpacing.s12, bottom: AppSpacing.s4, top: AppSpacing.s4),
               child: Row(
                 children: [
                   Icon(Icons.error_outline, size: 14, color: AppColors.danger),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s4),
                   Expanded(
                     child: Text(
                       _termsError!,
@@ -937,7 +940,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     double total,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s12, AppSpacing.s20, AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         boxShadow: [

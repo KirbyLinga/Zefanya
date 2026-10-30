@@ -1,4 +1,4 @@
-// lib/screens/buyer/courier_tracker_screen.dart
+﻿// lib/screens/buyer/courier_tracker_screen.dart
 //
 // Read-only view of courier progress for a buyer's order. Pushed from
 // the "Track Courier" button on order cards (inTransit / outForDelivery)
@@ -171,7 +171,7 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -186,7 +186,7 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
                 order: widget.order,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.s20),
 
             // ---- Handover pass ----------------------------------
             // Only while the rider is on the way; the code is the proof the
@@ -197,7 +197,7 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
                 index: 1,
                 child: DeliveryPassCard(job: deliveryPass),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.s12),
             ],
 
             // ---- Failure notice ---------------------------------
@@ -213,7 +213,7 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
                 index: 2,
                 child: _ProgressTimeline(theme: theme, milestone: milestone),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.s20),
             ],
 
             // ---- Who has it, then what it is --------------------
@@ -232,7 +232,7 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
                   ratingCount: courier.ratingCount,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.s12),
               StaggeredReveal(
                 index: 4,
                 child: _DeliveryDetails(
@@ -293,7 +293,7 @@ class _StatusHero extends StatelessWidget {
     return ClipRRect(
       borderRadius: editorialRadius(0, ShapeTier.card),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.s20),
         decoration: BoxDecoration(
           color: _accentColor.withValues(alpha: 0.12),
           border: Border(left: BorderSide(color: _accentColor, width: 4)),
@@ -302,16 +302,16 @@ class _StatusHero extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('YOUR ORDER', style: AppType.eyebrow),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s4),
             Text(order.shopName, style: theme.textTheme.titleSmall),
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSpacing.s4),
             Text(
               order.itemSummary,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.s16),
             Text(
               _headline,
               style: AppType.sectionDisplay.copyWith(
@@ -319,7 +319,7 @@ class _StatusHero extends StatelessWidget {
                 color: _accentColor,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.s4),
             Text(
               order.eta,
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -352,7 +352,7 @@ class _ProgressTimeline extends StatelessWidget {
         .clamp(0, _steps.length - 1);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: editorialRadius(1, ShapeTier.card),
@@ -361,7 +361,7 @@ class _ProgressTimeline extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('DELIVERY PROGRESS', style: AppType.eyebrow),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.s16),
           for (var i = 0; i < _steps.length; i++)
             _step(
               label: _steps[i].$2,
@@ -419,10 +419,10 @@ class _ProgressTimeline extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 18, top: 4),
+              padding: const EdgeInsets.only(bottom: AppSpacing.s16, top: AppSpacing.s4),
               child: Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -454,8 +454,8 @@ class _FailureNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: AppSpacing.s20),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.danger.withValues(alpha: 0.08),
         borderRadius: editorialRadius(0, ShapeTier.card),
@@ -467,7 +467,7 @@ class _FailureNotice extends StatelessWidget {
           Row(
             children: [
               Icon(Icons.error_outline, size: 18, color: AppColors.danger),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.s8),
               Text(
                 returning ? 'Order Being Returned' : 'Delivery Attempt Failed',
                 style: theme.textTheme.titleSmall?.copyWith(
@@ -476,7 +476,7 @@ class _FailureNotice extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           Text(
             returning
                 ? 'This package is being returned to the seller. '
@@ -518,7 +518,7 @@ class _DeliveryDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: editorialRadius(0, ShapeTier.card),
@@ -527,13 +527,13 @@ class _DeliveryDetails extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('DELIVERY DETAILS', style: AppType.eyebrow),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.s12),
           _CopyLine(theme: theme, label: 'Order ID', value: order.id),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s4),
           _CopyLine(theme: theme, label: 'Request ID', value: job.id),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s4),
           _line(theme, 'Package', job.packageSize),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s4),
           _line(theme, 'Deliver to', job.deliveryArea),
         ],
       ),
@@ -613,7 +613,7 @@ class _CopyLine extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s4),
                   Icon(
                     Icons.copy_outlined,
                     size: 13,
@@ -691,7 +691,7 @@ class _CourierCard extends StatelessWidget {
     final photo = job.courierPhotoPath;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: editorialRadius(1, ShapeTier.card),
@@ -699,7 +699,7 @@ class _CourierCard extends StatelessWidget {
       child: Row(
         children: [
           _CourierAvatar(photoPath: photo, name: name),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -708,7 +708,7 @@ class _CourierCard extends StatelessWidget {
                   assigned ? 'YOUR COURIER' : 'NO COURIER YET',
                   style: AppType.eyebrow,
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: AppSpacing.s4),
                 Text(
                   name ?? 'Waiting for a rider to be assigned',
                   style: theme.textTheme.titleSmall,
@@ -716,7 +716,7 @@ class _CourierCard extends StatelessWidget {
                 // Only once there is something to say. A rider with no
                 // ratings gets no rating line rather than an empty one.
                 if (assigned && averageRating != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.s4),
                   Row(
                     children: [
                       Icon(
@@ -724,7 +724,7 @@ class _CourierCard extends StatelessWidget {
                         size: 14,
                         color: AppColors.ratingStar,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSpacing.s4),
                       Text(
                         '${averageRating!.toStringAsFixed(1)} · $ratingCount '
                         '${ratingCount == 1 ? 'delivery rated' : 'deliveries rated'}',

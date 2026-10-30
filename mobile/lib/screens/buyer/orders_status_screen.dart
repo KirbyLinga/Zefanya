@@ -1,4 +1,4 @@
-// lib/screens/buyer/orders_status_screen.dart
+﻿// lib/screens/buyer/orders_status_screen.dart
 //
 // Order Status Tracking screen: To Ship / In Transit / Out for Delivery /
 // Rate & Feedback tabs, each showing order cards. Orders come from
@@ -134,7 +134,7 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
                   EaseInFrame(
                     index: 0,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.s24, AppSpacing.s20, AppSpacing.s24, AppSpacing.s8),
                       child: _OrderStageStepper(controller: controller),
                     ),
                   ),
@@ -237,7 +237,7 @@ class _OrderStageStepper extends StatelessWidget {
                   if (i > 0)
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(bottom: 30),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s32),
                         child: Container(
                           height: 2,
                           color: i <= current
@@ -330,7 +330,7 @@ class _StageNode extends StatelessWidget {
                       ),
                     ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s4),
             SizedBox(
               width: width,
               child: Text(
@@ -408,7 +408,7 @@ class _OrderList extends StatelessWidget {
       color: AppColors.primaryDark,
       onRefresh: () => context.read<OrderState>().refresh(),
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, 120),
         itemCount: filtered.length,
         itemBuilder: (context, i) => EaseInFrame(
           index: i.clamp(0, 5),
@@ -476,7 +476,7 @@ class _OrderCard extends StatelessWidget {
       ),
       borderRadius: radius,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: AppSpacing.s16),
         decoration: BoxDecoration(
           color: AppColors.surfaceMuted,
           borderRadius: radius,
@@ -486,14 +486,14 @@ class _OrderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s12, AppSpacing.s16, AppSpacing.s12),
             child: Row(
               children: [
                 Expanded(
                   child: Row(
                     children: [
                       Icon(Icons.storefront_outlined, size: 16, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s4),
                       Expanded(
                         child: Text(
                           order.shopName,
@@ -514,7 +514,7 @@ class _OrderCard extends StatelessWidget {
           // is" is torn, not a flat Divider rule.
           const _PerforationLine(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s12, AppSpacing.s16, AppSpacing.s16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -523,13 +523,13 @@ class _OrderCard extends StatelessWidget {
                 // for, and it stops the stub half of the card from
                 // opening with three lines of identical bodySmall.
                 Text(order.id, style: AppType.eyebrow),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.s4),
                 Text(order.itemSummary, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.s4),
                 Row(
                   children: [
                     Icon(Icons.schedule, size: 14, color: AppColors.accent),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.s4),
                     Flexible(
                       child: Text(
                         order.cancelled
@@ -547,7 +547,7 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.s12),
                 _actionRow(context, theme, returnRequest),
               ],
             ),
@@ -565,7 +565,7 @@ class _OrderCard extends StatelessWidget {
     // _statusTextColor helper.
     final textColor = Color.lerp(color, Colors.black, 0.40)!;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: radiusOf(ShapeTier.pill),
@@ -641,14 +641,14 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.s4),
                       child: Text(
                         'Cancel ${order.id}?',
                         style: theme.textTheme.titleMedium,
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
                       child: Text(
                         'The seller is notified and the item returns to stock. '
                         'This cannot be undone.',
@@ -663,7 +663,7 @@ class _OrderCard extends StatelessWidget {
                         title: Text(option),
                       ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s8, AppSpacing.s20, AppSpacing.s16),
                       child: ElevatedButton(
                         onPressed: selected == null
                             ? null
@@ -733,7 +733,7 @@ class _OrderCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s8),
           OutlinedButton.icon(
             onPressed: () => _contactSeller(context),
             icon: const Icon(Icons.chat_bubble_outline, size: 16),
@@ -761,7 +761,7 @@ class _OrderCard extends StatelessWidget {
                 label: const Text('Contact Seller'),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _cancelOrder(context),
@@ -786,7 +786,7 @@ class _OrderCard extends StatelessWidget {
                 label: const Text('Contact Seller'),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).push(
@@ -812,11 +812,11 @@ class _OrderCard extends StatelessWidget {
                 icon: const Icon(Icons.inventory_2_outlined, size: 16),
                 label: const Text('Order Received'),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.s8),
               Row(
                 children: [
                   Expanded(child: ReviewButton(order: order, expanded: false)),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s8),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _buyAgain(context),
@@ -839,7 +839,7 @@ class _OrderCard extends StatelessWidget {
         return Row(
           children: [
             Expanded(child: ReviewButton(order: order, expanded: false)),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => _buyAgain(context),
