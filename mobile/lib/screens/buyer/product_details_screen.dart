@@ -494,13 +494,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             _buildAppBar(context),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.only(bottom: AppSpacing.s24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildGallery(ext),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -510,37 +510,37 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildTitleAndPrice(theme),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: AppSpacing.s8),
                                 _buildRatingRow(theme),
-const SizedBox(height: 20),
+const SizedBox(height: AppSpacing.s20),
 _buildShippingAndVoucher(theme),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: AppSpacing.s20),
                           EaseInFrame(
                             index: 1,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildSellerRow(theme, ext),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: AppSpacing.s24),
                                 if (_product.optionGroups.isNotEmpty) ...[
                                   _buildVariantPicker(theme, ext),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: AppSpacing.s24),
                                 ],
                                 _buildQuantityStepper(theme, ext),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.s24),
                           EaseInFrame(
                             index: 2,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildDescription(theme),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: AppSpacing.s24),
                                 _buildReviewsSection(theme),
                               ],
                             ),
@@ -564,7 +564,7 @@ _buildShippingAndVoucher(theme),
 
   Widget _buildAppBar(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.s12, AppSpacing.s8, AppSpacing.s12, 0),
       child: Row(
         children: [
           _circleIconButton(
@@ -574,13 +574,13 @@ _buildShippingAndVoucher(theme),
           ),
           const Spacer(),
           HeartButton(product: _product),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.s8),
           _circleIconButton(
             Icons.share_outlined,
             _shareProduct,
             tooltip: 'Share product',
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.s8),
           // Gives the flight somewhere to land on this route. Home's
           // anchor is still mounted underneath, but an item arcing off
           // to an icon the user can't currently see would read as a
@@ -611,8 +611,9 @@ _buildShippingAndVoucher(theme),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
+        child: SizedBox(
+          width: 48,
+          height: 48,
           child: Icon(icon, size: 20, color: AppColors.textPrimary),
         ),
       ),
@@ -661,7 +662,7 @@ _buildShippingAndVoucher(theme),
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s12, AppSpacing.s20, 0),
       child: ClipRRect(
         // Asymmetric corners rather than a uniform cardRadius — same
         // shape language as the grid tiles this screen is entered from.
@@ -725,7 +726,7 @@ _buildShippingAndVoucher(theme),
         // no way to assert "one dot per photo" from outside the widget, since
         // the dots are private and AnimatedContainer is used elsewhere.
         key: const ValueKey('gallery-dots'),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s4),
         decoration: BoxDecoration(
           // 85% opaque, so the scrim stays a predictable near-surface
           // colour over a photo of any brightness — which is the premise
@@ -741,7 +742,7 @@ _buildShippingAndVoucher(theme),
               duration: reduceMotion(context)
                   ? Duration.zero
                   : const Duration(milliseconds: 250),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
               width: active ? 18 : 6,
               height: 6,
               decoration: BoxDecoration(
@@ -760,7 +761,7 @@ _buildShippingAndVoucher(theme),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(_product.name, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.s12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -779,9 +780,9 @@ _buildShippingAndVoucher(theme),
               ),
             ),
             if (_product.compareAtPrice != null) ...[
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.s12),
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
                 child: Text(
                   formatPeso(_product.compareAtPrice!),
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -811,7 +812,7 @@ _buildShippingAndVoucher(theme),
               size: 14,
               color: isFree ? AppColors.tertiary : AppColors.textSecondary,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: AppSpacing.s4),
             Text(
               isFree
                   ? 'Free shipping on orders over \u20b11,000'
@@ -823,21 +824,21 @@ _buildShippingAndVoucher(theme),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.s12),
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s4),
               decoration: BoxDecoration(
                 color: AppColors.primaryDark.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppSpacing.s20),
                 border: Border.all(color: AppColors.primaryDark.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.local_offer, size: 14, color: AppColors.primaryDark),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.s4),
                   Text(
                     'Apply voucher',
                     style: theme.textTheme.labelSmall?.copyWith(
@@ -848,13 +849,13 @@ _buildShippingAndVoucher(theme),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.s8),
             OutlinedButton(
               onPressed: () => Navigator.of(context).push(
                 AppPageRoute(builder: (_) => VouchersScreen()),
               ),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s4),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: BorderSide(color: AppColors.divider),
@@ -884,8 +885,8 @@ _buildShippingAndVoucher(theme),
     // Wrap (grouped so a bullet never dangles alone): on narrow screens or
     // large text the "sold" count drops to a second line instead of overflowing.
     return Wrap(
-      spacing: 12,
-      runSpacing: 4,
+      spacing: AppSpacing.s12,
+      runSpacing: AppSpacing.s4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (hasRating)
@@ -893,12 +894,12 @@ _buildShippingAndVoucher(theme),
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.star_rounded, size: 18, color: AppColors.ratingStar),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.s4),
               Text(
                 _product.rating.toStringAsFixed(1),
                 style: theme.textTheme.bodyMedium,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.s4),
               Text(
                 '(${_product.ratingCount} ratings)',
                 style: theme.textTheme.bodySmall,
@@ -913,7 +914,7 @@ _buildShippingAndVoucher(theme),
               // when it would be leading one.
               if (hasRating) ...[
                 Text('•', style: theme.textTheme.bodySmall),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.s12),
               ],
               Text(sold, style: theme.textTheme.bodySmall),
             ],
@@ -924,7 +925,7 @@ _buildShippingAndVoucher(theme),
 
   Widget _buildSellerRow(ThemeData theme, AppThemeExtension ext) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(ext.cardRadius),
@@ -940,7 +941,7 @@ _buildShippingAndVoucher(theme),
               size: 20,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -992,7 +993,7 @@ _buildShippingAndVoucher(theme),
             icon: const Icon(Icons.chat_bubble_outline, size: 16),
             label: const Text('Chat'),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s8),
             ),
           ),
         ],
@@ -1038,7 +1039,7 @@ _buildShippingAndVoucher(theme),
       children: [
         for (var i = 0; i < _groups.length; i++) ...[
           _buildVariationGroup(theme, _groups[i]),
-          if (i < _groups.length - 1) const SizedBox(height: 18),
+          if (i < _groups.length - 1) const SizedBox(height: AppSpacing.s16),
         ],
       ],
     );
@@ -1050,7 +1051,7 @@ _buildShippingAndVoucher(theme),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(isColor ? 'Color' : group.name, style: theme.textTheme.titleSmall),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.s8),
         Wrap(
           spacing: isColor ? 14 : 10,
           runSpacing: 10,
@@ -1081,44 +1082,45 @@ _buildShippingAndVoucher(theme),
         onTap: available ? () => _selectOption(groupName, name) : null,
         child: Tooltip(
           message: available ? name : '$name — out of stock',
-          child: Opacity(
-            opacity: available ? 1 : 0.35,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              width: selected ? 34 : 28,
-              height: selected ? 34 : 28,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? AppColors.primaryDark : AppColors.divider,
-                  width: selected ? 2.5 : 1,
-                ),
-                // Always present — null vs list can't lerp, so
-                // the shadow would snap instead of easing in.
-                // alpha: 0 when unselected gives a smooth fade.
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: selected ? 0.15 : 0.0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Center(
+              child: Opacity(
+                opacity: available ? 1 : 0.35,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  width: selected ? 34 : 28,
+                  height: selected ? 34 : 28,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? AppColors.primaryDark : AppColors.divider,
+                      width: selected ? 2.5 : 1,
                     ),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: selected ? 0.15 : 0.0,
+                        ),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
+                  child: selected
+                      ? Icon(
+                          Icons.check,
+                          size: 16,
+                          color: ThemeData.estimateBrightnessForColor(color) ==
+                                  Brightness.dark
+                              ? Colors.white
+                              : Colors.black87,
+                        )
+                      : null,
+                ),
               ),
-              child: selected
-                  ? Icon(
-                      Icons.check,
-                      size: 16,
-                      color:
-                          ThemeData.estimateBrightnessForColor(color) ==
-                              Brightness.dark
-                          ? Colors.white
-                          : Colors.black87,
-                    )
-                  : null,
             ),
           ),
         ),
@@ -1188,7 +1190,7 @@ _buildShippingAndVoucher(theme),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.s12),
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: AppColors.divider),
@@ -1224,7 +1226,7 @@ _buildShippingAndVoucher(theme),
           ],
         ),
         if (limit != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           Row(
             children: [
               Icon(
@@ -1234,7 +1236,7 @@ _buildShippingAndVoucher(theme),
                     ? AppColors.danger
                     : AppColors.textSecondary,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.s4),
               Expanded(
                 child: Text(
                   remaining == 0
@@ -1259,11 +1261,11 @@ _buildShippingAndVoucher(theme),
   }
 
   Widget _stepperButton(IconData icon, VoidCallback? onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: radiusOf(ShapeTier.pill),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radiusOf(ShapeTier.pill),
         child: Icon(
           icon,
           size: 16,
@@ -1280,7 +1282,7 @@ _buildShippingAndVoucher(theme),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Description', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.s8),
         Text(
           _product.description.isEmpty
               ? 'No description provided yet.'
@@ -1318,7 +1320,7 @@ _buildShippingAndVoucher(theme),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('WHAT BUYERS SAY', style: AppType.eyebrow),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.s8),
         // The aggregate claims "how everyone rated this". With no ratings it
         // would read "0 / REVIEWS / ★ 0.0 average" — three claims resting on an
         // empty set — so it is not drawn at all, and the "No reviews yet" line
@@ -1326,7 +1328,7 @@ _buildShippingAndVoucher(theme),
         if (_product.ratingCount > 0)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
               color: AppColors.surfaceMuted,
               borderRadius: editorialRadius(0, ShapeTier.accent),
@@ -1339,7 +1341,7 @@ _buildShippingAndVoucher(theme),
                   '${_product.ratingCount}',
                   style: AppType.priceNumeral(34),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.s12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1347,7 +1349,7 @@ _buildShippingAndVoucher(theme),
                       _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
                       style: AppType.eyebrow,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.s4),
                     Row(
                       children: [
                         Icon(
@@ -1355,7 +1357,7 @@ _buildShippingAndVoucher(theme),
                           size: 16,
                           color: AppColors.ratingStar,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.s4),
                         Text(
                           '${_product.rating.toStringAsFixed(1)} average',
                           style: theme.textTheme.bodySmall,
@@ -1367,11 +1369,11 @@ _buildShippingAndVoucher(theme),
               ],
             ),
           ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.s16),
         for (final review in myReviews) _ownReviewTile(theme, review),
         if (myReviews.isEmpty && _product.ratingCount == 0)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
             child: Text(
               'No reviews yet — be the first to leave one.',
               style: theme.textTheme.bodySmall,
@@ -1381,7 +1383,7 @@ _buildShippingAndVoucher(theme),
         // product you never received, and the button would have no order to
         // attach the review to.
         if (purchased && myReviews.isEmpty) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.s4),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -1419,8 +1421,8 @@ _buildShippingAndVoucher(theme),
   Widget _ownReviewTile(ThemeData theme, ProductReview review) {
     final written = review.createdAt;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: AppSpacing.s8),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: editorialRadius(0, ShapeTier.accent),
@@ -1465,17 +1467,17 @@ _buildShippingAndVoucher(theme),
             ],
           ),
           if (review.comment.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.s8),
             Text(
               review.comment,
               style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
             ),
           ],
           if (review.photos.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s8),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
               children: [
                 for (final photo in review.photos)
                   ClipRRect(
@@ -1500,7 +1502,7 @@ _buildShippingAndVoucher(theme),
               ],
             ),
           ],
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s4),
           Row(
             children: [
               Text(
@@ -1552,7 +1554,7 @@ _buildShippingAndVoucher(theme),
     final actionsDisabled = isOutOfStock || onVacation;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         // index 1 — the mirrored lean, so this bar and the cart's summary
@@ -1575,11 +1577,11 @@ _buildShippingAndVoucher(theme),
           children: [
             if (onVacation || isOutOfStock)
               Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 6,
-                    horizontal: 12,
+                    vertical: AppSpacing.s4,
+                    horizontal: AppSpacing.s12,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.12),
@@ -1593,7 +1595,7 @@ _buildShippingAndVoucher(theme),
                         size: 16,
                         color: AppColors.danger,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s4),
                       Text(
                         onVacation ? 'Store on vacation' : 'Out of stock',
                         style: theme.textTheme.labelMedium?.copyWith(
@@ -1619,7 +1621,7 @@ _buildShippingAndVoucher(theme),
                   ),
                   tooltip: 'Chat with seller',
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.s8),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: actionsDisabled
@@ -1632,7 +1634,7 @@ _buildShippingAndVoucher(theme),
                     label: const Text('Add to Cart'),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.s8),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: actionsDisabled ? null : _buyNow,
