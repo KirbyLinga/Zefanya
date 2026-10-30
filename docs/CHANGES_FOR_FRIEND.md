@@ -59,3 +59,16 @@ This document tracks all new tables, columns, enum values, routes, and service c
 ### 2. New Tests & Documentation
 - `web/tests/Feature/EndToEndAcceptanceTest.php`: 15-step multi-role lifecycle feature test (56 assertions).
 - `docs/acceptance.md`: Verification checklist and physical device testing guide.
+
+## Phase F: Features (Vertical Slices)
+
+### 1. New API Endpoints (Slice 5)
+- **Seller**: `GET /v1/seller/orders`, `PATCH /v1/seller/orders/{sellerOrder}/confirm`, `PATCH /v1/seller/orders/{sellerOrder}/ready`
+- **Admin**: `GET /v1/admin/logistics/pending`, `POST /v1/admin/logistics/{logisticsProvider}/approve`, `POST /v1/admin/logistics/{logisticsProvider}/reject`
+
+### 2. New Controller Classes
+- `App\\Http\\Controllers\\Api\\Seller\\SellerOrderController` (index, confirm, ready)
+- `App\\Http\\Controllers\\Api\\Admin\\AdminLogisticsController` (pending, approve, reject)
+
+### 3. No New Database Tables, Columns, or Enum Values
+- Purely additive route/controller surface reusing existing `SellerOrder`, `LogisticsProvider`, `OrderStatus`, and `LogisticsProviderStatus` models/enums.

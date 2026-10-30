@@ -63,6 +63,9 @@ Product productFromJson(Map<String, Object?> json) => Product(
       // and a mock number on a live product would be a claim nobody made.
       rating: _number(json['rating_avg']),
       ratingCount: _int(json['rating_count']),
+      // The server's per-star histogram, keyed '1'..'5'. Empty means "not
+      // sent", and the bars hide rather than deriving counts from the average.
+      ratingDistribution: _ratingDistribution(json['rating_distribution']),
       soldCount: 0,
       stock: json['stock'] == null ? 24 : _int(json['stock']),
     );
@@ -188,4 +191,18 @@ int _int(Object? value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// The server's per-star histogram, keyed `'1'`..`'5'` by star. Returns an
+/// empty map when absent or unparseable, so a product without distribution
+/// data simply shows no bars.
+Map<int, int> _ratingDistribution(Object? value) {
+  if (value is! Map) return const {};
+  final result = <int, int>{};
+  for (final entry in value.entries) {
+    final star = int.tryParse(entry.key.toString());
+    final count = entry.value is int ? entry.value : int.tryParse(entry.value.toString()) ?? 0;
+    if (star != null && star >= 1 && star <= 5) result[star] = count;
+  }
+  return Map.unmodifiable(result);
 }

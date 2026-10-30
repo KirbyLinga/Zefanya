@@ -46,6 +46,8 @@ use App\Http\Controllers\Api\Courier\CourierRegistrationController;
 use App\Http\Controllers\Api\Order\OrderController;
 use App\Http\Controllers\Api\Psgc\PsgcController;
 use App\Http\Controllers\Api\Review\ReviewController;
+use App\Http\Controllers\Api\Seller\SellerOrderController;
+use App\Http\Controllers\Api\Admin\AdminLogisticsController;
 use Illuminate\Support\Facades\Route;
 
 // ── Registration (public: there is no session to require yet) ───────────────
@@ -233,5 +235,19 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.v1.courier.jobs.index');
         Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.v1.courier.jobs.milestone');
+    });
+
+    // Seller
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/seller/orders', [SellerOrderController::class, 'index'])->name('api.v1.seller.orders.index');
+        Route::patch('/seller/orders/{sellerOrder}/confirm', [SellerOrderController::class, 'confirm'])->name('api.v1.seller.orders.confirm');
+        Route::patch('/seller/orders/{sellerOrder}/ready', [SellerOrderController::class, 'ready'])->name('api.v1.seller.orders.ready');
+    });
+
+    // Admin
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/admin/logistics/pending', [AdminLogisticsController::class, 'pending'])->name('api.v1.admin.logistics.pending');
+        Route::post('/admin/logistics/{logisticsProvider}/approve', [AdminLogisticsController::class, 'approve'])->name('api.v1.admin.logistics.approve');
+        Route::post('/admin/logistics/{logisticsProvider}/reject', [AdminLogisticsController::class, 'reject'])->name('api.v1.admin.logistics.reject');
     });
 });

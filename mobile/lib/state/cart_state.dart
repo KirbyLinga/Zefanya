@@ -215,6 +215,11 @@ class CartState extends ChangeNotifier {
 
   List<String> get appliedVoucherCodes => List.unmodifiable(_appliedCodes);
 
+  /// Voucher codes the buyer has claimed from the wallet but not necessarily
+  /// applied to the cart yet.
+  List<String> get claimedVoucherCodes =>
+      List.unmodifiable(_claimedCodes.toList()..sort());
+
   bool isClaimed(String code) => _claimedCodes.contains(code);
 
   int buyerUsesFor(String code) => _buyerUses[code] ?? 0;

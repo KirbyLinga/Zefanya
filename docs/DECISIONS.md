@@ -47,3 +47,24 @@ This file records deviations from the repository's baseline instructions or deci
 2. **Multi-Role Acceptance Coverage**:
    - Automated end-to-end integration test `web/tests/Feature/EndToEndAcceptanceTest.php` covers the 15-step story across Buyer, Seller, Rider, and Admin.
    - Comprehensive checklist documented in `docs/acceptance.md` including physical device verification guidelines (Camera, Barcode/QR scanner, GPS, Google OAuth).
+
+## Phase F: Features (Vertical Slices)
+
+1. **Seller & Admin API Routes (Slice 5)**:
+   - Added `web/app/Http/Controllers/Api/Seller/SellerOrderController.php` with `index`, `confirm`, `ready` methods.
+   - Added `web/app/Http/Controllers/Api/Admin/AdminLogisticsController.php` with `pending`, `approve`, `reject` methods.
+   - Added v1 routes: `GET /v1/seller/orders`, `PATCH /v1/seller/orders/{sellerOrder}/confirm`, `PATCH /v1/seller/orders/{sellerOrder}/ready`, `GET /v1/admin/logistics/pending`, `POST /v1/admin/logistics/{logisticsProvider}/approve`, `POST /v1/admin/logistics/{logisticsProvider}/reject`.
+   - No new tables, columns, or enum values — purely additive route/controller surface reusing existing `SellerOrder`, `LogisticsProvider`, and `OrderStatus` models.
+
+2. **Photo Reviews UI (Slice 1)**:
+   - Added `ratingDistribution` field to `Product` model (mock data) and `_ratingDistribution()` mapper in `remote_catalog.dart` reading `rating_distribution` from server.
+   - Added `_RatingDistributionBars` widget and `_ReviewPhotoViewer` (tap-to-expand) to product details screen.
+
+3. **Voucher Wallet (Slice 2)**:
+   - Rewrote `vouchers_screen.dart` with Available/Claimed/Used tabs, claim-with-ineligible-reasons, inline blocker messages.
+   - Added `claimedVoucherCodes` getter to `CartState`.
+
+4. **Search Filters (Slice 4)**:
+   - Added `shipsFrom`, `supportsCod` fields to `Product` model (mock data).
+   - Extended `SearchFilter` with `shipsFrom`, `freeShipping`, `supportsCod` fields; updated `filterProducts()`.
+   - Added ships-from/free-shipping/COD filter chips to `search_screen.dart`.

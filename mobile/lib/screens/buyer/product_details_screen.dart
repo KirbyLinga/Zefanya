@@ -1369,6 +1369,14 @@ _buildShippingAndVoucher(theme),
               ],
             ),
           ),
+          if (_product.ratingDistribution.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.s12),
+              child: _RatingDistributionBars(
+                distribution: _product.ratingDistribution,
+                total: _product.ratingCount,
+              ),
+            ),
         const SizedBox(height: AppSpacing.s16),
         for (final review in myReviews) _ownReviewTile(theme, review),
         if (myReviews.isEmpty && _product.ratingCount == 0)
@@ -1480,7 +1488,16 @@ _buildShippingAndVoucher(theme),
               runSpacing: AppSpacing.s8,
               children: [
                 for (final photo in review.photos)
-                  ClipRRect(
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      AppPageRoute(
+                        builder: (_) => _ReviewPhotoViewer(
+                          path: photo,
+                          heroTag: 'review-${_product.id}-$photo',
+                        ),
+                      ),
+                    ),
+                    child: ClipRRect(
                     borderRadius: editorialRadius(0, ShapeTier.accent),
                     child: Image.file(
                       File(photo),
@@ -1498,6 +1515,7 @@ _buildShippingAndVoucher(theme),
                         ),
                       ),
                     ),
+                  ),
                   ),
               ],
             ),
@@ -1650,6 +1668,109 @@ _buildShippingAndVoucher(theme),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A horizontal bar per star (5 at top, 1 at bottom) whose length is the
+/// share of that star within [total]. Tappable bars do nothing — they are a
+/// read-only honest histogram until the server owns the distribution.
+class _RatingDistributionBars extends StatelessWidget {
+  const _RatingDistributionBars({
+    required this.distribution,
+    required this.total,
+  });
+
+  final Map<int, int> distribution;
+  final int total;
+
+  double get _peak => distribution.values.isEmpty ? 0 : distribution.values.reduce(math.max).toDouble();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final star in [5, 4, 3, 2, 1]) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24,
+                  child: Text('$star', style: theme.textTheme.labelSmall),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.s4),
+                    child: LinearProgressIndicator(
+                      value: _peak == 0 ? 0 : (distribution[star] ?? 0) / _peak,
+                      minHeight: AppSpacing.s8,
+                      backgroundColor: AppColors.divider,
+                      valueColor: AlwaysStoppedAnimation(
+                        star == 5 ? AppColors.ratingStar : AppColors.tertiary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Text(
+                  '${distribution[star] ?? 0}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.s4),
+          child: Text(
+            '$total ${total == 1 ? 'RATING' : 'RATINGS'}',
+            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Full-screen photo viewer for a review photo, opened by tapping a review's
+/// photo thumbnail. No hero here — a review photo is opened from the product
+/// page, not a grid, so a plain fade-through keeps the transition honest.
+class _ReviewPhotoViewer extends StatelessWidget {
+  const _ReviewPhotoViewer({required this.path, required this.heroTag});
+
+  final String path;
+  final String heroTag;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          panEnabled: true,
+          scaleEnabled: true,
+          minScale: 0.5,
+          maxScale: 3,
+          child: Image.file(File(path)),
         ),
       ),
     );

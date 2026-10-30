@@ -31,15 +31,29 @@ import '../../data/mock_data.dart' show Voucher;
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
-import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
 
 /// Width of the dark stub, and therefore where the perforation falls.
 const double _stubWidth = 96;
 
-class VouchersScreen extends StatelessWidget {
+class VouchersScreen extends StatefulWidget {
   const VouchersScreen({super.key});
+
+  @override
+  State<VouchersScreen> createState() => _VouchersScreenState();
+}
+
+class _VouchersScreenState extends State<VouchersScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+      TabController(length: 3, vsync: this);
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,40 +61,111 @@ class VouchersScreen extends StatelessWidget {
     // The catalogue is the repository's answer, reached through the cart state
     // that loaded it — not a local constant, so a live build cannot show a
     // wallet of vouchers the server never offered.
-    final vouchers = context.watch<CartState>().vouchers;
+    final cart = context.watch<CartState>();
+    final claimedCodes = cart.claimedVoucherCodes.toSet();
+    final available =
+        cart.vouchers.where((v) => !claimedCodes.contains(v.code)).toList(growable: false);
+    final claimed = cart.vouchers
+        .where((v) => claimedCodes.contains(v.code))
+        .toList(growable: false);
 
     return Scaffold(
       backgroundColor:
           Colors.transparent, // the app-wide gradient in main.dart paints this
       // Title out of the AppBar and into the app's own eyebrow +
       // Playfair voice, like every other non-Home screen.
-      appBar: AppBar(),
-      body: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-        itemCount: vouchers.length + 1,
-        itemBuilder: (context, i) {
-          if (i == 0) {
-            return const EditorialHeader(
-              eyebrow: 'YOUR WALLET',
-              title: 'Vouchers',
-              padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
-            );
-          }
-          final index = i - 1;
-          return StaggeredReveal(
-            index: index,
-            child: _VoucherTile(voucher: vouchers[index], index: index),
-          );
-        },
+      appBar: AppBar(
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.textPrimary,
+          unselectedLabelColor: AppColors.textSecondary,
+          indicatorColor: AppColors.primaryDark,
+          tabs: const [
+            Tab(key: ValueKey('voucher-tab-available'), text: 'AVAILABLE'),
+            Tab(key: ValueKey('voucher-tab-claimed'), text: 'CLAIMED'),
+            Tab(key: ValueKey('voucher-tab-used'), text: 'USED'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _VoucherList(vouchers: available, claimable: true),
+          _VoucherList(vouchers: claimed, claimable: false),
+          const _VoucherList(vouchers: [], claimable: false, used: true),
+        ],
+      ),
+    );
+  }
+}
+
+/// A single wallet tab's list. [claimable] shows a Claim button and surfaces
+/// the ineligible reason when a claim is blocked; otherwise a Remove button.
+class _VoucherList extends StatelessWidget {
+  const _VoucherList({
+    required this.vouchers,
+    required this.claimable,
+    this.used = false,
+  });
+
+  final List<Voucher> vouchers;
+  final bool claimable;
+  final bool used;
+
+  @override
+  Widget build(BuildContext context) {
+    if (vouchers.isEmpty) {
+      final message = used
+          ? 'No used vouchers yet.'
+          : claimable
+              ? 'Nothing to claim right now.'
+              : 'No claimed vouchers yet.';
+      final hint = used
+          ? 'Used vouchers appear here once an order settles against them.'
+          : claimable
+              ? 'New vouchers land here as the server offers them.'
+              : 'Claim one from Available and apply it at checkout.';
+      return _EmptyState(message: message, hint: hint);
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+      itemCount: vouchers.length,
+      itemBuilder: (context, i) =>
+          StaggeredReveal(index: i, child: _VoucherTile(voucher: vouchers[i], claimable: claimable, index: i)),
+    );
+  }
+}
+
+/// No vouchers to show on this tab.
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message, required this.hint});
+
+  final String message;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.local_offer_outlined, size: 48, color: AppColors.textSecondary),
+          const SizedBox(height: 16),
+          Text(message, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text(hint, style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+        ],
       ),
     );
   }
 }
 
 class _VoucherTile extends StatelessWidget {
-  const _VoucherTile({required this.voucher, required this.index});
+  const _VoucherTile({required this.voucher, required this.claimable, required this.index});
 
   final Voucher voucher;
+  final bool claimable;
   final int index;
 
   @override
@@ -164,7 +249,10 @@ class _VoucherTile extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(height: 12),
-                      Row(
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -186,49 +274,77 @@ class _VoucherTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const Spacer(),
-                          if (claimed && !unavailable) ...[
-                            OutlinedButton(
-                              key: ValueKey('use-${voucher.code}'),
-                              onPressed: () =>
-                                  Navigator.of(context).pop(voucher.code),
-                              style: OutlinedButton.styleFrom(
+                          if (claimable) ...[
+                            if (unavailable) ...[
+                              Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
+                                  horizontal: 10,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.danger.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(
+                                    ext.utilityRadius,
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.danger.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  _claimBlocker(voucher, cart)!,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.danger,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
-                              child: const Text('Use'),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          ElevatedButton(
-                            key: ValueKey('claim-${voucher.code}'),
-                            onPressed: claimed || unavailable
-                                ? null
-                                : () async {
-                                    final error = await context
-                                        .read<CartState>()
-                                        .claimVoucher(voucher.code);
-                                    if (!context.mounted) return;
-                                    showTimedSnackBar(
-                                      context,
-                                      SnackBar(
-                                        content: Text(
-                                          error ??
-                                              'Voucher "${voucher.code}" claimed.',
-                                        ),
+                            ] else ...[
+                              FilledButton.tonal(
+                                key: ValueKey('claim-${voucher.code}'),
+                                onPressed: () async {
+                                  final error = await context
+                                      .read<CartState>()
+                                      .claimVoucher(voucher.code);
+                                  if (!context.mounted) return;
+                                  showTimedSnackBar(
+                                    context,
+                                    SnackBar(
+                                      content: Text(
+                                        error ??
+                                            'Voucher "${voucher.code}" claimed.',
                                       ),
-                                    );
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 8,
+                                    ),
+                                  );
+                                },
+                                child: const Text('CLAIM'),
                               ),
+                            ],
+                          ] else ...[
+                            if (claimed && !unavailable) ...[
+                              OutlinedButton(
+                                key: ValueKey('use-${voucher.code}'),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(voucher.code),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: const Text('Use'),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            OutlinedButton(
+                              key: ValueKey('remove-${voucher.code}'),
+                              onPressed: () =>
+                                  cart.removeVoucher(voucher.code),
+                              child: const Text('Remove'),
                             ),
-                            child: Text(claimed ? 'Claimed' : 'Claim'),
-                          ),
+                          ],
                         ],
                       ),
                     ],
@@ -320,6 +436,27 @@ class _Stub extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The reason a voucher can't be claimed right now, or null when it can be.
+/// Mirrors CartState.claimVoucher's ineligible reasons so the wallet shows
+/// the same message the claim would return.
+String? _claimBlocker(Voucher voucher, CartState cart) {
+  final now = DateTime.now();
+  if (voucher.expiresAt != null && voucher.expiresAt!.isBefore(now)) {
+    return 'Voucher "${voucher.code}" has expired.';
+  }
+  if (voucher.startsAt != null && voucher.startsAt!.isAfter(now)) {
+    return 'Voucher "${voucher.code}" is not active yet.';
+  }
+  if (voucher.usageExhausted) {
+    return 'Voucher "${voucher.code}" has reached its usage limit.';
+  }
+  final uses = cart.buyerUsesFor(voucher.code);
+  if (voucher.perBuyerLimit != null && uses >= voucher.perBuyerLimit!) {
+    return 'Voucher "${voucher.code}" is limited to ${voucher.perBuyerLimit} per buyer.';
+  }
+  return null;
 }
 
 /// Countdown text for a voucher's real expiry date, or null when there

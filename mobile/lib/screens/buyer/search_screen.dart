@@ -234,18 +234,26 @@ class _SearchScreenState extends State<SearchScreen> {
   ProductSort _sort = ProductSort.featured;
 
   /// Extra client-side filters — all from data the catalogue already
-  /// carries (price, rating). See utils/search_filter.dart.
+  /// carries (price, rating, shipsFrom, shipping, COD).
+  /// See utils/search_filter.dart.
   double? _minPrice;
   double? _maxPrice;
   double _minRating = 0;
+  String? _shipsFrom;
+  bool _freeShipping = false;
+  bool _supportsCod = false;
 
   SearchFilter get _filter => SearchFilter(
         minPrice: _minPrice,
         maxPrice: _maxPrice,
         minRating: _minRating,
+        shipsFrom: _shipsFrom,
+        freeShipping: _freeShipping,
+        supportsCod: _supportsCod,
       );
 
   static const _priceBounds = [300.0, 500.0, 1000.0];
+
   List<String> _history = const [];
 
   static const _popularSearches = [
@@ -305,11 +313,29 @@ class _SearchScreenState extends State<SearchScreen> {
     _minPrice = null;
     _maxPrice = null;
     _minRating = 0;
+    _shipsFrom = null;
+    _freeShipping = false;
+    _supportsCod = false;
   });
+
+  /// Distinct ships-from origins present in the catalogue, sorted.
+  List<String> _computeShipsFromOptions(CatalogState catalog) {
+    final origins = <String>{};
+    for (final p in catalog.products) {
+      if (p.shipsFrom != null && p.shipsFrom!.isNotEmpty) {
+        origins.add(p.shipsFrom!);
+      }
+    }
+    return origins.toList()..sort();
+  }
 
   bool get _customPriceActive =>
       _minPrice != null ||
-      (_maxPrice != null && !_priceBounds.contains(_maxPrice));
+      (_maxPrice != null && !_priceBounds.contains(_maxPrice)) ||
+      _minRating > 0 ||
+      _shipsFrom != null ||
+      _freeShipping ||
+      _supportsCod;
 
   String get _customPriceLabel {
     if (_minPrice == null && _maxPrice == null) return 'Price range';
@@ -394,6 +420,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
+    final catalog = context.watch<CatalogState>();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -439,7 +466,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                       setState(() => _sort = sort),
                                 ),
                                 const SizedBox(height: 8),
-                                _buildFilterChips(),
+                                _buildFilterChips(_computeShipsFromOptions(catalog)),
                               ],
                             ),
                           ),
@@ -643,7 +670,7 @@ class _SearchScreenState extends State<SearchScreen> {
   /// from catalogue data (price, rating) — no endpoint, no new state
   /// class. "Any price" clears the bound; tapping the active bound
   /// again clears it too.
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(List<String> shipsFromOptions) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -652,7 +679,6 @@ class _SearchScreenState extends State<SearchScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
-              avatar: const Icon(Icons.tune, size: 16),
               label: Text(_customPriceLabel),
               selected: _customPriceActive,
               onSelected: (_) => _openPriceRange(),
@@ -676,6 +702,28 @@ class _SearchScreenState extends State<SearchScreen> {
             selected: _minRating >= 4.5,
             onSelected: (_) =>
                 setState(() => _minRating = _minRating >= 4.5 ? 0 : 4.5),
+          ),
+          if (shipsFromOptions.isNotEmpty)
+            for (final origin in shipsFromOptions)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text('Ships from $origin'),
+                  selected: _shipsFrom == origin,
+                  onSelected: (_) => setState(() {
+                    _shipsFrom = _shipsFrom == origin ? null : origin;
+                  }),
+                ),
+              ),
+          FilterChip(
+            label: const Text('Free shipping'),
+            selected: _freeShipping,
+            onSelected: (_) => setState(() => _freeShipping = !_freeShipping),
+          ),
+          FilterChip(
+            label: const Text('Cash on delivery'),
+            selected: _supportsCod,
+            onSelected: (_) => setState(() => _supportsCod = !_supportsCod),
           ),
         ],
       ),

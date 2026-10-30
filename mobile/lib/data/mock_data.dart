@@ -66,6 +66,7 @@ class Product {
     this.compareAtPrice,
     this.rating = 4.5,
     this.ratingCount = 0,
+    this.ratingDistribution = const {},
     this.soldCount = 0,
     this.variants = const [],
     this.variationTypes = const [],
@@ -76,6 +77,8 @@ class Product {
     this.shippingFee,
     this.purchaseLimit,
     this.sellerOnVacation = false,
+    this.shipsFrom,
+    this.supportsCod = true,
   });
 
   final String id;
@@ -96,6 +99,15 @@ class Product {
 
   final double rating;
   final int ratingCount;
+
+  /// How many buyers gave each star — keyed 1..5. Empty when the server has
+  /// not sent a distribution (then the bars hide and the average stands
+  /// alone). Mock data carries real counts so the distribution bars are
+  /// exercisable; the live mapper leaves it empty until
+  /// `rating_distribution` arrives on the wire — it is never derived from
+  /// [rating], because that would invent counts nobody measured.
+  final Map<int, int> ratingDistribution;
+
   final int soldCount;
 
   /// Legacy, one-dimensional option labels ("Small", "Blush", …).
@@ -208,6 +220,11 @@ class Product {
   /// threshold is a platform promotion, not a promise that every parcel ships
   /// free. This is a mock-side shape; a live quote remains the server's job.
   final double? shippingFee;
+  final String? shipsFrom;
+
+  /// Whether the product can be purchased with cash on delivery. Defaults
+  /// to true; set false for seller-prepaid-only items.
+  final bool supportsCod;
 
   /// How many units one buyer may purchase across all orders, or null when
   /// there is no product-level cap.
@@ -654,8 +671,11 @@ final List<Product> mockProducts = [
     sellerName: 'Willow & Bloom Atelier',
     rating: 4.8,
     ratingCount: 212,
+    ratingDistribution: {5: 150, 4: 40, 3: 12, 2: 6, 1: 4},
     soldCount: 1100,
     stock: 12,
+    shipsFrom: 'Metro Manila',
+    supportsCod: true,
     variants: ['Small', 'Medium', 'Large', 'X-Large'],
     description:
         'A breathable linen-cotton blend wrap dress with adjustable tie waist. '
@@ -670,6 +690,7 @@ final List<Product> mockProducts = [
     sellerName: 'Rattan & Reed Co.',
     rating: 4.7,
     ratingCount: 86,
+    ratingDistribution: {5: 55, 4: 20, 3: 6, 2: 3, 1: 2},
     soldCount: 340,
     stock: 3,
     shippingFee: 65,
@@ -686,6 +707,7 @@ final List<Product> mockProducts = [
     sellerName: 'Sage & Clay Studio',
     rating: 4.9,
     ratingCount: 154,
+    ratingDistribution: {5: 130, 4: 20, 3: 2, 2: 1, 1: 1},
     soldCount: 610,
     stock: 0,
     variants: ['Set of 2', 'Set of 4'],
@@ -701,6 +723,7 @@ final List<Product> mockProducts = [
     sellerName: 'Willow & Bloom Atelier',
     rating: 4.6,
     ratingCount: 58,
+    ratingDistribution: {5: 35, 4: 15, 3: 4, 2: 2, 1: 2},
     soldCount: 220,
     stock: 24,
     variants: ['Blush', 'Sage', 'Neutral'],
@@ -718,6 +741,8 @@ final List<Product> mockProducts = [
     ratingCount: 41,
     soldCount: 175,
     stock: 0,
+    shipsFrom: 'Cebu',
+    supportsCod: false,
     description:
         'A hand-tied bundle of dried pampas, bunny tail grass, and native '
         'foliage. Arrives ready to display, no water needed.',
@@ -734,6 +759,8 @@ final List<Product> mockProducts = [
     soldCount: 290,
     stock: 4,
     shippingFee: 120,
+    shipsFrom: 'Metro Manila',
+    supportsCod: true,
     variants: ['16x16', '18x18', '20x20'],
     description:
         'Stonewashed linen cover with a hidden zip closure. Pairs well '
@@ -750,6 +777,8 @@ final List<Product> mockProducts = [
     soldCount: 98,
     stock: 18,
     purchaseLimit: 2,
+    shipsFrom: 'Cebu',
+    supportsCod: true,
     variants: ['One Size'],
     description:
         'Wide-brim straw hat woven from natural raffia, with a soft '
@@ -766,6 +795,8 @@ final List<Product> mockProducts = [
     soldCount: 260,
     stock: 4,
     sellerOnVacation: true,
+    shipsFrom: 'Davao',
+    supportsCod: false,
     variants: ['Set of 3'],
     description:
         'Three cold-processed bar soaps scented with rosemary, '
@@ -788,6 +819,8 @@ final List<Product> mockProducts = [
     ratingCount: 44,
     soldCount: 130,
     stock: 10,
+    shipsFrom: 'Metro Manila',
+    supportsCod: true,
     variationTypes: [
       VariationType(name: 'Color', values: ['Black', 'White']),
       VariationType(name: 'Size', values: ['S', 'M', 'L']),

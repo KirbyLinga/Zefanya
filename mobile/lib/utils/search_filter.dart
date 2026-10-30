@@ -13,15 +13,38 @@
 
 import '../data/mock_data.dart' show Product;
 
-/// Price/rating bounds. Null min/max = no bound; 0 rating = any.
+/// Price/rating/ships-from/free-shipping/COD bounds.
+/// Null min/max = no bound; 0 rating = any; null shipsFrom/cod = any.
 class SearchFilter {
-  const SearchFilter({this.minPrice, this.maxPrice, this.minRating = 0});
+  const SearchFilter({
+    this.minPrice,
+    this.maxPrice,
+    this.minRating = 0,
+    this.shipsFrom,
+    this.freeShipping = false,
+    this.supportsCod = false,
+  });
 
   final double? minPrice;
   final double? maxPrice;
   final double minRating;
 
-  bool get isActive => minPrice != null || maxPrice != null || minRating > 0;
+  /// Only products shipping from this origin.
+  final String? shipsFrom;
+
+  /// Only products with free shipping (shippingFee == null or 0).
+  final bool freeShipping;
+
+  /// Only products that accept cash on delivery.
+  final bool supportsCod;
+
+  bool get isActive =>
+      minPrice != null ||
+      maxPrice != null ||
+      minRating > 0 ||
+      shipsFrom != null ||
+      freeShipping ||
+      supportsCod;
 
   static const none = SearchFilter();
 }
@@ -33,7 +56,10 @@ List<Product> filterProducts(List<Product> products, SearchFilter filter) {
     for (final p in products)
       if ((filter.minPrice == null || p.price >= filter.minPrice!) &&
           (filter.maxPrice == null || p.price <= filter.maxPrice!) &&
-          p.rating >= filter.minRating)
+          p.rating >= filter.minRating &&
+          (filter.shipsFrom == null || p.shipsFrom == filter.shipsFrom) &&
+          (!filter.freeShipping || p.shippingFee == null || p.shippingFee == 0) &&
+          (!filter.supportsCod || p.supportsCod))
         p,
   ];
 }

@@ -174,18 +174,23 @@ void main() {
         ChangeNotifierProvider<CartState>.value(value: cart),
       ]);
 
+      // Default tab is AVAILABLE (index 0).
       final claim = find.byKey(const ValueKey('claim-MCH50'));
       expect(claim, findsOneWidget);
-      expect(tester.widget<ElevatedButton>(claim).onPressed, isNotNull);
+      expect(tester.widget<FilledButton>(claim).onPressed, isNotNull);
 
       await tester.tap(claim);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(cart.isClaimed('MCH50'), isTrue);
-      expect(tester.widget<ElevatedButton>(claim).onPressed, isNull);
+
+      // Switch to CLAIMED tab (index 1) to see claimed vouchers.
+      await tester.tap(find.text('CLAIMED'));
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const ValueKey('use-MCH50')), findsOneWidget);
-      expect(find.text('Claimed'), findsOneWidget);
+      expect(find.text('Remove'), findsOneWidget);
     });
   });
 
