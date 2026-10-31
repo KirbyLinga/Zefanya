@@ -7,6 +7,7 @@ use App\Http\Requests\Buyer\StoreBuyerRegistrationRequest;
 use App\Models\Buyer\Buyer;
 use App\Notifications\Buyer\BuyerVerifyOtp;
 use App\Support\EmailMask;
+use App\Support\EmailRegistry;
 use App\Support\SignedOtpLink;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class RegisterBuyerController extends Controller
 {
@@ -30,21 +32,21 @@ class RegisterBuyerController extends Controller
         $path = $request->file('upload_id')->store('ids', 'local');
 
         try {
-            $buyer = DB::transaction(function () use ($data, $path) {
+            $buyer = EmailRegistry::register($data['email'], 'buyer', function () use ($data, $path) {
                 // Resume: ARCHIVE any leftover unverified OR rejected row so a
                 // half-finished first attempt — or a rejection — never
                 // permanently reserves the email/mobile. The row (and its
                 // rejection trail) is kept; only the private ID file is removed.
                 // A still-fresh unverified row never reaches here — the form
                 // request refuses it so a stranger cannot wipe it.
-                $existingBuyer = Buyer::where('email', $data['email'])
+                $existingBuyer = Buyer::whereRaw('LOWER(email) = ?', [strtolower($data['email'])])
                     ->whereIn('status', ['unverified', 'rejected'])
                     ->first();
 
                 if ($existingBuyer) {
-                    if ($existingBuyer->upload_id_path && Storage::disk('local')->exists($existingBuyer->upload_id_path)) {
-                        Storage::disk('local')->delete($existingBuyer->upload_id_path);
-                    }
+                    $obsoletePaths = array_values(array_filter([$existingBuyer->upload_id_path]));
+                    // Preserve the old documents if archive-and-retry rolls back.
+                    DB::afterCommit(fn () => Storage::disk('local')->delete($obsoletePaths));
 
                     $existingBuyer->archiveRegistration();
                 }
@@ -75,23 +77,32 @@ class RegisterBuyerController extends Controller
                     'status' => 'unverified',
                     'otp_attempts' => 0,
                 ]);
-            });
+            }, $data);
 
-            // Deliver the code synchronously: a registration only counts as
-            // submitted once the applicant can actually receive the OTP.
-            $otp = $buyer->issueOtp();
-            $buyer->notify(new BuyerVerifyOtp($otp));
+            if (! $buyer->wasRecentlyCreated) {
+                // Double submit: keep the first registration and its OTP.
+                Storage::disk('local')->delete($path);
+            } else {
+                // Deliver the code synchronously: a registration only counts as
+                // submitted once the applicant can actually receive the OTP.
+                $otp = $buyer->issueOtp();
+                $buyer->notify(new BuyerVerifyOtp($otp));
+            }
         } catch (UniqueConstraintViolationException) {
             // Lost a race against a concurrent request for the same email/mobile.
             Storage::disk('local')->delete($path);
 
-            return response()->json([
-                'message' => 'This email or mobile number is already registered.',
-            ], 422);
+            throw ValidationException::withMessages(
+                EmailRegistry::registrationConflictErrors($data['email'], 'buyer', $data['contact_no'])
+            );
+        } catch (ValidationException $e) {
+            Storage::disk('local')->delete($path);
+
+            throw $e;
         } catch (\Throwable $e) {
             // Delivery failed (e.g. mail is down): roll the reservation back so
             // the applicant is never locked out of the email/mobile they used.
-            if (isset($buyer) && $buyer->exists) {
+            if (isset($buyer) && $buyer->exists && $buyer->wasRecentlyCreated) {
                 $buyer->delete();
             }
 

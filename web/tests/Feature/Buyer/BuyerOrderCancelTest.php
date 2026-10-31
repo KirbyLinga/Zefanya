@@ -7,23 +7,23 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\InventoryTransaction;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
-use App\Models\ProductVariant;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use App\Notifications\Seller\BuyerOrderCancelled;
-use App\Services\SellerOrderStatusService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
- * F3 — Buyer can cancel their own seller_order slice while still PLACED:
+ * F3 — Buyer can cancel their own seller_order slice before Ready for Pickup:
  * restore stock once, void pending COD, notify the seller; siblings continue.
  */
 class BuyerOrderCancelTest extends TestCase
@@ -197,7 +197,7 @@ class BuyerOrderCancelTest extends TestCase
             expectedFrom: OrderStatus::Placed,
         );
 
-        // HTTP double-submit after already cancelled: controller rejects non-PLACED.
+        // HTTP double-submit after cancellation is rejected without side effects.
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), [
                 'reason' => 'Again',
@@ -213,10 +213,13 @@ class BuyerOrderCancelTest extends TestCase
     {
         [$buyer, , , , $soA, , $order] = $this->multiSellerCheckout();
 
-        $this->actingAs($buyer, 'buyer')
-            ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), [])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['reason']);
+        foreach ([[], ['reason' => ''], ['reason' => '   ']] as $payload) {
+            $this->actingAs($buyer, 'buyer')
+                ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), $payload)
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['reason'])
+                ->assertJsonPath('errors.reason.0', 'Please provide a cancellation reason.');
+        }
 
         $this->assertSame(OrderStatus::Placed, $soA->fresh()->status);
     }
@@ -233,11 +236,11 @@ class BuyerOrderCancelTest extends TestCase
         $this->assertSame(OrderStatus::Placed, $soA->fresh()->status);
     }
 
-    public function test_cancel_after_seller_accepts_is_rejected(): void
+    public function test_cancel_after_ready_for_pickup_is_rejected(): void
     {
         [$buyer, , , , $soA, , $order] = $this->multiSellerCheckout();
 
-        $soA->forceFill(['status' => OrderStatus::Confirmed->value])->save();
+        $soA->forceFill(['status' => OrderStatus::ReadyForPickup->value])->save();
 
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), [
@@ -245,7 +248,7 @@ class BuyerOrderCancelTest extends TestCase
             ])
             ->assertStatus(422);
 
-        $this->assertSame(OrderStatus::Confirmed, $soA->fresh()->status);
+        $this->assertSame(OrderStatus::ReadyForPickup, $soA->fresh()->status);
         $this->assertSame(0, InventoryTransaction::query()->where('reason', 'cancel')->count());
     }
 
@@ -303,7 +306,7 @@ class BuyerOrderCancelTest extends TestCase
         Notification::assertNotSentTo($sellerB, BuyerOrderCancelled::class);
     }
 
-    public function test_show_page_offers_cancel_only_while_placed(): void
+    public function test_show_page_offers_cancel_for_new_and_accepted_shipments(): void
     {
         [$buyer, , , , $soA, $soB, $order] = $this->multiSellerCheckout();
         $soB->forceFill(['status' => OrderStatus::Confirmed->value])->save();
@@ -312,6 +315,6 @@ class BuyerOrderCancelTest extends TestCase
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
             ->assertSee(route('buyer.orders.cancelSellerOrder', [$order, $soA]), false)
-            ->assertDontSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
+            ->assertSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
     }
 }

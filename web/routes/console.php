@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\AutoApproveOverdueReturnsCommand;
 use App\Console\Commands\AutoCompleteBuyerReceiptsCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -10,5 +11,9 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command(AutoCompleteBuyerReceiptsCommand::class)
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command(AutoApproveOverdueReturnsCommand::class)
     ->everyFiveMinutes()
     ->withoutOverlapping();

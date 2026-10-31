@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Http\Controllers\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;

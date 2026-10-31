@@ -3,6 +3,10 @@
 @section('title', 'Lost/Damaged Incidents')
 
 @section('content')
+<x-admin.tabs :tabs="[
+    ['label' => 'Incidents', 'route' => 'admin.incidents.index'],
+    ['label' => 'Return exceptions', 'route' => 'admin.returns.index'],
+]" />
     @if (session('success'))
         <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
             {{ session('success') }}

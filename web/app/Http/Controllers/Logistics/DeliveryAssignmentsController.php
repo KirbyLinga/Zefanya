@@ -6,14 +6,15 @@ use App\Enums\OrderStatus;
 use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ParcelIncident\StoreIncidentRequest;
-use App\Models\Courier;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelIncidentService;
-use App\Services\ParcelReturnService;
-use App\Services\RiderNotifier;
-use App\Services\SellerOrderStatusService;
+use App\Models\Rider\Courier;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\LogisticsStatusOverrideService;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\ParcelReturnService;
+use App\Services\Rider\RiderNotifier;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -109,6 +110,7 @@ class DeliveryAssignmentsController extends Controller
 
         return view('Logistics.DeliveryMonitoring.show', [
             'sellerOrder' => $parcel,
+            'overrideOptions' => app(LogisticsStatusOverrideService::class)->options($parcel),
             'openIncident' => $openIncident,
             'incident' => $openIncident ? $parcel->incidentSet()->where('status', ParcelIncidentStatus::Open->value)->latest('id')->first() : null,
         ]);
@@ -133,7 +135,6 @@ class DeliveryAssignmentsController extends Controller
             return back()->with('error', 'This delivery leg cannot be reassigned.');
         }
         $data = $request->validate([
-            'reason' => [$request->filled('courier_id') ? 'required' : 'nullable', 'string', 'max:500'],
             'courier_id' => ['nullable', 'integer'],
             'reason' => ['required', 'string', 'max:500'],
             'expected_courier_id' => ['required', 'integer'],
@@ -183,6 +184,7 @@ class DeliveryAssignmentsController extends Controller
                 'integer',
                 Rule::exists('couriers', 'id')->where('logistics_provider_id', $provider->id),
             ],
+            'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         $courier = $this->assignment->assignDelivery(

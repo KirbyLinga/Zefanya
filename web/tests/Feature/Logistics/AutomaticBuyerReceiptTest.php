@@ -9,31 +9,35 @@ use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
-use App\Models\IncidentEvents;
-use App\Models\Incidents;
+use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Logistics\ParcelReturn;
-use App\Models\Order;
-use App\Models\Payment;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\SellerSettlement;
-use App\Models\StatusHistory;
-use App\Models\Voucher;
-use App\Services\AutomaticBuyerReceiptService;
-use App\Services\RiderOperationsService;
+use App\Models\Seller\SellerSettlement;
+use App\Models\Shared\IncidentEvents;
+use App\Models\Shared\Incidents;
+use App\Models\Shared\Order;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Models\Shared\Voucher;
+use App\Services\Buyer\AutomaticBuyerReceiptService;
+use App\Services\Logistics\CodRemittanceService;
+use App\Services\Rider\RiderOperationsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class AutomaticBuyerReceiptTest extends TestCase
 {
+    use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
     private LogisticsProvider $provider;
@@ -147,18 +151,28 @@ class AutomaticBuyerReceiptTest extends TestCase
     {
         $this->sellerOrder->forceFill(['status' => OrderStatus::Delivered->value])->save();
 
-        StatusHistory::query()->create([
-            'seller_order_id' => $this->sellerOrder->id,
-            'from_status' => OrderStatus::OutForDelivery->value,
-            'to_status' => OrderStatus::Delivered->value,
-            'changed_by' => 'Rider',
-            'note' => 'Parcel delivered to buyer.',
-            'actor_type' => 'rider',
-            'actor_id' => $this->rider->id,
-            'source' => 'web',
-            'created_at' => $deliveredAt,
-            'updated_at' => $deliveredAt,
-        ]);
+        $history = StatusHistory::query()
+            ->where('seller_order_id', $this->sellerOrder->id)
+            ->where('to_status', OrderStatus::Delivered->value)
+            ->latest('id')
+            ->first();
+
+        if ($history === null) {
+            $history = StatusHistory::query()->create([
+                'seller_order_id' => $this->sellerOrder->id,
+                'from_status' => OrderStatus::OutForDelivery->value,
+                'to_status' => OrderStatus::Delivered->value,
+                'changed_by' => 'Rider',
+                'note' => 'Parcel delivered to buyer.',
+                'actor_type' => 'rider',
+                'actor_id' => $this->rider->id,
+                'source' => 'web',
+            ]);
+        }
+
+        // created_at is not mass-assignable, so back-date it explicitly. This
+        // also rewrites the real delivery event when the rider flow created it.
+        $history->forceFill(['created_at' => $deliveredAt])->saveQuietly();
     }
 
     /** Helper: complete automatic receipt for this seller order. */
@@ -171,24 +185,24 @@ class AutomaticBuyerReceiptTest extends TestCase
     }
 
     /** @test */
-    public function test_delivered_older_than_72_hours_is_completed_automatically(): void
+    public function test_delivered_older_than_seven_days_is_completed_automatically(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         $result = $this->autoComplete();
 
         $this->assertTrue($result);
         $this->assertSame(OrderStatus::Completed, $this->sellerOrder->fresh()->status);
         $this->assertNotNull($this->sellerOrder->fresh()->commission_finalized_at);
-        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_bps);
-        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_minor);
-        $this->assertSame(7000, $this->sellerOrder->fresh()->seller_net_minor);
+        $this->assertSame(500, $this->sellerOrder->fresh()->commission_bps);
+        $this->assertSame(400, $this->sellerOrder->fresh()->commission_minor);
+        $this->assertSame(7600, $this->sellerOrder->fresh()->seller_net_minor);
     }
 
     /** @test */
-    public function test_delivered_less_than_72_hours_remains_delivered(): void
+    public function test_delivered_less_than_seven_days_remains_delivered(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(71));
+        $this->deliverAt(CarbonImmutable::now()->subHours(167));
 
         $result = $this->autoComplete();
 
@@ -198,7 +212,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     }
 
     /** @test */
-    public function test_delivered_exactly_72_hours_is_eligible(): void
+    public function test_delivered_exactly_seven_days_is_eligible(): void
     {
         $this->deliverAt(CarbonImmutable::now()->subHours(AutomaticBuyerReceiptService::WAIT_HOURS));
 
@@ -211,7 +225,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_open_incident_prevents_completion(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         Incidents::query()->create([
             'incident_seller_order_id' => $this->sellerOrder->id,
@@ -232,7 +246,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_terminal_lost_resolution_prevents_completion(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         $incident = Incidents::query()->create([
             'incident_seller_order_id' => $this->sellerOrder->id,
@@ -261,7 +275,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_physical_return_prevents_completion(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         ParcelReturn::query()->create([
             'seller_order_id' => $this->sellerOrder->id,
@@ -280,7 +294,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_unresolved_handoff_exception_prevents_completion(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         ParcelHandoffException::query()->create([
             'seller_order_id' => $this->sellerOrder->id,
@@ -310,7 +324,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_ambiguous_delivery_timestamp_prevents_completion(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         // Add a second, undated Delivered history record — makes the delivery ambiguous.
         StatusHistory::query()->create([
@@ -335,7 +349,7 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_repeated_execution_does_not_duplicate_completion(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         $first = $this->autoComplete();
         $this->assertTrue($first);
@@ -346,16 +360,16 @@ class AutomaticBuyerReceiptTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $this->sellerOrder->fresh()->status);
 
         // No duplicate commission records.
-        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_bps);
-        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_minor);
-        $this->assertSame(7000, $this->sellerOrder->fresh()->seller_net_minor);
+        $this->assertSame(500, $this->sellerOrder->fresh()->commission_bps);
+        $this->assertSame(400, $this->sellerOrder->fresh()->commission_minor);
+        $this->assertSame(7600, $this->sellerOrder->fresh()->seller_net_minor);
         $this->assertNotNull($this->sellerOrder->fresh()->commission_finalized_at);
     }
 
     /** @test */
     public function test_successful_completion_records_system_source(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
 
         $this->autoComplete();
 
@@ -374,15 +388,26 @@ class AutomaticBuyerReceiptTest extends TestCase
     /** @test */
     public function test_completed_order_creates_settlement_with_finalized_commission(): void
     {
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
-
-        // First complete delivery to create COD remittance and settlement.
+        // Deliver through the real rider flow first: the parcel is still Out
+        // for Delivery at this point, so the proof + COD + settlement records
+        // are created exactly as in production.
         $operations = app(RiderOperationsService::class);
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
+            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);
+
+        $this->sellerOrder->refresh();
+        $this->assertSame(OrderStatus::Delivered, $this->sellerOrder->status);
+
+        // Logistics confirms the cash it received; that is what creates the
+        // Seller settlement (still pending commission at this point).
+        $remittance = CodRemittance::query()
+            ->where('seller_order_id', $this->sellerOrder->id)
+            ->firstOrFail();
+        app(CodRemittanceService::class)->confirmReceipt($remittance, $this->provider, 8500);
 
         // Verify settlement exists in pending state.
         $settlement = SellerSettlement::where('seller_order_id', $this->sellerOrder->id)->first();
@@ -390,15 +415,16 @@ class AutomaticBuyerReceiptTest extends TestCase
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->status);
         $this->assertNull($settlement->commission_bps);
 
-        // Now auto-complete the receipt (72+ hours since delivery).
-        $this->deliverAt(CarbonImmutable::now()->subHours(73));
+        // Back-date the real delivery event, then auto-complete the receipt
+        // (seven days since delivery).
+        $this->deliverAt(CarbonImmutable::now()->subHours(169));
         $this->autoComplete();
 
         // Settlement should now have finalized commission.
         $settlement->refresh();
-        $this->assertSame(1000, $settlement->commission_bps);
-        $this->assertSame(1000, $settlement->commission_minor);
-        $this->assertSame(7000, $settlement->seller_payout_minor);
+        $this->assertSame(500, $settlement->commission_bps);
+        $this->assertSame(400, $settlement->commission_minor);
+        $this->assertSame(7600, $settlement->seller_payout_minor);
         $this->assertNotNull($settlement->financials_finalized_at);
         $this->assertNull($settlement->pending_reason);
     }

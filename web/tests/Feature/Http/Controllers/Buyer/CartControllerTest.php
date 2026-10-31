@@ -3,10 +3,10 @@
 namespace Tests\Feature\Http\Controllers\Buyer;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\Voucher;
+use App\Models\Shared\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 

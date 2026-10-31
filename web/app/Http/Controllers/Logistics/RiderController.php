@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Logistics\StoreRiderRequest;
 use App\Models\Logistics\LogisticsHub;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Notifications\Rider\RiderActivation;
-use App\Services\RiderRegistrationService;
+use App\Services\Rider\RiderRegistrationService;
 use App\Support\RiderValidation;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -59,7 +59,7 @@ class RiderController extends Controller
         $data = $request->validated();
 
         try {
-            $rider = DB::transaction(function () use ($provider, $data, $request) {
+            DB::transaction(function () use ($provider, $data, $request) {
                 $licensePath = $request->file('drivers_license')->store('rider-licenses', 'local');
                 $orcrPath = $request->file('or_cr')->store('rider-or-crs', 'local');
                 $row = new Rider([
@@ -131,7 +131,7 @@ class RiderController extends Controller
     {
         $this->scope($rider);
         $data = $request->validate([
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason' => ['required', 'string', 'min:10', 'max:300'],
         ]);
 
         $service->decide($rider, Auth::guard('logistics')->user(), Rider::STATUS_REJECTED, $data['reason']);
@@ -142,8 +142,8 @@ class RiderController extends Controller
     public function suspend(Request $request, Rider $rider, RiderRegistrationService $service): RedirectResponse
     {
         $this->scope($rider);
-        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
-        $service->suspend($rider, Auth::guard('logistics')->user(), $data['reason'] ?? null);
+        $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:300']]);
+        $service->suspend($rider, Auth::guard('logistics')->user(), $data['reason']);
 
         return redirect()->route('logistics.riders.show', $rider)->with('success', 'Rider suspended. Affected parcels are flagged for reassignment.');
     }

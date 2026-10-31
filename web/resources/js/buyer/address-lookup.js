@@ -1,6 +1,7 @@
+import { accountAddress } from './account-address.js';
+
 // resources/js/buyer/address-lookup.js
-// Shared PH address cascading dropdowns (PSGC API) + optional manual-address
-// fallback (buyer account address page only).
+// Shared PH address cascading dropdowns (PSGC API).
 //
 // Supports:
 //   - Region -> Province -> City/Municipality -> Barangay (when region select exists)
@@ -38,20 +39,10 @@
         var municipalitySelect = root.querySelector('[data-address-municipality]') || root.querySelector('#municipality');
         var barangaySelect = root.querySelector('[data-address-barangay]') || root.querySelector('#barangay');
 
-        var apiFields = root.querySelector('[data-address-api-fields]') || root.querySelector('#apiAddressFields');
-        var manualFields = root.querySelector('#manualAddressFields');
-        var manualProvince = root.querySelector('#manualProvince');
-        var manualMunicipality = root.querySelector('#manualMunicipality');
-        var manualBarangay = root.querySelector('#manualBarangay');
-        var toggleManualBtn = root.querySelector('#toggleManualAddress');
-        var addressModeField = root.querySelector('[data-address-mode]') || root.querySelector('#addressMode');
-
         var regionNameField = root.querySelector('[data-address-region-name]') || root.querySelector('#regionNameField');
         var provinceNameField = root.querySelector('[data-address-province-name]') || root.querySelector('#provinceNameField');
         var municipalityNameField = root.querySelector('[data-address-municipality-name]') || root.querySelector('#municipalityNameField');
         var barangayNameField = root.querySelector('[data-address-barangay-name]') || root.querySelector('#barangayNameField');
-
-        var allowManual = !!(manualFields && toggleManualBtn);
 
         // Required minimal dropdowns
         var missing = [provinceSelect, municipalitySelect, barangaySelect].filter(function (el) { return !el; });
@@ -59,8 +50,6 @@
 
         var regionsLoaded = false;
         var provincesLoaded = false;
-        var manualMode = false;
-        var manualToggles = [];
 
         function loadRegions() {
             if (!regionSelect) return;
@@ -215,45 +204,9 @@
             }
         });
 
-        function setManualMode(on) {
-            if (!allowManual) {
-                if (addressModeField) addressModeField.value = 'api';
-                return;
-            }
-            manualMode = on;
-            if (apiFields) apiFields.classList.toggle('hidden', on);
-            if (manualFields) manualFields.classList.toggle('hidden', !on);
-            if (toggleManualBtn) toggleManualBtn.textContent = on ? 'Use address lookup instead' : 'Enter address manually';
-            if (addressModeField) addressModeField.value = on ? 'manual' : 'api';
-            if (on) {
-                var sync = function () {
-                    if (provinceNameField) provinceNameField.value = manualProvince ? manualProvince.value : '';
-                    if (municipalityNameField) municipalityNameField.value = manualMunicipality ? manualMunicipality.value : '';
-                    if (barangayNameField) barangayNameField.value = manualBarangay ? manualBarangay.value : '';
-                };
-                [manualProvince, manualMunicipality, manualBarangay].forEach(function (el) {
-                    if (el) {
-                        el.addEventListener('input', sync);
-                        el.addEventListener('change', sync);
-                    }
-                });
-                sync();
-            }
-            manualToggles.forEach(function (fn) { fn(on); });
-        }
-
-        if (allowManual) {
-            toggleManualBtn.addEventListener('click', function () { setManualMode(!manualMode); });
-        } else if (addressModeField) {
-            addressModeField.value = 'api';
-        }
-
         var api = {
             provincesLoaded: function () { return provincesLoaded; },
             ensureLoaded: function () { if (!provincesLoaded) loadProvinces(); },
-            setManualMode: setManualMode,
-            isManualMode: function () { return manualMode; },
-            onManualToggle: function (fn) { manualToggles.push(fn); },
             pendingRegion: null,
             pendingProvince: null,
             pendingMunicipality: null,
@@ -306,6 +259,7 @@
 
     // Auto-init on elements with data-address-lookup
     document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-account-address]').forEach(root => accountAddress(root));
         document.querySelectorAll('[data-address-lookup]').forEach(function (el) {
             initAddressLookup(el);
         });

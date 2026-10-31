@@ -7,15 +7,15 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
+use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -103,7 +103,7 @@ class BuyerOrderLifecycleTest extends TestCase
 
     public function test_index_renders_reference_design_shell_with_real_buyer_info(): void
     {
-        $order = $this->fullOrder();
+        $this->fullOrder();
 
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.index'))
@@ -208,7 +208,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertSee('Confirm this shipment received')
+            ->assertSee('Order Received')
             ->assertSee('name="seller_order_id" value="'.$sliceB->id.'"', false)
             ->assertDontSee('name="seller_order_id" value="'.$sliceA->id.'"', false);
 
@@ -229,7 +229,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertDontSee('Confirm this shipment received')
+            ->assertDontSee('Order Received')
             ->assertDontSee('name="seller_order_id"', false);
     }
 
@@ -243,7 +243,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertDontSee('Confirm this shipment received')
+            ->assertDontSee('Order Received')
             ->assertDontSee('name="seller_order_id"', false);
     }
 

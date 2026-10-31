@@ -47,7 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let   selectedValues = [];
   let   selectedVariant = null;
   const basePriceText = document.getElementById('pdp-price')?.textContent || '';
-  let   baseStock      = Math.max(0, parseInt(addCartBtn?.dataset.stock || '0', 10) || 0);
+  const regularPriceEl = document.getElementById('pdp-price-regular');
+  const priceBadgeEl = document.getElementById('pdp-price-badge');
+  const baseRegularText = regularPriceEl?.textContent || '';
+  const baseBadgeText = priceBadgeEl?.textContent || '';
+  let   baseStock     = Math.max(0, parseInt(addCartBtn?.dataset.stock || '0', 10) || 0);
 
   if (variantMode) {
     try { variantsData = JSON.parse(variantsScript.textContent || '[]'); } catch { variantsData = []; }
@@ -61,6 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
       v.values.length === selection.length
       && v.values.every((value, i) => selection[i] === value)
     ) || null;
+  }
+
+  // Sale text is resolved by the server (PriceResolver); only ever displayed here.
+  function showSaleText(element, text) {
+    if (!element) return;
+    element.textContent = text || '';
+    element.hidden = !text;
   }
 
   function updateVariantUi() {
@@ -89,13 +100,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Price + stock follow the selected variant.
     const priceEl = document.getElementById('pdp-price');
     if (selectedVariant && priceEl) {
-      priceEl.textContent = '₱' + selectedVariant.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      priceEl.textContent = selectedVariant.price;
+      showSaleText(regularPriceEl, selectedVariant.regular_price);
+      showSaleText(priceBadgeEl, selectedVariant.badge);
       const hidden = document.getElementById('pdp-variant-id');
       if (hidden) hidden.value = selectedVariant.available && selectedVariant.stock > 0 ? String(selectedVariant.id) : '';
     }
 
     if (!selectedVariant) {
       if (priceEl) priceEl.textContent = basePriceText;
+      showSaleText(regularPriceEl, baseRegularText);
+      showSaleText(priceBadgeEl, baseBadgeText);
       const hidden = document.getElementById('pdp-variant-id');
       if (hidden) hidden.value = '';
     }
@@ -103,8 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const availability = document.getElementById('pdp-availability');
     if (availability) {
       availability.textContent = selectedVariant
-        ? (selectedVariant.available && selectedVariant.stock > 0 ? selectedVariant.stock + ' unit(s) available' : 'Out of Stock')
-        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Out of Stock' : variantsScript.dataset.selectionMessage || 'Select color and size to see availability.');
+        ? (selectedVariant.available && selectedVariant.stock > 0 ? selectedVariant.stock + ' unit(s) available' : 'Sold Out')
+        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Sold Out' : 'Please select a variation');
     }
 
     // Sold-out styling: a value is sold out when every variant carrying it
@@ -119,8 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
         && v.values[axis] === value
       );
       btn.classList.toggle('soldout', !hasStock);
-      btn.disabled = !hasStock;
-      btn.setAttribute('aria-disabled', String(!hasStock));
+      btn.disabled = !hasStock || btn.dataset.vacation === '1';
+      btn.setAttribute('aria-disabled', String(btn.disabled));
       btn.classList.toggle('selected', selectedValues[axis] === value);
       btn.setAttribute('aria-pressed', String(selectedValues[axis] === value));
     });
@@ -158,32 +173,50 @@ document.addEventListener('DOMContentLoaded', () => {
   let   pdpQty     = 1;
   if (variantMode) updateVariantUi();
 
+  function requiresSelection() {
+    return variantMode && !selectedVariant;
+  }
+
   function currentStock() {
     return variantMode ? (selectedVariant?.available ? Math.max(0, selectedVariant.stock) : 0) : baseStock;
   }
 
+  // Quantity to send now: 1–20 per buyer, after units already purchased and already in the cart.
+  function currentLimit() {
+    const purchaseMax = Math.max(0, parseInt(qtyDisplay?.dataset.purchaseMax || '20', 10) || 20);
+    const purchased = Math.max(0, parseInt(qtyDisplay?.dataset.purchased || '0', 10) || 0);
+    const cartTotal = Math.max(0, parseInt(qtyDisplay?.dataset.cartTotal || '0', 10) || 0);
+    const onThisLine = variantMode
+      ? Math.max(0, selectedVariant?.cart_quantity || 0)
+      : Math.max(0, parseInt(qtyDisplay?.dataset.cartQuantity || '0', 10) || 0);
+    const room = Math.max(0, purchaseMax - purchased - cartTotal);
+    return Math.min(Math.max(0, currentStock() - onThisLine), room);
+  }
+
   function updateQtyDisplay() {
-    const stock = currentStock();
-    pdpQty = stock > 0 ? Math.max(1, Math.min(pdpQty, stock)) : 0;
+    const limit = requiresSelection() ? 0 : currentLimit();
+    pdpQty = limit > 0 ? Math.max(1, Math.min(pdpQty, limit)) : (requiresSelection() ? Math.max(1, pdpQty || 1) : 0);
     if (qtyDisplay) {
-      qtyDisplay.value = String(pdpQty);
-      qtyDisplay.max = String(stock);
-      qtyDisplay.disabled = stock <= 0;
+      qtyDisplay.value = String(requiresSelection() ? 1 : pdpQty);
+      qtyDisplay.max = String(Math.max(limit, requiresSelection() ? 1 : 0));
+      qtyDisplay.disabled = requiresSelection() || limit <= 0;
     }
-    if (qtyDown) qtyDown.disabled = stock <= 0 || pdpQty <= 1;
-    if (qtyUp) qtyUp.disabled = stock <= 0 || pdpQty >= stock;
+    if (qtyDown) qtyDown.disabled = requiresSelection() || limit <= 0 || pdpQty <= 1;
+    if (qtyUp) qtyUp.disabled = requiresSelection() || limit <= 0 || pdpQty >= limit;
     [addCartBtn, document.getElementById('pdp-buy-now')].forEach(button => {
-      if (button) button.disabled = stock <= 0 || button.dataset.busy === '1';
+      if (!button) return;
+      button.disabled = button.dataset.vacation === '1' || button.dataset.busy === '1'
+        || (!requiresSelection() && limit <= 0);
     });
     // Dim the down button at min, up button at max
     if (qtyDown) qtyDown.style.opacity = pdpQty <= 1 ? '0.35' : '1';
-    if (qtyUp)   qtyUp.style.opacity   = pdpQty >= currentStock() ? '0.35' : '1';
+    if (qtyUp)   qtyUp.style.opacity   = !requiresSelection() && pdpQty >= limit ? '0.35' : '1';
   }
 
   function readTypedQuantity() {
-    const stock = currentStock();
+    const limit = currentLimit();
     const typed = Number(qtyDisplay.value);
-    pdpQty = stock > 0 ? Math.max(1, Math.min(Number.isFinite(typed) ? Math.trunc(typed) : 1, stock)) : 0;
+    pdpQty = limit > 0 ? Math.max(1, Math.min(Number.isFinite(typed) ? Math.trunc(typed) : 1, limit)) : 0;
     // Leave an empty field editable until blur so replacing a number is easy.
     if (qtyDisplay.value !== '') updateQtyDisplay();
   }
@@ -192,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
   qtyDisplay?.addEventListener('blur', () => { readTypedQuantity(); updateQtyDisplay(); });
 
   qtyUp?.addEventListener('click', () => {
-    if (pdpQty < currentStock()) { pdpQty++; updateQtyDisplay(); }
+    if (pdpQty < currentLimit()) { pdpQty++; updateQtyDisplay(); }
   });
   qtyDown?.addEventListener('click', () => {
     if (pdpQty > 1) { pdpQty--; updateQtyDisplay(); }
@@ -209,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!selectedVariant) {
         if (variantError) {
-          variantError.textContent = 'Please choose one option per axis before adding to cart.';
+          variantError.textContent = variantError.dataset.selectionMessage || 'Please select a variation';
           variantError.classList.remove('hidden');
           variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -283,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (variantError) {
           variantError.textContent = selectedVariant
             ? 'This combination is sold out — pick another.'
-            : 'Please choose one option per axis first.';
+            : (variantError.dataset.selectionMessage || 'Please select a variation');
           variantError.classList.remove('hidden');
           variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -358,6 +391,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (src) window.open(src, '_blank', 'noopener');
   });
 
+  // Jump bar above the specifications: the links scroll natively, this marks the current one.
+  const detailTabs = [...document.querySelectorAll('[data-pdp-tabs] a')];
+  detailTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      detailTabs.forEach((other) => other.setAttribute('aria-current', String(other === tab)));
+    });
+  });
+
   // ── 9. Chat with Seller ─────────────────────────────────────────────────
   const chatBtn = document.getElementById('pdp-chat-seller');
   if (chatBtn) {
@@ -366,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const productId = chatBtn.dataset.productId;
 
       try {
-        const response = await fetch('{{ route("buyer.messages.get-or-create") }}', {
+        const response = await fetch(chatBtn.dataset.url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -378,6 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
             product_id: productId,
           }),
         });
+
+        if (response.status === 401) {
+          window.openLoginModal?.();
+          return;
+        }
 
         if (response.ok) {
           const data = await response.json();

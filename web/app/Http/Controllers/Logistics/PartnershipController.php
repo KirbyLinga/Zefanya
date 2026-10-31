@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
-use App\Services\ProviderHandoffSchemaService;
+use App\Services\Logistics\ProviderHandoffSchemaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -77,7 +77,7 @@ class PartnershipController extends Controller
         $destination = LogisticsProvider::query()->findOrFail($data['destination_provider_id']);
 
         try {
-            $link = $partnerships->requestLink($provider, $destination);
+            $partnerships->requestLink($provider, $destination);
         } catch (ValidationException $exception) {
             return back()->withInput()->withErrors($exception->errors());
         }

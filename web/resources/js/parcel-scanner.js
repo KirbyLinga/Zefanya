@@ -182,7 +182,7 @@
             if (trackingInput) {
                 trackingInput.value = value;
             }
-            setStatus(`Verified ${data.parcel?.tracking_number || value}`);
+            setStatus(data.message || `Verified ${data.parcel?.tracking_number || value}`);
             renderResult(data);
         } catch (e) {
             lastSubmitted = null;

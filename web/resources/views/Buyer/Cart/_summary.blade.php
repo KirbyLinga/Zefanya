@@ -1,7 +1,7 @@
 {{--
     Order Summary card (right column; sticky on lg+).
 
-    Expects: $summary (App\Services\CartSummary), $voucher (?App\Models\Voucher),
+    Expects: $summary (App\Services\Buyer\CartSummary), $voucher (?App\Models\Shared\Voucher),
              $voucherNotice (?string)
 
     DOM contract for cart.js:
@@ -13,13 +13,14 @@
       #cartpage-total              total value
       #cartpage-mobile-total       total shown in the mobile bottom bar
       #cartpage-voucher-input / #cartpage-voucher-apply / #cartpage-voucher-error
-      #cartpage-voucher-chip / #cartpage-voucher-chip-label / #cartpage-voucher-remove
+      #cartpage-voucher-chips / .js-cartpage-voucher-chip / .js-cartpage-voucher-remove
       .js-cartpage-checkout-btn    both checkout buttons
 --}}
 @php
     $selectedLines = $summary->selectedLineCount();
-    $hasVoucher  = $voucher !== null;
+    $hasVoucher  = $summary->hasVoucher();
     $canCheckout = $summary->subtotalCentavos > 0;
+    $appliedVouchers = $summary->voucherApplication->toArray();
 @endphp
 
 <aside class="lg:sticky lg:top-6 lg:h-fit" id="cartpage-summary">
@@ -84,21 +85,26 @@
       {{-- Inline error --}}
       <p id="cartpage-voucher-error" class="mt-1.5 hidden text-[11.5px] font-medium text-primary-700" role="alert"></p>
 
-      {{-- Applied voucher chip --}}
-      <div id="cartpage-voucher-chip"
-           class="mt-2 flex items-center gap-2 rounded-lg border border-tertiary-200 bg-tertiary-50 px-2.5 py-2 {{ $hasVoucher ? '' : 'hidden' }}">
-        <i data-lucide="tag" width="13" height="13" class="shrink-0 text-tertiary-700"></i>
-        <span id="cartpage-voucher-chip-label" class="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-tertiary-700">
-          {{ $hasVoucher ? $summary->voucherChipLabel() : '' }}
-        </span>
-        <button
-          type="button"
-          id="cartpage-voucher-remove"
-          class="shrink-0 text-tertiary-700 transition-opacity hover:opacity-70"
-          aria-label="Remove the applied voucher"
-        >
-          <i data-lucide="x" width="14" height="14"></i>
-        </button>
+      {{-- Applied vouchers (one platform, one shipping, one per shop) --}}
+      <div id="cartpage-voucher-chips"
+           class="mt-2 flex flex-col gap-2 {{ $hasVoucher ? '' : 'hidden' }}">
+        @foreach ($appliedVouchers as $applied)
+          <div class="js-cartpage-voucher-chip flex items-center gap-2 rounded-lg border border-tertiary-200 bg-tertiary-50 px-2.5 py-2"
+               data-slot="{{ $applied['slot'] }}">
+            <i data-lucide="tag" width="13" height="13" class="shrink-0 text-tertiary-700"></i>
+            <span class="js-cartpage-voucher-chip-label min-w-0 flex-1 truncate text-[11.5px] font-semibold text-tertiary-700">
+              {{ $applied['scope'] === 'shipping' ? $applied['code'].' (shipping)' : $applied['label'] }}
+            </span>
+            <button
+              type="button"
+              class="js-cartpage-voucher-remove shrink-0 text-tertiary-700 transition-opacity hover:opacity-70"
+              data-slot="{{ $applied['slot'] }}"
+              aria-label="Remove {{ $applied['code'] }}"
+            >
+              <i data-lucide="x" width="14" height="14"></i>
+            </button>
+          </div>
+        @endforeach
       </div>
 
       {{-- Shown when a previously applied voucher was dropped on recalculation --}}

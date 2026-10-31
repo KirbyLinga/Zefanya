@@ -12,7 +12,7 @@
             <h1 class="font-serif text-2xl text-[var(--text-ink)]">Delivery Assignments</h1>
             <p class="font-sans text-[12.5px] text-[var(--text-muted)]">
                 Parcels Logistics has assigned to you for the final leg. Scan the waybill to verify, then start the run and record proof of delivery.
-                Maximum {{ \App\Services\SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS }} total delivery attempts: the initial delivery and one retry.
+                Maximum {{ \App\Services\Seller\SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS }} total delivery attempts: the initial delivery and one retry.
             </p>
         </div>
         <a href="{{ route('rider.scan.index') }}"
@@ -82,8 +82,8 @@
 
                         @if ($shipment->status === OrderStatus::DeliveryFailed)
                             <p class="font-sans text-[11.5px] text-rose-700">
-                                Failed attempts: {{ (int) $shipment->delivery_attempts }} / {{ \App\Services\SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS }}.
-                                @if ((int) $shipment->delivery_attempts >= \App\Services\SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS)
+                                Failed attempts: {{ (int) $shipment->delivery_attempts }} / {{ \App\Services\Seller\SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS }}.
+                                @if ((int) $shipment->delivery_attempts >= \App\Services\Seller\SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS)
                                     Two attempts exhausted. Logistics must arrange return to seller.
                                 @else
                                     Waiting for Logistics to schedule the final attempt or return the parcel.

@@ -9,11 +9,10 @@
 @section('content')
 @php
     /**
-     * Low-stock limit for the STOCK pill — single source of truth for this page.
-     * 0 → "0 in stock" (rose), 1..$lowStockLimit → "N left (Low)" (amber), above → "N in stock" (green).
-     * Mirrors the products.low_stock_threshold column default.
+     * STOCK pill tones: 0 → "0 in stock" (rose), 1..threshold → "N left (Low)"
+     * (amber), above → "N in stock" (green). The threshold is per product
+     * (products.low_stock_threshold), resolved inside the row loop.
      */
-    $lowStockLimit = 5;
 
     $statusOptions = ['active' => 'Active', 'draft' => 'Draft', 'inactive' => 'Inactive'];
 
@@ -29,10 +28,11 @@
     $searchTerm = $filters['q'] ?? null;
     $statusFilter = $filters['status'] ?? null;
     $categoryFilter = $filters['category'] ?? null;
+    $stockFilter = $filters['stock'] ?? null;
     $categoryFilterLabel = $categoryFilter
         ? optional($categories->firstWhere('id', (int) $categoryFilter))->label
         : null;
-    $hasFilters = filled($searchTerm) || filled($statusFilter) || filled($categoryFilter);
+    $hasFilters = filled($searchTerm) || filled($statusFilter) || filled($categoryFilter) || filled($stockFilter);
 
     $total = $products->total();
     $currentPage = $products->currentPage();
@@ -64,7 +64,7 @@
                     Bulk Actions
                     <i data-lucide="chevron-down" width="15" height="15"></i>
                 </button>
-                {{-- UI only: no bulk route exists; these items are not wired to anything. --}}
+                <span data-bulk-url="{{ route('seller.products.bulk', absolute: false) }}" hidden></span>
                 <div class="sp-dropdown__menu sp-dropdown__menu--right" data-dropdown-menu role="menu" aria-labelledby="spBulkToggle" hidden>
                     <button type="button" role="menuitem" class="sp-dropdown__item" data-bulk-action="activate">
                         <i data-lucide="circle-check" width="14" height="14"></i>Set Active
@@ -118,6 +118,10 @@
             </select>
 
             <button type="submit" class="sp-btn sp-btn--outline">Search</button>
+            @if ($stockFilter === 'low')
+                {{-- Keep the dashboard's low-stock filter when the other filters change. --}}
+                <input type="hidden" name="stock" value="low">
+            @endif
         </form>
 
         <div class="sp-chips">
@@ -139,6 +143,13 @@
                 </span>
             @else
                 <span class="sp-chip">Status: All</span>
+            @endif
+
+            @if ($stockFilter === 'low')
+                <span class="sp-chip sp-chip--active">
+                    Stock: Low
+                    <a href="{{ request()->fullUrlWithQuery(['stock' => null, 'page' => null]) }}" class="sp-chip__remove" aria-label="Remove the low-stock filter">&times;</a>
+                </span>
             @endif
 
             @if (filled($searchTerm))
@@ -194,7 +205,8 @@
                                 // loaded sum when present).
                                 $stock = (int) ($product->variants_sum_stock_quantity ?? $product->stock_quantity);
                                 $isOutOfStock = $stock <= 0;
-                                $isLowStock = ! $isOutOfStock && $stock <= $lowStockLimit;
+                                // Each product carries its own low-stock threshold.
+                                $isLowStock = ! $isOutOfStock && $stock <= (int) $product->low_stock_threshold;
 
                                 $stockPillClass = $isOutOfStock ? 'sp-pill--rose' : ($isLowStock ? 'sp-pill--amber' : 'sp-pill--green');
                                 $stockLabel = $isOutOfStock
@@ -241,8 +253,8 @@
                                 </td>
                                 <td class="sp-table__actions">
                                     <div class="sp-actions">
-                                        <a href="{{ route('seller.products.edit', $product) }}" data-product-edit-open="{{ $product->id }}"
-   data-update-url="{{ route('seller.products.update', $product) }}"
+                                        <a href="{{ route('seller.products.edit', $product, absolute: false) }}" data-product-edit-open="{{ $product->id }}"
+   data-update-url="{{ route('seller.products.update', $product, absolute: false) }}"
    class="sp-icon-btn" title="Edit" aria-label="Edit {{ $product->name }}">
                                             <i data-lucide="pencil" width="15" height="15"></i>
                                         </a>
@@ -253,15 +265,15 @@
                                                 <i data-lucide="ellipsis-vertical" width="15" height="15"></i>
                                             </button>
                                             <div class="sp-dropdown__menu sp-dropdown__menu--right" data-dropdown-menu role="menu" hidden>
-                                                <a href="{{ route('seller.products.edit', $product) }}" role="menuitem" class="sp-dropdown__item"
-   data-product-edit-open="{{ $product->id }}"
-   data-update-url="{{ route('seller.products.update', $product) }}">
-                                                    <i data-lucide="pencil" width="14" height="14"></i>Edit
+                                                <a href="{{ route('seller.products.edit', $product, absolute: false) }}" role="menuitem" class="sp-dropdown__item"
+   data-product-edit-open="{{ $product->id }}" data-product-stock-open
+   data-update-url="{{ route('seller.products.update', $product, absolute: false) }}">
+                                                    <i data-lucide="package-plus" width="14" height="14"></i>Add stock
                                                 </a>
                                                 @if ($product->status !== 'active')
                                                     <button type="button" role="menuitem" class="sp-dropdown__item"
                                                             data-status-set="{{ $product->id }}"
-                                                            data-url="{{ route('seller.products.toggleStatus', $product) }}"
+                                                            data-url="{{ route('seller.products.toggleStatus', $product, absolute: false) }}"
                                                             data-to="active">
                                                         <i data-lucide="circle-check" width="14" height="14"></i>Set Active
                                                     </button>
@@ -269,14 +281,14 @@
                                                 @if ($product->status !== 'inactive')
                                                     <button type="button" role="menuitem" class="sp-dropdown__item"
                                                             data-status-set="{{ $product->id }}"
-                                                            data-url="{{ route('seller.products.toggleStatus', $product) }}"
+                                                            data-url="{{ route('seller.products.toggleStatus', $product, absolute: false) }}"
                                                             data-to="inactive">
                                                         <i data-lucide="circle-pause" width="14" height="14"></i>Set Inactive
                                                     </button>
                                                 @endif
                                                 <button type="button" role="menuitem" class="sp-dropdown__item sp-dropdown__item--danger"
                                                         data-archive="{{ $product->id }}"
-                                                        data-url="{{ route('seller.products.destroy', $product) }}"
+                                                        data-url="{{ route('seller.products.destroy', $product, absolute: false) }}"
                                                         data-name="{{ $product->name }}">
                                                     <i data-lucide="archive" width="14" height="14"></i>Archive
                                                 </button>

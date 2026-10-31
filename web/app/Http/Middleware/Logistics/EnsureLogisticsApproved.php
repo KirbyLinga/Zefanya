@@ -3,6 +3,7 @@
 namespace App\Http\Middleware\Logistics;
 
 use App\Enums\LogisticsProviderStatus;
+use App\Support\AccountUnderReview;
 use App\Support\SignedOtpLink;
 use Closure;
 use Illuminate\Http\Request;
@@ -14,8 +15,8 @@ class EnsureLogisticsApproved
     /**
      * Mirror of EnsureSellerApproved for the logistics guard.
      * A logistics provider must be verified AND admin-approved before they
-     * can reach any logistics-panel route. Pending/non-approved providers are
-     * logged out and bounced to the login screen with a contextual message.
+     * can reach logistics operations. Pending providers keep their session and
+     * see a review notice; other non-approved accounts return to login.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -23,6 +24,10 @@ class EnsureLogisticsApproved
 
         if (! $provider) {
             return redirect()->route('home', ['login' => 1]);
+        }
+
+        if ($provider->status === LogisticsProviderStatus::Pending) {
+            return AccountUnderReview::response($request);
         }
 
         // LogisticsProvider casts `status` to LogisticsProviderStatus.
@@ -35,7 +40,7 @@ class EnsureLogisticsApproved
             $redirect = redirect()->route('home', ['login' => 1])->with('auth.status_message', match ($provider->status) {
                 LogisticsProviderStatus::Unverified => 'Your email has not been verified yet. Please check your email for the verification code.',
                 LogisticsProviderStatus::Pending => 'Your account is still pending administrator approval.',
-                LogisticsProviderStatus::Rejected => 'Your registration was not approved. Please contact support or submit a new registration.',
+                LogisticsProviderStatus::Rejected => 'Your registration was not approved. Please contact support or submit a new registration.'.(filled($provider->rejection_reason) ? ' Reason: '.$provider->rejection_reason : ''),
                 LogisticsProviderStatus::Suspended => 'Your logistics account has been suspended. Please contact support.',
                 default => 'Your account is not active.',
             });

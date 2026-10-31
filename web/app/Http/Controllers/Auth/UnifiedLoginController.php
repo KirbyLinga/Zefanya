@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Enums\AuthRole;
+use App\Enums\LogisticsProviderStatus;
 use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
+use App\Models\Rider\Rider;
 use App\Support\EmailRegistry;
 use App\Support\SignedOtpLink;
+use App\Support\SignedRegistrationResubmission;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,12 +56,25 @@ class UnifiedLoginController extends Controller
                 // One account per browser: end every other role's session.
                 $this->clearOtherGuards($role->guard());
 
+                if (Auth::guard($role->guard())->user()->status === 'pending'
+                    || Auth::guard($role->guard())->user()->status === LogisticsProviderStatus::Pending) {
+                    $request->session()->forget('url.intended');
+
+                    return redirect()->to($role->dashboardUrl());
+                }
+
                 return redirect()->intended($role->dashboardUrl());
             }
         }
 
         if ($this->tryRider($email, $password, $remember, $request)) {
             $request->session()->forget('auth.open_login_modal');
+
+            if (Auth::guard('rider')->user()->status === Rider::STATUS_PENDING) {
+                $request->session()->forget('url.intended');
+
+                return redirect()->route('rider.dashboard');
+            }
 
             return redirect()->intended(route('rider.dashboard'));
         }
@@ -72,8 +88,8 @@ class UnifiedLoginController extends Controller
     /**
      * Rider login: credentials must match AND the account must be operational
      * (approved/active, email-verified, assigned to an approved and active
-     * Station Hub, with a linked Courier). Pending, rejected, suspended and
-     * deactivated riders are denied without leaking password validity.
+     * Station Hub, with a linked Courier). Verified pending riders receive a
+     * restricted session; the operational middleware shows their review notice.
      */
     private function tryRider(string $email, string $password, bool $remember, Request $request): bool
     {
@@ -81,7 +97,8 @@ class UnifiedLoginController extends Controller
             return false;
         }
         $rider = Auth::guard('rider')->user();
-        if (! $rider || ! $rider->isOperational()) {
+        $pending = $rider && $rider->status === Rider::STATUS_PENDING && $rider->email_verified_at !== null;
+        if (! $rider || (! $pending && ! $rider->isOperational())) {
             Auth::guard('rider')->logout();
             $request->session()->forget('password_hash_rider');
 
@@ -102,10 +119,9 @@ class UnifiedLoginController extends Controller
     /**
      * Attempt authentication against one guard.
      *
-     * Returns true only when the attempt succeeds AND the account is
-     * in an approved state. On a successful attempt with a non-approved
-     * account the guard is logged out so the next guard can be tried, and
-     * a role-specific hint is stored for the final error response.
+     * Approved accounts and verified pending sellers/providers may sign in.
+     * Approval middleware restricts pending sessions to the review notice.
+     * Other non-approved accounts are logged out with a role-specific hint.
      */
     private function tryGuard(string $guard, string $email, string $password, bool $remember, Request $request): bool
     {
@@ -123,10 +139,15 @@ class UnifiedLoginController extends Controller
             default => '',
         };
 
-        if ($status !== 'approved') {
+        $pending = in_array($guard, ['seller', 'logistics'], true) && $status === 'pending' && $user->email_verified_at !== null;
+        if ($status !== 'approved' && ! $pending) {
             Auth::guard($guard)->logout();
 
-            $request->session()->flash('auth.status_message', $this->statusMessage($guard, $status));
+            $request->session()->flash('auth.status_message', $this->statusMessage($guard, $status, $user->rejection_reason));
+            if ($status === 'rejected' && in_array($guard, ['seller', 'logistics'], true) && $user->email_verified_at !== null) {
+                $request->session()->flash('auth.resume_url', SignedRegistrationResubmission::url($user));
+                $request->session()->flash('auth.resume_label', 'Edit and resubmit application');
+            }
 
             // An unverified account can finish verification without
             // re-registering — hand the login surface a direct link to that
@@ -178,18 +199,18 @@ class UnifiedLoginController extends Controller
     /**
      * Role-specific approval-status message.
      */
-    private function statusMessage(string $guard, mixed $status): string
+    private function statusMessage(string $guard, mixed $status, ?string $rejectionReason = null): string
     {
         $status = is_scalar($status) ? (string) $status : '';
 
         return match ([$guard, $status]) {
             ['seller', 'unverified'] => 'Your email has not been verified yet. Please check your email for the verification code.',
             ['seller', 'pending'] => 'Your seller account is still pending administrator approval.',
-            ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.',
+            ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.'.(filled($rejectionReason) ? ' Reason: '.$rejectionReason : ''),
             ['seller', 'suspended'] => 'Your seller account has been suspended. Please contact support.',
             ['logistics', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
             ['logistics', 'pending'] => 'Your logistics provider registration is still awaiting administrator approval.',
-            ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.',
+            ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.'.(filled($rejectionReason) ? ' Reason: '.$rejectionReason : ''),
             ['logistics', 'suspended'] => 'Your logistics account has been suspended. Please contact support.',
             ['buyer', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
             ['buyer', 'pending'] => 'Your buyer registration is still awaiting administrator approval.',

@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Http\Controllers\Seller;
 
-use App\Models\InventoryTransaction;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Enums\OrderStatus;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
+use App\Models\Shared\OrderItem;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ProductControllerTest extends TestCase
@@ -47,7 +49,7 @@ class ProductControllerTest extends TestCase
 
     public function test_a_seller_sees_only_their_own_products(): void
     {
-        $mine = $this->mine(['name' => 'My Walnut Desk']);
+        $this->mine(['name' => 'My Walnut Desk']);
         Product::factory()->create(['seller_id' => $this->otherSeller->id, 'name' => 'Their Oak Table']);
 
         $this->actingAs($this->seller, 'seller')
@@ -269,9 +271,10 @@ class ProductControllerTest extends TestCase
             ->post(route('seller.products.store'), [
                 '_modal' => 'product-create',
                 'name' => 'Half Filled Lantern',
+                'creation_key' => (string) Str::uuid(),
                 'price' => '',
                 'stock_quantity' => '',
-                'status' => 'draft',
+                'status' => 'active',
             ])
             ->assertRedirect(route('seller.products.index'))
             ->assertSessionHasErrors(['price', 'stock_quantity', 'images'])
@@ -299,6 +302,9 @@ class ProductControllerTest extends TestCase
     public function test_toggle_status_sets_a_draft_product_active(): void
     {
         $product = $this->mine(['status' => 'draft']);
+        $product->variants()->update(['is_available' => true]);
+        $product->forceFill(['category_id' => Category::query()->firstOrCreate(['label' => 'Home & Living'], ['icon' => 'home'])->id])->save();
+        $product->images()->create(['path' => 'products/existing.png']);
 
         $this->actingAs($this->seller, 'seller')
             ->patchJson(route('seller.products.toggleStatus', $product), ['status' => 'active'])
@@ -398,6 +404,7 @@ class ProductControllerTest extends TestCase
         $product = $this->mine(['name' => 'Archived Clock']);
         $variant = $product->variants()->first();
         $item = OrderItem::factory()->create(['product_id' => $product->id, 'variant_id' => $variant->id]);
+        $item->sellerOrder->forceFill(['status' => OrderStatus::Completed])->save();
         $entry = InventoryTransaction::create(['product_id' => $product->id, 'variant_id' => $variant->id, 'quantity_before' => 0, 'quantity_after' => $variant->stock_quantity, 'delta' => $variant->stock_quantity, 'reason' => 'restock']);
 
         $this->actingAs($this->seller, 'seller')

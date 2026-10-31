@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Enums\OrderStatus;
+use App\Enums\VoucherScope;
 use App\Http\Controllers\Controller;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
-use App\Models\Voucher;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Voucher;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -29,9 +30,21 @@ class HomeController extends Controller
             ->limit(20)
             ->get();
 
-        $flashProducts = $catalog->take(4)->values();
-        $newArrivals = $catalog->slice(4, 4)->values();
-        $forYouProducts = $catalog->slice(8, 6)->values();
+        // Only what a buyer can really buy for less. A running sale can still
+        // show no discount (its variant sold out), so check the resolved price.
+        $flashProducts = Product::query()->withBuyerCardData()
+            ->activeInStock()
+            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
+            ->whereHas('ongoingSale')
+            ->with(['images', 'seller'])
+            ->latest('id')
+            ->limit(12)
+            ->get()
+            ->filter(fn (Product $product) => $product->buyerPrice()?->badge() !== null)
+            ->take(4)
+            ->values();
+        $newArrivals = $catalog->take(4)->values();
+        $forYouProducts = $catalog->slice(4, 6)->values();
         if ($forYouProducts->isEmpty()) {
             $forYouProducts = $catalog->take(6)->values();
         }
@@ -87,7 +100,8 @@ class HomeController extends Controller
         if ($featured) {
             $slides[] = [
                 'heading' => 'New arrivals',
-                'text' => $featured->name,
+                'title' => 'Fresh finds for every day',
+                'text' => 'Just added: '.$featured->name,
                 'imageProduct' => $featured,
                 'alt' => $featured->name,
                 'url' => route('buyer.products.index', ['sort' => 'newest']),
@@ -112,7 +126,8 @@ class HomeController extends Controller
         if ($storeProduct) {
             $slides[] = [
                 'heading' => 'Best-selling store',
-                'text' => $topStore->business_name,
+                'title' => $topStore->business_name,
+                'text' => 'The store with the most items delivered on Zefanya.',
                 'imageProduct' => $storeProduct,
                 'alt' => $storeProduct->name.' from '.$topStore->business_name,
                 'url' => route('buyer.products.index', ['seller' => $topStore->id]),
@@ -127,7 +142,8 @@ class HomeController extends Controller
         if ($spotlight?->category) {
             $slides[] = [
                 'heading' => 'Category spotlight',
-                'text' => $spotlight->category->label,
+                'title' => $spotlight->category->label,
+                'text' => 'See what stores are offering in this category.',
                 'imageProduct' => $spotlight,
                 'alt' => $spotlight->name.' in '.$spotlight->category->label,
                 'url' => route('buyer.categories.show', $spotlight->category_id),
@@ -135,17 +151,21 @@ class HomeController extends Controller
             ];
         }
 
+        // Platform vouchers only: a Seller's code-only code must never be advertised.
         $voucher = Voucher::query()->where('is_active', true)->where('value', '>', 0)
+            ->where('scope', VoucherScope::Platform->value)
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
             ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('times_used', '<', 'usage_limit'))
             ->latest('id')->first();
         if ($voucher && $featured) {
             $minimum = $voucher->min_spend
-                ? 'Minimum spend: PHP '.number_format($voucher->min_spend / 100, 2).'.'
+                ? 'Minimum spend: ₱'.number_format($voucher->min_spend / 100, 2).'.'
                 : 'Apply at checkout.';
             $slides[] = [
                 'heading' => 'A little extra',
-                'text' => 'Use '.$voucher->code.'. '.$minimum,
+                'title' => 'Use '.$voucher->code,
+                'text' => $minimum,
                 'imageProduct' => $featured,
                 'alt' => $featured->name,
                 'url' => route('buyer.products.index'),
@@ -164,6 +184,7 @@ class HomeController extends Controller
 
         return $slides ?: [[
             'heading' => 'Discover Zefanya',
+            'title' => 'Find something you love',
             'text' => 'Explore our product catalog.',
             'image' => null,
             'alt' => '',
@@ -191,7 +212,13 @@ class HomeController extends Controller
             [$width, $height] = $dimensions;
             if ($width * $height > $largestArea) {
                 $largestArea = $width * $height;
-                $best = ['image' => $disk->url($image->path), 'width' => $width, 'height' => $height];
+                // Path-only URL — Storage::url() embeds APP_URL (often a local
+                // http host) and browsers block it as mixed content on HTTPS.
+                $best = [
+                    'image' => $product->catalogImageUrl(collect([$image]), requireExistingFile: false),
+                    'width' => $width,
+                    'height' => $height,
+                ];
             }
         }
 

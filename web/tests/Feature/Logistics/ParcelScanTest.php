@@ -3,17 +3,17 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\WaybillQrCode;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\WaybillQrCode;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesAssignableFleet;
@@ -274,7 +274,9 @@ class ParcelScanTest extends TestCase
             ->postJson(route('logistics.scan.verify'), [
                 'tracking_number' => $parcel->tracking_number,
             ])
-            ->assertForbidden();
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Scan rejected: this parcel is not authorized for your logistics company.')
+            ->assertJsonMissingPath('parcel');
     }
 
     public function test_unknown_tracking_rejected(): void
@@ -283,7 +285,8 @@ class ParcelScanTest extends TestCase
             ->postJson(route('logistics.scan.verify'), [
                 'tracking_number' => 'TRK-00000000-MISSING',
             ])
-            ->assertNotFound();
+            ->assertNotFound()
+            ->assertJsonPath('message', 'Parcel not found. Check the tracking number and try again.');
     }
 
     public function test_verify_uses_same_payload_as_waybill_qr(): void
@@ -297,5 +300,51 @@ class ParcelScanTest extends TestCase
             ->postJson(route('logistics.scan.verify'), ['tracking_number' => $tracking])
             ->assertOk()
             ->assertJsonPath('parcel.tracking_number', $tracking);
+    }
+
+    public function test_duplicate_hub_scan_reports_already_received_without_repeating_the_transition(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+        $token = $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()->json('actions.0.verification_token');
+        $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
+            ->assertSessionHas('success', 'Parcel received at the hub. Pickup courier released.');
+        $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        $this->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()
+            ->assertJsonPath('message', 'Parcel already received at the hub. You may proceed with sorting.')
+            ->assertJsonPath('actions.0.key', 'sort_parcel');
+        $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
+            ->assertSessionHas('success', 'Parcel already received at the hub. No status change was made.');
+        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_out_of_order_scan_explains_block_and_does_not_offer_or_apply_hub_receipt(): void
+    {
+        $parcel = $this->parcel(OrderStatus::ReadyForPickup, $this->courier);
+        $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()
+            ->assertJsonPath('actions', [])
+            ->assertJsonPath('message', 'Scan blocked: no hub receipt or sorting action is allowed while this parcel is Ready for pickup.');
+        $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
+            ->assertSessionHas('error', 'Scan blocked: this parcel must be picked up before it can be received at the hub.');
+        $this->assertSame(OrderStatus::ReadyForPickup, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_foreign_company_cannot_confirm_hub_receipt_or_change_status(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+        $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        $other = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now()]);
+        $this->actingAs($other, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
+            ->assertForbidden();
+        $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
     }
 }

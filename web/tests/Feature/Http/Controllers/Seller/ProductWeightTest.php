@@ -2,24 +2,27 @@
 
 namespace Tests\Feature\Http\Controllers\Seller;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
+use App\Services\Seller\ProductPublishingService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class ProductWeightTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private function payload(): array
     {
         return [
+            ...$this->publicationDefaults(),
             'name' => 'Weighted item', 'price' => 100, 'stock_quantity' => 2,
-            'status' => 'active', 'weight' => 1.001, 'weight_unit' => 'kg',
+            'status' => 'active', 'weight_grams' => 1001, 'weight' => 1.001, 'weight_unit' => 'kg',
             'images' => [UploadedFile::fake()->createWithContent('item.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='))],
         ];
     }
@@ -89,7 +92,9 @@ class ProductWeightTest extends TestCase
     public function test_status_toggle_blocks_an_existing_weightless_product(): void
     {
         $seller = Seller::factory()->create();
-        $product = Product::factory()->create(['seller_id' => $seller->id, 'status' => 'draft', 'weight_grams' => 0]);
+        $product = app(ProductPublishingService::class)->save(new Product, $seller, $this->payload());
+        $product->forceFill(['status' => 'draft', 'weight_grams' => 0])->save();
+        $product->variants()->update(['weight_grams' => 0]);
         $this->actingAs($seller, 'seller')->patchJson(route('seller.products.toggleStatus', $product), ['status' => 'active'])
             ->assertUnprocessable()->assertJsonValidationErrors('weight');
         $this->assertSame('draft', $product->fresh()->status);

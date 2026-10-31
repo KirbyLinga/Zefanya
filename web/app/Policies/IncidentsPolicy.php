@@ -4,7 +4,7 @@ namespace App\Policies;
 
 use App\Enums\AdminRole;
 use App\Models\Admin\Admin;
-use App\Models\Incidents;
+use App\Models\Shared\Incidents;
 
 class IncidentsPolicy
 {

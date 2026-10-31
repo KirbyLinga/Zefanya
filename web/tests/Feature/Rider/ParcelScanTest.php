@@ -3,9 +3,9 @@
 namespace Tests\Feature\Rider;
 
 use App\Enums\OrderStatus;
-use App\Models\StatusHistory;
-use App\Services\RiderHandoffVerification;
-use App\Services\WaybillQrCode;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\WaybillQrCode;
 
 /**
  * F2 Stage 2/3 — Rider tracking verification + scan-required handoffs.
@@ -110,12 +110,12 @@ class ParcelScanTest extends RiderTestCase
             'courier_id' => $this->courier->id,
         ]);
 
-        $token = $this->handoffToken($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP);
+        $token = $this->handoffToken($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP);
 
-        app(RiderHandoffVerification::class)->consume(
+        app(ParcelHandoffVerification::class)->consumeForRider(
             $this->rider,
             $parcel,
-            RiderHandoffVerification::ACTION_CONFIRM_PICKUP,
+            ParcelHandoffVerification::ACTION_CONFIRM_PICKUP,
             $token,
         );
 
@@ -136,7 +136,7 @@ class ParcelScanTest extends RiderTestCase
             'courier_id' => $this->courier->id,
         ]);
 
-        $token = $this->handoffToken($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP, $otherRider);
+        $token = $this->handoffToken($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP, $otherRider);
 
         $this->actingAsRider()
             ->post(route('rider.pickups.confirm', $parcel), ['verification_token' => $token])
@@ -151,7 +151,7 @@ class ParcelScanTest extends RiderTestCase
         $parcelA = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $this->courier->id]);
         $parcelB = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $this->courier->id]);
 
-        $token = $this->handoffToken($parcelA, RiderHandoffVerification::ACTION_CONFIRM_PICKUP);
+        $token = $this->handoffToken($parcelA, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP);
 
         $this->actingAsRider()
             ->post(route('rider.pickups.confirm', $parcelB), ['verification_token' => $token])
@@ -167,7 +167,7 @@ class ParcelScanTest extends RiderTestCase
             'courier_id' => $this->courier->id,
         ]);
 
-        $token = $this->handoffToken($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP);
+        $token = $this->handoffToken($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP);
         $this->travel(11)->minutes();
 
         $this->actingAsRider()

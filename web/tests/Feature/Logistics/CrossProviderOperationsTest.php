@@ -6,26 +6,28 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Admin\Admin;
-use App\Models\Courier;
 use App\Models\Logistics\ParcelHandoffException;
-use App\Models\Payment;
-use App\Models\Rider;
-use App\Services\CourierAssignmentService;
-use App\Services\ManifestService;
-use App\Services\ParcelHandoffService;
-use App\Services\RiderOperationsService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
+use App\Models\Shared\Payment;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\ManifestService;
+use App\Services\Logistics\ParcelHandoffService;
+use App\Services\Rider\RiderOperationsService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
+use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class CrossProviderOperationsTest extends TestCase
 {
     use BootstrapsCrossProviderHandoffs;
     use LazilyRefreshDatabase;
+    use ProvidesDeliveryOtp;
 
     private function routeFixture(): array
     {
@@ -103,6 +105,7 @@ class CrossProviderOperationsTest extends TestCase
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
         $this->assertSame(PaymentStatus::Pending, $payment->fresh()->status);
         $operations->completeDelivery($courier->rider, $parcel->fresh(), [
+            'delivery_otp' => $this->deliveryOtp($parcel->fresh()),
             'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
             'received_by' => 'Buyer', 'cod_amount_minor' => 44900,
         ]);

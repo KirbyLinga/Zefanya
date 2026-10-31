@@ -60,7 +60,7 @@ final class Race
     public static function run(array $a, array $b, bool $bothHeld = false, bool $rejectionWithoutLock = false): array
     {
         $runRoot = match ($a['action'] ?? '') {
-            'dispatch' => '/storage/logs/phase6-races/', 'return_request', 'return_receipt' => '/storage/logs/phase7-races/', default => '/.codex/t05-runs/'
+            'dispatch' => '/storage/logs/phase6-races/', 'payout_request', 'settlement' => '/storage/logs/payout-races/', 'return_request', 'return_receipt' => '/storage/logs/phase7-races/', default => '/.codex/t05-runs/'
         };
         $directory = dirname(__DIR__, 2).$runRoot.bin2hex(random_bytes(8));
         mkdir($directory, 0700, true);
@@ -100,6 +100,7 @@ final class Race
                             'parcel' => str_contains($sql, 'from `seller_orders`') && str_contains($sql, 'for update'),
                             'provider' => str_contains($sql, 'from `logistics_providers`') && str_contains($sql, 'for update'),
                             'product' => str_contains($sql, 'from `products`') && str_contains($sql, 'for update'),
+                            'variant' => str_contains($sql, 'from `product_variants`') && str_contains($sql, 'for update'),
                             'seller' => str_contains($sql, 'from `sellers`') && str_contains($sql, 'for update'),
                             'token' => str_starts_with($sql, 'update `checkout_tokens`'),
                             'cartwrite' => str_starts_with($sql, 'update `cart_items`'),
@@ -134,6 +135,9 @@ final class Race
                 $results[$name] = json_decode(file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
                 if (($results[$name]['preflight_failed'] ?? false)) {
                     Preflight::halt();
+                }
+                if (isset($results[$name]['exception'])) {
+                    throw new RuntimeException('Worker '.$name.' failed: '.$results[$name]['exception']);
                 }
             }
             if ($results['a']['connection'] === $results['b']['connection']) {

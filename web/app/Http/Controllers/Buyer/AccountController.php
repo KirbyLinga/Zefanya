@@ -5,14 +5,18 @@ namespace App\Http\Controllers\Buyer;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
-use App\Models\Order;
+use App\Models\Buyer\BuyerAddress;
+use App\Models\Shared\Order;
+use App\Services\Buyer\BuyerAddressBook;
+use App\Support\BirthDate;
+use App\Support\PersonName;
+use App\Support\PhilippineMobile;
 use Carbon\Carbon;
+use Closure;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AccountController extends Controller
@@ -80,17 +84,25 @@ class AccountController extends Controller
      * subset the profile tab owns. Address and password have their own tabs /
      * follow-up tasks and are deliberately not validated here.
      *
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
-    private function profileRules(): array
+    private function profileRules(Buyer $buyer): array
     {
         return [
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
+            'first_name' => PersonName::rules(),
+            'last_name' => PersonName::rules(),
             'middle_initial' => ['nullable', 'string', 'max:2'],
             'sex' => ['required', Rule::in(['male', 'female'])],
-            'contact_no' => ['required', 'regex:/^09\d{9}$/'],
-            'birthday' => ['required', 'date', 'before:today'],
+            'contact_no' => [
+                ...PhilippineMobile::rules(),
+                // Saving your own unchanged number must not count as a duplicate.
+                function (string $attribute, mixed $value, Closure $fail) use ($buyer): void {
+                    if ($value !== $buyer->contact_no && PhilippineMobile::isTaken($value, 'buyer')) {
+                        $fail(PhilippineMobile::TAKEN_MESSAGE);
+                    }
+                },
+            ],
+            'birthday' => BirthDate::rules(),
         ];
     }
 
@@ -137,20 +149,33 @@ class AccountController extends Controller
     }
 
     /**
-     * Persist the profile tab. Email is intentionally not editable here
-     * (it is the login identity and is verified at registration).
+     * Persist the profile tab. Email is not editable here: it is the login
+     * identity, so changing it needs a code (see AccountEmailController).
      */
     public function update(Request $request): RedirectResponse
     {
         /** @var Buyer $buyer */
         $buyer = $request->user('buyer');
 
-        $data = $request->validate($this->profileRules());
+        if (is_string($request->input('contact_no'))) {
+            $request->merge(['contact_no' => PhilippineMobile::normalize($request->input('contact_no'))]);
+        }
 
-        // `age` is a real column (registration derives it from birthday too).
-        $buyer->update($data + [
-            'age' => Carbon::parse($data['birthday'])->age,
+        $data = $request->validate($this->profileRules($buyer), [
+            ...PersonName::messages('first_name', 'First name'),
+            ...PersonName::messages('last_name', 'Last name'),
+            ...BirthDate::messages(),
         ]);
+
+        try {
+            // `age` is a real column (registration derives it from birthday too).
+            $buyer->update($data + [
+                'age' => Carbon::parse($data['birthday'])->age,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Another buyer took the number between validation and saving.
+            return back()->withInput()->withErrors(['contact_no' => PhilippineMobile::TAKEN_MESSAGE]);
+        }
 
         return redirect()
             ->route('buyer.account.index')
@@ -171,61 +196,21 @@ class AccountController extends Controller
     }
 
     /**
-     * Persist the password tab.
-     *
-     * @throws ValidationException
-     */
-    public function passwordUpdate(Request $request): RedirectResponse
-    {
-        $buyer = $request->user('buyer');
-
-        $data = $request->validate([
-            'current_password' => ['required', 'string'],
-            'new_password' => [
-                'required',
-                'string',
-                'min:8',
-                'confirmed',
-                Password::defaults(),
-            ],
-        ], [
-            // user-facing rules only (the field-error-block style used by the
-            // form is handled by the blade view, so keep these plain strings).
-            'current_password.required' => 'Enter your current password.',
-            'new_password.required' => 'Enter a new password.',
-            'new_password.min' => 'The new password must be at least 8 characters.',
-            'new_password.confirmed' => 'The new password confirmation does not match.',
-        ]);
-
-        // Reject outright if the current password doesn't match — never
-        // silently no-op.
-        if (! Hash::check($data['current_password'], $buyer->password)) {
-            $request->session()->flash('error', 'That doesn\'t match your current password.');
-
-            return back()
-                ->withInput()
-                ->withErrors(['current_password' => 'That doesn\'t match your current password.']);
-        }
-
-        $buyer->update([
-            'password' => Hash::make($data['new_password']),
-        ]);
-
-        return redirect()
-            ->route('buyer.account.index')
-            ->with('success', 'Password updated.');
-    }
-
-    /**
      * Address tab — the saved delivery address (PSGC codes + names, or the
      * free-text manual fallback), the same data checkout snapshots.
      */
     public function addressEdit(Request $request): View
     {
         $buyer = $request->user('buyer');
+        $addresses = $buyer->addresses()->orderByDesc('is_default')->orderBy('id')->get();
+        $editing = $request->filled('edit')
+            ? $addresses->firstWhere('id', $request->integer('edit')) ?? abort(404)
+            : null;
 
         return view('Buyer.Account.address', [
             'buyer' => $buyer,
+            'addresses' => $addresses,
+            'editing' => $editing,
             'counts' => $this->getOrderCounts($buyer),
         ]);
     }
@@ -245,22 +230,68 @@ class AccountController extends Controller
 
         $data = $request->validate($this->addressRules($request));
 
-        $buyer->update([
-            'address_mode' => $data['address_mode'],
-            'province_code' => $data['province'] ?? null,
-            'province_name' => $data['province_name'] ?? null,
-            'municipality_code' => $data['municipality'] ?? null,
-            'municipality_name' => $data['municipality_name'] ?? null,
-            'barangay_code' => $data['barangay'] ?? null,
-            'barangay_name' => $data['barangay_name'] ?? null,
-            'street' => $data['street'],
-            'house_number' => $data['house_number'] ?? null,
-            'address_detail' => $data['address_detail'] ?? null,
-            'postal_code' => $data['postal_code'] ?? null,
-        ]);
+        app(BuyerAddressBook::class)->saveDefault($buyer, $data);
 
         return redirect()
             ->route('buyer.account.address')
             ->with('success', 'Address updated.');
+    }
+
+    public function addressStore(Request $request): RedirectResponse
+    {
+        /** @var Buyer $buyer */
+        $buyer = $request->user('buyer');
+        $data = $request->validate($this->addressRules($request));
+
+        app(BuyerAddressBook::class)->save($buyer, $data, null, $request->boolean('is_default'));
+
+        return redirect()
+            ->route('buyer.account.address')
+            ->with('success', 'Address saved.');
+    }
+
+    public function addressRecordUpdate(Request $request, BuyerAddress $address): RedirectResponse
+    {
+        /** @var Buyer $buyer */
+        $buyer = $request->user('buyer');
+        abort_unless((int) $address->buyer_id === (int) $buyer->id, 404);
+        $data = $request->validate($this->addressRules($request));
+
+        app(BuyerAddressBook::class)->save(
+            $buyer,
+            $data,
+            $address,
+            $request->boolean('is_default') || $address->is_default,
+        );
+
+        return redirect()
+            ->route('buyer.account.address')
+            ->with('success', 'Address updated.');
+    }
+
+    public function addressMakeDefault(Request $request, BuyerAddress $address): RedirectResponse
+    {
+        /** @var Buyer $buyer */
+        $buyer = $request->user('buyer');
+        abort_unless((int) $address->buyer_id === (int) $buyer->id, 404);
+
+        app(BuyerAddressBook::class)->makeDefault($buyer, $address);
+
+        return redirect()
+            ->route('buyer.account.address')
+            ->with('success', 'Default address updated.');
+    }
+
+    public function addressDestroy(Request $request, BuyerAddress $address): RedirectResponse
+    {
+        /** @var Buyer $buyer */
+        $buyer = $request->user('buyer');
+        abort_unless((int) $address->buyer_id === (int) $buyer->id, 404);
+
+        app(BuyerAddressBook::class)->delete($buyer, $address);
+
+        return redirect()
+            ->route('buyer.account.address')
+            ->with('success', 'Address deleted.');
     }
 }

@@ -13,8 +13,6 @@ class RiderValidation
 {
     public const TIMEZONE = 'Asia/Manila';
 
-    public const NAME_REGEX = '/^[\p{L} .\'-]+$/u';
-
     public const LICENSE_REGEX = '/^[A-Z]\d{2}-\d{2}-\d{6}$/';
 
     public const VEHICLES = ['Motorcycle', 'Car', 'Van'];
@@ -24,15 +22,10 @@ class RiderValidation
         return strtolower(trim($email));
     }
 
-    /** Strip spaces/hyphens/parens; +63→09. */
+    /** Shared PH mobile normalisation (spaces removed, +639… → 09…). */
     public static function normalizeMobile(string $phone): string
     {
-        $phone = (string) preg_replace('/[\s\-()]/u', '', trim($phone));
-        if (str_starts_with($phone, '+63')) {
-            $phone = '0'.substr($phone, 3);
-        }
-
-        return $phone;
+        return PhilippineMobile::normalize($phone);
     }
 
     public static function normalizePlate(string $plate): string
@@ -50,20 +43,10 @@ class RiderValidation
         return Carbon::now(self::TIMEZONE)->startOfDay();
     }
 
-    /** DOB must be ≥18y ago today (Manila). Leap-day: Carbon handles anniversary. */
+    /** DOB must be ≥18y ago today (Manila); see BirthDate. */
     public static function isAdult(string $dob): bool
     {
-        try {
-            $birth = Carbon::parse($dob, self::TIMEZONE)->startOfDay();
-        } catch (\Throwable) {
-            return false;
-        }
-        $today = self::today();
-        if ($birth->greaterThan($today)) {
-            return false;
-        }
-
-        return $birth->copy()->addYears(18)->lessThanOrEqualTo($today);
+        return BirthDate::isAdult($dob);
     }
 
     /** Expiry must be today or later (Manila). */

@@ -26,7 +26,7 @@ class LogisticsRegistrationOtp extends Notification
             ->line(new HtmlString(
                 '<h1 style="letter-spacing: 4px; font-size: 32px;">'.$this->otp.'</h1>'
             ))
-            ->line('This code expires in 10 minutes.')
+            ->line('This code expires in 5 minutes.')
             ->line('If you didn\'t request this, you can safely ignore this email.');
     }
 }

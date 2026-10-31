@@ -9,7 +9,7 @@
     CSS (sp-hero: flex + justify-between + align-items: flex-start) places
     the body on the left and the toolbar on the right visually.
 --}}
-@props(['name', 'date'])
+@props(['name', 'date', 'notifications' => collect(), 'unreadCount' => 0])
 
 <div class="sp-hero" data-dashboard-hero>
 

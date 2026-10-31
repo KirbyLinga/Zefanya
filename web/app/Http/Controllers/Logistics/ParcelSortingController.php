@@ -5,15 +5,16 @@ namespace App\Http\Controllers\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelHandoffVerification;
-use App\Services\ParcelIncidentService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Rider\Courier;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +64,17 @@ class ParcelSortingController extends Controller
             ? [OrderStatus::AssignedToRider]
             : [OrderStatus::AtSortingCenter, OrderStatus::Sorted];
 
+        // The immutable destination snapshot is authoritative; never use the buyer's live address.
+        $grammar = DB::connection()->getQueryGrammar();
+        $regionParts = collect(['region_code', 'province_code', 'municipality_code', 'barangay_code'])
+            ->map(fn (string $key) => 'NULLIF(SUBSTRING(TRIM('.$grammar->wrap('orders.shipping_address->'.$key)."), 1, 2), '')")
+            ->implode(', ');
+        $destinationRegion = Order::query()
+            ->selectRaw("COALESCE({$regionParts}, 'zz')")
+            ->whereColumn('orders.id', 'seller_orders.order_id');
         $shipments = (clone $baseQuery)
+            ->select('seller_orders.*')
+            ->selectSub($destinationRegion, 'destination_region_sort')
             ->whereIn('status', $statuses)
             ->with([
                 'deliveryCourier' => fn ($q) => $q->withWorkload(),
@@ -76,7 +87,7 @@ class ParcelSortingController extends Controller
                 'seller',
                 'orderItems.product',
             ])
-            ->orderBy('created_at')->orderBy('id')
+            ->orderBy('destination_region_sort')->orderBy('created_at')->orderBy('id')
             ->paginate(25)->withQueryString();
 
         return view('Logistics.ParcelSorting.index', [

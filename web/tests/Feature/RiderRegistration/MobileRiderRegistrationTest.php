@@ -6,7 +6,7 @@ use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Notifications\Rider\RiderRegistrationOtp;
 use App\Support\EmailRegistry;
@@ -267,7 +267,8 @@ class MobileRiderRegistrationTest extends TestCase
 
         $this->postJson($data['verify_url'], ['otp' => '654321'])->assertUnprocessable()->assertJsonValidationErrors(['otp']);
         $this->travel(11)->minutes();
-        $this->postJson($data['verify_url'], ['otp' => '123456'])->assertUnprocessable()->assertJsonValidationErrors(['otp']);
+        $this->postJson($data['verify_url'], ['otp' => '123456'])->assertUnprocessable()
+            ->assertJsonPath('errors.otp.0', 'This code has expired. Tap "Resend code" for a new one.');
         $this->assertSame('unverified', $rider->fresh()->status);
     }
 
@@ -275,7 +276,10 @@ class MobileRiderRegistrationTest extends TestCase
     {
         [$rider, $data] = $this->register();
 
-        $this->postJson($data['verify_url'], ['otp' => ['123456']])->assertUnprocessable()->assertJsonValidationErrors(['otp']);
+        foreach ([['123456'], '', '12345', '1234567', 'abcdef'] as $otp) {
+            $this->postJson($data['verify_url'], ['otp' => $otp])->assertUnprocessable()
+                ->assertJsonPath('errors.otp.0', 'Enter the 6-digit code from your email.');
+        }
         $this->assertSame('unverified', $rider->fresh()->status);
     }
 

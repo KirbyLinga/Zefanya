@@ -41,7 +41,7 @@ There is also a legacy `web` guard bound to `App\Models\Shared\User` / the `user
 - [x] Checkout: confirm saved address, choose payment method, place order (single transaction, no double-submit).
 - [x] Track order status; confirm receipt (order → Completed).
 - [ ] Rate / review a seller or product — **missing**.
-- [ ] Buyer-initiated return request — **missing** (returns only happen when delivery fails, see below).
+- [x] Buyer-initiated return request: seller decision, admin dispute, rider collection and reverse transport back to the seller (scope awaiting panel confirmation, see open decision 8).
 
 ### Seller
 - [x] Register → OTP → admin decision → login only if `approved`.
@@ -110,10 +110,10 @@ From `composer.json` and `package.json` (verified):
 **Run it**
 ```sh
 composer install
-copy .env.example .env        # Windows; then set DB_*, APP_KEY, ADMIN_SEED_PASSWORD
+copy .env.example .env        # Windows; then set DB_*, APP_KEY, ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
 php artisan key:generate
 php artisan migrate
-php artisan db:seed           # requires ADMIN_SEED_PASSWORD (seeder refuses otherwise)
+php artisan db:seed           # requires ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD (seeder refuses otherwise)
 npm install && npm run build
 php artisan serve             # or: composer run dev
 ```
@@ -158,14 +158,14 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Feature | Status | Evidence |
 |---|---|---|
 | Home, categories, search, product detail, variants | Implemented | `Buyer/HomeController.php`, `CategoryController.php`, `ProductController.php` |
-| Cart (add/merge/update/remove/voucher) | Implemented | `Buyer/CartController.php`, `Services/CartSummary.php` |
+| Cart (add/merge/update/remove/voucher) | Implemented | `Buyer/CartController.php`, `Services/Buyer/CartSummary.php` |
 | Wishlist (UI + toggle) | Implemented | `Buyer/WishlistController.php`; `wishlist-cards.js` |
 | Checkout (address confirm + payment + place order) | Implemented | `Buyer/CheckoutController.php` |
 | Orders list / timeline / tracking / confirm receipt | Implemented | `Buyer/OrderController.php` |
 | Account (profile/address/password), settings | Implemented | `Buyer/AccountController.php`, `SettingsController.php` |
 | Notifications centre | Implemented | `Buyer/NotificationController.php` |
 | Messages (buyer↔seller) | Implemented | `Buyer/MessageController.php`, `Components/.../Messages` views |
-| **Chat** page | **Placeholder** | `Buyer/ChatController.php:20-32` redirects "Chat is coming soon"; `Buyer/Chat/index.blade.php` (144 B) is a comment |
+| **Chat** links | Implemented | `Buyer/ChatController.php` redirects to Messages |
 | **Category grid** page | **Placeholder** | `Buyer/Categories/index.blade.php` (134 B) body is a comment |
 | Account landing (`/account`) | **Placeholder** | `Buyer/Account/index.blade.php` (422 B) renders an empty `<main>` |
 | Rate / review seller | **Missing** | no rating code anywhere |
@@ -173,8 +173,8 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 ### Seller
 | Feature | Status | Evidence |
 |---|---|---|
-| Products + variants (1–2 axes), images, status | Implemented | `Seller/ProductController.php`, `Services/VariantSyncService.php` |
-| Stock ledger (every change) | Implemented | `Services/StockService.php`, `inventory_transactions` |
+| Products + variants (1–2 axes), images, status | Implemented | `Seller/ProductController.php`, `Services/Seller/VariantSyncService.php` |
+| Stock ledger (every change) | Implemented | `Services/Seller/StockService.php`, `inventory_transactions` |
 | Orders: accept → preparing, mark ready | Implemented | `Seller/OrderController.php:79-172` |
 | Shipments list + printable waybill | Implemented | `Seller/ShipmentController.php`, `Seller/Shipments/{index,label}.blade.php` |
 | Messages | Implemented | `Seller/MessageController.php` |
@@ -187,7 +187,7 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Dashboard | Partial | `Logistics/DashboardController.php`; view renders no notifications despite passing them |
 | Incoming parcels: pickup, to sorting center | Implemented | `Logistics/IncomingParcelsController.php` |
 | Sorting: receive → sort (determines destination area) | Implemented | `Logistics/ParcelSortingController.php:102-138` |
-| Assign delivery rider by area (+ override) | Implemented | `ParcelSortingController.php:146`; `Services/CourierAssignmentService.php` |
+| Assign delivery rider by area (+ override) | Implemented | `ParcelSortingController.php:146`; `Services/Logistics/CourierAssignmentService.php` |
 | Delivery: start, delivered, failed, reschedule, return | Implemented | `Logistics/DeliveryAssignmentsController.php` |
 | Delivery monitoring | Implemented | `Logistics/DeliveryMonitoringController.php` |
 | Delivery areas CRUD + link riders | Implemented | `Logistics/AreaController.php`, `Logistics/Areas/index.blade.php` |
@@ -200,9 +200,9 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Dashboard (company, station, real counters, attention items) | Implemented | `Rider/DashboardController.php`, `Services/RiderOperationsService::dashboard()` |
 | Pickup assignments + confirm collection | Implemented | `Rider/PickupAssignmentsController.php`, `RiderOperationsService::confirmPickup()` |
 | Delivery assignments, start, failed attempts | Implemented | `Rider/DeliveryAssignmentsController.php`, `RiderOperationsService::{startDelivery,failDelivery}()` |
-| Proof of delivery + COD collection | Implemented | `Rider/DeliveryProofController.php`, `Logistics/DeliveryProofController.php`, `Models/DeliveryProof.php`, `Payment::recordCodCollection()` |
+| Proof of delivery + COD collection | Implemented | `Rider/DeliveryProofController.php`, `Logistics/DeliveryProofController.php`, `Models/Logistics/DeliveryProof.php`, `Payment::recordCodCollection()` |
 | Delivery history + account | Implemented | `Rider/DeliveryHistoryController.php`, `Rider/AccountController.php` |
-| Notifications centre (assignments, reassignment, station, account) | Implemented | `Rider/NotificationController.php`, `Services/RiderNotifier.php`, `Notifications/Rider/*` |
+| Notifications centre (assignments, reassignment, station, account) | Implemented | `Rider/NotificationController.php`, `Services/Rider/RiderNotifier.php`, `Notifications/Rider/*` |
 
 ### Admin
 | Feature | Status | Evidence |
@@ -217,7 +217,7 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 ### Order & delivery engine
 | Feature | Status | Evidence |
 |---|---|---|
-| Status pipeline PLACED…COMPLETED | Implemented | `Services/SellerOrderStatusService.php:41-55` |
+| Status pipeline PLACED…COMPLETED | Implemented | `Services/Seller/SellerOrderStatusService.php:41-55` |
 | DELIVERY_FAILED → retry (≤2) / RETURNED | Implemented | `DeliveryAssignmentsController.php:201-250` |
 | COD settlement on delivery | Implemented | `SellerOrderStatusService.php:336-346` |
 | Stock restore on return | Implemented | `SellerOrderStatusService.php:258-287` |
@@ -233,8 +233,6 @@ Each item was checked in the current code. "Verified" means the file/line was re
 
 | # | Problem | File | Verified | Severity |
 |---|---|---|---|---|
-| C1 | `App\Models\Seller\ProductImage` is a **0-byte dead file**; live code uses `App\Models\ProductImage` | `app/Models/Seller/ProductImage.php` | yes (empty) | High (dead code) |
-| C2 | `App\Models\Seller\Product.php` declares `namespace App\Models` (same FQCN as `app/Models/Product.php`) → **unreachable** | `app/Models/Seller/Product.php` | yes (0 refs) | Medium |
 | C7 | `RETURNED` can → `COMPLETED` in the graph but **no actor owns it**; a returned slice is a dead end and blocks buyer confirmation of the whole order | `SellerOrderStatusService.php:53`, `Enums/OrderActor.php:61-63`, `Order.php:118-123` | yes | High (logic) |
 | C8 | Idempotent-replay path can **re-fire notifications** (the post-transaction `status === $to` guard is true on a racing replay) | `SellerOrderStatusService.php:119-121,186` | yes | Medium |
 | C9 | `Buyer/CourierAssigned` notification on `ASSIGNED_TO_RIDER` reads `courier?->name` (**pickup** courier), not `delivery_courier_id` | `Notifications/Buyer/CourierAssigned.php:25` | yes | Low |
@@ -245,8 +243,6 @@ Each item was checked in the current code. "Verified" means the file/line was re
 | C14 | Logistics dashboard passes `$notifications`/`$unreadCount` but the view renders neither | `Logistics/DashboardController.php:38-54` | yes | Low |
 | C15 | Buyer order list runs a **second full query** to compute pill counts | `Buyer/OrderController.php:55-97,120-123` | yes | Low |
 | C16 | Cart voucher is not cleared on the checkout **failure** path (only on success) | `Buyer/CheckoutController.php` | yes | Low |
-| C17 | `LoginChoiceController` is **dead** (no route references it; `/login` is a closure) | `Auth/LoginChoiceController.php` | yes | Low |
-| C18 | `Admin\SellerRegistrationController` is **unrouted** (dead legacy controller) | `app/Http/Controllers/Admin/SellerRegistrationController.php` | yes | Low |
 | C20 | ~~`buyers.contact_no` has no unique constraint~~ **Fixed** — unique nullable `contact_no` on buyers/sellers/logistics_providers (`2026_10_17_000001`); archive nulls the phone | migration + FormRequests | yes | — |
 | C21 | `ConversationPolicy` exists but is **not registered** in `AppServiceProvider` | `Providers/AppServiceProvider.php` | yes | Low |
 | C22 | ~~Admin registrations "View details" unwired~~ **Fixed** — detail modal with address + document links | `Admin/Registrations/index.blade.php` | yes | — |
@@ -293,9 +289,11 @@ Each item was checked in the current code. "Verified" means the file/line was re
 4. **Session hardening for production** — `SESSION_ENCRYPT` / `SESSION_SECURE_COOKIE` / `secure` cookies.
 5. **Rider API** — Sanctum, or a hand-rolled hashed token table? (Batch D)
 6. **Commission model** — where 10% is recorded and how seller earnings are surfaced.
-7. **Dead code** — delete `Seller/ProductImage.php`, `Seller/Product.php`, `Seller/Products/show.blade.php`, `Admin\SellerRegistrationController`, `Auth/LoginChoiceController`? (They are listed in `3-Folder-Structure.md`.)
+7. **Dead code** — removed 2026-10-31 (unrouted controllers, duplicate `Seller` product models, orphan views, the `RiderHandoffVerification` wrapper).
+8. **Reverse pickup scope (audit F-03, P1-07)** — built and tested, but the panel has not confirmed it. If it is ruled out, hide the buyer Return button so no return stops at approved.
 8. **Registration test failures** — fix the 403-vs-302 + `postal_code` assertions, or accept?
 9. **Test baseline** — establish the true pass/fail count.
+10. **Money on returned parcels** — the Logistics company keeps the shipping fee and the rest of the cash still goes to Zefanya, which refunds the buyer. Both Earnings and Settlements label these parcels. The panel has not confirmed who bears the delivery cost of a return.
 
 ---
 

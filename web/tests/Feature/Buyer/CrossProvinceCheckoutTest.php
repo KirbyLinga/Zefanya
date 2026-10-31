@@ -6,18 +6,19 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\Payment;
-use App\Models\Product;
+use App\Models\Logistics\LogisticsShippingRate;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
-use App\Models\SellerOrder;
-use App\Services\CartSummary;
-use App\Services\CheckoutCarrierService;
-use App\Services\ProviderHandoffSchemaService;
+use App\Models\Shared\Order;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Services\Buyer\CartSummary;
+use App\Services\Buyer\CheckoutCarrierService;
+use App\Services\Logistics\ProviderHandoffSchemaService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
@@ -127,6 +128,29 @@ class CrossProvinceCheckoutTest extends TestCase
             ->get(route('buyer.checkout.index'))
             ->assertOk()
             ->assertSee('Cross-province shipping is not configured by the marketplace yet');
+    }
+
+    public function test_the_origin_carriers_own_rate_opens_a_route_the_marketplace_has_not_priced(): void
+    {
+        config(['buyer.cross_province.fee_minor' => null]);
+        $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->cart();
+        LogisticsShippingRate::query()->create([
+            'logistics_provider_id' => $this->origin->id,
+            'zone' => LogisticsShippingRate::CROSS_PROVINCE,
+            'first_kg_minor' => 15000,
+            'additional_kg_minor' => 3000,
+        ]);
+
+        $options = $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index'))
+            ->assertOk()
+            ->assertDontSee('not configured by the marketplace')
+            ->viewData('carrierOptions');
+
+        $this->assertTrue($options[0]['available']);
+        $this->assertSame((int) $this->origin->id, $options[0]['carriers'][0]['id']);
+        $this->assertGreaterThanOrEqual(15000, $options[0]['carriers'][0]['fee_minor']);
     }
 
     public function test_cross_province_order_saves_origin_carrier_and_destination_without_transferring_custody(): void

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
-use App\Models\DeliveryProof;
+use App\Models\Logistics\DeliveryProof;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;

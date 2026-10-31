@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Seller;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Notifications\Notification;
 
 /**

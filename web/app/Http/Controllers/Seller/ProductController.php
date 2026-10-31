@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Seller\StoreProductRequest;
-use App\Models\Product;
-use App\Models\ProductImage;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductImage;
+use App\Models\Seller\StoreCategory;
 use App\Models\Shared\Category;
-use App\Services\ProductPublishingService;
+use App\Services\Seller\ProductPublishingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -35,6 +37,11 @@ class ProductController extends Controller
             $categoryId = null;
         }
 
+        $stock = $request->input('stock');
+        if ($stock !== 'low') {
+            $stock = null;
+        }
+
         $perPage = (int) $request->input('per_page', self::DEFAULT_PER_PAGE);
         if (! in_array($perPage, self::PER_PAGE_OPTIONS, true)) {
             $perPage = self::DEFAULT_PER_PAGE;
@@ -58,6 +65,10 @@ class ProductController extends Controller
             ->withSum('variants as variants_sum_stock_quantity', 'stock_quantity')
             ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
             ->when($status, fn ($q) => $q->where('status', $status))
+            ->when($stock === 'low', fn ($q) => $q->whereHas('variants', fn ($variants) => $variants
+                ->select('product_id')
+                ->groupBy('product_id')
+                ->havingRaw('SUM(stock_quantity) <= products.low_stock_threshold')))
             ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'));
 
         $sorts[$sort]($query);
@@ -75,7 +86,7 @@ class ProductController extends Controller
         $editProduct = null;
         if (old('_modal') === 'product-edit') {
             $editProduct = Product::forSeller($sellerId)
-                ->with(['images', 'variants.optionValues.option', 'options.values'])
+                ->with(['images', 'variants.optionValues.option', 'options.values', 'storeCategories'])
                 ->find((int) old('_product_id'));
         }
 
@@ -87,6 +98,7 @@ class ProductController extends Controller
                 'q' => $search !== '' ? $search : null,
                 'status' => $status,
                 'category' => $categoryId,
+                'stock' => $stock,
             ],
             'sort' => $sort,
             'perPage' => $perPage,
@@ -98,6 +110,8 @@ class ProductController extends Controller
                 ->get(['id', 'label']),
             'newProduct' => new Product(['status' => 'draft', 'low_stock_threshold' => 5]),
             'lockedCategory' => $seller->lineOfBusiness,
+            'platformCategories' => Category::query()->orderBy('label')->get(),
+            'storeCategories' => StoreCategory::query()->where('seller_id', $sellerId)->orderBy('name')->get(),
             'openCreateModal' => $openCreateModal,
             'editProduct' => $editProduct,
             'openEditId' => $openEditId ?: null,
@@ -124,13 +138,15 @@ class ProductController extends Controller
     public function edit(Request $request, Product $product)
     {
         $this->authorizeOwnership($product);
-        $product->load(['images', 'variants.optionValues.option', 'options.values']);
+        $product->load(['images', 'variants.optionValues.option', 'options.values', 'storeCategories']);
 
         // The products index opens this route through the Edit Product modal.
         if ($request->ajax()) {
             return response()->view('Seller.Products._form', [
                 'product' => $product,
                 'lockedCategory' => Auth::guard('seller')->user()->lineOfBusiness,
+                'platformCategories' => Category::query()->orderBy('label')->get(),
+                'storeCategories' => StoreCategory::query()->where('seller_id', $product->seller_id)->orderBy('name')->get(),
             ]);
         }
 
@@ -142,17 +158,21 @@ class ProductController extends Controller
     public function update(StoreProductRequest $request, Product $product, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
+        $this->authorizeNotRestricted($product);
         $publishing->save($product, Auth::guard('seller')->user(), $request->validated());
 
         return back()->with('success', "\"{$product->name}\" was updated.");
     }
 
-    public function destroy(Request $request, Product $product)
+    public function destroy(Request $request, Product $product, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
+        $this->authorizeNotRestricted($product);
 
         $name = $product->name;
-        $product->delete();
+        if (! $publishing->archive($product, Auth::guard('seller')->user())) {
+            throw ValidationException::withMessages(['product' => 'This product has unfinished orders and cannot be deleted.']);
+        }
 
         $message = "\"{$name}\" was archived.";
 
@@ -166,15 +186,13 @@ class ProductController extends Controller
     public function toggleStatus(Request $request, Product $product, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
+        $this->authorizeNotRestricted($product);
 
         $validated = $request->validate([
             'status' => ['required', 'in:active,inactive'],
         ]);
 
-        if ($validated['status'] === 'active') {
-            $publishing->assertPublishable($product);
-        }
-        $product->forceFill(['status' => $validated['status']])->save();
+        $product = $publishing->setStatus($product, Auth::guard('seller')->user(), $validated['status']);
 
         $message = "\"{$product->name}\" was marked as {$product->status}.";
 
@@ -193,13 +211,61 @@ class ProductController extends Controller
     public function deleteImage(Product $product, ProductImage $image, ProductPublishingService $publishing)
     {
         $this->authorizeOwnership($product);
+        $this->authorizeNotRestricted($product);
         $publishing->removeImage($product, $image);
 
         return back()->with('success', 'Image removed.');
     }
 
+    public function duplicate(Product $product, ProductPublishingService $publishing)
+    {
+        $this->authorizeOwnership($product);
+        $this->authorizeNotRestricted($product);
+        $copy = $publishing->duplicate($product, Auth::guard('seller')->user());
+
+        return to_route('seller.products.index', ['edit' => $copy->id])->with('success', 'Product copied as a draft. Unique SKUs must be assigned to the copy.');
+    }
+
+    public function bulk(Request $request, ProductPublishingService $publishing)
+    {
+        $data = $request->validate([
+            'product_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'product_ids.*' => ['required', 'integer', 'distinct'],
+            'action' => ['required', 'in:activate,inactivate,archive'],
+        ]);
+        $seller = Auth::guard('seller')->user();
+        $products = Product::forSeller($seller->id)->whereIn('id', $data['product_ids'])->get();
+        abort_unless($products->count() === count($data['product_ids']), 403);
+        $skipped = [];
+        $skipMessages = [];
+        foreach ($products as $product) {
+            if ($product->isRestricted()) {
+                $skipped[] = $product->name.' (admin-restricted)';
+                $skipMessages[] = $product->name.' (admin-restricted)';
+
+                continue;
+            }
+            if ($data['action'] === 'archive') {
+                if (! $publishing->archive($product, $seller)) {
+                    $skipped[] = $product->name;
+                    $skipMessages[] = $product->name.' (unfinished orders)';
+                }
+            } else {
+                $publishing->setStatus($product, $seller, $data['action'] === 'activate' ? 'active' : 'inactive');
+            }
+        }
+        $message = 'Product action completed.'.($skipped === [] ? '' : ' Skipped products: '.implode(', ', $skipMessages).'.');
+
+        return $request->expectsJson() ? response()->json(['message' => $message, 'skipped' => $skipped]) : back()->with('success', $message);
+    }
+
     private function authorizeOwnership(Product $product): void
     {
         abort_unless($product->seller_id === Auth::guard('seller')->id(), 403);
+    }
+
+    private function authorizeNotRestricted(Product $product): void
+    {
+        abort_unless(! $product->isRestricted(), 403, 'This product is restricted by an administrator and cannot be modified.');
     }
 }

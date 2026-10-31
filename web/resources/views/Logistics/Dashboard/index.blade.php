@@ -33,9 +33,20 @@
                 </optgroup>
             </select>
         </div>
-        <button type="submit" class="h-10 rounded-sm bg-primary-800 px-4 font-sans text-xs font-semibold uppercase text-white hover:bg-primary-900">View facility</button>
+        <div>
+            <label for="dashboard-from" class="mb-1 block text-xs text-[var(--text-muted)]">From</label>
+            <input id="dashboard-from" type="date" name="from" value="{{ $dateFrom }}" class="h-10 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-ink)]">
+        </div>
+        <div>
+            <label for="dashboard-to" class="mb-1 block text-xs text-[var(--text-muted)]">To (inclusive)</label>
+            <input id="dashboard-to" type="date" name="to" value="{{ $dateTo }}" class="h-10 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-ink)]">
+        </div>
+        @if ($metric)<input type="hidden" name="metric" value="{{ $metric }}">@endif
+        <button type="submit" class="h-10 rounded-sm bg-primary-800 px-4 font-sans text-xs font-semibold uppercase text-white hover:bg-primary-900">Apply filters</button>
     </form>
 
+    <p class="mb-4 text-xs text-[var(--text-muted)]">Dates include the full start and end days. Hub, transit and available-fleet results use the last updated date; deliveries use the delivery event date. Without dates, deliveries show today.</p>
+    @if ($errors->any())<p role="alert" class="mb-4 text-sm text-red-800">{{ $errors->first() }}</p>@endif
     <section class="mb-6 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm" aria-labelledby="networkSetupTitle">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 id="networkSetupTitle" class="font-sans text-base font-semibold text-[var(--text-ink)]">Network setup</h2>
@@ -66,43 +77,65 @@
 
     {{-- ========================== STAT CARDS =========================== --}}
     <section class="grid grid-cols-4 gap-5 mb-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <a href="{{ route('logistics.dashboard', array_filter(['facility' => $facilityKey, 'from' => $dateFrom, 'to' => $dateTo, 'metric' => 'hub'])) }}#metric-results" class="block rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm transition-colors hover:border-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-primary-500 text-[#fff8f7]">
                 <i data-lucide="inbox" class="w-[18px] h-[18px]"></i>
             </div>
             <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Parcels in hub</p>
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($parcelsInHub) }}</p>
             <p class="font-sans text-xs text-[var(--text-muted)] mt-1">At sorting center</p>
-        </div>
+        </a>
 
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <a href="{{ route('logistics.dashboard', array_filter(['facility' => $facilityKey, 'from' => $dateFrom, 'to' => $dateTo, 'metric' => 'transit'])) }}#metric-results" class="block rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm transition-colors hover:border-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-secondary-700 text-[#fff8f7]">
                 <i data-lucide="truck" class="w-[18px] h-[18px]"></i>
             </div>
             <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Parcels in transit</p>
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($parcelsInTransit) }}</p>
             <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Picked up, sorted, assigned, or out for delivery</p>
-        </div>
+        </a>
 
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <a href="{{ route('logistics.dashboard', array_filter(['facility' => $facilityKey, 'from' => $dateFrom, 'to' => $dateTo, 'metric' => 'delivered'])) }}#metric-results" class="block rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm transition-colors hover:border-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-warning text-[#fff8f7]">
                 <i data-lucide="check-circle-2" class="w-[18px] h-[18px]"></i>
             </div>
-            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Delivered today</p>
+            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">{{ $dateFrom || $dateTo ? 'Delivered in period' : 'Delivered today' }}</p>
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($deliveredToday) }}</p>
-            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Delivered or completed today</p>
-        </div>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Unique parcels delivered or completed</p>
+        </a>
 
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <a href="{{ route('logistics.dashboard', array_filter(['facility' => $facilityKey, 'from' => $dateFrom, 'to' => $dateTo, 'metric' => 'riders'])) }}#metric-results" class="block rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm transition-colors hover:border-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-tertiary-500 text-[#fff8f7]">
                 <i data-lucide="users" class="w-[18px] h-[18px]"></i>
             </div>
             <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Available fleet riders</p>
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($activeRiders) }}</p>
             <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Available in this facility</p>
-        </div>
+        </a>
     </section>
 
+    @if ($metricResults !== null)
+        <section id="metric-results" class="mb-6 scroll-mt-5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
+            <h2 class="text-base font-semibold text-[var(--text-ink)]">{{ ['hub' => 'Parcels in hub', 'transit' => 'Parcels in transit', 'delivered' => 'Delivered parcels', 'riders' => 'Available fleet riders'][$metric] }} ({{ $metricResults->total() }})</h2>
+            <p class="mt-1 text-xs text-[var(--text-muted)]">Matches the selected dashboard card and filters.</p>
+            <ul class="mt-4 divide-y divide-[var(--border-strong)]">
+                @forelse ($metricResults as $result)
+                    <li class="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                        @if ($metric === 'riders')
+                            <span class="font-semibold text-[var(--text-ink)]">{{ $result->name }}</span>
+                            <span class="rounded-full bg-teal-50 px-3 py-1 text-xs text-teal-900">Available</span>
+                        @else
+                            <span class="font-mono text-[var(--text-ink)]">{{ $result->tracking_number ?? 'Order #'.$result->id }}</span>
+                            <span class="rounded-full bg-primary-50 px-3 py-1 text-xs text-primary-900">{{ $result->status->label() }}</span>
+                        @endif
+                    </li>
+                @empty
+                    <li class="py-6 text-sm text-[var(--text-muted)]">No results match this card and date range.</li>
+                @endforelse
+            </ul>
+            <div class="mt-4">{{ $metricResults->fragment('metric-results')->links() }}</div>
+        </section>
+    @endif
     <div class="grid grid-cols-[2fr_1fr] gap-5 mb-5 max-lg:grid-cols-1">
 
         {{-- ======================= DELIVERY ACTIVITY ====================== --}}
@@ -174,7 +207,27 @@
                             <tr>
                                 <td class="px-3 py-3 font-sans text-xs font-semibold text-[var(--text-ink)]">{{ $parcel->tracking_number }}</td>
                                 <td class="px-3 py-3 font-sans text-xs text-[var(--text-muted)]">{{ $parcel->seller?->business_name ?? 'Seller' }}</td>
-                                <td class="px-3 py-3 font-sans text-xs text-[var(--text-ink)]">{{ $parcel->status?->label() ?? 'Unknown' }}</td>
+                                <td class="px-3 py-3 font-sans text-xs">
+                                    @php
+                                        $parcelStatusTone = match ($parcel->status?->name) {
+                                            'Cancelled' => 'bg-red-50 text-red-900 ring-red-200',
+                                            'DeliveryFailed' => 'bg-orange-50 text-orange-900 ring-orange-200',
+                                            'Returned' => 'bg-stone-100 text-stone-900 ring-stone-300',
+                                            'Completed' => 'bg-emerald-50 text-emerald-900 ring-emerald-200',
+                                            'Delivered' => 'bg-teal-50 text-teal-900 ring-teal-200',
+                                            'ReadyForPickup' => 'bg-sky-50 text-sky-900 ring-sky-200',
+                                            'PickedUp' => 'bg-indigo-50 text-indigo-900 ring-indigo-200',
+                                            'AtSortingCenter', 'Sorted' => 'bg-violet-50 text-violet-900 ring-violet-200',
+                                            'AssignedToRider', 'OutForDelivery' => 'bg-blue-50 text-blue-900 ring-blue-200',
+                                            'Placed', 'Confirmed', 'Preparing' => 'bg-amber-50 text-amber-900 ring-amber-200',
+                                            default => 'bg-neutral-100 text-neutral-900 ring-neutral-200',
+                                        };
+                                    @endphp
+                                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 ring-inset {{ $parcelStatusTone }}">
+                                        <span class="size-1.5 shrink-0 rounded-full bg-current text-inherit" aria-hidden="true"></span>
+                                        <span class="text-inherit">{{ $parcel->status?->label() ?? 'Unknown' }}</span>
+                                    </span>
+                                </td>
                                 <td class="px-3 py-3 font-sans text-xs text-[var(--text-muted)]">{{ $parcel->updated_at->diffForHumans() }}</td>
                             </tr>
                         @endforeach

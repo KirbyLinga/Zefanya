@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -64,6 +63,7 @@ class SellerRegistrationTest extends TestCase
             'contact_no' => '09189876543',
             'birthday' => '1990-01-15',
             'address_mode' => 'api',
+            'region_code' => '030000000',
             'province' => '0300000000',
             'province_name' => 'Metro Manila',
             'municipality' => '1305000000',
@@ -72,33 +72,19 @@ class SellerRegistrationTest extends TestCase
             'barangay_name' => 'Commonwealth',
             'street' => 'Blk 12 Lot 8, Sampaguita St.',
             'house_number' => 'Blk 12 Lot 8',
+            'seller_type' => 'sole_proprietor',
             'business_name' => 'Maria Clara Handicrafts',
+            'tin' => '123-456-789-000',
             'line_of_business_id' => $this->firstCategoryId(),
             'upload_id' => $this->fakeId(),
             'business_permit' => $this->fakePdf(),
+            'terms' => '1',
         ], $overrides);
     }
 
     private function registerSeller(array $payload = []): TestResponse
     {
         return $this->postJson(route('register.seller.store'), $this->basePayload($payload));
-    }
-
-    private function registerAndCaptureOtp(array $payload = []): array
-    {
-        Notification::fake();
-
-        $response = $this->registerSeller($payload);
-        $seller = Seller::query()->latest('id')->firstOrFail();
-
-        $otp = null;
-        Notification::assertSentTo($seller, SellerRegistrationOtp::class, function ($notification) use (&$otp): bool {
-            $otp = $notification->otp;
-
-            return true;
-        });
-
-        return [$seller, $otp, $response];
     }
 
     /**
@@ -361,23 +347,23 @@ class SellerRegistrationTest extends TestCase
 
     public function test_sel_007_email_no_tld(): void
     {
-        // Laravel's default email rule accepts a host without a dotted TLD.
+        // TC-SEL-007: the domain must contain a dot (same rule as every role).
         $response = $this->registerSeller(['email' => 'mariaclara.santos@example']);
-        $response->assertStatus(201);
+        $response->assertStatus(422)->assertJsonValidationErrorFor('email');
     }
 
     public function test_sel_007_email_with_space(): void
     {
-        // Quoted local-parts are valid RFC 5321 addresses; the app accepts them.
+        // TC-SEL-007: spaces are rejected, even in a quoted local-part.
         $response = $this->registerSeller(['email' => '"mariaclara santos"@example.com']);
-        $response->assertStatus(201);
+        $response->assertStatus(422)->assertJsonValidationErrorFor('email');
     }
 
     // ── TC-SEL-008: Email already registered ────────────────────────────────
 
     public function test_sel_008_email_already_registered(): void
     {
-        $existing = $this->createSeller([
+        $this->createSeller([
             'email' => 'mariaclara.santos@example.com',
         ]);
 
@@ -589,14 +575,52 @@ class SellerRegistrationTest extends TestCase
 
     // ── TC-SEL-019: Terms not accepted ──────────────────────────────────────
 
-    public function test_sel_019_terms_not_required_for_seller(): void
+    public function test_sel_019_registration_blocked_without_accepting_terms(): void
     {
-        // Seller registration has no terms checkbox (buyer does).
         Notification::fake();
-        $this->registerSeller()->assertStatus(201);
+
+        foreach ([['terms' => null], ['terms' => '0']] as $override) {
+            $this->registerSeller($override)
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['terms' => 'You must accept the Terms and Privacy Policy.']);
+        }
+
+        $this->assertDatabaseCount('sellers', 0);
+        Notification::assertNothingSent();
+    }
+
+    public function test_sel_019_modal_renders_the_terms_checkbox(): void
+    {
+        $this->get(route('register.type'))
+            ->assertOk()
+            ->assertSee('id="sellerTerms"', false);
     }
 
     // ── TC-SEL-020: Rapid triple click ──────────────────────────────────────
+
+    public function test_sel_020_repeat_submission_returns_the_first_registration_with_one_otp(): void
+    {
+        Notification::fake();
+        $payload = $this->basePayload();
+
+        $first = $this->registerSeller($payload)->assertStatus(201);
+        $second = $this->registerSeller($payload)->assertStatus(201);
+
+        $this->assertSame($first->json('seller_id'), $second->json('seller_id'));
+        $seller = Seller::where('email', $payload['email'])->sole();
+        $this->assertSame(1, Notification::sent($seller, SellerRegistrationOtp::class)->count());
+    }
+
+    public function test_seller_must_be_18_and_not_born_in_the_future(): void
+    {
+        $this->registerSeller(['birthday' => '2008-10-10'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['birthday' => 'You must be at least 18 years old.']);
+
+        $this->registerSeller(['birthday' => '2026-10-10'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['birthday' => 'Please enter a valid date of birth. It cannot be in the future.']);
+    }
 
     public function test_sel_020_rapid_triple_click_single_account(): void
     {
@@ -613,7 +637,7 @@ class SellerRegistrationTest extends TestCase
 
     // ── TC-SEL-021: Shop name already used ──────────────────────────────────
 
-    public function test_sel_021_shop_name_may_be_reused(): void
+    public function test_sel_021_shop_name_is_unique_ignoring_case_and_spaces(): void
     {
         Notification::fake();
 
@@ -623,25 +647,24 @@ class SellerRegistrationTest extends TestCase
 
         // business_name is not unique — only email/contact_no are.
         $this->registerSeller([
-            'business_name' => 'Maria Clara Handicrafts',
+            'business_name' => ' mArIaClara HANDICRAFTS ',
             'email' => 'different'.uniqid().'@example.com',
             'contact_no' => '09189876544',
-        ])->assertStatus(201);
+        ])->assertUnprocessable()->assertJsonValidationErrors(['business_name']);
     }
 
     // ── TC-SEL-023: Documents change with seller type ────────────────────────
 
     public function test_sel_023_documents_by_seller_type(): void
     {
-        // No seller_type field exists - SPEC GAP
-        // The form only collects: upload_id, business_permit
+        // A sole proprietor submits ID and business/DTI permit.
         $response = $this->registerSeller();
         $response->assertStatus(201);
     }
 
     // ── TC-SEL-024: Corporation without SEC certificate ───────────────────────
 
-    public function test_sel_024_corporation_fields_not_collected(): void
+    public function test_sel_024_corporation_requires_an_sec_certificate(): void
     {
         // No seller_type / SEC certificate — business_permit covers current KYC.
         Notification::fake();
@@ -650,18 +673,29 @@ class SellerRegistrationTest extends TestCase
 
     // ── TC-SEL-025: TIN validation ───────────────────────────────────────
 
-    public function test_sel_025_tin_not_collected(): void
+    public function test_sel_025_tin_format_is_required(): void
     {
-        Notification::fake();
-        $this->registerSeller()->assertStatus(201);
-        $this->assertFalse(Schema::hasColumn('sellers', 'tin'));
+        foreach (['', '123456789000', '123-456-789', 'ABC-456-789-000'] as $tin) {
+            $this->registerSeller(['tin' => $tin])->assertUnprocessable()->assertJsonValidationErrors(['tin']);
+        }
     }
 
-    // ── TC-SEL-026: TIN already registered ────────────────────────────────────
-
-    public function test_sel_026_tin_column_absent(): void
+    public function test_sel_026_duplicate_tin_is_rejected(): void
     {
-        $this->assertFalse(Schema::hasColumn('sellers', 'tin'));
+        $this->createSeller(['tin' => '123-456-789-000', 'business_name' => 'Another shop']);
+        $this->registerSeller()->assertUnprocessable()->assertJsonPath('errors.tin.0', 'This TIN is already registered.');
+    }
+
+    public function test_sel_022_shop_name_length_boundaries(): void
+    {
+        Notification::fake();
+        foreach ([2, 31] as $length) {
+            $this->registerSeller(['business_name' => str_repeat('a', $length)])->assertUnprocessable()->assertJsonValidationErrors(['business_name']);
+        }
+        foreach ([3, 30] as $length) {
+            $this->registerSeller(['business_name' => str_repeat('a', $length), 'tin' => sprintf('123-456-789-%03d', $length), 'contact_no' => $length === 3 ? '09189876541' : '09189876542'])
+                ->assertCreated();
+        }
     }
 
     // ── TC-SEL-027: Address dropdowns depend on each other ────────────────────
@@ -766,7 +800,7 @@ class SellerRegistrationTest extends TestCase
         Carbon::setTestNow('2026-10-09 12:00:00');
         Notification::fake();
 
-        $response = $this->registerSeller();
+        $this->registerSeller();
         $seller = Seller::query()->latest('id')->firstOrFail();
 
         $otp = null;
@@ -790,7 +824,7 @@ class SellerRegistrationTest extends TestCase
         Carbon::setTestNow('2026-10-09 12:00:00');
         Notification::fake();
 
-        $response = $this->registerSeller();
+        $this->registerSeller();
         $seller = Seller::query()->latest('id')->firstOrFail();
 
         $wrongOtp = '000000';
@@ -856,7 +890,7 @@ class SellerRegistrationTest extends TestCase
         Carbon::setTestNow('2026-10-09 12:00:00');
         Notification::fake();
 
-        $response = $this->registerSeller();
+        $this->registerSeller();
         $seller = Seller::query()->latest('id')->firstOrFail();
 
         $otp = null;
@@ -866,14 +900,16 @@ class SellerRegistrationTest extends TestCase
             return true;
         });
 
-        // Move time past the 10-minute OTP expiry
-        Carbon::setTestNow('2026-10-09 12:10:01');
+        // The OTP lives 5 minutes; the workbook enters it at 5:01.
+        Carbon::setTestNow('2026-10-09 12:05:01');
         $seller->refresh();
 
         $this->assertTrue($seller->isOtpExpired());
 
         $verifyResponse = $this->verifyOtpWithSession($seller, $otp);
-        $verifyResponse->assertStatus(422)->assertJsonPath('message', 'This code has expired. Please request a new one.');
+        $verifyResponse->assertStatus(422)
+            ->assertJsonPath('expired', true)
+            ->assertJsonPath('message', 'This code has expired. Tap "Resend code" for a new one.');
     }
 
     // ── TC-SEL-036: Resend OTP ───────────────────────────────────────────────
@@ -883,7 +919,7 @@ class SellerRegistrationTest extends TestCase
         Carbon::setTestNow('2026-10-09 12:00:00');
         Notification::fake();
 
-        $response = $this->registerSeller();
+        $this->registerSeller();
         $seller = Seller::query()->latest('id')->firstOrFail();
 
         $firstOtp = null;
@@ -933,7 +969,7 @@ class SellerRegistrationTest extends TestCase
             'status' => 'unverified',
         ]);
 
-        $response = $this->post(route('unified.login'), [
+        $this->post(route('unified.login'), [
             'email' => $seller->email,
             'password' => 'Tindahan@2026',
         ]);
@@ -966,15 +1002,15 @@ class SellerRegistrationTest extends TestCase
         $this->actingAs($seller, 'seller');
 
         $response = $this->get(route('seller.dashboard'));
-        // EnsureSellerApproved logs out and redirects to login (302), not 403.
-        $response->assertRedirect(route('home', ['login' => 1]));
+        $response->assertForbidden()->assertSee('Your account is under review');
+        $this->assertAuthenticatedAs($seller, 'seller');
     }
 
     // ── TC-SEL-039: New application appears in admin pending list ────────────
 
     public function test_sel_039_application_in_admin_pending_list(): void
     {
-        $seller = $this->createSeller([
+        $this->createSeller([
             'business_name' => 'Maria Clara Handicrafts',
             'email' => 'mariaclara.santos@example.com',
             'status' => 'pending',

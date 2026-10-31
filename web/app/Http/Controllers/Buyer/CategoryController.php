@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Shared\Category;
+use App\Models\Shared\OrderItem;
 use Illuminate\View\View;
 
 class CategoryController extends Controller

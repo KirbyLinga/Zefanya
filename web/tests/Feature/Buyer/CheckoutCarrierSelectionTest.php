@@ -4,14 +4,14 @@ namespace Tests\Feature\Buyer;
 
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\Order;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
-use App\Services\CartSummary;
-use App\Services\CheckoutCarrierService;
+use App\Models\Shared\Order;
+use App\Services\Buyer\CartSummary;
+use App\Services\Buyer\CheckoutCarrierService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
@@ -52,7 +52,7 @@ class CheckoutCarrierSelectionTest extends TestCase
 
     public function test_same_province_checkout_lists_eligible_enabled_carriers_with_fees(): void
     {
-        $carrier = $this->bootstrapCheckoutCarriers($this->buyer, [$this->sellerA]);
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->sellerA]);
         $second = $this->makeOperationalCheckoutCarrier('Second Cargo', '0305401001');
         SellerShippingProvider::query()->create([
             'seller_id' => $this->sellerA->id,

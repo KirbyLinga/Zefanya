@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
-use App\Models\SellerOrder;
-use App\Services\LogisticsHubService;
-use App\Services\PhilippineLocationService;
+use App\Models\Rider\Courier;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Shared\PhilippineLocationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

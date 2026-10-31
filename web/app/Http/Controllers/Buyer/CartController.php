@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
-use App\Models\CartItem;
-use App\Models\Product;
-use App\Models\Voucher;
-use App\Services\CartSummary;
-use App\Services\CartVariantResolver;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
+use App\Models\Seller\Seller;
+use App\Models\Shared\Voucher;
+use App\Services\Buyer\BuyerPurchaseLimit;
+use App\Services\Buyer\CartSummary;
+use App\Services\Buyer\CartVariantResolver;
+use App\Services\Buyer\VoucherApplication;
+use App\Services\Buyer\VoucherSessionService;
+use App\Services\Shared\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -61,6 +66,27 @@ class CartController extends Controller
     }
 
     /**
+     * Normalize an optional voucher slot from the request. `slot=shop` plus
+     * `seller_id` is accepted as shorthand for `shop:{seller_id}`.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function requestedSlot(array $validated): ?string
+    {
+        $slot = $validated['slot'] ?? $validated['scope'] ?? null;
+
+        if ($slot === null && isset($validated['seller_id'])) {
+            return 'shop:'.(int) $validated['seller_id'];
+        }
+
+        if ($slot === 'shop' && isset($validated['seller_id'])) {
+            return 'shop:'.(int) $validated['seller_id'];
+        }
+
+        return is_string($slot) && $slot !== '' ? $slot : null;
+    }
+
+    /**
      * Recompute the cart totals and return them as JSON, so every mutating
      * endpoint answers with the same shape as `summary`.
      *
@@ -68,11 +94,10 @@ class CartController extends Controller
      */
     private function summaryResponse(Collection $items, ?array $selectedIds = null, array $extra = []): JsonResponse
     {
-        $voucher = $this->resolveVoucher(
-            (new CartSummary($items, null, $selectedIds))->subtotalCentavos
-        );
+        $base = new CartSummary($items, null, $selectedIds);
+        $application = $this->resolveVouchers($base);
 
-        $summary = new CartSummary($items, $voucher, $selectedIds);
+        $summary = new CartSummary($items, $application, $selectedIds);
 
         return response()->json(array_merge(
             $summary->toJson($this->voucherNotice),
@@ -81,33 +106,23 @@ class CartController extends Controller
     }
 
     /**
-     * Resolve the voucher stored in the session (re-validated on every request
-     * against the current subtotal). An expired, inactive or below-min-spend
-     * voucher is dropped and its reason is captured in $voucherNotice so the
-     * page / JSON response can explain why.
+     * Resolve, re-validate, and stack the vouchers stored in the session. Any
+     * expired/inactive/below-minimum voucher is dropped by the session service
+     * and its reason is captured in $voucherNotice.
      */
-    private function resolveVoucher(int $subtotalCentavos): ?Voucher
+    private function resolveVouchers(CartSummary $base): VoucherApplication
     {
-        $code = session('cart_voucher');
+        $notice = null;
+        $application = app(VoucherSessionService::class)->resolve(
+            $base->sellerGroups,
+            $base->subtotalCentavos,
+            [],
+            $notice,
+        );
 
-        if (! $code) {
-            return null;
-        }
+        $this->voucherNotice = $notice;
 
-        $voucher = Voucher::where('code', strtoupper($code))->first();
-
-        $reason = $voucher === null
-            ? 'This voucher code is no longer valid.'
-            : $voucher->rejectionReason($subtotalCentavos);
-
-        if ($reason !== null) {
-            session()->forget('cart_voucher');
-            $this->voucherNotice = $reason;
-
-            return null;
-        }
-
-        return $voucher;
+        return $application;
     }
 
     // ── index ─────────────────────────────────────────────────────────────────
@@ -115,14 +130,20 @@ class CartController extends Controller
     public function index(): View
     {
         $items = $this->loadItems();
-        $voucher = $this->resolveVoucher((new CartSummary($items))->subtotalCentavos);
-        $summary = new CartSummary($items, $voucher);
+        $base = new CartSummary($items);
+        $application = $this->resolveVouchers($base);
+        $summary = new CartSummary($items, $application);
 
         return view('Buyer.Cart.index', [
             'items' => $items,
             'summary' => $summary,
-            'voucher' => $voucher,
+            'voucher' => $summary->voucher,
+            'vouchers' => $application->toArray(),
             'voucherNotice' => $this->voucherNotice,
+            'shopVouchers' => Voucher::offeredBy(
+                $summary->sellerGroups->map(fn (array $group): int => (int) $group['seller']->getKey())->all(),
+                (int) auth('buyer')->id(),
+            )->groupBy('seller_id'),
         ]);
     }
 
@@ -145,7 +166,7 @@ class CartController extends Controller
         $product = Product::where('status', 'active')->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
             ->find($validated['product_id']);
 
-        if (! $product) {
+        if (! $product || ! $product->isListedForSale()) {
             return response()->json(['error' => 'This product is not available.'], 422);
         }
 
@@ -164,22 +185,33 @@ class CartController extends Controller
         try {
             // Missing-row gap locks can deadlock on concurrent first inserts.
             // Retry the entire read/merge/write transaction, never just INSERT.
-            DB::transaction(function () use ($buyer, $product, $variantId, $validated): void {
+            $quantityResult = DB::transaction(function () use ($buyer, $product, $variantId, $validated): array {
                 $currentProduct = Product::query()->find($product->id);
                 if ($currentProduct === null) {
                     throw ValidationException::withMessages(['product_id' => 'This product is not available.']);
                 }
+                $currentProduct->setRelation('seller', Seller::query()
+                    ->whereKey($currentProduct->seller_id)->sharedLock()->first());
                 $currentVariant = app(CartVariantResolver::class)->resolve($currentProduct, $variantId);
                 $stockCeiling = $currentVariant->stock_quantity;
 
-                $existing = CartItem::where('buyer_id', $buyer->id)
+                $locked = CartItem::query()
+                    ->where('buyer_id', $buyer->id)
                     ->where('product_id', $product->id)
-                    ->where('variant_id', $variantId)
+                    ->orderBy('id')
                     ->lockForUpdate()
-                    ->first();
+                    ->get();
+                $existing = $locked->firstWhere('variant_id', $variantId);
+                $others = (int) $locked->where('id', '!=', $existing?->id)->sum('quantity');
+                $cap = min($stockCeiling, max(0, app(BuyerPurchaseLimit::class)->remaining($buyer->id, $product->id) - $others));
+
+                if ($cap < 1) {
+                    throw ValidationException::withMessages(['quantity' => BuyerPurchaseLimit::MESSAGE]);
+                }
 
                 $requested = (int) $validated['quantity'];
-                $newQty = min(($existing?->quantity ?? 0) + $requested, $stockCeiling);
+                $wanted = ($existing?->quantity ?? 0) + $requested;
+                $newQty = min($wanted, $cap);
 
                 if ($existing !== null) {
                     $existing->update(['quantity' => $newQty]);
@@ -188,10 +220,16 @@ class CartController extends Controller
                         'buyer_id' => $buyer->id,
                         'product_id' => $product->id,
                         'variant_id' => $variantId,
-                        'quantity' => min($requested, $stockCeiling),
+                        'quantity' => $newQty,
                     ]);
                 }
 
+                return [
+                    'quantity' => $newQty,
+                    'quantity_limit' => $cap,
+                    'quantity_warning' => $wanted > $cap
+                        ? ($cap < $stockCeiling ? BuyerPurchaseLimit::MESSAGE : "Only {$cap} available.") : null,
+                ];
             }, attempts: 3);
         } catch (QueryException $exception) {
             if (! in_array((int) ($exception->errorInfo[1] ?? 0), [1213, 1205], true)) {
@@ -204,15 +242,14 @@ class CartController extends Controller
         // Count after commit rather than using an earlier retry snapshot.
         $cartCount = (int) CartItem::where('buyer_id', $buyer->id)->count();
 
-        // Calculate price: use variant price if available, else product price
-        $priceCentavos = (int) round((float) $variant->price * 100);
-        $formattedPrice = '₱'.number_format($priceCentavos / 100, 2);
+        $formattedPrice = app(PriceResolver::class)->forVariant($product, $variant)->formatted();
 
         return response()->json([
             'success' => true,
             'cart_count' => $cartCount,
             'product_name' => $product->name,
             'product_price' => $formattedPrice,
+            ...$quantityResult,
         ]);
     }
 
@@ -240,15 +277,38 @@ class CartController extends Controller
             return response()->json(['error' => 'This item is no longer available.'], 422);
         }
 
-        $item->update([
-            'quantity' => min((int) $validated['quantity'], $item->availableQuantity()),
-        ]);
+        $quantityResult = DB::transaction(function () use ($item, $validated): array {
+            $locked = CartItem::query()
+                ->where('buyer_id', $item->buyer_id)
+                ->where('product_id', $item->product_id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $current = $locked->firstWhere('id', $item->id) ?? $item;
+            $others = (int) $locked->where('id', '!=', $item->id)->sum('quantity');
+            $cap = min($item->availableQuantity(), max(0, app(BuyerPurchaseLimit::class)->remaining($item->buyer_id, $item->product_id) - $others));
+
+            if ($cap < 1) {
+                throw ValidationException::withMessages(['quantity' => BuyerPurchaseLimit::MESSAGE]);
+            }
+
+            $current->update([
+                'quantity' => min((int) $validated['quantity'], $cap),
+            ]);
+
+            return [
+                'quantity_limit' => $cap,
+                'quantity_warning' => (int) $validated['quantity'] > $cap
+                    ? ($cap < $item->availableQuantity() ? BuyerPurchaseLimit::MESSAGE : "Only {$cap} available.") : null,
+            ];
+        });
 
         $item->refresh();
 
         return $this->summaryResponse($this->loadItems(), $this->selectedIdsFrom($request), [
             'item_id' => $item->id,
             'quantity' => $item->quantity,
+            ...$quantityResult,
             'line_total' => $item->formattedLineTotal(),
             'line_total_raw' => $item->lineTotalCentavos(),
         ]);
@@ -308,8 +368,9 @@ class CartController extends Controller
     public function miniCart(Request $request): JsonResponse
     {
         $items = $this->loadItems();
-        $voucher = $this->resolveVoucher((new CartSummary($items))->subtotalCentavos);
-        $summary = new CartSummary($items, $voucher);
+        $base = new CartSummary($items);
+        $application = $this->resolveVouchers($base);
+        $summary = new CartSummary($items, $application);
 
         $itemsData = $items->map(fn (CartItem $item) => [
             'id' => $item->id,
@@ -340,6 +401,9 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:64'],
+            'slot' => ['nullable', 'string', 'max:64'],
+            'scope' => ['nullable', 'string', 'max:20'],
+            'seller_id' => ['nullable', 'integer'],
         ]);
 
         $code = strtoupper(trim($validated['code']));
@@ -351,29 +415,52 @@ class CartController extends Controller
 
         $items = $this->loadItems();
         $selectedIds = $this->selectedIdsFrom($request);
-        $subtotal = (new CartSummary($items, null, $selectedIds))->subtotalCentavos;
-        $reason = $voucher->rejectionReason($subtotal);
+        $base = new CartSummary($items, null, $selectedIds);
 
-        if ($reason !== null) {
-            return response()->json(['error' => $reason], 422);
+        $requestedSlot = $this->requestedSlot($validated);
+
+        $service = app(VoucherSessionService::class);
+        $notice = null;
+
+        if (! $service->apply($voucher, $base->sellerGroups, $base->subtotalCentavos, $notice, $requestedSlot)) {
+            return response()->json(['error' => $notice], 422);
         }
 
-        session(['cart_voucher' => $code]);
-        $this->voucherNotice = null;
+        // Using a listed voucher puts it in the buyer's wallet, so the rule lock
+        // and the wallet both see every buyer holding it.
+        if ($voucher->is_claimable) {
+            $voucher->claims()->firstOrCreate(['buyer_id' => (int) auth('buyer')->id()]);
+        }
 
-        $summary = new CartSummary($items, $voucher, $selectedIds);
+        $resolveNotice = null;
+        $application = $service->resolve($base->sellerGroups, $base->subtotalCentavos, [], $resolveNotice);
+        $this->voucherNotice = $resolveNotice;
 
-        return response()->json(array_merge($summary->toJson(), ['applied' => true]));
+        $summary = new CartSummary($items, $application, $selectedIds);
+
+        return response()->json(array_merge($summary->toJson($this->voucherNotice), ['applied' => true]));
     }
 
     // ── removeVoucher (DELETE /buyer/cart/voucher) ────────────────────────────
 
     public function removeVoucher(Request $request): JsonResponse
     {
-        session()->forget('cart_voucher');
+        $validated = $request->validate([
+            'slot' => ['nullable', 'string', 'max:64'],
+            'scope' => ['nullable', 'string', 'max:20'],
+            'seller_id' => ['nullable', 'integer'],
+        ]);
+
+        $slot = $this->requestedSlot($validated);
+
+        app(VoucherSessionService::class)->remove($slot);
         $this->voucherNotice = null;
 
-        $summary = new CartSummary($this->loadItems(), null, $this->selectedIdsFrom($request));
+        $items = $this->loadItems();
+        $selectedIds = $this->selectedIdsFrom($request);
+        $base = new CartSummary($items, null, $selectedIds);
+        $application = $this->resolveVouchers($base);
+        $summary = new CartSummary($items, $application, $selectedIds);
 
         return response()->json(array_merge($summary->toJson(), ['removed' => true]));
     }
@@ -399,43 +486,56 @@ class CartController extends Controller
             return response()->json(['success' => false, 'message' => 'This product is no longer available.'], 422);
         }
 
-        $variant = app(CartVariantResolver::class)->resolve(
-            $product, isset($data['variant_id']) ? (int) $data['variant_id'] : null,
-        );
+        return DB::transaction(function () use ($buyer, $product, $data): JsonResponse {
+            $product->setRelation('seller', Seller::query()->whereKey($product->seller_id)->sharedLock()->first());
+            $variant = app(CartVariantResolver::class)->resolve(
+                $product, isset($data['variant_id']) ? (int) $data['variant_id'] : null,
+            );
 
-        $item = $buyer->cartItems()
-            ->where('product_id', $product->id)
-            ->when(
-                $variant !== null,
-                fn ($q) => $q->where(fn ($w) => $w
-                    ->where('variant_id', $variant->id)
-                    ->when(! $product->hasVariants(), fn ($w2) => $w2->orWhereNull('variant_id'))),
-                fn ($q) => $q->whereNull('variant_id'),
-            )
-            ->first() ?? new CartItem([
-                'buyer_id' => $buyer->id,
-                'product_id' => $product->id,
-                'quantity' => 1,
+            $item = $buyer->cartItems()
+                ->where('product_id', $product->id)
+                ->when(
+                    $variant !== null,
+                    fn ($q) => $q->where(fn ($w) => $w
+                        ->where('variant_id', $variant->id)
+                        ->when(! $product->hasVariants(), fn ($w2) => $w2->orWhereNull('variant_id'))),
+                    fn ($q) => $q->whereNull('variant_id'),
+                )
+                ->first() ?? new CartItem([
+                    'buyer_id' => $buyer->id,
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                ]);
+
+            $item->variant_id = $variant?->id;
+            $item->setRelation('product', $product);
+            $item->setRelation('variant', $variant);
+
+            $ceiling = $item->availableQuantity();
+            $others = (int) $buyer->cartItems()
+                ->where('product_id', $product->id)
+                ->when($item->exists, fn ($query) => $query->whereKeyNot($item->id))
+                ->lockForUpdate()
+                ->sum('quantity');
+            $cap = min($ceiling, max(0, app(BuyerPurchaseLimit::class)->remaining($buyer->id, $product->id) - $others));
+
+            if (! $item->isAvailable() || $ceiling < 1) {
+                return response()->json(['success' => false, 'message' => 'Sorry, this item is out of stock.'], 422);
+            }
+
+            if ($cap < 1) {
+                throw ValidationException::withMessages(['quantity' => BuyerPurchaseLimit::MESSAGE]);
+            }
+
+            $item->quantity = min($data['quantity'], $cap);
+            $item->save();
+
+            return response()->json([
+                'success' => true,
+                'redirect' => route('buyer.checkout.index', ['items' => [$item->id]]),
+                'cart_count' => (int) CartItem::query()->where('buyer_id', $buyer->id)->count(),
+                'capped' => $item->quantity < $data['quantity'],
             ]);
-
-        $item->variant_id = $variant?->id;
-        $item->setRelation('product', $product);
-        $item->setRelation('variant', $variant);
-
-        $ceiling = $item->availableQuantity();
-
-        if (! $item->isAvailable() || $ceiling < 1) {
-            return response()->json(['success' => false, 'message' => 'Sorry, this item is out of stock.'], 422);
-        }
-
-        $item->quantity = min($data['quantity'], $ceiling);
-        $item->save();
-
-        return response()->json([
-            'success' => true,
-            'redirect' => route('buyer.checkout.index', ['items' => [$item->id]]),
-            'cart_count' => (int) CartItem::query()->where('buyer_id', $buyer->id)->count(),
-            'capped' => $item->quantity < $data['quantity'],
-        ]);
+        }, 3);
     }
 }

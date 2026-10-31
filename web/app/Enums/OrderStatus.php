@@ -72,7 +72,8 @@ enum OrderStatus: string
             self::AssignedToRider, self::PickedUp, self::AtSortingCenter,
             self::Sorted, self::OutForDelivery => 'shipped',
             self::Delivered, self::Completed,
-            self::DeliveryFailed, self::Returned, self::Cancelled => 'delivered',
+            self::DeliveryFailed, self::Returned => 'delivered',
+            self::Cancelled => 'cancelled',
         };
     }
 }

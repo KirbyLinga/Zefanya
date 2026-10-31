@@ -2,19 +2,19 @@
 
 namespace App\Http\Controllers\Rider;
 
+use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rider\PickupFailureRequest;
-use App\Models\Rider;
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Admin\PickupFailureException;
 use App\Notifications\Logistics\RiderParcelActivity;
 use App\Notifications\Rider\PickupFailure;
 use App\Notifications\Seller\PickupFailed;
-use App\Services\ParcelHandoffVerification;
-use App\Services\ParcelIncidentService;
-use App\Services\RiderHandoffVerification;
-use App\Services\RiderOperationsService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Rider\RiderOperationsService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +24,10 @@ use Illuminate\View\View;
 
 class PickupAssignmentsController extends Controller
 {
-    public function __construct(protected readonly RiderOperationsService $operations) {}
+    public function __construct(
+        protected readonly RiderOperationsService $operations,
+        protected readonly SellerOrderStatusService $statuses,
+    ) {}
 
     public function index(Request $request, RiderOperationsService $operations): View
     {
@@ -40,7 +43,7 @@ class PickupAssignmentsController extends Controller
         Request $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
-        RiderHandoffVerification $handoffVerify,
+        ParcelHandoffVerification $handoffVerify,
     ): RedirectResponse {
         $rider = $request->user('rider');
 
@@ -50,10 +53,10 @@ class PickupAssignmentsController extends Controller
         try {
             $method = null;
             if ($sellerOrder->fresh()?->status !== OrderStatus::PickedUp) {
-                $payload = $handoffVerify->assertValid(
+                $payload = $handoffVerify->assertValidForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_CONFIRM_PICKUP,
+                    ParcelHandoffVerification::ACTION_CONFIRM_PICKUP,
                     $request->input('verification_token'),
                 );
                 $method = $payload['method'] ?? null;
@@ -62,10 +65,10 @@ class PickupAssignmentsController extends Controller
             $operations->confirmPickup($rider, $sellerOrder, $method);
 
             if ($method !== null) {
-                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consume(
+                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consumeForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_CONFIRM_PICKUP,
+                    ParcelHandoffVerification::ACTION_CONFIRM_PICKUP,
                     $request->input('verification_token'),
                 ));
             }
@@ -85,103 +88,122 @@ class PickupAssignmentsController extends Controller
      * records the failure attempt, releases the rider reservation,
      * and notifies the seller and logistics.
      *
-     * First failure: records attempt #1, releases reservation,
+     * First failure: records attempt #1, releases the reservation,
      *    keeps status READY_FOR_PICKUP, notifies seller + logistics.
      *
-     * Second failure: records attempt #2, prevents third attempt,
-     *    cancels order via existing canonical mechanism, notifies buyer/seller/admin.
+     * Second failure: records attempt #2, prevents a third attempt,
+     *    and cancels the order via the canonical status service so stock is
+     *    restored, a pending payment is voided, the audit history is written,
+     *    and the parent order rolls up — all inside one locked transaction.
      *
      * @throws ValidationException
      */
     public function reportFailure(PickupFailureRequest $request, SellerOrder $sellerOrder): RedirectResponse
     {
-        $rider = auth('rider')->rider();
+        $rider = $request->user('rider');
 
         // Ensure rider owns this assignment before proceeding
         $this->operations->assertPickupAssigned($rider, $sellerOrder);
 
-        return DB::transaction(function () use ($rider, $sellerOrder, $request) {
-            $sellerOrder = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
-            ParcelIncidentService::assertOperationsAllowed($sellerOrder);
-            $attemptNumber = $sellerOrder->pickupAttempts()->max('attempt_number') ?? 0;
-            $nextAttempt = $attemptNumber + 1;
+        try {
+            return DB::transaction(function () use ($rider, $sellerOrder, $request) {
+                $sellerOrder = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
+                ParcelIncidentService::assertOperationsAllowed($sellerOrder);
+                $reason = $request->validated('failure_reason');
+                $attemptNumber = $sellerOrder->pickupAttempts()->max('attempt_number') ?? 0;
+                $nextAttempt = $attemptNumber + 1;
 
-            // Record the failure attempt
-            $sellerOrder->pickupAttempts()->create([
-                'attempt_number' => $nextAttempt,
-                'rider_id' => $rider->id,
-                'failure_reason' => $request->validated('failure_reason'),
-                'failed_at' => now(),
-            ]);
-
-            if ($nextAttempt >= 2) {
-                // --- SECOND FAILURE ---
-                // Cancel the order using the existing canonical status service
-                // This will restore inventory exactly once
-                $sellerOrder->status = OrderStatus::Cancelled;
-                $sellerOrder->save();
-
-                // Notify all stakeholders
-                Notification::to($rider)->route('rider.notifications.index')->notify(new PickupFailure(
-                    $sellerOrder,
-                    'second',
-                    $request->validated('failure_reason')
-                ));
-
-                Notification::to($sellerOrder->seller)
-                    ->route('seller.orders.show', $sellerOrder)
-                    ->notify(new PickupFailed($sellerOrder, $nextAttempt, $request->validated('failure_reason')));
-
-                // Notify selected logistics providers
-                $selectedProvider = $sellerOrder->selectedLogisticsProvider();
-                if ($selectedProvider) {
-                    $selectedProvider->notify(new RiderParcelActivity($sellerOrder, 'pickup_failure', [
-                        'attempt' => $nextAttempt,
-                        'reason' => $request->validated('failure_reason'),
-                    ]));
+                // Two total attempts only: a third report must not resurrect a
+                // cancelled parcel or restore stock a second time.
+                if ($attemptNumber >= 2) {
+                    return back()->with('error', 'Pickup attempts are limited to two; this parcel is already cancelled.');
                 }
 
-                // Notify Admin via RiderParcelActivity
-                // Admin receives exception notification
-                $adminException = $sellerOrder->exceptions()->create([
-                    'type' => 'pickup_failure',
+                // Record the failure attempt
+                $sellerOrder->pickupAttempts()->create([
+                    'attempt_number' => $nextAttempt,
                     'rider_id' => $rider->id,
-                    'details' => 'Second pickup failure: '.$request->validated('failure_reason'),
-                    'created_by' => 'rider',
+                    'failure_reason' => $reason,
+                    'failed_at' => now(),
                 ]);
 
-                // Notify admin through the existing exception notification channel
-                Notification::route('mail', config('admin.email'))
-                    ->notify(new PickupFailureException($adminException));
+                if ($nextAttempt >= 2) {
+                    // --- SECOND FAILURE ---
+                    // Cancel through the canonical status service. The service
+                    // restores inventory, voids the pending payment, records
+                    // the status history, and rolls up the parent order.
+                    $this->statuses->transition(
+                        $sellerOrder,
+                        OrderStatus::Cancelled,
+                        note: 'Second pickup failure: '.$reason,
+                        changedBy: $rider->fullName(),
+                        actor: OrderActor::Rider,
+                        actorId: $this->operations->operationalCourier($rider)->id,
+                        source: 'web',
+                        expectedFrom: OrderStatus::ReadyForPickup,
+                    );
+
+                    // Notify all stakeholders
+                    $rider->notify(new PickupFailure($sellerOrder, $nextAttempt, $reason));
+
+                    $sellerOrder->seller->notify(
+                        new PickupFailed($sellerOrder, $nextAttempt, $reason)
+                    );
+
+                    // Notify selected logistics providers
+                    $selectedProvider = $sellerOrder->selectedLogisticsProvider();
+                    if ($selectedProvider) {
+                        $selectedProvider->notify(new RiderParcelActivity(
+                            $sellerOrder,
+                            'pickup_failure',
+                            'Attempt #'.$nextAttempt.': '.$reason,
+                        ));
+                    }
+
+                    // Admin receives an exception alert.
+                    $adminEmail = config('admin.notification_email') ?: config('mail.from.address');
+                    if (filled($adminEmail)) {
+                        Notification::route('mail', $adminEmail)->notify(
+                            new PickupFailureException(
+                                $sellerOrder,
+                                $nextAttempt,
+                                $reason,
+                                $request->validated('failure_notes'),
+                            )
+                        );
+                    }
+
+                    return redirect()
+                        ->route('rider.pickups.index')
+                        ->with('status', 'Order cancelled after second pickup failure. Inventory restored.');
+                }
+
+                // --- FIRST FAILURE ---
+                // Release the rider's reservation for this parcel. The courier
+                // stays assigned so the same rider can make the single retry.
+                $this->operations->releasePickupReservation($sellerOrder, $rider);
+
+                // Notify seller
+                $sellerOrder->seller->notify(
+                    new PickupFailed($sellerOrder, $nextAttempt, $reason)
+                );
+
+                // Notify selected logistics provider
+                $selectedProvider = $sellerOrder->selectedLogisticsProvider();
+                if ($selectedProvider) {
+                    $selectedProvider->notify(new RiderParcelActivity(
+                        $sellerOrder,
+                        'pickup_failure',
+                        'Attempt #'.$nextAttempt.': '.$reason,
+                    ));
+                }
 
                 return redirect()
                     ->route('rider.pickups.index')
-                    ->with('status', 'Order cancelled after second pickup failure. Inventory restored.');
-            }
-
-            // --- FIRST FAILURE ---
-            // Release the rider's reservation for this parcel
-            $this->operations->releaseRiderReservation($sellerOrder, $rider);
-
-            // Keep canonical status at READY_FOR_PICKUP (no status change needed)
-
-            // Notify seller
-            Notification::to($sellerOrder->seller)
-                ->route('seller.orders.show', $sellerOrder)
-                ->notify(new PickupFailed($sellerOrder, $nextAttempt, $request->validated('failure_reason')));
-
-            // Notify selected logistics provider
-            $selectedProvider = $sellerOrder->selectedLogisticsProvider();
-            if ($selectedProvider) {
-                $selectedProvider->notify(new RiderParcelActivity($sellerOrder, 'pickup_failure', [
-                    'attempt' => $nextAttempt,
-                    'reason' => $request->validated('failure_reason'),
-                ]));
-            }
-
-            return redirect()
-                ->route('rider.pickups.index')
-                ->with('status', 'Pickup failure recorded. Seller and logistics notified. Parcel available for retry.');
-        });
+                    ->with('status', 'Pickup failure recorded. Seller and logistics notified. Parcel available for retry.');
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

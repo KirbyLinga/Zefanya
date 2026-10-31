@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Rider;
 
+use App\Http\Controllers\Concerns\VerifiesEmailOtp;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rider\StoreRiderRegistrationRequest;
-use App\Models\Rider;
-use App\Services\RiderRegistrationService;
+use App\Models\Rider\Rider;
+use App\Services\Rider\RiderRegistrationService;
 use App\Support\EmailMask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\URL;
 
 class RegistrationController extends Controller
 {
+    use VerifiesEmailOtp;
+
     public function store(StoreRiderRegistrationRequest $request, RiderRegistrationService $service): JsonResponse
     {
         $rider = $service->register($request->validated());
@@ -47,7 +50,7 @@ class RegistrationController extends Controller
 
     public function verify(Request $request, Rider $rider, RiderRegistrationService $service): JsonResponse
     {
-        $data = $request->validate(['otp' => ['required', 'string', 'regex:/^\d{6}$/']]);
+        $data = $request->validate(['otp' => ['required', 'string', 'regex:/^\d{6}$/']], $this->otpValidationMessages());
         $service->verify($rider, $data['otp']);
 
         return response()->json(['message' => 'Email verified. Your application is pending Logistics approval.', 'data' => ['rider_id' => $rider->id, 'status' => 'pending']]);

@@ -4,7 +4,7 @@ namespace Tests\Feature\RiderRegistration;
 
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Notifications\Rider\RiderRegistrationOtp;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Http\JsonResponse;
 
 class NotificationController extends Controller
@@ -17,16 +18,23 @@ class NotificationController extends Controller
         $notifications = $buyer->unreadNotifications()
             ->latest()
             ->take(10)
-            ->get()
-            ->map(function ($notif) {
-                return [
-                    'id' => $notif->id,
-                    'type' => $notif->data['type'] ?? 'notification',
-                    'title' => $this->getNotificationTitle($notif),
-                    'message' => $notif->data['message'] ?? 'You have a new notification',
-                    'created_at' => $notif->created_at->toIso8601String(),
-                ];
-            });
+            ->get();
+        $orderIds = SellerOrder::query()
+            ->whereIn('id', $notifications->pluck('data.seller_order_id')->filter())
+            ->whereHas('order', fn ($query) => $query->where('buyer_id', $buyer->id))
+            ->pluck('order_id', 'id');
+        $notifications = $notifications->map(function ($notif) use ($orderIds) {
+            $orderId = $orderIds->get($notif->data['seller_order_id'] ?? null);
+
+            return [
+                'id' => $notif->id,
+                'type' => $notif->data['type'] ?? 'notification',
+                'title' => $this->getNotificationTitle($notif),
+                'message' => $notif->data['message'] ?? 'You have a new notification',
+                'url' => $orderId ? route('buyer.orders.show', $orderId) : null,
+                'created_at' => $notif->created_at->toIso8601String(),
+            ];
+        });
 
         return response()->json([
             'notifications' => $notifications,
@@ -52,16 +60,22 @@ class NotificationController extends Controller
     public function markRead(string $id): JsonResponse
     {
         $buyer = auth('buyer')->user();
-        $notification = $buyer->unreadNotifications()->find($id);
+        $notification = $buyer->notifications()->find($id);
 
         if (! $notification) {
             return response()->json(['error' => 'Notification not found'], 404);
         }
 
         $notification->markAsRead();
+        $orderId = SellerOrder::query()
+            ->whereKey($notification->data['seller_order_id'] ?? null)
+            ->whereHas('order', fn ($query) => $query->where('buyer_id', $buyer->id))
+            ->value('order_id');
 
         return response()->json([
             'success' => true,
+            'count' => $buyer->unreadNotifications()->count(),
+            'url' => $orderId ? route('buyer.orders.show', $orderId) : null,
         ]);
     }
 
@@ -75,6 +89,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
+            'count' => $buyer->unreadNotifications()->count(),
         ]);
     }
 
@@ -87,8 +102,12 @@ class NotificationController extends Controller
 
         return match ($type) {
             'courier_assigned' => 'Courier Assigned',
-            'order_out_for_delivery' => 'Order Out for Delivery',
-            'order_delivered' => 'Order Delivered',
+            'out_for_delivery', 'order_out_for_delivery' => 'Order Out for Delivery',
+            'delivered', 'order_delivered' => 'Order Delivered',
+            'delivery_failed' => 'Delivery Attempt Failed',
+            'seller_order_cancelled' => 'Shipment Cancelled',
+            'return_request_decided' => 'Return Request Updated',
+            'return_dispute_resolved' => 'Return Dispute Resolved',
             default => 'Notification',
         };
     }

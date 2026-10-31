@@ -19,39 +19,33 @@
         @include('Components.admin-sidebar')
 
         <div class="flex flex-1 min-w-0 flex-col">
-            {{-- Admin Top Bar --}}
-            <header class="flex items-center justify-between px-8 py-4 bg-white border-b border-neutral-200">
-                {{-- Left: Global Search --}}
-                <div class="flex-1 max-w-md">
-                    <input type="text" placeholder="Search accounts, email or user ID…"
-                           class="w-full h-10 px-4 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" />
-                </div>
-
-                {{-- Right: Notifications, Help, User --}}
-                <div class="flex items-center gap-6">
-                    {{-- Notifications Bell --}}
-                    <button class="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-neutral-100 transition-colors">
-                        <i data-lucide="bell" class="w-5 h-5 text-neutral-600"></i>
-                        <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-                    </button>
-
-                    {{-- Help Icon --}}
-                    <button class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-neutral-100 transition-colors">
-                        <i data-lucide="help-circle" class="w-5 h-5 text-neutral-600"></i>
-                    </button>
-
-                    {{-- User Block --}}
-                    <button class="flex items-center gap-3 pl-4 pr-2 py-2 rounded-lg hover:bg-neutral-100 transition-colors">
-                        <div class="flex flex-col items-end">
-                            <span class="text-sm font-semibold text-neutral-950">Zefanya Admin</span>
-                            <span class="text-xs text-neutral-600">Super Admin</span>
-                        </div>
-                        <div class="w-8 h-8 rounded-full bg-primary-200 flex items-center justify-center">
-                            <i data-lucide="user" class="w-4 h-4 text-primary-800"></i>
-                        </div>
-                        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-600"></i>
-                    </button>
-                </div>
+            {{-- Only controls that work: today's date and this admin's own account menu. --}}
+            @php
+                $topBarAdmin = auth('admin')->user();
+            @endphp
+            <header data-admin-topbar class="flex min-h-16 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 sm:px-8">
+                <p class="font-sans text-[13px] text-neutral-600">{{ now(\App\Models\Seller\StoreSale::TIMEZONE)->format('l, F j, Y') }}</p>
+                <details class="group relative">
+                    <summary class="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2 transition-colors hover:bg-neutral-100 [&::-webkit-details-marker]:hidden">
+                        <span class="hidden flex-col items-end sm:flex">
+                            <span class="text-sm font-semibold text-neutral-950">{{ $topBarAdmin?->name ?? 'Admin' }}</span>
+                            <span class="text-xs text-neutral-600">{{ \Illuminate\Support\Str::headline($topBarAdmin?->role ?? 'admin') }}</span>
+                        </span>
+                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-800 font-sans text-sm font-semibold text-white">{{ mb_strtoupper(mb_substr($topBarAdmin?->name ?? 'A', 0, 1)) }}</span>
+                        <i data-lucide="chevron-down" class="size-4 text-neutral-600 transition-transform group-open:rotate-180" aria-hidden="true"></i>
+                    </summary>
+                    <div class="absolute right-0 z-30 mt-2 w-56 rounded-lg border border-neutral-200 bg-white p-1.5 shadow-lg">
+                        <a href="{{ route('admin.two-factor.show') }}" class="flex min-h-11 items-center gap-2 rounded-md px-3 font-sans text-[13px] text-neutral-950 no-underline hover:bg-neutral-100">
+                            <i data-lucide="shield-check" class="size-4 shrink-0" aria-hidden="true"></i>Two-factor security
+                        </a>
+                        <form method="POST" action="{{ route('admin.logout') }}">
+                            @csrf
+                            <button type="submit" class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left font-sans text-[13px] text-neutral-950 hover:bg-neutral-100">
+                                <i data-lucide="log-out" class="size-4 shrink-0" aria-hidden="true"></i>Log out
+                            </button>
+                        </form>
+                    </div>
+                </details>
             </header>
 
             {{-- Main Content --}}

@@ -2,11 +2,13 @@
 
 namespace Tests\Unit\Admin;
 
+use App\Http\Controllers\Admin\UserAccountController;
+use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -21,69 +23,20 @@ class UserAccountControllerSessionRevocationTest extends TestCase
 
         $this->withoutVite();
 
-        // Keep the session-driver contract explicit for these tests.
-        Config::shouldReceive('get')->andReturnUsing(static function (string $key, mixed $default = null): mixed {
-            return match ($key) {
-                'session.table' => 'sessions',
-                'session.driver' => 'database',
-                'app.faker_locale' => 'en_US',
-                default => value($default),
-            };
-        });
+        // The controller only clears database session rows when the database
+        // session driver is active, and phpunit.xml defaults to the array
+        // driver. Override the real config instead of mocking the Config
+        // facade: a facade mock here leaks into every later test because the
+        // framework reads config for the database connection itself.
+        config([
+            'session.driver' => 'database',
+            'session.table' => 'sessions',
+        ]);
 
-        Config::shouldReceive('offsetExists')->andReturnUsing(static function (string $key): bool {
-            return in_array($key, [
-                'session.table',
-                'session.driver',
-                'auth.defaults.guard',
-                'auth.guards',
-                'auth.providers',
-                'auth.passwords',
-                'auth.password_timeout',
-                'app.faker_locale',
-            ], true);
-        });
-
-        Config::shouldReceive('offsetGet')->andReturnUsing(static function (string $key) {
-            return match ($key) {
-                'auth.defaults.guard' => 'web',
-                'auth.guards' => [
-                    'web' => ['driver' => 'session', 'provider' => 'users'],
-                    'buyer' => ['driver' => 'session', 'provider' => 'buyers'],
-                    'seller' => ['driver' => 'session', 'provider' => 'sellers'],
-                    'logistics' => ['driver' => 'session', 'provider' => 'logistics'],
-                ],
-                'auth.providers' => [
-                    'users' => ['driver' => 'eloquent', 'model' => User::class],
-                    'buyers' => ['driver' => 'eloquent', 'model' => Buyer::class],
-                    'sellers' => ['driver' => 'eloquent', 'model' => Seller::class],
-                    'logistics' => ['driver' => 'eloquent', 'model' => LogisticsProvider::class],
-                ],
-                'auth.passwords' => [
-                    'users' => ['provider' => 'users',    'table' => 'password_reset_tokens',          'expire' => 60, 'throttle' => 60],
-                    'buyers' => ['provider' => 'buyers',   'table' => 'password_reset_tokens_buyers',   'expire' => 60, 'throttle' => 60],
-                    'sellers' => ['provider' => 'sellers',  'table' => 'password_reset_tokens_sellers', 'expire' => 60, 'throttle' => 60],
-                    'logistics' => ['provider' => 'logistics', 'table' => 'password_reset_tokens_logistics', 'expire' => 60, 'throttle' => 60],
-                ],
-                'auth.password_timeout' => 10800,
-                'session.table' => 'sessions',
-                'session.driver' => 'database',
-                'app.faker_locale' => 'en_US',
-                default => null,
-            };
-        });
-
-        Config::shouldReceive('offsetSet')->andReturnUsing(static function (string $key, mixed $value): void {
-            // no-op
-        });
-
-        Config::shouldReceive('offsetUnset')->andReturnUsing(static function (string $key): void {
-            // no-op
-        });
-
-        Config::shouldReceive('shouldUse')->andReturnUsing(static function (string $guard) {
-            return in_array($guard, ['web', 'buyer', 'seller', 'logistics'], true);
-        });
+        // The suspend/reactivate routes sit behind auth:admin +
+        // admin.role:admin,moderator, so an admin has to be signed in
+        // alongside the account being acted upon.
+        $this->actingAs(Admin::factory()->create(), 'admin');
     }
 
     #[Test]
@@ -94,8 +47,12 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         $this->seedSessionFor($buyer, 'abc-session');
         $this->seedSessionFor($buyer, 'xyz-session');
 
+        // Control row: revoking one account's sessions must never touch
+        // another account that happens to be signed in.
+        $this->seedSessionRow(99, 'other-users-session');
+
         $this->actingAs($buyer, 'buyer')
-            ->post(route('admin.users.buyer.suspend', $buyer))
+            ->post(route('admin.users.buyer.suspend', $buyer), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $this->assertDatabaseMissing('sessions', ['id' => 'abc-session']);
@@ -115,11 +72,13 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         ]);
 
         $this->actingAs($buyer, 'buyer')
-            ->post(route('admin.users.buyer.suspend', $buyer))
+            ->post(route('admin.users.buyer.suspend', $buyer), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $buyer->refresh();
-        $this->assertNull($buyer->getRememberToken());
+        // Assert the stored column, not getRememberToken(): Laravel casts that
+        // accessor to string, so a NULL column reads back as ''.
+        $this->assertNull($buyer->remember_token);
     }
 
     #[Test]
@@ -131,41 +90,54 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         ]);
 
         $this->actingAs($buyer, 'buyer')
-            ->post(route('admin.users.buyer.suspend', $buyer))
+            ->post(route('admin.users.buyer.suspend', $buyer), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $buyer->refresh();
-        $this->assertNull($buyer->getRememberToken());
+        // Assert the stored column, not getRememberToken(): Laravel casts that
+        // accessor to string, so a NULL column reads back as ''.
+        $this->assertNull($buyer->remember_token);
     }
 
     #[Test]
-    public function suspending_a_buyer_with_a_non_integer_id_is_safe(): void
+    public function a_non_integer_identifier_is_not_used_against_the_sessions_table(): void
     {
-        // Buyer factories here use surrogate keys; this guard is mostly a
-        // defensive check against any future custom-key identity models.
+        // Buyer factories here use surrogate keys; this guard is a defensive
+        // check against any future custom-key identity model. Exercise the
+        // guard directly with a string identifier instead of pretending an
+        // ordinary buyer suspension must leave its sessions intact.
         $buyer = Buyer::factory()->create(['status' => 'approved']);
-
         $this->seedSessionFor($buyer, 'safe-session');
 
-        $this->actingAs($buyer, 'buyer')
-            ->post(route('admin.users.buyer.suspend', $buyer))
-            ->assertSessionHas('success');
+        // Eloquent casts integer keys, so a real Buyer cannot surface a
+        // non-numeric identifier. Use a subclass to exercise the guard.
+        $stringKeyed = new class extends Buyer
+        {
+            public function getAuthIdentifier(): mixed
+            {
+                return 'buyer-uuid-1';
+            }
+        };
+        $stringKeyed->forceFill(['remember_token' => 'keep-me']);
+
+        $controller = app(UserAccountController::class);
+        (new \ReflectionMethod($controller, 'revokeAccountSessionsAndRememberToken'))
+            ->invoke($controller, $stringKeyed);
 
         $this->assertDatabaseHas('sessions', ['id' => 'safe-session']);
+        $this->assertSame('keep-me', $stringKeyed->remember_token);
     }
 
     #[Test]
     public function suspending_a_buyer_when_session_driver_is_not_database_is_safe(): void
     {
-        Config::shouldReceive('get')
-            ->with('session.driver')
-            ->andReturn('file');
+        config(['session.driver' => 'file']);
 
         $buyer = Buyer::factory()->create(['status' => 'approved']);
         $this->seedSessionFor($buyer, 'file-session');
 
         $this->actingAs($buyer, 'buyer')
-            ->post(route('admin.users.buyer.suspend', $buyer))
+            ->post(route('admin.users.buyer.suspend', $buyer), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('sessions', ['id' => 'file-session']);
@@ -182,12 +154,14 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         $buyer->saveQuietly();
 
         $this->actingAs($buyer, 'buyer')
-            ->post(route('admin.users.buyer.reactivate', $buyer))
+            ->post(route('admin.users.buyer.reactivate', $buyer), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $this->assertDatabaseMissing('sessions', ['id' => 'zombie-session']);
         $buyer->refresh();
-        $this->assertNull($buyer->getRememberToken());
+        // Assert the stored column, not getRememberToken(): Laravel casts that
+        // accessor to string, so a NULL column reads back as ''.
+        $this->assertNull($buyer->remember_token);
         $this->assertSame('approved', $buyer->status);
     }
 
@@ -201,11 +175,11 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         $this->seedSessionFor($seller, 'seller-session');
 
         $this->actingAs($seller, 'seller')
-            ->post(route('admin.users.seller.suspend', $seller))
+            ->post(route('admin.users.seller.suspend', $seller), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $seller->refresh();
-        $this->assertNull($seller->getRememberToken());
+        $this->assertNull($seller->remember_token);
         $this->assertDatabaseMissing('sessions', ['id' => 'seller-session']);
     }
 
@@ -219,11 +193,11 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         $this->seedSessionFor($provider, 'logistics-session');
 
         $this->actingAs($provider, 'logistics')
-            ->post(route('admin.users.logistics.suspend', $provider))
+            ->post(route('admin.users.logistics.suspend', $provider), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $provider->refresh();
-        $this->assertNull($provider->getRememberToken());
+        $this->assertNull($provider->remember_token);
         $this->assertDatabaseMissing('sessions', ['id' => 'logistics-session']);
     }
 
@@ -237,11 +211,11 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         $this->seedSessionFor($seller, 'seller-session-no-token');
 
         $this->actingAs($seller, 'seller')
-            ->post(route('admin.users.seller.suspend', $seller))
+            ->post(route('admin.users.seller.suspend', $seller), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $seller->refresh();
-        $this->assertNull($seller->getRememberToken());
+        $this->assertNull($seller->remember_token);
         $this->assertDatabaseMissing('sessions', ['id' => 'seller-session-no-token']);
     }
 
@@ -255,19 +229,35 @@ class UserAccountControllerSessionRevocationTest extends TestCase
         $this->seedSessionFor($provider, 'logistics-session-no-token');
 
         $this->actingAs($provider, 'logistics')
-            ->post(route('admin.users.logistics.suspend', $provider))
+            ->post(route('admin.users.logistics.suspend', $provider), ['reason' => 'Account status reviewed by Admin.'])
             ->assertSessionHas('success');
 
         $provider->refresh();
-        $this->assertNull($provider->getRememberToken());
+        $this->assertNull($provider->remember_token);
         $this->assertDatabaseMissing('sessions', ['id' => 'logistics-session-no-token']);
     }
 
     private function seedSessionFor($account, string $sessionId): void
     {
+        $this->seedSessionRow($account->getAuthIdentifier(), $sessionId);
+        $guard = match (true) {
+            $account instanceof Buyer => 'buyer',
+            $account instanceof Seller => 'seller',
+            $account instanceof LogisticsProvider => 'logistics',
+        };
+        $attributes = [Auth::guard($guard)->getName() => $account->getAuthIdentifier()];
+        $serialized = config('session.serialization') === 'json' ? json_encode($attributes, JSON_THROW_ON_ERROR) : serialize($attributes);
+        if (config('session.encrypt')) {
+            $serialized = app('encrypter')->encrypt($serialized);
+        }
+        DB::table('sessions')->where('id', $sessionId)->update(['payload' => base64_encode($serialized)]);
+    }
+
+    private function seedSessionRow(int|string $userId, string $sessionId): void
+    {
         DB::table('sessions')->insert([
             'id' => $sessionId,
-            'user_id' => $account->getAuthIdentifier(),
+            'user_id' => $userId,
             'ip_address' => '127.0.0.1',
             'user_agent' => 'test',
             'payload' => '{}',

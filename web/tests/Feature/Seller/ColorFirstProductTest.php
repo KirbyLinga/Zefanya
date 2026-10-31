@@ -2,18 +2,20 @@
 
 namespace Tests\Feature\Seller;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
+use App\Services\Seller\ProductPublishingService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class ColorFirstProductTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private function image(string $name): UploadedFile
     {
@@ -23,6 +25,7 @@ class ColorFirstProductTest extends TestCase
     private function payload(): array
     {
         return [
+            ...$this->publicationDefaults(),
             'name' => 'Color-first shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0,
             'status' => 'active', 'variants_exist' => 1, 'color_first' => 1,
             'images' => [$this->image('cover.png')],

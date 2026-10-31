@@ -2,8 +2,8 @@
 
 namespace App\Models\Logistics;
 
-use App\Models\Courier;
-use Database\Factories\AreaFactory;
+use App\Models\Rider\Courier;
+use Database\Factories\Logistics\AreaFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

@@ -12,6 +12,8 @@ export default defineConfig({
                 'resources/css/auth.css',
                 'resources/css/buyer/buyer-register-modal.css',
                 'resources/css/seller/products-index.css',
+                'resources/js/app.js',
+                'resources/js/registration-resubmission.js',
                 'resources/js/buyer/buyer.js',
                 'resources/js/buyer/buyer-register-modal.js',
                 'resources/js/buyer/messages.js',

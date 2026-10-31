@@ -4,15 +4,15 @@ namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use App\Notifications\Rider\AssignmentReassigned;
 use App\Notifications\Rider\DeliveryAssigned;
 use App\Notifications\Rider\PickupAssigned;
-use App\Services\CourierAssignmentService;
-use App\Services\RiderRegistrationService;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Rider\RiderRegistrationService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -69,7 +69,7 @@ class RiderReassignmentTest extends TestCase
     {
         Notification::fake();
         [$provider, $old, $replacement, $parcel] = $this->fixture($role, $status);
-        app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider);
+        app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider, 'Safety review required.');
         $before = $parcel->fresh();
         $this->actingAs($provider, 'logistics')->post($this->url($role, $parcel), ['courier_id' => $replacement->id, 'reassign' => 1, 'reason' => 'Rider unavailable; replace within this station.', 'expected_courier_id' => $old->id])
             ->assertRedirect()->assertSessionHas('success');
@@ -161,9 +161,9 @@ class RiderReassignmentTest extends TestCase
     {
         Notification::fake();
         [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::OutForDelivery);
-        app(RiderRegistrationService::class)->suspend($parcel->courier->rider, $provider);
+        app(RiderRegistrationService::class)->suspend($parcel->courier->rider, $provider, 'Safety review required.');
         $this->assertFalse($parcel->fresh()->needs_reassignment);
-        app(RiderRegistrationService::class)->suspend($old->rider, $provider);
+        app(RiderRegistrationService::class)->suspend($old->rider, $provider, 'Safety review required.');
         $this->assertTrue($parcel->fresh()->needs_reassignment);
     }
 
@@ -227,7 +227,7 @@ class RiderReassignmentTest extends TestCase
         foreach (['suspended', 'deactivated', 'unavailable'] as $condition) {
             [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::DeliveryFailed);
             if ($condition !== 'unavailable') {
-                app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider);
+                app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider, 'Safety review required.');
             }
             $this->actingAs($provider, 'logistics')->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id, 'reason' => 'Replacement Rider selected for the final attempt.'])
                 ->assertSessionHas('success');

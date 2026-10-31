@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Seller;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -24,6 +24,7 @@ class NewOrderReceived extends Notification
     public function toArray(object $notifiable): array
     {
         $buyerName = $this->sellerOrder->order?->buyer?->fullName();
+        $note = $this->sellerOrder->buyer_note;
 
         return [
             'type' => 'seller_new_order',
@@ -32,8 +33,10 @@ class NewOrderReceived extends Notification
             'buyer_name' => $buyerName,
             'tracking_number' => $this->sellerOrder->tracking_number,
             'amount_minor' => $this->sellerOrder->subtotal_minor,
+            'buyer_note' => $note,
             'message' => 'New order '.($this->sellerOrder->order?->reference ?? '')
-                .' from '.($buyerName ?? 'a buyer').'. Review and accept it.',
+                .' from '.($buyerName ?? 'a buyer').'. Review and accept it.'
+                .(filled($note) ? "\nNote from buyer: {$note}" : ''),
         ];
     }
 }

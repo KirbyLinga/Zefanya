@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin\DocumentAccessLog;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,7 +17,8 @@ class DocumentController extends Controller
 {
     /**
      * Stream a document from the private disk for admin viewing.
-     * Only accessible to authenticated admins.
+     * Only accessible to authenticated admins (super_admin / admin); moderators
+     * are intentionally excluded by the route middleware.
      */
     public function stream(Request $request, string $type, int $id, string $document): StreamedResponse|BinaryFileResponse
     {
@@ -37,6 +40,16 @@ class DocumentController extends Controller
         if (! $disk->exists($path)) {
             abort(404, 'Document file not found on disk.');
         }
+
+        // Audit the successful view before streaming. Only the reference is
+        // recorded — never the document bytes, storage path, or any token.
+        DocumentAccessLog::record(
+            Auth::guard('admin')->id(),
+            $type,
+            (int) $model->getKey(),
+            $document,
+            $request->ip(),
+        );
 
         $mimeType = $disk->mimeType($path) ?? 'application/octet-stream';
         $filename = basename($path);
@@ -61,6 +74,7 @@ class DocumentController extends Controller
         return match (true) {
             $model instanceof Seller && $document === 'id' => $model->upload_id_path,
             $model instanceof Seller && $document === 'business_permit' => $model->business_permit_path,
+            $model instanceof Seller && $document === 'sec_certificate' => $model->sec_certificate_path,
             $model instanceof LogisticsProvider && $document === 'id' => $model->upload_id_path,
             $model instanceof LogisticsProvider && $document === 'dti_permit' => $model->dti_permit_path,
             $model instanceof Buyer && $document === 'id' => $model->upload_id_path,

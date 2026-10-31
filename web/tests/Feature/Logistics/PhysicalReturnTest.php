@@ -7,26 +7,28 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
 use App\Models\Admin\Admin;
-use App\Models\Courier;
-use App\Models\InventoryTransaction;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\ParcelReturn;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\ManifestService;
-use App\Services\ParcelHandoffService;
-use App\Services\ParcelHandoffVerification;
-use App\Services\ParcelReturnService;
-use App\Services\RiderOperationsService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\ManifestService;
+use App\Services\Logistics\ParcelHandoffService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelReturnService;
+use App\Services\Rider\RiderOperationsService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
 use Tests\TestCase;
 
@@ -353,7 +355,7 @@ class PhysicalReturnTest extends TestCase
     public function test_paid_payment_is_flagged_for_review_without_inventing_a_refund(): void
     {
         $f = $this->fixture();
-        $f['payment']->forceFill(['method' => 'gcash', 'status' => 'paid', 'paid_at' => now()])->save();
+        $f['payment']->forceFill(['method' => 'cod', 'status' => 'paid', 'paid_at' => now()])->save();
         $return = $this->twice($f);
         $this->moveHome($f, $return);
         $token = $this->receiptToken($f, $return);
@@ -524,6 +526,228 @@ class PhysicalReturnTest extends TestCase
         $item = $manifest->items()->sole();
         $this->expectException(ValidationException::class);
         $manifestService->receive($manifest, $f['b']['provider'], $item, $receiveScan['verification_token']);
+    }
+
+    /** A delivered parcel whose buyer has asked to return it, not yet decided by the Seller. */
+    private function buyerReturn(array $f): ParcelReturn
+    {
+        $parcel = $f['parcel'];
+        $parcel->forceFill(['status' => OrderStatus::Delivered->value])->save();
+        StatusHistory::query()->create([
+            'seller_order_id' => $parcel->id, 'from_status' => OrderStatus::OutForDelivery,
+            'to_status' => OrderStatus::Delivered, 'actor_type' => 'rider', 'source' => 'web',
+        ]);
+
+        return app(ParcelReturnService::class)->requestByBuyer($parcel->fresh(), $f['buyer'], 'Item arrived damaged');
+    }
+
+    private function assertManifestRefuses(array $f, string $message): void
+    {
+        $service = app(ManifestService::class);
+        $manifest = $service->create($f['b']['provider'], $f['b']['station']->id, $f['a']['station']->id, 'return');
+
+        $this->assertNotContains($f['parcel']->id, $service->eligibleParcels($manifest)->pluck('id')->all());
+
+        try {
+            $service->addParcel($manifest, $f['parcel']->fresh());
+            $this->fail('The manifest accepted a return that cannot move yet.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString($message, $exception->getMessage());
+        }
+
+        $this->assertSame(0, $manifest->items()->count());
+    }
+
+    private function assertHandoffRefuses(array $f, ParcelReturn $return, string $message): void
+    {
+        try {
+            app(ParcelReturnService::class)->reverseHandoff($return->fresh(), $f['b']['provider']);
+            $this->fail('A reverse handoff started for a return that cannot move yet.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString($message, $exception->getMessage());
+        }
+    }
+
+    public function test_manifest_service_refuses_a_buyer_return_until_it_is_decided_and_collected(): void
+    {
+        $f = $this->fixture();
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+
+        $this->assertManifestRefuses($f, 'has not decided');
+
+        $returns->approveBySeller($return, $f['seller']);
+        $this->assertManifestRefuses($f, 'still with the buyer');
+
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+        $this->assertManifestRefuses($f, 'still with the buyer');
+
+        $returns->confirmBuyerCollection($return, $f['rider'], $f['parcel']->tracking_number);
+
+        $service = app(ManifestService::class);
+        $manifest = $service->create($f['b']['provider'], $f['b']['station']->id, $f['a']['station']->id, 'return');
+        $this->assertContains($f['parcel']->id, $service->eligibleParcels($manifest)->pluck('id')->all());
+        $this->assertSame($f['parcel']->id, $service->addParcel($manifest, $f['parcel']->fresh())->seller_order_id);
+    }
+
+    public function test_a_normal_delivered_parcel_stays_closed_to_manifests(): void
+    {
+        $f = $this->fixture();
+        $f['parcel']->forceFill(['status' => OrderStatus::Delivered->value])->save();
+        $service = app(ManifestService::class);
+        $manifest = $service->create($f['b']['provider'], $f['b']['station']->id, $f['a']['station']->id);
+
+        $this->assertNotContains($f['parcel']->id, $service->eligibleParcels($manifest)->pluck('id')->all());
+        $this->expectException(ValidationException::class);
+        $service->addParcel($manifest, $f['parcel']->fresh());
+    }
+
+    public function test_handoff_refuses_a_buyer_return_until_it_is_collected(): void
+    {
+        $f = $this->fixture(true);
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+        $this->activeHandoffLink($f['b']['provider'], $f['a']['provider'], $f['admin']);
+
+        $this->assertHandoffRefuses($f, $return, 'has not decided');
+
+        $returns->approveBySeller($return, $f['seller']);
+        $this->assertHandoffRefuses($f, $return, 'still with the buyer');
+    }
+
+    public function test_only_the_custody_provider_can_assign_and_only_its_active_riders(): void
+    {
+        $f = $this->fixture(true);
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+
+        try {
+            $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+            $this->fail('Assigned before the Seller decided.');
+        } catch (ValidationException) {
+            $this->assertNull($return->fresh()->collection_courier_id);
+        }
+
+        $returns->approveBySeller($return, $f['seller']);
+
+        $foreign = Courier::factory()->create(['logistics_provider_id' => $f['a']['provider']->id]);
+        try {
+            $returns->assignBuyerCollection($return, $f['b']['provider'], $foreign->id);
+            $this->fail('Assigned another provider\'s rider.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('courier_id', $exception->errors());
+        }
+
+        try {
+            $returns->assignBuyerCollection($return, $f['a']['provider'], $foreign->id);
+            $this->fail('A provider without custody assigned a rider.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+        $this->assertSame($f['courier']->id, (int) $return->fresh()->collection_courier_id);
+        $this->assertSame(1, $f['rider']->notifications()->count());
+        $this->assertStringContainsString('Collect', $f['rider']->notifications()->first()->data['message']);
+    }
+
+    public function test_only_the_assigned_rider_can_collect_with_the_right_waybill(): void
+    {
+        $f = $this->fixture();
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+        $returns->approveBySeller($return, $f['seller']);
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+
+        $other = Rider::factory()->create(['logistics_provider_id' => $f['b']['provider']->id, 'station_hub_id' => $f['b']['station']->id, 'status' => 'approved', 'email_verified_at' => now()]);
+        Courier::factory()->create(['logistics_provider_id' => $f['b']['provider']->id, 'rider_id' => $other->id, 'area_id' => $f['b']['area']->id]);
+
+        $this->actingAs($other, 'rider')->post(route('rider.return-pickups.collect', $return), ['tracking_number' => $f['parcel']->tracking_number])->assertForbidden();
+        $this->assertSame([], $this->get(route('rider.return-pickups.index'))->assertOk()->viewData('returns')->modelKeys());
+
+        $this->actingAs($f['rider'], 'rider');
+        $this->assertSame([$return->id], $this->get(route('rider.return-pickups.index'))->assertOk()->assertSee('action="'.route('rider.return-pickups.collect', $return).'"', false)->viewData('returns')->modelKeys());
+        $this->post(route('rider.return-pickups.collect', $return), ['tracking_number' => 'WRONG'])->assertSessionHasErrors('tracking_number');
+        $this->assertNull($return->fresh()->collected_at);
+
+        $this->post(route('rider.return-pickups.collect', $return), ['tracking_number' => $f['parcel']->tracking_number])->assertSessionHasNoErrors();
+
+        $this->assertNotNull($return->fresh()->collected_at);
+        $this->assertSame($f['b']['station']->id, (int) $f['parcel']->fresh()->custody_hub_id);
+        $this->assertSame($f['b']['provider']->id, (int) $f['parcel']->fresh()->custody_provider_id);
+        $this->assertSame(OrderStatus::Delivered, $f['parcel']->fresh()->status);
+        $this->assertSame([], $this->get(route('rider.return-pickups.index'))->assertOk()->viewData('returns')->modelKeys());
+
+        $this->post(route('rider.return-pickups.collect', $return), ['tracking_number' => $f['parcel']->tracking_number])->assertSessionHasErrors('return');
+    }
+
+    public function test_logistics_page_offers_collection_only_while_it_is_needed(): void
+    {
+        $f = $this->fixture();
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+        $this->actingAs($f['b']['provider'], 'logistics');
+        $assign = 'action="'.route('logistics.returns.assign-collection', $return).'"';
+        $manifest = 'action="'.route('logistics.returns.manifest', $return).'"';
+
+        $this->get(route('logistics.returns.show', $return))->assertOk()->assertSee('has not decided')->assertDontSee($assign, false)->assertDontSee($manifest, false);
+
+        $returns->approveBySeller($return, $f['seller']);
+        $this->get(route('logistics.returns.show', $return))->assertOk()->assertSee($assign, false)->assertDontSee($manifest, false);
+
+        $this->post(route('logistics.returns.assign-collection', $return), ['courier_id' => $f['courier']->id])->assertSessionHasNoErrors();
+        $this->get(route('logistics.returns.show', $return))->assertOk()->assertSee('You can reassign');
+
+        $returns->confirmBuyerCollection($return, $f['rider'], $f['parcel']->tracking_number);
+        $this->get(route('logistics.returns.show', $return))->assertOk()->assertDontSee($assign, false)->assertSee($manifest, false);
+    }
+
+    public function test_buyer_return_travels_from_the_buyer_all_the_way_to_seller_receipt(): void
+    {
+        $f = $this->fixture();
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+
+        $returns->approveBySeller($return, $f['seller']);
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+        $returns->confirmBuyerCollection($return, $f['rider'], $f['parcel']->tracking_number);
+
+        $this->moveHome($f, $return->fresh());
+        $this->assertSame(OrderStatus::Delivered, $f['parcel']->fresh()->status);
+
+        $token = $this->receiptToken($f, $return->fresh(), 'resellable');
+        $returns->receiveBySeller($return->fresh(), $f['seller'], 'resellable', $token);
+
+        $this->assertSame(ParcelReturnStatus::Completed, $return->fresh()->status);
+        $this->assertSame(OrderStatus::Returned, $f['parcel']->fresh()->status);
+        $this->assertSame(5, $f['variant']->fresh()->stock_quantity);
+        $this->assertSame(1, InventoryTransaction::query()->where('reason', 'return')->count());
+        $this->assertSame(['requested', 'seller_approved', 'collection_assigned', 'collected_from_buyer', 'in_transit', 'at_origin', 'awaiting_seller', 'completed'], $return->events()->pluck('event_key')->all());
+    }
+
+    public function test_cross_provider_buyer_return_reaches_the_origin_provider(): void
+    {
+        $f = $this->fixture(true);
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+        $returns->approveBySeller($return, $f['seller']);
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+        $returns->confirmBuyerCollection($return, $f['rider'], $f['parcel']->tracking_number);
+        $this->activeHandoffLink($f['b']['provider'], $f['a']['provider'], $f['admin']);
+
+        $handoff = $returns->reverseHandoff($return->fresh(), $f['b']['provider']);
+        $this->assertSame('return', $handoff->direction);
+
+        $service = app(ParcelHandoffService::class);
+        $handoff = $service->accept($handoff, $f['a']['provider']);
+        $scan = $service->verifyScan($handoff, $f['b']['provider'], $f['parcel']->tracking_number, 'dispatch');
+        $handoff = $service->dispatch($handoff, $f['b']['provider'], $scan['verification_token']);
+        $scan = $service->verifyScan($handoff, $f['a']['provider'], $f['parcel']->tracking_number, 'receive');
+        $service->receive($handoff, $f['a']['provider'], $scan['verification_token']);
+
+        $this->assertSame($f['a']['provider']->id, $f['parcel']->fresh()->custody_provider_id);
+        $this->assertSame(ParcelReturnStatus::AtOrigin, $return->fresh()->status);
+        $this->assertSame(OrderStatus::Delivered, $f['parcel']->fresh()->status);
     }
 
     public function test_unauthorized_initiation_is_rejected(): void

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Http\Controllers\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -17,7 +17,7 @@ class HomeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Discover Zefanya');
-        $response->assertSee('Flash Sale');
+        $response->assertDontSee('Flash Sale');
         $response->assertSee('Todays For You!');
         $response->assertSee('Best Selling Store');
         $response->assertSee('Product coming soon');

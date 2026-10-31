@@ -1,4 +1,7 @@
 // Shared multipart create/edit dialog. Product state belongs to each injected form root.
+import { clearProductValidationErrors, showProductValidationErrors } from './product-validation-errors.js';
+import { refreshProductSections, updateStoreCategoryChoices, revealProductField } from './product-form-flow.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const overlay = document.getElementById('productModalOverlay');
     const form = document.getElementById('productModalForm');
@@ -12,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const back = document.querySelector('[data-pf-back]');
     const next = document.querySelector('[data-pf-next]');
     const createSnapshot = body.dataset.mode === 'create' ? { html: body.innerHTML, action: form.action } : null;
+    const LAST_STEP = 4;
     let state;
     let fetchToken = 0;
     let previousFocus;
@@ -74,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const root = q('[data-pf-root]');
         if (!root) { submit.disabled = true; next.disabled = true; return; }
         const initial = JSON.parse(q('[data-pf-initial]').textContent);
-        state = { colorFirst: root.dataset.pfColorFirst === '1', groups: [], step: 1, edit: root.dataset.pfEdit === '1', urls: new Set(), rows: new Map(), colors: new Map(), initialColors: initial.colorImages || {}, imageIds: initial.colorImageIds || {}, axes: (initial.options || []).slice(0, 2).map(axis => ({ name: axis.name || '', values: asValues(axis.values) })) };
+        state = { colorFirst: root.dataset.pfColorFirst === '1', groups: [], step: 1, furthestStep: 1, edit: root.dataset.pfEdit === '1', urls: new Set(), rows: new Map(), colors: new Map(), initialColors: initial.colorImages || {}, imageIds: initial.colorImageIds || {}, axes: (initial.options || []).slice(0, 2).map(axis => ({ name: axis.name || '', values: asValues(axis.values) })) };
         initial.variants.forEach(row => state.rows.set(key(asValues(row.values)), { ...row, values: asValues(row.values) }));
         if (state.colorFirst) {
             const colors = state.axes[0]?.values || [];
@@ -86,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOptions();
         syncVariations();
         generate();
+        updateStoreCategoryChoices(body);
         showStep(1);
     }
     function weightBounds(field, unit) {
@@ -150,17 +155,18 @@ document.addEventListener('DOMContentLoaded', () => {
         q('[data-pf-single-weight] [data-pf-weight-unit]').disabled = enabled();
         q('[data-pf-variants-exist]').value = enabled() ? '1' : '0';
         q('[data-pf-options-area]').hidden = !enabled();
-        q('[data-pf-single-message]').hidden = enabled();
         qa('[data-pf-option-name], [data-pf-option-values]').forEach(field => { field.disabled = !enabled(); });
         q('[data-pf-single-inventory]').hidden = enabled();
         q('[data-pf-variant-inventory]').hidden = !enabled();
-        q('[data-pf-variant-body]').closest('table').parentElement.hidden = state.colorFirst;
+        qa('[data-pf-sku-col]').forEach(column => { column.hidden = !state.edit; });
         q('#price').readOnly = enabled();
         q('#stock_quantity').readOnly = enabled();
+        if (enabled()) q('#stock_quantity').removeAttribute('max');
+        else q('#stock_quantity').max = '99999';
         qa('[data-pf-variant-row] input, [data-pf-variant-row] select').forEach(field => { field.disabled = !enabled(); });
         qa('[data-pf-colors] input').forEach(field => { field.disabled = !enabled(); });
         const count = state.colorFirst ? state.groups.reduce((sum, group) => sum + group.sizes.length, 0) : state.axes.reduce((total, axis) => total * axis.values.length, 1);
-        q('[data-pf-combo-summary]').textContent = count + ' combination' + (count === 1 ? '' : 's') + ' · maximum 50';
+        q('[data-pf-combo-summary]').textContent = count + ' version' + (count === 1 ? '' : 's') + ' so far. You will set their prices in the next step.';
         rollup();
     }
     function saveRows() {
@@ -180,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
         qa('[data-pf-variant-row]').forEach(row => row.remove());
         const container = q('[data-pf-variant-body]');
         container.replaceChildren();
-        if (rows.length <= 50) rows.forEach((values, index) => {
+        if (rows.length <= 400) rows.forEach((values, index) => {
             const old = state.rows.get(key(values)) || { price: '', stock_quantity: 0, sku: '', is_available: true };
             const row = node('tr', undefined, 'border-t border-[var(--border-hairline)]');
             row.setAttribute('data-pf-variant-row', '');
@@ -192,22 +198,27 @@ document.addEventListener('DOMContentLoaded', () => {
             row.append(label);
             [['price', 'number', 'data-pf-price'], ['stock_quantity', 'number', 'data-pf-stock'], ['weight', 'number', 'data-pf-weight'], ['sku', 'text', 'data-pf-sku']].forEach(([name, type, hook]) => {
                 const cell = node('td', undefined, 'p-3');
+                if (name === 'sku') { cell.setAttribute('data-pf-sku-col', ''); cell.hidden = !state.edit; }
                 const field = input(type, 'variants[' + index + '][' + name + ']', old[name], hook);
                 field.setAttribute('aria-label', values.join(' / ') + ' ' + name.replace('_quantity', ''));
-                if (type === 'number') { field.min = '0'; field.step = name === 'price' ? '0.01' : '1'; field.required = true; }
+                if (type === 'number') { field.min = name === 'price' ? '1' : '0'; if (name === 'price') field.max = '1000000'; if (name === 'stock_quantity') field.max = '99999'; field.step = name === 'price' ? '0.01' : '1'; field.required = true; }
                 else field.maxLength = 64;
                 field.classList.add(name === 'sku' ? 'min-w-28' : 'min-w-24');
-                cell.append(field);
                 if (name === 'weight') {
+                    const pair = node('div', undefined, 'flex gap-1');
+                    pair.append(field);
+                    cell.append(pair);
                     const unit = node('select', undefined, fieldClass);
                     unit.name = 'variants[' + index + '][weight_unit]';
                     unit.setAttribute('data-pf-weight-unit', '');
                     unit.setAttribute('aria-label', values.join(' / ') + ' weight unit');
                     ['g', 'kg'].forEach(value => { const option = node('option', value); option.value = value; unit.append(option); });
                     unit.value = old.weight_unit || 'g';
-                    cell.append(unit);
+                    unit.classList.remove('w-full');
+                    unit.classList.add('w-[72px]', 'shrink-0');
+                    pair.append(unit);
                     weightBounds(field, unit.value);
-                }
+                } else cell.append(field);
                 row.append(cell);
             });
             const cell = node('td', undefined, 'p-3');
@@ -226,6 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderColors() {
         const axis = enabled() ? state.axes.find(axis => /^(color|colour)$/i.test(axis.name.trim())) : null;
         const values = axis?.values || [];
+        refreshProductSections(body, { step: state.step, variations: enabled(), colorFirst: state.colorFirst, hasColor: Boolean(axis) });
         const container = q('[data-pf-colors]');
         const previous = state.colors;
         const current = new Map();
@@ -236,15 +248,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.setAttribute('data-pf-color-card', '');
                 card.dataset.color = value;
                 if (state.colorFirst) {
-                    const nameLabel = node('label', 'Color name', 'flex flex-col gap-2 font-semibold');
+                    const header = node('div', undefined, 'flex items-end gap-3');
+                    const nameLabel = node('label', 'Color name', 'flex min-w-0 flex-1 flex-col gap-2 font-semibold');
                     const name = input('text', null, value, 'data-pf-color-name');
                     name.maxLength = 100; name.required = true;
-                    nameLabel.append(name); card.append(nameLabel);
-                    card.append(action('Remove color', 'data-pf-remove-color'));
-                    const sizeLabel = node('label', 'Available sizes (separate with commas)', 'flex flex-col gap-2 font-semibold');
+                    nameLabel.append(name);
+                    header.append(nameLabel, action('Remove color', 'data-pf-remove-color'));
+                    card.append(header);
+                    const sizeLabel = node('label', 'Sizes in this color', 'flex flex-col gap-2 font-semibold');
                     const sizes = input('text', null, state.groups.find(group => group.value === value)?.sizes.join(', '), 'data-pf-color-sizes');
                     sizes.placeholder = 'S, M, L'; sizes.required = true;
-                    sizeLabel.append(sizes); card.append(sizeLabel);
+                    sizeLabel.append(sizes);
+                    sizeLabel.append(node('span', 'Separate with commas. No sizes? Type "One size".', 'text-xs font-normal text-[var(--text-muted)]'));
+                    card.append(sizeLabel);
                 } else card.append(node('h4', value, 'font-semibold text-[var(--text-ink)]'));
                 const existing = node('div', undefined, 'grid grid-cols-3 gap-2');
                 (state.initialColors[value] || []).forEach(url => {
@@ -258,33 +274,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 card.append(existing);
                 card.append(input('hidden', null, value, 'data-pf-color-value'));
-                const uploadLabel = node('label', 'Color photos (up to 6)', 'flex flex-col gap-2 text-xs text-[var(--text-ink)]');
+                const uploadLabel = node('label', undefined, 'flex cursor-pointer flex-col items-center gap-1 rounded-sm border border-dashed border-[var(--border-input)] bg-[var(--bg-soft)] p-3 text-center hover:border-[var(--brand)]');
+                uploadLabel.append(node('span', '+ Add photos of this color', 'font-semibold text-[var(--text-ink)]'));
+                uploadLabel.append(node('span', 'Up to 9. Buyers see these when they pick this color.', 'text-xs text-[var(--text-muted)]'));
                 const files = input('file', null, '', 'data-pf-color-files');
-                files.multiple = true; files.accept = 'image/jpeg,image/png,image/webp';
-                files.className = 'w-full min-w-0 text-xs';
+                files.multiple = true; files.accept = 'image/jpeg,image/png';
+                files.className = 'sr-only';
                 uploadLabel.append(files);
                 card.append(uploadLabel);
                 const previews = node('div', undefined, 'grid grid-cols-3 gap-2');
                 previews.setAttribute('data-pf-color-previews', '');
                 card.append(previews);
-                card.append(node('p', 'Shared by all sizes of this color.', 'text-xs text-[var(--text-muted)]'));
-            }
-            if (state.colorFirst) {
-                let inventory = card.querySelector('[data-pf-color-inventory]');
-                if (!inventory) {
-                    const wrapper = node('div', undefined, 'overflow-auto');
-                    const table = node('table', undefined, 'w-full min-w-[650px] text-left text-sm');
-                    const head = node('thead'); const tr = node('tr');
-                    ['Size', 'Price (PHP)', 'Stock', 'Weight (required)', 'SKU', 'Selling'].forEach(text => tr.append(node('th', text, 'p-3')));
-                    head.append(tr); inventory = node('tbody'); inventory.setAttribute('data-pf-color-inventory', '');
-                    table.append(head, inventory); wrapper.append(table); card.append(wrapper);
-                }
-                inventory.replaceChildren(...qa('[data-pf-variant-row]').filter(row => JSON.parse(row.dataset.values)[0] === value));
             }
             card.querySelector('[data-pf-color-value]').name = 'color_images[' + index + '][value]';
             card.querySelector('[data-pf-color-files]').name = 'color_images[' + index + '][files][]';
             card.querySelectorAll('[data-pf-removed-color-photo]').forEach(field => { field.name = 'color_images[' + index + '][remove_ids][]'; });
-            if (state.colorFirst) card.querySelectorAll('[data-pf-variant-row]').forEach(row => { row.querySelector('td span').textContent = JSON.parse(row.dataset.values)[1]; });
             current.set(value, card);
         });
         previous.forEach((card, value) => { if (!current.has(value)) card.querySelectorAll('[data-object-url]').forEach(image => { URL.revokeObjectURL(image.src); state.urls.delete(image.src); }); });
@@ -305,35 +309,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function validate(step) {
         error('');
-        if (step === 1 && !state.edit && !q('[data-pf-gallery-files]').files.length) { error('Upload at least one product photo.'); return false; }
+        if (step === 2 && !state.edit && !q('[data-pf-gallery-files]').files.length) { error('Add at least one main photo.'); return false; }
         if (step === 2 && enabled() && state.colorFirst) {
             const names = state.groups.map(group => group.value.trim().toLowerCase());
             if (!names.length || names.some(name => !name) || new Set(names).size !== names.length || state.groups.some(group => !group.sizes.length || new Set(group.sizes.map(size => size.toLowerCase())).size !== group.sizes.length)) {
-                error('Enter unique colors and at least one unique size per color.'); return false;
+                error('Give each color its own name and at least one size. No sizes? Type "One size".'); return false;
             }
-            if (combinations().length > 50) { error('Use at most 50 color-size combinations.'); return false; }
+            if (state.axes.some(axis => axis.values.length > 20)) { error('Each variation can have at most 20 options.'); return false; }
             for (const card of state.colors.values()) {
-                if (!card.querySelector('[data-pf-color-files]').files.length && !(state.initialColors[card.dataset.color] || []).length) { error('Upload a photo specifically for ' + card.dataset.color + '.'); return false; }
+                if (!card.querySelector('[data-pf-color-files]').files.length && !(state.initialColors[card.dataset.color] || []).length) { error('Add at least one photo of ' + card.dataset.color + '.'); return false; }
             }
         }
         if (step === 2 && enabled()) {
-            if (state.axes.some(axis => !axis.name.trim() || !axis.values.length)) { error('Give each variation a name and at least one option.'); return false; }
-            if (new Set(state.axes.map(axis => axis.name.trim().toLowerCase())).size !== state.axes.length) { error('Variation group names must be different.'); return false; }
-            if (combinations().length > 50) { error('This creates more than 50 variants. Remove some options to continue.'); return false; }
+            const axisErrors = {}, names = new Set();
+            state.axes.forEach((axis, index) => {
+                const name = axis.name.trim().toLowerCase();
+                if (!name || names.has(name)) axisErrors['options.' + index + '.name'] = ['Variation group names must be unique and not empty.'];
+                if (!axis.values.length) axisErrors['options.' + index + '.values'] = ['Add at least one option.'];
+                names.add(name);
+            });
+            if (Object.keys(axisErrors).length) {
+                showProductValidationErrors(form, axisErrors);
+                error(Object.values(axisErrors).flat().join(' '));
+                return false;
+            }
+            if (state.axes.some(axis => axis.values.length > 20)) { error('Each variation can have at most 20 options.'); return false; }
         }
         const panel = q('[data-pf-step="' + step + '"]');
         for (const field of panel.querySelectorAll('input, textarea, select')) {
-            if (!field.disabled && !field.checkValidity()) { field.reportValidity(); return false; }
+            if (!field.disabled && !field.checkValidity()) {
+                revealProductField(field);
+                showProductValidationErrors(form, { [field.name]: [field.validationMessage] });
+                field.reportValidity();
+                return false;
+            }
         }
         return true;
     }
     function review() {
         rollup();
         q('[data-pf-review-name]').textContent = q('#name').value;
-        q('[data-pf-review-category]').textContent = q('[data-pf-category]').textContent;
-        q('[data-pf-review-options]').textContent = enabled() ? state.axes.map(axis => axis.name + ': ' + axis.values.join(', ')).join(' · ') : 'Single item';
+        const category = q('[data-pf-category]');
+        q('[data-pf-review-category]').textContent = (category.selectedOptions ? category.selectedOptions[0]?.textContent : category.textContent) || '';
+        q('[data-pf-review-options]').textContent = enabled() ? state.axes.map(axis => axis.name + ': ' + axis.values.join(', ')).join(' · ') : 'One version';
         const price = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(q('#price').value));
-        q('[data-pf-review-summary]').textContent = (enabled() ? combinations().length + ' variants' : '1 item') + ' · ' + q('#stock_quantity').value + ' pieces · ' + (enabled() ? 'from ' : '') + price;
+        q('[data-pf-review-summary]').textContent = (enabled() ? combinations().length + ' versions' : '1 version') + ' · ' + q('#stock_quantity').value + ' pieces · ' + (enabled() ? 'from ' : '') + price;
         const cover = q('[data-pf-review-cover]');
         const index = Number(q('[data-pf-cover-index]').value);
         const gallery = qa('[data-pf-gallery] img');
@@ -346,34 +366,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function showStep(step) {
         if (!state) return;
         state.step = step;
+        state.furthestStep = Math.max(state.furthestStep, step);
         error('');
-        qa('[data-pf-step]').forEach(panel => { panel.hidden = Number(panel.dataset.pfStep) !== step; });
+        refreshProductSections(body, { step, variations: enabled(), colorFirst: state.colorFirst, hasColor: state.axes.some(axis => /^(color|colour)$/i.test(axis.name.trim())) });
         qa('[data-pf-progress]').forEach(item => {
-            const current = Number(item.dataset.pfProgress) === step;
-            if (current) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
-            item.classList.toggle('text-[var(--text-ink)]', current);
-            item.querySelector('[data-pf-number]').classList.toggle('bg-[var(--bg-soft)]', current);
+            const number = Number(item.dataset.pfProgress);
+            if (number === step) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
+            // New products unlock steps in order; an existing one can jump anywhere.
+            item.disabled = !state.edit && number > state.furthestStep;
         });
-        back.disabled = step === 1;
-        back.hidden = step === 1;
-        next.hidden = step === 5;
+        // Editing a price should not mean walking through every step to save it:
+        // an existing product moves by the step bar and can save from anywhere.
+        back.hidden = state.edit || step === 1;
+        next.hidden = state.edit || step === LAST_STEP;
         next.disabled = false;
-        submit.hidden = step !== 5;
-        submit.disabled = step !== 5;
-        next.textContent = step === 4 ? 'Review product →' : 'Continue →';
-        if (step === 5) review();
+        submit.hidden = !state.edit && step !== LAST_STEP;
+        submit.disabled = false;
+        review();
         body.scrollTop = 0;
     }
-    function addValue(row) {
+    function addValue(row, focus = true) {
         const index = Number(row.dataset.index);
         const entry = row.querySelector('[data-pf-value-entry]');
         const values = asValues(entry.value);
-        if (!values.length) return;
-        if (values.some(value => value.length > 50)) { error('Keep each option value within 50 characters.'); return; }
+        if (!values.length) return true;
+        if (values.some(value => value.length > 50)) { error('Keep each option value within 50 characters.'); entry.focus(); return false; }
         const axis = state.axes[index];
+        const additions = values.filter(value => !axis.values.some(old => old.toLowerCase() === value.toLowerCase()));
+        if (axis.values.length + new Set(additions.map(value => value.toLowerCase())).size > 20) { error('Each variation can have at most 20 options.'); entry.focus(); return false; }
         values.forEach(value => { if (!axis.values.some(old => old.toLowerCase() === value.toLowerCase())) axis.values.push(value); });
         error(''); renderOptions(); generate();
-        q('[data-pf-option-row][data-index="' + index + '"] [data-pf-value-entry]').focus();
+        if (focus) q('[data-pf-option-row][data-index="' + index + '"] [data-pf-value-entry]').focus();
+        return true;
+    }
+    function commitPendingValues(exceptIndex = null) {
+        if (!enabled()) return true;
+        for (const entry of qa('[data-pf-value-entry]')) {
+            if (Number(entry.closest('[data-pf-option-row]').dataset.index) === exceptIndex) continue;
+            if (entry.value.trim() && !addValue(entry.closest('[data-pf-option-row]'), false)) return false;
+        }
+        return true;
     }
     function open() {
         previousFocus = document.activeElement;
@@ -408,7 +440,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const html = await response.text();
             if (token !== fetchToken) return;
             apply('edit', html, trigger?.dataset.updateUrl || overlay.dataset.updateTemplate.replace('__ID__', id), id);
-            q('#name')?.focus();
+            if (trigger?.hasAttribute('data-product-stock-open')) {
+                title.textContent = 'Add Stock';
+                showStep(3);
+                (enabled() ? q('[data-pf-stock]:not(:disabled)') : q('#stock_quantity'))?.focus();
+            } else {
+                q('#name')?.focus();
+            }
         } catch {
             if (token === fetchToken) body.replaceChildren(node('p', 'Could not load this product. Close and try again.', 'p-6 text-[var(--status-danger)]'));
         }
@@ -440,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     back.addEventListener('click', () => { if (state) showStep(Math.max(1, state.step - 1)); });
     next.addEventListener('click', () => {
-        if (!state || !validate(state.step)) return;
+        if (!state || !commitPendingValues() || !validate(state.step)) return;
         if (state.step === 2) generate();
         showStep(state.step + 1);
     });
@@ -449,6 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = event.target.closest('button');
         if (!button) return;
         const row = button.closest('[data-pf-option-row]');
+        if (button.matches('[data-pf-progress]')) { generate(); showStep(Number(button.dataset.pfProgress)); return; }
         if (button.matches('[data-pf-remove-color-photo]')) {
             const card = button.closest('[data-pf-color-card]');
             if (!button.dataset.imageId) { error('Reload this product to remove saved photos.'); return; }
@@ -461,6 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
             removed.name = 'color_images[' + index + '][remove_ids][]';
         }
         if (button.matches('[data-pf-add-color]')) {
+            if (state.groups.length >= 20) { error('A variation can have at most 20 colors.'); return; }
             saveRows();
             let index = state.groups.length + 1;
             while (state.groups.some(group => group.value === 'Color ' + index)) index++;
@@ -474,32 +514,62 @@ document.addEventListener('DOMContentLoaded', () => {
             state.groups = state.groups.filter(group => group.value !== button.closest('[data-pf-color-card]').dataset.color);
             renderOptions(); generate();
         }
-        if (button.matches('[data-pf-add-option]') && state.axes.length < 2) { state.axes.push({ name: '', values: [] }); renderOptions(); }
-        if (button.matches('[data-pf-remove-option]')) { saveRows(); state.axes.splice(Number(row.dataset.index), 1); renderOptions(); generate(); }
-        if (button.matches('[data-pf-add-value]')) addValue(row);
-        if (button.matches('[data-pf-remove-value]')) { saveRows(); state.axes[Number(row.dataset.index)].values.splice(Number(button.dataset.valueIndex), 1); renderOptions(); generate(); }
+        if (button.matches('[data-pf-add-option]') && state.axes.length < 2) {
+            if (!commitPendingValues()) return;
+            state.axes.push({ name: '', values: [] }); renderOptions();
+        }
+        if (button.matches('[data-pf-remove-option]')) {
+            if (!commitPendingValues(Number(row.dataset.index))) return;
+            saveRows(); state.axes.splice(Number(row.dataset.index), 1); renderOptions(); generate();
+        }
+        if (button.matches('[data-pf-add-value]')) commitPendingValues();
+        if (button.matches('[data-pf-remove-value]')) {
+            if (!commitPendingValues()) return;
+            saveRows(); state.axes[Number(row.dataset.index)].values.splice(Number(button.dataset.valueIndex), 1); renderOptions(); generate();
+        }
         if (button.matches('[data-pf-set-cover]')) { q('[data-pf-cover-index]').disabled = false; q('[data-pf-cover-index]').value = button.dataset.pfSetCover; preview([...q('[data-pf-gallery-files]').files], q('[data-pf-gallery]'), true); }
         if (button.matches('[data-pf-apply-bulk]')) {
-            const price = q('[data-pf-bulk-price]'), stock = q('[data-pf-bulk-stock]');
-            if (![price, stock].every(field => field.checkValidity())) { error('Enter a valid non-negative price and whole-number stock.'); return; }
+            const price = q('[data-pf-bulk-price]'), stock = q('[data-pf-bulk-stock]'), weight = q('[data-pf-bulk-weight]'), unit = q('[data-pf-bulk-weight-unit]');
+            if (![price, stock, weight].every(field => field.checkValidity())) { error('Enter a valid price, whole-number stock and weight.'); return; }
             qa('[data-pf-variant-row]').forEach(row => {
                 if (price.value !== '') row.querySelector('[data-pf-price]').value = price.value;
                 if (stock.value !== '') row.querySelector('[data-pf-stock]').value = stock.value;
+                if (weight.value !== '') {
+                    const field = row.querySelector('[data-pf-weight]'), rowUnit = row.querySelector('[data-pf-weight-unit]');
+                    rowUnit.value = unit.value;
+                    weightBounds(field, unit.value);
+                    field.value = weight.value;
+                }
             });
+            clearProductValidationErrors(form);
             rollup();
         }
     });
     form.addEventListener('keydown', event => {
-        if (event.key === 'Enter' && event.target.matches('[data-pf-value-entry]')) { event.preventDefault(); addValue(event.target.closest('[data-pf-option-row]')); }
-        else if (event.key === 'Enter' && state?.step !== 5 && event.target.tagName === 'INPUT') event.preventDefault();
+        if (['Enter', ','].includes(event.key) && event.target.matches('[data-pf-value-entry]')) { event.preventDefault(); addValue(event.target.closest('[data-pf-option-row]')); }
+        else if (event.key === 'Enter' && event.target.tagName === 'INPUT') event.preventDefault();
+    });
+    form.addEventListener('focusout', event => {
+        const entry = event.target;
+        if (!state || !entry.matches('[data-pf-value-entry]') || !entry.value.trim()) return;
+        // Buttons already have an explicit action; don't replace their DOM before click.
+        if (event.relatedTarget?.closest('button')) return;
+        const nextField = event.relatedTarget;
+        const nextRow = nextField?.closest('[data-pf-option-row]');
+        const nextHook = nextField?.matches('[data-pf-option-name]') ? '[data-pf-option-name]' : nextField?.matches('[data-pf-value-entry]') ? '[data-pf-value-entry]' : null;
+        const nextIndex = nextRow?.dataset.index;
+        if (!addValue(entry.closest('[data-pf-option-row]'), false)) return;
+        if (nextHook && nextIndex !== undefined) q('[data-pf-option-row][data-index="' + nextIndex + '"] ' + nextHook)?.focus();
     });
     form.addEventListener('input', event => {
         if (!state) return;
+        if (form.querySelector('[data-pf-field-error]')) clearProductValidationErrors(form);
         if (event.target.matches('[data-pf-option-name]')) {
             state.axes[Number(event.target.closest('[data-pf-option-row]').dataset.index)].name = event.target.value;
             renderColors();
         }
         if (event.target.matches('[data-pf-price], [data-pf-stock], #price, #stock_quantity')) rollup();
+        review();
     });
     form.addEventListener('change', event => {
         if (!state) return;
@@ -529,6 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.querySelector('[data-pf-color-value]').value = name;
             } else {
                 const sizes = asValues(target.value);
+                const allSizes = new Set([...sizes, ...state.groups.filter(other => other !== group).flatMap(other => other.sizes)]);
+                if (new Set([...allSizes].map(size => size.toLowerCase())).size > 20) { target.value = group.sizes.join(', '); error('A variation can have at most 20 sizes.'); return; }
                 if (new Set(sizes.map(size => size.toLowerCase())).size !== sizes.length) { target.value = group.sizes.join(', '); error('Sizes must be unique within a color.'); return; }
                 // A size label replacement retains that row's identity and inventory.
                 const removed = group.sizes.filter(size => !sizes.includes(size));
@@ -544,25 +616,63 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderOptions(); generate();
         }
-        if (target.matches('[data-pf-variants-toggle]')) { generate(); syncVariations(); }
+        if (target.matches('[data-pf-variants-toggle], [data-pf-variants-none]')) {
+            if (enabled() && state.colorFirst && !state.groups.length) state.groups.push({ value: 'Color 1', sizes: [] });
+            renderOptions(); generate(); syncVariations();
+            refreshProductSections(body, { step: state.step, variations: enabled(), colorFirst: state.colorFirst, hasColor: state.axes.some(axis => /^(color|colour)$/i.test(axis.name.trim())) });
+            if (enabled() && state.colorFirst && state.groups.length === 1 && state.groups[0].value === 'Color 1') {
+                const firstColor = q('[data-pf-color-name]');
+                firstColor?.focus(); firstColor?.select();
+            }
+        }
+        if (target.matches('[data-pf-store-categories] input[type="checkbox"]')) updateStoreCategoryChoices(body);
         if (target.matches('[data-pf-enabled]')) target.closest('tr').querySelector('[data-pf-available]').value = target.checked ? '1' : '0';
         if (target.matches('#status')) review();
         if (target.matches('[data-pf-gallery-files], [data-pf-color-files]')) {
             const files = [...target.files];
-            const invalid = files.length > 6 || files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024);
-            if (invalid) { target.value = ''; error('Choose up to 6 JPG, PNG or WebP images, no larger than 3 MB each.'); }
+            const invalid = files.length > 9 || files.some(file => !['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024);
+            if (invalid) { target.value = ''; error('Choose up to 9 JPG/PNG images, no larger than 5 MB each.'); }
             else error('');
             const isGallery = target.matches('[data-pf-gallery-files]');
             if (isGallery) { q('[data-pf-cover-index]').value = '0'; q('[data-pf-cover-index]').disabled = state.edit; }
             preview([...target.files], isGallery ? q('[data-pf-gallery]') : target.closest('[data-pf-color-card]').querySelector('[data-pf-color-previews]'), isGallery);
         }
+        review();
     });
+    async function persistForm() {
+        form.dataset.submitting = '1';
+        clearProductValidationErrors(form);
+        try {
+            const response = await fetch(form.action, { method: 'POST', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(form) });
+            if (!response.ok) {
+                const data = await response.json();
+                const first = showProductValidationErrors(form, data.errors || {});
+                if (first?.step) showStep(first.step);
+                error(Object.values(data.errors || {}).flat().join(' ') || data.message || 'Unable to save the product.');
+                if (first?.field) { revealProductField(first.field); first.field.focus(); }
+                return;
+            }
+            window.location.assign(response.url);
+        } catch { error('Unable to save the product. Your entered values and photos have been kept. Please try again.'); }
+        finally { delete form.dataset.submitting; }
+    }
     form.addEventListener('submit', event => {
-        if (!state || state.step !== 5) { event.preventDefault(); return; }
-        for (let step = 1; step <= 5; step++) {
+        event.preventDefault();
+        if (form.dataset.submitting === '1') { event.preventDefault(); return; }
+        if (!commitPendingValues()) return;
+        if (event.submitter?.matches('[data-pf-save-draft]') || q('#status')?.value === 'draft') {
+            if (!q('#name').checkValidity()) { event.preventDefault(); showStep(1); q('#name').reportValidity(); return; }
+            q('#status').value = 'draft';
+            rollup();
+            persistForm();
+            return;
+        }
+        if (!state) return;
+        for (let step = 1; step <= LAST_STEP; step++) {
             if (!validate(step)) { event.preventDefault(); showStep(step); validate(step); return; }
         }
         rollup();
+        persistForm();
     });
     initialize();
     if (overlay.dataset.autoEditId && /^\d+$/.test(overlay.dataset.autoEditId)) openEdit(overlay.dataset.autoEditId);

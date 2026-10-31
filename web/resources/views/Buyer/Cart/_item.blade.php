@@ -69,18 +69,30 @@
     <p class="mt-0.5 text-[11.5px] text-neutral-400">
       @if ($unavailable)
         @if ($item->requiresVariantReselection())
-          Choose a color or size on the product page first.
+          Variation unavailable. Choose a color or size on the product page first.
+        @elseif (! $product?->isOnVacation() && $item->isVariationUnavailable())
+          Variation unavailable
         @else
-          No longer available
+          {{ $product?->isOnVacation() ? 'On vacation — purchasing is temporarily unavailable.' : 'No longer available' }}
         @endif
       @elseif ($variantLabel)
         {{ $variantLabel }}@if ($item->quantity > 1) · Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)@endif
       @elseif ($item->quantity > 1)
         Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)
       @endif
+      @if (! $unavailable && ($offerNote = $item->offerNote()))
+        <span class="mt-1 block">{{ $offerNote }}</span>
+      @endif
     </p>
 
-    @if (! $unavailable && $product?->isLowStock())
+    @if (! $unavailable && ($regularPrice = $item->resolvedPrice()?->formattedRegular()))
+      <p class="mt-1 text-[11.5px]">
+        <span class="text-price-muted line-through">{{ $regularPrice }}</span>
+        <span class="font-semibold text-primary-700">₱{{ number_format($unit / 100, 2) }} each</span>
+      </p>
+    @endif
+
+    @if (! $unavailable && ($item->quantity > $stock || ($stock > 0 && $stock <= $product?->low_stock_threshold)))
       <p class="mt-1 flex items-center gap-1 text-[11.5px] font-semibold text-primary-700">
         <i data-lucide="alert-triangle" width="11" height="11"></i>
         Only {{ $stock }} left

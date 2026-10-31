@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Buyer;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Notifications\Notification;
 
 class OrderOutForDelivery extends Notification

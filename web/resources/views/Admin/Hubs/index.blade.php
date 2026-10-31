@@ -3,6 +3,10 @@
 @section('title', 'Logistics Hub Approvals')
 
 @section('content')
+<x-admin.tabs :tabs="[
+    ['label' => 'Hub approvals', 'route' => 'admin.hubs.index'],
+    ['label' => 'Partnerships', 'route' => 'admin.partnerships.index'],
+]" />
 
 @php
     $statusColors = [

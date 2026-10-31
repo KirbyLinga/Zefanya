@@ -3,45 +3,62 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
+use App\Models\Catalog\Product;
+use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
+use App\Services\Buyer\CatalogSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SearchController extends Controller
 {
+    private const MIN_LENGTH = 2;
+
     /**
      * GET /buyer/search — Display search results page
      */
     public function index(Request $request): View
     {
-        $query = (string) $request->query('q', '');
-        $query = trim($query);
+        $query = CatalogSearch::term($request->query('q'));
+        ['filters' => $priceFilters, 'error' => $priceError] = CatalogSearch::priceFilters($request->only(['min_price', 'max_price']));
 
         $products = collect();
         $categories = collect();
+        $stores = collect();
+        $suggestion = null;
+        $tooShort = $query !== '' && mb_strlen($query) < self::MIN_LENGTH;
 
-        if (strlen($query) >= 2) {
-            $products = Product::query()->withBuyerCardData()
-                ->activeInStock()
+        if ($query !== '' && ! $tooShort) {
+            $phrase = CatalogSearch::phrasePattern($query);
+            $stores = Seller::query()->where('status', 'approved')
+                ->whereRaw("LOWER(business_name) LIKE ? ESCAPE '!'", [$phrase])
+                ->orderBy('business_name')->limit(20)->get(['id', 'business_name', 'store_description', 'store_logo_path']);
+            $products = CatalogSearch::apply(Product::query()->withBuyerCardData(), $query)
+                // SEL-INV-007: a sold-out listing remains discoverable by name.
+                ->where('status', 'active')
+                ->whereNull('restriction_reason')
+                ->whereHas('variants', fn ($query) => $query->where('is_available', true))
                 ->when($request->filled('category'), fn ($q) => $q->where('category_id', $request->integer('category')))
                 ->when($request->filled('seller'), fn ($q) => $q->where('seller_id', $request->integer('seller')))
-                ->where(function ($q) use ($query) {
-                    $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($query).'%'])
-                        ->orWhereRaw('LOWER(description) LIKE ?', ['%'.strtolower($query).'%']);
-                })
                 ->with(['images', 'seller', 'category'])
                 ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
-                ->withBuyerPriceFilters($request->only(['min_price', 'max_price', 'sort']))
-                ->paginate(12)->withQueryString();
+                ->withBuyerPriceFilters($priceFilters + $request->only(['sort']))
+                ->paginate(12)
+                // A rejected price must not follow the buyer from page to page.
+                ->appends($request->except(array_merge(['page'], $priceError !== null ? ['min_price', 'max_price'] : [])));
 
             $categories = Category::query()
-                ->whereRaw('LOWER(label) LIKE ?', ['%'.strtolower($query).'%'])
+                ->whereRaw("LOWER(label) LIKE ? ESCAPE '!'", [$phrase])
                 ->get();
+
+            if ($products->isEmpty() && $stores->isEmpty() && $categories->isEmpty()
+                && $priceFilters === [] && ! $request->filled('category') && ! $request->filled('seller')) {
+                $suggestion = CatalogSearch::suggest($query);
+            }
         }
 
-        return view('Buyer.Search.index', compact('products', 'categories', 'query'));
+        return view('Buyer.Search.index', compact('products', 'categories', 'stores', 'query', 'priceError', 'priceFilters', 'suggestion', 'tooShort'));
     }
 
     /**
@@ -50,18 +67,14 @@ class SearchController extends Controller
      */
     public function suggestions(Request $request): JsonResponse
     {
-        $term = trim($request->query('term', ''));
+        $term = CatalogSearch::term($request->query('term'));
 
         $popular = collect();
 
         // Fetch matching products
-        if (strlen($term) >= 1) {
-            $popular = Product::query()->withBuyerCardData()
+        if ($term !== '') {
+            $popular = CatalogSearch::apply(Product::query()->withBuyerCardData(), $term)
                 ->activeInStock()
-                ->where(function ($q) use ($term) {
-                    $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($term).'%'])
-                        ->orWhereRaw('LOWER(description) LIKE ?', ['%'.strtolower($term).'%']);
-                })
                 ->with(['images', 'seller'])
                 ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
                 ->limit(5)

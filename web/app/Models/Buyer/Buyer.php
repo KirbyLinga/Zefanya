@@ -2,23 +2,23 @@
 
 namespace App\Models\Buyer;
 
-use App\Models\CartItem;
 use App\Models\Concerns\HasEmailOtp;
 use App\Models\Concerns\HasRegistrationArchive;
-use App\Models\Conversation;
-use App\Models\Wishlist;
+use App\Models\Shared\Conversation;
+use App\Support\WaybillPrivacy;
 use Carbon\Carbon;
-use Database\Factories\BuyerFactory;
+use Database\Factories\Buyer\BuyerFactory;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class Buyer extends Authenticatable
 {
-    use CanResetPassword, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable;
+    use CanResetPassword, HasApiTokens, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable;
 
     protected $fillable = [
         'last_name',
@@ -53,6 +53,9 @@ class Buyer extends Authenticatable
         'password',
         'remember_token',
         'email_verification_code',
+        'pending_email_code',
+        'pending_password',
+        'pending_password_code',
     ];
 
     protected function casts(): array
@@ -61,6 +64,8 @@ class Buyer extends Authenticatable
             'birthday' => 'date',
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
+            'pending_email_expires_at' => 'datetime',
+            'pending_password_expires_at' => 'datetime',
             'approved_at' => 'datetime',
             'archived_at' => 'datetime',
             'password' => 'hashed',
@@ -87,6 +92,12 @@ class Buyer extends Authenticatable
         $middle = $this->middle_initial ? " {$this->middle_initial}." : '';
 
         return trim("{$this->first_name}{$middle} {$this->last_name}");
+    }
+
+    /** Public review byline. Keeps the first and last character of each name part. */
+    public function maskedName(): string
+    {
+        return WaybillPrivacy::maskPersonName($this->fullName());
     }
 
     public function isEmailVerified(): bool
@@ -119,6 +130,11 @@ class Buyer extends Authenticatable
     public function conversations(): HasMany
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(BuyerAddress::class);
     }
 
     public function isVerificationLinkExpired(): bool

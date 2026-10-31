@@ -17,7 +17,6 @@
     $actorName = $manifest->provider?->business_name ?? $provider->business_name;
     $isDraft = $manifest->status === ManifestStatus::Draft;
     $isDispatched = $manifest->status === ManifestStatus::Dispatched;
-    $isReceived = $manifest->status === ManifestStatus::Received;
 @endphp
 
 <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-[var(--border-strong)] pb-6">

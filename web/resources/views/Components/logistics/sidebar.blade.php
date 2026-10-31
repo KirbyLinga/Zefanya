@@ -14,7 +14,9 @@
             ['route' => 'logistics.delivery-monitoring.index', 'icon' => 'activity', 'label' => 'Delivery tracking'],
         ]],
         ['label' => 'More tools', 'items' => [
+            ['route' => 'logistics.earnings.index', 'icon' => 'wallet', 'label' => 'Earnings'],
             ['route' => 'logistics.cod-remittances.index', 'icon' => 'banknote', 'label' => 'COD remittances'],
+            ['route' => 'logistics.audit-logs.index', 'icon' => 'scroll-text', 'label' => 'Activity log'],
         ]],
         ['label' => 'Transfers & returns', 'icon' => 'repeat-2', 'collapsible' => true, 'items' => [
             ['route' => 'logistics.handoffs.index', 'icon' => 'repeat-2', 'label' => 'Provider handoffs'],
@@ -26,6 +28,7 @@
             ['route' => 'logistics.hubs.index', 'icon' => 'network', 'label' => 'Hubs & stations'],
             ['route' => 'logistics.partnerships.index', 'icon' => 'handshake', 'label' => 'Provider partnerships'],
             ['route' => 'logistics.areas.index', 'icon' => 'map', 'label' => 'Delivery areas'],
+            ['route' => 'logistics.shipping-rates.index', 'icon' => 'receipt', 'label' => 'Shipping rates'],
         ]],
     ];
 @endphp

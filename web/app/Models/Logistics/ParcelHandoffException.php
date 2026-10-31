@@ -3,7 +3,7 @@
 namespace App\Models\Logistics;
 
 use App\Models\Admin\Admin;
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

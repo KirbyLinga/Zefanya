@@ -4,21 +4,36 @@ namespace App\Http\Controllers\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
-use App\Models\Rider;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\LogisticsHubService;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
+use App\Models\Seller\StoreSale;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\LogisticsHubService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
     public function index(Request $request, LogisticsHubService $hubService): View
     {
+        $filters = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'metric' => ['nullable', Rule::in(['hub', 'transit', 'delivered', 'riders'])],
+        ]);
+        $timezone = StoreSale::TIMEZONE;
+        $from = filled($filters['from'] ?? null) ? CarbonImmutable::parse($filters['from'], $timezone)->startOfDay()->setTimezone(config('app.timezone')) : null;
+        $to = filled($filters['to'] ?? null) ? CarbonImmutable::parse($filters['to'], $timezone)->endOfDay()->setTimezone(config('app.timezone')) : null;
+        $dateFilter = function ($query, string $column) use ($from, $to): void {
+            $query->when($from, fn ($q) => $q->where($column, '>=', $from))
+                ->when($to, fn ($q) => $q->where($column, '<=', $to));
+        };
         $provider = $request->user('logistics');
         $facilityKey = (string) $request->query('facility', 'all');
         $facility = $this->resolveFacility($provider->id, $facilityKey);
@@ -37,20 +52,37 @@ class DashboardController extends Controller
         $courierIds = (clone $courierQuery)->pluck('id');
 
         $parcelQuery = fn () => $this->parcelQuery($provider->id, $facility === null, $areaIds, $courierIds);
-        $parcelsInHub = $parcelQuery()->where('status', OrderStatus::AtSortingCenter->value)->count();
-        $parcelsInTransit = $parcelQuery()->whereIn('status', [
+        $hubQuery = $parcelQuery()->where('status', OrderStatus::AtSortingCenter->value);
+        $transitQuery = $parcelQuery()->whereIn('status', [
             OrderStatus::PickedUp->value,
             OrderStatus::Sorted->value,
             OrderStatus::AssignedToRider->value,
             OrderStatus::OutForDelivery->value,
-        ])->count();
-        $deliveredToday = StatusHistory::query()
-            ->whereIn('seller_order_id', $parcelQuery()->select('seller_orders.id'))
-            ->whereIn('to_status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
-            ->where('created_at', '>=', now()->startOfDay())
-            ->distinct('seller_order_id')
-            ->count('seller_order_id');
-        $activeRiders = (clone $courierQuery)->where('is_available', true)->count();
+        ]);
+        $dateFilter($hubQuery, 'seller_orders.updated_at');
+        $dateFilter($transitQuery, 'seller_orders.updated_at');
+        $deliveryEvents = StatusHistory::query()
+            ->select('seller_order_id')
+            ->whereIn('to_status', [OrderStatus::Delivered->value, OrderStatus::Completed->value]);
+        if ($from === null && $to === null) {
+            $today = CarbonImmutable::now($timezone);
+            $deliveryEvents->whereBetween('created_at', [
+                $today->startOfDay()->setTimezone(config('app.timezone')),
+                $today->endOfDay()->setTimezone(config('app.timezone')),
+            ]);
+        } else {
+            $dateFilter($deliveryEvents, 'created_at');
+        }
+        $deliveredQuery = $parcelQuery()->whereIn('seller_orders.id', $deliveryEvents);
+        $riderQuery = (clone $courierQuery)->where('is_available', true);
+        $dateFilter($riderQuery, 'couriers.updated_at');
+        $queries = ['hub' => $hubQuery, 'transit' => $transitQuery, 'delivered' => $deliveredQuery, 'riders' => $riderQuery];
+        $parcelsInHub = (clone $hubQuery)->count();
+        $parcelsInTransit = (clone $transitQuery)->count();
+        $deliveredToday = (clone $deliveredQuery)->count();
+        $activeRiders = (clone $riderQuery)->count();
+        $metric = $filters['metric'] ?? null;
+        $metricResults = $metric === null ? null : (clone $queries[$metric])->orderByDesc('id')->paginate(20)->withQueryString();
         $recentParcels = $parcelQuery()->with('seller')->latest()->limit(5)->get();
 
         $provinceHubs = LogisticsHub::query()
@@ -77,6 +109,10 @@ class DashboardController extends Controller
         $unreadCount = $notificationsTableExists ? $provider->unreadNotifications()->count() : 0;
 
         return view('Logistics.Dashboard.index', [
+            'metric' => $metric,
+            'metricResults' => $metricResults,
+            'dateFrom' => $filters['from'] ?? '',
+            'dateTo' => $filters['to'] ?? '',
             'provider' => $provider,
             'provinceHubs' => $provinceHubs,
             'facility' => $facility,

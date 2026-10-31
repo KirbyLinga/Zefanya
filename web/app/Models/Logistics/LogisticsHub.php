@@ -3,8 +3,8 @@
 namespace App\Models\Logistics;
 
 use App\Models\Admin\Admin;
-use App\Models\Courier;
-use App\Services\LogisticsHubService;
+use App\Models\Rider\Courier;
+use App\Services\Logistics\LogisticsHubService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -78,11 +78,6 @@ class LogisticsHub extends Model
         return $this->hub_type === self::PROVINCE
             && $this->archived_at === null
             && (int) $this->active_province_slot === 1;
-    }
-
-    public function scopeNonArchived(Builder $query): Builder
-    {
-        return $query->whereNull('archived_at');
     }
 
     public function scopeLiveProvince(Builder $query): Builder

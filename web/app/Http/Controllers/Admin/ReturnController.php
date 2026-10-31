@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\ParcelReturn;
-use App\Services\ParcelHandoffService;
-use App\Services\ParcelReturnService;
-use App\Services\SellerOrderStatusService;
+use App\Services\Logistics\ParcelHandoffService;
+use App\Services\Logistics\ParcelReturnService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\Request;
 
 class ReturnController extends Controller
@@ -38,6 +38,36 @@ class ReturnController extends Controller
         $return->forceFill(['exception_reason' => null])->save();
 
         return back()->with('success', 'Exception resolution recorded. Custody, Seller receipt and payment states were not changed.');
+    }
+
+    public function resolveDispute(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'outcome' => ['required', 'in:upheld,overturned'],
+            'note' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'outcome.required' => 'Choose whether the rejection stands or the return goes ahead.',
+            'note.required' => 'The resolution note must be 10 to 1000 characters.',
+            'note.min' => 'The resolution note must be 10 to 1000 characters.',
+            'note.max' => 'The resolution note must be 10 to 1000 characters.',
+        ]);
+        $service->resolveDispute($return, $request->user('admin'), $data['outcome'], $data['note']);
+
+        return back()->with('success', $data['outcome'] === 'upheld'
+            ? 'The seller’s rejection stands. The dispute is closed.'
+            : 'The return goes ahead. The seller’s rejection was overturned.');
+    }
+
+    public function recordRefund(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'reference' => ['required', 'string', 'max:255'],
+        ], [
+            'reference.required' => 'A refund reference of at most 255 characters is required.',
+        ]);
+        $service->recordRefund($return, $request->user('admin'), $data['reference']);
+
+        return back()->with('success', 'Refund recorded. Pending earnings and commission for this shipment have been released.');
     }
 
     public function stock(Request $request, ParcelReturn $return, SellerOrderStatusService $status)

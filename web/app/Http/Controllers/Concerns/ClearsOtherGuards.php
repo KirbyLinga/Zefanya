@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Enums\AuthRole;
+use App\Services\Shared\AccountSessionService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 /**
  * "One account per browser": opening a session on one role's guard must end
@@ -73,6 +74,7 @@ trait ClearsOtherGuards
         if ($user) {
             session([
                 'password_hash_'.$guard => hash_hmac('sha256', (string) $user->getAuthPassword(), (string) config('app.key')),
+                'password_hash_user_'.$guard => $user->getAuthIdentifier(),
             ]);
         }
 
@@ -80,13 +82,17 @@ trait ClearsOtherGuards
     }
 
     /**
-     * After login, remember the current session so a later login on the same
-     * guard (e.g. after password reset) can restore it.
+     * After login, remember which browser this session belongs to and end any
+     * earlier database session this account left behind in the same browser.
+     *
+     * The fingerprint is the request's IP + User-Agent. It is persisted in the
+     * session so a later login from the same browser compares against the same
+     * values, and falls back to the live request when no fingerprint is stored
+     * yet (the normal production case).
      */
     protected function rememberSessionOnLogin(string $guard): void
     {
         $realSession = app('session.store');
-        $table = config('session.table');
         $driver = config('session.driver');
         $suppressedId = $realSession->get('session.suppressed_session_id');
 
@@ -100,94 +106,28 @@ trait ClearsOtherGuards
             return;
         }
 
-        $where = [
-            ['user_id', '=', $userId],
-            ['ip_address', '=', $realSession->get('session.ip_address')],
-            ['user_agent', '=', $realSession->get('session.user_agent')],
-        ];
+        $ip = (string) ($realSession->get('session.ip_address') ?? request()->ip());
+        $userAgent = (string) ($realSession->get('session.user_agent') ?? request()->userAgent());
 
-        DB::table($table)->where($where)->delete();
+        if ($ip === '' || $userAgent === '') {
+            return;
+        }
+
+        $realSession->put('session.ip_address', $ip);
+        $realSession->put('session.user_agent', $userAgent);
+
+        $currentId = (string) $realSession->getId();
+
+        app(AccountSessionService::class)->revoke($guard, $userId, function (Builder $query) use ($ip, $userAgent, $currentId): void {
+            $query->where('ip_address', $ip)
+                ->where('user_agent', $userAgent)
+                ->when($currentId !== '', fn ($query) => $query->where('id', '!=', $currentId));
+        });
 
         if ($suppressedId !== null) {
-            DB::table($table)
-                ->where('id', $suppressedId)
-                ->where('user_id', $userId)
-                ->delete();
+            app(AccountSessionService::class)->revoke($guard, $userId, function (Builder $query) use ($suppressedId): void {
+                $query->where('id', $suppressedId);
+            });
         }
-    }
-
-    /**
-     * Re-attach a previously suppressed session for the given guard once the
-     * user reauthenticates on that same guard (e.g. after password reset).
-     * This keeps the session-driver cutoff/lookup symmetric with password-change
-     * revocation while still ending every other role's session on login.
-     */
-    protected function restoreSessionForGuard(string $guard): void
-    {
-        $realSession = app('session.store');
-        $table = config('session.table');
-        $driver = config('session.driver');
-
-        if ($driver !== 'database' || ! $realSession->getId() || ! $realSession->isStarted()) {
-            return;
-        }
-
-        $userId = optional(Auth::guard($guard)->user())->getAuthIdentifier();
-
-        if ($userId === null) {
-            return;
-        }
-
-        $restored = DB::table($table)
-            ->where('user_id', $userId)
-            ->where('ip_address', $realSession->get('session.ip_address'))
-            ->where('user_agent', $realSession->get('session.user_agent'))
-            ->first();
-
-        if (! $restored) {
-            return;
-        }
-
-        $realSession->setId((string) $restored->id);
-        $realSession->set('session.ip_address', (string) $restored->ip_address);
-        $realSession->set('session.user_agent', (string) $restored->user_agent);
-    }
-
-    /**
-     * Shortcut for tests: mark the real session id as a suppressed session id
-     * so the single-account rule can be asserted against the database row id.
-     */
-    protected function markRealSessionAs(string $sessionId): void
-    {
-        $realSession = app('session.store');
-
-        if ($realSession->get('session.ip_address') === null) {
-            $realSession->set('session.ip_address', '127.0.0.1');
-        }
-
-        if ($realSession->get('session.user_agent') === null) {
-            $realSession->set('session.user_agent', 'test');
-        }
-
-        $realSession->set('session.suppressed_session_id', $sessionId);
-    }
-
-    /**
-     * Shortcut for tests: set the real session id to a specific value so the
-     * suppression path can be asserted against that exact database row id.
-     */
-    protected function setRealSessionId(string $sessionId): void
-    {
-        $realSession = app('session.store');
-
-        if ($realSession->get('session.ip_address') === null) {
-            $realSession->set('session.ip_address', '127.0.0.1');
-        }
-
-        if ($realSession->get('session.user_agent') === null) {
-            $realSession->set('session.user_agent', 'test');
-        }
-
-        $realSession->setId($sessionId);
     }
 }

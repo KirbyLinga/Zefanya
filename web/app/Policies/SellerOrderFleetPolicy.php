@@ -3,8 +3,8 @@
 namespace App\Policies;
 
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
-use App\Services\LogisticsHubService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\LogisticsHubService;
 
 /**
  * Authorization for LOGISTICS actions on seller_orders: a logistics rep may

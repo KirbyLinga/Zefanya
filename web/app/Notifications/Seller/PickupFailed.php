@@ -2,10 +2,17 @@
 
 namespace App\Notifications\Seller;
 
+use App\Models\Shared\SellerOrder;
 use Illuminate\Notifications\Notification;
 
 class PickupFailed extends Notification
 {
+    public function __construct(
+        public SellerOrder $sellerOrder,
+        public int $attempt,
+        public string $reason,
+    ) {}
+
     public function via($notifiable): array
     {
         return ['database'];
@@ -15,12 +22,12 @@ class PickupFailed extends Notification
     {
         return [
             'title' => 'Pickup Failed',
-            'message' => 'Pickup attempt #'.$this->data['attempt'].' failed: '.$this->data['reason'],
+            'message' => 'Pickup attempt #'.$this->attempt.' failed: '.$this->reason,
             'order_id' => $this->sellerOrder->id,
             'parcel_id' => $this->sellerOrder->id,
             'type' => 'pickup_failed',
-            'attempt' => $this->data['attempt'] ?? null,
-            'reason' => $this->data['reason'] ?? null,
+            'attempt' => $this->attempt,
+            'reason' => $this->reason,
         ];
     }
 

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\ParcelReturn;
-use App\Services\ParcelReturnService;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
+use App\Services\Logistics\ParcelReturnService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -25,10 +27,21 @@ class ReturnController extends Controller
         $return->load(['sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'originHub', 'originProvider', 'events', 'sellerOrder.manifestItems.manifest', 'sellerOrder.parcelHandoffs', 'sellerOrder.parcelHandoffExceptions']);
         $provider = $request->user('logistics');
         abort_unless(ParcelReturn::query()->whereKey($return->id)->visibleToProvider((int) $provider->id)->exists(), 404);
-        $canOperate = $service->custodyProviderId($return->sellerOrder) === (int) $provider->id && $return->isActive();
+        $canOperate = $service->custodyProviderId($return->sellerOrder) === (int) $provider->id && $return->isActive() && ! $return->inDispute();
         $hubs = LogisticsHub::query()->where('logistics_provider_id', $provider->id)->operational()->orderBy('name')->get();
+        $collectionCouriers = Courier::query()->where('logistics_provider_id', $provider->id)
+            ->whereHas('rider', fn ($rider) => $rider->whereIn('status', Rider::ASSIGNABLE_STATUSES))
+            ->with('rider')->get();
 
-        return view('Logistics.Returns.show', compact('return', 'provider', 'canOperate', 'hubs'));
+        return view('Logistics.Returns.show', compact('return', 'provider', 'canOperate', 'hubs', 'collectionCouriers'));
+    }
+
+    public function assignCollection(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate(['courier_id' => ['required', 'integer']]);
+        $service->assignBuyerCollection($return, $request->user('logistics'), (int) $data['courier_id']);
+
+        return back()->with('success', 'Rider assigned to collect this return from the buyer.');
     }
 
     public function scan(Request $request, ParcelReturn $return, ParcelReturnService $service)

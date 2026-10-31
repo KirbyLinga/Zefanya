@@ -7,15 +7,15 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\InventoryTransaction;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\Voucher;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
@@ -368,7 +368,7 @@ class CheckoutControllerTest extends TestCase
         $this->assertSame(0, Order::query()->count());
     }
 
-    public function test_an_invalid_parked_voucher_is_dropped_and_the_order_still_places(): void
+    public function test_an_invalid_parked_voucher_stops_the_order_until_the_buyer_confirms_the_new_total(): void
     {
         $cart = CartItem::factory()->create([
             'buyer_id' => $this->buyer->id,
@@ -378,18 +378,23 @@ class CheckoutControllerTest extends TestCase
         Voucher::factory()->fixed(5000)->expired()->create(['code' => 'OLDCODE']);
         $this->parkSelection([$cart->id], 'OLDCODE');
 
-        $response = $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
-                ...$this->checkoutCarrierPayload([$this->sellerA]),
-            ]);
+        $token = CheckoutToken::issue($this->buyer->id)->token;
+        $payload = ['checkout_token' => $token, ...$this->checkoutCarrierPayload([$this->sellerA])];
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), $payload)
+            ->assertRedirect(route('buyer.checkout.index', ['items' => [$cart->id]]))
+            ->assertSessionHas('error', fn (string $message) => str_contains($message, 'expired'));
+        $this->assertSame(0, Order::query()->count());
+
+        // Confirming again places it at the total the page now shows.
+        $this->post(route('buyer.checkout.store'), $payload)->assertRedirect();
 
         $order = Order::query()->sole();
         $this->assertSame(10000, $order->subtotal_minor);
         $this->assertSame(0, $order->discount_minor);
         $this->assertSame(14900, $order->total_minor);
         $this->assertSame(14900, (int) Payment::query()->value('amount_minor'));
-        $response->assertSessionHas('voucher_notice');
     }
 
     // ── Checkout index: invalid / stale selections ───────────────────────

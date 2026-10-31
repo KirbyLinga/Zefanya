@@ -12,7 +12,7 @@
                 <div class="relative">
                     @php
                         $sortOptions = ['relevance' => 'Relevance', 'price_asc' => 'Price: Low to High', 'price_desc' => 'Price: High to Low', 'newest' => 'Newest', 'oldest' => 'Oldest'];
-                        $currentSort = request('sort', 'relevance');
+                        $currentSort = is_string(request('sort')) ? request('sort') : 'relevance';
                         $currentLabel = $sortOptions[$currentSort] ?? 'Relevance';
                     @endphp
                     <button type="button"
@@ -55,6 +55,8 @@
                 <span class="text-buyer-ink font-medium">{{ $products->total() }}</span> @if ($products->total() === 1) result @else results @endif
             </div>
         </div>
+
+        @include('Buyer.Search._price-filter', ['action' => route('buyer.products.index')])
 
         {{-- Category pills (horizontal scroll) --}}
         <div class="mb-8 relative group/category-row">
@@ -106,19 +108,19 @@
         </div>
 
         {{-- Active filters chips --}}
-        @if (request('q') || request('category') || request('sort') !== 'relevance')
+        @if ($searchTerm || request('category') || request('sort') !== 'relevance')
             <div class="mb-8">
-                @if (request('q'))
+                @if ($searchTerm)
                     <div class="mb-4 flex items-center justify-between">
-                        <h2 class="text-[16px] font-semibold text-buyer-ink">Results for "<span class="text-primary-800">{{ request('q') }}</span>"</h2>
+                        <h2 class="text-[16px] font-semibold text-buyer-ink">Results for "<span class="text-primary-800">{{ $searchTerm }}</span>"</h2>
                         <a href="{{ route('buyer.products.index') }}" class="text-[13px] font-medium text-primary-800 hover:text-primary-900">Clear</a>
                     </div>
                 @endif
                 
                 <div class="flex flex-wrap gap-2">
-                    @if (request('q'))
+                    @if ($searchTerm)
                         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
-                            Search: "{{ request('q') }}"
+                            Search: "{{ $searchTerm }}"
                             <a href="{{ request()->fullUrlWithQuery(['q' => null, 'page' => 1]) }}"
                                aria-label="Remove search filter"
                                class="hover:text-primary-900">
@@ -145,7 +147,7 @@
 
                 @if (request('sort') !== 'relevance')
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
-                        Sort: {{ $sortOptions[request('sort')] ?? 'Relevance' }}
+                        Sort: {{ $currentLabel }}
                         <a href="{{ request()->fullUrlWithQuery(['sort' => 'relevance', 'page' => 1]) }}"
                            aria-label="Remove sort filter"
                            class="hover:text-primary-900">
@@ -183,7 +185,10 @@
             <div class="rounded-2xl border-2 border-dashed border-buyer-line bg-primary-50/50 p-12 text-center">
                 <i data-lucide="shopping-bag" width="48" height="48" class="mx-auto mb-4 text-buyer-ink-soft"></i>
                 <p class="font-serif text-[20px] text-buyer-ink mb-2">No products found</p>
-                <p class="text-[14px] text-buyer-ink-soft mb-6">Try adjusting your filters or search terms</p>
+                @include('Buyer.Search._empty-hint', [
+                    'term' => $searchTerm,
+                    'suggestionUrl' => $suggestion ? route('buyer.products.index', ['q' => $suggestion]) : null,
+                ])
                 <a href="{{ route('buyer.products.index') }}"
                    class="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-primary-800 text-white hover:bg-primary-700 transition-colors font-semibold text-[13px]">
                     <i data-lucide="rotate-ccw" width="16" height="16"></i>

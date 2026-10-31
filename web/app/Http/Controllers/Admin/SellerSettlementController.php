@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CodRemittance;
-use App\Models\SellerSettlement;
-use App\Services\SellerSettlementService;
+use App\Models\Logistics\CodRemittance;
+use App\Models\Seller\SellerSettlement;
+use App\Services\Seller\SellerSettlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

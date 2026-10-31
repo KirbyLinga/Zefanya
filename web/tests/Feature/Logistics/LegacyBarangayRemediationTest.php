@@ -3,11 +3,12 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
+use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -156,6 +157,9 @@ class LegacyBarangayRemediationTest extends TestCase
         $audit = $parcel->fresh()->delivery_address_verification;
         $this->actingAs($provider, 'logistics')->post(route('logistics.parcel-sorting.address.verify', $parcel), $data)->assertSessionHasErrors('address');
         $this->assertSame($audit, $parcel->fresh()->delivery_address_verification);
+        $log = OperationsAuditLog::query()->where('action', 'address_verified_manually')->sole();
+        $this->assertSame('Bayog', $log->new_values['barangay']);
+        $this->assertSame($data['evidence'], $log->reason);
         $address = $order->shipping_address;
         $address['barangay'] = 'Changed';
         $order->update(['shipping_address' => $address]);

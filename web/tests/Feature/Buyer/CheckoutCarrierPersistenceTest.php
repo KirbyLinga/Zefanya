@@ -5,21 +5,21 @@ namespace Tests\Feature\Buyer;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\Courier;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsHub;
-use App\Models\Order;
-use App\Models\Payment;
-use App\Models\Product;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
-use App\Models\SellerOrder;
+use App\Models\Shared\Order;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
 use App\Policies\SellerOrderFleetPolicy;
-use App\Services\CheckoutCarrierService;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
+use App\Services\Buyer\CheckoutCarrierService;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -79,11 +79,11 @@ class CheckoutCarrierPersistenceTest extends TestCase
         [$buyer, $sellers, $lines, $payload] = $this->prepare();
         $this->app->instance(CheckoutCarrierService::class, new class extends CheckoutCarrierService
         {
-            public function validateSelectionForOrder(Buyer $buyer, Collection $sellerGroups, array $submitted): array
+            public function validateSelectionForOrder(Buyer $buyer, Collection $sellerGroups, array $submitted, ?array $rateSnapshot = null): array
             {
                 SellerShippingProvider::query()->whereIn('seller_id', $sellerGroups->pluck('seller.id'))->update(['is_enabled' => false]);
 
-                return parent::validateSelectionForOrder($buyer, $sellerGroups, $submitted);
+                return parent::validateSelectionForOrder($buyer, $sellerGroups, $submitted, $rateSnapshot);
             }
         });
 
@@ -94,25 +94,26 @@ class CheckoutCarrierPersistenceTest extends TestCase
         $this->assertSame(10, $lines[0]->product->variants()->sole()->stock_quantity);
     }
 
-    public function test_shipping_fee_and_address_are_recalculated_inside_transaction(): void
+    public function test_a_fee_that_changes_inside_the_transaction_stops_the_order_for_reconfirmation(): void
     {
         [$buyer, $sellers, $lines, $payload] = $this->prepare();
         $this->app->instance(CheckoutCarrierService::class, new class extends CheckoutCarrierService
         {
-            public function validateSelectionForOrder(Buyer $buyer, Collection $sellerGroups, array $submitted): array
+            public function validateSelectionForOrder(Buyer $buyer, Collection $sellerGroups, array $submitted, ?array $rateSnapshot = null): array
             {
                 $buyer->forceFill(['municipality_code' => '030540200'])->save();
 
-                return parent::validateSelectionForOrder($buyer, $sellerGroups, $submitted);
+                return parent::validateSelectionForOrder($buyer, $sellerGroups, $submitted, $rateSnapshot);
             }
         });
 
-        $this->post(route('buyer.checkout.store'), $payload)->assertSessionHasNoErrors();
+        $this->post(route('buyer.checkout.store'), $payload)
+            ->assertRedirect()
+            ->assertSessionHas('error', fn (string $message) => str_contains($message, 'Shipping fees changed'));
 
-        $this->assertSame(6900, SellerOrder::query()->sole()->shipping_fee_minor);
-        $this->assertSame(16900, Order::query()->sole()->total_minor);
-        $this->assertSame(16900, Payment::query()->sole()->amount_minor);
-        $this->assertSame('030540200', Order::query()->sole()->shipping_address['municipality_code']);
+        $this->assertSame(0, Order::query()->count());
+        $this->assertSame(0, SellerOrder::query()->count());
+        $this->assertSame(0, Payment::query()->count());
     }
 
     public function test_overlapping_provider_cannot_claim_selected_parcel_and_legacy_remains_unowned(): void

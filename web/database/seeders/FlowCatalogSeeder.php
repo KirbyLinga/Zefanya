@@ -3,9 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
-use App\Models\ProductVariant;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
 use Illuminate\Database\Seeder;
 

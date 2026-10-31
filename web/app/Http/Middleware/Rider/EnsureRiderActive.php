@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware\Rider;
 
+use App\Models\Rider\Rider;
+use App\Support\AccountUnderReview;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +25,10 @@ class EnsureRiderActive
 
         if (! $rider) {
             return redirect()->route('home', ['login' => 1]);
+        }
+
+        if ($rider->status === Rider::STATUS_PENDING) {
+            return AccountUnderReview::response($request);
         }
 
         $rider->loadMissing(['station', 'courier']);

@@ -84,7 +84,7 @@
         </div>
 
         {{-- Right column: summary (sticky on lg+) --}}
-        @include('Buyer.Cart._summary', ['summary' => $summary, 'voucher' => $voucher])
+        @include('Buyer.Cart._summary', ['summary' => $summary, 'voucher' => $voucher, 'vouchers' => $vouchers])
 
       </div>
 

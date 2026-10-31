@@ -2,20 +2,18 @@
 
 namespace App\Models\Seller;
 
+use App\Models\Buyer\Review;
+use App\Models\Catalog\Product;
 use App\Models\Concerns\HasEmailOtp;
 use App\Models\Concerns\HasRegistrationArchive;
-use App\Models\Conversation;
-use App\Models\Logistics\LogisticsProvider;
-use App\Models\Product;
-use App\Models\Review;
-use App\Models\SellerOrder;
 use App\Models\Shared\Category;
+use App\Models\Shared\Conversation;
+use App\Models\Shared\SellerOrder;
 use Carbon\Carbon;
-use Database\Factories\SellerFactory;
+use Database\Factories\Seller\SellerFactory;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -23,6 +21,8 @@ use Illuminate\Notifications\Notifiable;
 
 class Seller extends Authenticatable
 {
+    public const VACATION_MESSAGE = 'This store is on vacation. Purchasing is temporarily unavailable.';
+
     use CanResetPassword, HasEmailOtp, HasFactory, HasRegistrationArchive, Notifiable;
 
     protected $fillable = [
@@ -47,6 +47,12 @@ class Seller extends Authenticatable
         'address_detail',
         'postal_code',
         'business_name',
+        'tin',
+        'seller_type',
+        'sec_certificate_path',
+        'store_description',
+        'contact_email',
+        'region_code',
         'line_of_business_id',
         'upload_id_path',
         'business_permit_path',
@@ -55,6 +61,7 @@ class Seller extends Authenticatable
     ];
 
     protected $hidden = [
+        'store_name_key',
         'password',
         'remember_token',
         'email_verification_code',
@@ -63,6 +70,7 @@ class Seller extends Authenticatable
     protected function casts(): array
     {
         return [
+            'is_on_vacation' => 'boolean',
             'birthday' => 'date',
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
@@ -117,21 +125,6 @@ class Seller extends Authenticatable
         return $this->hasMany(Conversation::class);
     }
 
-    public function shippingProviderLinks(): HasMany
-    {
-        return $this->hasMany(SellerShippingProvider::class);
-    }
-
-    public function shippingProviders(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            LogisticsProvider::class,
-            'seller_shipping_providers',
-            'seller_id',
-            'logistics_provider_id',
-        )->withPivot(['is_enabled'])->withTimestamps();
-    }
-
     public function storeInitials(): string
     {
         $letters = collect(preg_split('/\s+/', trim($this->business_name)) ?: [])
@@ -141,6 +134,11 @@ class Seller extends Authenticatable
             ->implode('');
 
         return $letters !== '' ? $letters : 'S';
+    }
+
+    public static function normalizedStoreName(string $name): string
+    {
+        return mb_strtolower(preg_replace('/\s+/u', '', $name));
     }
 
     public function fullName(): string

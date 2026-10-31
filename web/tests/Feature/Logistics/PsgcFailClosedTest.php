@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Logistics;
 
-use App\Services\PhilippineLocationService;
+use App\Services\Shared\PhilippineLocationService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;

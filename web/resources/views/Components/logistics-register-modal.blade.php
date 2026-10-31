@@ -83,10 +83,17 @@
                     {{-- Province / municipality / barangay: dropdowns only (no free-text). --}}
                     <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1" id="logisticsApiAddressFields">
                         <div>
+                            <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsRegion">Region *</label>
+                            <select name="region_code" id="logisticsRegion" required class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900">
+                                <option value="">Select region</option>
+                            </select>
+                            <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-region_code"></span>
+                        </div>
+                        <div>
                             <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsProvince">Province *</label>
-                            <select name="province" id="logisticsProvince" required
+                            <select name="province" id="logisticsProvince" required disabled
                                     class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                                <option value="" disabled selected>Loading provinces...</option>
+                                <option value="" disabled selected>Select region first</option>
                             </select>
                         </div>
                         <div>
@@ -135,7 +142,7 @@
                             <div>
                                 <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsPostalCode">Postal code</label>
                                 <input type="text" name="postal_code" id="logisticsPostalCode"
-                                       inputmode="numeric" maxlength="10"
+                                       inputmode="numeric" maxlength="4" pattern="[0-9]{4}" data-validate-rule="postal-code" data-optional
                                        placeholder="e.g. 4030"
                                        value="{{ old('postal_code') }}"
                                        class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
@@ -158,10 +165,29 @@
                 <p class="mb-4 font-sans text-xs text-neutral-500">Your logistics company details and supporting papers.</p>
 
                 <div class="mb-5">
+                    <label class="mb-2 block font-sans text-xs font-semibold text-neutral-600" for="logisticsSecNumber">SEC registration number *</label>
+                    <input type="text" name="sec_number" id="logisticsSecNumber" required maxlength="11" pattern="[A-Za-z]{2}[0-9]{9}" placeholder="AB123456789" data-validate-rule="sec-reg-no" class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm">
+                    <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-sec_number"></span>
+                </div>
+                <div class="mb-5">
+                    <label class="mb-2 block font-sans text-xs font-semibold text-neutral-600" for="logisticsServiceAreas">Service cities / municipalities *</label>
+                    <select name="service_areas[]" id="logisticsServiceAreas" required multiple disabled size="6" class="w-full rounded-sm border border-neutral-300 bg-white px-4 py-2 font-sans text-sm"></select>
+                    <p class="mt-1 font-sans text-xs text-neutral-500">Select all cities and municipalities your company serves. Use Ctrl or Command to select several.</p>
+                    <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="logisticsServiceAreasError"></span>
+                    <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-service_areas"></span>
+                </div>
+                <div class="mb-5">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsBusinessName">Business / company name *</label>
                     <input type="text" name="business_name" id="logisticsBusinessName" required value="{{ old('business_name') }}"
                            class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-business_name"></span>
+                </div>
+
+                <div class="mb-5">
+                    <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsTin">TIN *</label>
+                    <input type="text" name="tin" id="logisticsTin" required maxlength="15" pattern="[0-9]{3}-[0-9]{3}-[0-9]{3}-[0-9]{3}" data-validate-rule="tin" placeholder="000-000-000-000" value="{{ old('tin') }}"
+                           class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
+                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-tin"></span>
                 </div>
 
                 <div class="mb-5 rounded-sm bg-[#F7D6D0]/50 px-4 py-3 font-sans text-xs text-[#7a4550]">
@@ -177,7 +203,7 @@
                             <span class="block font-sans text-xs text-neutral-500">JPG, JPEG, PNG or PDF · Max 5MB</span>
                         </span>
                     </label>
-                    <input type="file" name="upload_id" id="logisticsUploadId" accept="image/*,.pdf" required class="hidden">
+                    <input type="file" name="upload_id" id="logisticsUploadId" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-upload_id"></span>
                 </div>
 
@@ -190,8 +216,33 @@
                             <span class="block font-sans text-xs text-neutral-500">JPG, JPEG, PNG or PDF · Max 5MB</span>
                         </span>
                     </label>
-                    <input type="file" name="dti_permit_upload" id="logisticsDtiPermit" accept="image/*,.pdf" required class="hidden">
+                    <input type="file" name="dti_permit_upload" id="logisticsDtiPermit" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-dti_permit_upload"></span>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox"
+                               name="terms"
+                               id="logisticsTerms"
+                               value="1"
+                               required
+                               data-validate-rule="terms"
+                               class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border-neutral-300 text-[#9c5c68] accent-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
+                        <p class="font-sans text-xs leading-5 text-neutral-700">
+                            <label for="logisticsTerms" class="cursor-pointer">I agree to the</label>
+                            <a href="{{ Route::has('buyer.pages.terms-of-service') ? route('buyer.pages.terms-of-service') : '#' }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Terms of Service</a>
+                            <label for="logisticsTerms" class="cursor-pointer">and</label>
+                            <a href="{{ Route::has('buyer.pages.privacy-policy') ? route('buyer.pages.privacy-policy') : '#' }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Privacy Policy</a>.
+                        </p>
+                    </div>
+                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" data-error-for="logisticsTerms"></span>
                 </div>
 
                 <div class="flex gap-3">

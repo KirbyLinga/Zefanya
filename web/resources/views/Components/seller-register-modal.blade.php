@@ -81,10 +81,17 @@
                     {{-- Province / municipality / barangay: dropdowns only (no free-text). --}}
                     <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1" id="sellerApiAddressFields">
                         <div>
+                            <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerRegion">Region *</label>
+                            <select name="region_code" id="sellerRegion" required class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900">
+                                <option value="">Select region</option>
+                            </select>
+                            <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-region_code"></span>
+                        </div>
+                        <div>
                             <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerProvince">Province *</label>
-                            <select name="province" id="sellerProvince" required
+                            <select name="province" id="sellerProvince" required disabled
                                     class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
-                                <option value="" disabled selected>Loading provinces...</option>
+                                <option value="" disabled selected>Select region first</option>
                             </select>
                         </div>
                         <div>
@@ -123,7 +130,7 @@
                         <div>
                             <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerPostalCode">Postal code</label>
                             <input type="text" name="postal_code" id="sellerPostalCode"
-                                   inputmode="numeric" maxlength="10"
+                                   inputmode="numeric" maxlength="4" pattern="[0-9]{4}" data-validate-rule="postal-code" data-optional
                                    placeholder="e.g. 4030"
                                    value="{{ old('postal_code') }}"
                                    class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm text-neutral-900 outline-none focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
@@ -144,10 +151,31 @@
                 <p class="mb-4 font-sans text-xs text-neutral-500">Provide the details of your store and the required documents for admin review.</p>
 
                 <div class="mb-5">
+                    <label class="mb-2 block font-sans text-xs font-semibold text-neutral-600" for="sellerType">Seller type *</label>
+                    <select name="seller_type" id="sellerType" required class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-4 font-sans text-sm">
+                        <option value="sole_proprietor">Sole proprietor</option>
+                        <option value="corporation">Corporation</option>
+                    </select>
+                    <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-seller_type"></span>
+                </div>
+                <div class="mb-5 hidden" id="sellerSecCertificateFields">
+                    <label class="mb-2 block font-sans text-xs font-semibold text-neutral-600" for="sellerSecCertificate">SEC certificate (corporations) *</label>
+                    <input type="file" name="sec_certificate" id="sellerSecCertificate" accept=".jpg,.jpeg,.png,.pdf" disabled class="block w-full font-sans text-sm">
+                    <p class="mt-1 font-sans text-xs text-neutral-500">JPG, PNG or PDF, maximum 5 MB.</p>
+                    <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-sec_certificate"></span>
+                </div>
+                <div class="mb-5">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerBusinessName">Business / store name *</label>
-                    <input type="text" name="business_name" id="sellerBusinessName" required value="{{ old('business_name') }}"
+                    <input type="text" name="business_name" id="sellerBusinessName" required minlength="3" maxlength="30" data-validate-rule="shop-name" value="{{ old('business_name') }}"
                            class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-business_name"></span>
+                </div>
+
+                <div class="mb-5">
+                    <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerTin">TIN *</label>
+                    <input type="text" name="tin" id="sellerTin" required maxlength="15" pattern="[0-9]{3}-[0-9]{3}-[0-9]{3}-[0-9]{3}" data-validate-rule="tin" placeholder="000-000-000-000" value="{{ old('tin') }}"
+                           class="h-11 w-full rounded-sm border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
+                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-tin"></span>
                 </div>
 
                 <div class="mb-4">
@@ -176,7 +204,7 @@
                             <span class="block font-sans text-xs text-neutral-500">JPG, PNG, or PDF · Max 5MB</span>
                         </span>
                     </div>
-                    <input type="file" name="upload_id" id="sellerUploadId" accept="image/*,.pdf" required class="hidden">
+                    <input type="file" name="upload_id" id="sellerUploadId" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-upload_id"></span>
                 </div>
 
@@ -189,8 +217,33 @@
                             <span class="block font-sans text-xs text-neutral-500">JPG, PNG, or PDF · Max 5MB</span>
                         </span>
                     </div>
-                    <input type="file" name="business_permit" id="sellerBusinessPermit" accept="image/*,.pdf" required class="hidden">
+                    <input type="file" name="business_permit" id="sellerBusinessPermit" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-business_permit"></span>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox"
+                               name="terms"
+                               id="sellerTerms"
+                               value="1"
+                               required
+                               data-validate-rule="terms"
+                               class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border-neutral-300 text-[#9c5c68] accent-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
+                        <p class="font-sans text-xs leading-5 text-neutral-700">
+                            <label for="sellerTerms" class="cursor-pointer">I agree to the</label>
+                            <a href="{{ Route::has('buyer.pages.terms-of-service') ? route('buyer.pages.terms-of-service') : '#' }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Terms of Service</a>
+                            <label for="sellerTerms" class="cursor-pointer">and</label>
+                            <a href="{{ Route::has('buyer.pages.privacy-policy') ? route('buyer.pages.privacy-policy') : '#' }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Privacy Policy</a>.
+                        </p>
+                    </div>
+                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" data-error-for="sellerTerms"></span>
                 </div>
 
                 <div class="flex gap-3">

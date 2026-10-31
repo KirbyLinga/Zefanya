@@ -48,7 +48,7 @@ class VerifySellerOtpController extends Controller
     {
         $data = $request->validate([
             'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
-        ]);
+        ], $this->otpValidationMessages());
 
         if ($this->otpIsLocked('seller', $seller->email)) {
             return $this->lockedResponse($request, $seller);
@@ -66,7 +66,7 @@ class VerifySellerOtpController extends Controller
         if ($seller->isOtpExpired()) {
             return $this->respond($request, [
                 'ok' => false,
-                'message' => 'This code has expired. Please request a new one.',
+                'message' => $this->otpExpiredMessage(),
                 'expired' => true,
             ], 422);
         }
@@ -81,7 +81,7 @@ class VerifySellerOtpController extends Controller
 
             return $this->respond($request, [
                 'ok' => false,
-                'message' => 'That code doesn\'t match. Please try again.',
+                'message' => $this->otpInvalidMessage(),
                 'attempts_remaining' => $remaining,
             ], 422);
         }
