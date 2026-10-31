@@ -3,9 +3,15 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
 use App\Models\Shared\Category;
-use App\Services\ProductReviewService;
+use App\Models\Shared\Voucher;
+use App\Services\Buyer\BuyerPurchaseLimit;
+use App\Services\Buyer\CatalogSearch;
+use App\Services\Buyer\ProductReviewService;
+use App\Services\Shared\PriceResolver;
+use App\Services\Shared\ResolvedPrice;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -27,26 +33,36 @@ class ProductController extends Controller
             $query->where('category_id', (int) $categoryId);
         }
 
-        // Search by product name or description
-        $search = request('q');
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($search).'%'])
-                    ->orWhereRaw('LOWER(description) LIKE ?', ['%'.strtolower($search).'%']);
-            });
+        // Search by product name or description (the navbar searches here).
+        $searchTerm = CatalogSearch::term(request()->query('q'));
+        if ($searchTerm !== '') {
+            CatalogSearch::apply($query, $searchTerm);
         }
 
-        $query->withBuyerPriceFilters(request()->only(['min_price', 'max_price', 'sort']));
+        ['filters' => $priceFilters, 'error' => $priceError] = CatalogSearch::priceFilters(request()->only(['min_price', 'max_price']));
 
-        // Paginate with query string preservation
-        $products = $query->paginate(12)->withQueryString();
+        $query->withBuyerPriceFilters($priceFilters + request()->only(['sort']));
+
+        // Paginate with query string preservation; a rejected price must not
+        // follow the buyer from page to page.
+        $products = $query->paginate(12)
+            ->appends(request()->except(array_merge(['page'], $priceError !== null ? ['min_price', 'max_price'] : [])));
 
         // Load all categories for filters
         $categories = Category::orderBy('label')->get();
 
+        $suggestion = $products->isEmpty() && $searchTerm !== '' && $priceFilters === []
+            && ! request()->filled('category') && ! request()->filled('seller')
+            ? CatalogSearch::suggest($searchTerm)
+            : null;
+
         return view('Buyer.Products.index', compact(
             'products',
             'categories',
+            'searchTerm',
+            'priceFilters',
+            'priceError',
+            'suggestion',
         ));
     }
 
@@ -58,13 +74,18 @@ class ProductController extends Controller
             abort(404);
         }
 
-        $product->load(['images', 'seller', 'category', 'variants.optionValues.option']);
+        $product->load(['images', 'seller', 'category', 'variants.optionValues.option', 'options.values', 'storeCategories.parent']);
 
         $product->loadAvg('reviews', 'rating')->loadCount('reviews');
-        $reviews = $product->reviews()->latest('id')->paginate(10, ['rating', 'body', 'created_at'], 'reviews_page');
+        $ratingCounts = $product->reviews()->selectRaw('rating, COUNT(*) as total')->groupBy('rating')->pluck('total', 'rating');
+        $reviews = $product->reviews()->with(['photos', 'orderItem', 'buyer:id,first_name,middle_initial,last_name'])->latest('id')->paginate(10, ['id', 'buyer_id', 'order_item_id', 'rating', 'body', 'seller_reply', 'seller_replied_at', 'seller_reply_edited_at', 'created_at'], 'reviews_page');
         $reviewBuyer = auth('buyer')->user();
-        $canReview = $reviewBuyer && app(ProductReviewService::class)->eligibleItem($product, $reviewBuyer);
-        $myReview = $reviewBuyer ? $product->reviews()->where('buyer_id', $reviewBuyer->id)->first() : null;
+        $reviewService = app(ProductReviewService::class);
+        $reviewableItems = $reviewBuyer ? $reviewService->reviewableItems($product, $reviewBuyer) : collect();
+        $canReview = $reviewableItems->isNotEmpty();
+        $myReviews = $reviewBuyer
+            ? $product->reviews()->where('buyer_id', $reviewBuyer->id)->with(['photos', 'orderItem'])->latest('id')->get()
+            : collect();
 
         $breadcrumb = [
             ['label' => 'Home', 'url' => route('buyer.home')],
@@ -85,7 +106,18 @@ class ProductController extends Controller
             $galleryImages = array_values(array_unique([$coverImage, ...$galleryImages]));
         }
 
-        $price = $product->formattedPriceRange();
+        $pricing = $product->buyerPrice();
+        $price = $pricing?->formatted() ?? 'Unavailable';
+        $resolver = app(PriceResolver::class);
+        $buyerId = auth('buyer')->id();
+        $purchasedQuantity = $buyerId === null
+            ? 0
+            : app(BuyerPurchaseLimit::class)->purchased((int) $buyerId, $product->id);
+        $cartRows = $buyerId === null
+            ? collect()
+            : CartItem::query()->where('buyer_id', $buyerId)->where('product_id', $product->id)->get(['variant_id', 'quantity']);
+        $cartQuantity = (int) $cartRows->sum('quantity');
+        $cartByVariant = $cartRows->mapWithKeys(fn (CartItem $row): array => [(int) $row->variant_id => (int) $row->quantity]);
 
         $variantAxes = null;
         $variantData = null;
@@ -106,8 +138,9 @@ class ProductController extends Controller
                 ->filter->hasOptions()
                 ->map(fn ($variant) => [
                     'id' => $variant->id,
-                    'price' => (float) $variant->price,
+                    ...$this->variantPricing($resolver->forVariant($product, $variant)),
                     'stock' => (int) $variant->stock_quantity,
+                    'cart_quantity' => (int) ($cartByVariant[$variant->id] ?? 0),
                     'available' => $variant->is_available,
                     'images' => ($variantImage = $product->catalogImageUrl(
                         $product->images->where('variant_id', $variant->id), requireExistingFile: false,
@@ -125,8 +158,8 @@ class ProductController extends Controller
         if ($variantAxes === null && $product->variants->count() > 1) {
             $variantAxes = [['name' => 'Option', 'values' => $product->variants->map(fn ($variant) => 'Option '.$variant->id)->all()]];
             $variantData = $product->variants->map(fn ($variant) => [
-                'id' => $variant->id, 'price' => (float) $variant->price,
-                'stock' => $variant->stock_quantity, 'available' => $variant->is_available,
+                'id' => $variant->id, ...$this->variantPricing($resolver->forVariant($product, $variant)),
+                'stock' => $variant->stock_quantity, 'cart_quantity' => (int) ($cartByVariant[$variant->id] ?? 0), 'available' => $variant->is_available,
                 'values' => ['Option '.$variant->id],
             ])->all();
         }
@@ -135,6 +168,9 @@ class ProductController extends Controller
             ?? 'No description has been added for this product yet.';
 
         $seller = $product->seller;
+        $shopVouchers = $seller === null ? collect() : Voucher::offeredBy([(int) $seller->id], auth('buyer')->id())
+            ->filter(fn (Voucher $voucher): bool => $voucher->appliesToProduct($product->id))
+            ->values();
         $sellerData = [
             'name' => $seller?->business_name ?? 'Zefanya Marketplace',
             'initials' => $seller?->storeInitials() ?? 'ZM',
@@ -157,15 +193,35 @@ class ProductController extends Controller
             'product',
             'reviews',
             'canReview',
-            'myReview',
+            'reviewableItems',
+            'ratingCounts',
+            'myReviews',
             'breadcrumb',
             'galleryImages',
             'price',
+            'pricing',
+            'shopVouchers',
             'description',
             'sellerData',
             'related',
             'variantAxes',
             'variantData',
+            'purchasedQuantity',
+            'cartQuantity',
         ));
+    }
+
+    /**
+     * The picker's price text comes from the server, never from browser math.
+     *
+     * @return array{price: string, regular_price: string|null, badge: string|null}
+     */
+    private function variantPricing(ResolvedPrice $price): array
+    {
+        return [
+            'price' => $price->formatted(),
+            'regular_price' => $price->formattedRegular(),
+            'badge' => $price->badge(),
+        ];
     }
 }

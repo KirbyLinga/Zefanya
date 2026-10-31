@@ -4,11 +4,11 @@ namespace Tests\Feature\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\Order;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Order;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;

@@ -9,10 +9,10 @@ use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
-use App\Models\Order;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\ProviderHandoffSchemaService;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ProviderHandoffSchemaService;
 
 /**
  * Phase 5.3–5.5 fixtures: two operational providers in different provinces,

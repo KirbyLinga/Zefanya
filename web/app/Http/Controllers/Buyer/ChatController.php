@@ -3,31 +3,23 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\Shared\Conversation;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 
-/**
- * Stop-gap controller: the chat feature is not built yet, but the routes
- * (buyer.chat.index / buyer.chat.show) exist and are linked from the buyer
- * footer. Without these methods any direct URL access was a 500
- * ("Call to undefined method"). Redirect back to the storefront with a
- * friendly flash message instead.
- *
- * When real chat lands, replace both methods with the actual implementations
- * (and wire up resources/views/Buyer/Chat/*, which are stubs right now).
- */
+/** Backwards-compatible Chat links open the existing Messages system. */
 class ChatController extends Controller
 {
     public function index(): RedirectResponse
     {
-        return redirect()
-            ->route('buyer.home')
-            ->with('info', 'Chat is coming soon');
+        return redirect()->route('buyer.messages.index');
     }
 
     public function show(string $id): RedirectResponse
     {
-        return redirect()
-            ->route('buyer.home')
-            ->with('info', 'Chat is coming soon');
+        $conversation = Conversation::query()->findOrFail($id);
+        Gate::forUser(auth('buyer')->user())->authorize('view', $conversation);
+
+        return redirect()->route('buyer.messages.show', $conversation);
     }
 }

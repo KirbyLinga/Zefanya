@@ -3,8 +3,8 @@
 namespace App\Models\Logistics;
 
 use App\Enums\ParcelHandoffStatus;
-use App\Models\SellerOrder;
-use App\Services\ProviderHandoffSchemaService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ProviderHandoffSchemaService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Validation\ValidationException;
@@ -48,11 +48,6 @@ class ParcelHandoff extends Model
     public function isAccepted(): bool
     {
         return $this->status === ParcelHandoffStatus::Accepted;
-    }
-
-    public function isInTransit(): bool
-    {
-        return $this->status === ParcelHandoffStatus::InTransit;
     }
 
     public function isReceived(): bool

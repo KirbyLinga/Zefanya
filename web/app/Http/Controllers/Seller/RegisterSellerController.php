@@ -7,6 +7,7 @@ use App\Http\Requests\Seller\StoreSellerRegistrationRequest;
 use App\Models\Seller\Seller;
 use App\Notifications\Seller\SellerRegistrationOtp;
 use App\Support\EmailMask;
+use App\Support\EmailRegistry;
 use App\Support\SignedOtpLink;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class RegisterSellerController extends Controller
 {
@@ -25,29 +27,31 @@ class RegisterSellerController extends Controller
         $idPath = $request->file('upload_id')->store('seller-ids', 'local');
         $permitPath = $request->file('business_permit')->store('business-permits', 'local');
 
+        $secPath = null;
         try {
-            $seller = DB::transaction(function () use ($data, $idPath, $permitPath) {
+            if (isset($data['sec_certificate'])) {
+                $secPath = $data['sec_certificate']->store('seller-sec-certificates', 'local');
+            }
+            $seller = EmailRegistry::register($data['email'], 'seller', function () use ($data, $idPath, $permitPath, $secPath) {
                 // Resume: ARCHIVE any leftover unverified OR rejected row so a
                 // half-finished first attempt — or a rejection — never
                 // permanently reserves the email/mobile. The row (and its
                 // rejection trail) is kept; only the private documents are
                 // removed. A still-fresh unverified row never reaches here.
-                $existingSeller = Seller::where('email', $data['email'])
+                $existingSeller = Seller::whereRaw('LOWER(email) = ?', [strtolower($data['email'])])
                     ->whereIn('status', ['unverified', 'rejected'])
                     ->first();
 
                 if ($existingSeller) {
-                    if ($existingSeller->upload_id_path && Storage::disk('local')->exists($existingSeller->upload_id_path)) {
-                        Storage::disk('local')->delete($existingSeller->upload_id_path);
-                    }
-                    if ($existingSeller->business_permit_path && Storage::disk('local')->exists($existingSeller->business_permit_path)) {
-                        Storage::disk('local')->delete($existingSeller->business_permit_path);
-                    }
+                    $obsoletePaths = array_values(array_filter([$existingSeller->upload_id_path, $existingSeller->business_permit_path, $existingSeller->sec_certificate_path]));
+                    // Preserve the old documents if archive-and-retry rolls back.
+                    DB::afterCommit(fn () => Storage::disk('local')->delete($obsoletePaths));
 
+                    $existingSeller->forceFill(['tin' => null, 'store_name_key' => null])->save();
                     $existingSeller->archiveRegistration();
                 }
 
-                return Seller::create([
+                $seller = Seller::create([
                     'last_name' => $data['last_name'],
                     'first_name' => $data['first_name'],
                     'middle_initial' => $data['middle_initial'] ?? null,
@@ -58,6 +62,7 @@ class RegisterSellerController extends Controller
                     'birthday' => $data['birthday'],
                     'age' => Carbon::parse($data['birthday'])->age,
                     'address_mode' => $data['address_mode'],
+                    'region_code' => $data['region_code'],
                     'province_code' => $data['province'] ?? null,
                     'province_name' => $data['province_name'] ?? null,
                     'municipality_code' => $data['municipality'] ?? null,
@@ -69,6 +74,9 @@ class RegisterSellerController extends Controller
                     'address_detail' => $data['address_detail'] ?? null,
                     'postal_code' => $data['postal_code'] ?? null,
                     'business_name' => $data['business_name'],
+                    'tin' => $data['tin'],
+                    'seller_type' => $data['seller_type'],
+                    'sec_certificate_path' => $secPath,
                     'line_of_business_id' => $data['line_of_business_id'],
                     'upload_id_path' => $idPath,
                     'business_permit_path' => $permitPath,
@@ -76,30 +84,61 @@ class RegisterSellerController extends Controller
                     'email_verified_at' => null,
                     'otp_attempts' => 0,
                 ]);
-            });
+                $seller->forceFill([
+                    'store_name_key' => hash('sha256', Seller::normalizedStoreName($data['business_name'])),
+                ])->save();
 
-            $otp = $seller->issueOtp();
+                return $seller;
+            }, $data);
 
-            // Deliver the code synchronously: a registration only counts as
-            // submitted once the applicant can actually receive the OTP.
-            $seller->notify(new SellerRegistrationOtp($otp));
-        } catch (UniqueConstraintViolationException) {
+            if (! $seller->wasRecentlyCreated) {
+                // Double submit: keep the first registration and its OTP.
+                Storage::disk('local')->delete(array_values(array_filter([$idPath, $permitPath, $secPath])));
+            } else {
+                $otp = $seller->issueOtp();
+
+                // Deliver the code synchronously: a registration only counts as
+                // submitted once the applicant can actually receive the OTP.
+                $seller->notify(new SellerRegistrationOtp($otp));
+            }
+        } catch (UniqueConstraintViolationException $exception) {
             // Lost a race against a concurrent request for the same email/mobile.
             Storage::disk('local')->delete($idPath);
             Storage::disk('local')->delete($permitPath);
+            if ($secPath) {
+                Storage::disk('local')->delete($secPath);
+            }
 
-            return response()->json([
-                'message' => 'This email or mobile number is already registered.',
-            ], 422);
+            $constraint = (string) ($exception->errorInfo[2] ?? '');
+            if (str_contains($constraint, 'store_name_key')) {
+                throw ValidationException::withMessages(['business_name' => 'This shop name is already taken.']);
+            }
+            if (str_contains($constraint, 'tin')) {
+                throw ValidationException::withMessages(['tin' => 'This TIN is already registered.']);
+            }
+            throw ValidationException::withMessages(
+                EmailRegistry::registrationConflictErrors($data['email'], 'seller', $data['contact_no'])
+            );
+        } catch (ValidationException $e) {
+            Storage::disk('local')->delete($idPath);
+            Storage::disk('local')->delete($permitPath);
+            if ($secPath) {
+                Storage::disk('local')->delete($secPath);
+            }
+
+            throw $e;
         } catch (\Throwable $e) {
             // Delivery failed (e.g. mail is down): roll the reservation back so
             // the applicant is never locked out of the email/mobile they used.
-            if (isset($seller) && $seller->exists) {
+            if (isset($seller) && $seller->exists && $seller->wasRecentlyCreated) {
                 $seller->delete();
             }
 
             Storage::disk('local')->delete($idPath);
             Storage::disk('local')->delete($permitPath);
+            if ($secPath) {
+                Storage::disk('local')->delete($secPath);
+            }
 
             Log::error('Failed to send seller OTP email', [
                 'error' => $e->getMessage(),

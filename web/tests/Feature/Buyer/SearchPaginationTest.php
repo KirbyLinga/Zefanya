@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;

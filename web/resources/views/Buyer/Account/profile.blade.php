@@ -113,7 +113,7 @@
                             </div>
                             <span class="mt-1.5 flex items-center gap-1.5 font-sans text-[11px] text-[var(--text-muted)]">
                                 <i data-lucide="info" width="12" height="12" class="shrink-0"></i>
-                                <span>Email address cannot be changed directly here. Contact Zefanya Concierge for updates.</span>
+                                <span>This is your sign-in email. Use "Change email" below to update it.</span>
                             </span>
                         </div>
 
@@ -172,6 +172,53 @@
                             <span class="text-center font-sans text-[11.5px] text-[var(--text-muted)] sm:ml-auto sm:text-left">Last updated: {{ optional($buyer->updated_at)->format('M d, Y') ?? '—' }}</span>
                         </div>
                     </form>
+                </section>
+
+                {{-- Change email: its own forms, since the profile form above cannot nest them. --}}
+                <section class="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
+                    <h2 class="font-serif text-[20px] font-normal leading-tight text-[var(--text-ink)]">Change email</h2>
+                    <p class="mt-1 font-sans text-[12px] text-[var(--text-muted)]">We send a code to the new address. Your current email keeps working until you enter it.</p>
+
+                    @if ($buyer->pending_email)
+                        <p class="mt-4 font-sans text-[13px] text-[var(--text-ink)]">Code sent to <strong>{{ $buyer->pending_email }}</strong>.</p>
+                        @error('email', 'emailChange')<span class="{{ $errorCls }}" role="alert">{{ $message }}</span>@enderror
+
+                        <form method="POST" action="{{ route('buyer.account.email.verify') }}" class="mt-4">
+                            @csrf
+                            <label class="{{ $labelCls }}" for="emailChangeOtp">6-digit code *</label>
+                            <input type="text" name="otp" id="emailChangeOtp" required inputmode="numeric" pattern="\d{6}" maxlength="6" autocomplete="one-time-code"
+                                   class="{{ $inputCls }} sm:max-w-[220px]">
+                            @error('otp', 'emailChange')<span class="{{ $errorCls }}" role="alert">{{ $message }}</span>@enderror
+                            <button type="submit"
+                                    class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[var(--btn-primary-bg)] px-7 py-2.5 font-sans text-[13px] font-semibold text-[var(--btn-primary-text)] transition-colors hover:bg-[var(--btn-primary-bg-hover)] sm:w-auto">
+                                Confirm new email
+                            </button>
+                        </form>
+
+                        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                            <form method="POST" action="{{ route('buyer.account.email.resend') }}">
+                                @csrf
+                                <button type="submit" class="font-sans text-[13px] font-medium text-[var(--link)]">Resend code</button>
+                            </form>
+                            <form method="POST" action="{{ route('buyer.account.email.cancel') }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="font-sans text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--link)]">Cancel change</button>
+                            </form>
+                        </div>
+                    @else
+                        <form method="POST" action="{{ route('buyer.account.email.request') }}" class="mt-4">
+                            @csrf
+                            <label class="{{ $labelCls }}" for="newEmail">New e-mail address *</label>
+                            <input type="email" name="email" id="newEmail" required maxlength="255" value="{{ old('email') }}"
+                                   class="{{ $inputCls }}">
+                            @error('email', 'emailChange')<span class="{{ $errorCls }}" role="alert">{{ $message }}</span>@enderror
+                            <button type="submit"
+                                    class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[var(--btn-primary-bg)] px-7 py-2.5 font-sans text-[13px] font-semibold text-[var(--btn-primary-text)] transition-colors hover:bg-[var(--btn-primary-bg-hover)] sm:w-auto">
+                                Send code
+                            </button>
+                        </form>
+                    @endif
                 </section>
             </main>
         </div>

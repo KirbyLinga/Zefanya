@@ -138,7 +138,69 @@
                                         <p class="font-mono text-sm text-[var(--text-ink)] break-all">{{ $sellerOrder->tracking_number }}</p>
                                     </div>
                                 @endif
-                                @if ($sellerOrder->status === OrderStatus::Placed)
+                                @if (in_array($sellerOrder->id, $returnableShipmentIds, true))
+                                    <form method="POST" action="{{ route('buyer.orders.requestReturn', [$order, $sellerOrder]) }}" enctype="multipart/form-data" class="space-y-3">
+                                        @csrf
+                                        <label for="return-reason-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Return reason</label>
+                                        <select id="return-reason-{{ $sellerOrder->id }}" name="reason" required class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">
+                                            <option value="">Choose a reason</option>
+                                            @foreach (\App\Services\Logistics\ParcelReturnService::BUYER_REASONS as $reason)
+                                                <option value="{{ $reason }}" @selected(old('reason') === $reason)>{{ $reason }}</option>
+                                            @endforeach
+                                        </select>
+                                        <label for="return-description-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">What happened? (10–500 characters)</label>
+                                        <textarea id="return-description-{{ $sellerOrder->id }}" name="description" required minlength="10" maxlength="500" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">{{ old('description') }}</textarea>
+                                        <label for="return-photos-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Photos (1–5 JPG or PNG, up to 5 MB each)</label>
+                                        <input id="return-photos-{{ $sellerOrder->id }}" type="file" name="photos[]" required multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="block w-full text-sm text-[var(--text-ink)]">
+                                        <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-primary-800 hover:bg-primary-50">Request return</button>
+                                    </form>
+                                @elseif ($sellerOrder->parcelReturn?->inDispute())
+                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">In Dispute</p>
+                                    <p class="text-sm text-[var(--text-ink)]">An admin is reviewing the seller's rejection. The seller cannot change it until that review is finished.</p>
+                                    <p class="text-sm text-[var(--text-ink)]"><span class="font-semibold">Seller's reason:</span> {{ $sellerOrder->parcelReturn->seller_decision_reason }}</p>
+                                @elseif ($sellerOrder->parcelReturn?->status === \App\Enums\ParcelReturnStatus::Rejected)
+                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request rejected</p>
+                                    <p class="text-sm text-[var(--text-ink)]"><span class="font-semibold">Seller's reason:</span> {{ $sellerOrder->parcelReturn->seller_decision_reason }}</p>
+                                    @if ($sellerOrder->parcelReturn->canBuyerEscalate())
+                                        <form method="POST" action="{{ route('buyer.orders.escalateReturn', [$order, $sellerOrder]) }}" class="space-y-3">
+                                            @csrf
+                                            <label for="escalate-reason-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Ask an admin to review this rejection</label>
+                                            <textarea id="escalate-reason-{{ $sellerOrder->id }}" name="reason" required minlength="10" maxlength="1000" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">{{ old('reason') }}</textarea>
+                                            <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-primary-800 hover:bg-primary-50">Escalate</button>
+                                        </form>
+                                    @elseif ($sellerOrder->parcelReturn->dispute_outcome === \App\Models\Logistics\ParcelReturn::DISPUTE_UPHELD)
+                                        <p class="text-sm text-[var(--text-ink)]">An admin reviewed this and kept the rejection. {{ $sellerOrder->parcelReturn->dispute_note }}</p>
+                                    @endif
+                                @elseif ($sellerOrder->parcelReturn?->isActive() && $sellerOrder->parcelReturn->seller_decision !== null)
+                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request approved</p>
+                                    @if ($sellerOrder->parcelReturn->dispute_outcome === \App\Models\Logistics\ParcelReturn::DISPUTE_OVERTURNED)
+                                        <p class="text-sm text-[var(--text-ink)]">An admin overturned the seller's rejection. {{ $sellerOrder->parcelReturn->dispute_note }}</p>
+                                    @elseif ($sellerOrder->parcelReturn->seller_decision === \App\Models\Logistics\ParcelReturn::AUTO_APPROVED)
+                                        <p class="text-sm text-[var(--text-ink)]">The seller did not answer in time, so your request was approved automatically.</p>
+                                    @endif
+                                    @if ($sellerOrder->parcelReturn->collectedFromBuyer())
+                                        <p class="text-sm text-[var(--text-ink)]">Your parcel was collected and is on its way back to the seller.</p>
+                                    @elseif ($sellerOrder->parcelReturn->collection_courier_id)
+                                        <p class="text-sm text-[var(--text-ink)]">A rider has been assigned to collect the parcel from you.</p>
+                                    @else
+                                        <p class="text-sm text-[var(--text-ink)]">Please keep the parcel ready. A rider will be assigned to collect it.</p>
+                                    @endif
+                                @elseif ($sellerOrder->parcelReturn?->awaitingSellerDecision())
+                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request open</p>
+                                    <p class="text-sm text-[var(--text-ink)]">Waiting for the seller to decide by {{ $sellerOrder->parcelReturn->seller_response_due_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}.</p>
+                                @elseif ($sellerOrder->parcelReturn?->isActive())
+                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return in progress</p>
+                                    <p class="text-sm text-[var(--text-ink)]">This parcel is on its way back to the seller.</p>
+                                @elseif ($sellerOrder->parcelReturn?->status === \App\Enums\ParcelReturnStatus::Completed)
+                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return completed</p>
+                                    <p class="text-sm text-[var(--text-ink)]">The seller has received the parcel.</p>
+                                    @if ($sellerOrder->parcelReturn->refunded_at)
+                                        <p class="text-sm text-[var(--text-ink)]">Refund recorded. Reference: {{ $sellerOrder->parcelReturn->refund_reference }}</p>
+                                    @elseif ($sellerOrder->parcelReturn->financial_review_required)
+                                        <p class="text-sm text-[var(--text-ink)]">Your refund is being reviewed.</p>
+                                    @endif
+                                @endif
+                                @if (in_array($sellerOrder->status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing], true))
                                     <div class="pt-2" data-cancel-action="{{ $sellerOrder->id }}">
                                         <button
                                             type="button"
@@ -157,13 +219,13 @@
                     @endforeach
 
                     @foreach ($order->sellerOrders as $shipment)
-                        @if ($shipment->status === OrderStatus::Delivered)
+                        @if ($shipment->status === OrderStatus::Delivered && ! $shipment->hasActiveReturn())
                             <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-6">
                                 <h2 class="text-sm font-semibold text-buyer-ink">{{ $shipment->seller?->business_name ?? 'Seller' }}</h2>
                                 <form method="POST" action="{{ route('buyer.orders.confirmReceived', $order) }}" class="mt-3">
                                     @csrf
                                     <input type="hidden" name="seller_order_id" value="{{ $shipment->id }}">
-                                    <button type="submit" class="w-full rounded-xl bg-primary-800 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]">Confirm this shipment received</button>
+                                    <button type="submit" class="w-full rounded-xl bg-primary-800 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]">Order Received</button>
                                 </form>
                             </section>
                         @elseif ($shipment->status === OrderStatus::Completed)

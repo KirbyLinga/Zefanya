@@ -54,7 +54,7 @@
                 @forelse ($provinceHubs as $provinceHub)
                     @php
                         $provinceEditLocation = $provinceHub->pendingLocationChange ?: $provinceHub;
-                        $provinceEditSubmitted = (string) old('edit_hub_id') === (string) $provinceHub->id;
+                        $provinceEditSubmitted =(string) old('edit_hub_id') === (string) $provinceHub->id;
                         $stationFormSubmitted = !old('edit_hub_id') && (string) old('parent_hub_id') === (string) $provinceHub->id;
                     @endphp
                     <article class="min-w-0 overflow-hidden rounded-lg border border-[var(--border-strong)] border-l-[3px] border-l-primary-300 bg-[var(--bg-surface)] shadow-sm" aria-labelledby="province-hub-{{ $provinceHub->id }}">
@@ -95,7 +95,7 @@
                                 @forelse ($provinceHub->stations as $station)
                                     @php
                                         $stationEditLocation = $station->pendingLocationChange ?: $station;
-                                        $stationEditSubmitted = (string) old('edit_hub_id') === (string) $station->id;
+                                        $stationEditSubmitted =(string) old('edit_hub_id') === (string) $station->id;
                                     @endphp
                                     <div class="py-4">
                                         <details id="station-details-{{ $station->id }}" data-station-details class="group/station" @if($stationEditSubmitted && $errors->any()) open @endif>

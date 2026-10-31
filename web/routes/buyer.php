@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\Buyer\AccountController;
+use App\Http\Controllers\Buyer\AccountEmailController;
+use App\Http\Controllers\Buyer\AccountPasswordController;
 use App\Http\Controllers\Buyer\CartController;
 use App\Http\Controllers\Buyer\CategoryController;
 use App\Http\Controllers\Buyer\ChatController;
@@ -16,6 +18,9 @@ use App\Http\Controllers\Buyer\ProductController;
 use App\Http\Controllers\Buyer\ReviewController;
 use App\Http\Controllers\Buyer\SearchController;
 use App\Http\Controllers\Buyer\SettingsController;
+use App\Http\Controllers\Buyer\StoreCategoryController;
+use App\Http\Controllers\Buyer\StoreFollowController;
+use App\Http\Controllers\Buyer\VoucherWalletController;
 use App\Http\Controllers\Buyer\WishlistController;
 
 /*
@@ -33,6 +38,9 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
     // Catalog browsing — open to guests AND logged-in buyers
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/home', [HomeController::class, 'index']);
+    Route::get('/stores/{seller}', [StoreCategoryController::class, 'show'])->name('stores.show');
+    Route::get('/stores/{seller}/uncategorized', [StoreCategoryController::class, 'show'])->name('stores.uncategorized');
+    Route::get('/stores/{seller}/categories/{storeCategory}', [StoreCategoryController::class, 'show'])->name('stores.categories.show');
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('/categories/{id}', [CategoryController::class, 'show'])->name('categories.show');
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
@@ -51,6 +59,8 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
     Route::middleware(['auth:buyer', 'buyer.active'])->group(function () {
         Route::post('/products/{product}/reviews', [ReviewController::class, 'store'])
             ->middleware('throttle:10,1')->name('products.reviews.store');
+        Route::patch('/reviews/{review}', [ReviewController::class, 'update'])
+            ->middleware('throttle:10,1')->name('reviews.update');
 
         Route::post('/logout', [UnifiedLoginController::class, 'logout'])->name('logout');
 
@@ -77,6 +87,10 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
 
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return', [OrderController::class, 'requestReturn'])
+            ->name('orders.requestReturn');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/escalate', [OrderController::class, 'escalateReturn'])
+            ->name('orders.escalateReturn');
         Route::post('/orders/{order}/confirm-received', [OrderController::class, 'confirmReceived'])->name('orders.confirmReceived');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/cancel', [OrderController::class, 'cancelSellerOrder'])
             ->name('orders.cancelSellerOrder');
@@ -87,13 +101,27 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::get('/account', [AccountController::class, 'index'])->name('account.index');
         Route::patch('/account', [AccountController::class, 'update'])->name('account.update');
 
+        Route::post('/account/email', [AccountEmailController::class, 'request'])->name('account.email.request')->middleware('throttle:otp-verify');
+        Route::post('/account/email/verify', [AccountEmailController::class, 'verify'])->name('account.email.verify')->middleware('throttle:otp-verify');
+        Route::post('/account/email/resend', [AccountEmailController::class, 'resend'])->name('account.email.resend')->middleware('throttle:otp-verify');
+        Route::delete('/account/email', [AccountEmailController::class, 'cancel'])->name('account.email.cancel');
+
         Route::get('/account/address', [AccountController::class, 'addressEdit'])->name('account.address');
         Route::patch('/account/address', [AccountController::class, 'addressUpdate'])->name('account.address.update');
+        Route::post('/account/addresses', [AccountController::class, 'addressStore'])->name('account.addresses.store');
+        Route::patch('/account/addresses/{address}', [AccountController::class, 'addressRecordUpdate'])->name('account.addresses.update');
+        Route::post('/account/addresses/{address}/default', [AccountController::class, 'addressMakeDefault'])->name('account.addresses.default');
+        Route::delete('/account/addresses/{address}', [AccountController::class, 'addressDestroy'])->name('account.addresses.destroy');
 
         Route::get('/account/password', [AccountController::class, 'passwordEdit'])->name('account.password');
-        Route::patch('/account/password', [AccountController::class, 'passwordUpdate'])->name('account.password.update');
+        Route::patch('/account/password', [AccountPasswordController::class, 'request'])->name('account.password.update')->middleware('throttle:password-update');
+        Route::post('/account/password/verify', [AccountPasswordController::class, 'verify'])->name('account.password.verify')->middleware('throttle:otp-verify');
+        Route::post('/account/password/resend', [AccountPasswordController::class, 'resend'])->name('account.password.resend')->middleware('throttle:otp-verify');
+        Route::delete('/account/password', [AccountPasswordController::class, 'cancel'])->name('account.password.cancel');
 
         Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+        Route::get('/following', [StoreFollowController::class, 'index'])->name('following.index');
+        Route::post('/stores/{seller}/follow', [StoreFollowController::class, 'toggle'])->name('stores.follow');
         Route::post('/wishlist/{productId}', [WishlistController::class, 'toggle'])->name('wishlist.toggle');
         Route::delete('/wishlist/{id}', [WishlistController::class, 'destroy'])->name('wishlist.destroy');
 
@@ -109,7 +137,11 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
         Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
         Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
+        Route::get('/messages/{conversation}/images/{message}', [MessageController::class, 'image'])->name('messages.image');
         Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
         Route::post('/messages/get-or-create', [MessageController::class, 'getOrCreateConversation'])->name('messages.getOrCreate');
+
+        Route::get('/vouchers', [VoucherWalletController::class, 'index'])->name('vouchers.index');
+        Route::post('/vouchers/{voucher}/claim', [VoucherWalletController::class, 'claim'])->name('vouchers.claim');
     });
 });

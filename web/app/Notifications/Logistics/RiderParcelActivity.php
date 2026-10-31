@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Logistics;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 

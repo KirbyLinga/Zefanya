@@ -4,15 +4,15 @@ namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Rider\PickupAssigned;
-use App\Services\SellerOrderStatusService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\Support\CreatesAssignableFleet;
@@ -85,6 +85,49 @@ class PickupDispatchConfirmationTest extends TestCase
             ->get(route('logistics.incoming-parcels.index'))
             ->assertOk()
             ->assertViewHas('shipments', fn ($shipments) => $shipments->contains('id', $this->parcel->id));
+    }
+
+    public function test_manual_reassignment_after_automatic_dispatch_is_preserved_by_automatic_retry(): void
+    {
+        $this->parcel->forceFill(['status' => OrderStatus::Preparing])->save();
+        app(SellerOrderStatusService::class)->transition(
+            $this->parcel,
+            OrderStatus::ReadyForPickup,
+            actor: OrderActor::Seller,
+            actorId: $this->seller->id,
+        );
+        Notification::assertSentToTimes($this->first->rider, PickupAssigned::class, 1);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), [
+                'reassign' => 1,
+                'courier_id' => $this->second->id,
+                'expected_courier_id' => $this->first->id,
+                'reason' => 'Original Rider cannot collect today.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->post(route('logistics.dispatch.retry', [$this->parcel, 'pickup']))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $parcel = $this->parcel->fresh();
+        $this->assertSame($this->second->id, (int) $parcel->courier_id);
+        $this->assertSame(OrderStatus::ReadyForPickup, $parcel->status);
+        $this->assertNull($parcel->handover_at);
+        $this->assertSame(2, $parcel->deliveryAssignments()->where('role', 'pickup')->count());
+        Notification::assertNotSentTo($this->second->rider, PickupAssigned::class);
+
+        $this->post(route('logistics.incoming-parcels.confirmPickupDispatch', $this->parcel))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->post(route('logistics.incoming-parcels.confirmPickupDispatch', $this->parcel))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Notification::assertSentToTimes($this->first->rider, PickupAssigned::class, 1);
+        Notification::assertSentToTimes($this->second->rider, PickupAssigned::class, 1);
     }
 
     public function test_incoming_parcels_does_not_show_another_carriers_parcel_even_with_origin_coverage(): void

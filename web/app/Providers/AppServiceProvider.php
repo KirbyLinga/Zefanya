@@ -2,18 +2,21 @@
 
 namespace App\Providers;
 
-use App\Models\CartItem;
-use App\Models\Incidents;
-use App\Models\Order;
-use App\Models\SellerOrder;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\Wishlist;
+use App\Models\Rider\Rider;
 use App\Models\Shared\Category;
-use App\Models\Wishlist;
+use App\Models\Shared\Incidents;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
 use App\Policies\BuyerOrderPolicy;
 use App\Policies\IncidentsPolicy;
 use App\Policies\SellerOrderFleetPolicy;
 use App\Policies\SellerOrderPolicy;
+use App\Services\Shared\OfferPricing;
 use App\View\Composers\RiderNotificationComposer;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(OfferPricing::class);
     }
 
     /**
@@ -42,6 +45,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Rider notifications and API tokens saved before the model moved to
+        // App\Models\Rider\Rider store this class name. Keep reading and
+        // writing it so those rows stay attached without changing any data.
+        Relation::morphMap(['App\Models\Rider' => Rider::class]);
+
         // ── Login / auth throttling ─────────────────────────────────────────
         // Throttle logins per e-mail+IP (5/min) with a looser per-IP ceiling
         // (25/min), so one shared office/NAT IP cannot lock every user out.
@@ -53,6 +61,23 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(5)->by('login-email:'.$email.'|'.$request->ip()),
                 Limit::perMinute(25)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
+        // Bearer login has the same limits, with the API response envelope.
+        // Keep the existing web login limiter and its responses unchanged.
+        RateLimiter::for('api-login', function (Request $request) {
+            $email = Str::lower((string) $request->input('email'));
+            $response = fn (Request $request, array $headers) => response()->json([
+                'success' => false,
+                'message' => 'Too many login attempts. Please try again later.',
+                'data' => null,
+                'errors' => ['email' => ['Too many login attempts. Please try again later.']],
+            ], 429, $headers);
+
+            return [
+                Limit::perMinute(5)->by('api-login-email:'.$email.'|'.$request->ip())->response($response),
+                Limit::perMinute(25)->by('api-login-ip:'.$request->ip())->response($response),
             ];
         });
 
@@ -90,6 +115,15 @@ class AppServiceProvider extends ServiceProvider
             ->by('password-update:'.$request->ip()));
         RateLimiter::for('google-auth', fn (Request $request) => Limit::perMinute(10)
             ->by('google-auth:'.$request->ip()));
+
+        // Admin second factor: 5 attempts/minute per pending admin + IP. The
+        // challenge route has no authenticated user yet, so the session marker
+        // set by AuthController::login() is the per-account key.
+        RateLimiter::for('admin-2fa', function (Request $request) {
+            $pending = (string) $request->session()->get('admin.2fa.id', 'guest');
+
+            return Limit::perMinute(5)->by('admin-2fa:'.$pending.'|'.$request->ip());
+        });
 
         // ── Policies for the order flow (Slice 1) ───────────────────────────
         // BuyerOrderPolicy / SellerOrderFleetPolicy don't match Laravel's

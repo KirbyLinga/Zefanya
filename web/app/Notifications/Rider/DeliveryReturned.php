@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Rider;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 
 /**
  * A failed delivery was closed by Logistics returning the parcel to the

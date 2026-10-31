@@ -15,9 +15,17 @@
     </div>
 @endif
 
+@if ($errors->any())
+    <div role="alert" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        @foreach ($errors->all() as $error)
+            <p>{{ $error }}</p>
+        @endforeach
+    </div>
+@endif
+
 <div class="mb-8">
     <h1 class="text-[28px] font-bold text-neutral-950 mb-1">User Accounts</h1>
-    <p class="text-base text-neutral-600">Suspend or reactivate approved buyers, sellers, and logistics providers.</p>
+    <p class="text-base text-neutral-600">Search buyers, sellers, and logistics providers by account status. Suspend approved accounts or reactivate suspended accounts.</p>
 </div>
 
 <div class="mb-6 bg-white border border-neutral-200 rounded-lg p-5">
@@ -33,6 +41,15 @@
                 <option value="seller" {{ $type === 'seller' ? 'selected' : '' }}>Seller</option>
                 <option value="logistics" {{ $type === 'logistics' ? 'selected' : '' }}>Logistics</option>
                 <option value="buyer" {{ $type === 'buyer' ? 'selected' : '' }}>Buyer</option>
+            </select>
+        </div>
+        <div>
+            <label for="status" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Account Status</label>
+            <select name="status" id="status" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base">
+                <option value="" @selected($status === '')>All statuses</option>
+                @foreach ($statuses as $value => $label)
+                    <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
+                @endforeach
             </select>
         </div>
         <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
@@ -106,8 +123,10 @@
                         <td class="px-6 py-4">
                             @if ($statusValue === 'suspended')
                                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700">Suspended</span>
-                            @else
+                            @elseif ($statusValue === 'approved')
                                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">Approved</span>
+                            @else
+                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700">{{ $statuses[$statusValue] ?? ucfirst($statusValue) }}</span>
                             @endif
                         </td>
                         <td class="px-6 py-4 text-center">
@@ -118,15 +137,21 @@
                                     default => 'admin.users.seller.suspend',
                                 }, $account) }}" class="inline" onsubmit="return confirm('Suspend this account?');">
                                     @csrf
+                                    <label for="suspend-reason-{{ $account->id }}" class="sr-only">Reason for suspension</label>
+                                    <input id="suspend-reason-{{ $account->id }}" name="reason" required maxlength="1000" placeholder="Reason for suspension"
+                                           class="mb-2 w-full h-10 px-3 border border-neutral-300 rounded-lg text-sm" />
                                     <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100">Suspend</button>
                                 </form>
-                            @else
+                            @elseif ($statusValue === 'suspended')
                                 <form method="POST" action="{{ route(match ($type) {
                                     'buyer' => 'admin.users.buyer.reactivate',
                                     'logistics' => 'admin.users.logistics.reactivate',
                                     default => 'admin.users.seller.reactivate',
                                 }, $account) }}" class="inline" onsubmit="return confirm('Reactivate this account?');">
                                     @csrf
+                                    <label for="reactivate-reason-{{ $account->id }}" class="sr-only">Reason for reactivation</label>
+                                    <input id="reactivate-reason-{{ $account->id }}" name="reason" required maxlength="1000" placeholder="Reason for reactivation"
+                                           class="mb-2 w-full h-10 px-3 border border-neutral-300 rounded-lg text-sm" />
                                     <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-green-700 bg-green-50 rounded-lg hover:bg-green-100">Reactivate</button>
                                 </form>
                             @endif
@@ -139,7 +164,7 @@
             {{ $accounts->links() }}
         </div>
     @else
-        <div class="px-6 py-16 text-center text-neutral-500">No approved or suspended accounts found.</div>
+        <div class="px-6 py-16 text-center text-neutral-500">No accounts match your filters.</div>
     @endif
 </div>
 

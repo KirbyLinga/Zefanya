@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -70,6 +70,30 @@ class ProductCardImagesTest extends TestCase
 
         $this->assertNotNull($image);
         $this->assertSame('/storage/products/available.jpg', $image->getAttribute('src'));
+    }
+
+    public function test_product_gallery_exposes_every_uploaded_angle_as_a_selectable_thumbnail(): void
+    {
+        Storage::fake('public');
+        $this->withoutVite();
+        $product = Product::factory()->create(['status' => 'active', 'stock_quantity' => 10]);
+        $paths = ['products/front.jpg', 'products/left.jpg', 'products/right.png'];
+        foreach ($paths as $index => $path) {
+            $product->images()->create(['path' => $path, 'is_primary' => $index === 0, 'sort_order' => $index]);
+            Storage::disk('public')->put($path, 'image');
+        }
+        $response = $this->get(route('buyer.products.show', $product))->assertOk();
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($document);
+        $buttons = $xpath->query('//button[contains(concat(" ", normalize-space(@class), " "), " js-pdp-thumb ")]');
+        $this->assertSame(3, $buttons->length);
+        foreach ($buttons as $index => $button) {
+            $this->assertSame('/storage/'.$paths[$index], $button->getAttribute('data-src'));
+            $this->assertSame($index === 0 ? 'true' : 'false', $button->getAttribute('aria-pressed'));
+            $this->assertSame('View photo '.($index + 1).' of 3', $button->getAttribute('aria-label'));
+        }
+        $this->assertStringContainsString('object-contain', $xpath->query('//img[@id="pdp-main-img"]')->item(0)->getAttribute('class'));
     }
 
     public function test_cards_show_a_placeholder_without_image_records(): void

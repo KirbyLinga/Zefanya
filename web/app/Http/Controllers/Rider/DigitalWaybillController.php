@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Rider;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\SellerOrder;
-use App\Services\RiderOperationsService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Rider\RiderOperationsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;

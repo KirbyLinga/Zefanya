@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
-use App\Models\Order;
+use App\Models\Shared\Order;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 

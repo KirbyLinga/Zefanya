@@ -18,14 +18,14 @@
 @section('content')
     <x-seller.dashboard-hero
         :name="$seller->business_name ?? $seller->fullName()"
-        :date="now()->format('l, F j, Y')"
+        :date="now(\App\Models\Seller\StoreSale::TIMEZONE)->format('l, F j, Y')"
         :notifications="$notifications"
         :unreadCount="$unreadCount"
     />
 
     {{-- ========================== STAT CARDS =========================== --}}
-    <section class="grid grid-cols-4 gap-5 mb-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+    <section class="grid grid-cols-3 gap-5 mb-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+        <a href="{{ route('seller.reports.index') }}" class="block no-underline bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-primary-500 text-[#fff8f7]">
                 <i data-lucide="wallet" class="w-[18px] h-[18px]"></i>
             </div>
@@ -37,9 +37,22 @@
                     ₱{{ number_format($totalSales, 2) }}
                 @endif
             </p>
-        </div>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">All delivered and completed orders.</p>
+        </a>
 
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <a href="{{ route('seller.earnings.index') }}" data-net-earnings class="block no-underline bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
+            <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-primary-500 text-[#fff8f7]">
+                <i data-lucide="banknote" class="w-[18px] h-[18px]"></i>
+            </div>
+            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Net Earnings</p>
+            <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">₱{{ number_format($netEarningsMinor / 100, 2) }}</p>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">After commission and seller-funded discounts; excludes shipping.</p>
+            @if ($earningsPendingCount > 0)
+                <p class="font-sans text-xs text-[var(--text-muted)] mt-1">{{ number_format($earningsPendingCount) }} completed {{ Str::plural('order', $earningsPendingCount) }} awaiting finalized earnings.</p>
+            @endif
+        </a>
+
+        <a href="{{ route('seller.orders.index') }}" class="block no-underline bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-secondary-700 text-[#fff8f7]">
                 <i data-lucide="shopping-bag" class="w-[18px] h-[18px]"></i>
             </div>
@@ -47,9 +60,19 @@
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">
                 {{ is_null($totalOrders) ? '—' : number_format($totalOrders) }}
             </p>
-        </div>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Every order, in any status.</p>
+        </a>
 
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <a href="{{ route('seller.orders.index', ['bucket' => 'delivered']) }}" data-completed-orders class="block no-underline bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
+            <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-secondary-700 text-[#fff8f7]">
+                <i data-lucide="circle-check" class="w-[18px] h-[18px]"></i>
+            </div>
+            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Completed Orders</p>
+            <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($completedOrders) }}</p>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Received by the buyer.</p>
+        </a>
+
+        <a href="{{ route('seller.orders.index', ['bucket' => 'to_ship']) }}" data-pending-orders class="block no-underline bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-warning text-[#fff8f7]">
                 <i data-lucide="clock" class="w-[18px] h-[18px]"></i>
             </div>
@@ -57,18 +80,24 @@
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">
                 {{ is_null($pendingOrders) ? '—' : number_format($pendingOrders) }}
             </p>
-        </div>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">
+                {{ $pendingOrders > 0 ? 'Waiting for you to prepare them.' : "You're all caught up." }}
+            </p>
+        </a>
 
-        <div class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        {{-- The whole card links through the title; the weight warning stays its own link on top. --}}
+        <div class="relative bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-tertiary-500 text-[#fff8f7]">
                 <i data-lucide="package" class="w-[18px] h-[18px]"></i>
             </div>
-            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Products</p>
-            <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($productCount) }}</p>
-            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">{{ $activeProductCount }} active</p>
+            <a href="{{ route('seller.products.index') }}" class="block no-underline after:absolute after:inset-0">
+                <span class="block font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Products</span>
+                <span class="block font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($productCount) }}</span>
+                <span class="block font-sans text-xs text-[var(--text-muted)] mt-1">{{ $activeProductCount }} active</span>
+            </a>
             @if ($productsMissingWeight > 0)
                 <a href="{{ route('seller.products.index') }}"
-                   class="font-sans text-xs font-semibold text-[var(--status-warning)] mt-1 inline-block no-underline">
+                   class="relative z-10 font-sans text-xs font-semibold text-[var(--status-warning)] mt-1 inline-block no-underline">
                     {{ $productsMissingWeight }} {{ Str::plural('product', $productsMissingWeight) }} need{{ $productsMissingWeight === 1 ? 's' : '' }} weight
                 </a>
             @endif
@@ -79,34 +108,15 @@
 
         {{-- ========================= SALES CHART ========================= --}}
         <section class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm flex flex-col">
-            <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center justify-between gap-3 mb-5">
                 <h2 class="font-sans text-base font-semibold text-[var(--text-ink)]">Sales performance</h2>
-                <span class="font-sans text-[11.5px] font-semibold text-[var(--text-muted)] bg-[var(--bg-chip)] rounded-full px-1 px-3">Last 7 days</span>
+                <a href="{{ route('seller.reports.index') }}" class="inline-flex items-center gap-1 font-sans text-[12.5px] font-semibold text-[var(--link)] no-underline">
+                    Full report <i data-lucide="arrow-right" class="w-[14px] h-[14px]" aria-hidden="true"></i>
+                </a>
             </div>
 
             @if($ordersModuleReady)
-                @php
-                    $max = max(1, $salesTrend->max('value'));
-                    $points = $salesTrend->values()->map(function ($point, $i) use ($salesTrend, $max) {
-                        $x = $salesTrend->count() > 1 ? ($i / ($salesTrend->count() - 1)) * 100 : 0;
-                        $y = 100 - (($point['value'] / $max) * 90);
-                        return "$x,$y";
-                    })->implode(' ');
-                @endphp
-                <svg class="w-full h-[160px]" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline
-                        fill="none"
-                        stroke="var(--brand)"
-                        stroke-width="1.5"
-                        vector-effect="non-scaling-stroke"
-                        points="{{ $points }}"
-                    />
-                </svg>
-                <div class="flex justify-between mt-2 font-sans text-[11.5px] text-[var(--text-muted)]">
-                    @foreach($salesTrend as $point)
-                        <span>{{ $point['label'] }}</span>
-                    @endforeach
-                </div>
+                <x-seller.sales-chart :summary="$salesSummary" />
             @else
                 <div class="flex flex-col items-center justify-center text-center p-10 px-4">
                     <i data-lucide="line-chart" class="w-[28px] h-[28px] text-[var(--icon-soft)] mb-3"></i>
@@ -119,7 +129,7 @@
         </section>
 
         {{-- ========================= LOW STOCK =========================== --}}
-        <section class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
+        <section class="self-start bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
             <div class="flex items-center justify-between mb-5">
                 <h2 class="font-sans text-base font-semibold text-[var(--text-ink)]">Low-stock products</h2>
                 @if($lowStockCount > 0)
@@ -160,6 +170,9 @@
     <section class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
         <div class="flex items-center justify-between mb-5">
             <h2 class="font-sans text-base font-semibold text-[var(--text-ink)]">Recent orders</h2>
+            <a href="{{ route('seller.orders.index') }}" class="inline-flex items-center gap-1 font-sans text-[12.5px] font-semibold text-[var(--link)] no-underline">
+                All orders <i data-lucide="arrow-right" class="w-[14px] h-[14px]" aria-hidden="true"></i>
+            </a>
         </div>
 
         @if(!$ordersModuleReady || $recentOrders->isEmpty())
@@ -171,24 +184,26 @@
                 </p>
             </div>
         @else
+            <div class="overflow-x-auto">
             <table class="w-full border-collapse [&>tbody>tr:last-child>td]:border-b-0">
                 <thead>
                     <tr>
-                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] px-2 px-3 border-b border-neutral-200">Order</th>
-                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] px-2 px-3 border-b border-neutral-200">Buyer</th>
-                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] px-2 px-3 border-b border-neutral-200">Status</th>
-                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] px-2 px-3 border-b border-neutral-200">Date</th>
+                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] py-2 px-3 border-b border-[var(--border-strong)]">Order</th>
+                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] py-2 px-3 border-b border-[var(--border-strong)]">Buyer</th>
+                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] py-2 px-3 border-b border-[var(--border-strong)]">Status</th>
+                        <th class="text-left font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] py-2 px-3 border-b border-[var(--border-strong)]">Date</th>
+                        <th class="py-2 px-3 border-b border-[var(--border-strong)]"><span class="sr-only">Action</span></th>
                     </tr>
                 </thead>
                  <tbody>
                     @foreach($recentOrders as $sellerOrder)
                          @php($order = $sellerOrder->order ?? null)
                          <tr>
-                             <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">#{{ $sellerOrder->id }}</td>
-                             <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $order?->buyer?->fullName() ?? '—' }}</td>
-                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->status->label }}</td>
-                              <td class="font-sans text-[13.5px] text-[var(--text-ink)] px-3 border-b border-neutral-200">{{ $sellerOrder->created_at->format('M d, Y') }}</td>
-                              <td class="px-3 border-b border-neutral-200">
+                             <td class="font-sans text-[13.5px] text-[var(--text-ink)] py-3 px-3 border-b border-[var(--border-strong)]">#{{ $sellerOrder->id }}</td>
+                             <td class="font-sans text-[13.5px] text-[var(--text-ink)] py-3 px-3 border-b border-[var(--border-strong)]">{{ $order?->buyer?->fullName() ?? '—' }}</td>
+                              <td class="py-3 px-3 border-b border-[var(--border-strong)]"><x-seller.order-status-pill :status="$sellerOrder->status" /></td>
+                              <td class="whitespace-nowrap font-sans text-[13.5px] text-[var(--text-ink)] py-3 px-3 border-b border-[var(--border-strong)]">{{ $sellerOrder->created_at->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M d, Y') }}</td>
+                              <td class="py-3 px-3 text-right border-b border-[var(--border-strong)]">
                                   @if($sellerOrder->status === OrderStatus::Placed)
                                       <form method="POST" action="{{ route('seller.orders.markReady', $sellerOrder) }}">
                                           @csrf
@@ -206,6 +221,7 @@
                      @endforeach
                  </tbody>
             </table>
+            </div>
         @endif
     </section>
 @endsection

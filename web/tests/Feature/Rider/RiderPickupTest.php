@@ -5,13 +5,12 @@ namespace Tests\Feature\Rider;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Models\Payment;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\StatusHistory;
+use App\Models\Shared\Payment;
+use App\Models\Shared\StatusHistory;
 use App\Notifications\Logistics\RiderParcelActivity;
-use App\Services\ParcelHandoffVerification;
-use App\Services\RiderHandoffVerification;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Support\Facades\Notification;
 use Tests\Support\IssuesLogisticsHandoff;
 
@@ -37,7 +36,7 @@ class RiderPickupTest extends RiderTestCase
         $parcel = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $this->courier->id]);
 
         $this->actingAsRider()
-            ->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))
+            ->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -68,11 +67,11 @@ class RiderPickupTest extends RiderTestCase
     {
         $parcel = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $this->courier->id]);
 
-        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
 
         $historyCount = StatusHistory::query()->where('seller_order_id', $parcel->id)->count();
 
-        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
 
         $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
         $this->assertSame($historyCount, StatusHistory::query()->where('seller_order_id', $parcel->id)->count());
@@ -83,7 +82,7 @@ class RiderPickupTest extends RiderTestCase
         $otherCourier = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
         $parcel = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $otherCourier->id]);
 
-        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))->assertForbidden();
+        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))->assertForbidden();
 
         $this->assertSame(OrderStatus::ReadyForPickup, $parcel->fresh()->status);
     }
@@ -102,7 +101,7 @@ class RiderPickupTest extends RiderTestCase
         ]);
 
         $this->actingAsRider()
-            ->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))
+            ->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))
             ->assertRedirect()
             ->assertSessionHasErrors('parcel');
 
@@ -118,7 +117,7 @@ class RiderPickupTest extends RiderTestCase
             'amount_minor' => 150000,
         ]);
 
-        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
 
         $payment = $payment->fresh();
 
@@ -132,7 +131,7 @@ class RiderPickupTest extends RiderTestCase
     {
         $parcel = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $this->courier->id]);
 
-        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.pickups.confirm', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_CONFIRM_PICKUP))->assertRedirect();
 
         // The rider has no route that advances PickedUp → AtSortingCenter.
         $parcel = $parcel->fresh();

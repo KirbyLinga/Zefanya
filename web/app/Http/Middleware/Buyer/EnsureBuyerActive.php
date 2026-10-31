@@ -45,7 +45,7 @@ class EnsureBuyerActive
             // remember_me, without waiting for the session to expire.
             $buyer->setRememberToken(null);
 
-            $redirect = redirect()->route('home', ['login' => 1])->with('auth.status_message', match ($buyer->status) {
+            return redirect()->route('home', ['login' => 1])->with('auth.status_message', match ($buyer->status) {
                 'unverified' => 'Your email has not been verified yet. Please check your email for the verification code.',
                 'pending' => 'Your account is still pending administrator approval.',
                 'rejected' => 'Your registration was not approved. Please contact support or submit a new registration.',
@@ -53,7 +53,6 @@ class EnsureBuyerActive
                 default => 'Your account is not active.',
             });
 
-            return $redirect;
         }
 
         return $next($request);

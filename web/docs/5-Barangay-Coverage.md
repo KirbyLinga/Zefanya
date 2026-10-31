@@ -25,10 +25,10 @@ Rollback restores municipality uniqueness only if existing data permits it. It r
 Changed application files:
 
 - `app/Models/Logistics/Area.php`
-- `app/Models/SellerOrder.php`
-- `app/Services/LogisticsHubService.php`
-- `app/Services/CourierAssignmentService.php`
-- `app/Services/RiderOperationsService.php`
+- `app/Models/Shared/SellerOrder.php`
+- `app/Services/Logistics/LogisticsHubService.php`
+- `app/Services/Logistics/CourierAssignmentService.php`
+- `app/Services/Rider/RiderOperationsService.php`
 - `app/Http/Controllers/Buyer/CheckoutController.php`
 - `app/Http/Controllers/Logistics/AreaController.php`
 - `app/Http/Controllers/Logistics/HubsController.php`
@@ -43,7 +43,7 @@ Changed test files:
 - `tests/Feature/Logistics/BarangayCoverageTest.php` (24 new tests)
 - `tests/Support/CreatesAssignableFleet.php`
 - `tests/Feature/Admin/HubApprovalTest.php`
-- `tests/Feature/FulfillmentLifecycleTest.php`
+- `tests/Feature/Order/FulfillmentLifecycleTest.php`
 - `tests/Feature/Logistics/HubsTest.php`
 - `tests/Feature/Logistics/HubsUiTest.php`
 - `tests/Feature/Logistics/IncomingParcelsTest.php`
@@ -52,7 +52,7 @@ Changed test files:
 - `tests/Feature/Rider/RiderTestCase.php`
 - `tests/Feature/Seller/CourierAssignmentTest.php`
 - `tests/Feature/Seller/CourierPickupMunicipalityTest.php`
-- `tests/Feature/TestCouriersSeederTest.php`
+- `tests/Feature/Rider/TestCouriersSeederTest.php`
 
 Existing regression fixtures were updated to explicit barangay addresses and claims. Activation-before-coverage and silent coverage-transfer expectations now test the requested ordering/conflict behavior. Municipality-only demo seeder records explicitly remain blocked from new assignment. Unrelated existing workspace changes were retained.
 

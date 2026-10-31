@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
-use App\Services\ParcelHandoffVerification;
-use App\Services\ParcelTrackingVerificationService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelTrackingVerificationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;

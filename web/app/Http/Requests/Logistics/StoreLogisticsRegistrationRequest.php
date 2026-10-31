@@ -2,9 +2,13 @@
 
 namespace App\Http\Requests\Logistics;
 
-use App\Enums\LogisticsProviderStatus;
 use App\Models\Logistics\LogisticsProvider;
+use App\Support\BirthDate;
+use App\Support\DocumentUpload;
 use App\Support\EmailRegistry;
+use App\Support\PasswordRule;
+use App\Support\PersonName;
+use App\Support\PhilippineMobile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,93 +21,71 @@ class StoreLogisticsRegistrationRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if (is_string($this->input('sec_number'))) {
+            $this->merge(['sec_number' => strtoupper(trim($this->input('sec_number')))]);
+        }
         $email = $this->input('email');
         if ($email) {
-            $this->merge(['email' => trim(strtolower($email))]);
+            $this->merge(['email' => EmailRegistry::normalize($email)]);
         }
 
         $contactNo = $this->input('contact_no');
-        if ($contactNo) {
-            $phone = preg_replace('/[\s\-()]/u', '', (string) $contactNo);
-            if (str_starts_with($phone, '+63')) {
-                $phone = '0'.substr($phone, 3);
-            }
-            $this->merge(['contact_no' => $phone]);
+        if (is_string($contactNo)) {
+            $this->merge(['contact_no' => PhilippineMobile::normalize($contactNo)]);
         }
     }
 
     public function rules(): array
     {
         return [
-            // Names accept letters (incl. accented), spaces, hyphens and
-            // apostrophes — same rule as buyer/seller registration.
-            'last_name' => ['required', 'string', 'regex:/^[\p{L}\s\'-]+$/u', 'max:100'],
-            'first_name' => ['required', 'string', 'regex:/^[\p{L}\s\'-]+$/u', 'max:100'],
+            // Shared name rule for every role (see PersonName).
+            'last_name' => PersonName::rules(),
+            'first_name' => PersonName::rules(),
             'middle_initial' => ['nullable', 'string', 'max:2'],
             'sex' => ['required', Rule::in(['male', 'female'])],
 
             'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255',
+                ...EmailRegistry::formatRules(),
                 function ($attribute, $value, $fail) {
-                    // Block only a LIVE logistics registration. A rejected (or
-                    // abandoned unverified) provider may retry with the same
-                    // email — a rejection must not be a permanent dead end.
-                    $live = LogisticsProvider::whereRaw('LOWER(email) = ?', [strtolower($value)])
-                        ->whereNotIn('status', ['unverified', 'rejected'])
-                        ->exists();
-
-                    if ($live) {
-                        $fail('This email is already registered. Use a different email.');
-
-                        return;
-                    }
-
-                    // One email = one role across every account table
-                    // (buyers, sellers, logistics providers, admins).
-                    $foreign = EmailRegistry::otherRolesFor($value, 'logistics');
-
-                    if ($foreign !== []) {
-                        $fail('This email is already registered as a '.EmailRegistry::labelList($foreign).'. Use a different email.');
-
-                        return;
-                    }
-
-                    // Never let a newcomer replace a registration that is still
-                    // inside its 10-minute verification window.
-                    $stale = LogisticsProvider::whereRaw('LOWER(email) = ?', [strtolower($value)])
-                        ->where('status', LogisticsProviderStatus::Unverified->value)
-                        ->first();
-
-                    if ($stale && ! $stale->isAbandonedRegistration()) {
-                        $fail('This email is currently awaiting verification. Please finish verifying it, then try again later.');
+                    if ($error = EmailRegistry::registrationError($value, 'logistics', submission: $this->only(['password', 'first_name', 'last_name', 'contact_no']))) {
+                        $fail($error);
                     }
                 },
             ],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => PasswordRule::rules(),
 
             'contact_no' => [
-                'required',
-                'regex:/^09\d{9}$/',
-                // Live numbers unique; same-email unverified/rejected is archived on store.
-                Rule::unique('logistics_providers', 'contact_no')
-                    ->whereNull('archived_at')
-                    ->where(function ($query) {
-                        $email = strtolower(trim((string) $this->input('email')));
-                        $query->whereRaw(
-                            '(LOWER(email) != ? OR status NOT IN (?, ?))',
-                            [$email, 'unverified', 'rejected']
-                        );
-                    }),
+                'bail',
+                ...PhilippineMobile::rules(),
+                // Unique across every role; same-email unverified/rejected is archived on store.
+                function ($attribute, $value, $fail) {
+                    if (PhilippineMobile::isTaken($value, 'logistics', (string) $this->input('email'))) {
+                        $fail(PhilippineMobile::TAKEN_MESSAGE);
+                    }
+                },
             ],
-            'birthday' => ['required', 'date', 'before:today'],
+            'birthday' => BirthDate::rules(),
 
-            'business_name' => ['required', 'string', 'max:255'],
+            'business_name' => ['bail', 'required', 'string', 'max:255', function ($attribute, $value, $fail) {
+                $taken = LogisticsProvider::withoutGlobalScope('not_archived')
+                    ->whereRaw('LOWER(email) != ?', [(string) $this->input('email')])
+                    ->pluck('business_name')->contains(fn ($name) => LogisticsProvider::normalizedCompanyName($name) === LogisticsProvider::normalizedCompanyName($value));
+                if ($taken) {
+                    $fail('This company name is already registered.');
+                }
+            }],
+            'sec_number' => ['bail', 'required', 'string', 'regex:/\A[A-Z]{2}[0-9]{9}\z/',
+                Rule::unique('logistics_providers', 'sec_number')->where(fn ($query) => $query->whereRaw('LOWER(email) != ?', [(string) $this->input('email')])),
+            ],
+            'service_areas' => ['required', 'array', 'min:1', 'max:100'],
+            'service_areas.*' => ['required', 'string', 'distinct', 'regex:/\A[0-9]{9,10}\z/'],
+            'tin' => ['bail', 'required', 'string', 'regex:/\A[0-9]{3}-[0-9]{3}-[0-9]{3}-[0-9]{3}\z/',
+                Rule::unique('logistics_providers', 'tin')->where(fn ($query) => $query->whereRaw('LOWER(email) != ?', [(string) $this->input('email')])),
+            ],
 
             // Registration: province / municipality / barangay from dropdowns only.
             'address_mode' => ['required', Rule::in(['api'])],
+            'region_code' => ['required', 'string', 'regex:/\A[0-9]{9,10}\z/'],
 
             'province' => ['required', 'string'],
             'province_name' => ['required', 'string'],
@@ -115,25 +97,37 @@ class StoreLogisticsRegistrationRequest extends FormRequest
             'street' => ['required', 'string', 'max:255'],
             'house_number' => ['nullable', 'string', 'max:50'],
             'address_detail' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:10'],
+            'postal_code' => ['nullable', 'string', 'regex:/\A[0-9]{4}\z/'],
 
-            'upload_id' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
-            'dti_permit_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'upload_id' => DocumentUpload::rules(),
+            'dti_permit_upload' => DocumentUpload::rules(),
+
+            'terms' => ['required', 'accepted'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'first_name.regex' => 'First name can only contain letters, spaces, hyphens and apostrophes.',
-            'last_name.regex' => 'Last name can only contain letters, spaces, hyphens and apostrophes.',
-            'contact_no.regex' => 'Enter a valid PH mobile number (09XXXXXXXXX).',
-            'upload_id.uploaded' => 'Upload ID failed to upload. Use a JPG, PNG, or PDF under 5MB.',
-            'upload_id.mimes' => 'Upload ID must be a JPG, PNG, or PDF.',
-            'upload_id.max' => 'Upload ID must be smaller than 5MB.',
-            'dti_permit_upload.uploaded' => 'DTI permit failed to upload. Use a JPG, PNG, or PDF under 5MB.',
-            'dti_permit_upload.mimes' => 'DTI permit must be a JPG, PNG, or PDF.',
-            'dti_permit_upload.max' => 'DTI permit must be smaller than 5MB.',
+            'postal_code.regex' => 'Postal code must contain exactly 4 digits.',
+            'region_code.required' => 'Select a region.',
+            'sec_number.regex' => 'SEC number must contain 2 letters followed by 9 digits.',
+            'sec_number.unique' => 'This SEC number is already registered.',
+            'service_areas.required' => 'Select at least one service area.',
+            'service_areas.*.distinct' => 'Select each service area only once.',
+            'tin.required' => 'Enter your TIN in this format: 000-000-000-000.',
+            'tin.regex' => 'Enter your TIN in this format: 000-000-000-000.',
+            'tin.unique' => 'This TIN is already registered.',
+            'email.email' => 'Enter a valid email address.',
+            'email.regex' => EmailRegistry::FORMAT_MESSAGE,
+            ...PasswordRule::messages(),
+            ...BirthDate::messages(),
+            ...PersonName::messages('first_name', 'First name'),
+            ...PersonName::messages('last_name', 'Last name'),
+            ...DocumentUpload::messages('upload_id', 'Upload ID'),
+            ...DocumentUpload::messages('dti_permit_upload', 'DTI permit'),
+            'terms.required' => 'You must accept the Terms and Privacy Policy.',
+            'terms.accepted' => 'You must accept the Terms and Privacy Policy.',
             'street.required' => 'Street / house number is required.',
             'province.required' => 'Select a province.',
             'business_name.required' => 'Enter your business or company name.',

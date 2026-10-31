@@ -4,11 +4,11 @@ namespace Tests\Feature\Buyer;
 
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\Voucher;
+use App\Models\Shared\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;

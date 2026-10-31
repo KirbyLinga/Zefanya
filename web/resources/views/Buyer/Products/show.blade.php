@@ -30,6 +30,7 @@
 
     {{-- ── Seller strip ── --}}
     @include('Buyer.Products._seller-strip')
+    @include('Buyer.Vouchers._shop-offers', ['offers' => $shopVouchers, 'wrapperClass' => 'mt-4 rounded-2xl border border-buyer-line bg-white px-5 py-4'])
 
     @include('Buyer.Products._tabs', ['description' => $product->description])
 

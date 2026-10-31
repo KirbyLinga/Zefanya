@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
-use App\Models\Rider;
-use App\Services\RiderRegistrationService;
+use App\Models\Rider\Rider;
+use App\Services\Rider\RiderRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -50,7 +50,7 @@ class RiderApplicationController extends Controller
 
     public function reject(Request $request, Rider $rider, RiderRegistrationService $service): JsonResponse
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:300']]);
         $row = $service->decide($rider, $request->user('logistics'), 'rejected', $data['reason']);
 
         return response()->json(['message' => 'Rider application rejected.', 'data' => ['rider_id' => $row->id, 'status' => $row->status]]);

@@ -4,12 +4,12 @@ namespace Tests\Feature\Buyer;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
 use App\Models\Shared\Category;
-use App\Services\VariantSyncService;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;

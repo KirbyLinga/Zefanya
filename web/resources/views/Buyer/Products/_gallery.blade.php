@@ -16,7 +16,7 @@
         id="pdp-main-img"
         src="{{ $mainImg ?? '' }}"
         alt="{{ $product->name }}"
-        class="h-full w-full object-cover object-top transition-opacity duration-200 {{ $mainImg ? '' : 'opacity-0' }}"
+        class="h-full w-full object-contain transition-opacity duration-200 {{ $mainImg ? '' : 'opacity-0' }}"
       />
       {{-- Placeholder shown when no image --}}
       @if (!$mainImg)
@@ -37,5 +37,20 @@
     </button>
   </div>
 
-
+  @if (count($galleryImages) > 1)
+    <div class="mx-auto w-full max-w-[480px]" role="group" aria-label="Product photos">
+      <p class="mb-2 text-xs text-buyer-ink-soft">{{ count($galleryImages) }} photos — select a photo to view another angle</p>
+      <div class="flex gap-2 overflow-x-auto pb-2">
+        @foreach ($galleryImages as $imageUrl)
+          <button type="button"
+                  class="js-pdp-thumb h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 bg-secondary-100 p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-buyer-ink {{ $loop->first ? 'border-buyer-ink' : 'border-transparent' }}"
+                  data-src="{{ $imageUrl }}"
+                  aria-label="View photo {{ $loop->iteration }} of {{ count($galleryImages) }}"
+                  aria-pressed="{{ $loop->first ? 'true' : 'false' }}">
+            <img src="{{ $imageUrl }}" alt="{{ $product->name }} — photo {{ $loop->iteration }}" loading="lazy" class="h-full w-full object-contain">
+          </button>
+        @endforeach
+      </div>
+    </div>
+  @endif
 </div>

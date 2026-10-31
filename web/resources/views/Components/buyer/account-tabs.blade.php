@@ -10,9 +10,11 @@
     $accountActive = $active ?? null;
     $accountTabs = [
         ['key' => 'profile', 'label' => 'Profile', 'route' => 'buyer.account.index'],
+        ['key' => 'following', 'label' => 'Following', 'route' => 'buyer.following.index'],
         ['key' => 'address', 'label' => 'Address Book', 'route' => 'buyer.account.address'],
         ['key' => 'password', 'label' => 'Password & Security', 'route' => 'buyer.account.password'],
         ['key' => 'orders', 'label' => 'Order History', 'route' => 'buyer.orders.index'],
+        ['key' => 'vouchers', 'label' => 'My Vouchers', 'route' => 'buyer.vouchers.index'],
     ];
 @endphp
 

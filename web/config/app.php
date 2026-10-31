@@ -67,6 +67,10 @@ return [
 
     'timezone' => 'UTC',
 
+    // Business schedules use Manila time; keep persisted timestamps in UTC so
+    // historical records and elapsed-time delivery deadlines retain their meaning.
+    'schedule_timezone' => 'Asia/Manila',
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

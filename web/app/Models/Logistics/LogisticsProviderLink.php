@@ -3,7 +3,7 @@
 namespace App\Models\Logistics;
 
 use App\Models\Admin\Admin;
-use App\Services\ProviderHandoffSchemaService;
+use App\Services\Logistics\ProviderHandoffSchemaService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -62,11 +62,6 @@ class LogisticsProviderLink extends Model
     public function isRejected(): bool
     {
         return $this->status === self::REJECTED;
-    }
-
-    public function isRevoked(): bool
-    {
-        return $this->status === self::REVOKED;
     }
 
     public function statusLabel(): string

@@ -4,16 +4,16 @@ namespace Tests\Feature\Seller;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\CourierAssignmentService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
@@ -23,8 +23,6 @@ class CourierAssignmentTest extends TestCase
     use CreatesAssignableFleet, LazilyRefreshDatabase;
 
     private Seller $seller;
-
-    private SellerOrder $sellerOrder;
 
     private Product $product;
 
@@ -81,7 +79,9 @@ class CourierAssignmentTest extends TestCase
     private function makeReadyOrder(): SellerOrder
     {
         $so = $this->makeOrder();
-        $so = $this->service->transition($so, OrderStatus::ReadyForPickup);
+        foreach ([OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup] as $status) {
+            $so = $this->service->transition($so, $status);
+        }
 
         return $so->fresh();
     }
@@ -107,8 +107,8 @@ class CourierAssignmentTest extends TestCase
         $this->assertSame($courier->id, (int) $so->courier_id);
         $this->assertNotNull($so->tracking_number);
 
-        // One history row: ReadyForPickup → PickedUp.
-        $this->assertSame(2, StatusHistory::where('seller_order_id', $so->id)->count());
+        // Three fulfillment rows plus one pickup row.
+        $this->assertSame(4, StatusHistory::where('seller_order_id', $so->id)->count());
     }
 
     public function test_assign_pickup_with_no_matching_courier_returns_null(): void
@@ -418,6 +418,5 @@ class CourierAssignmentTest extends TestCase
         $so->refresh();
         $this->assertSame(OrderStatus::PickedUp, $so->status);
         $this->assertSame($providerA->id, (int) $so->courier->logistics_provider_id);
-        $this->assertTrue($so->courier->id !== $so->fresh()->courier->id ? true : true); // courier is from provider A
     }
 }

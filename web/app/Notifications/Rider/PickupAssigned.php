@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Rider;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 
 /**
  * Logistics reserved a pickup task for this rider.

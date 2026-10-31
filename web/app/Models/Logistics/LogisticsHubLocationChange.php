@@ -2,7 +2,6 @@
 
 namespace App\Models\Logistics;
 
-use App\Models\Admin\Admin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -46,11 +45,6 @@ class LogisticsHubLocationChange extends Model
     public function hub(): BelongsTo
     {
         return $this->belongsTo(LogisticsHub::class, 'logistics_hub_id');
-    }
-
-    public function reviewer(): BelongsTo
-    {
-        return $this->belongsTo(Admin::class, 'reviewed_by');
     }
 
     public function proposedAddress(): string

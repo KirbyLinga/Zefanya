@@ -5,17 +5,17 @@ namespace Tests\Feature\Logistics;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentStatus;
-use App\Models\Courier;
-use App\Models\DeliveryProof;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
+use App\Models\Logistics\DeliveryProof;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
-use App\Models\Rider;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -53,7 +53,7 @@ class DeliveryAssignmentsTest extends TestCase
         $assigned = $this->order(OrderStatus::AssignedToRider, $courier);
         $outForDelivery = $this->order(OrderStatus::OutForDelivery, $courier);
 
-        $response = $this->actingAs($this->provider, 'logistics')
+        $this->actingAs($this->provider, 'logistics')
             ->get(route('logistics.delivery-assignments.index'))
             ->assertOk()
             ->assertSee('#'.$assigned->id)
@@ -182,12 +182,12 @@ class DeliveryAssignmentsTest extends TestCase
             'logistics_provider_id' => $otherProvider->id,
             'is_available' => false,
         ]);
-        $assigned = SellerOrder::factory()->create([
+        SellerOrder::factory()->create([
             'status' => OrderStatus::AssignedToRider->value,
             'courier_id' => $aCourier->id,
             'delivery_courier_id' => $deliveryCourier->id,
         ])->fresh();
-        $outForDelivery = SellerOrder::factory()->create([
+        SellerOrder::factory()->create([
             'status' => OrderStatus::OutForDelivery->value,
             'courier_id' => $aCourier->id,
             'delivery_courier_id' => $deliveryCourier->id,
@@ -262,7 +262,7 @@ class DeliveryAssignmentsTest extends TestCase
         $so = $this->order(OrderStatus::DeliveryFailed, $courier);
         $so->forceFill(['delivery_attempts' => 2])->save();
 
-        $response = $this->actingAs($this->provider, 'logistics')
+        $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.delivery-assignments.return', $so))
             ->assertRedirect()
             ->assertSessionHas('success');

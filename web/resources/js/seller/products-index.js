@@ -168,3 +168,23 @@ function initAutoSubmitFields() {
         });
     });
 }
+
+// Server validates ownership and publication readiness for every selected product.
+document.addEventListener('click', async function (event) {
+    const button = event.target.closest('[data-bulk-action]');
+    if (!button || button.disabled) return;
+    const ids = [...document.querySelectorAll('.sp-row-check:checked')].map(box => box.value);
+    if (!ids.length) return;
+    if (button.dataset.bulkAction === 'archive' && !window.confirm('Archive the selected products? Products with unfinished orders will be skipped.')) return;
+    button.disabled = true;
+    try {
+        const response = await fetch(document.querySelector('[data-bulk-url]').dataset.bulkUrl, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('#productModalForm input[name="_token"]').value },
+            body: JSON.stringify({ product_ids: ids, action: button.dataset.bulkAction })
+        });
+        const data = await response.json();
+        window.alert(data.message || 'The product action could not be completed.');
+        if (response.ok) window.location.reload();
+    } catch { window.alert('Unable to complete the product action. Please try again.'); }
+    finally { button.disabled = false; }
+});

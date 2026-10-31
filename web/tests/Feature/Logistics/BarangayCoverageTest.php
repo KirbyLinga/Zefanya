@@ -3,17 +3,17 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\RiderOperationsService;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Rider\RiderOperationsService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -246,7 +246,7 @@ class BarangayCoverageTest extends TestCase
 
     public function test_concurrent_connections_produce_exactly_one_active_claim(): void
     {
-        $station = $this->station();
+        $this->station();
         $database = tempnam(sys_get_temp_dir(), 'coverage-race-');
         $barrier = $database.'.go';
         $pdo = new \PDO('sqlite:'.$database);

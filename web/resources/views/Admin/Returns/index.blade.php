@@ -1,6 +1,10 @@
 @extends('Admin.Layouts.app')
 @section('title', 'Return Exceptions')
 @section('content')
+<x-admin.tabs :tabs="[
+    ['label' => 'Incidents', 'route' => 'admin.incidents.index'],
+    ['label' => 'Return exceptions', 'route' => 'admin.returns.index'],
+]" />
 <h1 class="mb-6 font-serif text-2xl text-[var(--text-ink)]">Return Exceptions and Custody</h1>
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 @if ($errors->any())<div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
@@ -17,6 +21,19 @@
         @endforeach
     </div>
 
+    @if ($record->inDispute())
+        <p class="mt-3 text-xs font-semibold text-[var(--text-ink)]">In Dispute. The seller is locked out until you resolve this.</p>
+        <p class="mt-1 text-xs text-[var(--text-muted)]">Seller's rejection: {{ $record->seller_decision_reason }}</p>
+        <form method="POST" action="{{ route('admin.returns.dispute', $record) }}" class="mt-3 space-y-2">@csrf
+            <fieldset class="flex flex-wrap gap-4 text-xs text-[var(--text-ink)]">
+                <label class="flex items-center gap-2"><input type="radio" name="outcome" value="upheld" required> Keep the rejection</label>
+                <label class="flex items-center gap-2"><input type="radio" name="outcome" value="overturned"> Approve the return</label>
+            </fieldset>
+            <label class="block text-xs" for="dispute-note-{{ $record->id }}">Resolution note</label>
+            <textarea id="dispute-note-{{ $record->id }}" name="note" required minlength="10" maxlength="1000" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+            <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Resolve dispute</button>
+        </form>
+    @endif
     @if ($record->exception_reason)
         <p class="mt-3 text-xs text-red-800">Unresolved: {{ $record->exception_reason }}</p>
         <form method="POST" action="{{ route('admin.returns.resolve', $record) }}" class="mt-3 flex flex-wrap gap-2">@csrf<input name="resolution_note" required maxlength="1000" placeholder="Resolution evidence" aria-label="Resolution evidence" class="min-w-0 flex-1 rounded-sm border border-[var(--border-strong)] p-2 text-xs"><button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Record exception resolution</button></form>
@@ -30,7 +47,17 @@
             <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Verify original location</button>
         </form>
     @endif
-    @if ($record->financial_review_required)<p class="mt-3 text-xs text-amber-800">Financial review required. No refund, commission or shipping reimbursement is automated.</p>@endif
+    @if ($record->financial_review_required)
+        @if ($record->refunded_at)
+            <p class="mt-3 text-xs text-[var(--text-ink)]">Refund recorded {{ $record->refunded_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reference: {{ $record->refund_reference }}. Pending earnings and commission have left this shipment.</p>
+        @else
+            <form method="POST" action="{{ route('admin.returns.refund', $record) }}" class="mt-3 flex flex-wrap gap-2">@csrf
+                <input name="reference" required maxlength="255" placeholder="COD refund reference" aria-label="COD refund reference" class="min-w-0 flex-1 rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Record refund</button>
+            </form>
+            <p class="mt-2 text-xs text-amber-800">Approving this return, or recording the refund, releases pending earnings and commission. Shipping is not reimbursed here.</p>
+        @endif
+    @endif
     @if ($record->seller_received_at && ! $record->stock_restored_at)
         <p class="mt-3 text-xs text-amber-800">Inventory held | {{ $record->stock_condition }}</p>
         @if ($record->stock_condition === 'resellable' && config('returns.restore_verified_resellable') === true)

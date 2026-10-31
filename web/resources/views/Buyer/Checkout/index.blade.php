@@ -17,6 +17,12 @@
                 </div>
             @endif
 
+            @if (! empty($voucherNotice))
+                <div role="status" class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+                    {{ $voucherNotice }}
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-900">
                     <ul class="list-disc pl-4">
@@ -33,10 +39,17 @@
             @else
                 <form method="POST" action="{{ route('buyer.checkout.store') }}" id="checkout-form"
                       data-checkout-carriers
-                      data-merchandise-minor="{{ $merchandiseTotalMinor ?? $summary->totalCentavos }}">
+                      data-merchandise-minor="{{ $merchandiseTotalMinor ?? $summary->totalCentavos }}"
+                      data-shipping-voucher-type="{{ $shippingVoucher?->type->value }}"
+                      data-shipping-voucher-value="{{ $shippingVoucher?->value }}">
                     @csrf
                     @isset($checkoutToken)
                         <input type="hidden" name="checkout_token" value="{{ $checkoutToken }}">
+                        <input type="hidden" name="price_fingerprint" value="{{ $summary->priceFingerprint() }}">
+                        <input type="hidden" name="shipping_fingerprint" value="{{ $shippingFingerprint }}">
+                        <input type="hidden" name="voucher_fingerprint" value="{{ $voucherFingerprint }}">
+                        <input type="hidden" name="address_id" value="{{ $selectedAddress?->id }}">
+                        <input type="hidden" name="address_fingerprint" value="{{ $addressFingerprint }}">
                     @endisset
 
                     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
@@ -48,18 +61,18 @@
 
                                 @php
                                     $confirmParts = array_filter([
-                                        $buyer->house_number,
-                                        $buyer->street,
-                                        $buyer->barangay_name,
-                                        $buyer->municipality_name,
-                                        $buyer->province_name,
-                                        $buyer->postal_code,
+                                        $deliverTo->house_number,
+                                        $deliverTo->street,
+                                        $deliverTo->barangay_name,
+                                        $deliverTo->municipality_name,
+                                        $deliverTo->province_name,
+                                        $deliverTo->postal_code,
                                     ]);
                                     $confirmFull = implode(', ', $confirmParts);
-                                    if ($buyer->address_detail) {
-                                        $confirmFull = ($confirmFull ? $confirmFull . ', ' : '') . $buyer->address_detail;
+                                    if ($deliverTo->address_detail) {
+                                        $confirmFull = ($confirmFull ? $confirmFull . ', ' : '') . $deliverTo->address_detail;
                                     }
-                                    $addressComplete = filled($buyer->municipality_name) && filled($buyer->street);
+                                    $addressComplete = filled($deliverTo->municipality_name) && filled($deliverTo->street);
                                 @endphp
 
                                 @unless ($addressComplete)
@@ -78,12 +91,36 @@
                                             <p class="mt-0.5 text-[12.5px] text-neutral-500">{{ $buyer->contact_no }}</p>
                                             <p class="mt-2 text-[13px] text-buyer-ink">{{ $confirmFull ?: '— no address on file —' }}</p>
                                         </div>
-                                        <a href="{{ route('buyer.account.address') }}" class="shrink-0 text-[12.5px] font-semibold text-primary-800 underline">Change</a>
+                                        <a href="{{ route('buyer.account.address') }}" class="shrink-0 text-[12.5px] font-semibold text-primary-800 underline">Manage addresses</a>
                                     </div>
                                     <p class="mt-3 text-[11.5px] text-neutral-400">
                                         Deliver to this saved address. Your order is frozen to this address once placed.
                                     </p>
                                 </div>
+
+                                {{-- Each choice reloads the page so fees and coverage are re-quoted by the server. --}}
+                                @if ($addresses->count() > 1)
+                                    <div class="mt-4" data-checkout-address-picker>
+                                        <p class="mb-2 text-[12.5px] font-semibold text-buyer-ink">Deliver somewhere else</p>
+                                        <ul class="flex flex-col gap-2">
+                                            @foreach ($addresses as $option)
+                                                @php
+                                                    $isSelected = $option->is($selectedAddress);
+                                                @endphp
+                                                <li>
+                                                    <a href="{{ route('buyer.checkout.index', ['items' => $checkoutItemIds, 'address' => $option->id]) }}"
+                                                       @if ($isSelected) aria-current="true" @endif
+                                                       class="block rounded-xl border px-4 py-3 text-[12.5px] {{ $isSelected ? 'border-primary-800 bg-secondary-50/40 font-semibold text-buyer-ink' : 'border-buyer-line text-neutral-500 hover:border-primary-800' }}">
+                                                        {{ $option->summary() }}
+                                                        @if ($option->is_default)
+                                                            <span class="ml-1 text-[11.5px] font-normal text-neutral-400">(Default)</span>
+                                                        @endif
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
                             </section>
 
                             {{-- Shipping carriers (one selection per seller group) --}}
@@ -112,6 +149,7 @@
                                                         @else
                                                             Address incomplete
                                                         @endif
+                                                        · Charged for {{ $carrierGroup['chargeable_kg'] }} kg
                                                     </p>
                                                 </div>
                                             </div>
@@ -153,6 +191,17 @@
                                                     @endforeach
                                                 </div>
                                             @endif
+
+                                            @php
+                                                $noteValue = old('notes.'.$carrierGroup['seller_id']);
+                                            @endphp
+                                            <label for="note_{{ $carrierGroup['seller_id'] }}" class="mt-3 block text-[12px] font-semibold text-buyer-ink">Note to seller (optional)</label>
+                                            <textarea id="note_{{ $carrierGroup['seller_id'] }}"
+                                                      name="notes[{{ $carrierGroup['seller_id'] }}]"
+                                                      rows="2"
+                                                      maxlength="{{ \App\Http\Controllers\Buyer\CheckoutController::NOTE_MAX_LENGTH }}"
+                                                      placeholder="Up to {{ \App\Http\Controllers\Buyer\CheckoutController::NOTE_MAX_LENGTH }} characters"
+                                                      class="mt-1 w-full rounded-lg border border-buyer-line px-3 py-2 text-[13px] text-buyer-ink">{{ is_string($noteValue) ? $noteValue : '' }}</textarea>
                                         </div>
                                     @endforeach
                                 </div>
@@ -162,25 +211,17 @@
                             <section class="rounded-2xl border border-buyer-line bg-white p-5">
                                 <h2 class="font-serif text-[18px] font-semibold text-buyer-ink mb-4">Payment Method</h2>
 
-                                @php $paymentMethods = \App\Enums\PaymentMethod::cases(); @endphp
-
                                 <div class="flex flex-col gap-3">
-                                    @foreach ($paymentMethods as $method)
-                                        <label for="payment_{{ $method->value }}"
+                                        <label for="payment_cod"
                                                class="flex cursor-pointer items-start gap-3 rounded-xl border border-buyer-line bg-white p-4">
-                                            <input type="radio" id="payment_{{ $method->value }}" name="payment_method"
-                                                value="{{ $method->value }}" @checked(old('payment_method', 'cod') === $method->value)
+                                            <input type="radio" id="payment_cod" name="payment_method"
+                                                value="cod" checked
                                                 class="mt-0.5 h-4 w-4 cursor-pointer accent-primary-800">
                                             <div class="flex-1">
-                                                <span class="block font-semibold text-buyer-ink">{{ $method->label() }}</span>
-                                                @if ($method->isIntegrated())
-                                                    <p class="text-[12.5px] text-neutral-400 mt-0.5">Pay cash when your order is delivered. No card needed.</p>
-                                                @else
-                                                    <p class="text-[12.5px] text-amber-700 mt-0.5">Recorded as <span class="font-semibold">pending</span> — this method is not yet integrated. A representative will follow up to collect payment.</p>
-                                                @endif
+                                                <span class="block font-semibold text-buyer-ink">Cash on Delivery (COD)</span>
+                                                <p class="text-[12.5px] text-neutral-400 mt-0.5">Pay cash when your order is delivered.</p>
                                             </div>
                                         </label>
-                                    @endforeach
                                 </div>
                             </section>
 
@@ -190,7 +231,7 @@
                                     class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-6 py-4 text-[14px] font-semibold text-white transition-opacity enabled:cursor-pointer enabled:hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800 disabled:cursor-not-allowed disabled:opacity-40"
                                     @disabled($summary->subtotalCentavos === 0 || ! ($carriersAvailable ?? false))>
                                 <i data-lucide="shopping-bag" width="18" height="18" aria-hidden="true"></i>
-                                <span data-checkout-place-label class="text-white">Place Order — {{ $summary->formattedTotal() }}</span>
+                                <span data-checkout-place-label class="text-white">Place Order — ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}</span>
                             </button>
 
                             <p class="mt-3 text-center text-[11px] text-neutral-400">
@@ -227,7 +268,7 @@
                                                             <p class="text-[11.5px] text-neutral-400">{{ $variantLabels[$item->id] }}</p>
                                                         @endif
                                                         <p class="text-[11.5px] text-neutral-400">Qty: {{ $item->quantity }}</p>
-                                                        <p class="text-[11.5px] text-neutral-400">Unit Price: ₱{{ number_format($item->unitPriceCentavos() / 100, 2) }}</p>
+                                                        <p class="text-[11.5px] text-neutral-400">Unit Price: ₱{{ number_format($item->unitPriceCentavos() / 100, 2) }}@if ($regularPrice = $item->resolvedPrice()?->formattedRegular()) <span class="line-through">{{ $regularPrice }}</span>@endif</p>
                                                     </div>
                                                 </div>
                                                 <span class="font-semibold text-buyer-ink shrink-0">Subtotal: {{ $item->formattedLineTotal() }}</span>
@@ -250,21 +291,39 @@
                                         <span class="font-serif text-[14px] font-semibold text-buyer-ink">{{ $summary->formattedSubtotal() }}</span>
                                     </div>
 
-                                    @if ($voucher)
-                                        <div class="flex items-center justify-between text-[12.5px] text-tertiary-700">
-                                            <span>Voucher Discount</span>
-                                            <span class="font-semibold">{{ $summary->formattedDiscount() }}</span>
-                                        </div>
-                                    @endif
+                                    @foreach (($vouchers ?? []) as $applied)
+                                        @if ($applied['scope'] !== 'shipping')
+                                            <div class="flex items-center justify-between gap-3 text-[12.5px] text-tertiary-700">
+                                                <span class="min-w-0 truncate">{{ $applied['code'] }} <span class="text-[10.5px] text-neutral-400">({{ $applied['scope'] }})</span></span>
+                                                <span class="shrink-0 font-semibold">{{ $applied['discount_minor'] > 0 ? $applied['discount_formatted'] : 'Applied' }}</span>
+                                            </div>
+                                        @endif
+                                    @endforeach
 
                                     <div class="flex items-center justify-between text-[12.5px]">
                                         <span class="text-neutral-400">Shipping</span>
-                                        <span class="font-semibold text-buyer-ink" data-checkout-shipping-total>Select a carrier</span>
+                                        <span class="font-semibold text-buyer-ink" data-checkout-shipping-total>
+                                            @if ($shippingTotalMinor ?? 0)
+                                                ₱{{ number_format((($shippingTotalMinor ?? 0) - ($shippingDiscountMinor ?? 0)) / 100, 2) }}
+                                            @else
+                                                Select a carrier
+                                            @endif
+                                        </span>
                                     </div>
+
+                                    @if ($shippingVoucher)
+                                        <div class="flex items-center justify-between gap-3 text-[12.5px] text-tertiary-700"
+                                             data-checkout-shipping-discount-row @if (($shippingDiscountMinor ?? 0) <= 0) hidden @endif>
+                                            <span class="min-w-0 truncate">Shipping voucher ({{ $shippingVoucher->code }})</span>
+                                            <span class="shrink-0 font-semibold" data-checkout-shipping-discount>-₱{{ number_format(($shippingDiscountMinor ?? 0) / 100, 2) }}</span>
+                                        </div>
+                                    @endif
 
                                     <div class="flex items-end justify-between border-t border-buyer-line pt-4 mt-2">
                                         <span class="text-[13px] font-semibold text-buyer-ink">Total</span>
-                                        <span class="font-serif text-[26px] font-semibold text-buyer-ink" data-checkout-payable-total>{{ $summary->formattedTotal() }}</span>
+                                        <span class="font-serif text-[26px] font-semibold text-buyer-ink" data-checkout-payable-total>
+                                            ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}
+                                        </span>
                                     </div>
                                     <p class="mt-2 text-[11px] text-neutral-400">Merchandise total is charged at place-order today. Carrier assignment is saved for fulfilment in the next release.</p>
                                 </div>

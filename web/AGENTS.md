@@ -49,8 +49,8 @@ One approval covers the described change set. Do not ask again for every file or
 - Follow existing Laravel architecture and naming conventions.
 - Reuse existing services, models, routes, and components.
 - Business invariants belong in services, not controllers.
-- Status transitions: `App\Services\SellerOrderStatusService::transition()`.
-- Stock changes: `App\Services\StockService`.
+- Status transitions: `App\Services\Seller\SellerOrderStatusService::transition()`.
+- Stock changes: `App\Services\Seller\StockService`.
 - Do not mass-assign `status` or `courier_id`; use authorized service methods and `forceFill()` where appropriate.
 - Keep literal routes before wildcard routes.
 - Use Tailwind v4 and existing `@theme` tokens in `resources/css/app.css`.

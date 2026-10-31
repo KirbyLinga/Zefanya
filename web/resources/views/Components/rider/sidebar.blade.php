@@ -20,6 +20,7 @@
             'items' => [
                 ['route' => 'rider.scan.index', 'icon' => 'scan-line', 'label' => 'Scan Parcel', 'match' => ['rider.scan.*']],
                 ['route' => 'rider.pickups.index', 'icon' => 'package-search', 'label' => 'Pickup Assignments', 'match' => ['rider.pickups.*']],
+                ['route' => 'rider.return-pickups.index', 'icon' => 'package-open', 'label' => 'Return Pickups', 'match' => ['rider.return-pickups.*']],
                 ['route' => 'rider.deliveries.index', 'icon' => 'truck', 'label' => 'Delivery Assignments', 'match' => ['rider.deliveries.*']],
                 ['route' => 'rider.history.index', 'icon' => 'history', 'label' => 'Delivery History', 'match' => ['rider.history.*']],
             ],

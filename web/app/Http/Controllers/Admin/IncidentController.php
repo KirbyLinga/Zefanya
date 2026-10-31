@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Incidents;
-use App\Services\ParcelIncidentService;
+use App\Models\Shared\Incidents;
+use App\Services\Logistics\ParcelIncidentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

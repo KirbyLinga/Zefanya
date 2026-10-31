@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Rider;
 
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 /**
  * Validates the Rider's proof-of-delivery submission.
@@ -27,6 +29,7 @@ class CompleteDeliveryRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'delivery_otp' => ['nullable', 'digits:6'],
             'proof_photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'received_by' => ['nullable', 'string', 'max:120'],
             'delivery_notes' => ['nullable', 'string', 'max:1000'],
@@ -34,9 +37,19 @@ class CompleteDeliveryRequest extends FormRequest
         ];
     }
 
-    /**
-     * @return array<string, string>
-     */
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            parent::failedValidation($validator);
+        }
+        throw new HttpResponseException(
+            redirect($this->getRedirectUrl())
+                ->withErrors($validator, $this->errorBag)
+                ->withInput($this->except('delivery_otp'))
+        );
+    }
+
+    /** @return array<string, string> */
     public function messages(): array
     {
         return [

@@ -4,13 +4,13 @@ namespace Tests\Feature\Buyer;
 
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\InventoryTransaction;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Buyer\Wishlist;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\Wishlist;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -85,7 +85,7 @@ class WishlistAvailabilityTest extends TestCase
         $this->assertSame($canBuy ? 0 : 1, $xpath->query($root.'//button[contains(@class,"add-to-cart-btn")][@disabled]')->length);
         $this->assertSame($canBuy ? 1 : 0, $xpath->query($root.'//a[normalize-space(.)="Add to Cart"]')->length);
         $this->assertSame(1, $xpath->query($root.'//*[@data-wishlist-toggle][@aria-pressed="true"]')->length);
-        $response->assertSee($canBuy ? 'In stock' : 'Unavailable');
+        $response->assertSee($canBuy ? 'in stock' : 'Unavailable');
         $this->assertSame($canBuy, ! $saved->fresh()->product->buyerIsOutOfStock());
         $this->get(route('buyer.products.index'))->assertOk()->assertViewHas('products', fn ($products) => $products->count() === ($canBuy ? 1 : 0));
         $this->assertModelExists($saved);
@@ -128,7 +128,7 @@ class WishlistAvailabilityTest extends TestCase
         $restored->update(['status' => 'active']);
         $restored->seller->update(['status' => 'approved']);
         $restored->variants()->update(['is_available' => true, 'stock_quantity' => 4]);
-        $response = $this->get(route('buyer.wishlist.index'))->assertOk()->assertSee('In stock');
+        $response = $this->get(route('buyer.wishlist.index'))->assertOk()->assertSee('in stock');
         $xpath = $this->card($response->getContent(), $product->id);
         $this->assertSame(1, $xpath->query('//*[@data-wishlist-item="'.$product->id.'"]//a[normalize-space(.)="Add to Cart"]')->length);
         $this->assertSame($saved->id, $buyer->wishlist()->sole()->id);

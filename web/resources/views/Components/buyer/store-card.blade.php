@@ -10,41 +10,46 @@
     $starRating = $store->reviews_count ? number_format((float) $store->reviews_avg_rating, 1) : null;
     $fullStars  = (int) floor((float) $starRating);
     $hasHalf    = ((float) $starRating - $fullStars) >= 0.5;
+    $storeUrl   = route('buyer.stores.show', $store);
 @endphp
 <div class="buyer-product-card h-full bg-white">
     {{-- Store header --}}
     <div class="flex items-center gap-3 px-4 pt-4 pb-3">
-        {{-- Avatar --}}
-        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-buyer-ink font-serif text-[11px] font-bold text-white">
-            {{ $store->storeInitials() }}
-        </div>
+        <a href="{{ $storeUrl }}"
+           class="group flex min-w-0 flex-1 items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+           aria-label="View {{ $store->business_name }} store">
+            {{-- Avatar --}}
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-buyer-ink font-serif text-[11px] font-bold text-white transition-opacity group-hover:opacity-90">
+                {{ $store->storeInitials() }}
+            </div>
 
-        {{-- Name + meta --}}
-        <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5">
-                <span class="truncate text-[13px] font-semibold text-buyer-ink">{{ $store->business_name }}</span>
-                {{-- Verified badge --}}
-                <span class="shrink-0 text-primary-700" title="Verified seller">
-                    <i data-lucide="badge-check" width="14" height="14"></i>
-                </span>
-            </div>
-            {{-- Star rating row --}}
-            <div class="mt-0.5 flex items-center gap-1">
-                <div class="flex items-center gap-0.5">
-                    @for ($s = 1; $s <= 5; $s++)
-                        @if ($s <= $fullStars)
-                            <i class="fa-solid fa-star text-[9px] text-buyer-star"></i>
-                        @elseif ($s == $fullStars + 1 && $hasHalf)
-                            <i class="fa-solid fa-star-half-stroke text-[9px] text-buyer-star"></i>
-                        @else
-                            <i class="fa-regular fa-star text-[9px] text-neutral-300"></i>
-                        @endif
-                    @endfor
+            {{-- Name + meta --}}
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                    <span class="truncate text-[13px] font-semibold text-buyer-ink transition-colors group-hover:text-primary-800">{{ $store->business_name }}</span>
+                    {{-- Verified badge --}}
+                    <span class="shrink-0 text-primary-700" title="Verified seller">
+                        <i data-lucide="badge-check" width="14" height="14"></i>
+                    </span>
                 </div>
-                <span class="text-[10.5px] font-semibold text-buyer-ink-soft">{{ $starRating ? $starRating.'/5 ('.$store->reviews_count.' reviews)' : 'No reviews yet' }}</span>
-                <span class="text-[10px] text-neutral-400">· {{ $count }} listed</span>
+                {{-- Star rating row --}}
+                <div class="mt-0.5 flex items-center gap-1">
+                    <div class="flex items-center gap-0.5">
+                        @for ($s = 1; $s <= 5; $s++)
+                            @if ($s <= $fullStars)
+                                <i class="fa-solid fa-star text-[9px] text-buyer-star"></i>
+                            @elseif ($s == $fullStars + 1 && $hasHalf)
+                                <i class="fa-solid fa-star-half-stroke text-[9px] text-buyer-star"></i>
+                            @else
+                                <i class="fa-regular fa-star text-[9px] text-neutral-300"></i>
+                            @endif
+                        @endfor
+                    </div>
+                    <span class="text-[10.5px] font-semibold text-buyer-ink-soft">{{ $starRating ? $starRating.'/5 ('.$store->reviews_count.' reviews)' : 'No reviews yet' }}</span>
+                    <span class="text-[10px] text-neutral-400">· {{ $count }} listed</span>
+                </div>
             </div>
-        </div>
+        </a>
 
         {{-- Follow button --}}
         <button type="button"
@@ -57,12 +62,16 @@
     <div class="grid grid-cols-3 gap-px bg-buyer-line/60">
         @forelse ($store->products as $product)
             <div class="relative aspect-square overflow-hidden bg-secondary-100">
+                <a href="{{ $storeUrl }}"
+                   class="block h-full w-full"
+                   aria-label="View {{ $store->business_name }} store">
+                    @if ($product->catalogImageUrl())
+                        <img src="{{ $product->catalogImageUrl() }}"
+                             alt="{{ $product->name }}"
+                             class="h-full w-full object-cover object-top transition-transform duration-300 hover:scale-105">
+                    @endif
+                </a>
                 @include('Components.buyer.wishlist-heart')
-                @if ($product->catalogImageUrl())
-                    <img src="{{ $product->catalogImageUrl() }}"
-                         alt="{{ $product->name }}"
-                         class="h-full w-full object-cover object-top">
-                @endif
             </div>
         @empty
             @foreach (range(1, 3) as $slot)

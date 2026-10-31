@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\Auth\RegistrationResubmissionController;
 use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\Buyer\RegisterBuyerController;
 use App\Http\Controllers\Buyer\VerifyBuyerOtpController;
@@ -20,6 +21,12 @@ Route::get('/', [LandingPageController::class, 'index'])->name('home');
 // Guest-only auth surfaces: any signed-in role is redirected to their dashboard.
 // Logout stays outside this group.
 Route::middleware('guest.role')->group(function (): void {
+    Route::get('/registration/{role}/{application}/resubmit', [RegistrationResubmissionController::class, 'show'])
+        ->where('role', 'seller|logistics')->whereNumber('application')
+        ->middleware(['signed', 'throttle:10,1'])->name('registration.resubmit');
+    Route::post('/registration/{role}/{application}/resubmit', [RegistrationResubmissionController::class, 'store'])
+        ->where('role', 'seller|logistics')->whereNumber('application')
+        ->middleware(['signed', 'throttle:5,1'])->name('registration.resubmit.store');
     Route::get('/register', function () {
         return view('Auth.Register-Type', [
             'riderProviders' => LogisticsProvider::query()->where('status', 'approved')->whereNull('archived_at')

@@ -5,6 +5,9 @@
  <testsuites>
   <testsuite name="Isolated MySQL concurrency">
    <file>tests/MySql/CheckoutConcurrencyTest.php</file>
+   <file>tests/MySql/SellerVacationConcurrencyTest.php</file>
+   <file>tests/MySql/InventoryOversellingConcurrencyTest.php</file>
+   <file>tests/MySql/LowStockAlertConcurrencyTest.php</file>
   </testsuite>
  </testsuites>
  <php>

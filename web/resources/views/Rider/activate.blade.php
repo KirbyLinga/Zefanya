@@ -4,7 +4,7 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Activate Rider Account — Zefanya</title>
-        @vite(['resources/css/app.css', 'resources/css/login-modal.css'])
+        @vite(['resources/css/app.css', 'resources/css/login-modal.css', 'resources/js/app.js'])
     </head>
     <body class="flex items-center justify-center min-h-screen bg-gray-50">
         <div class="w-full max-w-md">
@@ -30,14 +30,26 @@
                     @csrf
                     <div>
                         <label for="riderPassword" class="block text-sm font-medium text-gray-700">Password</label>
-                        <input id="riderPassword" name="password" type="password" required autofocus
-                               class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        <div class="relative mt-1">
+                            <input id="riderPassword" name="password" type="password" required autofocus
+                                   class="block w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    data-toggle-visibility="riderPassword" aria-label="Show password" aria-pressed="false">
+                                <i data-lucide="eye" width="16" height="16"></i>
+                            </button>
+                        </div>
                         <p class="mt-1 text-xs text-gray-500">Min 8 characters with uppercase, lowercase, number, and special character.</p>
                     </div>
                     <div>
                         <label for="riderPasswordConfirm" class="block text-sm font-medium text-gray-700">Confirm password</label>
-                        <input id="riderPasswordConfirm" name="password_confirmation" type="password" required
-                               class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        <div class="relative mt-1">
+                            <input id="riderPasswordConfirm" name="password_confirmation" type="password" required
+                                   class="block w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    data-toggle-visibility="riderPasswordConfirm" aria-label="Show password" aria-pressed="false">
+                                <i data-lucide="eye" width="16" height="16"></i>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">
                         ACTIVATE ACCOUNT
@@ -45,5 +57,7 @@
                 </form>
             </div>
         </div>
+        <script src="{{ asset('js/lucide.min.js') }}"></script>
+        <script>if (window.lucide) { lucide.createIcons(); }</script>
     </body>
 </html>

@@ -3,21 +3,24 @@
 namespace Tests\Feature\Http\Controllers\Seller;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
-use App\Models\ProductImage;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductImage;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
+use App\Models\Shared\Category;
+use App\Services\Seller\ProductPublishingService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class ProductPublishingTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private function image(string $name = 'shirt.png'): UploadedFile
     {
@@ -35,6 +38,7 @@ class ProductPublishingTest extends TestCase
         }
 
         return [
+            ...$this->publicationDefaults(),
             'name' => 'Premium Oversized Cotton Shirt', 'description' => 'Premium cotton oversized shirt, available in multiple colors and sizes.',
             'price' => 999, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0, 'status' => 'active', 'variants_exist' => '1',
             'images' => [$this->image('detail.png'), $this->image('cover.png')], 'cover_index' => '1',
@@ -57,7 +61,7 @@ class ProductPublishingTest extends TestCase
             ->assertSessionHasNoErrors()->assertRedirect(route('seller.products.index'));
 
         $product = Product::query()->sole();
-        $this->assertSame($seller->line_of_business_id, $product->category_id);
+        $this->assertSame($seller->line_of_business_id ?? Category::query()->where('label', 'Home & Living')->value('id'), $product->category_id);
         $this->assertSame(12, $product->variants()->count());
         $this->assertSame(94, $product->stock_quantity);
         $this->assertSame('350.00', $product->price);
@@ -98,7 +102,7 @@ class ProductPublishingTest extends TestCase
             'fractional stock' => ['fractional', 'variants.0.stock_quantity'],
             'unknown color upload' => ['color', 'color_images.0.value'],
             'cover outside upload list' => ['cover', 'cover_index'],
-            'more than fifty combinations' => ['limit', 'variants'],
+            'more than twenty options in one axis' => ['limit', 'options.0.values'],
         ];
     }
 
@@ -128,8 +132,8 @@ class ProductPublishingTest extends TestCase
             case 'cover': $data['cover_index'] = 8;
                 break;
             case 'limit':
-                $data['options'] = [['name' => 'Color', 'values' => range(1, 51)]];
-                $data['variants'] = array_map(fn ($i) => ['values' => [(string) $i], 'price' => 50, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 1], range(1, 51));
+                $data['options'] = [['name' => 'Color', 'values' => range(1, 21)]];
+                $data['variants'] = array_map(fn ($i) => ['values' => [(string) $i], 'price' => 50, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 1], range(1, 21));
                 unset($data['color_images']);
                 break;
         }
@@ -183,7 +187,7 @@ class ProductPublishingTest extends TestCase
         $seller = Seller::factory()->create();
         $product = Product::factory()->create(['seller_id' => $seller->id]);
         $foreign = Product::factory()->create()->variants()->firstOrFail();
-        $data = ['name' => $product->name, 'price' => 100, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 2, 'status' => 'active', 'variant_images' => [$foreign->id => [$this->image()]]];
+        $data = [...$this->publicationDefaults(), 'name' => $product->name, 'price' => 100, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 2, 'status' => 'active', 'variant_images' => [$foreign->id => [$this->image()]]];
 
         $this->actingAs($seller, 'seller')->put(route('seller.products.update', $product), $data + ['inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'))])->assertSessionHasErrors('variant_images');
 

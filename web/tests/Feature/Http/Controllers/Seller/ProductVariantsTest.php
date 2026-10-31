@@ -2,22 +2,26 @@
 
 namespace Tests\Feature\Http\Controllers\Seller;
 
+use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
-use App\Models\ProductOptionValue;
-use App\Models\ProductVariant;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductOptionValue;
+use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
-use App\Services\VariantSyncService;
+use App\Models\Shared\OrderItem;
+use App\Services\Seller\ProductPublishingService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class ProductVariantsTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private Seller $seller;
 
@@ -54,6 +58,7 @@ class ProductVariantsTest extends TestCase
     private function variantPayload(array $overrides = []): array
     {
         return array_merge([
+            ...$this->publicationDefaults(),
             'variants_exist' => '1',
             'options' => [
                 ['name' => 'Color', 'values' => ['Red', 'Blue']],
@@ -74,6 +79,7 @@ class ProductVariantsTest extends TestCase
     {
         $this->actingAs($this->seller, 'seller')
             ->post(route('seller.products.store'), [
+                ...$this->publicationDefaults(),
                 'name' => 'Variant Tee',
                 'price' => '100.00',
                 'stock_quantity' => '26',
@@ -146,6 +152,7 @@ class ProductVariantsTest extends TestCase
         $this->actingAs($this->seller, 'seller')
             ->from(route('seller.products.index'))
             ->put(route('seller.products.update', $product), [
+                ...$this->publicationDefaults(),
                 'inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants')),
                 'name' => $product->name,
                 'description' => $product->description,
@@ -219,6 +226,7 @@ class ProductVariantsTest extends TestCase
         $this->actingAs($this->seller, 'seller')
             ->from(route('seller.products.index'))
             ->put(route('seller.products.update', $product), [
+                ...$this->publicationDefaults(),
                 'inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants')),
                 'name' => $product->name,
                 'price' => '88.00',
@@ -249,6 +257,7 @@ class ProductVariantsTest extends TestCase
         $this->actingAs($this->seller, 'seller')
             ->from(route('seller.products.index'))
             ->put(route('seller.products.update', $product), [
+                ...$this->publicationDefaults(),
                 'inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants')),
                 'name' => $product->name,
                 'price' => '45.00',
@@ -302,6 +311,7 @@ class ProductVariantsTest extends TestCase
         $this->actingAs($this->seller, 'seller')
             ->from(route('seller.products.index'))
             ->post(route('seller.products.store'), [
+                ...$this->publicationDefaults(),
                 'name' => 'Too Many Axes',
                 'price' => '10.00',
                 'stock_quantity' => '5',
@@ -411,6 +421,7 @@ class ProductVariantsTest extends TestCase
         $this->actingAs($this->seller, 'seller')
             ->from(route('seller.products.index'))
             ->put(route('seller.products.update', $product), [
+                ...$this->publicationDefaults(),
                 'inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants')),
                 'name' => $product->name,
                 'description' => $product->description,
@@ -431,6 +442,46 @@ class ProductVariantsTest extends TestCase
             ->assertSessionHasErrors('variants.1.sku');
 
         $this->assertSame(0, Product::query()->where('name', 'Dup Tee')->count());
+    }
+
+    public function test_empty_and_duplicate_option_names_are_rejected_without_creating_variants(): void
+    {
+        foreach (['', 'color', ' Color '] as $name) {
+            $data = $this->storePayload('Invalid Variation Tee', ['A', 'B', 'C', 'D']);
+            $data['options'][1]['name'] = $name;
+            $this->actingAs($this->seller, 'seller')->postJson(route('seller.products.store'), $data)
+                ->assertUnprocessable()->assertJsonValidationErrors('options.1.name');
+        }
+        $this->assertDatabaseCount('products', 0);
+        $this->assertDatabaseCount('product_variants', 0);
+    }
+
+    public function test_unfinished_order_alone_blocks_variant_removal_without_cart_or_inventory_history(): void
+    {
+        $product = $this->mine(['stock_quantity' => 0]);
+        $data = $this->variantPayload();
+        foreach ($data['variants'] as &$row) {
+            $row['stock_quantity'] = 0;
+        }
+        unset($row);
+        $service = app(VariantSyncService::class);
+        $service->sync($product, $data['options'], $data['variants'], true);
+        $variant = $product->variants()->where('sku', 'RM')->sole();
+        $item = OrderItem::factory()->create(['product_id' => $product->id, 'variant_id' => $variant->id]);
+        $item->sellerOrder->forceFill(['status' => OrderStatus::Preparing])->save();
+        $this->assertDatabaseCount('inventory_transactions', 0);
+        $this->assertDatabaseCount('cart_items', 0);
+        $before = $product->variants()->orderBy('id')->pluck('id')->all();
+        try {
+            $service->sync($product, [
+                ['name' => 'Color', 'values' => ['Red']], ['name' => 'Size', 'values' => ['L']],
+            ], [['values' => ['Red', 'L'], 'price' => 110, 'stock_quantity' => 0, 'weight_grams' => 250]], true);
+            $this->fail('A variation with an unfinished order was removed.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('options', $exception->errors());
+        }
+        $this->assertSame($before, $product->variants()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($variant->id, $item->fresh()->variant_id);
     }
 
     public function test_blank_skus_on_multiple_variants_are_allowed(): void

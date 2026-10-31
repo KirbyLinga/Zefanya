@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Logistics;
 
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 

@@ -3,13 +3,13 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\RiderRegistrationService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Rider\RiderRegistrationService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;

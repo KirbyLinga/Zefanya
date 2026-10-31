@@ -2,7 +2,7 @@
 
 namespace App\View\Composers;
 
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 

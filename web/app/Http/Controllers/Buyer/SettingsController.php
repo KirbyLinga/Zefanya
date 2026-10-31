@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Buyer;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
-use App\Models\Order;
+use App\Models\Shared\Order;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

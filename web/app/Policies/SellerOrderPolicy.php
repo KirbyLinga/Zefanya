@@ -3,7 +3,7 @@
 namespace App\Policies;
 
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 
 /**
  * Authorization for seller_order actions.

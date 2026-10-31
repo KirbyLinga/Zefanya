@@ -3,19 +3,22 @@
 namespace Tests\MySql;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\InventoryTransaction;
-use App\Models\Order;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\VariantSyncService;
+use App\Models\Shared\Order;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
 class CheckoutConcurrencyTest extends TestCase
 {
+    use BootstrapsCheckoutCarriers;
+
     private static bool $migrated = false;
 
     public function createApplication()
@@ -48,10 +51,12 @@ class CheckoutConcurrencyTest extends TestCase
     private function checkout(Product $product, ?int $variant, ?Buyer $buyer = null): array
     {
         $buyer ??= Buyer::factory()->create();
+        $this->bootstrapCheckoutCarriers($buyer, [$product->seller]);
         $line = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $variant, 'quantity' => 1]);
         $token = CheckoutToken::issue($buyer->id);
 
-        return ['action' => 'checkout', 'buyer' => $buyer->id, 'items' => [$line->id], 'token' => $token->token];
+        return ['action' => 'checkout', 'buyer' => $buyer->id, 'items' => [$line->id], 'token' => $token->token,
+            ...$this->checkoutCarrierPayload([$product->seller])];
     }
 
     private function integrity(int $stock, int $orders, int $cartLines, int $usedTokens): void
@@ -74,7 +79,8 @@ class CheckoutConcurrencyTest extends TestCase
                 $this->assertSame($lines, $sellerOrder->subtotal_minor);
                 $this->assertSame('cod', $sellerOrder->payment->method->value);
                 $this->assertSame('pending', $sellerOrder->payment->status->value);
-                $this->assertSame($lines, $sellerOrder->payment->amount_minor);
+                $this->assertGreaterThanOrEqual(0, $sellerOrder->shipping_fee_minor);
+                $this->assertSame($lines + $sellerOrder->shipping_fee_minor, $sellerOrder->payment->amount_minor);
                 $subtotal += $lines;
                 $paid += $sellerOrder->payment->amount_minor;
             }
@@ -112,7 +118,7 @@ class CheckoutConcurrencyTest extends TestCase
         $this->assertSame(302, $results['b']['status']);
         $this->assertNotEmpty($results['b']['error']);
         $this->integrity(0, 1, 1, 1);
-        $this->assertSame(10000, Order::query()->sole()->total_minor);
+        $this->assertSame(10000 + Order::query()->sole()->sellerOrders()->sole()->shipping_fee_minor, Order::query()->sole()->total_minor);
         $this->assertSame([0], InventoryTransaction::query()->where('reason', 'checkout')->pluck('quantity_after')->all());
     }
 

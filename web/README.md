@@ -17,7 +17,7 @@ All project documentation lives in **four** files — start here:
 
 ```sh
 composer install
-copy .env.example .env        # Windows (cp on Unix); set DB_*, APP_KEY, ADMIN_SEED_PASSWORD
+copy .env.example .env        # Windows (cp on Unix); set DB_*, APP_KEY, ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
 php artisan key:generate
 php artisan migrate
 php artisan db:seed

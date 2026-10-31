@@ -3,7 +3,7 @@
 namespace App\Notifications\Rider;
 
 use App\Models\Logistics\LogisticsHub;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 
 /**
  * Logistics moved this rider to another Station Hub.

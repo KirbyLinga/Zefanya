@@ -3,15 +3,15 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\ParcelHandoffVerification;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\Support\IssuesLogisticsHandoff;
@@ -352,5 +352,37 @@ class ParcelSortingTest extends TestCase
         $so->refresh();
         $this->assertSame(OrderStatus::AtSortingCenter, $so->status);
         $this->assertNull($so->delivery_courier_id);
+    }
+
+    public function test_parcels_are_sorted_by_destination_region_across_pages_with_unknown_regions_last(): void
+    {
+        $courier = Courier::factory()->create(['logistics_provider_id' => $this->provider->id]);
+        $expected = [];
+        foreach (['sorting' => OrderStatus::AtSortingCenter, 'assigned' => OrderStatus::AssignedToRider] as $tab => $status) {
+            $groups = [];
+            foreach (['13', '03'] as $region) {
+                for ($i = 0; $i < 13; $i++) {
+                    $parcel = $this->order($status, $courier);
+                    $parcel->order->update(['shipping_address' => ['province_code' => $region.'0540000']]);
+                    $parcel->forceFill(['created_at' => '2026-10-20 08:00:00'])->save();
+                    $groups[$region][] = $parcel->id;
+                }
+            }
+            $unknown = $this->order($status, $courier);
+            $unknown->order->update(['shipping_address' => []]);
+            $expected[$tab] = [...$groups['03'], ...$groups['13'], $unknown->id];
+            $foreign = $this->order($status, $courier);
+            $foreign->forceFill(['custody_provider_id' => LogisticsProvider::factory()->create()->id])->save();
+        }
+        foreach ($expected as $tab => $ids) {
+            $first = $this->actingAs($this->provider, 'logistics')
+                ->get(route('logistics.parcel-sorting.index', ['tab' => $tab]))
+                ->assertOk()->assertSee('Destination region 03')->assertSee('Destination region 13');
+            $this->assertSame(27, $first->viewData('shipments')->total());
+            $this->assertSame(array_slice($ids, 0, 25), $first->viewData('shipments')->pluck('id')->all());
+            $second = $this->get(route('logistics.parcel-sorting.index', ['tab' => $tab, 'page' => 2]))
+                ->assertOk()->assertSee('Region unavailable');
+            $this->assertSame(array_slice($ids, 25), $second->viewData('shipments')->pluck('id')->all());
+        }
     }
 }

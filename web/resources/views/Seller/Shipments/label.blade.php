@@ -147,10 +147,6 @@
 
         @if ($payment?->method === PaymentMethod::Cod)
             <div class="cod">COLLECT ON DELIVERY: {{ $payment->formattedAmount() }}</div>
-        @elseif ($payment?->method === PaymentMethod::Gcash)
-            <div class="cod" style="border-style:solid;">PAYMENT: GCash (prepaid / non-cash collection)</div>
-        @elseif ($payment?->method)
-            <div class="cod" style="border-style:solid;">PAYMENT: {{ $payment->method->label() }} — no cash collection</div>
         @endif
 
         <p class="foot">Tracking: {{ $sellerOrder->tracking_number ?? 'not yet assigned' }}

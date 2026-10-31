@@ -56,7 +56,7 @@ class SellerAuthRedirectTest extends TestCase
             'seller.vouchers.index',
             'seller.reports.index',
             'seller.feedback.index',
-            'seller.chat.index',
+            'seller.messages.index',
             'seller.account.index',
         ];
 

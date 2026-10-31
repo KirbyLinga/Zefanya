@@ -2,18 +2,20 @@
 
 namespace Tests\Feature\Seller;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
-use App\Services\StockService;
+use App\Services\Seller\ProductPublishingService;
+use App\Services\Seller\StockService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class ProductEditingSafetyTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private function payload(): array
     {
@@ -25,7 +27,8 @@ class ProductEditingSafetyTest extends TestCase
             }
         }
 
-        return ['name' => 'Oversized Cotton Shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0, 'status' => 'active',
+        return [
+            ...$this->publicationDefaults(), 'name' => 'Oversized Cotton Shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0, 'status' => 'active',
             'variants_exist' => true, 'options' => [
                 ['name' => 'Color', 'values' => ['Black', 'White']],
                 ['name' => 'Size', 'values' => ['S', 'M']],
@@ -58,7 +61,7 @@ class ProductEditingSafetyTest extends TestCase
         Storage::fake('public');
         $seller = Seller::factory()->create();
         $service = app(ProductPublishingService::class);
-        $data = ['name' => 'Single shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 10, 'status' => 'active'];
+        $data = [...$this->publicationDefaults(), 'name' => 'Single shirt', 'price' => 299, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 10, 'status' => 'active'];
         $product = $service->save(new Product, $seller, $data);
         $data['inventory_revision'] = $service->inventoryRevision($product->load('variants'));
         $variant = $product->variants->first();

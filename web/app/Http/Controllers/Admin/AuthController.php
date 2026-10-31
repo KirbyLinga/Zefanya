@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
+use App\Models\Admin\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -28,6 +29,23 @@ class AuthController extends Controller
         ]);
 
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
+            $admin = Auth::guard('admin')->user();
+
+            // Enrolled admins do not get a real session from the password step
+            // alone: hold the account id in the session and require a TOTP or
+            // recovery code before logging in again.
+            if ($admin instanceof Admin && $admin->hasEnabledTwoFactor()) {
+                $this->clearOtherGuards('admin');
+                Auth::guard('admin')->logout();
+                $request->session()->forget('password_hash_admin');
+
+                $request->session()->put('admin.2fa.id', $admin->getKey());
+                $request->session()->put('admin.2fa.remember', $request->boolean('remember'));
+                $request->session()->regenerate();
+
+                return redirect()->route('admin.two-factor.challenge');
+            }
+
             // One account per browser: end every other role's session.
             $this->clearOtherGuards('admin');
 

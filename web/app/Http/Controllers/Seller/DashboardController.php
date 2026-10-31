@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Seller;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Product;
-use App\Models\SellerOrder;
-use Illuminate\Support\Carbon;
+use App\Models\Catalog\Product;
+use App\Models\Shared\SellerOrder;
+use App\Services\Seller\SellerSalesTrend;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
@@ -66,7 +66,7 @@ class DashboardController extends Controller
 
         $totalOrders = (int) $baseQuery->count();
 
-        $pendingOrders = (int) $baseQuery
+        $pendingOrders = (int) (clone $baseQuery)
             ->whereIn('status', [
                 OrderStatus::Placed->value,
                 OrderStatus::Confirmed->value,
@@ -74,28 +74,30 @@ class DashboardController extends Controller
             ])->count();
 
         // Sales = sum of fully delivered/completed subtotals (centavos → float).
-        $deliveredSalesMinor = (int) $baseQuery
+        $deliveredSalesMinor = (int) (clone $baseQuery)
             ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
             ->sum('subtotal_minor');
         $totalSales = $deliveredSalesMinor > 0 ? $deliveredSalesMinor / 100 : null;
 
-        $recentOrders = $baseQuery
+        $completedQuery = (clone $baseQuery)->where('status', OrderStatus::Completed->value);
+        $completedOrders = (int) (clone $completedQuery)->count();
+
+        // Use the recorded net once commission and voucher funding are finalized.
+        // Never estimate legacy/unknown earnings from gross sales or payout cash.
+        $finalizedEarnings = (clone $completedQuery)
+            ->whereNotNull('commission_finalized_at')
+            ->whereNotNull('commission_bps')
+            ->whereNotNull('commission_minor')
+            ->whereNotNull('seller_net_minor');
+        $netEarningsMinor = (int) (clone $finalizedEarnings)->sum('seller_net_minor');
+        $earningsPendingCount = $completedOrders - (int) (clone $finalizedEarnings)->count();
+
+        $recentOrders = (clone $baseQuery)
             ->latest('id')
             ->limit(8)
             ->get();
 
-        $salesTrend = collect(range(6, 0))->map(function (int $daysAgo) use ($baseQuery): array {
-            $day = Carbon::now()->subDays($daysAgo)->startOfDay();
-            $value = $baseQuery
-                ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
-                ->whereDate('seller_orders.updated_at', $day->toDateString())
-                ->sum('subtotal_minor');
-
-            return [
-                'label' => Carbon::now()->subDays($daysAgo)->format('D'),
-                'value' => $value,
-            ];
-        })->values();
+        $salesSummary = app(SellerSalesTrend::class)->forSeller($sellerId);
 
         // ── Notifications: only query if the table exists (Notifiable trait
         //     is present on Seller, but the Laravel notifications table may not
@@ -113,13 +115,17 @@ class DashboardController extends Controller
             'totalSales' => $totalSales,
             'totalOrders' => $totalOrders,
             'pendingOrders' => $pendingOrders,
+            'completedOrders' => $completedOrders,
+            'netEarningsMinor' => $netEarningsMinor,
+            'earningsPendingCount' => $earningsPendingCount,
             'productCount' => $productCount,
             'activeProductCount' => $activeProductCount,
             'productsMissingWeight' => $productsMissingWeight,
             'lowStockCount' => $lowStockCount,
             'lowStockProducts' => $lowStockProducts,
             'recentOrders' => $recentOrders,
-            'salesTrend' => $salesTrend,
+            'salesTrend' => $salesSummary['days'],
+            'salesSummary' => $salesSummary,
             'ordersModuleReady' => true,
             'notifications' => $notifications,
             'unreadCount' => $unreadCount,

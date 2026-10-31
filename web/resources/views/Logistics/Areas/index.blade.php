@@ -103,7 +103,11 @@
     {{-- Add / update area --}}
     <aside class="flex flex-col gap-6">
         <section id="coverage-form" class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg shadow-sm p-5">
-            <h2 class="font-serif text-[17px] text-[var(--text-ink)] mb-4">{{ $convertingArea ? 'Convert legacy area' : 'Configure Barangay Coverage' }}</h2>
+            <h2 class="font-serif text-[17px] text-[var(--text-ink)] mb-4">{{ $convertingArea ? 'Convert legacy area' : 'Add delivery zone' }}</h2>
+            @unless ($convertingArea)
+                <p class="mb-4 text-sm leading-relaxed text-[var(--text-muted)]">Select your Station Hub, municipality and the barangays to serve. A zone becomes serviceable only while its validated coverage and hubs are active and approved.</p>
+                <a href="{{ route('logistics.shipping-rates.index') }}" class="mb-4 inline-flex min-h-10 items-center rounded-lg px-2 text-xs font-semibold text-[var(--link)] hover:bg-[var(--bg-hover)] focus-visible:outline-2 focus-visible:outline-primary-700">Manage shipping rates</a>
+            @endunless
             @if ($convertingArea)
                 <p class="mb-4 font-sans text-sm text-[var(--text-ink)]">Select one barangay to replace {{ $convertingArea->name }}. Add any further barangays as new coverage afterward.</p>
                 <a href="{{ route('logistics.areas.index') }}" class="mb-3 inline-flex min-h-11 items-center px-2 text-sm underline">Cancel conversion</a>

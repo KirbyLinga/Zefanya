@@ -66,6 +66,21 @@
                     <span class="text-emerald-700">{{ $order->formattedDiscount() }}</span>
                 </div>
             @endif
+            @php
+                $shippingTotalMinor = (int) $order->sellerOrders->sum('shipping_fee_minor');
+            @endphp
+            @if ($shippingTotalMinor > 0)
+                <div class="mt-1 flex items-center justify-between text-sm">
+                    <span class="text-neutral-500">Shipping</span>
+                    <span class="text-neutral-700">₱{{ number_format($shippingTotalMinor / 100, 2) }}</span>
+                </div>
+            @endif
+            @if ($order->shipping_discount_minor > 0)
+                <div class="mt-1 flex items-center justify-between text-sm">
+                    <span class="text-neutral-500">Shipping voucher</span>
+                    <span class="text-emerald-700">-₱{{ number_format($order->shipping_discount_minor / 100, 2) }}</span>
+                </div>
+            @endif
             <div class="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3">
                 <span class="font-semibold text-[#0a0a0a]">Total</span>
                 <span class="text-lg font-bold text-[#0a0a0a]">{{ $order->formattedTotal() }}</span>

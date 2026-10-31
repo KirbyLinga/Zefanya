@@ -145,9 +145,18 @@
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
             })
-                .then(() => {
+                .then(response => {
+                    if (!response.ok) throw new Error('Could not mark notification as read');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.url) {
+                        window.location.assign(data.url);
+                        return;
+                    }
                     loadNotifications();
                     updateNotificationBadge();
                 })

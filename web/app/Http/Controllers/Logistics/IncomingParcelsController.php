@@ -5,14 +5,14 @@ namespace App\Http\Controllers\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
+use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelHandoffVerification;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -246,7 +246,7 @@ class IncomingParcelsController extends Controller
         $token = $request->input('verification_token');
 
         if (! $alreadyAtHub && $fresh->status !== OrderStatus::PickedUp) {
-            return back()->with('error', 'This parcel is not in the pickup phase.');
+            return back()->with('error', 'Scan blocked: this parcel must be picked up before it can be received at the hub.');
         }
 
         try {
@@ -293,6 +293,8 @@ class IncomingParcelsController extends Controller
             $this->assignment->release($pickupCourier);
         }
 
-        return back()->with('success', 'Parcel delivered to sorting center. Pickup courier released.');
+        return back()->with('success', $alreadyAtHub
+            ? 'Parcel already received at the hub. No status change was made.'
+            : 'Parcel received at the hub. Pickup courier released.');
     }
 }

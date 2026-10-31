@@ -4,10 +4,10 @@ namespace Tests\Feature\Console;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Models\Order;
-use App\Models\Payment;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
+use App\Models\Shared\Order;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;

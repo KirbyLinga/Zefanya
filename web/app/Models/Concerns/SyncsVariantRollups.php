@@ -2,7 +2,7 @@
 
 namespace App\Models\Concerns;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use Illuminate\Support\Facades\DB;
 
 /**

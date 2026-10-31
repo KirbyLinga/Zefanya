@@ -7,11 +7,10 @@ use App\Models\Admin\Admin;
 use App\Models\Concerns\HasEmailOtp;
 use App\Models\Concerns\HasRegistrationArchive;
 use Carbon\Carbon;
-use Database\Factories\LogisticsProviderFactory;
+use Database\Factories\Logistics\LogisticsProviderFactory;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -31,6 +30,10 @@ class LogisticsProvider extends Authenticatable
         'birthday',
         'age',
         'business_name',
+        'tin',
+        'sec_number',
+        'service_areas',
+        'region_code',
         'address_mode',
         'province_code',
         'province_name',
@@ -58,6 +61,11 @@ class LogisticsProvider extends Authenticatable
         'province_verified_by',
     ];
 
+    public static function normalizedCompanyName(string $name): string
+    {
+        return mb_strtolower(preg_replace('/\s+/u', '', $name));
+    }
+
     protected $hidden = [
         'password',
         'remember_token',
@@ -67,6 +75,7 @@ class LogisticsProvider extends Authenticatable
     protected function casts(): array
     {
         return [
+            'service_areas' => 'array',
             'birthday' => 'date',
             'email_verified_at' => 'datetime',
             'email_verification_expires_at' => 'datetime',
@@ -151,11 +160,6 @@ class LogisticsProvider extends Authenticatable
     public function incomingHandoffs(): HasMany
     {
         return $this->hasMany(ParcelHandoff::class, 'destination_provider_id');
-    }
-
-    public function provinceVerifier(): BelongsTo
-    {
-        return $this->belongsTo(Admin::class, 'province_verified_by');
     }
 
     public function isEmailVerified(): bool

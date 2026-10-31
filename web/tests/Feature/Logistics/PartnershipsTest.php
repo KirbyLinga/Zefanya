@@ -7,7 +7,7 @@ use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
-use App\Services\ProviderHandoffSchemaService;
+use App\Services\Logistics\ProviderHandoffSchemaService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 

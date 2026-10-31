@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Concerns\ClearsOtherGuards;
 use App\Http\Controllers\Controller;
 use App\Support\SignedOtpLink;
+use App\Support\SignedRegistrationResubmission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -12,16 +13,6 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     use ClearsOtherGuards;
-
-    /**
-     * The seller login page has been folded into the unified login entry
-     * point (/login). Anything still pointing at /seller/login is forwarded
-     * there so there is exactly one login screen in the application.
-     */
-    public function showLogin()
-    {
-        return redirect()->route('home', ['login' => 1]);
-    }
 
     public function login(Request $request)
     {
@@ -38,19 +29,24 @@ class AuthController extends Controller
 
         $seller = Auth::guard('seller')->user();
 
-        if ($seller->status !== 'approved') {
+        $pending = $seller->status === 'pending' && $seller->email_verified_at !== null;
+        if ($seller->status !== 'approved' && ! $pending) {
             Auth::guard('seller')->logout();
 
             $request->session()->flash('auth.status_message', match ($seller->status) {
                 'unverified' => 'Your email has not been verified yet. Please check your email for the verification code.',
                 'pending' => 'Your account is still pending administrator approval.',
-                'rejected' => 'Your registration has been rejected. Please contact support or submit a new registration.',
+                'rejected' => 'Your registration has been rejected. Please contact support or submit a new registration.'.(filled($seller->rejection_reason) ? ' Reason: '.$seller->rejection_reason : ''),
                 default => 'Your account is not active.',
             });
 
             if ($seller->status === 'unverified') {
                 $request->session()->flash('auth.resume_url', SignedOtpLink::showUrl('seller', $seller));
                 $request->session()->flash('auth.resume_label', 'Verify your email now');
+            }
+            if ($seller->status === 'rejected' && $seller->email_verified_at !== null) {
+                $request->session()->flash('auth.resume_url', SignedRegistrationResubmission::url($seller));
+                $request->session()->flash('auth.resume_label', 'Edit and resubmit application');
             }
 
             return back();
@@ -60,6 +56,12 @@ class AuthController extends Controller
 
         // One account per browser: end any other role's session.
         $this->clearOtherGuards('seller');
+
+        if ($pending) {
+            $request->session()->forget('url.intended');
+
+            return redirect()->route('seller.dashboard');
+        }
 
         return redirect()->intended(route('seller.dashboard'));
     }

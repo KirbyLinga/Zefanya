@@ -24,6 +24,33 @@ use Illuminate\Support\Str;
 trait VerifiesEmailOtp
 {
     /** Wrong codes allowed before the account verification is locked. */
+    /** Same wording as the "otp" validator in registration-validation.js. */
+    protected function otpFormatMessage(): string
+    {
+        return 'Enter the 6-digit code from your email.';
+    }
+
+    protected function otpInvalidMessage(): string
+    {
+        return 'That code doesn\'t match. Please try again.';
+    }
+
+    /** Names the "Resend code" button shown under every OTP form. */
+    protected function otpExpiredMessage(): string
+    {
+        return 'This code has expired. Tap "Resend code" for a new one.';
+    }
+
+    /** @return array<string, string> */
+    protected function otpValidationMessages(): array
+    {
+        return [
+            'otp.required' => $this->otpFormatMessage(),
+            'otp.string' => $this->otpFormatMessage(),
+            'otp.regex' => $this->otpFormatMessage(),
+        ];
+    }
+
     protected function otpMaxFailures(): int
     {
         return 5;

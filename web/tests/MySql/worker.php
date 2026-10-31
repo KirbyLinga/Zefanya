@@ -4,19 +4,25 @@ require_once dirname(__DIR__, 2).'/vendor/autoload.php';
 require_once __DIR__.'/Preflight.php';
 
 use App\Http\Controllers\Buyer\CheckoutController;
+use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ParcelReturn;
-use App\Models\Product;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\ParcelReturnService;
-use App\Services\VariantSyncService;
+use App\Models\Shared\SellerOrder;
+use App\Models\Seller\SellerSettlement;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\ParcelReturnService;
+use App\Services\Seller\SellerVacationService;
+use App\Services\Seller\StockService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Tests\MySql\CheckoutShippingFixture;
 use Tests\MySql\Preflight;
 use Tests\TestCase;
 
@@ -76,6 +82,7 @@ final class T05Worker extends TestCase
             'token' => str_starts_with($sql, 'update `checkout_tokens`'),
             'cartread' => str_starts_with($sql, 'select') && str_contains($sql, 'from `cart_items`') && str_contains($sql, 'for update'),
             'cartwrite' => str_starts_with($sql, 'update `cart_items`'),
+            'variant' => str_starts_with($sql, 'select') && str_contains($sql, 'from `product_variants`') && str_contains($sql, 'for update'),
             default => false,
         };
     }
@@ -114,7 +121,21 @@ final class T05Worker extends TestCase
             }
         });
         $start = microtime(true);
-        if ($task['action'] === 'return_request') {
+        if ($task['action'] === 'vacation') {
+            app(SellerVacationService::class)->set(Seller::query()->findOrFail($task['seller']), (bool) $task['enabled']);
+            $result = ['status' => 200, 'success' => true];
+        } elseif ($task['action'] === 'payout_request') {
+            $response = $this->actingAs(Seller::query()->findOrFail($task['seller']), 'seller')
+                ->postJson(route('seller.payout-requests.store'), ['amount' => $task['amount'], 'idempotency_key' => $task['key'], 'destination' => 'GCash 09171234567']);
+            $result = ['status' => $response->getStatusCode(), 'success' => in_array($response->getStatusCode(), [200, 201], true),
+                'payout_id' => $response->json('id'), 'validation_fields' => array_keys($response->json('errors') ?? [])];
+        } elseif ($task['action'] === 'settlement') {
+            $response = $this->actingAs(Admin::query()->findOrFail($task['admin']), 'admin')
+                ->postJson(route('admin.settlements.confirm', SellerSettlement::query()->findOrFail($task['settlement'])),
+                    ['amount_minor' => $task['amount_minor'], 'reference' => $task['reference']]);
+            $result = ['status' => $response->getStatusCode(), 'success' => $response->getStatusCode() === 200,
+                'validation_fields' => array_keys($response->json('errors') ?? [])];
+        } elseif ($task['action'] === 'return_request') {
             $parcel = SellerOrder::query()->findOrFail($task['parcel']);
             $provider = LogisticsProvider::query()->findOrFail($task['provider']);
             $record = app(ParcelReturnService::class)->request($parcel, $provider, 'Concurrent physical return request.');
@@ -131,10 +152,14 @@ final class T05Worker extends TestCase
             } catch (ValidationException) {
                 $result = ['status' => 'rejected', 'success' => false];
             }
+        } elseif ($task['action'] === 'stock_set') {
+            $variant = ProductVariant::query()->findOrFail($task['variant']);
+            app(StockService::class)->set($variant, (int) $task['quantity']);
+            $result = ['status' => 200, 'success' => true];
         } elseif ($task['action'] === 'dispatch') {
             $dispatch = app(CourierAssignmentService::class)->dispatch(
                 SellerOrder::query()->findOrFail($task['parcel']), $task['role']);
-            $result = ['status' => $dispatch['status'], 'success' => $dispatch['status'] === 'assigned', 'courier_id' => $dispatch['courier']?->id];
+            $result = ['status' => $dispatch['status'], 'success' => in_array($dispatch['status'], ['reserved', 'assigned'], true), 'courier_id' => $dispatch['courier']?->id];
         } elseif (in_array($task['action'], ['price', 'suspend', 'variations'], true)) {
             DB::transaction(function () use ($task): void {
                 if ($task['action'] === 'suspend') {
@@ -160,8 +185,9 @@ final class T05Worker extends TestCase
         } else {
             $this->actingAs(Buyer::query()->findOrFail($task['buyer']), 'buyer');
             if ($task['action'] === 'checkout') {
+                CheckoutShippingFixture::primeCache();
                 $response = $this->withSession([CheckoutController::SESSION_KEY => $task['items']])
-                    ->post(route('buyer.checkout.store'), ['checkout_token' => $task['token']]);
+                    ->post(route('buyer.checkout.store'), ['checkout_token' => $task['token'], 'carriers' => $task['carriers'] ?? []]);
                 $result = ['status' => $response->getStatusCode(),
                     'success' => str_contains((string) $response->headers->get('Location'), '/checkout/success/'),
                     'error' => session('error')];
@@ -181,7 +207,7 @@ final class T05Worker extends TestCase
 
 $task = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
 $runRoot = match ($task['action'] ?? '') {
-    'dispatch' => '/storage/logs/phase6-races', 'return_request', 'return_receipt' => '/storage/logs/phase7-races', default => '/.codex/t05-runs'
+    'dispatch' => '/storage/logs/phase6-races', 'payout_request', 'settlement' => '/storage/logs/payout-races', 'return_request', 'return_receipt' => '/storage/logs/phase7-races', default => '/.codex/t05-runs'
 };
 $root = realpath(dirname(__DIR__, 2).$runRoot);
 if ($root === false || ! str_starts_with(realpath($task['directory']), $root.DIRECTORY_SEPARATOR)) {

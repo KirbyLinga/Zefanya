@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Logistics;
 
+use App\Support\SignedRegistrationResubmission;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -36,7 +37,9 @@ class LogisticsRegistrationDecision extends Notification
         return $message
             ->greeting("Hi {$notifiable->fullName()},")
             ->line('Unfortunately your logistics registration was not approved.')
-            ->when($this->reason, fn ($msg) => $msg->line("Reason: {$this->reason}"))
-            ->line('You are welcome to submit a new registration with corrected information.');
+            ->when(filled($this->reason), fn ($msg) => $msg->line("Reason: {$this->reason}"))
+            ->line('Correct your application details or replace documents, then resubmit for review.')
+            ->line('This edit link expires in one hour. If it expires, sign in to get a new edit link.')
+            ->action('Edit and resubmit application', SignedRegistrationResubmission::url($notifiable));
     }
 }

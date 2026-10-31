@@ -5,12 +5,13 @@ namespace Tests\Feature\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
+use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\CourierAssignmentService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -65,6 +66,43 @@ class DeliveryAttemptPolicyTest extends TestCase
         $this->assertSame(OrderStatus::DeliveryFailed, $parcel->fresh()->status);
         $this->assertSame(ParcelReturnStatus::Requested, $parcel->fresh()->parcelReturn->status);
         $this->assertSame(2, $parcel->fresh()->delivery_attempts);
+    }
+
+    public function test_the_reason_for_a_final_attempt_is_saved_and_logged(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture();
+        $parcel = app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::DeliveryFailed, actor: OrderActor::Rider);
+        $url = route('logistics.delivery-assignments.reschedule', $parcel);
+
+        $this->actingAs($provider, 'logistics')
+            ->post($url, ['courier_id' => $replacement->id, 'reason' => str_repeat('a', 501)])
+            ->assertSessionHasErrors('reason');
+        $this->assertSame($old->id, (int) $parcel->fresh()->delivery_courier_id);
+
+        $this->post($url, ['courier_id' => $replacement->id, 'reason' => 'Buyer asked for an afternoon rider.'])
+            ->assertSessionHas('success');
+
+        $log = OperationsAuditLog::query()->where('action', 'rider_chosen_manually')->sole();
+        $this->assertSame('Buyer asked for an afternoon rider.', $log->reason);
+        $this->assertSame($replacement->rider->fullName(), $log->new_values['delivery_rider']);
+
+        $notes = json_decode($parcel->deliveryAssignments()->where('role', 'delivery')->latest('id')->first()->notes, true);
+        $this->assertSame('Buyer asked for an afternoon rider.', $notes['reason']);
+        $this->get(route('logistics.delivery-assignments.index'))->assertOk()->assertSee('Buyer asked for an afternoon rider.');
+    }
+
+    public function test_a_final_attempt_with_no_reason_still_works(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture();
+        $parcel = app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::DeliveryFailed, actor: OrderActor::Rider);
+
+        $this->actingAs($provider, 'logistics')
+            ->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id])
+            ->assertSessionHas('success');
+
+        $this->assertNull(OperationsAuditLog::query()->where('action', 'rider_chosen_manually')->sole()->reason);
     }
 
     public static function invalidRetryCounts(): array

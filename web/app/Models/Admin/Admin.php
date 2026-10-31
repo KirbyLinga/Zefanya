@@ -56,6 +56,8 @@ class Admin extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -63,6 +65,25 @@ class Admin extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /** True only after the admin completed the authenticator enrolment. */
+    public function hasEnabledTwoFactor(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && filled($this->two_factor_secret);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function twoFactorRecoveryCodeHashes(): array
+    {
+        $codes = $this->two_factor_recovery_codes;
+
+        return is_array($codes) ? array_values($codes) : [];
     }
 }

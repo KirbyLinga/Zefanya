@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Buyer;
 
-use App\Models\InventoryTransaction;
-use App\Models\Product;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -52,13 +52,15 @@ class BuyerCatalogEligibilityTest extends TestCase
         $product = $this->product('Eligibility Shirt', $rows);
         $physical = $product->getAttributes();
         $ledger = InventoryTransaction::query()->get()->toArray();
-        $expected = $listed ? [$product->id] : [];
+        $listed ? [$product->id] : [];
 
         foreach ([route('buyer.products.index'), route('buyer.search.index', ['q' => 'Eligibility']), route('buyer.categories.show', $product->category_id)] as $url) {
-            $response = $this->get($url)->assertOk()->assertViewHas('products', fn ($items) => $items->modelKeys() === $expected);
-            if ($listed) {
+            $soldOutSearch = str_contains($url, '/search?') && ! $listed && collect($rows)->contains(fn ($row) => $row[2] && $row[1] === 0);
+            $visible = $listed || $soldOutSearch;
+            $response = $this->get($url)->assertOk()->assertViewHas('products', fn ($items) => $items->modelKeys() === ($visible ? [$product->id] : []));
+            if ($visible) {
                 $response->assertSee('Eligibility Shirt')->assertSee($price);
-                $response->assertSee($stock <= 5 ? 'Low stock' : 'In stock');
+                $response->assertSee($soldOutSearch ? 'Sold Out' : ($stock.' in stock'));
             } else {
                 $response->assertDontSee('Eligibility Shirt');
             }
@@ -75,7 +77,7 @@ class BuyerCatalogEligibilityTest extends TestCase
         }
         $aggregate = Product::query()->withBuyerCardData()->with('seller')->findOrFail($product->id);
         $card = (string) $this->view('Components.buyer.product-card', ['product' => $aggregate, 'wishlistIds' => collect()]);
-        $this->assertStringContainsString($listed ? ($stock <= 5 ? 'Low stock' : 'In stock') : 'Out of stock', $card);
+        $this->assertStringContainsString($listed ? ($stock.' in stock') : 'Out of stock', $card);
         $this->assertStringContainsString($price, $card);
         if (! $listed) {
             $this->assertStringContainsString('disabled', $card);
@@ -171,7 +173,7 @@ class BuyerCatalogEligibilityTest extends TestCase
         $response->assertSee($canBuy ? '4 unit(s) available' : 'Unavailable');
 
         $html = (string) $this->view('Components.buyer.product-card', ['product' => $product->fresh()->load(['variants', 'seller', 'images']), 'wishlistIds' => collect()]);
-        $this->assertStringContainsString($canBuy ? 'Low stock' : 'Out of stock', $html);
+        $this->assertStringContainsString($canBuy ? $stock.' in stock' : 'Out of stock', $html);
         if (! $canBuy) {
             $this->assertStringContainsString('disabled', $html);
         }

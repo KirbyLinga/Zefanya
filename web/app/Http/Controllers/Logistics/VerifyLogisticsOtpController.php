@@ -54,12 +54,13 @@ class VerifyLogisticsOtpController extends Controller
         $otp = (string) $request->input('otp', '');
 
         if (! preg_match('/^\d{6}$/', $otp)) {
-            return $this->respond($request, ['message' => 'Enter all 6 digits.'], 422);
+            return $this->respond($request, ['message' => $this->otpFormatMessage()], 422);
         }
 
         if ($logisticsProvider->isOtpExpired()) {
             return $this->respond($request, [
-                'message' => 'This code has expired. Tap "Resend code" for a new one.',
+                'expired' => true,
+                'message' => $this->otpExpiredMessage(),
             ], 422);
         }
 
@@ -72,7 +73,7 @@ class VerifyLogisticsOtpController extends Controller
             }
 
             return $this->respond($request, [
-                'message' => 'That code is incorrect. Please try again.',
+                'message' => $this->otpInvalidMessage(),
                 'attempts_remaining' => $remaining,
             ], 422);
         }

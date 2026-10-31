@@ -25,26 +25,25 @@ enum OrderActor: string
     {
         return match ($actor) {
             // Seller drives the packing pipeline up to handing the parcel over.
-            // NOTE: Placed → ReadyForPickup is not in the spec'd seller list,
-            // but the live seller flow packs straight from a fresh PLACED order
-            // (the status graph and CourierAssignmentTest have always allowed
-            // it) — keep it until a confirm/preparing UI step is mandatory.
             self::Seller => [
                 [OrderStatus::DeliveryFailed, OrderStatus::Returned],
+                [OrderStatus::Delivered, OrderStatus::Returned],
                 [OrderStatus::Placed, OrderStatus::Confirmed],
                 [OrderStatus::Confirmed, OrderStatus::Preparing],
                 [OrderStatus::Preparing, OrderStatus::ReadyForPickup],
-                [OrderStatus::Placed, OrderStatus::ReadyForPickup],
                 // Decline before handover — cancels this seller's slice only.
                 [OrderStatus::Placed, OrderStatus::Cancelled],
                 [OrderStatus::Confirmed, OrderStatus::Cancelled],
                 [OrderStatus::Preparing, OrderStatus::Cancelled],
+                [OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
             ],
 
             // Rider owns pickup collection and the delivery leg.
             // Station receipt (PickedUp → AtSortingCenter) is Logistics custody.
             self::Rider => [
                 [OrderStatus::ReadyForPickup, OrderStatus::PickedUp],
+                // The second failed pickup attempt cancels the parcel.
+                [OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
                 [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery],
                 [OrderStatus::OutForDelivery, OrderStatus::Delivered],
                 [OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed],
@@ -60,10 +59,12 @@ enum OrderActor: string
                 [OrderStatus::DeliveryFailed, OrderStatus::Returned],
             ],
 
-            // Buyer confirms receipt, and may cancel a still-unaccepted slice.
+            // Buyer confirms receipt, and may cancel before Ready for Pickup.
             self::Buyer => [
                 [OrderStatus::Delivered, OrderStatus::Completed],
                 [OrderStatus::Placed, OrderStatus::Cancelled],
+                [OrderStatus::Confirmed, OrderStatus::Cancelled],
+                [OrderStatus::Preparing, OrderStatus::Cancelled],
             ],
 
             // Automatic receipt completion after the waiting period.

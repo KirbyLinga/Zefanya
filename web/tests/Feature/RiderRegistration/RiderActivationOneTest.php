@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\RiderRegistration;
 
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Notifications\Rider\RiderActivation;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +23,32 @@ class RiderActivationOneTest extends RiderTestBase
     public function test_tc_rid_022_confirm_mismatch(): void
     {
         $rider = $this->pendingRider();
-        $this->post(route('rider.activate', $this->makeToken($rider)), ['password' => 'Rider@2026', 'password_confirmation' => 'Rider@2027'])->assertSessionHasErrors(['password']);
+        $this->post(route('rider.activate', $this->makeToken($rider)), ['password' => 'Rider@2026', 'password_confirmation' => 'Rider@2027'])
+            ->assertSessionHasErrors(['password' => 'Passwords do not match.']);
+    }
+
+    public function test_tc_rid_021_message_names_the_failing_rule(): void
+    {
+        $rider = $this->pendingRider();
+        $this->post(route('rider.activate', $this->makeToken($rider)), ['password' => 'rider@2026', 'password_confirmation' => 'rider@2026'])
+            ->assertSessionHasErrors(['password' => 'Password must include an uppercase letter.']);
+    }
+
+    public function test_any_special_character_counts_like_registration(): void
+    {
+        $rider = $this->pendingRider();
+        $this->post(route('rider.activate', $this->makeToken($rider)), ['password' => 'Rider_2026', 'password_confirmation' => 'Rider_2026'])
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_activation_page_has_show_password_toggles(): void
+    {
+        $rider = $this->pendingRider();
+        $this->get(route('rider.activate', $this->makeToken($rider)))
+            ->assertOk()
+            ->assertSee('data-toggle-visibility="riderPassword"', false)
+            ->assertSee('data-toggle-visibility="riderPasswordConfirm"', false)
+            ->assertSee('type="password"', false);
     }
 
     public function test_tc_rid_023_expired_link(): void
@@ -40,7 +65,7 @@ class RiderActivationOneTest extends RiderTestBase
         $rider = $this->pendingRider($p);
         $first = $this->makeToken($rider);
         $this->actingAs($p, 'logistics')->post(route('logistics.riders.resend', $rider['id']))->assertRedirect();
-        $second = DB::table('rider_activation_tokens')->where('rider_id', $rider['id'])->latest('id')->value('id');
+        DB::table('rider_activation_tokens')->where('rider_id', $rider['id'])->latest('id')->value('id');
         // Raw second token is only in the mailed notification; fetch via Notification fake instead:
         $secondRaw = null;
         Notification::assertSentTo(

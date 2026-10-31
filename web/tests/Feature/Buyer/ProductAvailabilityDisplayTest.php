@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -20,7 +20,7 @@ class ProductAvailabilityDisplayTest extends TestCase
             collect(['Black', 'Green'])->flatMap(fn ($color) => collect(['S', 'M'])->map(fn ($size) => ['values' => [$color, $size], 'price' => 299, 'stock_quantity' => 225, 'is_available' => true]))->all(), true);
         $this->assertSame(900, $product->fresh()->stock_quantity);
         $this->get(route('buyer.products.show', $product))->assertOk()
-            ->assertSee('Select color and size to see availability.')
+            ->assertSee('Please select a variation')
             ->assertDontSee('900 unit(s) available')
             ->assertViewHas('variantData', fn ($rows) => count($rows) === 4 && collect($rows)->every(fn ($row) => $row['stock'] === 225));
     }

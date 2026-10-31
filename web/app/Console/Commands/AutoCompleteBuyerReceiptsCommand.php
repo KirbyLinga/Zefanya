@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\AutomaticBuyerReceiptService;
+use App\Services\Buyer\AutomaticBuyerReceiptService;
 use App\Support\RuntimeSchema;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -13,7 +13,7 @@ class AutoCompleteBuyerReceiptsCommand extends Command
 {
     protected $signature = 'orders:auto-complete-receipts {--batch=100 : Records per batch (1-1000)}';
 
-    protected $description = 'Complete undisputed delivered Seller orders after 72 hours without Buyer confirmation';
+    protected $description = 'Complete undisputed delivered Seller orders after seven days without Buyer confirmation';
 
     public function handle(AutomaticBuyerReceiptService $receipts): int
     {

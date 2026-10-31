@@ -3,8 +3,9 @@
 namespace Tests\Feature\Buyer;
 
 use App\Models\Buyer\Buyer;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Category;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -23,6 +24,28 @@ class HomepageTest extends TestCase
             ->assertViewHas('forYouProducts');
     }
 
+    public function test_each_category_card_opens_its_own_category(): void
+    {
+        $response = $this->get(route('buyer.home'))->assertOk();
+        $categories = Category::query()->orderBy('id')->get();
+
+        $this->assertNotEmpty($categories);
+        foreach ($categories as $category) {
+            $response->assertSee('href="'.route('buyer.categories.show', $category->id).'"', false)
+                ->assertSee('data-lucide="'.$category->icon.'"', false)
+                ->assertSee($category->label);
+        }
+    }
+
+    public function test_category_row_is_a_native_scroller_with_no_layout_animating_hover(): void
+    {
+        $this->get(route('buyer.home'))->assertOk()
+            ->assertSee('snap-x', false)
+            ->assertDontSee('id="catTrack"', false)
+            ->assertDontSee('hover:grow-[0.3]', false)
+            ->assertDontSee('transition-[flex,padding,margin', false);
+    }
+
     /**
      * @test
      *
@@ -31,7 +54,7 @@ class HomepageTest extends TestCase
     public function test_search_page_displays_results(): void
     {
         $seller = Seller::factory()->create(['status' => 'approved']);
-        $product = Product::factory()->create([
+        Product::factory()->create([
             'seller_id' => $seller->id,
             'name' => 'Test Product',
             'status' => 'active',
@@ -100,7 +123,7 @@ class HomepageTest extends TestCase
         $product = Product::factory()->create(['status' => 'active', 'stock_quantity' => 10]);
 
         // Add to wishlist
-        $response = $this->actingAs($buyer, 'buyer')
+        $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.wishlist.toggle', $product->id))
             ->assertOk()
             ->assertJsonPath('isSaved', true)

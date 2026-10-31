@@ -4,10 +4,10 @@ namespace Tests\Feature\Rider;
 
 use App\Enums\DeliveryFailureReason;
 use App\Enums\OrderStatus;
-use App\Models\Payment;
-use App\Models\StatusHistory;
+use App\Models\Shared\Payment;
+use App\Models\Shared\StatusHistory;
 use App\Notifications\Logistics\RiderParcelActivity;
-use App\Services\RiderHandoffVerification;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Support\Facades\Notification;
 
 class RiderDeliveryTest extends RiderTestCase
@@ -55,7 +55,7 @@ class RiderDeliveryTest extends RiderTestCase
         );
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_START_DELIVERY))
+            ->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_START_DELIVERY))
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -76,10 +76,10 @@ class RiderDeliveryTest extends RiderTestCase
             ['destination_area_id' => $this->courier->area_id],
         );
 
-        $this->actingAsRider()->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_START_DELIVERY))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_START_DELIVERY))->assertRedirect();
         $historyCount = StatusHistory::query()->where('seller_order_id', $parcel->id)->count();
 
-        $this->actingAsRider()->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_START_DELIVERY))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_START_DELIVERY))->assertRedirect();
 
         $this->assertSame($historyCount, StatusHistory::query()->where('seller_order_id', $parcel->id)->count());
     }
@@ -95,7 +95,7 @@ class RiderDeliveryTest extends RiderTestCase
         );
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_START_DELIVERY))
+            ->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_START_DELIVERY))
             ->assertRedirect()
             ->assertSessionHasErrors('parcel');
 
@@ -110,7 +110,7 @@ class RiderDeliveryTest extends RiderTestCase
             'delivery_courier_id' => $otherCourier->id,
         ]);
 
-        $this->actingAsRider()->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_START_DELIVERY))->assertForbidden();
+        $this->actingAsRider()->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_START_DELIVERY))->assertForbidden();
 
         $this->assertSame(OrderStatus::AssignedToRider, $parcel->fresh()->status);
     }
@@ -122,7 +122,7 @@ class RiderDeliveryTest extends RiderTestCase
         ]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_START_DELIVERY))
+            ->post(route('rider.deliveries.start', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_START_DELIVERY))
             ->assertRedirect()
             ->assertSessionHasErrors('parcel');
 
@@ -138,7 +138,7 @@ class RiderDeliveryTest extends RiderTestCase
         );
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_FAIL_DELIVERY, [
+            ->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_FAIL_DELIVERY, [
                 'failure_reason' => DeliveryFailureReason::RecipientUnavailable->value,
                 'failure_notes' => 'Nobody answered the door.',
             ]))
@@ -182,8 +182,8 @@ class RiderDeliveryTest extends RiderTestCase
             'failure_notes' => 'Address does not exist.',
         ];
 
-        $this->actingAsRider()->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_FAIL_DELIVERY, $payload))->assertRedirect();
-        $this->actingAsRider()->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_FAIL_DELIVERY, $payload))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_FAIL_DELIVERY, $payload))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_FAIL_DELIVERY, $payload))->assertRedirect();
 
         $this->assertSame(1, (int) $parcel->fresh()->delivery_attempts);
         $this->assertSame(
@@ -204,7 +204,7 @@ class RiderDeliveryTest extends RiderTestCase
         );
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_FAIL_DELIVERY, [
+            ->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_FAIL_DELIVERY, [
                 'failure_reason' => DeliveryFailureReason::Other->value,
             ]))
             ->assertSessionHasErrors('failure_notes');
@@ -221,7 +221,7 @@ class RiderDeliveryTest extends RiderTestCase
         ]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_FAIL_DELIVERY, [
+            ->post(route('rider.deliveries.failed', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_FAIL_DELIVERY, [
                 'failure_reason' => DeliveryFailureReason::RecipientUnavailable->value,
             ]))
             ->assertForbidden();

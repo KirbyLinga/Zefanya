@@ -85,8 +85,6 @@
                 <p class="font-sans text-[12.5px] font-semibold text-amber-700">Collect {{ $payment->formattedAmount() }}</p>
             @elseif ($payment?->method === PaymentMethod::Cod)
                 <p class="font-sans text-[12px] text-emerald-700">COD already collected</p>
-            @elseif ($payment?->method === PaymentMethod::Gcash)
-                <p class="font-sans text-[12px] text-[var(--text-muted)]">GCash — no cash collection at the door</p>
             @endif
         </div>
 

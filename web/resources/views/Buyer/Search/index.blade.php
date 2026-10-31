@@ -13,8 +13,25 @@
             @endif
         </div>
 
+        @if ($query !== '' && ! $tooShort)
+            @include('Buyer.Search._price-filter', ['action' => route('buyer.search.index')])
+        @endif
+
         {{-- Results --}}
-        @if ($products->isNotEmpty() || $categories->isNotEmpty())
+        @if ($products->isNotEmpty() || $categories->isNotEmpty() || $stores->isNotEmpty())
+            @if($stores->isNotEmpty())
+                <section class="mb-12" aria-label="Matching stores">
+                    <h2 class="mb-4 font-serif text-xl text-buyer-ink">Stores</h2>
+                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach($stores as $store)
+                            <a href="{{ route('buyer.stores.show', $store) }}" class="flex items-start gap-4 rounded-xl border border-buyer-line bg-white p-4">
+                                @if($store->store_logo_path)<img src="{{ Storage::disk('public')->url($store->store_logo_path) }}" alt="{{ $store->business_name }} logo" class="size-16 shrink-0 rounded-lg object-contain">@endif
+                                <div class="min-w-0"><h3 class="break-words font-semibold text-buyer-ink">{{ $store->business_name }}</h3><p class="mt-2 line-clamp-3 break-words text-sm text-buyer-ink-soft">{{ $store->store_description }}</p></div>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
             {{-- Categories (if any) --}}
             @if ($categories->isNotEmpty())
                 <div class="mb-12">
@@ -54,13 +71,16 @@
             <div class="rounded-2xl border-2 border-dashed border-buyer-line bg-white p-12 text-center">
                 <i data-lucide="search" width="48" height="48" class="mx-auto mb-4 text-buyer-ink-soft"></i>
                 <p class="font-serif text-[20px] text-buyer-ink mb-2">No results found</p>
-                <p class="text-[14px] text-buyer-ink-soft mb-6">
-                    @if ($query)
-                        We couldn't find anything matching "{{ $query }}". Try a different search term.
-                    @else
-                        Enter a search term to get started.
-                    @endif
-                </p>
+                @if ($query === '')
+                    <p class="text-[14px] text-buyer-ink-soft mb-6">Enter a search term to get started.</p>
+                @elseif ($tooShort)
+                    <p class="text-[14px] text-buyer-ink-soft mb-6">Enter at least 2 characters to search.</p>
+                @else
+                    @include('Buyer.Search._empty-hint', [
+                        'term' => $query,
+                        'suggestionUrl' => $suggestion ? route('buyer.search.index', ['q' => $suggestion]) : null,
+                    ])
+                @endif
                 <a href="{{ route('buyer.home') }}"
                    class="inline-flex items-center gap-2 rounded-lg bg-buyer-ink px-6 py-3 text-[13px] font-semibold text-white hover:opacity-90 transition-opacity">
                     <i data-lucide="arrow-left" width="14" height="14"></i>

@@ -1,5 +1,7 @@
 @extends('Layouts.logistics')
 
+@use('App\Enums\OrderStatus')
+
 @section('title', 'Parcel #'.$sellerOrder->id.' — Details')
 
 @section('content')
@@ -101,7 +103,7 @@
 
 @endif
 
-@if (!$openIncident && $sellerOrder->handover_at !== null)
+@if (!$openIncident && $sellerOrder->handover_at !== null && in_array($sellerOrder->status, [OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed], true))
     <div class="mt-6 bg-white border border-[var(--border-strong)] rounded-lg p-5">
         <h2 class="text-base font-semibold text-[var(--text-ink)] mb-3">Report lost / damaged</h2>
         <p class="text-sm text-[var(--text-muted)] mb-4">Report a missing or damaged parcel before it can continue. Incidents are reviewed by Admin. Parcel operations pause while an incident is open.</p>
@@ -123,9 +125,9 @@
                 <textarea id="description" name="description" rows="4" maxlength="1000" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" required>{{ old('description') }}</textarea>
             </div>
             <div>
-                <label for="photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (optional)</label>
-                <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm">
-                <p class="mt-1 text-xs text-[var(--text-muted)]">JPEG, PNG, or WebP up to 5 MB. Photos are stored privately.</p>
+                <label for="photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (required for Damaged)</label>
+                <input id="photo" name="photo" type="file" @required(old('type') === 'damaged') accept="image/jpeg,image/png,image/webp" class="w-full text-sm">
+                <p class="mt-1 text-xs text-[var(--text-muted)]">Required for Damaged; optional for Lost. JPEG, PNG or WebP up to 5 MB. Stored privately.</p>
             </div>
             <div class="flex justify-end">
                 <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
@@ -135,4 +137,52 @@
         </form>
     </div>
 @endif
+<section class="mt-6 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
+    <h2 class="text-base font-semibold text-[var(--text-ink)]">Manual status override</h2>
+    <p class="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">Use only to record a verified operational correction. Your company, previous and new status, time and reason are recorded in the audit log.</p>
+    @if (! $openIncident && count($overrideOptions) > 0)
+        <form method="POST" action="{{ route('logistics.delivery-monitoring.override', $sellerOrder) }}" class="mt-4 space-y-4" onsubmit="return confirm('Apply this status change and record the reason in the audit log?');">
+            @csrf
+            <input type="hidden" name="expected_status" value="{{ $sellerOrder->status->value }}">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <p class="mb-2 text-xs font-semibold text-[var(--text-muted)]">Current status</p>
+                    <p class="text-sm font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label() }}</p>
+                </div>
+                <div>
+                    <label for="override-status" class="mb-2 block text-xs font-semibold text-[var(--text-ink)]">New status *</label>
+                    <select id="override-status" name="status" required class="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-ink)] focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-200">
+                        <option value="">Select an authorized status</option>
+                        @foreach ($overrideOptions as $option)
+                            <option value="{{ $option->value }}" @selected(old('status') === $option->value)>{{ $option->label() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label for="override-reason" class="mb-2 block text-xs font-semibold text-[var(--text-ink)]">Reason (10–300 characters) *</label>
+                <textarea id="override-reason" name="reason" rows="3" minlength="10" maxlength="300" required class="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-ink)] focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-200" placeholder="Explain the verified correction and why it is needed.">{{ old('reason') }}</textarea>
+            </div>
+            <button type="submit" class="min-h-11 rounded-lg bg-primary-800 px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">Apply and log status change</button>
+        </form>
+    @else
+        <p class="mt-3 rounded-lg bg-[var(--bg-page)] p-3 text-sm text-[var(--text-ink)]">{{ $openIncident ? 'Resolve the open incident before changing status.' : 'No Logistics status override is available at this step. Delivery requires the assigned rider, buyer code and proof; returns require physical receipt.' }}</p>
+    @endif
+</section>
 @endsection
+
+@push('scripts')
+<script>
+    (() => {
+        const incidentType = document.getElementById('type');
+        const incidentPhoto = document.getElementById('photo');
+        if (!incidentType || !incidentPhoto) return;
+        const updatePhotoRequirement = () => {
+            incidentPhoto.required = incidentType.value === 'damaged';
+            incidentPhoto.setAttribute('aria-required', String(incidentPhoto.required));
+        };
+        incidentType.addEventListener('change', updatePhotoRequirement);
+        updatePhotoRequirement();
+    })();
+</script>
+@endpush

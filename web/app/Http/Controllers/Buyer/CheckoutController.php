@@ -8,27 +8,35 @@ use App\Enums\PaymentStatus;
 use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\InventoryTransaction;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
-use App\Models\ProductVariant;
+use App\Models\Buyer\BuyerAddress;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\Voucher;
+use App\Models\Seller\StoreSale;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\Voucher;
 use App\Notifications\Seller\NewOrderReceived;
-use App\Services\CartSummary;
-use App\Services\CartVariantResolver;
-use App\Services\CheckoutCarrierService;
-use App\Services\PurchasedVariantSnapshot;
+use App\Services\Buyer\BuyerAddressBook;
+use App\Services\Buyer\BuyerPurchaseLimit;
+use App\Services\Buyer\CartSummary;
+use App\Services\Buyer\CartVariantResolver;
+use App\Services\Buyer\CheckoutCarrierService;
+use App\Services\Buyer\PurchasedVariantSnapshot;
+use App\Services\Buyer\VoucherSessionService;
+use App\Services\Shared\OfferPricing;
+use App\Services\Shared\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -36,6 +44,8 @@ class CheckoutController extends Controller
 {
     /** Session key holding the ids checkout is allowed to see. */
     public const SESSION_KEY = 'checkout_item_ids';
+
+    public const NOTE_MAX_LENGTH = 200;
 
     /** Session key for the one-time checkout form token. */
     public const TOKEN_KEY = 'checkout_form_token';
@@ -65,6 +75,11 @@ class CheckoutController extends Controller
         $available = $items
             ->filter(fn (CartItem $item): bool => $item->isAvailable())
             ->values();
+        $requestedVacation = $items->contains(fn (CartItem $item) => $item->product?->isOnVacation()
+            && (! $request->has('items') || in_array($item->id, array_map('intval', (array) $request->input('items', [])), true)));
+        if ($requestedVacation && ($request->has('items') || $available->isEmpty())) {
+            return to_route('buyer.cart.index')->with('error', Seller::VACATION_MESSAGE);
+        }
 
         // null = "no selection sent" → CartSummary covers every available item.
         $selectedIds = null;
@@ -87,6 +102,12 @@ class CheckoutController extends Controller
             }
         }
 
+        foreach ($available as $item) {
+            if (($selectedIds === null || in_array($item->id, $selectedIds, true)) && $item->quantity > $item->availableQuantity()) {
+                return to_route('buyer.cart.index')->with('error', "Only {$item->availableQuantity()} left for {$item->product->name}. Reduce the quantity before checkout.");
+            }
+        }
+
         // Park the resolved selection for the future checkout.store step.
         session([self::SESSION_KEY => $selectedIds ?? $available->pluck('id')->all()]);
 
@@ -96,26 +117,58 @@ class CheckoutController extends Controller
         if (! Schema::hasTable('checkout_tokens')) {
             return redirect()->route('buyer.cart.index')->with('error', 'Checkout is temporarily unavailable. Please try again later.');
         }
-        $checkoutToken = CheckoutToken::issue($buyer->id);
+
+        $base = new CartSummary($items, null, $selectedIds);
+
+        // A stale ?address= link just falls back to the default, which the page
+        // shows clearly; store() is where a bad id stops the order.
+        $addressBook = app(BuyerAddressBook::class);
+        try {
+            $selectedAddress = $addressBook->chosen($buyer, $request->query('address'));
+        } catch (CheckoutException) {
+            $selectedAddress = $addressBook->chosen($buyer, null);
+        }
+        $deliverTo = $addressBook->deliveringTo($buyer, $selectedAddress);
+
+        $carrierService = app(CheckoutCarrierService::class);
+        $checkoutToken = DB::transaction(function () use ($buyer, $base, $carrierService): CheckoutToken {
+            $snapshot = $carrierService->captureRates($base->sellerGroups);
+            $token = CheckoutToken::issue($buyer->id);
+            $token->forceFill(['shipping_rates_snapshot' => $snapshot])->save();
+
+            return $token;
+        });
         session([self::TOKEN_KEY => $checkoutToken->token]);
+        $carrierOptions = $carrierService->optionsForCheckout($deliverTo, $base->sellerGroups, $checkoutToken->shipping_rates_snapshot);
+        $carriersAvailable = $carrierService->allRoutesAvailable($carrierOptions);
+        $defaultShippingFees = $this->defaultShippingFees($carrierOptions, $request);
 
         $voucherNotice = null;
-        $voucher = Voucher::resolveCode(
-            session('cart_voucher'),
-            (new CartSummary($items, null, $selectedIds))->subtotalCentavos,
+        $application = app(VoucherSessionService::class)->resolve(
+            $base->sellerGroups,
+            $base->subtotalCentavos,
+            $defaultShippingFees,
             $voucherNotice,
         );
 
-        $summary = new CartSummary($items, $voucher, $selectedIds);
-        $carrierService = app(CheckoutCarrierService::class);
-        $carrierOptions = $carrierService->optionsForCheckout($buyer, $summary->sellerGroups);
-        $carriersAvailable = $carrierService->allRoutesAvailable($carrierOptions);
+        $summary = new CartSummary($items, $application, $selectedIds);
+
+        $shippingTotalMinor = array_sum($defaultShippingFees);
+        $shippingDiscountMinor = $application->shippingDiscountCentavos;
+        $payableTotalMinor = max(0, $summary->totalCentavos + $shippingTotalMinor - $shippingDiscountMinor);
 
         return view('Buyer.Checkout.index', [
             'buyer' => $buyer,
+            'deliverTo' => $deliverTo,
+            'addresses' => $buyer->addresses()->orderByDesc('is_default')->orderBy('id')->get(),
+            'selectedAddress' => $selectedAddress,
+            'addressFingerprint' => $this->addressFingerprint($deliverTo),
+            'checkoutItemIds' => session(self::SESSION_KEY),
             'items' => $available,
             'summary' => $summary,
-            'voucher' => $voucher,
+            'voucher' => $summary->voucher,
+            'vouchers' => $application->toArray(),
+            'shippingVoucher' => $application->shippingVoucher,
             'voucherNotice' => $voucherNotice,
             'variantLabels' => $summary->availableItems->mapWithKeys(fn (CartItem $item): array => [
                 $item->id => $item->variant?->optionValues
@@ -124,9 +177,14 @@ class CheckoutController extends Controller
                     ->implode(' | ') ?? '',
             ]),
             'checkoutToken' => $checkoutToken->token,
+            'shippingFingerprint' => $carrierService->quoteFingerprint($carrierOptions),
+            'voucherFingerprint' => $application->reviewFingerprint(),
             'carrierOptions' => $carrierOptions,
             'carriersAvailable' => $carriersAvailable,
             'merchandiseTotalMinor' => $summary->totalCentavos,
+            'shippingTotalMinor' => $shippingTotalMinor,
+            'shippingDiscountMinor' => $shippingDiscountMinor,
+            'payableTotalMinor' => $payableTotalMinor,
         ]);
     }
 
@@ -176,6 +234,11 @@ class CheckoutController extends Controller
             }
 
             $product = $item->product;
+            if ($product?->isOnVacation()) {
+                $problems[] = $product->name.' ('.Seller::VACATION_MESSAGE.')';
+
+                continue;
+            }
 
             if ($product === null || ! $item->isAvailable()) {
                 $problems[] = $item->requiresVariantReselection()
@@ -190,29 +253,63 @@ class CheckoutController extends Controller
             }
         }
 
+        foreach ($items->groupBy('product_id') as $productId => $lines) {
+            $allowed = app(BuyerPurchaseLimit::class)->remaining((int) $buyer->id, (int) $productId);
+            if ((int) $lines->sum('quantity') > $allowed) {
+                $name = $lines->first()->product?->name ?? 'A product';
+                $problems[] = $name.' ('.BuyerPurchaseLimit::MESSAGE.')';
+            }
+        }
+
         if ($problems !== []) {
             return redirect()->route('buyer.cart.index')
                 ->with('error', 'Some items are no longer available: '.implode(', ', array_unique($problems)).'. Please review your cart.');
         }
 
-        // Voucher re-resolution identical to index(): resolved against the
-        // selection's subtotal, dropped with a notice when invalid/expired.
-        $notice = null;
+        // Voucher re-resolution identical to index(): every slot is validated
+        // against the live selection and the carrier quotes, and invalid
+        // vouchers are dropped with a notice.
         $base = new CartSummary($items, null, null);
-        $voucher = Voucher::resolveCode(session('cart_voucher'), $base->subtotalCentavos, $notice);
-
-        // Authoritative money for the order — computed from DB rows only.
-        $summary = new CartSummary($items, $voucher, null);
-
-        // Payment method chosen at checkout. An unknown/absent value falls back
-        // to COD, so a missing field never places an order with no method. Only
-        // COD is integrated; the rest are recorded as Pending (see the enum).
-        $paymentMethod = PaymentMethod::tryFrom((string) $request->input('payment_method', ''))
-            ?? PaymentMethod::Cod;
-
-        // Revalidate carrier eligibility and server fees before entering checkout.
         $checkoutReturn = route('buyer.checkout.index', ['items' => $parkedIds]);
 
+        $addressBook = app(BuyerAddressBook::class);
+        try {
+            $address = $addressBook->chosen($buyer, $request->input('address_id'));
+        } catch (CheckoutException $e) {
+            return redirect()->to($checkoutReturn)->with('error', $e->getMessage());
+        }
+        $deliverTo = $addressBook->deliveringTo($buyer, $address);
+        $checkoutReturn = route('buyer.checkout.index', ['items' => $parkedIds, 'address' => $address?->id]);
+
+        // Anything the buyer did not see stops here and returns them to the
+        // checkout page with the new total, so they place the order knowingly.
+        $reviewedAddress = $request->input('address_fingerprint');
+        if (is_string($reviewedAddress) && ! hash_equals($this->addressFingerprint($deliverTo), $reviewedAddress)) {
+            return redirect()->to($checkoutReturn)
+                ->with('error', 'Your delivery address changed while you were checking out. Please check it and place your order again.');
+        }
+
+        $reviewedPrices = $request->input('price_fingerprint');
+        if (is_string($reviewedPrices) && ! hash_equals($base->priceFingerprint(), $reviewedPrices)) {
+            return redirect()->to($checkoutReturn)
+                ->with('error', 'A product price changed while you were checking out. Please review the updated total and place your order again.');
+        }
+
+        $notes = Validator::make($request->only('notes'), [
+            'notes' => ['nullable', 'array'],
+            'notes.*' => ['nullable', 'string', 'max:'.self::NOTE_MAX_LENGTH],
+        ], [
+            'notes.*.string' => 'Your note to the seller must be text.',
+            'notes.*.max' => 'A note to the seller can be up to '.self::NOTE_MAX_LENGTH.' characters.',
+        ]);
+
+        if ($notes->fails()) {
+            return redirect()->to($checkoutReturn)->withInput()->withErrors($notes);
+        }
+
+        $rateSnapshot = CheckoutToken::query()->where('buyer_id', $buyer->id)->where('token', $formToken)
+            ->where('used', false)->where('expires_at', '>', now())->first()?->shipping_rates_snapshot;
+        // Revalidate carrier eligibility and server fees before entering checkout.
         if ($request->filled('shipping_fee') || $request->filled('shipping_fees') || $request->filled('shipping_total')) {
             return redirect()->to($checkoutReturn)
                 ->withInput()
@@ -221,9 +318,10 @@ class CheckoutController extends Controller
 
         try {
             $carrierQuote = app(CheckoutCarrierService::class)->validateSelection(
-                $buyer,
-                $summary->sellerGroups,
+                $deliverTo,
+                $base->sellerGroups,
                 (array) $request->input('carriers', []),
+                $rateSnapshot,
             );
         } catch (ValidationException $e) {
             return redirect()->to($checkoutReturn)
@@ -232,10 +330,38 @@ class CheckoutController extends Controller
                 ->with('error', 'Shipping is not available for one or more shops in your order. Review carrier options or your delivery address.');
         }
 
+        $carrierQuote['rate_snapshot'] = $rateSnapshot;
         session([CheckoutCarrierService::SESSION_KEY => $carrierQuote['selections']]);
 
+        $reviewedShipping = $request->input('shipping_fingerprint');
+        if (is_string($reviewedShipping) && ! hash_equals(app(CheckoutCarrierService::class)->quoteFingerprint($carrierQuote['options']), $reviewedShipping)) {
+            return redirect()->to($checkoutReturn)
+                ->withInput()
+                ->with('error', 'Shipping fees changed while you were checking out. Please review the updated total and place your order again.');
+        }
+
+        $notice = null;
+        $application = app(VoucherSessionService::class)->resolve(
+            $base->sellerGroups,
+            $base->subtotalCentavos,
+            $carrierQuote['fees'],
+            $notice,
+        );
+
+        // A voucher that stopped applying must not quietly raise what the buyer
+        // pays. resolve() has already dropped it, so the page shows the new total.
+        $reviewedVouchers = $request->input('voucher_fingerprint');
+        if ($notice !== null || (is_string($reviewedVouchers) && ! hash_equals($application->reviewFingerprint(), $reviewedVouchers))) {
+            return redirect()->to($checkoutReturn)
+                ->withInput()
+                ->with('error', ($notice ?? 'A voucher on this order changed.').' Please review the updated total and place your order again.');
+        }
+
+        // Authoritative money for the order — computed from DB rows only.
+        $summary = new CartSummary($items, $application, null);
+
         try {
-            $order = $this->placeOrder($buyer, $items, $summary, $formToken, $paymentMethod, $carrierQuote['selections']);
+            $order = $this->placeOrder($buyer, $items, $summary, $formToken, $carrierQuote, (array) $request->input('notes', []), $address);
         } catch (CheckoutException $e) {
             return redirect()->route('buyer.cart.index')->with('error', $e->getMessage());
         }
@@ -251,15 +377,15 @@ class CheckoutController extends Controller
         // left in the cart survives for the next checkout.
         $buyer->cartItems()->whereIn('id', $parkedIds)->delete();
 
-        session()->forget([self::SESSION_KEY, 'cart_voucher', self::TOKEN_KEY, CheckoutCarrierService::SESSION_KEY]);
+        session()->forget([
+            self::SESSION_KEY,
+            VoucherSessionService::SESSION_KEY,
+            VoucherSessionService::LEGACY_KEY,
+            self::TOKEN_KEY,
+            CheckoutCarrierService::SESSION_KEY,
+        ]);
 
-        $redirect = redirect()->route('buyer.checkout.success', $order);
-
-        if ($notice !== null) {
-            $redirect = $redirect->with('voucher_notice', $notice);
-        }
-
-        return $redirect;
+        return redirect()->route('buyer.checkout.success', $order);
     }
 
     /**
@@ -268,10 +394,11 @@ class CheckoutController extends Controller
      * everything back — no partial orders, no phantom stock changes.
      *
      * @param  Collection<int, CartItem>  $items  The buyer's validated selection
+     * @param  array<int|string, mixed>  $notes  Seller id => the buyer's validated note
      */
-    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, PaymentMethod $paymentMethod = PaymentMethod::Cod, array $carrierSelections = []): Order
+    private function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, array $carrierQuote = [], array $notes = [], ?BuyerAddress $address = null): Order
     {
-        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $paymentMethod, $carrierSelections): Order {
+        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $carrierQuote, $notes, $address): Order {
             // ONE-TIME TOKEN GUARD (double-submit): claim the token first,
             // inside this transaction, via a conditional UPDATE. On a
             // double-click the second request finds used=1 already and gets
@@ -283,6 +410,13 @@ class CheckoutController extends Controller
             }
             if (! CheckoutToken::claim($buyer->id, $formToken)) {
                 throw new CheckoutException('Your checkout session is invalid, expired or already used. Please open checkout again.');
+            }
+
+            $offers = app(OfferPricing::class);
+            $offers->bind($items);
+            $reviewedTotals = [];
+            foreach ($items as $item) {
+                $reviewedTotals[$item->id] = $item->lineTotalCentavos();
             }
 
             // Lock the product AND variant rows in a stable order (id order
@@ -303,6 +437,9 @@ class CheckoutController extends Controller
                 $lockedProduct->setRelation('seller', $lockedSellers->get($lockedProduct->seller_id));
                 if (! $lockedProduct->isListedForSale()) {
                     throw new CheckoutException('A seller is no longer available. Please review your cart and try again.');
+                }
+                if ($lockedProduct->isOnVacation()) {
+                    throw new CheckoutException(Seller::VACATION_MESSAGE);
                 }
             }
 
@@ -342,7 +479,7 @@ class CheckoutController extends Controller
                     );
                 }
 
-                $lockedPrice = (int) bcmul((string) $variant->price, '100', 0);
+                $lockedPrice = app(PriceResolver::class)->forVariant($product, $variant)->unitCentavos();
                 if ($item->unitPriceCentavos() !== $lockedPrice) {
                     throw new CheckoutException('A product price changed while placing your order. Please review your cart and confirm the updated total.');
                 }
@@ -352,6 +489,25 @@ class CheckoutController extends Controller
                 $item->setRelation('variant', $variant);
             }
 
+            $saleIds = $items
+                ->map(fn (CartItem $item) => $item->product?->ongoingSale?->id)
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values();
+            if ($saleIds->isNotEmpty()) {
+                StoreSale::query()->whereIn('id', $saleIds)->orderBy('id')->lockForUpdate()->get();
+            }
+            foreach ($items as $item) {
+                $item->product?->unsetRelation('ongoingSale');
+            }
+            $offers->bind($items);
+            foreach ($items as $item) {
+                if ($item->lineTotalCentavos() !== $reviewedTotals[$item->id]) {
+                    throw new CheckoutException('A product price changed while placing your order. Please review your cart and confirm the updated total.');
+                }
+            }
+
             foreach ($items->groupBy(fn (CartItem $item) => $item->variant->id) as $lines) {
                 if ($lines->sum('quantity') > $lines->first()->variant->stock_quantity) {
                     throw new CheckoutException('There is not enough stock for the selected items. Please review your cart.');
@@ -359,86 +515,120 @@ class CheckoutController extends Controller
             }
 
             $base = new CartSummary($items);
-            $voucherCode = session('cart_voucher', $summary->voucher?->code);
-            $voucher = $voucherCode ? Voucher::query()
-                ->where('code', strtoupper(trim($voucherCode)))
-                ->lockForUpdate()->first() : null;
-            if ($voucher !== null && $voucher->rejectionReason($base->subtotalCentavos) !== null) {
-                $voucher = null;
-            }
-            $lockedSummary = new CartSummary($items, $voucher);
-            if ($lockedSummary->discountCentavos !== $summary->discountCentavos) {
-                throw new CheckoutException('Your voucher changed while placing your order. Please review your cart and confirm the updated total.');
-            }
-            $summary = $lockedSummary;
 
+            // The address book writes under this same buyer lock, so the row read
+            // here is the one that gets frozen onto the order.
             $buyer = Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
+            $lockedAddress = $address?->fresh();
+            if ($address !== null && $lockedAddress === null) {
+                throw new CheckoutException(BuyerAddressBook::UNAVAILABLE_MESSAGE);
+            }
+            $deliverTo = app(BuyerAddressBook::class)->deliveringTo($buyer, $lockedAddress);
+
             try {
-                $carrierQuote = app(CheckoutCarrierService::class)->validateSelectionForOrder(
-                    $buyer, $summary->sellerGroups, $carrierSelections,
+                $lockedCarrierQuote = app(CheckoutCarrierService::class)->validateSelectionForOrder(
+                    $deliverTo, $base->sellerGroups, $carrierQuote['selections'] ?? [], $carrierQuote['rate_snapshot'] ?? null,
                 );
             } catch (ValidationException $exception) {
                 throw new CheckoutException(collect($exception->errors())->flatten()->implode(' '));
             }
+            if ($lockedCarrierQuote['fees'] != $carrierQuote['fees']) {
+                throw new CheckoutException('Shipping fees changed while placing your order. Please review your cart and confirm the updated total.');
+            }
+            $carrierQuote = $lockedCarrierQuote;
+
+            $voucherNotice = null;
+            $application = app(VoucherSessionService::class)->resolve(
+                $base->sellerGroups,
+                $base->subtotalCentavos,
+                $carrierQuote['fees'],
+                $voucherNotice,
+                lock: true,
+            );
+            $lockedSummary = new CartSummary($items, $application);
+
+            if ($lockedSummary->discountCentavos !== $summary->discountCentavos
+                || $lockedSummary->shippingDiscountCentavos !== $summary->shippingDiscountCentavos
+                || $application->voucherIds() !== $summary->voucherApplication->voucherIds()) {
+                throw new CheckoutException('Your voucher changed while placing your order. Please review your cart and confirm the updated total.');
+            }
+
+            $summary = $lockedSummary;
 
             $order = new Order;
             $order->forceFill([
                 'buyer_id' => $buyer->id,
                 'reference' => Order::generateUniqueReference(),
-                'shipping_address' => $this->addressSnapshot($buyer),
+                'shipping_address' => $this->addressSnapshot($deliverTo),
                 'subtotal_minor' => $summary->subtotalCentavos,
                 'discount_minor' => $summary->discountCentavos,
-                'total_minor' => $summary->totalCentavos + $carrierQuote['shipping_total_minor'],
+                'shop_discount_minor' => $application->shopDiscountCentavos,
+                'platform_discount_minor' => $application->platformDiscountCentavos,
+                'shipping_discount_minor' => $application->shippingDiscountCentavos,
+                'total_minor' => max(
+                    0,
+                    $summary->totalCentavos + $carrierQuote['shipping_total_minor'] - $application->shippingDiscountCentavos,
+                ),
                 'status' => OrderStatus::Placed,
             ])->save();
 
-            // Consume the voucher. Voucher::rejectionReason() gates reuse on
-            // times_used, so leaving the counter untouched let a single-use
-            // code be redeemed over and over. increment() is an atomic
-            // `times_used = times_used + 1` inside this transaction.
-            $summary->voucher?->increment('times_used');
-
-            // One seller_order per shop; the order-level voucher discount is
-            // allocated proportionally so the per-shop COD payments sum to the
-            // discounted order total (largest-remainder method).
-            $discounts = $this->allocateDiscount(
-                $summary->discountCentavos,
-                $summary->sellerGroups
-                    ->map(fn (array $group): int => (int) $group['items']->sum(
-                        fn (CartItem $item): int => $item->lineTotalCentavos(),
-                    ))
-                    ->all(),
-            );
-
-            if (array_sum($discounts) !== $summary->discountCentavos) {
-                throw new CheckoutException('The voucher allocation does not match the applied discount.');
+            // Consume every applied voucher exactly once. The rows are locked
+            // above, so two checkouts cannot both pass a usage_limit check.
+            foreach ($application->vouchers as $usedVoucher) {
+                $usedVoucher->increment('times_used');
             }
 
             $sellerOrderIdsByCartItemId = [];
 
-            foreach ($summary->sellerGroups as $index => $group) {
+            foreach ($summary->sellerGroups as $group) {
+                $sellerId = (int) $group['seller']->getKey();
+                $subtotalMinor = (int) $group['items']->sum(
+                    fn (CartItem $item): int => $item->lineTotalCentavos(),
+                );
+                $shopVoucher = $application->shopVoucherFor($sellerId);
+                $shopDiscount = $application->shopDiscountFor($sellerId);
+                $platformDiscount = $application->platformDiscountFor($sellerId);
+                $shippingDiscount = $application->shippingDiscountFor($sellerId);
+                $shippingFee = (int) ($carrierQuote['fees'][$sellerId] ?? 0);
+                $merchandiseDiscount = $shopDiscount + $platformDiscount;
+
+                if ($merchandiseDiscount < 0 || $merchandiseDiscount > $subtotalMinor
+                    || $shippingDiscount < 0 || $shippingDiscount > $shippingFee) {
+                    throw new CheckoutException('The voucher allocation exceeds the Seller subtotal.');
+                }
+
+                $funding = $application->fundingFor($sellerId);
+                $legacyVoucher = $application->platformVoucher ?? $shopVoucher;
+
                 $sellerOrder = new SellerOrder;
                 $sellerOrder->forceFill([
                     'order_id' => $order->id,
-                    'seller_id' => $group['seller']->id,
-                    // Snapshot the locked voucher and the exact existing payment allocation.
-                    'voucher_id' => $summary->voucher?->getKey(),
-                    'voucher_funding_source' => $summary->voucher?->funding_source,
-                    'voucher_discount_minor' => $discounts[$index],
-                    'carrier_provider_id' => $carrierQuote['selections'][$group['seller']->id],
-                    'handoff_destination_provider_id' => $carrierQuote['destinations'][$group['seller']->id] ?? null,
-                    'shipping_fee_minor' => $carrierQuote['fees'][$group['seller']->id],
-                    'subtotal_minor' => (int) $group['items']->sum(
-                        fn (CartItem $item): int => $item->lineTotalCentavos(),
-                    ),
+                    'seller_id' => $sellerId,
+                    // Legacy single-voucher snapshot retained for old reports.
+                    'voucher_id' => $legacyVoucher?->getKey(),
+                    'voucher_funding_source' => $legacyVoucher?->funding_source,
+                    'voucher_discount_minor' => $merchandiseDiscount,
+                    // Immutable, per-slot checkout snapshots.
+                    'shop_voucher_id' => $shopVoucher?->getKey(),
+                    'shop_voucher_funding_source' => $shopVoucher?->funding_source,
+                    'shop_voucher_discount_minor' => $shopDiscount,
+                    'platform_voucher_id' => $application->platformVoucher?->getKey(),
+                    'platform_voucher_funding_source' => $application->platformVoucher?->funding_source,
+                    'platform_voucher_discount_minor' => $platformDiscount,
+                    'shipping_voucher_id' => $application->shippingVoucher?->getKey(),
+                    'shipping_voucher_funding_source' => $application->shippingVoucher?->funding_source,
+                    'shipping_voucher_discount_minor' => $shippingDiscount,
+                    'shipping_discount_minor' => $shippingDiscount,
+                    'seller_funded_discount_minor' => $funding['seller_minor'],
+                    'marketplace_funded_discount_minor' => $funding['marketplace_minor'],
+                    'carrier_provider_id' => $carrierQuote['selections'][$sellerId],
+                    'handoff_destination_provider_id' => $carrierQuote['destinations'][$sellerId] ?? null,
+                    'shipping_fee_minor' => $shippingFee,
+                    'subtotal_minor' => $subtotalMinor,
                     // Freeze the parcel weight with the address and prices so
                     // later catalog edits cannot change an in-transit parcel.
-                    'parcel_weight_grams' => (int) $group['items']->sum(function (CartItem $item): int {
-                        $weight = $item->variant?->effectiveWeightGrams()
-                            ?? (int) ($item->product?->weight_grams ?? 0);
-
-                        return $item->quantity * $weight;
-                    }),
+                    'parcel_weight_grams' => (int) $group['items']->sum(fn (CartItem $item): int => $item->lineWeightGrams()),
+                    'buyer_note' => filled($notes[$sellerId] ?? null) ? trim($notes[$sellerId]) : null,
                     'status' => OrderStatus::Placed,
                     // Tracking number exists from the moment the parcel is a
                     // seller_order, so the seller can print the waybill BEFORE
@@ -451,32 +641,39 @@ class CheckoutController extends Controller
                     $product = $item->product;
                     $variant = $item->variant;
 
-                    OrderItem::query()->create([
-                        'seller_order_id' => $sellerOrder->id,
-                        'product_id' => $product->id,
-                        'variant_id' => $variant?->id,
-                        'product_name' => $product->name,
-                        'variant_options' => app(PurchasedVariantSnapshot::class)->capture($variant),
-                        'quantity' => $item->quantity,
-                        // Price snapshot at order time — the variant's price
-                        // when the line targets one, otherwise the product
-                        // rollup (CartSummary uses the same source, so totals
-                        // and lines always agree).
-                        'price_minor' => $item->unitPriceCentavos(),
-                    ]);
+                    foreach (app(OfferPricing::class)->portions($item) as $portion) {
+                        OrderItem::query()->create([
+                            'seller_order_id' => $sellerOrder->id,
+                            'product_id' => $product->id,
+                            'variant_id' => $variant?->id,
+                            'product_name' => $product->name,
+                            'variant_options' => app(PurchasedVariantSnapshot::class)->capture($variant),
+                            'quantity' => $portion['quantity'],
+                            'price_minor' => $portion['price'],
+                            'regular_price_minor' => $portion['regular'],
+                            'store_sale_id' => $portion['sale_id'],
+                        ]);
+                    }
 
                     $sellerOrderIdsByCartItemId[$item->id] = $sellerOrder->id;
                 }
 
-                if ($discounts[$index] < 0 || $discounts[$index] > $sellerOrder->subtotal_minor) {
+                if ($merchandiseDiscount < 0 || $merchandiseDiscount > $sellerOrder->subtotal_minor) {
                     throw new CheckoutException('The allocated discount exceeds the Seller subtotal.');
+                }
+
+                $amountMinor = $sellerOrder->subtotal_minor - $merchandiseDiscount
+                    + $sellerOrder->shipping_fee_minor - $shippingDiscount;
+
+                if ($amountMinor < 0) {
+                    throw new CheckoutException('The voucher allocation produces a negative payment total.');
                 }
 
                 $payment = new Payment;
                 $payment->forceFill([
                     'seller_order_id' => $sellerOrder->id,
-                    'amount_minor' => $sellerOrder->subtotal_minor - $discounts[$index] + $sellerOrder->shipping_fee_minor,
-                    'method' => $paymentMethod,
+                    'amount_minor' => $amountMinor,
+                    'method' => PaymentMethod::Cod,
                     'status' => PaymentStatus::Pending,
                 ])->save();
             }
@@ -512,88 +709,48 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Split an order-level voucher discount across seller orders proportionally
-     * to their subtotals (largest-remainder method), so the per-shop COD
-     * payments sum exactly to the discounted order total.
+     * Server-side default shipping fees used for the initial checkout total.
+     * The browser recalculates with the buyer's actual radio selection.
      *
-     * @param  array<int, int>  $subtotals  Centavos per seller group, insertion order preserved
-     * @return array<int, int> Discount in centavos per seller group, same keys
+     * @param  list<array<string, mixed>>  $carrierOptions
+     * @return array<int, int>
      */
-    private function allocateDiscount(int $discount, array $subtotals): array
+    private function defaultShippingFees(array $carrierOptions, Request $request): array
     {
-        $total = array_sum($subtotals);
+        $old = $request->old('carriers', []);
+        $old = is_array($old) ? $old : [];
+        $fees = [];
 
-        if ($total <= 0 || $discount <= 0) {
-            return array_map(fn (): int => 0, $subtotals);
-        }
-
-        $allocated = [];
-        $remainders = [];
-
-        foreach ($subtotals as $key => $subtotal) {
-            $weighted = bcmul((string) $discount, (string) $subtotal, 0);
-            $allocated[$key] = (int) bcdiv($weighted, (string) $total, 0);
-            $remainders[$key] = (int) bcmod($weighted, (string) $total);
-        }
-
-        // Hand the leftover centavos to the largest fractional remainders
-        // (floor() can leave at most one centavo per group behind).
-        $left = $discount - array_sum($allocated);
-        arsort($remainders);
-
-        foreach (array_keys($remainders) as $key) {
-            if ($left <= 0) {
-                break;
+        foreach ($carrierOptions as $row) {
+            if (! ($row['available'] ?? false)) {
+                continue;
             }
 
-            $allocated[$key]++;
-            $left--;
+            $sellerId = (int) $row['seller_id'];
+            $raw = $old[$sellerId] ?? $old[(string) $sellerId] ?? null;
+            $chosen = is_int($raw) || (is_string($raw) && ctype_digit($raw)) ? (int) $raw : 0;
+            $match = collect($row['carriers'])->firstWhere('id', $chosen)
+                ?? ($row['carriers'][0] ?? null);
+
+            if ($match !== null) {
+                $fees[$sellerId] = (int) $match['fee_minor'];
+            }
         }
 
-        return $allocated;
+        return $fees;
     }
 
     /**
-     * Normalize phone number formats (strip formatting, return consistent format).
+     * Identifies the destination the buyer was shown, so an address edited in
+     * another tab stops the order instead of shipping somewhere unreviewed.
      */
-    private function normalizePhoneNumber(?string $phone): ?string
+    private function addressFingerprint(Buyer $deliverTo): string
     {
-        if (! $phone) {
-            return null;
-        }
-
-        // Remove spaces, hyphens, parentheses
-        $phone = preg_replace('/[\s\-()]/u', '', $phone);
-
-        // If starts with +63, replace with 0
-        if (str_starts_with($phone, '+63')) {
-            return '0'.substr($phone, 3);
-        }
-
-        // If starts with 63 (without +), replace with 0
-        if (str_starts_with($phone, '63')) {
-            return '0'.substr($phone, 2);
-        }
-
-        return $phone;
+        return hash('sha256', json_encode($this->addressSnapshot($deliverTo), JSON_THROW_ON_ERROR));
     }
 
     /**
-     * Build a full address string from saved address components.
-     */
-    private function buildAddressString(Buyer $buyer): string
-    {
-        $parts = array_filter([
-            $buyer->house_number,
-            $buyer->street,
-            $buyer->barangay_name,
-        ]);
-
-        return implode(', ', $parts);
-    }
-
-    /**
-     * Immutable snapshot of the buyer's profile address at order time
+     * Immutable snapshot of the chosen address at order time
      * (orders.shipping_address is JSON, deliberately not a live FK).
      *
      * @return array<string, string|null>

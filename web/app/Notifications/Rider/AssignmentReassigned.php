@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Rider;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 
 /**
  * A pickup or delivery task was taken away from this rider and given to

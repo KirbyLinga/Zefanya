@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
-use App\Models\CodRemittance;
-use App\Services\CodRemittanceService;
+use App\Models\Logistics\CodRemittance;
+use App\Services\Logistics\CodRemittanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -13,14 +13,30 @@ class CodRemittanceController extends Controller
 {
     public function index(Request $request): View
     {
-        $remittances = CodRemittance::query()
-            ->where('logistics_provider_id', $request->user('logistics')->getKey())
+        $ledger = CodRemittance::query()
+            ->where('logistics_provider_id', $request->user('logistics')->getKey());
+        $confirmedCash = 'CASE WHEN status = ? THEN COALESCE(received_amount_minor, 0) ELSE 0 END';
+        $riderReconciliation = (clone $ledger)
+            ->select('courier_id')
+            ->selectRaw('SUM(amount_minor) AS collected_minor')
+            ->selectRaw("SUM({$confirmedCash}) AS remitted_minor", [CodRemittance::REMITTED_TO_LOGISTICS])
+            ->selectRaw("SUM(amount_minor) - SUM({$confirmedCash}) AS difference_minor", [CodRemittance::REMITTED_TO_LOGISTICS])
+            ->groupBy('courier_id')
+            ->with('courier.rider')
+            ->orderByDesc('difference_minor')->orderBy('courier_id')
+            ->paginate(20, ['*'], 'riders_page')->withQueryString();
+        $reconciliationTotals = (clone $ledger)
+            ->selectRaw('COALESCE(SUM(amount_minor), 0) AS collected_minor')
+            ->selectRaw("COALESCE(SUM({$confirmedCash}), 0) AS remitted_minor", [CodRemittance::REMITTED_TO_LOGISTICS])
+            ->first();
+
+        $remittances = (clone $ledger)
             ->where('status', CodRemittance::PENDING_REMITTANCE)
             ->with(['courier.rider', 'sellerOrder'])
             ->orderBy('id')
-            ->paginate(20);
+            ->paginate(20)->withQueryString();
 
-        return view('Logistics.CodRemittances.index', compact('remittances'));
+        return view('Logistics.CodRemittances.index', compact('remittances', 'riderReconciliation', 'reconciliationTotals'));
     }
 
     public function confirm(

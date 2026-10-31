@@ -8,7 +8,8 @@ if (! is_dir($dir)) {
 }
 $files = [
     ['drivers_license.jpg', 1572864, "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00"],
-    ['drivers_license.png', 2097152, "\x89PNG\r\n\x1A\n"],
+    // Signature plus an IHDR chunk, so content sniffing (mimes) sees a real PNG.
+    ['drivers_license.png', 2097152, "\x89PNG\r\n\x1A\n\x00\x00\x00\x0DIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1F\x15\xC4\x89"],
     ['drivers_license.pdf', 716800, "%PDF-1.4\n"],
     ['or_cr.pdf', 921600, "%PDF-1.4\n"],
     ['size_4.9MB.jpg', 5138022, "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00"],

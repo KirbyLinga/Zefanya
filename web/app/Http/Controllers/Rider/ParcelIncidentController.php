@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ParcelIncident\StoreIncidentRequest;
-use App\Models\SellerOrder;
-use App\Services\ParcelIncidentService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ParcelIncidentService;
 use Illuminate\Http\JsonResponse;
 
 class ParcelIncidentController extends Controller

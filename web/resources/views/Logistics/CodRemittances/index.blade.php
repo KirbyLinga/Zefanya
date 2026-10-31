@@ -1,12 +1,12 @@
 @extends('Layouts.logistics')
 
-@section('title', 'COD Remittances')
+@section('title', 'COD Reconciliation')
 
 @section('content')
 <div class="flex flex-col gap-6">
     <header class="border-b border-[var(--border-strong)] pb-6">
-        <h1 class="font-serif text-[28px] text-[var(--text-ink)] sm:text-[32px]">COD Remittances</h1>
-        <p class="mt-2 font-sans text-sm text-[var(--text-muted)]">Confirm each parcel's cash receipt after collecting the full amount from the Rider.</p>
+        <h1 class="font-serif text-[28px] text-[var(--text-ink)] sm:text-[32px]">COD Reconciliation</h1>
+        <p class="mt-2 font-sans text-sm text-[var(--text-muted)]">Compare COD collected and cash remitted per rider. Confirm each parcel receipt after receiving the full amount.</p>
     </header>
 
     <x-logistics-flash />
@@ -21,6 +21,58 @@
         </div>
     @endif
 
+    @php
+        $collected = (int) $reconciliationTotals->collected_minor;
+        $remitted = (int) $reconciliationTotals->remitted_minor;
+        $difference = $collected - $remitted;
+        $money = fn (int $minor): string => ($minor < 0 ? '-' : '').'₱'.number_format(intdiv(abs($minor), 100)).'.'.str_pad((string) (abs($minor) % 100), 2, '0', STR_PAD_LEFT);
+    @endphp
+    <section aria-label="COD totals" class="grid gap-4 sm:grid-cols-3">
+        @foreach (['Collected' => $collected, 'Remitted to Logistics' => $remitted, 'Difference / cash still due' => $difference] as $label => $amount)
+            <div class="rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
+                <p class="font-sans text-xs font-semibold text-[var(--text-muted)]">{{ $label }}</p>
+                <p class="mt-2 font-sans text-2xl font-semibold tabular-nums {{ $loop->last && $amount > 0 ? 'text-[var(--status-danger)]' : 'text-[var(--text-ink)]' }}">{{ $money($amount) }}</p>
+                <p class="mt-1 text-xs text-[var(--text-muted)]">All records for your Logistics company</p>
+            </div>
+        @endforeach
+    </section>
+
+    <section aria-labelledby="riderReconciliationTitle" class="space-y-4">
+        <div>
+            <h2 id="riderReconciliationTitle" class="font-serif text-xl text-[var(--text-ink)]">Reconciliation by rider</h2>
+            <p class="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">Difference = collected minus confirmed remitted cash. A positive difference is a shortfall still due from the rider, including pending remittances. Largest shortfalls appear first.</p>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)]">
+            <table class="w-full min-w-[720px] text-left font-sans text-sm">
+                <thead class="border-b border-[var(--border-strong)] bg-[var(--bg-hover)] text-xs text-[var(--text-muted)]">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 font-semibold">Rider</th>
+                        <th scope="col" class="px-4 py-3 text-right font-semibold">Collected</th>
+                        <th scope="col" class="px-4 py-3 text-right font-semibold">Remitted</th>
+                        <th scope="col" class="px-4 py-3 text-right font-semibold">Difference</th>
+                        <th scope="col" class="px-4 py-3 font-semibold">Reconciliation</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border-strong)]">
+                    @forelse ($riderReconciliation as $row)
+                        @php($balance = (int) $row->difference_minor)
+                        <tr data-cod-rider="{{ $row->courier_id }}" class="{{ $balance > 0 ? 'bg-[var(--pill-danger-bg)]' : '' }}">
+                            <td class="px-4 py-4 font-semibold text-[var(--text-ink)]">{{ $row->courier?->rider?->fullName() ?: ($row->courier?->name ?: 'Courier #'.$row->courier_id) }}</td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[var(--text-ink)]">{{ $money((int) $row->collected_minor) }}</td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[var(--text-ink)]">{{ $money((int) $row->remitted_minor) }}</td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right font-semibold tabular-nums {{ $balance > 0 ? 'text-[var(--status-danger)]' : 'text-[var(--text-ink)]' }}">{{ $money($balance) }}</td>
+                            <td class="px-4 py-4">
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $balance > 0 ? 'bg-red-100 text-red-900' : ($balance < 0 ? 'bg-amber-100 text-amber-900' : 'bg-teal-100 text-teal-900') }}">{{ $balance > 0 ? 'Shortfall' : ($balance < 0 ? 'Over remitted' : 'Balanced') }}</span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="px-4 py-10 text-center text-[var(--text-muted)]">No COD collections to reconcile yet.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        {{ $riderReconciliation->links() }}
+    </section>
     <section aria-labelledby="pendingRemittancesTitle" class="flex flex-col gap-4">
         <h2 id="pendingRemittancesTitle" class="font-serif text-xl text-[var(--text-ink)]">Pending remittances ({{ $remittances->total() }})</h2>
 

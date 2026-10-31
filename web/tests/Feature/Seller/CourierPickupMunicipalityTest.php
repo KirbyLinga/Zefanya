@@ -4,14 +4,14 @@ namespace Tests\Feature\Seller;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
@@ -57,9 +57,9 @@ class CourierPickupMunicipalityTest extends TestCase
             'quantity' => 1,
         ]);
 
-        $sellerOrder = (new SellerOrderStatusService)
-            ->transition($sellerOrder->fresh(), OrderStatus::ReadyForPickup)
-            ->fresh();
+        foreach ([OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup] as $status) {
+            $sellerOrder = (new SellerOrderStatusService)->transition($sellerOrder->fresh(), $status);
+        }
 
         // The only available rider serves the SELLER's municipality.
         $provider = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now()]);

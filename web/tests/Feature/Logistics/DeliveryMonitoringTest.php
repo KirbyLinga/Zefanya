@@ -4,9 +4,9 @@ namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
+use App\Models\Rider\Courier;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -172,5 +172,58 @@ class DeliveryMonitoringTest extends TestCase
         $this->actingAs($buyer, 'buyer')
             ->get(route('logistics.delivery-monitoring.index'))
             ->assertRedirect(route('home', ['login' => 1]));
+    }
+
+    public function test_search_matches_tracking_order_ids_and_buyer_names_with_provider_scope(): void
+    {
+        $mine = $this->order(OrderStatus::OutForDelivery, $this->courier(), $this->courier());
+        $mine->forceFill(['tracking_number' => 'TRK-SEARCH-928XYZ'])->save();
+        $mine->order->buyer->forceFill(['first_name' => 'Maria', 'middle_initial' => 'J', 'last_name' => 'Dela Cruz'])->save();
+        $this->order(OrderStatus::OutForDelivery, $this->courier(), $this->courier());
+        $otherProvider = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now()]);
+        $foreign = $this->order(OrderStatus::OutForDelivery, $this->courier($otherProvider), $this->courier($otherProvider));
+        $foreign->order->update(['buyer_id' => $mine->order->buyer_id]);
+        $foreign->forceFill(['tracking_number' => 'TRK-FOREIGN-928XYZ'])->save();
+        $wrongStage = $this->order(OrderStatus::ReadyForPickup, $this->courier());
+        $wrongStage->order->update(['buyer_id' => $mine->order->buyer_id]);
+        foreach (['928XYZ', (string) $mine->id, '#'.$mine->id, (string) $mine->order_id, 'Maria J. Dela Cruz', 'dela cruz', 'maria'] as $search) {
+            $response = $this->actingAs($this->provider, 'logistics')
+                ->get(route('logistics.delivery-monitoring.index', ['search' => $search]))
+                ->assertOk();
+            $this->assertSame([$mine->id], $response->viewData('shipments')->pluck('id')->all(), $search);
+        }
+        foreach ([$foreign->tracking_number, '#'.$foreign->id] as $search) {
+            $this->get(route('logistics.delivery-monitoring.index', ['search' => $search]))
+                ->assertOk()->assertViewHas('shipments', fn ($rows) => $rows->isEmpty());
+        }
+    }
+
+    public function test_search_has_a_helpful_empty_state_and_validates_input(): void
+    {
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.delivery-monitoring.index', ['search' => 'no-such-parcel']))
+            ->assertOk()->assertSee('No matching shipments')->assertSee('Clear search');
+        $this->get(route('logistics.delivery-monitoring.index', ['search' => str_repeat('x', 101)]))
+            ->assertSessionHasErrors('search');
+        $this->get(route('logistics.delivery-monitoring.index', ['search' => ['invalid']]))
+            ->assertSessionHasErrors('search');
+    }
+
+    public function test_tracking_search_is_applied_before_pagination_and_preserved_in_page_links(): void
+    {
+        $courier = $this->courier();
+        $ids = [];
+        for ($i = 0; $i < 26; $i++) {
+            $parcel = $this->order(OrderStatus::OutForDelivery, $courier);
+            $parcel->forceFill(['tracking_number' => 'SEARCHPAGE-'.$i])->save();
+            $ids[] = $parcel->id;
+        }
+        $first = $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.delivery-monitoring.index', ['search' => 'SEARCHPAGE']))->assertOk();
+        $this->assertSame(26, $first->viewData('shipments')->total());
+        $this->assertCount(25, $first->viewData('shipments'));
+        $this->assertStringContainsString('search=SEARCHPAGE', $first->viewData('shipments')->nextPageUrl());
+        $second = $this->get(route('logistics.delivery-monitoring.index', ['search' => 'SEARCHPAGE', 'page' => 2]))->assertOk();
+        $this->assertSame([$ids[25]], $second->viewData('shipments')->pluck('id')->all());
     }
 }

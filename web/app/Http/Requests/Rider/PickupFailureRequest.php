@@ -22,7 +22,7 @@ class PickupFailureRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'failure_reason' => ['required', new Enum(DeliveryFailureReason::caseNames())],
+            'failure_reason' => ['required', new Enum(DeliveryFailureReason::class)],
             'failure_notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

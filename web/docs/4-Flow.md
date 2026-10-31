@@ -22,7 +22,7 @@
 | Messaging | `conversations`, `messages` | same | — | — |
 | Sessions | — | session | — | — |
 
-**Every** `seller_orders.status` change goes through `SellerOrderStatusService::transition()` (`app/Services/SellerOrderStatusService.php:85-194`), which re-reads under `lockForUpdate`, enforces the graph + role gate, writes `status_histories`, and rolls up the parent order — all in one transaction.
+**Every** `seller_orders.status` change goes through `SellerOrderStatusService::transition()` (`app/Services/Seller/SellerOrderStatusService.php:85-194`), which re-reads under `lockForUpdate`, enforces the graph + role gate, writes `status_histories`, and rolls up the parent order — all in one transaction.
 
 ---
 
@@ -93,6 +93,18 @@
 | 7 | Buyer | `GET /buyer/checkout/success/{order}` → `@success` | — | — | order summary | WORKS — `CheckoutController.php:543` |
 
 **Payment:** `payment_method` defaults to `Cod` when absent (`CheckoutController.php:188-189`); only COD is integrated (`PaymentMethod::isIntegrated()`). **Address:** a saved-address confirmation card replaces the old free-text fields; the snapshot includes `postal_code` (`addressSnapshot()` `:514-538`).
+
+**Checkout shipping and re-confirmation:** each carrier's fee comes from its own zone rate in `logistics_shipping_rates`, or `config('buyer.shipping_rates')` (cross-province: `buyer.cross_province`) if it set none, by the shop's total parcel weight rounded up to whole kilos, minimum one; the free-shipping threshold still applies first. The checkout page submits fingerprints of unit prices, shipping fees and vouchers. If any differ at Place Order, or a voucher stopped applying, `store` places nothing and returns to the checkout page with the new total; the token stays unused, so the buyer confirms once more. `placeOrder` re-checks prices, vouchers and fees under lock and stops the same way. Each shop can receive a note up to 200 characters (`seller_orders.buyer_note`).
+
+**Checkout address picker:** checkout quotes fees and coverage for the address chosen from `buyer_addresses` (default first; `?address=` reloads the page so the server re-quotes). `BuyerAddressBook::deliveringTo()` lays that address over an unsaved copy of the buyer, so choosing never changes the profile or the default. Place Order refuses an id the buyer does not own, re-reads the row under the buyer lock, and stops if the address changed since the page loaded. `orders.shipping_address` is the only destination an order reads afterwards, so later edits or deletes leave orders and waybills alone. A buyer with no saved rows checks out with the profile address.
+
+**Buyer password change:** `AccountPasswordController` checks the current password and the new password's rules, then mails a 5-minute code to the buyer's email and holds the new password's hash in `buyers.pending_password`; `password` stays the login until the code is confirmed. Confirming rotates `remember_token`, signs out other sessions through `AuthenticateRoleSession`, keeps this browser signed in, and mails a notice. Limits match the email change, per buyer.
+
+**Buyer email and phone change:** `AccountEmailController` refuses an address any role already uses, then mails a 5-minute code to the new address and holds it in `buyers.pending_email`; `email` stays the login until the code is confirmed, which re-checks the address under the registration lock and notifies the old address. Code sends (3 per 10 minutes) and wrong codes (5, then a 15-minute lock) are limited per buyer. The profile form's `contact_no` uses `PhilippineMobile` (format, `+63` normalised, unique across roles).
+
+**Store sales and prices:** `PriceResolver` applies the running sale to every buyer price; regular prices on `product_variants` never change, and seller pages keep showing them. A sale applies before vouchers, so voucher discounts and minimum spend use the sale-priced subtotal, and commission is taken on that same subtotal. Any cancel (seller, buyer or failed pickup) returns voucher usage in `SellerOrderStatusService::returnVouchers()`: a shop voucher straight away, and a platform or shipping voucher once every shipment using it is cancelled. The checkout page submits `price_fingerprint`; if a sale started or ended since the page rendered, `store` returns the buyer to the cart instead of charging a different total, and `placeOrder` re-resolves under the product lock. The Home Flash Sale section lists only products with a real resolved discount and hides when there are none.
+
+**Buyer return decision:** a buyer's request stores reason, optional description and up to 5 private photos, and sets `parcel_returns.seller_response_due_at` to 3 days out (failed-delivery returns have no due date and need no decision). Until the Seller answers on `/seller/returns`, `ParcelReturnService` refuses any reverse routing. Approve opens collection: the provider holding the parcel assigns a rider on `/logistics/returns/{return}`, the rider sees it under `/rider/return-pickups` and confirms with the waybill number, and the rider's station takes custody. Only then can the existing reverse flow move it (`ParcelReturn::movementBlockedReason()` gates manifests, handoffs and origin scans). The order stays `DELIVERED` until Seller receipt. Reject needs a 10–300 character reason, sets `RETURN_REJECTED`, and frees the order to complete. After the deadline the Seller can no longer decide and `returns:auto-approve-overdue` (every 5 minutes) approves it. No outcome infers a refund.
 
 **Purchase option snapshots (T06, verified locally 2026-10-18):** Checkout saves `order_items.variant_options` as ordered option name/value pairs from the locked variant and its transaction-loaded option names. `PurchasedVariantSnapshot` captures these values; buyer order list, details and checkout confirmation render only this JSON through `OrderItem::variantDescription()`. Existing product-name, quantity and integer-price snapshots are reused. Later catalog edits/disabling/deletion do not rewrite the saved options. Optionless purchases store []; historical rows remain NULL and omit option metadata without guessing from current variants. The additive migration must be applied through the normal release process; it has only been exercised in isolated SQLite tests here.
 
@@ -202,8 +214,11 @@ Admin role gate: `admin.role:admin,moderator`; `super_admin` always passes; **`s
 | 1 | Buyer/Seller | `GET /buyer/messages`, `/seller/messages` → `MessageController@index` | — | WORKS |
 | 2 | Buyer/Seller | `GET …/messages/unread-count` → `@unreadCount` | — | WORKS (literal route ordered before `{conversation}`) |
 | 3 | Buyer/Seller | `GET …/messages/{conversation}` → `@show` (policy-gated) | — | WORKS — `ConversationPolicy` |
-| 4 | Buyer/Seller | `POST …/messages` → `@store` | `messages` row; updates `conversations.last_message_at` | WORKS |
-| 5 | Buyer/Seller | `POST …/messages/get-or-create` → `@getOrCreateConversation` | `conversations` row (unique buyer+seller) | WORKS |
+| 3a | Buyer/Seller | `GET …/messages/{conversation}?after={id}` (JSON) → `@show` | `messages.read_at` | WORKS — open threads poll every 5 s for new messages |
+| 3b | Buyer/Seller | `GET …/messages/{conversation}/images/{message}` → `@image` (policy-gated) | — | WORKS — photos are on the private `local` disk |
+| 4 | Buyer/Seller | `POST …/messages` → `@store` (`StoreChatMessageRequest`: text ≤ 1,000 characters and/or JPG/PNG ≤ 5 MB) | `messages` row; updates `conversations.last_message_at` | WORKS |
+| 5 | Buyer | `POST /buyer/messages/get-or-create` → `@getOrCreateConversation` (approved seller; product/order must connect the pair) | `conversations` row (unique buyer+seller) | WORKS |
+| 5a | Seller | `POST /seller/orders/{sellerOrder}/message` → `@startFromOrder` (`SellerOrderPolicy@view`) | `conversations` row (unique buyer+seller) | WORKS |
 | 6 | Buyer | `GET /buyer/chat`, `/buyer/chat/{id}` → `ChatController@index`/`@show` | — | **PLACEHOLDER** — redirects "Chat is coming soon" (`ChatController.php:20-32`); views are comments |
 | 7 | Any | notifications endpoints → `Buyer\NotificationController@index/count/markRead/markAllRead` | `notifications.read_at` | WORKS (buyer). **No seller or logistics notification centre** |
 

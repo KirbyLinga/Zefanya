@@ -3,6 +3,14 @@
 @section('title', 'Registration Management')
 
 @section('content')
+@php
+    $registrationFilters = request()->only(['search', 'status', 'date_range', 'per_page']);
+@endphp
+<x-admin.tabs :tabs="[
+    ['label' => 'Buyers', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'buyer'], 'active' => request('type') === 'buyer'],
+    ['label' => 'Sellers', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'seller'], 'active' => request('type') === 'seller'],
+    ['label' => 'Logistics', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'logistics'], 'active' => request('type') === 'logistics'],
+]" />
 
 @php
     // Status colors and labels (updated for new status values)
@@ -288,6 +296,7 @@
                                         data-detail-address="{{ e(trim(collect([$model->street, $model->house_number, $model->barangay_name, $model->municipality_name, $model->province_name, $model->postal_code])->filter()->implode(', '))) }}"
                                         data-detail-id-url="{{ $model->upload_id_path ? route('admin.documents.stream', ['type' => $type, 'id' => $model->id, 'document' => 'id']) : '' }}"
                                         data-detail-permit-url="{{ $type === 'seller' && $model->business_permit_path ? route('admin.documents.stream', ['type' => 'seller', 'id' => $model->id, 'document' => 'business_permit']) : ($type === 'logistics' && ($model->dti_permit_path ?? null) ? route('admin.documents.stream', ['type' => 'logistics', 'id' => $model->id, 'document' => 'dti_permit']) : '') }}"
+                                        data-detail-sec-url="{{ $type === 'seller' && $model->sec_certificate_path ? route('admin.documents.stream', ['type' => 'seller', 'id' => $model->id, 'document' => 'sec_certificate']) : '' }}"
                                         data-detail-permit-label="{{ $type === 'seller' ? 'Business permit' : ($type === 'logistics' ? 'DTI permit' : '') }}"
                                         onclick="openDetailModal(this)">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
@@ -363,6 +372,7 @@
             <div class="flex flex-wrap gap-2 pt-2">
                 <a id="detailIdLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200">View ID</a>
                 <a id="detailPermitLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200"></a>
+                <a id="detailSecLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200">View SEC certificate</a>
             </div>
         </dl>
     </div>
@@ -422,6 +432,10 @@
         } else {
             idLink.classList.add('hidden');
         }
+
+        const secLink = document.getElementById('detailSecLink');
+        secLink.classList.toggle('hidden', !btn.dataset.detailSecUrl);
+        secLink.href = btn.dataset.detailSecUrl || '#';
 
         const permitLink = document.getElementById('detailPermitLink');
         if (btn.dataset.detailPermitUrl) {

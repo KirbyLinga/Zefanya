@@ -3,12 +3,12 @@
 namespace Database\Seeders;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
-use App\Models\SellerOrder;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
+use App\Models\Shared\SellerOrder;
 use Illuminate\Database\Seeder;
 
 /**

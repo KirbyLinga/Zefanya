@@ -4,7 +4,7 @@ namespace Tests\Feature\Logistics;
 
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\LogisticsHubDecisionNotification;
 use App\Notifications\Logistics\RiderAssignmentsNeedReassignment;
 use App\Notifications\Logistics\RiderParcelActivity;

@@ -20,6 +20,77 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// Category row. The browser scrolls and snaps it; this only drives the arrows
+// and dots, and keeps them in step however the row was moved.
+(function () {
+  const row = document.getElementById('catCarousel');
+  const dots = document.getElementById('catDots');
+  if (!row || !dots || !row.children.length) return;
+  const controls = document.getElementById('catControls');
+  const prev = document.getElementById('catPrev');
+  const next = document.getElementById('catNext');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let pending = false;
+
+  const perView = () => parseInt(getComputedStyle(row).getPropertyValue('--cat-per-view'), 10) || 5;
+  const pageCount = () => Math.ceil(row.children.length / perView());
+  const pageWidth = () => (row.children[0].offsetWidth + (parseFloat(getComputedStyle(row).columnGap) || 0)) * perView();
+  const maxScroll = () => row.scrollWidth - row.clientWidth;
+
+  function go(page) {
+    row.scrollTo({ left: page * pageWidth(), behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+  }
+
+  function currentPage() {
+    if (row.scrollLeft >= maxScroll() - 1) return pageCount() - 1;
+    return Math.round(row.scrollLeft / pageWidth());
+  }
+
+  function sync() {
+    pending = false;
+    const page = currentPage();
+    [...dots.children].forEach((dot, index) => {
+      const active = index === page;
+      dot.setAttribute('aria-current', String(active));
+      dot.firstElementChild.classList.toggle('bg-primary-800', active);
+      dot.firstElementChild.classList.toggle('scale-125', active);
+      dot.firstElementChild.classList.toggle('bg-buyer-line', !active);
+    });
+    prev.disabled = row.scrollLeft <= 1;
+    next.disabled = row.scrollLeft >= maxScroll() - 1;
+  }
+
+  function build() {
+    const pages = pageCount();
+    controls.hidden = pages < 2;
+    controls.classList.toggle('flex', pages > 1);
+    if (dots.children.length !== pages) {
+      dots.replaceChildren(...Array.from({ length: pages }, (_, index) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'flex h-8 w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0';
+        dot.setAttribute('aria-label', 'Category page ' + (index + 1));
+        const mark = document.createElement('span');
+        mark.className = 'h-2 w-2 rounded-full bg-buyer-line transition-[background-color,transform] duration-200 motion-reduce:transition-none';
+        dot.appendChild(mark);
+        dot.addEventListener('click', () => go(index));
+        return dot;
+      }));
+    }
+    sync();
+  }
+
+  prev.addEventListener('click', () => go(currentPage() - 1));
+  next.addEventListener('click', () => go(currentPage() + 1));
+  row.addEventListener('scroll', () => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(sync);
+  }, { passive: true });
+  new ResizeObserver(build).observe(row);
+  build();
+})();
+
 // Real-data hero carousel; hidden slides are also inert for keyboard users.
 (function () {
   const hero = document.querySelector('[data-home-hero]');

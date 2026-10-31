@@ -49,7 +49,7 @@ class VerifyBuyerOtpController extends Controller
     {
         $data = $request->validate([
             'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
-        ]);
+        ], $this->otpValidationMessages());
 
         // Per-account brute-force lock, checked before anything else so a
         // locked account cannot keep guessing (or be unlocked by a resend).
@@ -77,7 +77,7 @@ class VerifyBuyerOtpController extends Controller
 
             return $this->respond($request, [
                 'ok' => false,
-                'message' => 'That code doesn\'t match. Please try again.',
+                'message' => $this->otpInvalidMessage(),
                 'attempts_remaining' => $remaining,
             ], 422);
         }
@@ -86,7 +86,7 @@ class VerifyBuyerOtpController extends Controller
             return $this->respond($request, [
                 'ok' => false,
                 'expired' => true,
-                'message' => 'This code has expired. Please request a new one.',
+                'message' => $this->otpExpiredMessage(),
             ], 422);
         }
 

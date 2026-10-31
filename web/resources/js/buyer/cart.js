@@ -129,6 +129,29 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.from(selected);
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function voucherChip(voucher) {
+    const label = voucher.scope === 'shipping'
+      ? `${voucher.code} (shipping)`
+      : voucher.label;
+
+    return `<div class="js-cartpage-voucher-chip flex items-center gap-2 rounded-lg border border-tertiary-200 bg-tertiary-50 px-2.5 py-2" data-slot="${escapeHtml(voucher.slot)}">
+      <i data-lucide="tag" width="13" height="13" class="shrink-0 text-tertiary-700"></i>
+      <span class="js-cartpage-voucher-chip-label min-w-0 flex-1 truncate text-[11.5px] font-semibold text-tertiary-700">${escapeHtml(label)}</span>
+      <button type="button" class="js-cartpage-voucher-remove shrink-0 text-tertiary-700 transition-opacity hover:opacity-70" data-slot="${escapeHtml(voucher.slot)}" aria-label="Remove ${escapeHtml(voucher.code)}">
+        <i data-lucide="x" width="14" height="14"></i>
+      </button>
+    </div>`;
+  }
+
   function request(url, options = {}) {
     const method = options.method || 'GET';
     const body = options.body === undefined ? null : options.body;
@@ -174,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setText('#cartpage-select-all-count', `(${lineCount} ${lineCount === 1 ? 'item' : 'items'})`);
 
-    // Voucher discount row + applied-code chip
+    // Voucher discount row + applied-voucher chips
     const discountRow = $('#cartpage-discount-row');
 
     if (discountRow) {
@@ -183,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (payload.has_voucher) {
       setText('#cartpage-discount', payload.discount);
-      setText('#cartpage-voucher-chip-label', payload.voucher_label);
 
       const input = $('#cartpage-voucher-input');
 
@@ -192,10 +214,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const chip = $('#cartpage-voucher-chip');
+    const chips = $('#cartpage-voucher-chips');
 
-    if (chip) {
-      chip.classList.toggle('hidden', !payload.has_voucher);
+    if (chips) {
+      if (payload.has_voucher && Array.isArray(payload.vouchers)) {
+        chips.innerHTML = payload.vouchers.map(voucherChip).join('');
+        chips.classList.remove('hidden');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } else {
+        chips.innerHTML = '';
+        chips.classList.add('hidden');
+      }
     }
 
     // A previously applied voucher can be dropped when the selection changes
@@ -348,14 +379,17 @@ document.addEventListener('DOMContentLoaded', () => {
     })
       .then((payload) => {
         const applied = Number(payload.quantity) || quantity;
+        const currentStock = Number.isInteger(payload.quantity_limit) ? payload.quantity_limit : stock;
 
         row.dataset.confirmedQuantity = String(applied);
+        row.dataset.stock = String(currentStock);
 
         // The server may have capped the quantity at the available stock.
         if (display && applied !== quantity) {
           display.textContent = String(applied);
-          updateStepperBounds(row, applied, stock);
         }
+        updateStepperBounds(row, applied, currentStock);
+        if (payload.quantity_warning) toast(payload.quantity_warning);
 
         applySummary(payload);
       })
@@ -523,13 +557,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  function removeVoucher() {
+  function removeVoucher(slot) {
     clearVoucherError();
 
-    request(withQuery(data.voucherRemoveUrl, selectionParams()), { method: 'DELETE' })
+    const params = selectionParams(slot ? { slot } : {});
+
+    request(withQuery(data.voucherRemoveUrl, params), { method: 'DELETE' })
       .then((payload) => {
         applySummary(payload);
-        toast('Voucher removed');
+        toast(slot ? 'Voucher removed' : 'Vouchers removed');
       })
       .catch((error) => toast(error.message));
   }
@@ -622,14 +658,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const shopVoucher = event.target.closest('.js-cartpage-shop-voucher-apply');
+    if (shopVoucher) {
+      const input = document.getElementById('cartpage-voucher-input');
+      if (input) input.value = shopVoucher.dataset.code;
+      applyVoucher();
+      return;
+    }
+
     if (event.target.closest('#cartpage-voucher-apply')) {
       applyVoucher();
 
       return;
     }
 
-    if (event.target.closest('#cartpage-voucher-remove')) {
-      removeVoucher();
+    const voucherRemove = event.target.closest('.js-cartpage-voucher-remove, #cartpage-voucher-remove');
+
+    if (voucherRemove) {
+      removeVoucher(voucherRemove.dataset.slot);
 
       return;
     }

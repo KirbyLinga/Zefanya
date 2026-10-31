@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Rider;
 
 use App\Http\Requests\Logistics\StoreRiderRequest;
+use App\Support\PasswordRule;
 use Illuminate\Validation\Rule;
 
 class StoreRiderRegistrationRequest extends StoreRiderRequest
@@ -13,18 +14,16 @@ class StoreRiderRegistrationRequest extends StoreRiderRequest
             'address_mode' => ['required', Rule::in(['api'])],
             // Riders choose their company, never a station or coverage area.
             'station_hub_id' => ['prohibited'],
-            'email' => ['required', 'string', 'email:rfc', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed', 'not_regex:/\x00/',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (is_string($value) && strlen($value) > 72) {
-                        $fail('The password must not exceed 72 bytes.');
-                    }
-                }, 'regex:/^(?=.*\p{Lu})(?=.*\p{Ll})(?=.*\p{N})(?=.*[\p{Z}\p{S}\p{P}]).+$/u'],
+            // Email keeps the shared format rule from StoreRiderRequest.
+            'password' => PasswordRule::rules(),
             'logistics_provider_id' => ['required', 'integer', Rule::exists('logistics_providers', 'id')->where('status', 'approved')->whereNull('archived_at')],
-            'drivers_license' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'extensions:jpg,jpeg,png,pdf', 'max:5120'],
-            'or_cr' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'extensions:jpg,jpeg,png,pdf', 'max:5120'],
             'terms' => ['required', 'accepted'],
         ]);
+    }
+
+    public function messages(): array
+    {
+        return array_merge(parent::messages(), PasswordRule::messages());
     }
 
     /**

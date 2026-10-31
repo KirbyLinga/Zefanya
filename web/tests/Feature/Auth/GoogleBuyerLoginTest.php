@@ -143,7 +143,11 @@ class GoogleBuyerLoginTest extends TestCase
 
     private function fakeGoogleUser(string $email, string $id): void
     {
-        $googleUser = (new GoogleUser)->map([
+        $googleUser = (new GoogleUser)->setRaw([
+            'sub' => $id,
+            'email' => $email,
+            'email_verified' => true,
+        ])->map([
             'id' => $id,
             'email' => $email,
             'name' => 'Google Buyer',

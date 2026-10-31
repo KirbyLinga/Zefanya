@@ -24,6 +24,6 @@ class BuyerVerifyOtp extends Notification
             ->greeting("Hi {$notifiable->fullName()},")
             ->line('Use the 6-digit code below to confirm your email and finish your buyer registration.')
             ->line("**Verification code: {$this->code}**")
-            ->line('This code expires in 10 minutes. If it expires, request a new one from the registration form.');
+            ->line('This code expires in 5 minutes. If it expires, request a new one from the registration form.');
     }
 }
