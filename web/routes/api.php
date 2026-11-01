@@ -54,7 +54,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register/buyer', [RegisterBuyerController::class, 'store'])
     ->name('api.register.buyer.store')
-    ->middleware('throttle:5,1,api-register');
+    ->middleware(['throttle:api-register', 'throttle:api-uploads']);
 
 Route::post('/register/buyer/verify-otp/{buyer}', [VerifyBuyerOtpController::class, 'verify'])
     ->name('api.register.buyer.verify-otp')
@@ -66,31 +66,31 @@ Route::post('/register/buyer/verify-otp/{buyer}/resend', [VerifyBuyerOtpControll
 
 Route::post('/register/courier', [CourierRegistrationController::class, 'store'])
     ->name('api.register.courier.store')
-    ->middleware('throttle:5,1,api-register');
+    ->middleware(['throttle:api-register', 'throttle:api-uploads']);
 
 Route::post('/register/logistics', [CourierRegistrationController::class, 'store'])
     ->name('api.register.logistics.store')
-    ->middleware('throttle:5,1,api-register');
+    ->middleware(['throttle:api-register', 'throttle:api-uploads']);
 
 // ── Signing in (public: this is where a token comes from) ───────────────────
 
 Route::post('/login/buyer', [LoginController::class, 'store'])
     ->name('api.login.buyer')
-    ->middleware('throttle:5,1,api-login');
+    ->middleware('throttle:api-login');
 
 Route::post('/login/courier', [CourierLoginController::class, 'store'])
     ->name('api.login.courier')
-    ->middleware('throttle:5,1,api-login');
+    ->middleware('throttle:api-login');
 
 Route::post('/login/logistics', [CourierLoginController::class, 'store'])
     ->name('api.login.logistics')
-    ->middleware('throttle:5,1,api-login');
+    ->middleware('throttle:api-login');
 
 // ── Federated / Social Auth ──────────────────────────────────────────────────
 
 Route::post('/auth/google', [GoogleAuthController::class, 'handle'])
     ->name('api.auth.google')
-    ->middleware('throttle:15,1,api-auth-google');
+    ->middleware('throttle:api-google');
 
 // ── The catalogue (public: browsing needs no account) ───────────────────────
 //
@@ -144,7 +144,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Account security
     Route::post('/account/password', [AccountSecurityController::class, 'changePassword'])
         ->name('api.account.password')
-        ->middleware('throttle:5,1,api-account-password');
+        ->middleware('throttle:api-account-password');
 
     Route::post('/account/email', [AccountSecurityController::class, 'requestEmailChange'])
         ->name('api.account.email.request')
@@ -172,7 +172,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reviews
     Route::get('/reviews/mine', [ReviewController::class, 'index'])->name('api.reviews.mine');
-    Route::patch('/orders/{sellerOrder}/items/{product}/review', [ReviewController::class, 'upsert'])->name('api.reviews.upsert');
+    Route::patch('/orders/{sellerOrder}/items/{product}/review', [ReviewController::class, 'upsert'])->name('api.reviews.upsert')
+        ->middleware('throttle:api-uploads');
 
     // Wishlist
     Route::get('/buyer/wishlist', [WishlistController::class, 'index'])->name('api.buyer.wishlist.index');
@@ -188,13 +189,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Courier
     Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.courier.jobs.index');
-    Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.courier.jobs.milestone');
+    Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.courier.jobs.milestone')
+        ->middleware(['throttle:api-delivery-verify', 'throttle:api-uploads']);
 });
 
 // ── Versioned v1 Surface ──────────────────────────────────────────────────
 Route::prefix('v1')->group(function () {
     // Auth
-    Route::post('/auth/google', [GoogleAuthController::class, 'handle'])->name('api.v1.auth.google');
+    Route::post('/auth/google', [GoogleAuthController::class, 'handle'])->name('api.v1.auth.google')
+        ->middleware('throttle:api-google');
 
     // PSGC
     Route::get('/psgc/regions', [PsgcController::class, 'regions'])->name('api.v1.psgc.regions');
@@ -203,8 +206,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/psgc/barangays', [PsgcController::class, 'barangays'])->name('api.v1.psgc.barangays');
 
     // Buyer
-    Route::post('/buyer/register', [RegisterBuyerController::class, 'store'])->name('api.v1.buyer.register');
-    Route::post('/buyer/login', [LoginController::class, 'store'])->name('api.v1.buyer.login');
+    Route::post('/buyer/register', [RegisterBuyerController::class, 'store'])->name('api.v1.buyer.register')
+        ->middleware(['throttle:api-register', 'throttle:api-uploads']);
+    Route::post('/buyer/login', [LoginController::class, 'store'])->name('api.v1.buyer.login')
+        ->middleware('throttle:api-login');
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/buyer/me', [LoginController::class, 'show'])->name('api.v1.buyer.me');
         Route::post('/buyer/logout', [LoginController::class, 'destroy'])->name('api.v1.buyer.logout');
@@ -217,7 +222,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('/buyer/addresses/{address}/default', [AddressController::class, 'makeDefault'])->name('api.v1.buyer.addresses.default');
 
         Route::get('/buyer/reviews/mine', [ReviewController::class, 'index'])->name('api.v1.buyer.reviews.mine');
-        Route::patch('/buyer/orders/{sellerOrder}/items/{product}/review', [ReviewController::class, 'upsert'])->name('api.v1.buyer.reviews.upsert');
+        Route::patch('/buyer/orders/{sellerOrder}/items/{product}/review', [ReviewController::class, 'upsert'])->name('api.v1.buyer.reviews.upsert')
+            ->middleware('throttle:api-uploads');
 
         Route::get('/buyer/wishlist', [WishlistController::class, 'index'])->name('api.v1.buyer.wishlist.index');
         Route::post('/buyer/wishlist/{product}', [WishlistController::class, 'store'])->name('api.v1.buyer.wishlist.store');
@@ -231,14 +237,17 @@ Route::prefix('v1')->group(function () {
     });
 
     // Courier
-    Route::post('/courier/register', [CourierRegistrationController::class, 'store'])->name('api.v1.courier.register');
-    Route::post('/courier/login', [CourierLoginController::class, 'store'])->name('api.v1.courier.login');
+    Route::post('/courier/register', [CourierRegistrationController::class, 'store'])->name('api.v1.courier.register')
+        ->middleware(['throttle:api-register', 'throttle:api-uploads']);
+    Route::post('/courier/login', [CourierLoginController::class, 'store'])->name('api.v1.courier.login')
+        ->middleware('throttle:api-login');
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/courier/me', [CourierLoginController::class, 'show'])->name('api.v1.courier.me');
         Route::post('/courier/logout', [CourierLoginController::class, 'destroy'])->name('api.v1.courier.logout');
 
         Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.v1.courier.jobs.index');
-        Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.v1.courier.jobs.milestone');
+        Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.v1.courier.jobs.milestone')
+            ->middleware(['throttle:api-delivery-verify', 'throttle:api-uploads']);
     });
 
     // Seller
