@@ -143,6 +143,68 @@ class OrderController extends Controller
     }
 
     /**
+     * POST /api/orders/{sellerOrder}/delivery-pass
+     *
+     * The buyer asks the server for the current handover secret. Reissuing
+     * invalidates every older code and token for this parcel.
+     */
+    public function deliveryPass(
+        Request $request,
+        SellerOrder $sellerOrder,
+        \App\Services\OrderDeliveryService $delivery,
+    ): JsonResponse {
+        $buyer = $request->user();
+
+        abort_unless(
+            $buyer instanceof Buyer,
+            403,
+            'This token belongs to a different kind of account.',
+        );
+
+        abort_unless(
+            (int) $sellerOrder->order?->buyer_id === (int) $buyer->id,
+            403,
+            'This order belongs to another customer.',
+        );
+
+        try {
+            $pass = $delivery->issuePass($sellerOrder, $buyer);
+        } catch (\App\Exceptions\DeliveryHandoverException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->statusCode);
+        }
+
+        return response()->json(['data' => $pass]);
+    }
+
+    /**
+     * GET /api/orders/{sellerOrder}/delivery-proof
+     *
+     * Proof photos live on the private disk; the owner is the only buyer who
+     * may download them.
+     */
+    public function deliveryProof(Request $request, SellerOrder $sellerOrder): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $buyer = $request->user();
+
+        abort_unless(
+            $buyer instanceof Buyer,
+            403,
+            'This token belongs to a different kind of account.',
+        );
+
+        abort_unless(
+            (int) $sellerOrder->order?->buyer_id === (int) $buyer->id,
+            403,
+            'This order belongs to another customer.',
+        );
+
+        $path = (string) $sellerOrder->delivery_proof_path;
+        abort_unless($path !== '' && \Illuminate\Support\Facades\Storage::disk('local')->exists($path), 404);
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($path);
+    }
+
+    /**
      * Resolve the submitted code, or return the refusal to send back.
      *
      * @param  list<array{product_id: int, quantity: int}>  $lines

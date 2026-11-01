@@ -183,6 +183,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::post('/orders', [OrderController::class, 'store'])->name('api.orders.store');
     Route::get('/orders/{sellerOrder}/milestone', [OrderController::class, 'milestone'])->name('api.orders.milestone');
+    Route::post('/orders/{sellerOrder}/delivery-pass', [OrderController::class, 'deliveryPass'])->name('api.orders.delivery-pass');
+    Route::get('/orders/{sellerOrder}/delivery-proof', [OrderController::class, 'deliveryProof'])->name('api.orders.delivery-proof');
 
     // Courier
     Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.courier.jobs.index');
@@ -224,6 +226,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/buyer/orders', [OrderController::class, 'index'])->name('api.v1.buyer.orders.index');
         Route::post('/buyer/orders', [OrderController::class, 'store'])->name('api.v1.buyer.orders.store');
         Route::get('/buyer/orders/{sellerOrder}/milestone', [OrderController::class, 'milestone'])->name('api.v1.buyer.orders.milestone');
+        Route::post('/buyer/orders/{sellerOrder}/delivery-pass', [OrderController::class, 'deliveryPass'])->name('api.v1.buyer.orders.delivery-pass');
+        Route::get('/buyer/orders/{sellerOrder}/delivery-proof', [OrderController::class, 'deliveryProof'])->name('api.v1.buyer.orders.delivery-proof');
     });
 
     // Courier

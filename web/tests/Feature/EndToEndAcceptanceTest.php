@@ -306,26 +306,40 @@ class EndToEndAcceptanceTest extends TestCase
         $sellerOrder->refresh();
         $sellerOrder->forceFill([
             'status' => OrderStatus::OutForDelivery,
-            'delivery_otp_hash' => Hash::make('482913'),
         ])->save();
 
-        // ── 13. Buyer Delivery Pass QR & Verification ─────────────────────────
-        // Pass payload matches Zefanya standard: ZEFANYA:DELIVERY:{jobId}:{otp}
-        $passOtp = '482913';
+        // The previous request authenticated the rider; drop that cached guard
+        // before the buyer asks for the pass, then drop the buyer's before the
+        // rider confirms. Tokens differ per request, guards do not.
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
 
-        // ── 14. Rider Scans & Delivers with Proof Photo and Collects COD Cash ──
+        $passResponse = $this->withHeader('Authorization', "Bearer $buyerToken")
+            ->postJson(route('api.orders.delivery-pass', $sellerOrder))
+            ->assertOk();
+
+        $passToken = $passResponse->json('data.token');
+        $passOtp = $passResponse->json('data.code');
+        $this->assertNotEmpty($passToken);
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $passOtp);
+
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+
         $deliveryResponse = $this->withHeader('Authorization', "Bearer $riderToken")
-            ->patchJson(route('api.courier.jobs.milestone', $sellerOrder), [
+            ->patch(route('api.courier.jobs.milestone', $sellerOrder), [
                 'milestone' => 'DELIVERED',
-                'delivery_otp' => $passOtp,
+                'delivery_token' => $passToken,
                 'cod_amount' => 2300.00,
-            ])
+                'proof_photo' => UploadedFile::fake()->create('proof.jpg', 100, 'image/jpeg'),
+            ], ['Accept' => 'application/json'])
             ->assertOk()
             ->assertJson([
                 'ok' => true,
                 'milestone' => 'DELIVERED',
                 'payment_status' => 'paid',
             ]);
+
 
         $sellerOrder->refresh();
         $this->assertSame(OrderStatus::Delivered, $sellerOrder->status);

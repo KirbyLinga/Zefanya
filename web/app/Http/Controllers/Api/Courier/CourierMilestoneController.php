@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Api\Courier;
 
 use App\Enums\OrderStatus;
-use App\Enums\PaymentMethod;
-use App\Enums\PaymentStatus;
+use App\Exceptions\DeliveryHandoverException;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\SellerOrder;
+use App\Services\OrderDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * PATCH /api/courier/jobs/{sellerOrder}/milestone
@@ -19,6 +18,11 @@ use Illuminate\Support\Facades\Hash;
  * Advance a job's pipeline status one step. The courier holds the truth
  * about where the parcel is; this is how they write it to the server so
  * buyers can see it.
+ *
+ * A DELIVERED transition is delegated to OrderDeliveryService, the only
+ * writer of the delivered status. The service verifies the buyer's code or
+ * signed token, enforces expiry/single-use/lockout, stores the proof photo and
+ * settles COD in the same transaction.
  */
 class CourierMilestoneController extends Controller
 {
@@ -45,14 +49,10 @@ class CourierMilestoneController extends Controller
     /** The workbook's limit: a fourth attempt is never allowed. */
     private const int MAX_DELIVERY_ATTEMPTS = 3;
 
-    /** Wrong delivery codes before entry is locked (RID-DLV-004). */
-    private const int MAX_OTP_ATTEMPTS = 5;
-
-    /** How long a locked code entry stays closed. */
-    private const int OTP_LOCK_MINUTES = 15;
-
     /** The one reason that ends the attempt chain at once (RID-FAIL-003). */
     private const string BUYER_REFUSED = 'Buyer refused';
+
+    public function __construct(private readonly OrderDeliveryService $delivery) {}
 
     public function update(Request $request, SellerOrder $sellerOrder): JsonResponse
     {
@@ -75,6 +75,8 @@ class CourierMilestoneController extends Controller
             'milestone' => ['required', 'string', 'max:30'],
             'failure_reason' => ['nullable', 'string', 'max:80'],
             'delivery_otp' => ['nullable', 'string', 'max:6'],
+            'delivery_token' => ['nullable', 'string', 'max:512'],
+            'proof_photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'cod_amount' => ['nullable', 'numeric', 'min:0'],
             'tracking_number' => ['nullable', 'string', 'max:40'],
         ]);
@@ -86,6 +88,27 @@ class CourierMilestoneController extends Controller
             return response()->json([
                 'message' => "Unknown milestone: $target.",
             ], 422);
+        }
+
+        if ($target === 'DELIVERED') {
+            try {
+                $job = $this->delivery->markDelivered(
+                    $sellerOrder,
+                    $courier,
+                    $data,
+                    $request->file('proof_photo'),
+                    $request->ip(),
+                );
+            } catch (DeliveryHandoverException $e) {
+                return response()->json(['message' => $e->getMessage()], $e->statusCode);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'milestone' => $job->status->value,
+                'delivery_attempts' => (int) $job->delivery_attempts,
+                'payment_status' => $job->payment?->status?->value,
+            ]);
         }
 
         // Lock the row for the whole decision: two taps on "Complete" must
@@ -143,19 +166,7 @@ class CourierMilestoneController extends Controller
                 }
             }
 
-            if ($target === 'DELIVERED') {
-                $refusal = $this->handoverProblem($job, $data);
-                if ($refusal !== null) {
-                    return $refusal;
-                }
-            }
-
             $job->forceFill(['status' => OrderStatus::from($target)]);
-
-            if ($target === 'DELIVERED' && $job->delivered_at === null) {
-                $job->delivered_at = now();
-            }
-
             $job->save();
 
             return response()->json([
@@ -215,81 +226,6 @@ class CourierMilestoneController extends Controller
         }
 
         $job->delivery_attempts = $nextAttempt;
-
-        return null;
-    }
-
-    /**
-     * Verify the handover: the buyer's code and, for COD, the exact cash.
-     */
-    private function handoverProblem(SellerOrder $job, array $data): ?JsonResponse
-    {
-        $otpHash = $job->delivery_otp_hash;
-
-        if ($otpHash !== null) {
-            $lockedUntil = $job->delivery_otp_locked_until;
-
-            if ($lockedUntil !== null && now()->lt($lockedUntil)) {
-                $minutes = max(
-                    1,
-                    (int) ceil(now()->diffInSeconds($lockedUntil, true) / 60),
-                );
-
-                return response()->json([
-                    'message' => "Too many wrong delivery codes. Try again in $minutes minutes.",
-                ], 423);
-            }
-
-            // The lock has expired: the next entry starts a fresh set.
-            if ($lockedUntil !== null) {
-                $job->delivery_otp_attempts = 0;
-                $job->delivery_otp_locked_until = null;
-            }
-
-            $code = (string) ($data['delivery_otp'] ?? '');
-            if (preg_match('/^\d{6}$/', $code) !== 1) {
-                return $this->refuse('Enter the 6-digit delivery code shown by the buyer.');
-            }
-
-            if (! Hash::check($code, $otpHash)) {
-                $attempts = (int) ($job->delivery_otp_attempts ?? 0) + 1;
-                $job->delivery_otp_attempts = $attempts;
-
-                if ($attempts >= self::MAX_OTP_ATTEMPTS) {
-                    $job->delivery_otp_locked_until = now()->addMinutes(self::OTP_LOCK_MINUTES);
-                }
-
-                $job->save();
-
-                return $this->refuse('That delivery code is not correct.');
-            }
-
-            $job->delivery_otp_attempts = 0;
-            $job->delivery_otp_locked_until = null;
-        }
-
-        $payment = $job->payment;
-
-        if ($payment === null
-            || $payment->method !== PaymentMethod::Cod
-            || $payment->status !== PaymentStatus::Pending) {
-            return null;
-        }
-
-        if (! array_key_exists('cod_amount', $data) || $data['cod_amount'] === null) {
-            return $this->refuse(
-                'Enter the cash collected: ₱'.number_format($payment->amount_minor / 100, 2).'.',
-            );
-        }
-
-        $collectedMinor = (int) round(((float) $data['cod_amount']) * 100);
-        if ($collectedMinor !== (int) $payment->amount_minor) {
-            return $this->refuse(
-                'Cash collected must be exactly ₱'.number_format($payment->amount_minor / 100, 2).'.',
-            );
-        }
-
-        $payment->markPaid();
 
         return null;
     }

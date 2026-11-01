@@ -35,7 +35,7 @@ class SellerOrder extends Model
      * The delivery OTP is a bearer secret until the handover. It is never
      * serialized, even by accident: only the fact that one exists is exposed.
      */
-    protected $hidden = ['delivery_otp_hash'];
+    protected $hidden = ['delivery_otp_hash', 'delivery_proof_path'];
 
     protected function casts(): array
     {
@@ -45,6 +45,8 @@ class SellerOrder extends Model
             'delivery_attempts' => 'integer',
             'delivery_otp_attempts' => 'integer',
             'delivery_otp_locked_until' => 'datetime',
+            'delivery_otp_expires_at' => 'datetime',
+            'delivery_otp_used_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];
     }
