@@ -5,7 +5,7 @@ honest about the boundary: anything below is either local-only, explicitly
 unwired, or cannot be verified in a widget test. None of these are hidden behind
 fake success copy.
 
-Last reviewed: 29 October 2026 (Flutter 3.44.0, Windows).
+Last reviewed: 31 October 2026 (Flutter 3.44.0, Windows).
 
 ## Google sign-in
 
@@ -68,6 +68,36 @@ Last reviewed: 29 October 2026 (Flutter 3.44.0, Windows).
   its hash), so the buyer's pass card is hidden in live mode until the buyer
   order endpoint exposes the code.
 
+## Buyer tracking map
+
+- In mock mode `MockTrackingRepository` draws a fixed demo route between two
+  Pila, Laguna coordinates. It is not the buyer's saved address, not a geocoded
+  seller, and not a road route: the rider's position is interpolated along a
+  straight line from the milestone, with a 1.35 route factor and a 260 m/min
+  ETA. It illustrates progress; it does not navigate.
+- Live mode polls only `GET /orders/{sellerOrder}/milestone`, so it has no
+  coordinates. `GET /orders/{sellerOrder}/tracking` is specified in
+  `docs/api-contract.md` §6.4 but is not implemented, and the live repository
+  does not call it. The tracker therefore shows the milestone timeline without
+  the map in live mode rather than inventing a position.
+- The map is deliberately static (no pan or zoom) because it sits inside the
+  tracker's scroll view. Tiles come from the public OpenStreetMap server over
+  the network; widget and golden tests replace them with a transparent tile
+  provider, so tests prove layout and markers, not real tile rendering.
+- The map is hidden before dispatch and for `failedDelivery` /
+  `returnToSender`, where a route line would be misleading.
+
+## Checkout vouchers
+
+- The checkout picker is cart-checkout only. Buy Now's lines are not in the
+  cart, so the picker is omitted rather than showing a discount those lines do
+  not qualify for.
+- The picker reuses the wallet's claim/eligibility UI and `CartState` for
+  pricing. The app supports stacked vouchers, but the server accepts one
+  `voucher_code` on `POST /orders` and the live order repository sends none
+  (`docs/api-contract.md` §0.2). A live checkout can therefore display a local
+  saving that the server does not record.
+
 ## Other mocked or unwired seams
 
 - Returns use `MockReturnRepository` locally; the live `GET /returns`,
@@ -79,3 +109,26 @@ Last reviewed: 29 October 2026 (Flutter 3.44.0, Windows).
   unless the app is built with the live flag and a configured API base URL.
 - Golden tests cover the main buyer/courier screens only. Checkout, the address
   form and registration steps have widget tests but no golden baselines.
+
+## Not implemented / mock only (audit findings)
+
+The following features are referenced in `docs/api-contract.md` or other documentation but have **no backend implementation** in any current branch. They are mocked on the mobile side only.
+
+### Authentication extras
+- `POST /auth/google` (courier registration path) — the endpoint exists and creates a pending rider, but first-time Google couriers never receive a usable token (pending approval gate). The mobile `notWired('POST /auth/google (courier registration)')` comment in `live_stub.dart` is accurate.
+- Password reset / forgot-password — no route exists on either surface. The `api-account-password` limiter is wired for the change-password route; a forgot-password flow would reuse the same 3/min bucket.
+
+### Chat
+- `GET /api/chat`, `POST /api/chat`, websocket/push — no controller, no route, no migration. `MockChatRepository` returns fixture messages. The in-app chat UI is purely local.
+
+### Promotions
+- No promotions endpoint, no promotions model, no seeder beyond the `Voucher` model. The `PromoCarousel` widget displays static mock data.
+
+### Returns
+- `GET /returns`, `POST /orders/{sellerOrder}/returns`, `POST /returns/{return}/escalate` — all `notWired` in the live repository. No backend implementation.
+
+### Buyer tracking coordinates
+- `GET /orders/{sellerOrder}/tracking` described in `docs/api-contract.md §6.4` — not implemented. Live mode shows milestone timeline only; the map is hidden.
+
+### Voucher stacking on orders
+- `POST /orders` accepts one `voucher_code`. The mobile app supports stacked vouchers locally but the live repository sends none. Any local multi-voucher saving is not recorded server-side.

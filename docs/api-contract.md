@@ -55,6 +55,12 @@ Consequences already enforced in code:
 - `POST /orders` accepts `voucher_code`, but `mobile/lib/data/repositories/order_repository.dart`
   does not send one yet. The server computes the discount; the app would have
   to stop computing its own to avoid showing a different number.
+- Checkout now shows the vouchers already applied to the cart and can add more
+  from the wallet (§4.2). That list is priced by `CartState`/`quoteCart`, which
+  supports stacking; the server accepts exactly one `voucher_code`. In live
+  mode the picker can therefore display a stack the server will not receive.
+  This is documented rather than half-wired: sending only the first code would
+  make the visible total and the placed order disagree even more.
 
 `POST /checkout/quote` (specified in §4.3) is the intended endpoint that takes
 the total calculation over once this is answered.
@@ -467,6 +473,17 @@ longer applies does **not** silently disappear: the order is refused `422`
 with `voucher_rejected`, so a phone showing "₱200 off" cannot place the order
 at full price.
 
+The app's wallet (`VouchersScreen`) is the claim/eligibility surface. Checkout
+reuses it for discovery: "Browse" / "Add" opens the wallet, the buyer taps
+"Use" on a claimed voucher, and the returned code goes through
+`CartState.applyVoucher` — the same gate Cart uses for stacking, minimum spend
+and expiry. Checkout then lists each applied code with its quoted discount and
+a remove action. Buy Now uses checkout lines that are not in the cart, so it
+omits the picker rather than showing a discount those lines do not qualify for.
+
+This is a local pricing UI, not a new wire call; the server-side single-voucher
+gap is described in §0.2.
+
 ### §4.3 `POST /checkout/quote` — not built
 
 The intended endpoint once §0.1 and §0.2 are settled. It should accept the
@@ -655,6 +672,35 @@ checked against the parent order's buyer.
 
 Bare object, not wrapped in `data`. The value is the raw server status so a
 future tracker can show finer progress.
+
+### §6.4 `GET /orders/{sellerOrder}/tracking` — proposed, not built
+
+Buyer token. Would feed the tracker's route map. Neither API branch implements
+it; the live `TrackingRepository` deliberately does not call it, because a
+request/parser against a route nobody serves cannot be verified. In live mode
+`TrackingRepository.snapshotFor` therefore returns null and the tracker omits
+the map; only the milestone poll above is live.
+
+Proposed shape, matching `TrackingSnapshot`:
+
+```json
+{
+  "data": {
+    "pickup":  { "latitude": 14.2346, "longitude": 121.3649 },
+    "dropoff": { "latitude": 14.2118, "longitude": 121.3926 },
+    "courier": { "latitude": 14.2201, "longitude": 121.3812 },
+    "remaining_distance_meters": 1640.0,
+    "eta_minutes": 7,
+    "updated_at": "2026-10-31T08:15:00+00:00"
+  }
+}
+```
+
+An implementation must decide how coordinates are produced (device GPS,
+geocoded addresses, or a routing provider); the app only renders what it is
+sent. Coordinates are decimal degrees, distance is metres, and `eta_minutes` is
+a whole number. Returning `404` before a job exists is acceptable — the app
+already hides the map when it has no snapshot.
 
 ---
 
@@ -989,9 +1035,12 @@ stray whitespace. It never throws.
 | `POST /orders/{sellerOrder}/returns` | `LiveReturnRepository` | Return submission is `notWired` |
 | `POST /returns/{return}/escalate` | `LiveReturnRepository` | Escalation is `notWired` |
 | `POST /checkout/quote` | none yet | §4.3 design only |
+| `GET /orders/{sellerOrder}/tracking` | none yet | §6.4 design only; live tracker omits the map |
 
 `notWired` throws `ApiNotImplementedException` naming the endpoint. A live
-build is runnable and honest; those surfaces are not functional.
+build is runnable and honest; those surfaces are not functional. The tracking
+route is not even called: the app knows it does not exist, so it shows the
+milestone timeline without a map instead of requesting a 404 every 30 s.
 
 ### §12.4 Wire fields the app models but the server does not send
 
@@ -1072,6 +1121,9 @@ is in neither `web-api`, `web-api-master`, nor the working branch.
 | `ChatRepository.seedIfEmpty` | — | — | no route | live no-op; the server already has the opener |
 | `CourierRepository.assignedJobs` | `GET /courier/jobs` | bearer courier | none | `data[]` → `DeliveryJob` |
 | `CourierRepository.advanceMilestone` | `PATCH /courier/jobs/{jobId}/milestone` | bearer courier | `{milestone, tracking_number?, failure_reason?, delivery_otp?, cod_amount?}` | `void`; `422`/`423` propagate |
+| `TrackingRepository.poll` | `GET /orders/{sellerOrder}/milestone` | bearer buyer | none | `milestone` → `DeliveryMilestone?`; no coordinates |
+| `TrackingRepository.snapshotFor` | — | — | mock derives a fixed demo route from the milestone | live returns null until §6.4 exists |
+| `TrackingRepository.pollsServer` | — | — | capability flag | live `true`, mock `false` |
 | `ReturnRepository.load` | — | — | restores local requests | live implementation is a no-op |
 | `ReturnRepository.all` | `GET /returns` **not built** | bearer buyer | none | `notWired` |
 | `ReturnRepository.submit` | `POST /orders/{sellerOrder}/returns` **not built** | bearer buyer | would carry description + photos | `notWired` |

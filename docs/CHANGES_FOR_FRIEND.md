@@ -72,3 +72,78 @@ This document tracks all new tables, columns, enum values, routes, and service c
 
 ### 3. No New Database Tables, Columns, or Enum Values
 - Purely additive route/controller surface reusing existing `SellerOrder`, `LogisticsProvider`, `OrderStatus`, and `LogisticsProviderStatus` models/enums.
+
+---
+
+## Security Hardening (fix/security-hardening branch — H1–H8)
+
+> ⚠️ **Changed behaviour in this section.** Several existing code paths now enforce
+> gates that previously had none. Read this section before merging into integration.
+
+### New Columns (Additive Only)
+
+**`seller_orders` table** (migration `2026_10_31_100000`):
+- `delivery_otp_expires_at` (timestamp, nullable)
+- `delivery_otp_used_at` (timestamp, nullable)
+- `delivery_proof_path` (string, nullable)
+
+**`reviews` table** (migration `2026_11_01_100000`):
+- `order_item_id` (FK → `order_items`, nullable, unique index `reviews_order_item_unique`)
+- `photo_paths` (JSON, nullable)
+- `verified_purchase` (boolean, default false)
+
+**`users`, `buyers`, `logistics_providers`** (migration `2026_10_31_120000`):
+- `google_sub` (string 255, nullable, unique)
+
+### New Tables
+
+- `delivery_handover_audits` (`seller_order_id`, `actor_type`, `actor_id`, `action`, `metadata` JSON, `ip_address`, timestamps)
+
+### New Services
+
+- `App\Services\OrderDeliveryService` — single authoritative path for all delivery handovers. Methods: `issuePass()`, `markDelivered()`, `adminOverride()`.
+- `App\Services\Auth\GoogleIdTokenVerifier` (interface) + `App\Services\Auth\GoogleApiTokenVerifier` (implementation using `google/apiclient`).
+
+### New Middleware
+
+- `App\Http\Middleware\Courier\EnsureCourierApproved` — returns 403 for pending/rejected couriers on all courier routes.
+
+### New Factory
+
+- `Database\Factories\BuyerAddressFactory` — used by access-control tests.
+
+### Changed Rate Limits ⚠️
+
+Previously the login/register routes used inline `throttle:5,1,api-login`. They now use named buckets (`throttle:api-login`) keyed on `lowercase_email|ip` for login. The **legacy `/api/...` and `/api/v1/...` spellings share one counter** — you cannot bypass the login limit by hitting the other prefix.
+
+The api group now has a floor: `throttle:api-default` (60/min per actor) is appended to every route via `$middleware->api(append: ...)`. A new route that forgets to declare a limit still gets this floor.
+
+### Changed Route Behaviour ⚠️
+
+- `PATCH /courier/jobs/{job}/milestone` with `milestone=DELIVERED` now **requires**:
+  1. A server-issued 6-digit OTP (requested by the buyer via `POST /orders/{job}/delivery-pass`) validated by HMAC-SHA256 hash comparison, **OR** a signed QR token from the same issuance; and
+  2. A proof-of-delivery photo (`proof_photo` field, jpg/png/webp, max 5 MB).
+  
+  **There is no bypass for COD, admin, or any other case.** A null hash is always rejected. This closes the previous hole where a courier could set DELIVERED without any verification.
+
+- `GET /courier/jobs` and `PATCH /courier/jobs/{job}/milestone` now return **403** for couriers with `status != approved` (pending/rejected). Previously any sanctum token reached these routes.
+
+### New Routes
+
+- `POST /orders/{sellerOrder}/delivery-pass` — buyer requests a 6-digit OTP + signed token
+- `GET /orders/{sellerOrder}/delivery-proof` — view proof-of-delivery photo (authorised only)
+- (v1 mirrors of both)
+
+### Changed Google Sign-In ⚠️
+
+- `POST /auth/google` no longer falls back to the tokeninfo HTTP endpoint. It will return **401** (not try another verification method) if `google/apiclient` cannot verify the token cryptographically.
+- Returns **503** if `GOOGLE_CLIENT_IDS` env var is empty or missing — fail-closed.
+- New riders created through Google sign-in start as **pending_approval** and receive no token.
+
+### Test Counts
+
+| Suite | Count |
+|---|---|
+| `php artisan test` (fix/security-hardening) | 391 passed, 0 failed |
+| `flutter test` (feature/phase-f + H8 fix) | 760 passed, 0 failed |
+| `flutter analyze` | 0 errors, 0 warnings (3 pre-existing info hints) |
