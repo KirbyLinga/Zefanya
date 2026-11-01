@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Middleware\Admin\EnsureAdminRole;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
@@ -44,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.role' => EnsureAdminRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
             'seller.approved' => EnsureSellerApproved::class,
+            'courier.approved' => \App\Http\Middleware\Courier\EnsureCourierApproved::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

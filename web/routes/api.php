@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 // routes/api.php
 //
@@ -187,10 +187,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{sellerOrder}/delivery-pass', [OrderController::class, 'deliveryPass'])->name('api.orders.delivery-pass');
     Route::get('/orders/{sellerOrder}/delivery-proof', [OrderController::class, 'deliveryProof'])->name('api.orders.delivery-proof');
 
-    // Courier
-    Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.courier.jobs.index');
-    Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.courier.jobs.milestone')
-        ->middleware(['throttle:api-delivery-verify', 'throttle:api-uploads']);
+    // Courier — requires approved status on top of auth:sanctum
+    Route::middleware('courier.approved')->group(function () {
+        Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.courier.jobs.index');
+        Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.courier.jobs.milestone')
+            ->middleware(['throttle:api-delivery-verify', 'throttle:api-uploads']);
+    });
 });
 
 // ── Versioned v1 Surface ──────────────────────────────────────────────────
@@ -245,9 +247,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/courier/me', [CourierLoginController::class, 'show'])->name('api.v1.courier.me');
         Route::post('/courier/logout', [CourierLoginController::class, 'destroy'])->name('api.v1.courier.logout');
 
-        Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.v1.courier.jobs.index');
-        Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.v1.courier.jobs.milestone')
-            ->middleware(['throttle:api-delivery-verify', 'throttle:api-uploads']);
+        Route::middleware('courier.approved')->group(function () {
+            Route::get('/courier/jobs', [CourierJobController::class, 'index'])->name('api.v1.courier.jobs.index');
+            Route::patch('/courier/jobs/{sellerOrder}/milestone', [CourierMilestoneController::class, 'update'])->name('api.v1.courier.jobs.milestone')
+                ->middleware(['throttle:api-delivery-verify', 'throttle:api-uploads']);
+        });
     });
 
     // Seller
