@@ -19,6 +19,7 @@ class LogisticsProvider extends Authenticatable
         'middle_initial',
         'sex',
         'email',
+        'google_sub',
         'password',
         'contact_no',
         'birthday',

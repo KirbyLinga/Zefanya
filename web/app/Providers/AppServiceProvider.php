@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\CartItem;
+use App\Services\Auth\GoogleApiTokenVerifier;
+use App\Services\Auth\GoogleIdTokenVerifier;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
@@ -18,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(GoogleIdTokenVerifier::class, GoogleApiTokenVerifier::class);
     }
 
     /**

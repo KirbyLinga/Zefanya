@@ -27,6 +27,7 @@ class Buyer extends Authenticatable
         'middle_initial',
         'sex',
         'email',
+        'google_sub',
         'pending_email',
         'pending_email_code',
         'pending_email_expires_at',
