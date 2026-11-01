@@ -59,12 +59,17 @@ void main() {
 
     expect(find.text('Only 3 left'), findsOneWidget);
 
-    // Quantity stepper clamps to stock (3)
+    // Quantity stepper clamps to stock (3).
+    // ensureVisible() scrolls the stepper into the hit-test area before each
+    // tap; without it the button lands off-screen on a 390×844 viewport.
     final plusButton = find.byIcon(Icons.add);
+    await tester.ensureVisible(plusButton);
     await tester.tap(plusButton); // qty 2
     await tester.pump();
+    await tester.ensureVisible(plusButton);
     await tester.tap(plusButton); // qty 3
     await tester.pump();
+    await tester.ensureVisible(plusButton);
     await tester.tap(plusButton); // should clamp at 3
     await tester.pump();
 
