@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Middleware\Admin\EnsureAdminRole;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;

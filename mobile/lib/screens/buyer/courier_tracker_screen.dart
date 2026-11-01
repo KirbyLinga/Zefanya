@@ -1,4 +1,4 @@
-﻿// lib/screens/buyer/courier_tracker_screen.dart
+// lib/screens/buyer/courier_tracker_screen.dart
 //
 // Read-only view of courier progress for a buyer's order. Pushed from
 // the "Track Courier" button on order cards (inTransit / outForDelivery)

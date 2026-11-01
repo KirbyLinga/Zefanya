@@ -1,4 +1,4 @@
-﻿// lib/screens/shared/profile_screen.dart
+// lib/screens/shared/profile_screen.dart
 //
 // Path check: lives at lib/screens/shared/profile_screen.dart
 //   -> theme      => '../../theme/app_theme.dart'
