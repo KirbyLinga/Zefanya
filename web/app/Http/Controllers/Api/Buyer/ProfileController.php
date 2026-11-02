@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Buyer;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Models\Buyer\Buyer;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -38,7 +39,7 @@ class ProfileController extends Controller
         $buyer = $request->user();
 
         if (! $buyer instanceof Buyer) {
-            throw new \Illuminate\Auth\AuthenticationException('Unauthenticated.');
+            throw new AuthenticationException('Unauthenticated.');
         }
 
         $data = [

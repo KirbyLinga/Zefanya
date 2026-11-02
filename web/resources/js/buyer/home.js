@@ -1,24 +1,9 @@
 // resources/js/buyer/home.js
-// Buyer home page behaviour: category carousel tab visuals and cart hooks.
+// Buyer home page behaviour: category and hero carousels.
 // Catalog data is rendered by Blade from the Product model.
 
-// Tab switching for the category carousel / "Featured / New / Best-selling" tabs
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.js-home-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.js-home-tab').forEach((other) => {
-        other.classList.remove('active');
-        other.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-    });
-  });
-
-  // Add-to-cart on product cards is handled globally by add-to-cart-animation.js
-  // (`.add-to-cart-btn` → window.handleAddToCartSimple → window.addToCart).
-});
-
+// Add-to-cart on product cards is handled globally by add-to-cart-animation.js
+// (`.add-to-cart-btn` → window.handleAddToCartSimple → window.addToCart).
 
 // Category row. The browser scrolls and snaps it; this only drives the arrows
 // and dots, and keeps them in step however the row was moved.
@@ -87,6 +72,18 @@ document.addEventListener('DOMContentLoaded', () => {
     pending = true;
     requestAnimationFrame(sync);
   }, { passive: true });
+  
+  // Keyboard navigation: arrow keys scroll the carousel
+  row.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      go(currentPage() - 1);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      go(currentPage() + 1);
+    }
+  });
+  
   new ResizeObserver(build).observe(row);
   build();
 })();

@@ -3,6 +3,10 @@
 @section('title', 'Zefanya')
 
 @section('hero')
+    @if (session('success'))
+        <p role="status" class="bg-[var(--status-success)] px-4 py-3 text-center font-sans text-[13px] font-semibold text-white">{{ session('success') }}</p>
+    @endif
+
     {{-- ===== Hero =====
          Note: ≤1024px headline is 46px (was set by _products.scss's media
          query, which won the cascade over _hero.scss's 40px). Replicated as

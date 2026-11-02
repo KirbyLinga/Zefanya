@@ -44,6 +44,7 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('/categories/{id}', [CategoryController::class, 'show'])->name('categories.show');
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('/products/load-more', [ProductController::class, 'loadMore'])->name('products.load-more');
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
     Route::get('/search', [SearchController::class, 'index'])->name('search.index');
     Route::get('/search/suggestions', [SearchController::class, 'suggestions'])->name('search.suggestions');

@@ -17,7 +17,7 @@ use Throwable;
 
 class ProductPublishingService
 {
-    public function __construct(private VariantSyncService $variants) {}
+    public function __construct(private VariantSyncService $variants, private ProductThumbnailService $thumbnails) {}
 
     /** Save a listing and all its inventory/image associations as one operation. */
     public function save(Product $product, Seller $seller, array $data): Product
@@ -114,6 +114,7 @@ class ProductPublishingService
         } catch (Throwable $exception) {
             if ($stored !== []) {
                 Storage::disk('public')->delete($stored);
+                $this->thumbnails->delete($stored);
             }
             throw $exception;
         }
@@ -122,6 +123,7 @@ class ProductPublishingService
             foreach (array_unique($removedPaths) as $path) {
                 if (! ProductImage::query()->where('path', $path)->exists()) {
                     Storage::disk('public')->delete($path);
+                    $this->thumbnails->delete([$path]);
                 }
             }
         });
@@ -263,6 +265,7 @@ class ProductPublishingService
         // A color file is stored once and shared by all its size combinations.
         if (! ProductImage::query()->where('path', $image->path)->exists()) {
             Storage::disk('public')->delete($image->path);
+            $this->thumbnails->delete([$image->path]);
         }
     }
 
@@ -360,6 +363,9 @@ class ProductPublishingService
         $product->images()->create([
             'variant_id' => $variantId,
             'path' => $path,
+            // A color file is shared by its sizes, so only the first needs generating.
+            'thumbnail_path' => ProductImage::query()->where('path', $path)->value('thumbnail_path')
+                ?? $this->thumbnails->generate($path),
             'is_primary' => $primary,
             'sort_order' => $sortOrder ?? (int) $product->images()->max('sort_order') + 1,
         ]);

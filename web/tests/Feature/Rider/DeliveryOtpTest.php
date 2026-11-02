@@ -3,6 +3,7 @@
 namespace Tests\Feature\Rider;
 
 use App\Enums\OrderStatus;
+use App\Models\Buyer\Buyer;
 use App\Models\Logistics\DeliveryOtp;
 use App\Models\Logistics\DeliveryProof;
 use App\Models\Shared\Payment;
@@ -205,35 +206,29 @@ class DeliveryOtpTest extends RiderTestCase
         ])->assertSessionHasErrors('delivery_otp')->assertSessionMissing('_old_input.delivery_otp');
     }
 
-    public function test_mail_failure_preserves_the_previously_issued_code(): void
+    public function test_notification_failure_preserves_the_previously_issued_code(): void
     {
         $parcel = $this->delivery();
         $code = $this->sendCode($parcel);
         $hash = DeliveryOtp::firstOrFail()->code_hash;
         $this->travel(61)->seconds();
         $this->mock(Dispatcher::class, function ($mock): void {
-            $mock->shouldReceive('send')->once()->andThrow(new \RuntimeException('Mail unavailable'));
+            $mock->shouldReceive('send')->once()->andThrow(new \RuntimeException('Notification unavailable'));
         });
         try {
             app(DeliveryOtpService::class)->send($this->rider, $parcel);
-            $this->fail('Mail failure must be surfaced.');
+            $this->fail('Notification failure must be surfaced.');
         } catch (\RuntimeException $exception) {
-            $this->assertSame('Mail unavailable', $exception->getMessage());
+            $this->assertSame('Notification unavailable', $exception->getMessage());
         }
         $this->assertSame($hash, DeliveryOtp::firstOrFail()->code_hash);
         $this->assertTrue(Hash::check($code, DeliveryOtp::firstOrFail()->code_hash));
+        $this->assertSame($code, DeliveryOtp::firstOrFail()->code_encrypted);
     }
 
-    public function test_unverified_buyers_and_parcels_not_out_for_delivery_cannot_receive_codes(): void
+    public function test_parcels_not_out_for_delivery_cannot_receive_codes(): void
     {
         $parcel = $this->delivery();
-        $this->buyer->forceFill(['email_verified_at' => null])->save();
-        try {
-            $this->sendCode($parcel);
-            $this->fail('Unverified email must be blocked.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('delivery_otp', $exception->errors());
-        }
         $parcel->forceFill(['status' => OrderStatus::AssignedToRider])->save();
         try {
             $this->sendCode($parcel->fresh());
@@ -243,5 +238,65 @@ class DeliveryOtpTest extends RiderTestCase
         }
         $this->assertSame(0, DeliveryOtp::count());
         Notification::assertNotSentTo($this->buyer, DeliveryOtpCode::class);
+    }
+
+    public function test_code_needs_no_email_and_the_alert_never_carries_it(): void
+    {
+        $parcel = $this->delivery();
+        $this->buyer->forceFill(['email_verified_at' => null])->save();
+
+        $code = $this->sendCode($parcel->fresh());
+
+        Notification::assertSentTo($this->buyer, DeliveryOtpCode::class, function (DeliveryOtpCode $notification, array $channels) use ($code, $parcel): bool {
+            $data = $notification->toArray($this->buyer);
+
+            return $channels === ['database']
+                && $data['seller_order_id'] === $parcel->id
+                && ! str_contains((string) json_encode($data), $code);
+        });
+        $this->assertNotSame($code, DeliveryOtp::query()->toBase()->value('code_encrypted'));
+    }
+
+    public function test_only_the_buyer_sees_the_code_on_the_order_page_and_only_while_usable(): void
+    {
+        $this->withoutVite();
+        $parcel = $this->delivery();
+        $page = route('buyer.orders.show', $parcel->order);
+
+        $this->actingAs($this->buyer, 'buyer')->get($page)->assertOk()
+            ->assertSee('it will appear here');
+
+        $code = $this->sendCode($parcel);
+        $this->get($page)->assertOk()->assertSee($code);
+
+        $stranger = Buyer::factory()->create();
+        $response = $this->actingAs($stranger, 'buyer')->get($page);
+        $this->assertContains($response->getStatusCode(), [403, 404]);
+        $response->assertDontSee($code);
+
+        $this->travel(11)->minutes();
+        $this->actingAs($this->buyer, 'buyer')->get($page)->assertOk()->assertDontSee($code);
+    }
+
+    public function test_code_leaves_the_page_and_the_database_once_the_delivery_is_complete(): void
+    {
+        $this->withoutVite();
+        $parcel = $this->delivery();
+        $code = $this->sendCode($parcel);
+
+        $this->complete($parcel, $code);
+
+        $this->assertNull(DeliveryOtp::query()->toBase()->value('code_encrypted'));
+        $this->actingAs($this->buyer, 'buyer')->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertDontSee($code);
+    }
+
+    public function test_page_hides_a_code_locked_by_too_many_wrong_attempts(): void
+    {
+        $this->withoutVite();
+        $parcel = $this->delivery();
+        $code = $this->sendCode($parcel);
+        DeliveryOtp::query()->update(['attempts' => 5]);
+
+        $this->actingAs($this->buyer, 'buyer')->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertDontSee($code);
     }
 }

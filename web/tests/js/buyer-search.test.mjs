@@ -188,3 +188,15 @@ test('suggestion names render as text rather than executable markup', async () =
     const name = ui.dropdown().children[0].children[1].children[0];
     assert.equal(name.textContent, '<script>alert(1)</script>'); assert.equal(name.children.length, 0);
 });
+
+
+test('search keeps sale, sort and price filters while restarting pagination', () => {
+    const ui = mount({ url: 'http://localhost/buyer/products?on_sale=1&sort=price_asc&min_price=10&max_price=500&page=4' });
+    ui.input.value = 'flowers'; ui.button.dispatch('click');
+    const destination = new URL(ui.navigations[0], 'http://localhost');
+    assert.equal(destination.searchParams.get('on_sale'), '1');
+    assert.equal(destination.searchParams.get('sort'), 'price_asc');
+    assert.equal(destination.searchParams.get('min_price'), '10');
+    assert.equal(destination.searchParams.get('q'), 'flowers');
+    assert.equal(destination.searchParams.get('page'), '1');
+});

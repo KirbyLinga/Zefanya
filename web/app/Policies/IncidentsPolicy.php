@@ -19,13 +19,12 @@ class IncidentsPolicy
 
     public function view(Admin $admin, Incidents $incident): bool
     {
-        return $this->viewAny($admin)
-            && in_array(strtolower($incident->type), ['lost', 'damaged'], true);
+        return $this->viewAny($admin);
     }
 
     public function resolve(Admin $admin, Incidents $incident): bool
     {
-        return $this->view($admin, $incident) && $incident->isOpen();
+        return $this->view($admin, $incident) && $incident->isActive();
     }
 
     public function reject(Admin $admin, Incidents $incident): bool

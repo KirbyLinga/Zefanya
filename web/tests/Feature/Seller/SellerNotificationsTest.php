@@ -245,4 +245,30 @@ class SellerNotificationsTest extends TestCase
         $this->assertNull($row->fresh()->read_at);
         $this->assertAuthenticatedAs($seller, 'seller');
     }
+
+    public function test_recent_feed_is_scoped_bounded_uncached_and_does_not_mark_alerts_read(): void
+    {
+        $seller = Seller::factory()->create();
+        for ($index = 0; $index < 12; $index++) {
+            $this->alert($seller, 'Own alert '.$index, age: $index);
+        }
+        $this->alert(Seller::factory()->create(), 'Foreign seller alert');
+        $this->alert(Buyer::factory()->create(), 'Foreign role alert');
+
+        $this->actingAs($seller, 'seller')->getJson(route('seller.notifications.recent'))->assertOk()
+            ->assertJsonPath('unread_count', 12)->assertJsonCount(8, 'notifications')
+            ->assertJsonPath('notifications.0.message', 'Own alert 0')
+            ->assertJsonMissing(['message' => 'Foreign seller alert'])->assertJsonMissing(['message' => 'Foreign role alert'])
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->assertSame(12, $seller->unreadNotifications()->count());
+        $this->alert($seller, 'Arrived after the page loaded', age: -1);
+        $this->getJson(route('seller.notifications.recent'))->assertJsonPath('unread_count', 13)
+            ->assertJsonPath('notifications.0.message', 'Arrived after the page loaded');
+    }
+
+    public function test_recent_feed_requires_the_seller_guard(): void
+    {
+        $this->getJson(route('seller.notifications.recent'))->assertUnauthorized();
+        $this->actingAs(Buyer::factory()->create(), 'buyer')->getJson(route('seller.notifications.recent'))->assertUnauthorized();
+    }
 }

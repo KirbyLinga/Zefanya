@@ -10,6 +10,7 @@ use App\Notifications\Buyer\OrderDelivered;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -113,5 +114,21 @@ class BuyerNotificationsTest extends TestCase
         $this->getJson(route('buyer.notifications.count'))->assertUnauthorized();
         $this->postJson(route('buyer.notifications.markRead', 'unknown'))->assertUnauthorized();
         $this->postJson(route('buyer.notifications.markAllRead'))->assertUnauthorized();
+    }
+
+    public function test_live_feed_returns_full_unread_count_beyond_the_page_limit_and_never_caches_it(): void
+    {
+        $buyer = Buyer::factory()->create();
+        foreach (range(1, 12) as $index) {
+            $buyer->notifications()->create(['id' => (string) Str::uuid(),
+                'type' => OrderDelivered::class, 'data' => ['message' => 'Own update '.$index]]);
+        }
+        Buyer::factory()->create()->notifications()->create(['id' => (string) Str::uuid(),
+            'type' => OrderDelivered::class, 'data' => ['message' => 'Foreign buyer update']]);
+
+        $this->actingAs($buyer, 'buyer')->getJson(route('buyer.notifications.index'))->assertOk()
+            ->assertJsonPath('unread_count', 12)->assertJsonCount(10, 'notifications')
+            ->assertJsonMissing(['message' => 'Foreign buyer update'])->assertHeader('Cache-Control', 'no-store, private');
+        $this->assertSame(12, $buyer->unreadNotifications()->count());
     }
 }

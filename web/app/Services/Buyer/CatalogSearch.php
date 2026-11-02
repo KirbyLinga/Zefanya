@@ -204,6 +204,12 @@ final class CatalogSearch
         });
     }
 
+    /** A store going on or off vacation changes which names may be suggested. */
+    public static function forgetVocabulary(): void
+    {
+        Cache::forget(self::VOCABULARY_KEY);
+    }
+
     /** The search page's visibility rule: sold-out listings stay findable by name. */
     private static function visibleProducts(): Builder
     {
@@ -211,6 +217,6 @@ final class CatalogSearch
             ->where('status', 'active')
             ->whereNull('restriction_reason')
             ->whereHas('variants', fn ($variants) => $variants->where('is_available', true))
-            ->whereHas('seller', fn ($seller) => $seller->where('status', 'approved'));
+            ->fromOpenStore();
     }
 }

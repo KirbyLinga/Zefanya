@@ -23,12 +23,12 @@ use App\Models\Shared\SellerOrder;
 use App\Models\Shared\Voucher;
 use App\Notifications\Seller\NewOrderReceived;
 use App\Services\Buyer\BuyerAddressBook;
-use App\Services\Buyer\BuyerPurchaseLimit;
 use App\Services\Buyer\CartSummary;
 use App\Services\Buyer\CartVariantResolver;
 use App\Services\Buyer\CheckoutCarrierService;
 use App\Services\Buyer\PurchasedVariantSnapshot;
 use App\Services\Buyer\VoucherSessionService;
+use App\Services\Logistics\RoutePlannerService;
 use App\Services\Shared\OfferPricing;
 use App\Services\Shared\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
@@ -207,6 +207,12 @@ class CheckoutController extends Controller
                 ->with('error', 'Your checkout selection is empty. Please select items in your cart first.');
         }
 
+        // The rate snapshot below reads this table before placeOrder() does, so
+        // an unready schema has to stop here to fail closed for the buyer.
+        if (! Schema::hasTable('checkout_tokens')) {
+            return redirect()->route('buyer.cart.index')->with('error', 'Checkout is temporarily unavailable. Please try again later.');
+        }
+
         // The form token from the rendered checkout page. Consumed INSIDE the
         // order transaction (see placeOrder) so only the first of two racing
         // requests creates an order.
@@ -250,14 +256,6 @@ class CheckoutController extends Controller
 
             if ($item->quantity > $item->availableQuantity()) {
                 $problems[] = "{$product->name} (only {$item->availableQuantity()} left)";
-            }
-        }
-
-        foreach ($items->groupBy('product_id') as $productId => $lines) {
-            $allowed = app(BuyerPurchaseLimit::class)->remaining((int) $buyer->id, (int) $productId);
-            if ((int) $lines->sum('quantity') > $allowed) {
-                $name = $lines->first()->product?->name ?? 'A product';
-                $problems[] = $name.' ('.BuyerPurchaseLimit::MESSAGE.')';
             }
         }
 
@@ -704,6 +702,9 @@ class CheckoutController extends Controller
 
             Product::syncRollupsForProducts($items->pluck('product_id'));
 
+            // Phase 4: Plan multi-leg routes for all seller orders
+            $this->planRoutesForOrder($order, $deliverTo, $lockedSellers);
+
             return $order;
         });
     }
@@ -738,6 +739,55 @@ class CheckoutController extends Controller
         }
 
         return $fees;
+    }
+
+    /**
+     * Phase 4: Plan and persist multi-leg routes for all seller orders in an order.
+     *
+     * Called AFTER order creation but inside transaction. Routes are persisted
+     * as immutable snapshots. If any route fails to persist, transaction rolls back.
+     *
+     * @param  Buyer  $deliverTo  buyer carrying the address chosen for this order
+     * @param  Collection<int, Seller>  $sellers  locked sellers keyed by id
+     *
+     * @throws CheckoutException if route planning fails (triggers transaction rollback)
+     */
+    private function planRoutesForOrder(Order $order, Buyer $deliverTo, Collection $sellers): void
+    {
+        $routePlanner = app(RoutePlannerService::class);
+
+        foreach ($order->sellerOrders as $sellerOrder) {
+            $seller = $sellers->get($sellerOrder->seller_id);
+            $provider = $sellerOrder->selectedLogisticsProvider();
+
+            if (! $seller || ! $provider) {
+                continue;  // Skip if data is unavailable (validation passed earlier)
+            }
+
+            // Skip if route already exists (idempotent)
+            if ($sellerOrder->parcelRoute) {
+                continue;
+            }
+
+            try {
+                // Plan the route (will throw ValidationException if no path exists)
+                $route = $routePlanner->planRoute(
+                    $seller,
+                    $provider,
+                    $deliverTo->barangay_code ?? '',
+                    $deliverTo->province_code ?? '',
+                );
+
+                // Persist route with seller_order_id
+                $route->seller_order_id = $sellerOrder->id;
+                $route->save();
+            } catch (ValidationException $e) {
+                throw new CheckoutException(
+                    'No shipping route available for this delivery address. '.
+                    'Please select a different carrier or address.'
+                );
+            }
+        }
     }
 
     /**

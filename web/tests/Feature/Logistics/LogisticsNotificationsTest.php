@@ -8,6 +8,7 @@ use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\LogisticsHubDecisionNotification;
 use App\Notifications\Logistics\RiderAssignmentsNeedReassignment;
 use App\Notifications\Logistics\RiderParcelActivity;
+use App\Support\AccountUnderReview;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
@@ -163,11 +164,12 @@ class LogisticsNotificationsTest extends TestCase
         $provider = LogisticsProvider::factory()->create(['status' => 'pending']);
         $row = $this->notification($provider);
         $this->actingAs($provider, 'logistics')->getJson(route('logistics.notifications.recent'))
-            ->assertRedirect(route('home', ['login' => 1]));
+            ->assertForbidden()->assertExactJson(['message' => AccountUnderReview::MESSAGE]);
         $this->actingAs($provider, 'logistics')->postJson(route('logistics.notifications.read', $row->id))
-            ->assertRedirect(route('home', ['login' => 1]));
+            ->assertForbidden()->assertExactJson(['message' => AccountUnderReview::MESSAGE]);
         $this->actingAs($provider, 'logistics')->postJson(route('logistics.notifications.readAll'))
-            ->assertRedirect(route('home', ['login' => 1]));
+            ->assertForbidden()->assertExactJson(['message' => AccountUnderReview::MESSAGE]);
+        $this->assertAuthenticatedAs($provider, 'logistics');
         $this->assertNull($row->fresh()->read_at);
     }
 }

@@ -9,6 +9,7 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
 use App\Models\Logistics\ParcelHandoff;
 use App\Models\Logistics\ParcelHandoffException;
+use App\Models\Logistics\ParcelRoute;
 use App\Models\Shared\SellerOrder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -41,6 +42,21 @@ class ParcelHandoffService
         private readonly LogisticsHubService $hubs = new LogisticsHubService,
         private readonly ParcelHandoffVerification $verification = new ParcelHandoffVerification,
     ) {}
+
+    /**
+     * Check if a parcel is eligible for a handoff request (pickup confirmed).
+     * Returns null if eligible, or an ineligibility reason string if not.
+     *
+     * For handoffs, only pickup confirmation is required.
+     */
+    public function ineligibilityReason(SellerOrder $parcel): ?string
+    {
+        if ($parcel->handover_at === null) {
+            return 'Not yet picked up';
+        }
+
+        return null;
+    }
 
     // Readable aliases used by HTTP controllers and feature tests.
     /** Resolution acknowledges remediation; it never moves a parcel or bypasses scans. */
@@ -118,6 +134,10 @@ class ParcelHandoffService
                 ->filter(fn ($link) => (int) $link->destination_provider_id === (int) $parcel->parcelReturn->origin_provider_id)->values();
         }
 
+        if (($route = $parcel->parcelRoute()->first()) !== null) {
+            return $this->savedRouteLinks($parcel, $route, $origin);
+        }
+
         return $this->prioritizePlannedDestination(
             $parcel,
             $this->serviceableLinks(
@@ -145,6 +165,7 @@ class ParcelHandoffService
             })
             ->whereNotIn('status', self::TERMINAL_ORDER_STATUSES)
             ->whereDoesntHave('parcelHandoffs', fn ($handoff) => $handoff->whereIn('status', self::ACTIVE_STATUSES))
+            ->whereNotNull('handover_at')  // Must be picked up
             ->with(['order.buyer', 'seller', 'orderItems'])
             ->latest('id')
             ->limit($limit)
@@ -170,6 +191,14 @@ class ParcelHandoffService
             $this->require($origin->isApproved() && $origin->hasVerifiedProvince(), 'provider', 'Only an approved, province-verified provider can request a handoff.');
             abort_unless($parcel->currentCustodyProviderId() === (int) $origin->id, 403);
             $this->assertParcelOpen($parcel);
+
+            // Enforce pickup eligibility
+            $reason = $this->ineligibilityReason($parcel);
+            if ($reason !== null) {
+                throw ValidationException::withMessages([
+                    'seller_order_id' => $reason,
+                ]);
+            }
 
             $existing = ParcelHandoff::query()
                 ->where('seller_order_id', $parcel->id)
@@ -248,7 +277,10 @@ class ParcelHandoffService
                 'rejection_reason' => trim($reason),
             ])->save();
 
-            if ($selectNext) {
+            if ($locked->logistics_provider_link_id === null) {
+                // An Admin-authorized return has no other partner to try.
+                $this->recordException($parcel, $locked->originProvider()->firstOrFail(), $this->routingBarangay($parcel));
+            } elseif ($selectNext) {
                 $origin = $locked->originProvider()->firstOrFail();
 
                 try {
@@ -357,12 +389,17 @@ class ParcelHandoffService
     {
         $this->assertOriginProvider($handoff, $origin);
 
+        if ($handoff->fresh()->status === ParcelHandoffStatus::Accepted) {
+            app(ParcelIncidentService::class)->detectUnavailableDeparture($handoff->sellerOrder()->firstOrFail(), $origin);
+        }
+
         $dispatched = DB::transaction(function () use ($handoff, $origin, $token): ParcelHandoff {
             $parcel = $this->lockParcel($handoff->sellerOrder()->firstOrFail());
             $locked = $this->lockHandoff($handoff);
 
             $this->assertOriginProvider($locked, $origin);
             $this->require($locked->status === ParcelHandoffStatus::Accepted, 'status', 'Only accepted handoffs can be dispatched.');
+            app(RoutePlannerService::class)->requireAvailableDeparture($parcel);
             $this->assertOriginCustody($parcel, $origin);
             $hub = $this->assertHandoffHub((int) $origin->id, (int) $locked->sending_hub_id, 'sending_hub_id');
 
@@ -405,13 +442,21 @@ class ParcelHandoffService
     {
         $this->assertDestinationProvider($handoff, $destination);
 
+        if ($handoff->fresh()->status === ParcelHandoffStatus::InTransit) {
+            $this->verification->assertValidForHandoff($destination, $handoff,
+                ParcelHandoffVerification::ACTION_HANDOFF_RECEIVE, $token, (int) $handoff->receiving_hub_id);
+            app(ParcelIncidentService::class)->detectReceiptDiscrepancy($handoff->sellerOrder()->firstOrFail(),
+                (int) $handoff->sending_hub_id, (int) $handoff->receiving_hub_id, $destination, $handoff);
+        }
+
         $received = DB::transaction(function () use ($handoff, $destination, $token): ParcelHandoff {
-            $parcel = $this->lockParcel($handoff->sellerOrder()->firstOrFail());
+            $parcel = $this->lockParcel($handoff->sellerOrder()->firstOrFail(), receiving: true);
             $locked = $this->lockHandoff($handoff);
 
             $this->assertDestinationProvider($locked, $destination);
             $this->require($locked->status === ParcelHandoffStatus::InTransit, 'status', 'Only an in-transit handoff can be received.');
             $this->assertOriginCustody($parcel, $locked->originProvider()->firstOrFail());
+            app(ParcelLegService::class)->requireReceiptOrigin($parcel, (int) $locked->origin_provider_id, (int) $locked->sending_hub_id);
             $hub = $this->assertHandoffHub((int) $destination->id, (int) $locked->receiving_hub_id, 'receiving_hub_id');
 
             $this->verification->assertValidForHandoff(
@@ -436,6 +481,7 @@ class ParcelHandoffService
                 'custody_hub_id' => $hub->id,
             ])->save();
 
+            app(ParcelLegService::class)->advanceAfterReceipt($parcel, $locked);
             app(ParcelReturnService::class)->movement($parcel, $locked);
 
             return $locked;
@@ -465,17 +511,30 @@ class ParcelHandoffService
         bool $throwWhenUnavailable,
     ): ?ParcelHandoff {
         $buyerBarangay = $this->routingBarangay($parcel);
-        $links = $this->serviceableLinks(
-            $origin,
-            $buyerBarangay,
-            $this->buyerProvinceCode($parcel),
-            lock: true,
-        )->reject(fn (LogisticsProviderLink $link): bool => in_array((int) $link->id, array_map('intval', $excludeLinkIds), true));
+        $excluded = fn (LogisticsProviderLink $link): bool => in_array((int) $link->id, array_map('intval', $excludeLinkIds), true);
+        $reverseTarget = null;
+        $route = null;
 
         if ($parcel->hasActiveReturn()) {
-            $links = $links->filter(fn ($link) => (int) $link->destination_provider_id === (int) $parcel->parcelReturn->origin_provider_id);
+            $reverseTarget = $this->reverseTarget($parcel, $origin, $excluded);
+            $links = collect([$reverseTarget['link'] ?? null])->filter();
+        } elseif (($route = $parcel->parcelRoute()->lockForUpdate()->first()) !== null) {
+            $leg = $route->currentLeg();
+            $this->require(! $route->isCompleted() && $leg !== null, 'route', 'This saved route has no pending transport leg.');
+            $this->require(
+                (int) LogisticsHub::query()->whereKey($leg['hub_id'])->value('logistics_provider_id') !== (int) $origin->id,
+                'route',
+                'The next saved leg stays inside your network. Use an internal manifest for it.',
+            );
+            $links = $this->savedRouteLinks($parcel, $route, $origin, lock: true)->reject($excluded);
+        } else {
+            $links = $this->prioritizePlannedDestination($parcel, $this->serviceableLinks(
+                $origin,
+                $buyerBarangay,
+                $this->buyerProvinceCode($parcel),
+                lock: true,
+            )->reject($excluded));
         }
-        $links = $this->prioritizePlannedDestination($parcel, $links);
 
         if ($requestedLinkId !== null) {
             $chosen = $links->firstWhere('id', $requestedLinkId);
@@ -488,7 +547,7 @@ class ParcelHandoffService
             $chosen = $links->first();
         }
 
-        if ($chosen === null) {
+        if ($chosen === null && $reverseTarget === null) {
             $this->recordException($parcel, $origin, $buyerBarangay);
 
             if ($throwWhenUnavailable) {
@@ -500,26 +559,33 @@ class ParcelHandoffService
             return null;
         }
 
-        $destination = LogisticsProvider::query()->whereKey($chosen->destination_provider_id)->lockForUpdate()->firstOrFail();
-        $this->require($this->linkIsServiceable($chosen, $buyerBarangay, $this->buyerProvinceCode($parcel)), 'logistics_provider_link_id', 'The selected partnership is no longer serviceable.');
+        $destination = LogisticsProvider::query()
+            ->whereKey($reverseTarget['provider_id'] ?? $chosen->destination_provider_id)
+            ->lockForUpdate()
+            ->firstOrFail();
 
         $sendingHub = $this->sendingHub($parcel, $origin);
-        $receivingArea = $this->hubs->areaForBarangay((int) $destination->id, $buyerBarangay, lock: true);
-        $this->require($receivingArea !== null, 'receiving_hub_id', 'The destination provider no longer covers this barangay.');
-        $receivingHub = $this->assertHandoffHub(
-            (int) $destination->id,
-            (int) $receivingArea->station_hub_id,
-            'receiving_hub_id',
-        );
 
-        if ($parcel->hasActiveReturn()) {
-            $this->require((int) $receivingHub->id === (int) $parcel->parcelReturn->origin_hub_id, 'receiving_hub_id', 'The reverse receiving hub must match the frozen Seller origin.');
+        if ($reverseTarget !== null) {
+            $receivingHub = $this->assertHandoffHub((int) $destination->id, $reverseTarget['hub_id'], 'receiving_hub_id');
+        } elseif ($route === null) {
+            $this->require($this->linkIsServiceable($chosen, $buyerBarangay, $this->buyerProvinceCode($parcel)), 'logistics_provider_link_id', 'The selected partnership is no longer serviceable.');
+            $receivingArea = $this->hubs->areaForBarangay((int) $destination->id, $buyerBarangay, lock: true);
+            $this->require($receivingArea !== null, 'receiving_hub_id', 'The destination provider no longer covers this barangay.');
+            $receivingHub = $this->assertHandoffHub((int) $destination->id, (int) $receivingArea->station_hub_id, 'receiving_hub_id');
+        } else {
+            $expectedOrigin = (int) ($leg['origin_hub_id'] ?? ($route->current_leg_index === 0
+                ? $route->origin_hub_id : $route->legs[$route->current_leg_index - 1]['hub_id']));
+            $this->require((int) $sendingHub->id === $expectedOrigin
+                && app(ParcelLegService::class)->verifiedLocation($parcel)?->id === $expectedOrigin,
+                'sending_hub_id', 'Verified custody must match the saved route departure hub.');
+            $receivingHub = $this->assertHandoffHub((int) $destination->id, (int) $leg['hub_id'], 'receiving_hub_id');
         }
 
         $handoff = new ParcelHandoff;
         $handoff->forceFill([
             'seller_order_id' => $parcel->id,
-            'logistics_provider_link_id' => $chosen->id,
+            'logistics_provider_link_id' => $chosen?->id,
             'origin_provider_id' => $origin->id,
             'destination_provider_id' => $destination->id,
             'sending_hub_id' => $sendingHub->id,
@@ -543,6 +609,99 @@ class ParcelHandoffService
             ]);
 
         return $handoff;
+    }
+
+    /**
+     * The partnership a saved route needs for its next leg. An intermediate
+     * provider only has to be eligible and linked; the final provider must also
+     * still cover the buyer's barangay.
+     *
+     * @return Collection<int, LogisticsProviderLink>
+     */
+    private function savedRouteLinks(SellerOrder $parcel, ParcelRoute $route, LogisticsProvider $origin, bool $lock = false): Collection
+    {
+        $leg = $route->currentLeg();
+
+        if ($route->isCompleted() || $leg === null) {
+            return collect();
+        }
+
+        $query = LogisticsProviderLink::query()
+            ->where('origin_provider_id', $origin->id)
+            ->where('destination_provider_id', LogisticsHub::query()->whereKey($leg['hub_id'])->value('logistics_provider_id'))
+            ->where('status', LogisticsProviderLink::ACTIVE)
+            ->with(['originProvider', 'destinationProvider'])
+            ->orderBy('priority')
+            ->orderBy('id');
+
+        return ($lock ? $query->lockForUpdate() : $query)->get()
+            ->filter(function (LogisticsProviderLink $link) use ($parcel, $route): bool {
+                $destination = $link->destinationProvider;
+
+                if ($destination === null || ! $destination->isApproved() || $destination->archived_at !== null || ! $destination->hasVerifiedProvince()) {
+                    return false;
+                }
+
+                return ! $route->isCurrentLegFinal()
+                    || $this->linkIsServiceable($link, $this->routingBarangay($parcel), $this->buyerProvinceCode($parcel));
+            })
+            ->values();
+    }
+
+    /**
+     * Where a physical return may go next, one authorized step at a time: straight
+     * to the original provider on a reverse partnership, or back to the provider
+     * that handed this parcel over, on a reverse partnership or, with no link at
+     * all, once an Admin has authorized this one parcel. Providers outside the
+     * parcel's verified path are never used.
+     *
+     * @param  callable(LogisticsProviderLink): bool  $excluded
+     * @return array{link: ?LogisticsProviderLink, provider_id: int, hub_id: int}|null
+     */
+    private function reverseTarget(SellerOrder $parcel, LogisticsProvider $origin, callable $excluded): ?array
+    {
+        $record = $parcel->parcelReturn;
+        $direct = $this->serviceableLinks($origin, $this->routingBarangay($parcel), $this->buyerProvinceCode($parcel), lock: true)
+            ->first(fn (LogisticsProviderLink $link): bool => (int) $link->destination_provider_id === (int) $record->origin_provider_id && ! $excluded($link));
+
+        if ($direct !== null) {
+            return ['link' => $direct, 'provider_id' => (int) $record->origin_provider_id, 'hub_id' => (int) $record->origin_hub_id];
+        }
+
+        $arrival = ParcelHandoff::query()
+            ->where('seller_order_id', $parcel->id)
+            ->where('direction', 'forward')
+            ->where('destination_provider_id', $origin->id)
+            ->where('status', ParcelHandoffStatus::Received->value)
+            ->latest('id')
+            ->first();
+
+        if ($arrival === null) {
+            return null;
+        }
+
+        $link = LogisticsProviderLink::query()
+            ->where('origin_provider_id', $origin->id)
+            ->where('destination_provider_id', $arrival->origin_provider_id)
+            ->where('status', LogisticsProviderLink::ACTIVE)
+            ->lockForUpdate()
+            ->first();
+
+        if ($link === null || $excluded($link)) {
+            if (! app(ParcelReturnService::class)->reverseRouteAuthorized($record)) {
+                return null;
+            }
+
+            $link = null;
+        }
+
+        return [
+            'link' => $link,
+            'provider_id' => (int) $arrival->origin_provider_id,
+            'hub_id' => (int) $arrival->origin_provider_id === (int) $record->origin_provider_id
+                ? (int) $record->origin_hub_id
+                : (int) $arrival->sending_hub_id,
+        ];
     }
 
     /**
@@ -604,14 +763,18 @@ class ParcelHandoffService
         ]);
     }
 
-    private function lockParcel(SellerOrder $parcel): SellerOrder
+    private function lockParcel(SellerOrder $parcel, bool $receiving = false): SellerOrder
     {
         $locked = SellerOrder::query()
             ->whereKey($parcel->id)
             ->lockForUpdate()
             ->with(['order.buyer', 'seller', 'orderItems'])
             ->firstOrFail();
-        ParcelIncidentService::assertOperationsAllowed($locked);
+        if ($receiving) {
+            ParcelIncidentService::assertReceivingAllowed($locked);
+        } else {
+            ParcelIncidentService::assertOperationsAllowed($locked);
+        }
 
         return $locked;
     }
@@ -643,8 +806,29 @@ class ParcelHandoffService
 
     private function assertLinkStillServiceable(ParcelHandoff $handoff, SellerOrder $parcel): void
     {
+        if ($handoff->logistics_provider_link_id === null) {
+            return;
+        }
+
         $link = LogisticsProviderLink::query()->whereKey($handoff->logistics_provider_link_id)->lockForUpdate()->first();
         $this->require($link !== null && $link->status === LogisticsProviderLink::ACTIVE, 'link', 'This partnership is no longer active.');
+
+        if ($handoff->direction === 'return') {
+            // A step back along the parcel's path was authorized when requested;
+            // only the final step into the original provider checks seller coverage.
+            if ((int) $handoff->destination_provider_id !== (int) $parcel->parcelReturn?->origin_provider_id) {
+                return;
+            }
+        } elseif (($route = $parcel->parcelRoute()->first()) !== null) {
+            $this->require(
+                $this->savedRouteLinks($parcel, $route, $handoff->originProvider()->firstOrFail())->contains('id', $link->id),
+                'destination_provider_id',
+                'This partnership no longer serves the next saved leg of this parcel.',
+            );
+
+            return;
+        }
+
         $this->require(
             $this->linkIsServiceable($link, $this->routingBarangay($parcel), $this->buyerProvinceCode($parcel)),
             'destination_provider_id',

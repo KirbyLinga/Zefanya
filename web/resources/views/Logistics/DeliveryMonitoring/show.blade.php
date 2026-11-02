@@ -13,6 +13,7 @@
 </div>
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
+<x-parcel-route-progress :details="$routeDetails" />
 
 @if ($errors->any())
     <div role="alert" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -57,7 +58,7 @@
             <dl class="space-y-2 text-base">
                 @if ($sellerOrder->payment)
                     <div><dt class="text-xs text-[var(--text-muted)]">Method</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->payment->method?->label() ?? '—' }}</dd></div>
-                    <div><dt class="text-xs text-[var(--text-muted)]">Status</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->payment->status?->label() ?? '—' }}</dd></div>
+                    <div><dt class="text-xs text-[var(--text-muted)]">Status</dt><dd class="font-semibold text-[var(--text-ink)]">{{ ucfirst($sellerOrder->payment->status?->value ?? '') ?? '—' }}</dd></div>
                     <div><dt class="text-xs text-[var(--text-muted)]">Amount</dt><dd class="text-xs text-[var(--text-muted)]">{{ $sellerOrder->payment->formattedAmount() ?? '—' }}</dd></div>
                 @else
                     <div><dd class="text-xs text-[var(--text-muted)]">No payment recorded</dd></div>
@@ -93,7 +94,7 @@
         </div>
         <div class="flex-1">
             <h2 class="text-base font-semibold text-amber-900 mb-1">Open incident blocks this delivery</h2>
-            <p class="text-sm text-amber-800 mb-3">Parcel {{ $sellerOrder->id }} has an open lost/damaged incident. Resolve it in the admin queue before the delivery can complete, fail, reassign, or return.</p>
+            <p class="text-sm text-amber-800 mb-3">Parcel {{ $sellerOrder->id }} has an unresolved exception. Review it in Parcel exceptions; lost/damaged resolutions may require Admin. Movement remains blocked until an authorized resolution.</p>
             @if ($incident)
                 <p class="text-sm font-semibold text-amber-900">Incident #{{ $incident->id }} ({{ $incident->type }}) — open since {{ $incident->created_at->setTimezone('UTC')->format('M d, Y H:i') }}</p>
             @endif
@@ -137,6 +138,51 @@
         </form>
     </div>
 @endif
+
+@if (! $openIncident && ! in_array($sellerOrder->status, [OrderStatus::Delivered, OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled], true))
+    <div class="mt-6 bg-white border border-[var(--border-strong)] rounded-lg p-5">
+        <h2 class="text-base font-semibold text-[var(--text-ink)] mb-3">Report operational exception</h2>
+        <p class="text-sm text-[var(--text-muted)] mb-4">Use this for a missing parcel, wrong-hub receipt, or failed transfer. The parcel stays blocked until the exception is reviewed and resolved in <a href="{{ route('logistics.exceptions.index') }}" class="font-semibold text-primary-700 hover:text-primary-900">Parcel exceptions</a>.</p>
+        <form method="POST" enctype="multipart/form-data" action="{{ route('logistics.exceptions.store', $sellerOrder) }}" class="space-y-4">
+            @csrf
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="exception_type" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Exception type</label>
+                    <select id="exception_type" name="type" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" required>
+                        <option value="missing" @selected(old('type') === 'missing')>Missing</option>
+                        <option value="wrong_hub" @selected(old('type') === 'wrong_hub')>Wrong hub</option>
+                        <option value="inactive_connection" @selected(old('type') === 'inactive_connection')>Inactive connection</option>
+                        <option value="failed_transfer" @selected(old('type') === 'failed_transfer')>Failed transfer</option>
+                        <option value="damaged" @selected(old('type') === 'damaged')>Damaged</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="exception_blocked_leg" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Blocked leg (optional)</label>
+                    <input id="exception_blocked_leg" name="blocked_leg_index" type="number" min="0" value="{{ old('blocked_leg_index') }}" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
+                </div>
+            </div>
+            <div>
+                <label for="exception_reason" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Reason</label>
+                <input id="exception_reason" name="reason" value="{{ old('reason') }}" maxlength="255" required class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
+            </div>
+            <div>
+                <label for="exception_description" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Notes</label>
+                <textarea id="exception_description" name="description" rows="3" maxlength="1000" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent">{{ old('description') }}</textarea>
+            </div>
+            <div>
+                <label for="exception_photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (required for Damaged)</label>
+                <input id="exception_photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm">
+                <p class="mt-1 text-xs text-[var(--text-muted)]">JPEG, PNG or WebP up to 5 MB. Stored privately.</p>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 mr-2"></i> Record exception
+                </button>
+            </div>
+        </form>
+    </div>
+@endif
+
 <section class="mt-6 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
     <h2 class="text-base font-semibold text-[var(--text-ink)]">Manual status override</h2>
     <p class="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">Use only to record a verified operational correction. Your company, previous and new status, time and reason are recorded in the audit log.</p>
@@ -176,13 +222,25 @@
     (() => {
         const incidentType = document.getElementById('type');
         const incidentPhoto = document.getElementById('photo');
-        if (!incidentType || !incidentPhoto) return;
-        const updatePhotoRequirement = () => {
-            incidentPhoto.required = incidentType.value === 'damaged';
-            incidentPhoto.setAttribute('aria-required', String(incidentPhoto.required));
-        };
-        incidentType.addEventListener('change', updatePhotoRequirement);
-        updatePhotoRequirement();
+        if (incidentType && incidentPhoto) {
+            const updatePhotoRequirement = () => {
+                incidentPhoto.required = incidentType.value === 'damaged';
+                incidentPhoto.setAttribute('aria-required', String(incidentPhoto.required));
+            };
+            incidentType.addEventListener('change', updatePhotoRequirement);
+            updatePhotoRequirement();
+        }
+
+        const exceptionType = document.getElementById('exception_type');
+        const exceptionPhoto = document.getElementById('exception_photo');
+        if (exceptionType && exceptionPhoto) {
+            const updateExceptionPhotoRequirement = () => {
+                exceptionPhoto.required = exceptionType.value === 'damaged';
+                exceptionPhoto.setAttribute('aria-required', String(exceptionPhoto.required));
+            };
+            exceptionType.addEventListener('change', updateExceptionPhotoRequirement);
+            updateExceptionPhotoRequirement();
+        }
     })();
 </script>
 @endpush

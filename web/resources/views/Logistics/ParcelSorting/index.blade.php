@@ -127,7 +127,9 @@
                                         <a href="{{ route('logistics.parcel-sorting.address.preview', $shipment) }}" class="{{ $primaryButton }}">Verify delivery barangay</a>
                                     @endif
 
-                                    @if ($tab === 'sorting' && $shipment->status === OrderStatus::AtSortingCenter)
+                                    @if ($tab === 'sorting' && ($sortingBlocked[$shipment->id] ?? null))
+                                        <p class="max-w-[260px] font-sans text-[12px] text-[var(--text-muted)] xl:text-right">{{ $sortingBlocked[$shipment->id] }}</p>
+                                    @elseif ($tab === 'sorting' && $shipment->status === OrderStatus::AtSortingCenter)
                                         <a href="{{ route('logistics.scan.index') }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">Scan to confirm</a>
                                     @elseif ($tab === 'sorting' && $isSorted && ! $riderCourier)
                                         @php

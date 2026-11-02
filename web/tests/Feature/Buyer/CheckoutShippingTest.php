@@ -12,6 +12,7 @@ use App\Models\Catalog\ProductVariant;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Logistics\LogisticsShippingRate;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
@@ -19,6 +20,7 @@ use App\Models\Shared\Voucher;
 use App\Services\Buyer\CheckoutCarrierService;
 use App\Services\Buyer\VoucherSessionService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\BootstrapsCheckoutCarriers;
@@ -268,7 +270,7 @@ class CheckoutShippingTest extends TestCase
         $this->get(route('seller.dashboard'))->assertOk()
             ->assertSee('Note from buyer: Please &lt;b&gt;gift&lt;/b&gt; wrap', false);
         $this->get(route('seller.orders.index'))->assertOk()
-            ->assertSee('Note: Please &lt;b&gt;gift&lt;/b&gt; wrap', false)
+            ->assertSeeInOrder(['data-buyer-note', 'View buyer note', 'Hide buyer note', 'Please &lt;b&gt;gift&lt;/b&gt; wrap'], false)
             ->assertDontSee('<b>gift</b>', false);
         $this->actingAs($other, 'seller')->get(route('seller.orders.index'))->assertOk()->assertDontSee('data-buyer-note', false);
     }
@@ -478,5 +480,162 @@ class CheckoutShippingTest extends TestCase
         $this->post(route('buyer.checkout.store'), $fields)->assertSessionHasErrors('carriers.'.$this->seller->id);
         $this->assertSame(0, Order::count());
         $this->assertFalse(CheckoutToken::where('token', $fields['checkout_token'])->sole()->used);
+    }
+
+    // Phase 3: Route Feasibility Validation Tests
+
+    public function test_phase3_same_municipality_with_valid_coverage(): void
+    {
+        // Scenario 1: Same municipality with valid coverage — should succeed
+        [, $line] = $this->line(500);
+
+        $page = $this->openCheckout([$line]);
+        $this->assertTrue($page->viewData('carriersAvailable'));
+        $this->assertFalse($this->placeOrderIsDisabled($page));
+
+        $fields = $this->formFields($page);
+        $this->post(route('buyer.checkout.store'), $fields)->assertSessionHasNoErrors();
+        $this->assertSame(1, Order::count());
+    }
+
+    public function test_phase3_different_municipalities_same_province(): void
+    {
+        // Scenario 2: Different municipalities in same province with valid coverage — should succeed
+        [, $line] = $this->line(500);
+
+        // Setup PSGC cache for the new municipality/barangay
+        Cache::put('psgc:barangays:030540200', [
+            ['code' => '0305402001', 'name' => 'TestBarangay'],
+        ], 3600);
+
+        $this->buyer->forceFill([
+            'municipality_code' => '030540200',  // Angeles (in Pampanga)
+            'municipality_name' => 'Angeles',
+            'barangay_code' => '0305402001',
+            'barangay_name' => 'TestBarangay',
+        ])->save();
+
+        // Add coverage for this new barangay
+        $station = LogisticsHub::where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('hub_type', LogisticsHub::STATION)->firstOrFail();
+        $this->actingAs($this->checkoutCarrier, 'logistics')
+            ->post(route('logistics.areas.store'), [
+                'station_hub_id' => $station->id,
+                'city_municipality_code' => '030540200',
+                'barangay_codes' => ['0305402001'],
+            ])->assertSessionHasNoErrors();
+
+        // Ensure SAME_PROVINCE rates exist for this provider
+        LogisticsShippingRate::query()->updateOrCreate(
+            ['logistics_provider_id' => $this->checkoutCarrier->id, 'zone' => 'same_province'],
+            ['first_kg_minor' => 6900, 'additional_kg_minor' => 2000]
+        );
+
+        $this->actingAs($this->buyer->fresh(), 'buyer');
+        $page = $this->openCheckout([$line]);
+        $this->assertTrue($page->viewData('carriersAvailable'));
+
+        $fields = $this->formFields($page);
+        $this->post(route('buyer.checkout.store'), $fields)->assertSessionHasNoErrors();
+        $this->assertSame(1, Order::count());
+    }
+
+    public function test_phase3_inactive_origin_station_hub_blocks_checkout(): void
+    {
+        // Scenario 5: Inactive origin Station Hub — should block
+        [, $line] = $this->line(500);
+
+        // Deactivate the origin station hub
+        $station = LogisticsHub::where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('hub_type', LogisticsHub::STATION)->firstOrFail();
+        $this->actingAs($this->checkoutCarrier, 'logistics')
+            ->patch(route('logistics.hubs.status', $station), ['is_active' => false])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->buyer, 'buyer');
+        $page = $this->openCheckout([$line]);
+        $this->assertFalse($page->viewData('carriersAvailable'));
+        $this->assertTrue($this->placeOrderIsDisabled($page));
+    }
+
+    public function test_phase3_missing_pickup_barangay_coverage_blocks_checkout(): void
+    {
+        // Scenario 7: Missing pickup barangay coverage — should block
+        [, $line] = $this->line(500);
+
+        // Change seller to a barangay without coverage
+        $this->seller->forceFill([
+            'barangay_code' => '0305401002',
+            'barangay_name' => 'Uncovered Barangay',
+        ])->save();
+
+        $page = $this->openCheckout([$line]);
+        $this->assertFalse($page->viewData('carriersAvailable'));
+        $this->assertTrue($this->placeOrderIsDisabled($page));
+    }
+
+    public function test_phase3_missing_delivery_barangay_coverage_blocks_checkout(): void
+    {
+        // Scenario 8: Missing delivery barangay coverage — should block
+        [, $line] = $this->line(500);
+
+        // Change buyer to a barangay without coverage
+        $this->buyer->forceFill([
+            'barangay_code' => '0305401003',
+            'barangay_name' => 'Uncovered Destination',
+        ])->save();
+
+        $page = $this->openCheckout([$line]);
+        $this->assertFalse($page->viewData('carriersAvailable'));
+        $this->assertTrue($this->placeOrderIsDisabled($page));
+    }
+
+    public function test_phase3_checkout_eligibility_revalidated_at_order_placement(): void
+    {
+        // Scenario 10: Checkout eligibility changes before order placement — should catch at placement
+        [, $line] = $this->line(500);
+        $fields = $this->formFields($this->openCheckout([$line]));
+
+        // Disable coverage after checkout
+        Area::where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('barangay_code', $this->buyer->barangay_code)
+            ->update(['is_active' => false]);
+
+        // Order placement should fail
+        $this->post(route('buyer.checkout.store'), $fields)
+            ->assertSessionHasErrors('carriers.'.$this->seller->id);
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_phase3_unsupported_shipping_cannot_create_order(): void
+    {
+        // Scenario 11: Unsupported shipping cannot create order — verify safety
+        [, $line] = $this->line(500);
+        $this->buyer->forceFill(['barangay_code' => null])->save();
+
+        // Manually craft a post that tries to bypass validation
+        $fields = $this->formFields($this->openCheckout([$line]));
+
+        $this->post(route('buyer.checkout.store'), $fields)
+            ->assertSessionHasErrors();
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_phase3_existing_checkout_flows_unchanged(): void
+    {
+        // Scenario 12: Existing supported checkout flows unchanged — verify no regression
+        [, $line] = $this->line(500);
+
+        $page = $this->openCheckout([$line]);
+        $this->assertTrue($page->viewData('carriersAvailable'));
+
+        $fields = $this->formFields($page);
+        $response = $this->post(route('buyer.checkout.store'), $fields);
+        $response->assertSessionHasNoErrors()->assertRedirect();
+
+        $order = Order::query()->sole();
+        $this->assertNotNull($order);
+        $this->assertSame($this->buyer->id, $order->buyer_id);
+        $this->assertSame(1, $order->sellerOrders()->count());
     }
 }

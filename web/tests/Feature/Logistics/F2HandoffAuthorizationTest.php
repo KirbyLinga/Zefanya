@@ -8,6 +8,8 @@ use App\Enums\PaymentStatus;
 use App\Models\Buyer\Buyer;
 use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
+use App\Models\Logistics\CodRemittance;
+use App\Models\Logistics\DeliveryOtp;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Courier;
@@ -28,6 +30,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\Support\IssuesLogisticsHandoff;
+use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 /**
@@ -36,7 +39,7 @@ use Tests\TestCase;
  */
 class F2HandoffAuthorizationTest extends TestCase
 {
-    use CreatesAssignableFleet, IssuesLogisticsHandoff, LazilyRefreshDatabase;
+    use CreatesAssignableFleet, IssuesLogisticsHandoff, LazilyRefreshDatabase, ProvidesDeliveryOtp;
 
     private LogisticsProvider $provider;
 
@@ -301,20 +304,27 @@ class F2HandoffAuthorizationTest extends TestCase
             $parcel,
             ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY,
         );
+        $otp = $this->deliveryOtp($parcel);
 
         $this->actingAs($this->rider, 'rider')
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
+                'delivery_otp' => $otp,
                 'proof_photo' => UploadedFile::fake()->create('pod.jpg', 80, 'image/jpeg'),
                 'cod_amount' => '1.00',
             ])
             ->assertSessionHasErrors('cod_amount_minor');
 
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
+        $this->assertNull(DeliveryOtp::query()->sole()->used_at);
+        $this->assertNull(Payment::query()->sole()->collected_amount_minor);
+        $this->assertDatabaseCount('delivery_proofs', 0);
+        $this->assertSame(0, CodRemittance::query()->count());
 
         $this->actingAs($this->rider, 'rider')
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
+                'delivery_otp' => $otp,
                 'proof_photo' => UploadedFile::fake()->create('pod2.jpg', 80, 'image/jpeg'),
                 'cod_amount' => '1500.00',
             ])
@@ -322,6 +332,22 @@ class F2HandoffAuthorizationTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
+        $this->assertNotNull(DeliveryOtp::query()->sole()->used_at);
+        $this->assertSame(150000, Payment::query()->sole()->collected_amount_minor);
+        $this->assertDatabaseCount('delivery_proofs', 1);
+        $this->assertSame(1, CodRemittance::query()->count());
+
+        // A consumed token and code cannot start a second collection.
+        $this->post(route('rider.deliveries.deliver', $parcel), [
+            'verification_token' => $token,
+            'delivery_otp' => $otp,
+            'proof_photo' => UploadedFile::fake()->create('pod3.jpg', 80, 'image/jpeg'),
+            'cod_amount' => '1500.00',
+        ])->assertRedirect();
+        $this->assertSame(150000, Payment::query()->sole()->collected_amount_minor);
+        $this->assertDatabaseCount('delivery_proofs', 1);
+        $this->assertSame(1, CodRemittance::query()->count());
+        $this->assertSame(1, StatusHistory::query()->where('seller_order_id', $parcel->id)->where('to_status', OrderStatus::Delivered->value)->count());
     }
 
     private function pickedUpParcel(): SellerOrder
@@ -343,6 +369,8 @@ class F2HandoffAuthorizationTest extends TestCase
             'origin_station_hub_id' => $this->originStationId,
             'tracking_number' => 'TRK-20261021-'.strtoupper(Str::random(6)),
         ]);
+
+        $parcel->forceFill(['handover_at' => now()])->save();
 
         OrderItem::factory()->create([
             'seller_order_id' => $parcel->id,

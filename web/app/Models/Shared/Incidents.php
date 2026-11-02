@@ -3,6 +3,7 @@
 namespace App\Models\Shared;
 
 use App\Enums\ParcelIncidentStatus;
+use App\Enums\ParcelIncidentType;
 use App\Models\Rider\Rider;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One row per reported lost/damaged parcel. The parcel is a `SellerOrder`, so
+ * One row per reported parcel exception. The parcel is a `SellerOrder`, so
  * `incident_seller_order_id` references that fulfillment unit directly.
  *
  * Status is a VARCHAR cast to `ParcelIncidentStatus`. It is NEVER mass-assigned
@@ -38,6 +39,7 @@ class Incidents extends Model
         'photo_path',
         'happened_at',
         'status',
+        'blocked_leg_index',
     ];
 
     protected $casts = [
@@ -48,6 +50,12 @@ class Incidents extends Model
         'happened_at' => 'datetime',
         'status' => ParcelIncidentStatus::class,
         'custody_snapshot' => 'array',
+        'blocked_leg_index' => 'integer',
+        'resolution_context' => 'array',
+        'reviewed_at' => 'datetime',
+        'reviewed_by_id' => 'integer',
+        'resolved_at' => 'datetime',
+        'resolved_by_id' => 'integer',
     ];
 
     public function sellerOrder(): BelongsTo
@@ -74,8 +82,39 @@ class Incidents extends Model
             ->toArray();
     }
 
+    public function isActive(): bool
+    {
+        if ($this->isHeld()) {
+            return true;
+        }
+
+        return $this->status instanceof ParcelIncidentStatus
+            ? $this->status->isActive()
+            : in_array($this->status, [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value], true);
+    }
+
+    /**
+     * Backwards-compatible alias used by existing admin views/policies.
+     * "Open" here means the exception still blocks normal movement.
+     */
     public function isOpen(): bool
     {
-        return $this->status === ParcelIncidentStatus::Open;
+        return $this->isActive();
+    }
+
+    public function isUnderReview(): bool
+    {
+        return $this->status === ParcelIncidentStatus::UnderReview;
+    }
+
+    public function isHeld(): bool
+    {
+        return strtoupper((string) $this->resolution) === 'KEEP_ON_HOLD';
+    }
+
+    public function typeLabel(): string
+    {
+        return ParcelIncidentType::tryFrom(strtolower((string) $this->type))?->label()
+            ?? ucfirst((string) $this->type);
     }
 }

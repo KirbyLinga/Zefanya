@@ -63,14 +63,14 @@ class MessageController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'id' => $conversation->id,
-                'buyer_name' => $conversation->buyer->fullName(),
+                'buyer_name' => $conversation->buyer?->fullName() ?? 'Buyer',
                 'seller_name' => $conversation->seller->business_name,
                 'product_id' => $conversation->product_id,
                 'order_id' => $conversation->order_id,
                 'messages' => $messages->map(fn (Message $m) => [
                     'id' => $m->id,
                     'sender_role' => $m->sender_role,
-                    'sender_name' => $m->sender_role === 'buyer' ? $conversation->buyer->fullName() : $conversation->seller->business_name,
+                    'sender_name' => $m->sender_role === 'buyer' ? ($conversation->buyer?->fullName() ?? 'Buyer') : $conversation->seller->business_name,
                     'body' => htmlspecialchars($m->body, ENT_QUOTES, 'UTF-8'),
                     'image_url' => $m->imageUrl('seller'),
                     'html' => view('Messages._bubble', ['message' => $m, 'role' => 'seller'])->render(),

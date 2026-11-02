@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Rider;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Models\Rider\Rider;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -40,7 +41,7 @@ class ProfileController extends Controller
         $rider = $request->user();
 
         if (! $rider instanceof Rider) {
-            throw new \Illuminate\Auth\AuthenticationException('Unauthenticated.');
+            throw new AuthenticationException('Unauthenticated.');
         }
 
         $data = [

@@ -43,6 +43,8 @@ class ParcelReturnService
 {
     public const BUYER_REASONS = ['Item arrived damaged', 'Wrong item received', 'Item is defective', 'Missing items or parts', 'Item does not match the description', 'Other'];
 
+    public const REVERSE_ROUTE_AUTHORIZED = 'reverse_route_authorized';
+
     public function __construct(private readonly ParcelHandoffVerification $verification = new ParcelHandoffVerification) {}
 
     /** The same persisted delivery clock used by automatic receipt completion. */
@@ -412,6 +414,33 @@ class ParcelReturnService
             $this->event($record, 'origin_verified', 'admin', $admin->id, ['evidence' => $evidence]);
             $this->clearException($record, 'Original pickup location verified from historical evidence.', $admin->id);
         });
+    }
+
+    /**
+     * Admin override for one parcel: with no usable reverse partnership, it may
+     * still go back to the provider that handed it over. No partnership is created,
+     * and acceptance, scans and custody rules still apply.
+     */
+    public function authorizeReverseRoute(Admin $admin, ParcelReturn $record, string $note): void
+    {
+        $this->admin($admin);
+        DB::transaction(function () use ($admin, $record, $note): void {
+            $record = $this->locked($record, investigation: true);
+            $this->require(in_array($record->status, [State::Requested, State::InTransit], true), 'return', 'Reverse routing can only be authorized before the parcel reaches the origin.');
+            $this->require(
+                $record->sellerOrder->parcelHandoffs()->where('direction', 'forward')->where('status', 'RECEIVED')
+                    ->where('destination_provider_id', $this->custodyProviderId($record->sellerOrder))->exists(),
+                'return',
+                'This parcel did not arrive through a verified cross-provider handoff.',
+            );
+            $this->event($record, self::REVERSE_ROUTE_AUTHORIZED, 'admin', $admin->id, ['note' => trim($note)]);
+            $this->clearException($record, 'Admin authorized the reverse route for this parcel: '.trim($note), $admin->id);
+        });
+    }
+
+    public function reverseRouteAuthorized(ParcelReturn $record): bool
+    {
+        return $record->events()->where('event_key', self::REVERSE_ROUTE_AUTHORIZED)->exists();
     }
 
     public function reverseManifest(ParcelReturn $record, LogisticsProvider $provider, int $destinationHubId): Manifest

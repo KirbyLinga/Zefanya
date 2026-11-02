@@ -6,14 +6,19 @@ require_once __DIR__.'/Preflight.php';
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
-use App\Models\Logistics\LogisticsProvider;
-use App\Models\Logistics\ParcelReturn;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductVariant;
+use App\Models\Logistics\LogisticsProvider;
+use App\Models\Logistics\Manifest;
+use App\Models\Logistics\ManifestItem;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Seller\Seller;
-use App\Models\Shared\SellerOrder;
 use App\Models\Seller\SellerSettlement;
+use App\Models\Shared\Incidents;
+use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\ManifestService;
+use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelReturnService;
 use App\Services\Seller\SellerVacationService;
 use App\Services\Seller\StockService;
@@ -121,7 +126,25 @@ final class T05Worker extends TestCase
             }
         });
         $start = microtime(true);
-        if ($task['action'] === 'vacation') {
+        if (in_array($task['action'], ['phase6_reroute', 'phase6_receive'], true)) {
+            $provider = LogisticsProvider::query()->findOrFail($task['provider']);
+            try {
+                if ($task['action'] === 'phase6_reroute') {
+                    app(ParcelIncidentService::class)->resolveForProvider(
+                        Incidents::query()->findOrFail($task['incident']), $provider,
+                        ['event' => 'AUTHORIZE_REROUTE', 'reason' => 'Verified alternate connection approved by logistics.']);
+                } else {
+                    $manifest = Manifest::query()->findOrFail($task['manifest']);
+                    $item = ManifestItem::query()->findOrFail($task['item']);
+                    $service = app(ManifestService::class);
+                    $scan = $service->verifyScan($manifest, $provider, $item->sellerOrder->tracking_number, 'receive');
+                    $service->receive($manifest, $provider, $item, $scan['verification_token']);
+                }
+                $result = ['status' => 'completed', 'success' => true];
+            } catch (ValidationException) {
+                $result = ['status' => 'rejected', 'success' => false];
+            }
+        } elseif ($task['action'] === 'vacation') {
             app(SellerVacationService::class)->set(Seller::query()->findOrFail($task['seller']), (bool) $task['enabled']);
             $result = ['status' => 200, 'success' => true];
         } elseif ($task['action'] === 'payout_request') {
@@ -207,7 +230,7 @@ final class T05Worker extends TestCase
 
 $task = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
 $runRoot = match ($task['action'] ?? '') {
-    'dispatch' => '/storage/logs/phase6-races', 'payout_request', 'settlement' => '/storage/logs/payout-races', 'return_request', 'return_receipt' => '/storage/logs/phase7-races', default => '/.codex/t05-runs'
+    'dispatch', 'phase6_reroute', 'phase6_receive' => '/storage/logs/phase6-races', 'payout_request', 'settlement' => '/storage/logs/payout-races', 'return_request', 'return_receipt' => '/storage/logs/phase7-races', default => '/.codex/t05-runs'
 };
 $root = realpath(dirname(__DIR__, 2).$runRoot);
 if ($root === false || ! str_starts_with(realpath($task['directory']), $root.DIRECTORY_SEPARATOR)) {

@@ -9,8 +9,10 @@ use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
 use App\Models\Buyer\CheckoutToken;
 use App\Models\Catalog\Product;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsShippingRate;
+use App\Models\Logistics\TransportConnection;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
 use App\Models\Shared\Order;
@@ -88,6 +90,7 @@ class CrossProvinceCheckoutTest extends TestCase
     public function test_cross_province_checkout_displays_the_enabled_origin_and_its_approved_destination(): void
     {
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         $this->cart();
 
         $this->actingAs($this->buyer, 'buyer')
@@ -110,30 +113,32 @@ class CrossProvinceCheckoutTest extends TestCase
 
         $this->assertFalse($options[0]['available']);
         $this->assertSame('cross_province', $options[0]['route']);
-        $this->assertStringContainsString('Destination-provider links are required', (string) $options[0]['message']);
+        $this->assertStringContainsString('Delivery from this shop to your address is not available yet', (string) $options[0]['message']);
 
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertSee('Cross-province delivery is not available yet');
+            ->assertSee('Delivery from this shop to your address is not available yet');
     }
 
     public function test_cross_province_route_is_blocked_when_no_rate_is_configured(): void
     {
         config(['buyer.cross_province.fee_minor' => null]);
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         $this->cart();
 
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertSee('Cross-province shipping is not configured by the marketplace yet');
+            ->assertSee('Shipping rates for this delivery route are not available yet');
     }
 
     public function test_the_origin_carriers_own_rate_opens_a_route_the_marketplace_has_not_priced(): void
     {
         config(['buyer.cross_province.fee_minor' => null]);
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         $this->cart();
         LogisticsShippingRate::query()->create([
             'logistics_provider_id' => $this->origin->id,
@@ -145,7 +150,7 @@ class CrossProvinceCheckoutTest extends TestCase
         $options = $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertDontSee('not configured by the marketplace')
+            ->assertDontSee('Shipping rates for this delivery route are not available yet')
             ->viewData('carrierOptions');
 
         $this->assertTrue($options[0]['available']);
@@ -156,6 +161,7 @@ class CrossProvinceCheckoutTest extends TestCase
     public function test_cross_province_order_saves_origin_carrier_and_destination_without_transferring_custody(): void
     {
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         $cart = $this->cart();
         session([CheckoutController::SESSION_KEY => [$cart->id]]);
 
@@ -178,11 +184,13 @@ class CrossProvinceCheckoutTest extends TestCase
         $this->assertSame($this->origin->id, (int) $order->sellerOrders()->sole()->carrier_provider_id);
         $this->assertDatabaseCount('parcel_handoffs', 0);
         $this->assertDatabaseCount('parcel_handoff_exceptions', 0);
+        $this->assertSame(TransportConnection::query()->sole()->id, $sellerOrder->parcelRoute->legs[0]['transport_connection_id']);
     }
 
     public function test_cross_province_route_is_revalidated_against_locked_links_before_order_creation(): void
     {
         $link = $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         $this->cart();
 
         $service = app(CheckoutCarrierService::class);
@@ -216,7 +224,9 @@ class CrossProvinceCheckoutTest extends TestCase
         )['provider'];
 
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin, 50);
+        $this->configureConnection($this->destination);
         $this->activeHandoffLink($this->origin, $preferred, $this->admin, 1);
+        $this->configureConnection($preferred);
         $this->cart();
 
         $service = app(CheckoutCarrierService::class);
@@ -232,6 +242,7 @@ class CrossProvinceCheckoutTest extends TestCase
     public function test_cross_province_submission_rejects_client_supplied_fees(): void
     {
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         $cart = $this->cart();
         session([CheckoutController::SESSION_KEY => [$cart->id]]);
 
@@ -250,6 +261,7 @@ class CrossProvinceCheckoutTest extends TestCase
     public function test_multi_seller_cross_province_checkout_keeps_per_seller_ownership_and_fees(): void
     {
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
 
         $secondSeller = $this->sellerIn('030540000', 'Pampanga', '030540100', 'San Fernando', '0305401001', 'Santo Rosario');
         SellerShippingProvider::query()->create([
@@ -303,13 +315,42 @@ class CrossProvinceCheckoutTest extends TestCase
     public function test_invalid_cross_province_fees_never_become_a_zero_or_truncated_rate(): void
     {
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $this->configureConnection($this->destination);
         foreach ([-0.5, 19900.5, '19900.5', 'not-configured', '99999999999999999999999999999'] as $fee) {
             config(['buyer.cross_province.fee_minor' => $fee]);
             $options = app(CheckoutCarrierService::class)->optionsForSellerGroup($this->buyer, $this->seller, 25000);
             $this->assertFalse($options['available']);
             $this->assertSame([], $options['carriers']);
-            $this->assertStringContainsString('not configured', $options['message']);
+            $this->assertStringContainsString('rates for this delivery route are not available', $options['message']);
         }
+    }
+
+    public function test_approved_partner_without_transport_connection_cannot_checkout(): void
+    {
+        $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
+        $cart = $this->cart();
+        session([CheckoutController::SESSION_KEY => [$cart->id]]);
+        $options = app(CheckoutCarrierService::class)->optionsForSellerGroup($this->buyer, $this->seller, 25000);
+        $this->assertFalse($options['available']);
+
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            'carriers' => [$this->seller->id => $this->origin->id],
+        ])->assertSessionHasErrors();
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('parcel_routes', 0);
+    }
+
+    private function configureConnection(LogisticsProvider $destination): void
+    {
+        TransportConnection::query()->create([
+            'origin_hub_id' => LogisticsHub::query()->where('logistics_provider_id', $this->origin->id)->where('hub_type', LogisticsHub::STATION)->sole()->id,
+            'destination_hub_id' => LogisticsHub::query()->where('logistics_provider_id', $destination->id)->where('hub_type', LogisticsHub::STATION)->sole()->id,
+            'transport_mode' => TransportConnection::ROAD,
+            'operating_provider_id' => $this->origin->id,
+            'is_active' => true,
+        ]);
     }
 
     private function cart(): CartItem

@@ -54,7 +54,11 @@
         <i data-lucide="shopping-bag" class="w-[28px] h-[28px] text-[var(--icon-soft)] mb-3"></i>
         <p class="font-sans text-sm font-semibold text-[var(--text-ink)] mb-1">No orders in this view</p>
         <p class="font-sans text-[12.5px] text-[var(--text-muted)] max-w-[320px]">
-            @if($bucket === 'to_ship')
+            @if($sellerOrders->total() > 0)
+                This page is past the end of your results. Open the first page to continue.
+            @elseif($bucket === 'all')
+                New buyer orders will appear here. Your status tabs show which orders need preparation or are already with Logistics.
+            @elseif($bucket === 'to_ship')
                 New orders from buyers will appear here.
             @elseif($bucket === 'ready')
                 Orders you've packed will show up here, waiting for a courier.
@@ -66,6 +70,7 @@
                 Delivered and returned orders will show up here.
             @endif
         </p>
+        <a href="{{ route('seller.orders.index', $sellerOrders->total() > 0 ? ['bucket' => $bucket] : []) }}" class="mt-4 inline-flex min-h-10 items-center rounded-lg border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--link)]">{{ $sellerOrders->total() > 0 ? 'Go to first page' : 'View all orders' }}</a>
     </div>
 @else
     <div class="overflow-x-auto border border-[var(--border-strong)] rounded-xl bg-[var(--bg-surface)] shadow-sm">
@@ -108,6 +113,7 @@
                         </td>
                         <td class="px-4 py-4 border-b border-[var(--border-strong)]">
                             <x-seller.order-status-pill :status="$sellerOrder->status" />
+                            <x-seller.fulfillment-guidance :shipment="$sellerOrder" compact />
                         </td>
                         <td class="px-4 py-4 border-b border-[var(--border-strong)] text-center">
                             @if($sellerOrder->status === OrderStatus::Placed)

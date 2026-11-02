@@ -12,9 +12,11 @@ use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelLegService;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -264,15 +266,18 @@ class IncomingParcelsController extends Controller
                 );
                 $method = $payload['method'] ?? null;
 
-                $this->status->transition(
-                    $fresh,
-                    OrderStatus::AtSortingCenter,
-                    note: 'Parcel handed to sorting center.'.ParcelHandoffVerification::noteSuffix($method),
-                    changedBy: $provider->fullName(),
-                    actor: OrderActor::Logistics,
-                    actorId: $provider->id,
-                    source: 'web',
-                );
+                DB::transaction(function () use ($fresh, $provider, $method, $stationHubId): void {
+                    $this->status->transition(
+                        $fresh,
+                        OrderStatus::AtSortingCenter,
+                        note: 'Parcel handed to sorting center.'.ParcelHandoffVerification::noteSuffix($method),
+                        changedBy: $provider->fullName(),
+                        actor: OrderActor::Logistics,
+                        actorId: $provider->id,
+                        source: 'web',
+                    );
+                    app(ParcelLegService::class)->receiveAtOrigin($fresh, (int) $provider->id, $stationHubId);
+                });
 
                 $handoffVerify->consumeAfterSuccess(fn () => $handoffVerify->consumeForLogistics(
                     $provider,

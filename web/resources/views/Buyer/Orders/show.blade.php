@@ -65,6 +65,15 @@
                                         <span>Discount</span><span>{{ $order->formattedDiscount() }}</span>
                                     </p>
                                 @endif
+                                @php($shippingMinor = (int) $order->sellerOrders->sum('shipping_fee_minor'))
+                                <p class="flex justify-between gap-4 font-sans text-sm leading-relaxed text-[var(--text-muted)] mt-1">
+                                    <span>Shipping</span><span>{{ $shippingMinor > 0 ? '₱'.number_format($shippingMinor / 100, 2) : 'Free' }}</span>
+                                </p>
+                                @if ($order->shipping_discount_minor > 0)
+                                    <p class="flex justify-between gap-4 font-sans text-sm leading-relaxed text-[var(--text-muted)] mt-1">
+                                        <span>Shipping discount</span><span>−₱{{ number_format($order->shipping_discount_minor / 100, 2) }}</span>
+                                    </p>
+                                @endif
                                 <p class="flex justify-between gap-4 font-sans text-lg font-bold text-[var(--text-ink)] mt-2">
                                     <span>Total</span><span>{{ $order->formattedTotal() }}</span>
                                 </p>
@@ -90,7 +99,21 @@
                                     </button>
                                 @endif
                             </div>
+                            @if ($sellerOrder->status === \App\Enums\OrderStatus::OutForDelivery)
+                                @php($deliveryCode = $deliveryCodes[$sellerOrder->id] ?? null)
+                                <div class="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
+                                    <h3 class="font-sans text-sm font-semibold text-primary-900">Delivery code</h3>
+                                    @if ($deliveryCode)
+                                        <p class="mt-2 font-mono text-3xl font-semibold tracking-widest text-primary-900">{{ $deliveryCode['code'] }}</p>
+                                        <p class="mt-2 text-xs leading-relaxed text-[var(--text-ink)]">Give this code to your rider only after you have your parcel and have checked any cash payment. It expires at {{ $deliveryCode['expires_at']->timezone('Asia/Manila')->format('g:i A') }}.</p>
+                                    @else
+                                        <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">When your rider arrives, they will request a code and it will appear here.</p>
+                                        <a href="{{ route('buyer.orders.show', $order) }}" class="mt-2 inline-block text-xs font-semibold text-primary-900 underline">Refresh this page</a>
+                                    @endif
+                                </div>
+                            @endif
                             <x-shipment-tracking :shipment="$sellerOrder" />
+                            <x-parcel-route-progress :details="$routeDetails[$sellerOrder->id] ?? null" />
 
                             @php($hubMovements = $sellerOrder->manifestMovementEvents())
                             @if ($hubMovements !== [])

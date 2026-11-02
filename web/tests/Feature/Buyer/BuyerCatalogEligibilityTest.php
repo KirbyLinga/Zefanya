@@ -60,7 +60,7 @@ class BuyerCatalogEligibilityTest extends TestCase
             $response = $this->get($url)->assertOk()->assertViewHas('products', fn ($items) => $items->modelKeys() === ($visible ? [$product->id] : []));
             if ($visible) {
                 $response->assertSee('Eligibility Shirt')->assertSee($price);
-                $response->assertSee($soldOutSearch ? 'Sold Out' : ($stock.' in stock'));
+                $response->assertSee($soldOutSearch ? 'Sold Out' : $this->stockLabel($stock, $product));
             } else {
                 $response->assertDontSee('Eligibility Shirt');
             }
@@ -77,7 +77,7 @@ class BuyerCatalogEligibilityTest extends TestCase
         }
         $aggregate = Product::query()->withBuyerCardData()->with('seller')->findOrFail($product->id);
         $card = (string) $this->view('Components.buyer.product-card', ['product' => $aggregate, 'wishlistIds' => collect()]);
-        $this->assertStringContainsString($listed ? ($stock.' in stock') : 'Out of stock', $card);
+        $this->assertStringContainsString($listed ? $this->stockLabel($stock, $product) : 'Out of stock', $card);
         $this->assertStringContainsString($price, $card);
         if (! $listed) {
             $this->assertStringContainsString('disabled', $card);
@@ -173,11 +173,38 @@ class BuyerCatalogEligibilityTest extends TestCase
         $response->assertSee($canBuy ? '4 unit(s) available' : 'Unavailable');
 
         $html = (string) $this->view('Components.buyer.product-card', ['product' => $product->fresh()->load(['variants', 'seller', 'images']), 'wishlistIds' => collect()]);
-        $this->assertStringContainsString($canBuy ? $stock.' in stock' : 'Out of stock', $html);
+        $this->assertStringContainsString($canBuy ? $this->stockLabel($stock, $product) : 'Out of stock', $html);
         if (! $canBuy) {
             $this->assertStringContainsString('disabled', $html);
         }
         $this->assertSame(20, $product->fresh()->stock_quantity);
+    }
+
+    /** Approved card wording, using the product's own low-stock threshold. */
+    private function stockLabel(int $stock, Product $product): string
+    {
+        return $stock <= $product->low_stock_threshold ? 'Only '.$stock.' left' : $stock.' in stock';
+    }
+
+    public static function stockLabelBoundaries(): array
+    {
+        return [
+            'at threshold' => [5, 'Only 5 left', '5 in stock'],
+            'above threshold' => [6, '6 in stock', 'Only 6 left'],
+            'no stock' => [0, 'Out of stock', '0 in stock'],
+        ];
+    }
+
+    #[DataProvider('stockLabelBoundaries')]
+    public function test_card_stock_label_follows_the_product_threshold(int $stock, string $expected, string $unexpected): void
+    {
+        $product = Product::factory()->create(['seller_id' => Seller::factory()->create()->id, 'name' => 'Boundary Shirt', 'low_stock_threshold' => 5]);
+        $product->variants()->sole()->update(['is_available' => true, 'stock_quantity' => $stock]);
+
+        $html = (string) $this->view('Components.buyer.product-card', ['product' => $product->fresh()->load(['variants', 'seller', 'images']), 'wishlistIds' => collect()]);
+
+        $this->assertStringContainsString($expected, $html);
+        $this->assertStringNotContainsString($unexpected, $html);
     }
 
     public function test_zero_price_and_missing_variants_are_handled_without_rollup_fallback(): void
@@ -197,15 +224,15 @@ class BuyerCatalogEligibilityTest extends TestCase
     {
         $category = Category::create(['label' => 'Pages', 'icon' => 'shirt']);
         $ids = [];
-        for ($i = 0; $i < 13; $i++) {
+        for ($i = 0; $i < 21; $i++) {
             $ids[] = $this->product('Page Shirt '.$i, [[1, 5, false], [300, 2, true]], $category)->id;
         }
         $this->product('Page Shirt Disabled', [[1, 10, false]], $category);
 
         $this->get(route('buyer.products.index', ['min_price' => 300, 'max_price' => 300, 'sort' => 'price_asc', 'page' => 2]))
             ->assertOk()->assertViewHas('products', function ($products) use ($ids) {
-                $this->assertSame(13, $products->total());
-                $this->assertSame([$ids[12]], $products->modelKeys());
+                $this->assertSame(21, $products->total());
+                $this->assertSame([$ids[20]], $products->modelKeys());
                 $this->assertStringContainsString('min_price=300', $products->previousPageUrl());
                 $this->assertStringContainsString('max_price=300', $products->previousPageUrl());
                 $this->assertStringContainsString('sort=price_asc', $products->previousPageUrl());

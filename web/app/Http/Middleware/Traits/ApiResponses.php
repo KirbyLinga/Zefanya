@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware\Traits;
 
+use Illuminate\Http\JsonResponse;
+
 /** Shared JSON response helpers for API controllers.
  *
  * The application uses a consistent JSON shape for every API response:
@@ -17,7 +19,7 @@ namespace App\Http\Middleware\Traits;
 trait ApiResponses
 {
     /** Render a successful API response. */
-    public function success(string $message, $data = null, int $status = 200): \Illuminate\Http\JsonResponse
+    public function success(string $message, $data = null, int $status = 200): JsonResponse
     {
         $body = [
             'success' => true,
@@ -30,7 +32,7 @@ trait ApiResponses
     }
 
     /** Render an error API response (validation/422). */
-    public function error(string $message, array $errors = [], int $status = 422): \Illuminate\Http\JsonResponse
+    public function error(string $message, array $errors = [], int $status = 422): JsonResponse
     {
         $body = [
             'success' => false,
@@ -43,7 +45,7 @@ trait ApiResponses
     }
 
     /** Render an authentication/authorization error (401/403). */
-    public function unauthenticated(string $message, int $status = 401): \Illuminate\Http\JsonResponse
+    public function unauthenticated(string $message, int $status = 401): JsonResponse
     {
         return response()->json([
             'success' => false,
@@ -54,7 +56,7 @@ trait ApiResponses
     }
 
     /** Render a forbidden (role/ability) error. */
-    public function forbidden(string $message, int $status = 403): \Illuminate\Http\JsonResponse
+    public function forbidden(string $message, int $status = 403): JsonResponse
     {
         return response()->json([
             'success' => false,

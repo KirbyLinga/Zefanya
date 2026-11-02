@@ -17,6 +17,7 @@ use App\Services\Shared\PriceResolver;
 use App\Services\Shared\ResolvedPrice;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -282,6 +283,93 @@ class PriceResolverTest extends TestCase
         $this->assertSame([$onSale->id], $flash->pluck('id')->all());
     }
 
+    public function test_on_sale_filter_matches_the_resolver_badge_for_every_sale_shape(): void
+    {
+        $this->sale(['type' => 'percent', 'value' => 20]);
+
+        [$fixed] = $this->productAt(500.00, 'Fixed Below Regular');
+        $this->sale(['type' => 'fixed_price', 'value' => 40000], $fixed);
+
+        [$fixedAtRegular] = $this->productAt(199.99, 'Fixed At Regular');
+        $this->sale(['type' => 'fixed_price', 'value' => 19999], $fixedAtRegular);
+
+        [$fixedAbove] = $this->productAt(500.00, 'Fixed Above Regular');
+        $this->sale(['type' => 'fixed_price', 'value' => 90000], $fixedAbove);
+
+        [$roundsToNothing] = $this->productAt(0.10, 'Too Cheap To Discount');
+        $this->sale(['type' => 'percent', 'value' => 1], $roundsToNothing);
+
+        [$ended] = $this->productAt(500.00, 'Sale Ended');
+        $this->sale(['starts_at' => now()->subDays(2), 'ends_at' => now()->subDay()], $ended);
+
+        [$upcoming] = $this->productAt(500.00, 'Sale Upcoming');
+        $this->sale(['starts_at' => now()->addDay(), 'ends_at' => now()->addDays(2)], $upcoming);
+
+        [$soldOutVariantSale, $soldOutVariant] = $this->productAt(500.00, 'Sale Variant Sold Out');
+        ProductVariant::factory()->create(['product_id' => $soldOutVariantSale->id, 'price' => 500.00, 'stock_quantity' => 5, 'is_available' => true]);
+        $this->sale(['variant_id' => $soldOutVariant->id], $soldOutVariantSale);
+        $soldOutVariant->forceFill(['stock_quantity' => 0])->save();
+
+        [$oneVariantSale, $discountedVariant] = $this->productAt(500.00, 'One Variant On Sale');
+        ProductVariant::factory()->create(['product_id' => $oneVariantSale->id, 'price' => 500.00, 'stock_quantity' => 5, 'is_available' => true]);
+        $this->sale(['variant_id' => $discountedVariant->id], $oneVariantSale);
+
+        $this->productAt(500.00, 'No Sale');
+
+        $withBadge = Product::query()->activeInStock()->get()
+            ->filter(fn (Product $product) => $product->buyerPrice()?->badge() !== null)
+            ->pluck('id')->sort()->values()->all();
+
+        $this->assertSame([$this->product->id, $fixed->id, $oneVariantSale->id], $withBadge);
+        $this->assertSame(
+            $withBadge,
+            $this->get(route('buyer.products.index', ['on_sale' => 1]))->assertOk()
+                ->viewData('products')->pluck('id')->sort()->values()->all(),
+        );
+    }
+
+    public function test_on_sale_filter_keeps_other_filters_and_shows_its_chip(): void
+    {
+        $this->sale(['type' => 'percent', 'value' => 20]);
+        [$other] = $this->productAt(5000.00, 'Pricey Coat');
+        $this->sale(['type' => 'percent', 'value' => 20], $other);
+
+        $page = $this->get(route('buyer.products.index', ['on_sale' => 1, 'max_price' => 1000]))
+            ->assertOk()
+            ->assertSee('Remove on sale filter');
+
+        $this->assertSame([$this->product->id], $page->viewData('products')->pluck('id')->all());
+        $this->assertStringContainsString('on_sale=1', $page->viewData('products')->url(2));
+
+        $this->get(route('buyer.products.index'))->assertOk()->assertDontSee('Remove on sale filter');
+    }
+
+    public function test_navbar_sale_link_only_shows_while_a_real_discount_exists(): void
+    {
+        $saleLink = 'title="Sale"';
+
+        $this->get(route('buyer.home'))->assertOk()->assertDontSee($saleLink, false);
+
+        $this->sale(['type' => 'fixed_price', 'value' => 900000]);
+        Cache::flush();
+        $this->get(route('buyer.home'))->assertOk()->assertDontSee($saleLink, false);
+
+        StoreSale::query()->delete();
+        $this->sale(['type' => 'percent', 'value' => 20]);
+        Cache::flush();
+        $url = e(route('buyer.products.index', ['on_sale' => 1]));
+        $this->get(route('buyer.home'))->assertOk()->assertSee('href="'.$url.'"', false);
+
+        $this->assertMatchesRegularExpression(
+            '/zf-nav-link[^"]*active[^"]*" title="Sale"/',
+            $this->get(route('buyer.products.index', ['on_sale' => 1]))->getContent(),
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/zf-nav-link[^"]*active[^"]*" title="Sale"/',
+            $this->get(route('buyer.products.index'))->getContent(),
+        );
+    }
+
     public function test_voucher_applies_to_the_sale_price(): void
     {
         $this->sale(['type' => 'percent', 'value' => 50]);
@@ -316,7 +404,7 @@ class PriceResolverTest extends TestCase
         $this->post(route('buyer.checkout.store'), [
             'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
             ...$this->checkoutCarrierPayload([$this->seller]),
-        ])->assertSessionHas('error', fn (string $message) => str_contains($message, 'minimum spend'));
+        ])->assertSessionHas('error', fn (string $message) => str_contains($message, 'more to use this voucher.'));
 
         $this->assertSame(0, OrderItem::query()->count());
     }

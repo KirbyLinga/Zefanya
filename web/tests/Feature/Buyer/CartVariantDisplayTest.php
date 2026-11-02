@@ -106,7 +106,7 @@ class CartVariantDisplayTest extends TestCase
         $this->assertStringContainsString('data-unit-centavos="12025"', $row);
         $this->assertStringContainsString('data-line-total-centavos="24050"', $row);
         $this->assertStringContainsString('240.50', $row);
-        $this->assertStringContainsString('>2</span>', $row);
+        $this->assertMatchesRegularExpression('/<input[^>]*js-cartpage-qty-input[^>]*value="2"[^>]*aria-label="Quantity of Cart Display Shirt"/s', $row);
         if ($label !== null) {
             $this->assertStringContainsString($label, $row);
         } else {

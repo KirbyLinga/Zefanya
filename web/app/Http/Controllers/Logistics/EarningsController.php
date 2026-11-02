@@ -11,6 +11,7 @@ use App\Services\Logistics\LogisticsRemittanceService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class EarningsController extends Controller
@@ -27,8 +28,8 @@ class EarningsController extends Controller
             'earnedThisMonthMinor' => (int) (clone $parcels)
                 ->join('seller_orders', 'seller_orders.id', '=', 'cod_remittances.seller_order_id')
                 ->where('cod_remittances.created_at', '>=', Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc())
-                ->sum('seller_orders.shipping_fee_minor'),
-            'parcels' => (clone $parcels)->with('sellerOrder:id,tracking_number,shipping_fee_minor', 'sellerOrder.parcelReturn')
+                ->sum(DB::raw(CodRemittance::KEPT_SHIPPING_SQL)),
+            'parcels' => (clone $parcels)->with('sellerOrder:id,tracking_number,shipping_fee_minor,carrier_provider_id', 'sellerOrder.parcelReturn')
                 ->latest('id')->paginate(25, ['*'], 'parcels_page')->withQueryString(),
             'payments' => LogisticsRemittance::query()->where('logistics_provider_id', $provider->getKey())
                 ->latest('id')->paginate(25, ['*'], 'payments_page')->withQueryString(),

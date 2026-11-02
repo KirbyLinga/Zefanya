@@ -7,7 +7,6 @@ use App\Models\Buyer\CartItem;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Voucher;
-use App\Services\Buyer\BuyerPurchaseLimit;
 use App\Services\Buyer\CartSummary;
 use App\Services\Buyer\CartVariantResolver;
 use App\Services\Buyer\VoucherApplication;
@@ -193,7 +192,7 @@ class CartController extends Controller
                 $currentProduct->setRelation('seller', Seller::query()
                     ->whereKey($currentProduct->seller_id)->sharedLock()->first());
                 $currentVariant = app(CartVariantResolver::class)->resolve($currentProduct, $variantId);
-                $stockCeiling = $currentVariant->stock_quantity;
+                $cap = $currentVariant->stock_quantity;
 
                 $locked = CartItem::query()
                     ->where('buyer_id', $buyer->id)
@@ -202,11 +201,9 @@ class CartController extends Controller
                     ->lockForUpdate()
                     ->get();
                 $existing = $locked->firstWhere('variant_id', $variantId);
-                $others = (int) $locked->where('id', '!=', $existing?->id)->sum('quantity');
-                $cap = min($stockCeiling, max(0, app(BuyerPurchaseLimit::class)->remaining($buyer->id, $product->id) - $others));
 
                 if ($cap < 1) {
-                    throw ValidationException::withMessages(['quantity' => BuyerPurchaseLimit::MESSAGE]);
+                    throw ValidationException::withMessages(['quantity' => 'Sorry, this item is out of stock.']);
                 }
 
                 $requested = (int) $validated['quantity'];
@@ -227,8 +224,7 @@ class CartController extends Controller
                 return [
                     'quantity' => $newQty,
                     'quantity_limit' => $cap,
-                    'quantity_warning' => $wanted > $cap
-                        ? ($cap < $stockCeiling ? BuyerPurchaseLimit::MESSAGE : "Only {$cap} available.") : null,
+                    'quantity_warning' => $wanted > $cap ? "Only {$cap} available." : null,
                 ];
             }, attempts: 3);
         } catch (QueryException $exception) {
@@ -285,11 +281,10 @@ class CartController extends Controller
                 ->lockForUpdate()
                 ->get();
             $current = $locked->firstWhere('id', $item->id) ?? $item;
-            $others = (int) $locked->where('id', '!=', $item->id)->sum('quantity');
-            $cap = min($item->availableQuantity(), max(0, app(BuyerPurchaseLimit::class)->remaining($item->buyer_id, $item->product_id) - $others));
+            $cap = $item->availableQuantity();
 
             if ($cap < 1) {
-                throw ValidationException::withMessages(['quantity' => BuyerPurchaseLimit::MESSAGE]);
+                throw ValidationException::withMessages(['quantity' => 'Sorry, this item is out of stock.']);
             }
 
             $current->update([
@@ -298,8 +293,7 @@ class CartController extends Controller
 
             return [
                 'quantity_limit' => $cap,
-                'quantity_warning' => (int) $validated['quantity'] > $cap
-                    ? ($cap < $item->availableQuantity() ? BuyerPurchaseLimit::MESSAGE : "Only {$cap} available.") : null,
+                'quantity_warning' => (int) $validated['quantity'] > $cap ? "Only {$cap} available." : null,
             ];
         });
 
@@ -512,22 +506,12 @@ class CartController extends Controller
             $item->setRelation('variant', $variant);
 
             $ceiling = $item->availableQuantity();
-            $others = (int) $buyer->cartItems()
-                ->where('product_id', $product->id)
-                ->when($item->exists, fn ($query) => $query->whereKeyNot($item->id))
-                ->lockForUpdate()
-                ->sum('quantity');
-            $cap = min($ceiling, max(0, app(BuyerPurchaseLimit::class)->remaining($buyer->id, $product->id) - $others));
 
             if (! $item->isAvailable() || $ceiling < 1) {
                 return response()->json(['success' => false, 'message' => 'Sorry, this item is out of stock.'], 422);
             }
 
-            if ($cap < 1) {
-                throw ValidationException::withMessages(['quantity' => BuyerPurchaseLimit::MESSAGE]);
-            }
-
-            $item->quantity = min($data['quantity'], $cap);
+            $item->quantity = min($data['quantity'], $ceiling);
             $item->save();
 
             return response()->json([

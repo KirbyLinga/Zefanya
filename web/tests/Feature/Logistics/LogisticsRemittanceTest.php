@@ -33,9 +33,10 @@ class LogisticsRemittanceTest extends TestCase
         $this->provider = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now(), 'business_name' => 'Ninja Express']);
     }
 
-    private function parcel(int $cod, int $shipping, string $status = CodRemittance::REMITTED_TO_LOGISTICS, ?LogisticsProvider $provider = null): CodRemittance
+    private function parcel(int $cod, int $shipping, string $status = CodRemittance::REMITTED_TO_LOGISTICS, ?LogisticsProvider $provider = null, ?LogisticsProvider $carrier = null): CodRemittance
     {
         $order = SellerOrder::factory()->create(['shipping_fee_minor' => $shipping, 'tracking_number' => 'TRK-'.fake()->unique()->numerify('######')]);
+        $order->forceFill(['carrier_provider_id' => $carrier?->id])->save();
         $remittance = new CodRemittance;
         $remittance->forceFill([
             'payment_id' => Payment::factory()->create(['seller_order_id' => $order->id])->id,
@@ -101,6 +102,43 @@ class LogisticsRemittanceTest extends TestCase
         $this->assertSame($payment->id, $second->fresh()->logistics_remittance_id);
         $this->assertNull($withRider->fresh()->logistics_remittance_id);
         $this->assertNull($first->fresh()->zefanya_received_at);
+    }
+
+    public function test_a_cross_provider_shipping_fee_is_kept_by_no_company_and_stays_pending_allocation(): void
+    {
+        $carrier = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now()]);
+        $crossProvider = $this->parcel(50000, 4900, carrier: $carrier);
+        $ownCarrier = $this->parcel(30000, 5000, carrier: $this->provider);
+
+        $this->actingAs($this->provider, 'logistics')->get(route('logistics.earnings.index'))
+            ->assertOk()
+            ->assertSee('Pending allocation')
+            ->assertSee('₱50.00')        // earned: only the parcel it was the carrier for
+            ->assertDontSee('₱99.00')
+            ->assertSee('">₱750.00</span> to Zefanya', false); // 500 in full + 300 minus 50
+
+        $this->remit(75000)->assertSessionHasNoErrors();
+
+        $payment = LogisticsRemittance::query()->sole();
+        $this->assertSame(80000, $payment->cod_total_minor);
+        $this->assertSame(5000, $payment->shipping_total_minor);
+        $this->assertSame(75000, $payment->amount_minor);
+        $this->assertTrue($crossProvider->fresh()->isCrossProvider());
+        $this->assertFalse($ownCarrier->fresh()->isCrossProvider());
+
+        $admin = $this->admin();
+        $this->actingAs($admin, 'admin')->get(route('admin.logistics-remittances.index'))
+            ->assertOk()
+            ->assertSee('₱49.00')
+            ->assertSee('Shipping pending allocation')
+            ->assertSee('is pending allocation');
+
+        $this->actingAs($admin, 'admin')->get(route('admin.dashboard'))
+            ->assertViewHas('settlements', fn ($rows) => $rows->first()['shippingMinor'] === 5000 && $rows->first()['owedMinor'] === 75000);
+
+        // The carrier chosen at checkout is not credited either.
+        $this->actingAs($carrier, 'logistics')->get(route('logistics.earnings.index'))
+            ->assertOk()->assertDontSee('₱49.00');
     }
 
     public function test_a_changed_amount_or_nothing_to_send_stops_the_payment(): void

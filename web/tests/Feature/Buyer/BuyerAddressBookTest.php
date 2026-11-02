@@ -182,7 +182,7 @@ class BuyerAddressBookTest extends TestCase
     }
 
     #[DataProvider('addressRoutes')]
-    public function test_buy_addr_009_someone_elses_id_looks_the_same_as_one_that_does_not_exist(string $method, string $route): void
+    public function test_buy_addr_009_someone_elses_id_looks_the_same_as_one_that_does_not_exist(string $method, string $route, array $payload): void
     {
         [, , $office] = $this->otherBuyersBook();
         $this->actingAs(Buyer::factory()->create(), 'buyer');
@@ -190,8 +190,8 @@ class BuyerAddressBookTest extends TestCase
         // Production settings: debug pages name the model and differ on purpose.
         config(['app.debug' => false]);
 
-        $foreign = $this->{$method}(route($route, $office));
-        $missing = $this->{$method}(route($route, 999999));
+        $foreign = $this->{$method}(route($route, $office), $payload);
+        $missing = $this->{$method}(route($route, 999999), $payload);
 
         $foreign->assertNotFound();
         $missing->assertNotFound();

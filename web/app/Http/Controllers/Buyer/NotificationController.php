@@ -38,7 +38,8 @@ class NotificationController extends Controller
 
         return response()->json([
             'notifications' => $notifications,
-        ]);
+            'unread_count' => $buyer->unreadNotifications()->count(),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     /**
@@ -103,6 +104,7 @@ class NotificationController extends Controller
         return match ($type) {
             'courier_assigned' => 'Courier Assigned',
             'out_for_delivery', 'order_out_for_delivery' => 'Order Out for Delivery',
+            'delivery_code' => 'Delivery Code Ready',
             'delivered', 'order_delivered' => 'Order Delivered',
             'delivery_failed' => 'Delivery Attempt Failed',
             'seller_order_cancelled' => 'Shipment Cancelled',

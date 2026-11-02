@@ -27,7 +27,7 @@
   <div class="rounded-2xl border border-buyer-line bg-white p-5">
 
     {{-- Header --}}
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex items-center justify-between gap-3 mb-4 pb-4 border-b border-buyer-line/50">
       <h2 class="font-serif text-[20px] font-semibold text-buyer-ink">Order Summary</h2>
       <span id="cartpage-summary-count"
             class="rounded-full bg-secondary-100 px-3 py-1 text-[11px] font-semibold text-buyer-ink"
@@ -37,31 +37,47 @@
       </span>
     </div>
 
-    {{-- Totals --}}
-    <div class="mt-4 flex flex-col gap-2.5" aria-live="polite">
-      <div class="flex items-center justify-between text-[12.5px]">
-        <span class="text-neutral-400">Subtotal</span>
-        <span id="cartpage-subtotal" class="font-serif text-[14px] font-semibold text-buyer-ink">
+    {{-- Totals breakdown --}}
+    <div class="flex flex-col gap-3" aria-live="polite">
+      {{-- Subtotal --}}
+      <div class="flex items-center justify-between">
+        <span class="text-[13px] text-neutral-500">Subtotal</span>
+        <span id="cartpage-subtotal" class="font-serif text-[15px] font-semibold text-buyer-ink">
           {{ $summary->formattedSubtotal() }}
         </span>
       </div>
 
-      <div class="flex items-center justify-between text-[12.5px]">
-        <span class="text-neutral-400">Shipping</span>
-        <span class="text-neutral-400">Calculated at checkout</span>
+      {{-- Shipping placeholder --}}
+      <div class="flex items-center justify-between">
+        <span class="text-[13px] text-neutral-500">Shipping</span>
+        <span class="text-[13px] text-neutral-400 font-medium">Calculated at checkout</span>
       </div>
 
+      {{-- Voucher Discount --}}
       <div id="cartpage-discount-row"
-           class="flex items-center justify-between text-[12.5px] {{ $hasVoucher ? '' : 'hidden' }}">
-        <span class="text-neutral-400">Voucher Discount</span>
-        <span id="cartpage-discount" class="font-semibold text-tertiary-700">
-          {{ $summary->formattedDiscount() }}
+           class="flex items-center justify-between {{ $hasVoucher ? '' : 'hidden' }}">
+        <span class="text-[13px] text-neutral-500">Voucher Discount</span>
+        <span id="cartpage-discount" class="font-semibold text-[15px] text-tertiary-700">
+          -{{ $summary->formattedDiscount() }}
         </span>
       </div>
+
+      {{-- Divider --}}
+      <div class="my-1 border-t border-buyer-line/50"></div>
+
+      {{-- Subtotal before shipping --}}
+      <div class="flex items-end justify-between">
+        <span class="text-[14px] font-bold text-buyer-ink">Subtotal before shipping</span>
+        <span id="cartpage-total" class="font-serif text-[26px] font-semibold text-buyer-ink"
+              aria-live="polite">{{ $summary->formattedTotal() }}</span>
+      </div>
+
+      {{-- Note about final amount --}}
+      <p class="text-[11px] text-neutral-400 italic">Final payable amount will be shown at checkout</p>
     </div>
 
-    {{-- Voucher --}}
-    <div class="mt-4">
+    {{-- Voucher section --}}
+    <div class="mt-5 pt-5 border-t border-buyer-line/50">
       <div class="flex items-center gap-1 rounded-xl border border-buyer-line bg-blush p-1">
         <label for="cartpage-voucher-input" class="sr-only">Voucher code</label>
         <input
@@ -113,27 +129,16 @@
       @endif
     </div>
 
-    {{-- Total --}}
-    <div class="mt-4 border-t border-buyer-line pt-4">
-      <div class="flex items-end justify-between">
-        <span class="text-[13px] font-semibold text-buyer-ink">Total</span>
-        <span id="cartpage-total" class="font-serif text-[26px] font-semibold text-buyer-ink"
-              aria-live="polite">{{ $summary->formattedTotal() }}</span>
-      </div>
-
+    {{-- Checkout button --}}
+    <div class="mt-5 pt-5 border-t border-buyer-line/50">
       <button
         type="button"
-        class="js-cartpage-checkout-btn mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-5 py-3.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
+        class="js-cartpage-checkout-btn flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-5 py-3.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
         @disabled(! $canCheckout)
       >
         Proceed to Checkout
         <i data-lucide="arrow-right" width="15" height="15"></i>
       </button>
-
-      <p class="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
-        <i data-lucide="lock" width="12" height="12"></i>
-        Secure 256-bit SSL encrypted checkout
-      </p>
     </div>
   </div>
 </aside>

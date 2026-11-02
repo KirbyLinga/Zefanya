@@ -20,4 +20,7 @@
     @else
         <p>Try adjusting your filters.</p>
     @endif
+    @if (! $pastEnd && (request()->filled('category') || request()->filled('seller') || request()->filled('on_sale') || $priceFilters !== []))
+        <a href="{{ request()->fullUrlWithQuery(['category' => null, 'seller' => null, 'on_sale' => null, 'min_price' => null, 'max_price' => null, 'page' => null]) }}" class="mt-3 inline-flex min-h-10 items-center rounded-lg border border-buyer-line px-3 font-semibold text-primary-800 hover:bg-primary-50">Clear filters and keep search</a>
+    @endif
 </div>

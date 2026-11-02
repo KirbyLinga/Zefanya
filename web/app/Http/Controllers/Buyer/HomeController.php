@@ -5,16 +5,23 @@ namespace App\Http\Controllers\Buyer;
 use App\Enums\OrderStatus;
 use App\Enums\VoucherScope;
 use App\Http\Controllers\Controller;
+use App\Models\Buyer\StoreFollow;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
 use App\Models\Shared\OrderItem;
 use App\Models\Shared\Voucher;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class HomeController extends Controller
 {
+    private const TRENDING_DAYS = 30;
+
     public function index(): View
     {
         $buyer = auth('buyer')->user();
@@ -22,68 +29,79 @@ class HomeController extends Controller
 
         $categories = Category::query()->orderBy('id')->get();
 
-        $catalog = Product::query()->withBuyerCardData()
-            ->activeInStock()
-            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
-            ->with(['images', 'seller'])
-            ->latest('id')
-            ->limit(20)
-            ->get();
-
         // Only what a buyer can really buy for less. A running sale can still
         // show no discount (its variant sold out), so check the resolved price.
-        $flashProducts = Product::query()->withBuyerCardData()
-            ->activeInStock()
-            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
+        $flashIds = Product::query()->discoverable()
             ->whereHas('ongoingSale')
-            ->with(['images', 'seller'])
             ->latest('id')
             ->limit(12)
-            ->get()
+            ->pluck('id')
+            ->all();
+        $flashProducts = $this->productCards($flashIds)
             ->filter(fn (Product $product) => $product->buyerPrice()?->badge() !== null)
             ->take(4)
             ->values();
-        $newArrivals = $catalog->take(4)->values();
-        $forYouProducts = $catalog->slice(4, 6)->values();
-        if ($forYouProducts->isEmpty()) {
-            $forYouProducts = $catalog->take(6)->values();
-        }
+
+        $onSaleProducts = $this->productCards($this->fairProductIds(
+            Product::query()->discoverable()->withRealSaleDiscount(),
+            4,
+            $flashProducts->modelKeys(),
+        ));
+        $newArrivals = $this->productCards($this->fairProductIds(Product::query()->discoverable(), 4));
+        $trendingProducts = $this->productCards($this->trendingProductIds(4));
+
+        // Skip what is already on the page, unless that would leave the grid empty.
+        $shownIds = array_merge(
+            $flashProducts->modelKeys(),
+            $onSaleProducts->modelKeys(),
+            $newArrivals->modelKeys(),
+            $trendingProducts->modelKeys(),
+        );
+        $forYouIds = $this->fairProductIds(Product::query()->discoverable(), 8, $shownIds, rotateSellers: true)
+            ?: $this->fairProductIds(Product::query()->discoverable(), 8, rotateSellers: true);
+        $forYouProducts = $this->productCards($forYouIds);
         $heroSlides = $this->heroSlides();
 
-        $stores = Seller::query()
-            ->where('status', 'approved')
-            ->with('lineOfBusiness')->withAvg('reviews', 'rating')->withCount('reviews')
-            ->withCount(['products as active_products_count' => fn ($query) => $query->where('status', 'active')])
-            ->orderByDesc('active_products_count')
+        // Rank by units really delivered, then load the expensive review
+        // aggregates only for those three stores.
+        $storeIds = Seller::query()
+            ->openForBusiness()
+            ->whereHas('products', fn ($query) => $query->activeInStock())
+            ->where($this->sellerFulfilledUnits(), '>', 0)
+            ->orderByDesc($this->sellerFulfilledUnits())
             ->orderBy('id')
             ->limit(3)
-            ->get();
+            ->pluck('id')
+            ->all();
+        $stores = $this->storeCards($storeIds);
 
-        $storeProducts = $stores->isEmpty()
-            ? collect()
-            : Product::query()->withBuyerCardData()
-                ->whereIn('seller_id', $stores->modelKeys())
-                ->activeInStock()
-                ->with('images')
-                ->latest('id')
-                ->get()
-                ->groupBy('seller_id');
+        // Newly approved stores first, so a new seller can be found directly.
+        $exploreStores = $this->storeCards(Seller::query()
+            ->openForBusiness()
+            ->whereHas('products', fn ($query) => $query->activeInStock())
+            ->whereNotIn('id', $storeIds)
+            ->latest('approved_at')
+            ->latest('id')
+            ->limit(4)
+            ->pluck('id')
+            ->all());
 
-        $stores->each(function (Seller $store) use ($storeProducts): void {
-            $store->setRelation(
-                'products',
-                $storeProducts->get($store->id, collect())->take(3)->values(),
-            );
-        });
+        $followedStoreIds = $buyer
+            ? StoreFollow::query()->where('buyer_id', $buyer->id)->pluck('seller_id')->all()
+            : [];
 
         return view('Buyer.Home.index', compact(
             'buyerName',
             'categories',
             'flashProducts',
+            'onSaleProducts',
             'newArrivals',
+            'trendingProducts',
             'forYouProducts',
             'heroSlides',
             'stores',
+            'exploreStores',
+            'followedStoreIds',
         ));
     }
 
@@ -91,11 +109,14 @@ class HomeController extends Controller
     private function heroSlides(): array
     {
         $slides = [];
-        $featured = Product::query()->withBuyerCardData()->activeInStock()
-            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
+        $featuredId = Product::query()->discoverable()
             ->whereHas('images')
+            ->latest('created_at')->latest('id')
+            ->value('id');
+        $featured = $featuredId !== null ? Product::query()->withBuyerCardData()
             ->with(['images', 'category'])
-            ->latest('created_at')->latest('id')->first();
+            ->where('id', $featuredId)
+            ->first() : null;
 
         if ($featured) {
             $slides[] = [
@@ -111,14 +132,9 @@ class HomeController extends Controller
 
         // Sales means units in delivered/completed seller orders, excluding returns.
         $fulfilled = [OrderStatus::Delivered->value, OrderStatus::Completed->value];
-        $sales = OrderItem::query()
-            ->join('seller_orders', 'seller_orders.id', '=', 'order_items.seller_order_id')
-            ->whereColumn('seller_orders.seller_id', 'sellers.id')
-            ->whereIn('seller_orders.status', $fulfilled)
-            ->selectRaw('SUM(order_items.quantity)');
-        $topStore = Seller::query()->where('status', 'approved')
+        $topStore = Seller::query()->openForBusiness()
             ->whereHas('sellerOrders', fn ($query) => $query->whereIn('status', $fulfilled))
-            ->addSelect(['sold_units' => $sales])
+            ->addSelect(['sold_units' => $this->sellerFulfilledUnits()])
             ->with(['products' => fn ($query) => $query->activeInStock()->whereHas('images')
                 ->with('images')->latest('id')->limit(1)])
             ->orderByDesc('sold_units')->orderBy('id')->first();
@@ -135,8 +151,7 @@ class HomeController extends Controller
             ];
         }
 
-        $spotlight = $featured?->category ? $featured : Product::query()->withBuyerCardData()->activeInStock()
-            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
+        $spotlight = $featured?->category ? $featured : Product::query()->discoverable()->withBuyerCardData()
             ->whereHas('images')->whereHas('category')->with(['images', 'category'])
             ->latest('id')->first();
         if ($spotlight?->category) {
@@ -223,5 +238,124 @@ class HomeController extends Controller
         }
 
         return $best;
+    }
+
+    /** Units in a seller's delivered/completed seller orders. */
+    private function sellerFulfilledUnits(): QueryBuilder
+    {
+        return OrderItem::query()
+            ->join('seller_orders', 'seller_orders.id', '=', 'order_items.seller_order_id')
+            ->whereColumn('seller_orders.seller_id', 'sellers.id')
+            ->whereIn('seller_orders.status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
+            ->selectRaw('SUM(order_items.quantity)')
+            ->toBase();
+    }
+
+    /**
+     * Round-robin in SQL, over every listed product rather than a recent sample:
+     * each seller's newest product first, then each seller's second newest, and so on.
+     * With $rotateSellers, the sellers who go first change daily, so when there are
+     * more sellers than slots each one still takes a turn.
+     *
+     * @param  array<int, int>  $exceptIds
+     * @return array<int, int>
+     */
+    private function fairProductIds(Builder $products, int $limit, array $exceptIds = [], bool $rotateSellers = false): array
+    {
+        $products->whereNotIn('id', $exceptIds);
+        $sellerCount = (clone $products)->distinct()->count('seller_id');
+        if ($sellerCount === 0) {
+            return [];
+        }
+
+        $ranked = $products
+            ->select('id')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY seller_id ORDER BY id DESC) AS seller_rank')
+            ->selectRaw('DENSE_RANK() OVER (ORDER BY seller_id) AS seller_position');
+
+        return DB::query()->fromSub($ranked, 'ranked')
+            ->orderBy('seller_rank')
+            ->when($rotateSellers, fn ($query) => $query->orderByRaw(
+                '(seller_position + ?) % ?',
+                [(int) floor(now()->timestamp / 86400), $sellerCount],
+            ))
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Most units in delivered/completed seller orders placed in the last 30 days.
+     *
+     * @return array<int, int>
+     */
+    private function trendingProductIds(int $limit): array
+    {
+        $recentUnits = OrderItem::query()
+            ->join('seller_orders', 'seller_orders.id', '=', 'order_items.seller_order_id')
+            ->whereColumn('order_items.product_id', 'products.id')
+            ->whereIn('seller_orders.status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
+            ->where('seller_orders.created_at', '>=', now()->subDays(self::TRENDING_DAYS))
+            ->selectRaw('COALESCE(SUM(order_items.quantity), 0)');
+
+        return Product::query()->discoverable()
+            ->where($recentUnits, '>', 0)
+            ->orderByDesc($recentUnits)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Load the expensive card aggregates for the chosen products only, keeping their order.
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function productCards(array $ids): Collection
+    {
+        return Product::query()->withBuyerCardData()
+            ->with(['images', 'seller'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy(fn (Product $product) => array_search($product->id, $ids, true))
+            ->values();
+    }
+
+    /**
+     * Load store cards in the given order, each with up to three live products.
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function storeCards(array $ids): Collection
+    {
+        $stores = Seller::query()->whereIn('id', $ids)
+            ->with('lineOfBusiness')->withAvg('reviews', 'rating')->withCount('reviews')
+            ->withCount(['products as active_products_count' => fn ($query) => $query->where('status', 'active')])
+            ->get()
+            ->sortBy(fn (Seller $store) => array_search($store->id, $ids, true))
+            ->values();
+
+        $productIds = $this->fairProductIds(
+            Product::query()->activeInStock()->whereIn('seller_id', $ids),
+            3 * count($ids),
+        );
+        $storeProducts = Product::query()->withBuyerCardData()
+            ->whereIn('id', $productIds)
+            ->with('images')
+            ->latest('id')
+            ->get()
+            ->groupBy('seller_id');
+
+        $stores->each(function (Seller $store) use ($storeProducts): void {
+            $store->setRelation(
+                'products',
+                $storeProducts->get($store->id, collect())->take(3)->values(),
+            );
+        });
+
+        return $stores;
     }
 }

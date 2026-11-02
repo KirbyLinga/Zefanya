@@ -121,7 +121,7 @@ app/
 ├── Providers/AppServiceProvider.php               # policies, buyer routes, rate config
 └── Services/
     ├── Admin/{AccountStatusService,AdminVoucherService,BuyerRegistrationDecisionService,LogisticsRegistrationDecisionService,PlatformSettingService,SellerRegistrationDecisionService,TwoFactorAuthenticator}.php
-    ├── Buyer/{AutomaticBuyerReceiptService,BuyerAddressBook,BuyerPurchaseLimit,BuyerShipmentConfirmation,CartSummary,CartVariantResolver,CatalogSearch,CheckoutCarrierService,ProductReviewService,PurchasedVariantSnapshot,StoreFollowService,VoucherApplication,VoucherSessionService}.php
+    ├── Buyer/{AutomaticBuyerReceiptService,BuyerAddressBook,BuyerShipmentConfirmation,CartSummary,CartVariantResolver,CatalogSearch,CheckoutCarrierService,ProductReviewService,PurchasedVariantSnapshot,StoreFollowService,VoucherApplication,VoucherSessionService}.php
     ├── Logistics/{CodRemittanceService,CourierAssignmentService,DeliveryOtpService,LogisticsHubService,LogisticsRemittanceService,LogisticsStatusOverrideService,ManifestService,ParcelHandoffService,ParcelHandoffVerification,ParcelIncidentService,ParcelReturnService,ParcelTrackingVerificationService,ProviderHandoffSchemaService,ProviderProvinceService,ShippingRateService,WaybillQrCode}.php
     ├── Rider/{RiderNotifier,RiderOperationsService,RiderRegistrationService}.php
     ├── Seller/{InventoryAlertService,ProductPublishingService,SellerEarningsService,SellerOrderStatusService,SellerPayoutRequestService,SellerPromotionService,SellerSalesTrend,SellerSettlementService,SellerShippingProviderService,SellerStoreProfileService,SellerVacationService,SellerVoucherService,StockService,StoreCategoryService,StoreSaleService,VariantSyncService}.php
@@ -175,7 +175,7 @@ resources/views/
 
 **Placeholder views** (page exists, no real behaviour): `Seller/{Account/index,Chat/index,Feedback/index,Reports/index,Shipments/show,Vouchers/index,Vouchers/create,Vouchers/edit}`; `Buyer/Account/index`, `Buyer/Categories/index`, `Buyer/Chat/{index,show}`.
 
-**Dead nav links:** admin sidebar 8 items (`Components/admin-sidebar.blade.php:32-60`); logistics sidebar **Rider Management** + **Courier Applications** + **Account** (`Components/logistics/sidebar.blade.php`); 13 public-footer links + buyer navbar "Sale" (`Components/navbar.blade.php:188`). Seller sidebar and buyer account sidebar are **all live** (some point at stubs, but no broken links).
+**Dead nav links:** admin sidebar 8 items (`Components/admin-sidebar.blade.php:32-60`); logistics sidebar **Rider Management** + **Courier Applications** + **Account** (`Components/logistics/sidebar.blade.php`); 13 public-footer links. Seller sidebar and buyer account sidebar are **all live** (some point at stubs, but no broken links).
 
 ---
 

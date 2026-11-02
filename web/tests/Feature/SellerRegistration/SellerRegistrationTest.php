@@ -8,6 +8,7 @@ use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
 use App\Notifications\Seller\SellerRegistrationOtp;
 use App\Support\SignedOtpLink;
+use App\Support\SignedRegistrationResubmission;
 use Carbon\Carbon;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -1084,16 +1085,17 @@ class SellerRegistrationTest extends TestCase
 
     public function test_sel_042_rejected_seller_resubmit(): void
     {
-        // No resubmit route exists - SPEC GAP
-        $routes = Route::getRoutes();
-        $hasResubmit = false;
-        foreach ($routes as $route) {
-            if (str_contains($route->uri(), 'resubmit')) {
-                $hasResubmit = true;
-                break;
-            }
+        // The full correction workflow is covered by RegistrationResubmissionTest.
+        foreach (['registration.resubmit', 'registration.resubmit.store'] as $name) {
+            $this->assertContains('signed', Route::getRoutes()->getByName($name)->gatherMiddleware());
         }
-        $this->assertFalse($hasResubmit);
+
+        $seller = Seller::factory()->create(['status' => 'rejected', 'email_verified_at' => now()]);
+        $this->get(route('registration.resubmit', ['role' => 'seller', 'application' => $seller->id]))->assertForbidden();
+        $this->get(SignedRegistrationResubmission::url($seller))->assertOk();
+
+        $this->assertSame('rejected', $seller->fresh()->getRawOriginal('status'));
+        $this->assertDatabaseCount('sellers', 1);
     }
 
     // ── TC-SEL-043: Non-admin opens approval page ────────────────────────────

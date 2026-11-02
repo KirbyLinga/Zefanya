@@ -360,7 +360,10 @@ class SellerOrderDeclineTest extends TestCase
         }
 
         $this->get(route('seller.orders.index', ['bucket' => 'cancelled']))
-            ->assertSeeInOrder(['All orders (8)', 'To ship (3)', 'Ready for pickup (1)', 'Shipped (1)', 'Delivered (1)', 'Cancelled (2)']);
+            ->assertSeeInOrder([
+                '>All orders</span>', '>8</span>', '>To ship</span>', '>3</span>', '>Ready for pickup</span>', '>1</span>',
+                '>Shipped</span>', '>1</span>', '>Delivered</span>', '>1</span>', '>Cancelled</span>', '>2</span>',
+            ], false);
     }
 
     public function test_sel_ord_001_unknown_bucket_falls_back_to_all(): void

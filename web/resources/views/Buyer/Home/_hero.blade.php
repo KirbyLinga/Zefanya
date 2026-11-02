@@ -1,7 +1,7 @@
 <div class="mx-auto max-w-[1440px] px-4 pt-4 sm:px-8 lg:px-16">
   <section data-home-hero role="region" aria-roledescription="carousel" aria-label="Featured at Zefanya"
            tabindex="0" class="relative overflow-hidden rounded-2xl bg-[#4a3036] text-white">
-    <div data-hero-track class="flex h-[540px] transition-transform duration-700 ease-in-out motion-reduce:transition-none md:h-[440px]">
+    <div data-hero-track class="flex h-[450px] transition-transform duration-700 ease-in-out motion-reduce:transition-none md:h-[360px]">
       @foreach ($heroSlides as $slide)
         <div data-hero-slide role="group" aria-roledescription="slide" aria-label="{{ $loop->iteration }} of {{ count($heroSlides) }}"
              @if (!$loop->first) hidden inert @endif

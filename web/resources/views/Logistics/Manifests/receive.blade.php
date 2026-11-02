@@ -25,6 +25,13 @@
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 
+@if (session('nextStep'))
+    <div class="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 font-sans text-[12px] text-blue-800">
+        <p class="font-semibold">Next steps</p>
+        <p class="mt-1">{{ session('nextStep') }}</p>
+    </div>
+@endif
+
 @if ($errors->any())
     <div class="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 font-sans text-[12px] text-rose-800">
         <p class="font-semibold">Receiving was not recorded:</p>

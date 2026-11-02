@@ -6,6 +6,7 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Models\Admin\Admin;
 use App\Models\Catalog\Product;
+use App\Models\Logistics\DeliveryAssignment;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
@@ -215,6 +216,7 @@ class AutomaticDispatchTest extends TestCase
     public function test_delivery_reservation_cannot_run_during_an_active_manifest(): void
     {
         $f = $this->fixture(OrderStatus::Sorted);
+        $f['parcel']->forceFill(['handover_at' => now()])->save();
         $manifestService = app(ManifestService::class);
         $manifest = $manifestService->create($f['provider'], $f['first']->rider->station_hub_id, $f['first']->rider->station->parent_hub_id);
         $manifestService->addParcel($manifest, $f['parcel']);
@@ -227,12 +229,14 @@ class AutomaticDispatchTest extends TestCase
         $f = $this->fixture();
         $service = app(CourierAssignmentService::class);
         $service->dispatch($f['parcel'], 'pickup');
+        // The reassignment always lands in a later second than the reservation.
+        $this->travel(2)->seconds();
         $url = route('logistics.incoming-parcels.assignPickupRider', $f['parcel']);
         $payload = ['reassign' => 1, 'courier_id' => $f['second']->id, 'expected_courier_id' => $f['first']->id];
         $this->actingAs($f['provider'], 'logistics')->post($url, $payload)->assertSessionHasErrors('reason');
         $payload['reason'] = 'Original Rider cannot collect today.';
         $this->post($url, $payload)->assertRedirect()->assertSessionHas('success');
-        $assignment = $f['parcel']->deliveryAssignments()->latest('id')->firstOrFail();
+        $assignment = $f['parcel']->deliveryAssignments()->where('role', 'pickup')->where('courier_id', $f['second']->id)->reorder('id', 'desc')->firstOrFail();
         $audit = json_decode($assignment->notes, true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame($f['first']->rider_id, $audit['previous_rider_id']);
         $this->assertSame($f['second']->rider_id, $audit['rider_id']);
@@ -241,6 +245,28 @@ class AutomaticDispatchTest extends TestCase
         $this->assertNotNull($assignment->created_at);
         $this->post($url, $payload)->assertRedirect();
         $this->assertSame(2, $f['parcel']->deliveryAssignments()->count());
+    }
+
+    public function test_dispatch_labels_its_new_assignment_and_leaves_an_older_audit_row_untouched(): void
+    {
+        $f = $this->fixture();
+        $notes = json_encode(['reason' => 'Earlier manual reassignment.', 'rider_id' => $f['first']->rider_id], JSON_THROW_ON_ERROR);
+        $older = DeliveryAssignment::query()->create([
+            'seller_order_id' => $f['parcel']->id, 'courier_id' => $f['first']->id, 'role' => 'pickup',
+            'assigned_by_type' => 'logistics', 'assigned_by_id' => $f['provider']->id,
+        ]);
+        $older->forceFill(['notes' => $notes, 'created_at' => now()->subHour()])->save();
+
+        app(CourierAssignmentService::class)->dispatch($f['parcel'], 'pickup');
+
+        $older->refresh();
+        $this->assertSame($notes, $older->notes);
+        $this->assertSame('logistics', $older->assigned_by_type);
+        $this->assertSame($f['provider']->id, (int) $older->assigned_by_id);
+        $newest = DeliveryAssignment::query()->where('seller_order_id', $f['parcel']->id)->orderByDesc('id')->firstOrFail();
+        $this->assertNotSame($older->id, $newest->id);
+        $this->assertSame('system', $newest->assigned_by_type);
+        $this->assertStringContainsString('Reserved at pickup', $newest->notes);
     }
 
     public function test_foreign_provider_cannot_retry_or_reassign_dispatch(): void
@@ -292,7 +318,7 @@ class AutomaticDispatchTest extends TestCase
     {
         $f = $this->fixture(OrderStatus::Sorted);
         $station = $f['first']->rider->station;
-        $f['parcel']->forceFill(['custody_provider_id' => $f['provider']->id, 'custody_hub_id' => $station->parent_hub_id])->save();
+        $f['parcel']->forceFill(['handover_at' => now(), 'custody_provider_id' => $f['provider']->id, 'custody_hub_id' => $station->parent_hub_id])->save();
         $service = app(ManifestService::class);
         $manifest = $service->create($f['provider'], $station->parent_hub_id, $station->id);
         $item = $service->addParcel($manifest, $f['parcel']->fresh());

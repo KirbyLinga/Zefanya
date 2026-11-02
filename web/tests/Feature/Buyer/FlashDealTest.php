@@ -153,6 +153,56 @@ class FlashDealTest extends TestCase
         $this->assertSame(80000, $released->orderItems()->sole()->price_minor);
     }
 
+    public function test_on_sale_filter_drops_a_sold_out_flash_sale_until_the_order_is_cancelled(): void
+    {
+        StoreSale::factory()->create([
+            'seller_id' => $this->seller->id,
+            'product_id' => $this->product->id,
+            'type' => 'percent',
+            'value' => 20,
+            'flash_quantity' => 1,
+        ]);
+        $onSale = fn () => $this->get(route('buyer.products.index', ['on_sale' => 1]))->assertOk()->viewData('products')->pluck('id')->all();
+
+        $this->assertSame([$this->product->id], $onSale());
+
+        $this->checkout(1)->assertRedirect();
+        $this->assertSame([], $onSale());
+
+        SellerOrder::query()->sole()->forceFill(['status' => OrderStatus::Cancelled])->save();
+        $this->assertSame([$this->product->id], $onSale());
+    }
+
+    public function test_price_sort_and_filters_use_the_regular_price_once_flash_slots_sell_out(): void
+    {
+        [$cheaper] = $this->productAt(900.00, 'Plain Belt');
+        StoreSale::factory()->create([
+            'seller_id' => $this->seller->id,
+            'product_id' => $this->product->id,
+            'type' => 'percent',
+            'value' => 20,
+            'flash_quantity' => 1,
+        ]);
+        $ids = fn (array $query) => $this->get(route('buyer.products.index', $query))->assertOk()->viewData('products')->pluck('id')->all();
+        $assertPricedAtSale = function () use ($ids, $cheaper): void {
+            $this->assertSame([$this->product->id, $cheaper->id], $ids(['sort' => 'price_asc']));
+            $this->assertSame([$this->product->id], $ids(['min_price' => 800, 'max_price' => 800]));
+            $this->assertSame([], $ids(['min_price' => 1000, 'max_price' => 1000]));
+        };
+
+        $assertPricedAtSale();
+
+        $this->checkout(1)->assertRedirect();
+        $this->assertSame("\u{20B1}1,000.00", $this->product->fresh()->buyerPrice()->formatted());
+        $this->assertSame([$cheaper->id, $this->product->id], $ids(['sort' => 'price_asc']));
+        $this->assertSame([$cheaper->id, $this->product->id], array_reverse($ids(['sort' => 'price_desc'])));
+        $this->assertSame([], $ids(['min_price' => 800, 'max_price' => 800]));
+        $this->assertSame([$this->product->id], $ids(['min_price' => 1000, 'max_price' => 1000]));
+
+        SellerOrder::query()->sole()->forceFill(['status' => OrderStatus::Cancelled])->save();
+        $assertPricedAtSale();
+    }
+
     public function test_sel_flash_006_bundle_percentage_discounts_every_member_bought_together(): void
     {
         [$other] = $this->productAt(1000.00, 'Second Scarf');

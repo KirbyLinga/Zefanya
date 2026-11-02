@@ -14,6 +14,12 @@
     <div class="mb-6">
       <h1 class="font-serif text-[32px] font-semibold text-buyer-ink sm:text-[38px]">Your Shopping Cart</h1>
       <p class="mt-1 text-[13px] text-neutral-400">Review your items before checkout.</p>
+      @if ($isCartEmpty === false)
+        <a href="{{ route('buyer.products.index') }}" class="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary-800 hover:text-primary-900 transition-colors">
+          <i data-lucide="arrow-left" width="14" height="14"></i>
+          Continue Shopping
+        </a>
+      @endif
     </div>
 
     {{-- Server-side flash (e.g. bounced back from checkout with a stale selection) --}}

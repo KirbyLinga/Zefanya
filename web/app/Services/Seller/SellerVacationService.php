@@ -3,6 +3,7 @@
 namespace App\Services\Seller;
 
 use App\Models\Seller\Seller;
+use App\Services\Buyer\CatalogSearch;
 use Illuminate\Support\Facades\DB;
 
 class SellerVacationService
@@ -16,5 +17,6 @@ class SellerVacationService
             $current->forceFill(['is_on_vacation' => $enabled])->save();
         }, 3);
         $seller->refresh();
+        CatalogSearch::forgetVocabulary();
     }
 }

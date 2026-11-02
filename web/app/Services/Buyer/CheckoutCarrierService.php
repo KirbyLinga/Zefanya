@@ -10,7 +10,7 @@ use App\Models\Logistics\LogisticsShippingRate;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
 use App\Services\Logistics\LogisticsHubService;
-use App\Services\Logistics\ParcelHandoffService;
+use App\Services\Logistics\RoutePlannerService;
 use App\Services\Logistics\ShippingRateService;
 use App\Services\Seller\SellerShippingProviderService;
 use Illuminate\Support\Collection;
@@ -31,7 +31,6 @@ class CheckoutCarrierService
     public function __construct(
         private readonly SellerShippingProviderService $sellerShipping = new SellerShippingProviderService,
         private readonly LogisticsHubService $hubs = new LogisticsHubService,
-        private readonly ParcelHandoffService $handoffs = new ParcelHandoffService,
         private readonly ShippingRateService $rates = new ShippingRateService,
     ) {}
 
@@ -132,13 +131,16 @@ class CheckoutCarrierService
                 if ($provider->archived_at !== null || ($rateSnapshot !== null && ! array_key_exists($provider->id, $rateSnapshot))) {
                     continue;
                 }
-                $links = $this->handoffs->serviceableLinks(
-                    $provider,
-                    (string) $buyer->barangay_code,
-                    (string) $buyer->province_code,
-                );
 
-                if ($links->isEmpty()) {
+                // Phase 3: Check comprehensive route feasibility for cross-province
+                $feasibilityReason = $this->routeFeasibilityReason($seller, $buyer, $provider);
+                if ($feasibilityReason !== null) {
+                    continue;  // Route not feasible, skip this provider
+                }
+
+                $route = $this->crossProvinceRoute($seller, $buyer, $provider);
+
+                if ($route === null) {
                     continue;
                 }
 
@@ -149,7 +151,7 @@ class CheckoutCarrierService
                     continue;
                 }
 
-                $destination = $links->first()->destinationProvider;
+                $destination = $route['provider'];
                 $carriers[] = [
                     'id' => (int) $provider->id,
                     'name' => (string) $provider->business_name,
@@ -168,8 +170,8 @@ class CheckoutCarrierService
                     'route' => 'cross_province',
                     'available' => false,
                     'message' => $hasApprovedPath
-                        ? 'Cross-province shipping is not configured by the marketplace yet. Checkout for this route is temporarily unavailable.'
-                        : 'Cross-province delivery is not available yet. Destination-provider links are required before a carrier can serve this route.',
+                        ? 'Shipping rates for this delivery route are not available yet. Please try again later or choose another delivery address.'
+                        : 'Delivery from this shop to your address is not available yet. Please choose another delivery address.',
                     'carriers' => [],
                 ];
             }
@@ -189,6 +191,12 @@ class CheckoutCarrierService
             }
             if (! $this->hasDestinationCoverage($provider, (string) $buyer->barangay_code)) {
                 continue;
+            }
+
+            // Phase 3: Check comprehensive route feasibility
+            $feasibilityReason = $this->routeFeasibilityReason($seller, $buyer, $provider);
+            if ($feasibilityReason !== null) {
+                continue;  // Route not feasible, skip this provider
             }
 
             $fee = $this->feeMinor($provider, $seller, $buyer, $groupSubtotalMinor, $groupWeightGrams, $rateSnapshot);
@@ -321,24 +329,19 @@ class CheckoutCarrierService
 
             if ((string) $seller->province_code !== (string) $buyer->province_code) {
                 // Cross-province: the Seller-enabled origin keeps commercial
-                // ownership. The destination is resolved only from active,
-                // approved links and must still cover the buyer's barangay.
-                $links = $this->handoffs->serviceableLinks(
-                    $provider,
-                    (string) $buyer->barangay_code,
-                    (string) $buyer->province_code,
-                    lock: true,
-                );
-                $link = $links->first();
-                $destinationProvider = $link !== null
-                    ? LogisticsProvider::query()->whereKey($link->destination_provider_id)->lockForUpdate()->first()
+                // ownership. The destination comes from a connected route, whose
+                // every provider change has an active approved link, and must
+                // still cover the buyer's barangay.
+                $route = $this->crossProvinceRoute($seller, $buyer, $provider);
+                $destinationProvider = $route !== null
+                    ? LogisticsProvider::query()->whereKey($route['provider']->id)->lockForUpdate()->first()
                     : null;
                 $destinationArea = $destinationProvider !== null
                     ? $this->hubs->areaForBarangay((int) $destinationProvider->id, (string) $buyer->barangay_code, lock: true)
                     : null;
                 $fee = $this->crossProvinceFeeMinor($provider, $subtotal, $weight, $rateSnapshot);
 
-                if ($link === null || $destinationProvider === null || $destinationArea === null
+                if ($route === null || $destinationProvider === null || $destinationArea === null
                     || ! $destinationProvider->isApproved() || $destinationProvider->archived_at !== null
                     || ! $destinationProvider->hasVerifiedProvince()
                     || (string) $destinationProvider->province_code !== (string) $buyer->province_code) {
@@ -349,7 +352,7 @@ class CheckoutCarrierService
 
                 if ($fee === null) {
                     throw ValidationException::withMessages([
-                        'carriers.'.$seller->id => 'Cross-province shipping is not configured by the marketplace yet.',
+                        'carriers.'.$seller->id => 'Shipping rates for this delivery route are not available yet.',
                     ]);
                 }
 
@@ -465,5 +468,112 @@ class CheckoutCarrierService
     private function quotedRate(LogisticsProvider $provider, string $zone, ?array $snapshot): ?array
     {
         return $snapshot === null ? $this->rates->rateFor($provider, $zone) : ($snapshot[$provider->id][$zone] ?? null);
+    }
+
+    /**
+     * Comprehensive route feasibility validation. Ensures a complete operational path
+     * exists from seller origin to buyer destination.
+     *
+     * Returns null if route is feasible. Returns error message string if route
+     * is impossible or incomplete.
+     *
+     * Phase 3 enhancement: Validates all prerequisites before checkout accepts the route.
+     * Phase 4 enhancement: Validates complete multi-leg path through transport connections.
+     */
+    public function routeFeasibilityReason(Seller $seller, Buyer $buyer, LogisticsProvider $provider): ?string
+    {
+        // Prerequisite: seller and buyer have location data
+        if (blank($seller->province_code) || blank($seller->barangay_code)
+            || blank($buyer->province_code) || blank($buyer->barangay_code)) {
+            return 'Complete both the seller pickup address and your delivery address (province and barangay) before validating shipping.';
+        }
+
+        // Prerequisite: provider is operational
+        if (! $provider->isApproved() || $provider->archived_at !== null) {
+            return 'The selected provider is not operational. Choose another carrier.';
+        }
+
+        // Prerequisite: provider has verified province
+        if (! $provider->hasVerifiedProvince()) {
+            return 'The selected provider has not verified their service province. Choose another carrier.';
+        }
+
+        // Validate origin (pickup) coverage
+        $originArea = $this->hubs->areaForBarangay((int) $provider->id, $seller->barangay_code);
+        if ($originArea === null) {
+            return 'The selected provider does not serve the seller location ('.$seller->barangay_code.'). Choose another carrier or change seller address.';
+        }
+
+        // Validate origin Station Hub is operational
+        $originStation = $originArea->station;
+        if ($originStation === null || ! $originStation->isOperational()) {
+            return 'The origin Station Hub for this provider is not operational. Choose another carrier.';
+        }
+
+        // Same-province route: destination must be in same province
+        if ((string) $seller->province_code === (string) $buyer->province_code) {
+            // Validate destination (delivery) coverage
+            $destinationArea = $this->hubs->areaForBarangay((int) $provider->id, $buyer->barangay_code);
+            if ($destinationArea === null) {
+                return 'The selected provider does not serve the delivery location ('.$buyer->barangay_code.'). Choose another carrier or change delivery address.';
+            }
+
+            // Validate destination Station Hub is operational
+            $destinationStation = $destinationArea->station;
+            if ($destinationStation === null || ! $destinationStation->isOperational()) {
+                return 'The destination Station Hub for this provider is not operational. Choose another carrier.';
+            }
+
+            // Phase 4: Check for complete connected path (same-provider multi-hub route)
+            $reason = $this->validateConnectedPath($originStation, $destinationStation);
+            if ($reason !== null) {
+                return $reason;
+            }
+
+            // Same province, same provider: route is feasible
+            return null;
+        }
+
+        // Cross-province route: every provider change on the path must be usable
+        if ($this->crossProvinceRoute($seller, $buyer, $provider) === null) {
+            return 'No connected delivery route exists from '.$provider->business_name.' to the delivery location. Cross-province shipping is unavailable for this route.';
+        }
+
+        return null;
+    }
+
+    /**
+     * The final provider and legs for this seller and buyer through this origin
+     * carrier, or null when no connected route exists. Checkout quotes and places
+     * orders from this, so an unusable provider change never reaches an order.
+     *
+     * @return array{provider: LogisticsProvider, hub: LogisticsHub, legs: list<array<string, mixed>>}|null
+     */
+    private function crossProvinceRoute(Seller $seller, Buyer $buyer, LogisticsProvider $provider): ?array
+    {
+        $originStation = $this->hubs->areaForBarangay((int) $provider->id, $seller->barangay_code)?->station;
+
+        return $originStation === null ? null : app(RoutePlannerService::class)->crossProvinceDestination(
+            $provider,
+            $originStation,
+            (string) $buyer->barangay_code,
+            (string) $buyer->province_code,
+        );
+    }
+
+    /**
+     * Phase 4: Validate that the same provider's hubs are connected. Different
+     * hubs need a usable path; a deactivated connection does not count.
+     *
+     * @return string|null error message if path not found, null if feasible
+     */
+    private function validateConnectedPath(LogisticsHub $originHub, LogisticsHub $destinationHub): ?string
+    {
+        if ((int) $originHub->id === (int) $destinationHub->id
+            || app(RoutePlannerService::class)->findPath($originHub, $destinationHub, $originHub->provider) !== []) {
+            return null;
+        }
+
+        return 'No transport connection exists between origin and destination hubs. Route cannot be completed.';
     }
 }

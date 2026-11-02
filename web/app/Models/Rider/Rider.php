@@ -16,7 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Rider extends Authenticatable
 {
-    use HasEmailOtp, HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasEmailOtp, HasFactory, Notifiable;
 
     public const STATUS_UNVERIFIED = 'unverified';
 

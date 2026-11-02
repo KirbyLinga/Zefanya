@@ -12,6 +12,7 @@ use App\Models\Logistics\ManifestItem;
 use App\Models\Logistics\ParcelHandoff;
 use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Logistics\ParcelReturn;
+use App\Models\Logistics\ParcelRoute;
 use App\Models\Logistics\PickupAttempt;
 use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
@@ -435,6 +436,14 @@ class SellerOrder extends Model
     public function parcelHandoffExceptions(): HasMany
     {
         return $this->hasMany(ParcelHandoffException::class)->orderBy('created_at');
+    }
+
+    /**
+     * The planned multi-leg route for this parcel.
+     */
+    public function parcelRoute(): HasOne
+    {
+        return $this->hasOne(ParcelRoute::class);
     }
 
     /**

@@ -21,6 +21,12 @@ class ManifestItem extends Model
         'received_by_type',
         'received_by_id',
         'released_at',
+        'issue_type',
+        'issue_note',
+        'issue_recorded_at',
+        'verified_for_dispatch_at',
+        'verified_for_dispatch_by_type',
+        'verified_for_dispatch_by_id',
     ];
 
     protected function casts(): array
@@ -28,6 +34,8 @@ class ManifestItem extends Model
         return [
             'received_at' => 'datetime',
             'released_at' => 'datetime',
+            'issue_recorded_at' => 'datetime',
+            'verified_for_dispatch_at' => 'datetime',
         ];
     }
 
@@ -112,6 +120,94 @@ class ManifestItem extends Model
             return;
         }
 
-        $this->forceFill(['released_at' => now()])->save();
+        $this->forceFill([
+            'released_at' => now(),
+            'verified_for_dispatch_at' => null,
+            'verified_for_dispatch_by_type' => null,
+            'verified_for_dispatch_by_id' => null,
+        ])->save();
+    }
+
+    /**
+     * Record a parcel as damaged: receive it into custody with the issue flagged.
+     */
+    public function markDamaged(string $note, string $actorType, ?int $actorId = null): void
+    {
+        $now = now();
+        $this->forceFill([
+            'received_at' => $this->received_at ?? $now,
+            'received_by_type' => $actorType,
+            'received_by_id' => $actorId,
+            'released_at' => $this->released_at ?? $now,
+            'issue_type' => 'damaged',
+            'issue_note' => $note,
+            'issue_recorded_at' => $now,
+        ])->save();
+    }
+
+    /**
+     * Record a parcel as missing: release it without receiving, keep custody at origin.
+     */
+    public function markMissing(string $note): void
+    {
+        $now = now();
+        $this->forceFill([
+            'released_at' => $this->released_at ?? $now,
+            'issue_type' => 'missing',
+            'issue_note' => $note,
+            'issue_recorded_at' => $now,
+        ])->save();
+    }
+
+    /**
+     * Check if this item has an issue (missing or damaged).
+     */
+    public function hasIssue(): bool
+    {
+        return $this->issue_type !== null;
+    }
+
+    /**
+     * Label for issue display.
+     */
+    public function issueLabel(): string
+    {
+        return match ($this->issue_type) {
+            'missing' => 'Missing',
+            'damaged' => 'Damaged',
+            default => '',
+        };
+    }
+
+    /**
+     * Record dispatch verification — persistent, not time-limited.
+     */
+    public function markVerifiedForDispatch(string $actorType, ?int $actorId = null): void
+    {
+        $this->forceFill([
+            'verified_for_dispatch_at' => now(),
+            'verified_for_dispatch_by_type' => $actorType,
+            'verified_for_dispatch_by_id' => $actorId,
+        ])->save();
+    }
+
+    /**
+     * Check if dispatch verification exists and is valid.
+     */
+    public function isVerifiedForDispatch(): bool
+    {
+        return $this->verified_for_dispatch_at !== null;
+    }
+
+    /**
+     * Clear dispatch verification (when parcel is removed or manifest is cancelled).
+     */
+    public function clearDispatchVerification(): void
+    {
+        $this->forceFill([
+            'verified_for_dispatch_at' => null,
+            'verified_for_dispatch_by_type' => null,
+            'verified_for_dispatch_by_id' => null,
+        ])->save();
     }
 }

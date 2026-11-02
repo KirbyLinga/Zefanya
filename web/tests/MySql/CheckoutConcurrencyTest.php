@@ -191,7 +191,7 @@ class CheckoutConcurrencyTest extends TestCase
 
         $results = Race::run(
             ['action' => 'add', 'buyer' => $buyer->id, 'product' => $product->id, 'variant' => $variant->id, 'quantity' => 2, 'hold' => 'cartread'],
-            ['action' => 'update', 'buyer' => $buyer->id, 'item' => $line->id, 'quantity' => 5, 'watch' => 'cartwrite']);
+            ['action' => 'update', 'buyer' => $buyer->id, 'item' => $line->id, 'quantity' => 5, 'watch' => 'cartread']);
 
         $this->noSqlErrors($results);
         $this->assertSame([200, 200], array_column($results, 'status'));

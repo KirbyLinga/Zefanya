@@ -8,6 +8,8 @@ use App\Models\Rider\Rider;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Rider\RiderOperationsService;
+use Carbon\CarbonInterface;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -24,8 +26,8 @@ class DeliveryOtpService
                 throw ValidationException::withMessages(['delivery_otp' => 'A delivery code can only be sent while the parcel is out for delivery.']);
             }
             $buyer = $parcel->order?->buyer;
-            if ($buyer === null || blank($buyer->email) || $buyer->email_verified_at === null) {
-                throw ValidationException::withMessages(['delivery_otp' => 'The buyer needs a verified email address to receive the delivery code.']);
+            if ($buyer === null) {
+                throw ValidationException::withMessages(['delivery_otp' => 'This parcel has no buyer account to confirm the delivery.']);
             }
             $otp = DeliveryOtp::query()->where('seller_order_id', $parcel->id)->lockForUpdate()->first()
                 ?? new DeliveryOtp;
@@ -40,14 +42,42 @@ class DeliveryOtpService
                 'buyer_id' => $buyer->id,
                 'courier_id' => $parcel->delivery_courier_id,
                 'code_hash' => Hash::make($code),
+                'code_encrypted' => $code,
                 'attempts' => 0,
                 'expires_at' => now()->addMinutes(10),
                 'sent_at' => now(),
                 'used_at' => null,
             ])->save();
-            // Synchronous mail: failure rolls back the replacement, preserving the previous code.
+            // Inside the transaction: a failed alert rolls back the replacement, preserving the previous code.
             $buyer->notify(new DeliveryOtpCode($parcel, $code));
         });
+    }
+
+    /**
+     * The code the buyer can show the rider, for their own order page. Null once
+     * it stops being usable, so the page never offers a code the rider cannot enter.
+     *
+     * @return array{code: string, expires_at: CarbonInterface}|null
+     */
+    public function activeCodeFor(SellerOrder $parcel): ?array
+    {
+        if ($parcel->status !== OrderStatus::OutForDelivery) {
+            return null;
+        }
+
+        $otp = DeliveryOtp::query()->where('seller_order_id', $parcel->id)->first();
+
+        if ($otp === null || $this->invalidReason($otp, $parcel) !== null) {
+            return null;
+        }
+
+        try {
+            $code = $otp->code_encrypted;
+        } catch (DecryptException) {
+            return null;
+        }
+
+        return $code === null ? null : ['code' => $code, 'expires_at' => $otp->expires_at];
     }
 
     /** Validate before the delivery transaction so failed-attempt counters cannot roll back with POD/COD. */
@@ -84,7 +114,7 @@ class DeliveryOtpService
         if ($error !== null || ! hash_equals($otp->code_hash, $verifiedHash)) {
             throw ValidationException::withMessages(['delivery_otp' => $error ?? 'The delivery code changed. Ask the buyer for the latest code.']);
         }
-        $otp->forceFill(['used_at' => now()])->save();
+        $otp->forceFill(['used_at' => now(), 'code_encrypted' => null])->save();
     }
 
     private function invalidReason(?DeliveryOtp $otp, SellerOrder $parcel): ?string

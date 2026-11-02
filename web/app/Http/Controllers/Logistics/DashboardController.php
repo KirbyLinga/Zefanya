@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Logistics;
 
+use App\Enums\ManifestStatus;
 use App\Enums\OrderStatus;
+use App\Enums\ParcelHandoffStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
+use App\Models\Logistics\Manifest;
+use App\Models\Logistics\ParcelHandoff;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\StoreSale;
@@ -25,7 +29,7 @@ class DashboardController extends Controller
         $filters = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-            'metric' => ['nullable', Rule::in(['hub', 'transit', 'delivered', 'riders'])],
+            'metric' => ['nullable', Rule::in(['hub', 'transit', 'delivered', 'riders', 'stalled'])],
         ]);
         $timezone = StoreSale::TIMEZONE;
         $from = filled($filters['from'] ?? null) ? CarbonImmutable::parse($filters['from'], $timezone)->startOfDay()->setTimezone(config('app.timezone')) : null;
@@ -76,7 +80,34 @@ class DashboardController extends Controller
         $deliveredQuery = $parcelQuery()->whereIn('seller_orders.id', $deliveryEvents);
         $riderQuery = (clone $courierQuery)->where('is_available', true);
         $dateFilter($riderQuery, 'couriers.updated_at');
-        $queries = ['hub' => $hubQuery, 'transit' => $transitQuery, 'delivered' => $deliveredQuery, 'riders' => $riderQuery];
+        $stalledQuery = $parcelQuery()->whereIn('status', [
+            OrderStatus::ReadyForPickup->value, OrderStatus::PickedUp->value, OrderStatus::AtSortingCenter->value,
+            OrderStatus::Sorted->value, OrderStatus::AssignedToRider->value, OrderStatus::OutForDelivery->value, OrderStatus::DeliveryFailed->value,
+        ])->where('seller_orders.updated_at', '<=', now()->subHours(24));
+        $dateFilter($stalledQuery, 'seller_orders.updated_at');
+        $queries = ['hub' => $hubQuery, 'transit' => $transitQuery, 'delivered' => $deliveredQuery, 'riders' => $riderQuery, 'stalled' => $stalledQuery];
+        $pickupQuery = $parcelQuery()->where('status', OrderStatus::ReadyForPickup->value);
+        $dateFilter($pickupQuery, 'seller_orders.updated_at');
+        $facilityHubIds = $facility === null ? null : $stations->merge([$facility->id])->unique()->all();
+        $incomingHandoffs = ParcelHandoff::query()->where('destination_provider_id', $provider->id)
+            ->when($facilityHubIds !== null, fn ($query) => $query->whereIn('receiving_hub_id', $facilityHubIds));
+        $outgoingHandoffs = ParcelHandoff::query()->where('origin_provider_id', $provider->id)
+            ->when($facilityHubIds !== null, fn ($query) => $query->whereIn('sending_hub_id', $facilityHubIds));
+        $incomingTransfers = Manifest::query()->where('logistics_provider_id', $provider->id)
+            ->where('status', ManifestStatus::Dispatched->value)
+            ->when($facilityHubIds !== null, fn ($query) => $query->whereIn('destination_hub_id', $facilityHubIds));
+        $dateFilter($incomingHandoffs, 'parcel_handoffs.updated_at');
+        $dateFilter($outgoingHandoffs, 'parcel_handoffs.updated_at');
+        $dateFilter($incomingTransfers, 'manifests.updated_at');
+        $actionQueues = [
+            ['key' => 'pickup', 'label' => 'Awaiting pickup', 'count' => $pickupQuery->count(), 'hint' => 'Review parcels ready at the seller.', 'url' => route('logistics.incoming-parcels.index')],
+            ['key' => 'sorting', 'label' => 'At sorting center', 'count' => (clone $hubQuery)->count(), 'hint' => 'Review the verified route before sorting.', 'url' => route('logistics.parcel-sorting.index')],
+            ['key' => 'accept', 'label' => 'Incoming handoffs to accept', 'count' => (clone $incomingHandoffs)->where('status', ParcelHandoffStatus::Requested->value)->count(), 'hint' => 'Review partner requests before accepting.', 'url' => route('logistics.handoffs.index')],
+            ['key' => 'receive', 'label' => 'Incoming handoffs in transit', 'count' => (clone $incomingHandoffs)->where('status', ParcelHandoffStatus::InTransit->value)->count(), 'hint' => 'Receive only after verifying the physical parcel.', 'url' => route('logistics.handoffs.index')],
+            ['key' => 'dispatch', 'label' => 'Accepted outgoing handoffs', 'count' => $outgoingHandoffs->where('status', ParcelHandoffStatus::Accepted->value)->count(), 'hint' => 'Verify parcels before dispatch.', 'url' => route('logistics.handoffs.index')],
+            ['key' => 'transfers', 'label' => 'Incoming hub transfers', 'count' => $incomingTransfers->count(), 'hint' => 'Review manifests awaiting receiving scans.', 'url' => route('logistics.manifests.index')],
+            ['key' => 'stalled', 'label' => 'No update for 24 hours', 'count' => (clone $stalledQuery)->count(), 'hint' => 'Review inactive shipments; this is not a lost-parcel decision.', 'url' => route('logistics.dashboard', array_filter(['facility' => $facilityKey, 'from' => $filters['from'] ?? null, 'to' => $filters['to'] ?? null, 'metric' => 'stalled'])).'#metric-results'],
+        ];
         $parcelsInHub = (clone $hubQuery)->count();
         $parcelsInTransit = (clone $transitQuery)->count();
         $deliveredToday = (clone $deliveredQuery)->count();
@@ -109,6 +140,7 @@ class DashboardController extends Controller
         $unreadCount = $notificationsTableExists ? $provider->unreadNotifications()->count() : 0;
 
         return view('Logistics.Dashboard.index', [
+            'actionQueues' => $actionQueues,
             'metric' => $metric,
             'metricResults' => $metricResults,
             'dateFrom' => $filters['from'] ?? '',

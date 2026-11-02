@@ -103,23 +103,22 @@ document.addEventListener('DOMContentLoaded', () => {
       priceEl.textContent = selectedVariant.price;
       showSaleText(regularPriceEl, selectedVariant.regular_price);
       showSaleText(priceBadgeEl, selectedVariant.badge);
-      const hidden = document.getElementById('pdp-variant-id');
-      if (hidden) hidden.value = selectedVariant.available && selectedVariant.stock > 0 ? String(selectedVariant.id) : '';
     }
 
     if (!selectedVariant) {
       if (priceEl) priceEl.textContent = basePriceText;
       showSaleText(regularPriceEl, baseRegularText);
       showSaleText(priceBadgeEl, baseBadgeText);
-      const hidden = document.getElementById('pdp-variant-id');
-      if (hidden) hidden.value = '';
     }
+
+    const hidden = document.getElementById('pdp-variant-id');
+    if (hidden) hidden.value = selectedVariant?.available && selectedVariant.stock > 0 ? String(selectedVariant.id) : '';
 
     const availability = document.getElementById('pdp-availability');
     if (availability) {
       availability.textContent = selectedVariant
-        ? (selectedVariant.available && selectedVariant.stock > 0 ? selectedVariant.stock + ' unit(s) available' : 'Sold Out')
-        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Sold Out' : 'Please select a variation');
+        ? (selectedVariant.available && selectedVariant.stock > 0 ? selectedVariant.stock + ' unit(s) available' : 'Out of Stock')
+        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Out of Stock' : (variantsScript.dataset.selectionMessage || 'Please select a variation'));
     }
 
     // Sold-out styling: a value is sold out when every variant carrying it
@@ -181,16 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return variantMode ? (selectedVariant?.available ? Math.max(0, selectedVariant.stock) : 0) : baseStock;
   }
 
-  // Quantity to send now: 1–20 per buyer, after units already purchased and already in the cart.
+  // Quantity to send now: the stock. A cart is not a reservation; the server caps the cart line.
   function currentLimit() {
-    const purchaseMax = Math.max(0, parseInt(qtyDisplay?.dataset.purchaseMax || '20', 10) || 20);
-    const purchased = Math.max(0, parseInt(qtyDisplay?.dataset.purchased || '0', 10) || 0);
-    const cartTotal = Math.max(0, parseInt(qtyDisplay?.dataset.cartTotal || '0', 10) || 0);
-    const onThisLine = variantMode
-      ? Math.max(0, selectedVariant?.cart_quantity || 0)
-      : Math.max(0, parseInt(qtyDisplay?.dataset.cartQuantity || '0', 10) || 0);
-    const room = Math.max(0, purchaseMax - purchased - cartTotal);
-    return Math.min(Math.max(0, currentStock() - onThisLine), room);
+    return currentStock();
   }
 
   function updateQtyDisplay() {
@@ -206,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
     [addCartBtn, document.getElementById('pdp-buy-now')].forEach(button => {
       if (!button) return;
       button.disabled = button.dataset.vacation === '1' || button.dataset.busy === '1'
-        || (!requiresSelection() && limit <= 0);
+        || requiresSelection() || limit <= 0;
     });
     // Dim the down button at min, up button at max
     if (qtyDown) qtyDown.style.opacity = pdpQty <= 1 ? '0.35' : '1';
@@ -235,6 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 5. Add to Cart ───────────────────────────────────────────────────────
   addCartBtn?.addEventListener('click', () => {
+    if (addCartBtn.dataset.vacation === '1' || addCartBtn.dataset.busy === '1') return;
+    readTypedQuantity();
     const productId = parseInt(addCartBtn.dataset.productId, 10);
 
     if (variantMode) {
@@ -307,6 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const buyNowBtn = document.getElementById('pdp-buy-now');
 
   buyNowBtn?.addEventListener('click', () => {
+    if (buyNowBtn.dataset.vacation === '1' || buyNowBtn.dataset.busy === '1') return;
+    readTypedQuantity();
     const productId = parseInt(buyNowBtn.dataset.productId, 10);
     const variantError = document.getElementById('pdp-variant-error');
     let variantId = null;

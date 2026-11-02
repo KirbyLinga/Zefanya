@@ -72,7 +72,7 @@ class ColorFirstProductTest extends TestCase
         $this->assertSame(10, $product->variants()->count());
         $this->assertSame(30, $product->stock_quantity);
         $this->assertFalse($product->images()->where('sort_order', '<', 0)->exists());
-        $this->assertCount(4, Storage::disk('public')->allFiles());
+        $this->assertCount(4, Storage::disk('public')->allFiles('products'));
         $this->assertDatabaseCount('inventory_transactions', 10);
         $this->get(route('buyer.products.show', $product))->assertOk()->assertViewHas('variantData', function ($rows) {
             $this->assertCount(10, $rows);

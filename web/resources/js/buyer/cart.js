@@ -320,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateStepperBounds(row, quantity, stock) {
     const down = $('.js-cartpage-qty-down', row);
     const up = $('.js-cartpage-qty-up', row);
+    const input = $('.js-cartpage-qty-input', row);
 
     if (down) {
       down.disabled = quantity <= 1;
@@ -328,18 +329,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (up) {
       up.disabled = quantity >= stock;
     }
+
+    if (input) {
+      input.max = String(stock);
+    }
   }
 
   function stepQuantity(id, delta) {
     const row = rowFor(id);
-    const display = row && $('.js-cartpage-qty-display', row);
+    const input = row && $('.js-cartpage-qty-input', row);
 
-    if (!row || !display || row.dataset.available !== '1') {
+    if (!row || !input || row.dataset.available !== '1') {
       return;
     }
 
     const stock = Number.parseInt(row.dataset.stock, 10) || 0;
-    const current = Number.parseInt(display.textContent, 10) || 1;
+    const current = Number.parseInt(input.value, 10) || 1;
 
     if (row.dataset.confirmedQuantity === undefined) {
       row.dataset.confirmedQuantity = String(current);
@@ -351,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    display.textContent = String(next);
+    input.value = String(next);
     updateStepperBounds(row, next, stock);
 
     // Debounce so holding the stepper down sends one request, not many.
@@ -371,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const confirmed = Number.parseInt(row.dataset.confirmedQuantity, 10) || 1;
     const stock = Number.parseInt(row.dataset.stock, 10) || 0;
-    const display = $('.js-cartpage-qty-display', row);
+    const input = $('.js-cartpage-qty-input', row);
 
     request(itemUrl(data.updateUrl, id), {
       method: 'PATCH',
@@ -385,8 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
         row.dataset.stock = String(currentStock);
 
         // The server may have capped the quantity at the available stock.
-        if (display && applied !== quantity) {
-          display.textContent = String(applied);
+        if (input && applied !== quantity) {
+          input.value = String(applied);
         }
         updateStepperBounds(row, applied, currentStock);
         if (payload.quantity_warning) toast(payload.quantity_warning);
@@ -395,8 +400,8 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .catch((error) => {
         // Revert to the last server-confirmed quantity.
-        if (display) {
-          display.textContent = String(confirmed);
+        if (input) {
+          input.value = String(confirmed);
         }
 
         updateStepperBounds(row, confirmed, stock);
@@ -699,11 +704,47 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Initial state ────────────────────────────────────────────────────
 
   $$('.js-cartpage-item-row').forEach((row) => {
-    const display = $('.js-cartpage-qty-display', row);
+    const input = $('.js-cartpage-qty-input', row);
 
-    if (display) {
-      row.dataset.confirmedQuantity = display.textContent.trim();
+    if (input) {
+      row.dataset.confirmedQuantity = input.value.trim();
     }
+  });
+
+  // ── Input direct typing handler ─────────────────────────────────────
+  document.addEventListener('input', (event) => {
+    const input = event.target.closest('.js-cartpage-qty-input');
+
+    if (!input) {
+      return;
+    }
+
+    const id = input.dataset.itemId;
+    const row = rowFor(id);
+
+    if (!row || row.dataset.available !== '1') {
+      return;
+    }
+
+    const stock = Number.parseInt(row.dataset.stock, 10) || 0;
+    let value = Number.parseInt(input.value, 10);
+
+    // Validate: must be between 1 and stock
+    if (Number.isNaN(value) || value < 1) {
+      value = 1;
+    } else if (value > stock) {
+      value = stock;
+    }
+
+    input.value = String(value);
+    updateStepperBounds(row, value, stock);
+
+    // Debounce the commit when typing
+    clearTimeout(quantityTimers.get(id));
+
+    quantityTimers.set(id, setTimeout(() => {
+      commitQuantity(id, value);
+    }, 600));
   });
 
   syncSelectionUi();

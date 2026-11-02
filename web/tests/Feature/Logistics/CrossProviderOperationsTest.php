@@ -10,7 +10,9 @@ use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Shared\Payment;
+use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Rider\RiderOperationsService;
@@ -18,16 +20,15 @@ use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class CrossProviderOperationsTest extends TestCase
 {
     use BootstrapsCrossProviderHandoffs;
     use LazilyRefreshDatabase;
-    use ProvidesDeliveryOtp;
 
     private function routeFixture(): array
     {
@@ -74,6 +75,7 @@ class CrossProviderOperationsTest extends TestCase
     public function test_laguna_to_quezon_verified_receipt_allows_sort_assign_and_cod_delivery(): void
     {
         Storage::fake('local');
+        Notification::fake();
         $f = $this->routeFixture();
         $this->receive($f);
         $parcel = $f['parcel']->fresh();
@@ -104,8 +106,10 @@ class CrossProviderOperationsTest extends TestCase
         $operations->startDelivery($courier->rider, $parcel->fresh());
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
         $this->assertSame(PaymentStatus::Pending, $payment->fresh()->status);
+        app(DeliveryOtpService::class)->send($courier->rider, $parcel->fresh());
+        $code = Notification::sent($f['buyer'], DeliveryOtpCode::class)->sole()->code;
         $operations->completeDelivery($courier->rider, $parcel->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($parcel->fresh()),
+            'delivery_otp' => $code,
             'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
             'received_by' => 'Buyer', 'cod_amount_minor' => 44900,
         ]);

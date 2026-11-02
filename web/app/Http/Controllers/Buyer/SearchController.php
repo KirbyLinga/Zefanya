@@ -42,7 +42,7 @@ class SearchController extends Controller
                 ->when($request->filled('category'), fn ($q) => $q->where('category_id', $request->integer('category')))
                 ->when($request->filled('seller'), fn ($q) => $q->where('seller_id', $request->integer('seller')))
                 ->with(['images', 'seller', 'category'])
-                ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
+                ->fromOpenStore()
                 ->withBuyerPriceFilters($priceFilters + $request->only(['sort']))
                 ->paginate(12)
                 // A rejected price must not follow the buyer from page to page.
@@ -74,9 +74,8 @@ class SearchController extends Controller
         // Fetch matching products
         if ($term !== '') {
             $popular = CatalogSearch::apply(Product::query()->withBuyerCardData(), $term)
-                ->activeInStock()
+                ->discoverable()
                 ->with(['images', 'seller'])
-                ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
                 ->limit(5)
                 ->get()
                 ->map(fn ($p) => [

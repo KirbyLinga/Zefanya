@@ -170,7 +170,7 @@ class SellerProductManagementTest extends TestCase
         $data['inventory_revision'] = app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'));
         $this->put(route('seller.products.update', $product), $data)->assertSessionHasErrors('images');
         $this->assertSame(9, $product->images()->count());
-        $this->assertCount(9, Storage::disk('public')->allFiles());
+        $this->assertCount(9, Storage::disk('public')->allFiles('products'));
     }
 
     public static function invalidImages(): array
@@ -394,7 +394,7 @@ class SellerProductManagementTest extends TestCase
         $this->assertDatabaseCount('products', 1);
         $this->assertDatabaseCount('product_variants', 1);
         $this->assertDatabaseCount('inventory_transactions', 1);
-        $this->assertCount(1, Storage::disk('public')->allFiles());
+        $this->assertCount(1, Storage::disk('public')->allFiles('products'));
     }
 
     public function test_sel_prod_018_foreign_product_and_bulk_actions_are_denied_without_changes(): void

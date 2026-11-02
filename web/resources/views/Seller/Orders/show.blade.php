@@ -38,6 +38,8 @@
     <p class="mb-4 rounded-sm bg-[#dcfce7] px-3 py-2 font-sans text-[12.5px] text-[#15803d]">Order cancelled. Stock and any eligible voucher were returned and the buyer was notified.</p>
 @endif
 
+<x-seller.fulfillment-guidance :shipment="$sellerOrder" />
+
 <div class="grid grid-cols-1 items-start gap-6 xl:gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
     {{-- ── Left: items + timeline ────────────────────────────────── --}}
     <div class="min-w-0 space-y-6">

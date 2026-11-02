@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Buyer\CartItem;
 use App\Models\Buyer\Wishlist;
+use App\Models\Catalog\Product;
 use App\Models\Rider\Rider;
 use App\Models\Shared\Category;
 use App\Models\Shared\Incidents;
@@ -21,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -180,6 +182,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with('wishlistCount', $this->buyerWishlistCount());
             $view->with('unreadNotificationCount', $this->buyerUnreadNotificationCount());
             $view->with('categories', $this->getCategories());
+            $view->with('hasRealSaleDiscounts', $this->hasRealSaleDiscounts());
         });
 
         // Rider panel: the bell lives in Layouts/rider so it is present on
@@ -258,5 +261,18 @@ class AppServiceProvider extends ServiceProvider
         return Category::query()
             ->orderBy('id')
             ->get(['id', 'label', 'icon']);
+    }
+
+    /**
+     * Whether the navbar's Sale link has anything to show. The navbar renders on
+     * every buyer page, so the answer is cached briefly: the link can lag a sale
+     * starting or ending by up to a minute, and the filtered page is still correct.
+     */
+    private function hasRealSaleDiscounts(): bool
+    {
+        return Cache::remember('buyer:has-real-sale-discounts', now()->addMinute(), fn (): bool => Product::query()
+            ->discoverable()
+            ->withRealSaleDiscount()
+            ->exists());
     }
 }

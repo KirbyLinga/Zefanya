@@ -208,7 +208,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
             // The lower price no longer meets the voucher's minimum spend, so
             // losing the voucher is one more thing to confirm before ordering.
             $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))
-                ->assertSessionHas('error', fn ($message) => str_contains($message, 'minimum spend'));
+                ->assertSessionHas('error', fn ($message) => str_contains($message, 'Spend ₱0.01 more to use this voucher.'));
             $this->assertDatabaseCount('orders', 0);
         }
         $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))->assertRedirect();

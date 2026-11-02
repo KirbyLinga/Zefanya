@@ -32,6 +32,7 @@ Route::prefix('seller')->name('seller.')->group(function () {
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+        Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])

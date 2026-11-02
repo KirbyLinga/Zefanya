@@ -141,7 +141,7 @@ All tables below are derived from `database/migrations/`. Notation: `NN` = NOT N
 **`product_options`** — id, product_id FK cascade, name(50), sort_order — index `(product_id, sort_order)`.
 **`product_option_values`** — id, product_option_id FK cascade, value(100), sort_order — index `(product_option_id, sort_order)`.
 **`product_variant_option_values`** — pivot (variant_id, option_value_id), both FK cascade, **unique `(product_variant_id, product_option_value_id)`** (named explicitly — the auto name exceeds MySQL's 64-char limit).
-**`product_images`** — id, product_id FK cascade, `variant_id` FK **nullOnDelete** (product-level when null), path, is_primary, sort_order.
+**`product_images`** — id, product_id FK cascade, `variant_id` FK **nullOnDelete** (product-level when null), path, `thumbnail_path` nullable (card-sized WebP; cards fall back to `path`; backfill with `products:generate-thumbnails`), is_primary, sort_order.
 
 > **Money split:** catalog money is `decimal(10,2)` pesos. **Every order/ledger money column is integer centavos.** Converting `products.price` ⇄ `order_items.price_minor` requires ×100. `CartItem::unitPriceCentavos()` uses `bcmul(price,'100',0)` (`app/Models/Buyer/CartItem.php:58`).
 

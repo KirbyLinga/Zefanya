@@ -7,6 +7,7 @@ use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
 use App\Models\Buyer\CheckoutToken;
+use App\Models\Buyer\Wishlist;
 use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
@@ -14,6 +15,8 @@ use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
 use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
 use App\Services\Seller\SellerVacationService;
 use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -61,19 +64,81 @@ class SellerVacationModeTest extends TestCase
         $this->assertDatabaseCount('inventory_transactions', 0);
     }
 
-    public function test_buy_srch_011_vacation_products_remain_in_search_platform_category_and_storefront(): void
+    /** @return array<string, array{0: string}> */
+    private function discoveryPages(Product $product, Seller $seller): array
+    {
+        return [
+            route('home'),
+            route('buyer.home'),
+            route('buyer.categories.show', $product->category_id),
+            route('buyer.products.index'),
+            route('buyer.products.index', ['seller' => $seller->id]),
+        ];
+    }
+
+    public function test_vacation_products_leave_every_discovery_surface_and_return_on_reopening(): void
     {
         [$buyer, $seller, $product] = $this->fixture();
+        // Sold-out listings stay searchable, so exercise the search page's own rule too.
+        $search = route('buyer.search.index', ['q' => $product->name]);
+        $suggestions = route('buyer.search.suggestions', ['term' => 'Rattan']);
+        $typo = route('buyer.search.index', ['q' => 'rattam']);
+        $this->assertNotNull($this->get($typo)->assertOk()->viewData('suggestion'));
+
+        $before = $product->fresh()->getRawOriginal();
         app(SellerVacationService::class)->set($seller, true);
-        foreach ([route('buyer.search.index', ['q' => $product->name]), route('buyer.categories.show', $product->category_id), route('buyer.stores.show', $seller), route('buyer.products.index')] as $url) {
-            $this->get($url)->assertOk()->assertSee($product->name)->assertSee('On vacation');
+
+        foreach ($this->discoveryPages($product, $seller) as $url) {
+            $this->get($url)->assertOk()->assertDontSee($product->name);
         }
+        $this->assertSame([], $this->get($search)->assertOk()->viewData('products')->modelKeys());
+        $this->getJson($suggestions)->assertOk()->assertDontSee($product->name);
+        $this->assertNull($this->get($typo)->assertOk()->viewData('suggestion'));
+        $this->assertSame($before, $product->fresh()->getRawOriginal());
+
+        app(SellerVacationService::class)->set($seller, false);
+
+        foreach ($this->discoveryPages($product, $seller) as $url) {
+            $this->get($url)->assertOk()->assertSee($product->name);
+        }
+        $this->assertSame([$product->id], $this->get($search)->assertOk()->viewData('products')->modelKeys());
+        $this->getJson($suggestions)->assertOk()->assertSee($product->name);
+        $this->assertNotNull($this->get($typo)->assertOk()->viewData('suggestion'));
+    }
+
+    public function test_vacation_products_leave_related_products_on_another_listing(): void
+    {
+        [$buyer, $seller, $product] = $this->fixture();
+        $open = Product::factory()->create(['seller_id' => Seller::factory()->create()->id, 'category_id' => $product->category_id]);
+        app(SellerVacationService::class)->set($seller, true);
+
+        $related = $this->get(route('buyer.products.show', $open))->assertOk()->viewData('related');
+
+        $this->assertNotContains($product->id, $related->modelKeys());
+    }
+
+    public function test_vacation_products_stay_on_storefront_direct_link_wishlist_and_orders(): void
+    {
+        [$buyer, $seller, $product] = $this->fixture();
+        Wishlist::create(['buyer_id' => $buyer->id, 'product_id' => $product->id]);
+        $parcel = SellerOrder::factory()->create([
+            'order_id' => Order::factory()->create(['buyer_id' => $buyer->id])->id,
+            'seller_id' => $seller->id,
+        ]);
+        OrderItem::factory()->create(['seller_order_id' => $parcel->id, 'product_id' => $product->id, 'product_name' => $product->name]);
+        app(SellerVacationService::class)->set($seller, true);
+
+        $this->get(route('buyer.stores.show', $seller))->assertOk()->assertSee($product->name)->assertSee('On vacation');
         $response = $this->get(route('buyer.products.show', $product))->assertOk()->assertSee('On vacation');
         $dom = new \DOMDocument;
         @$dom->loadHTML($response->getContent());
         $xpath = new \DOMXPath($dom);
         $this->assertSame(2, $xpath->query('//*[@id="pdp-add-cart" or @id="pdp-buy-now"]/@disabled')->length);
         $this->assertSame(2, $xpath->query('//*[@id="pdp-add-cart" or @id="pdp-buy-now"][@data-vacation="1"]')->length);
+
+        $this->actingAs($buyer, 'buyer');
+        $this->get(route('buyer.wishlist.index'))->assertOk()->assertSee($product->name)->assertSee('On vacation');
+        $this->get(route('buyer.orders.show', $parcel->order_id))->assertOk()->assertSee($product->name);
         $this->assertSame('active', $product->fresh()->status);
     }
 
@@ -260,7 +325,9 @@ class SellerVacationModeTest extends TestCase
     {
         $this->patchJson(route('seller.account.vacation'), ['is_on_vacation' => true])->assertUnauthorized();
         $seller = Seller::factory()->pending()->create();
-        $this->actingAs($seller, 'seller')->patch(route('seller.account.vacation'), ['is_on_vacation' => true])->assertRedirect();
+        $this->actingAs($seller, 'seller')->patch(route('seller.account.vacation'), ['is_on_vacation' => true])
+            ->assertForbidden()->assertSee('Your account is under review');
+        $this->assertAuthenticatedAs($seller, 'seller');
         $this->assertFalse($seller->fresh()->is_on_vacation);
     }
 

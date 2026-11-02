@@ -40,6 +40,7 @@ class Manifest extends Model
             'status' => ManifestStatus::class,
             'dispatched_at' => 'datetime',
             'received_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 

@@ -39,7 +39,7 @@
 <div class="ip-canvas -m-4 min-h-screen sm:-m-6 xl:-m-8">
 <div class="border-b border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-4 sm:px-6 xl:px-8">
     <h1 class="font-serif text-2xl font-semibold text-[var(--text-ink)]">Earnings</h1>
-    <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">You keep the shipping fee on each delivered parcel and send Zefanya the rest of the cash.</p>
+    <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">You keep the shipping fee on each delivered parcel and send Zefanya the rest of the cash. If another company was the buyer's chosen carrier, send the full amount: that fee is pending allocation.</p>
 </div>
 
 <div class="p-4 sm:p-6 xl:px-8">
@@ -84,7 +84,7 @@
                 <ul class="max-h-64 divide-y divide-[var(--border-strong)] overflow-y-auto rounded-lg border border-[var(--border-strong)]">
                     @foreach ($readyParcels as $readyParcel)
                         @php
-                            $readyDue = $readyParcel->amount_minor - (int) $readyParcel->sellerOrder?->shipping_fee_minor;
+                            $readyDue = $readyParcel->dueToZefanyaMinor();
                         @endphp
                         <li>
                             <label class="flex cursor-pointer items-center gap-3 px-3 py-2 font-sans text-[13px] text-[var(--text-ink)]">
@@ -137,7 +137,6 @@
                 <tbody class="divide-y divide-[var(--border-strong)]">
                     @foreach ($parcels as $parcel)
                         @php
-                            $fee = (int) $parcel->sellerOrder?->shipping_fee_minor;
                             $stage = match (true) {
                                 $parcel->status === CodRemittance::PENDING_REMITTANCE => 'rider',
                                 $parcel->zefanya_received_at !== null => 'settled',
@@ -156,8 +155,12 @@
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-[var(--text-muted)]">{{ $parcel->created_at->timezone(StoreSale::TIMEZONE)->format('M j, Y') }}</td>
                             <td class="px-4 py-3 text-right tabular-nums">{{ $peso($parcel->amount_minor) }}</td>
-                            <td class="ip-emerald ip-tone-text px-4 py-3 text-right font-semibold tabular-nums">{{ $peso($fee) }}</td>
-                            <td class="px-4 py-3 text-right tabular-nums">{{ $peso($parcel->amount_minor - $fee) }}</td>
+                            @if ($parcel->isCrossProvider())
+                                <td class="px-4 py-3 text-right text-[12px] text-[var(--text-muted)]">Pending allocation</td>
+                            @else
+                                <td class="ip-emerald ip-tone-text px-4 py-3 text-right font-semibold tabular-nums">{{ $peso($parcel->keptShippingMinor()) }}</td>
+                            @endif
+                            <td class="px-4 py-3 text-right tabular-nums">{{ $peso($parcel->dueToZefanyaMinor()) }}</td>
                             <td class="px-4 py-3"><span class="{{ $look['tone'] }} ip-tinted inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold">{{ $look['label'] }}</span></td>
                         </tr>
                     @endforeach

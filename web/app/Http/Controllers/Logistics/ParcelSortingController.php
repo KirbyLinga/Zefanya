@@ -14,6 +14,7 @@ use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\RouteExecutionService;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,6 +93,9 @@ class ParcelSortingController extends Controller
 
         return view('Logistics.ParcelSorting.index', [
             'shipments' => $shipments,
+            'sortingBlocked' => $shipments->getCollection()
+                ->filter(fn (SellerOrder $parcel): bool => $parcel->status === OrderStatus::AtSortingCenter)
+                ->mapWithKeys(fn (SellerOrder $parcel): array => [$parcel->id => app(RouteExecutionService::class)->sortingBlockedReason($parcel)]),
             'tab' => $tab,
             'sortingCount' => $sortingCount,
             'assignedCount' => $assignedCount,
@@ -158,6 +162,10 @@ class ParcelSortingController extends Controller
             return back()->with('error', 'This parcel has already been sorted.');
         }
 
+        if (! $alreadySorted && ($blocked = app(RouteExecutionService::class)->sortingBlockedReason($fresh)) !== null) {
+            return back()->with('error', $blocked);
+        }
+
         $area = $this->destinationAreaFor($provider, $fresh);
 
         try {
@@ -184,6 +192,10 @@ class ParcelSortingController extends Controller
                 ParcelIncidentService::assertOperationsAllowed($fresh);
                 if ($alreadySorted) {
                     return;
+                }
+
+                if (($blocked = app(RouteExecutionService::class)->sortingBlockedReason($fresh)) !== null) {
+                    throw new \InvalidArgumentException($blocked);
                 }
 
                 if ($area !== null && $fresh->destination_area_id !== $area->id) {

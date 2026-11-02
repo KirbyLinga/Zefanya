@@ -50,6 +50,9 @@ class RiderApplicationController extends Controller
 
     public function reject(Request $request, Rider $rider, RiderRegistrationService $service): JsonResponse
     {
+        // Ownership before validation: a 422 would confirm the application exists.
+        $service->authorizeProvider($request->user('logistics'));
+        abort_unless((int) $rider->logistics_provider_id === (int) $request->user('logistics')->id, 404);
         $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:300']]);
         $row = $service->decide($rider, $request->user('logistics'), 'rejected', $data['reason']);
 

@@ -21,8 +21,8 @@
   {{-- ═══════════════════════════════════════════════════════════════════════
        CATEGORY CAROUSEL  (mirrors landing page, buyer tokens)
        ═══════════════════════════════════════════════════════════════════════ --}}
-  <section id="categories" class="py-10 sm:py-12">
-    <div class="mb-6 flex items-center justify-between">
+  <section id="categories" class="py-6 sm:py-8">
+    <div class="mb-4 flex items-center justify-between">
       <h2 class="font-serif text-2xl text-buyer-ink sm:text-[28px]">Explore Categories</h2>
       <a href="{{ route('buyer.categories.index') }}"
          class="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-primary-800 transition-colors hover:text-primary-900">
@@ -33,7 +33,7 @@
 
     {{-- A native scroller, so swipe, trackpad and keyboard all work and the browser does the animating.
          --cat-per-view drives card widths via CSS calc(); the padding leaves room for the hover lift and shadow. --}}
-    <div class="[--cat-per-view:5] -mx-1 -mb-5 -mt-1.5 flex snap-x snap-mandatory scroll-px-1 items-stretch gap-4 overflow-x-auto px-1 pb-5 pt-1.5 [scrollbar-width:none] max-lg:[--cat-per-view:4] max-sm:[--cat-per-view:2] [&::-webkit-scrollbar]:hidden"
+    <div class="[--cat-per-view:5] -mx-1 -mb-4 -mt-1 flex snap-x snap-mandatory scroll-px-1 items-stretch gap-4 overflow-x-auto px-1 pb-4 pt-1 [scrollbar-width:none] max-lg:[--cat-per-view:4] max-sm:[--cat-per-view:2] [&::-webkit-scrollbar]:hidden"
          id="catCarousel" tabindex="0" role="region" aria-label="Categories">
       @foreach ($categories as $cat)
         <a href="{{ route('buyer.categories.show', $cat->id) }}"
@@ -49,7 +49,7 @@
     </div>
 
     {{-- Prev / dots / Next --}}
-    <div class="mt-6 flex w-full items-center justify-center gap-3" id="catControls">
+    <div class="mt-3 flex w-full items-center justify-center gap-3" id="catControls">
       <button type="button"
               class="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-buyer-line bg-white shadow-[0_2px_8px_rgba(58,37,41,0.08)] transition-[background-color,opacity] duration-150 hover:bg-secondary-100 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-white"
               id="catPrev" aria-label="Previous categories">
@@ -82,10 +82,6 @@
       @if ($flashEndsAt)
         <p id="flash-countdown" class="text-sm font-semibold text-primary-800" data-ends="{{ $flashEndsAt->toIso8601String() }}">Ends in <span data-flash-remaining>--:--:--</span></p>
       @endif
-      {{-- Close / dismiss icon (decorative, matches mockup's ✕ in top-right) --}}
-      <button type="button" class="ml-auto rounded-full p-1 text-neutral-400 transition-colors hover:text-buyer-ink" aria-label="Dismiss flash sale">
-        <i data-lucide="x" width="16" height="16"></i>
-      </button>
     </div>
     @if ($flashEndsAt ?? null)
       <script>
@@ -108,81 +104,60 @@
       </script>
     @endif
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {{-- 4 product cards --}}
-      <div class="grid grid-cols-2 gap-4 sm:col-span-2 lg:col-span-4 lg:grid-cols-4">
-        @foreach ($flashProducts as $product)
-          @include('Components.buyer.product-card', [
-              'product'       => $product,
-              'url'           => route('buyer.products.show', $product->id),
-          ])
-        @endforeach
-      </div>
-
-      {{-- Promo aside — matches "PREMIUM BRAND / The Zefanya Mall Privilege" card --}}
-      <aside class="flex min-h-[280px] flex-col justify-between overflow-hidden rounded-2xl bg-linear-[160deg] from-primary-200 via-secondary-100 to-cream p-5 lg:min-h-full">
-        <div>
-          <span class="mb-2 inline-block rounded bg-buyer-ink px-2 py-0.5 text-[9px] font-bold tracking-[0.1em] text-white uppercase">Premium Brand</span>
-          <p class="mt-1 font-serif text-[20px] leading-snug text-buyer-ink">The Zefanya Mall Privilege</p>
-          <p class="mt-2 text-[12px] leading-relaxed text-buyer-ink-soft">
-            100% guaranteed authentic sourcing from global premium brands.
-          </p>
-        </div>
-        <div>
-          <div class="mb-3 rounded-xl bg-white/70 px-3 py-2.5">
-            <p class="text-[10px] font-bold tracking-[0.06em] text-buyer-ink-soft uppercase">Cashback 15%</p>
-            <p class="text-[10px] text-buyer-ink-soft">on your first premium order</p>
-          </div>
-          <a href="#for-you" class="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-buyer-ink hover:underline">
-            Explore Mall
-            <i data-lucide="arrow-right" width="13" height="13"></i>
-          </a>
-        </div>
-      </aside>
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      @foreach ($flashProducts as $product)
+        @include('Components.buyer.product-card', [
+            'product'       => $product,
+            'url'           => route('buyer.products.show', $product->id),
+        ])
+      @endforeach
     </div>
   </section>
   @endif
+
+  @include('Buyer.Home._product-section', [
+      'sectionId' => 'on-sale',
+      'title' => 'On Sale',
+      'products' => $onSaleProducts,
+      'viewAllUrl' => route('buyer.products.index', ['on_sale' => 1]),
+  ])
+
+  @include('Buyer.Home._product-section', [
+      'sectionId' => 'new-arrivals',
+      'title' => 'New Arrivals',
+      'products' => $newArrivals,
+      'viewAllUrl' => route('buyer.products.index', ['sort' => 'newest']),
+  ])
+
+  @include('Buyer.Home._product-section', [
+      'sectionId' => 'trending',
+      'title' => 'Trending Products',
+      'products' => $trendingProducts,
+  ])
 
   {{-- ═══════════════════════════════════════════════════════════════════════
        TODAY'S FOR YOU + BEST SELLING STORES
        ═══════════════════════════════════════════════════════════════════════ --}}
   <section id="for-you" class="py-8 sm:py-12">
-    {{-- Header row: title + tabs + View All --}}
+    {{-- Header row: title + View All --}}
     <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
       <h2 class="font-serif text-2xl text-buyer-ink sm:text-[28px]">Todays For You!</h2>
-      <div class="flex flex-wrap items-center gap-x-5 gap-y-2" role="tablist" aria-label="Product filters">
-        <button type="button"
-          class="js-home-tab active text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="true">Best Seller</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Keep It Off</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Special Discount</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Official Store</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Greatest Product</button>
-        <a href="{{ route('buyer.products.index') }}"
-           class="text-[12.5px] font-semibold text-neutral-400 transition-colors hover:text-buyer-ink">
-          View All
-        </a>
-      </div>
+      <a href="{{ route('buyer.products.index') }}"
+         class="text-[12.5px] font-semibold text-neutral-400 transition-colors hover:text-buyer-ink">
+        View All
+      </a>
     </div>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       {{-- Product grid --}}
-      <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+      <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         @forelse ($forYouProducts as $product)
           @include('Components.buyer.product-card', [
               'product' => $product,
               'url'     => route('buyer.products.show', $product->id),
           ])
         @empty
-          @foreach (range(1, 6) as $slot)
+          @foreach (range(1, 8) as $slot)
             @include('Components.buyer.product-card')
           @endforeach
         @endforelse
@@ -194,10 +169,10 @@
           <h3 class="font-serif text-[18px] text-buyer-ink">Best Selling Store</h3>
         </div>
         @forelse ($stores as $store)
-          @include('Components.buyer.store-card', ['store' => $store])
+          @include('Components.buyer.store-card', ['store' => $store, 'following' => in_array($store->id, $followedStoreIds, true)])
         @empty
           <div class="rounded-2xl border border-dashed border-buyer-line bg-white p-5 text-[13px] text-neutral-500">
-            Approved stores with live products will appear here.
+            Stores will appear here once they have delivered orders.
           </div>
         @endforelse
       </aside>
@@ -213,9 +188,63 @@
   </section>
 
   {{-- ═══════════════════════════════════════════════════════════════════════
+       EXPLORE STORES
+       ═══════════════════════════════════════════════════════════════════════ --}}
+  @if ($exploreStores->isNotEmpty())
+  <section id="explore-stores" class="py-6 sm:py-10">
+    <h2 class="mb-5 font-serif text-2xl text-buyer-ink sm:text-[28px]">Explore Stores</h2>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      @foreach ($exploreStores as $store)
+        @include('Components.buyer.store-card', ['store' => $store, 'following' => in_array($store->id, $followedStoreIds, true)])
+      @endforeach
+    </div>
+  </section>
+  @endif
+
+  {{-- ═══════════════════════════════════════════════════════════════════════
        TRUST BADGES — why shop with us
        ═══════════════════════════════════════════════════════════════════════ --}}
+  <section class="py-8 sm:py-12">
+    <h2 class="mb-8 text-center font-serif text-2xl text-buyer-ink sm:text-[28px]">Why Shop with Zefanya?</h2>
+    
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-8">
+      {{-- Cash on Delivery: the only payment method --}}
+      <div class="flex flex-col items-center text-center">
+        <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+          <i data-lucide="banknote" width="28" height="28" class="text-primary-800"></i>
+        </div>
+        <h3 class="mb-2 font-serif text-[18px] font-semibold text-buyer-ink">Cash on Delivery</h3>
+        <p class="text-[13px] leading-relaxed text-buyer-ink-soft">
+          Pay in cash when your order arrives. No card or online payment details needed.
+        </p>
+      </div>
 
+      {{-- Delivery Tracking --}}
+      <div class="flex flex-col items-center text-center">
+        <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+          <i data-lucide="truck" width="28" height="28" class="text-primary-800"></i>
+        </div>
+        <h3 class="mb-2 font-serif text-[18px] font-semibold text-buyer-ink">Order Tracking</h3>
+        <p class="text-[13px] leading-relaxed text-buyer-ink-soft">
+          Follow your order's status and tracking number from placement to delivery.
+        </p>
+      </div>
+
+      {{-- Verified Sellers --}}
+      <div class="flex flex-col items-center text-center">
+        <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+          <i data-lucide="store" width="28" height="28" class="text-primary-800"></i>
+        </div>
+        <h3 class="mb-2 font-serif text-[18px] font-semibold text-buyer-ink">Verified Sellers</h3>
+        <p class="text-[13px] leading-relaxed text-buyer-ink-soft">
+          Every seller submits an ID and business permit for approval by our team. Something wrong with an order? You can request a return.
+        </p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
 @endsection
 
 @push('scripts')

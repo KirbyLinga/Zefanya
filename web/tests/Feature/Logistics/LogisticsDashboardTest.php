@@ -48,11 +48,20 @@ class LogisticsDashboardTest extends TestCase
             ->assertRedirect(route('home', ['login' => 1]));
     }
 
-    public function test_non_approved_provider_is_bounced_to_home_login_modal(): void
+    public function test_pending_provider_sees_review_notice_and_suspended_provider_returns_to_login(): void
     {
-        $this->actingAs($this->pendingApprovalProvider(), 'logistics')
+        $pending = $this->pendingApprovalProvider();
+        $this->actingAs($pending, 'logistics')
+            ->get(route('logistics.dashboard'))
+            ->assertForbidden()
+            ->assertSee('Your account is under review');
+        $this->assertAuthenticatedAs($pending, 'logistics');
+        $this->assertSame(LogisticsProviderStatus::Pending, $pending->fresh()->status);
+
+        $this->actingAs(LogisticsProvider::factory()->create(['status' => LogisticsProviderStatus::Suspended->value]), 'logistics')
             ->get(route('logistics.dashboard'))
             ->assertRedirect(route('home', ['login' => 1]));
+        $this->assertGuest('logistics');
     }
 
     public function test_dashboard_renders_for_an_approved_provider(): void

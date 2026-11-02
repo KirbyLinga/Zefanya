@@ -22,6 +22,9 @@
     <div>
         <h1 class="font-serif text-3xl text-neutral-950">Settlements</h1>
         <p class="mt-2 text-sm text-neutral-600">Logistics companies keep each parcel's shipping fee and send Zefanya the rest of the cash. Confirm each payment only after the money has arrived. Sellers on those parcels can't be paid until you do.</p>
+        @if ($pendingAllocation['parcels'] > 0)
+            <p class="mt-2 text-sm text-neutral-600"><span class="font-semibold text-neutral-950">{{ $peso($pendingAllocation['shippingMinor']) }}</span> in cross-provider shipping fees across {{ $pendingAllocation['parcels'] }} {{ \Illuminate\Support\Str::plural('parcel', $pendingAllocation['parcels']) }} is pending allocation. No company keeps these fees until a settlement policy is agreed.</p>
+        @endif
     </div>
 
     @if (session('success'))
@@ -45,7 +48,7 @@
                             <summary class="cursor-pointer font-semibold text-primary-800">{{ $payment->parcel_count }} {{ \Illuminate\Support\Str::plural('parcel', $payment->parcel_count) }}</summary>
                             <ul class="mt-2 space-y-1">
                                 @foreach ($payment->codRemittances as $parcel)
-                                    <li class="tabular-nums">#{{ $parcel->seller_order_id }} · {{ $parcel->sellerOrder?->tracking_number ?? 'No tracking number' }} · {{ $peso($parcel->amount_minor - (int) $parcel->sellerOrder?->shipping_fee_minor) }}@if ($parcel->sellerOrder?->parcelReturn?->releasesPendingEarnings()) · <span class="font-semibold text-rose-900">Returned, the buyer's refund comes from this</span>@endif</li>
+                                    <li class="tabular-nums">#{{ $parcel->seller_order_id }} · {{ $parcel->sellerOrder?->tracking_number ?? 'No tracking number' }} · {{ $peso($parcel->dueToZefanyaMinor()) }}@if ($parcel->isCrossProvider()) · Shipping pending allocation @endif @if ($parcel->sellerOrder?->parcelReturn?->releasesPendingEarnings()) · <span class="font-semibold text-rose-900">Returned, the buyer's refund comes from this</span>@endif</li>
                                 @endforeach
                             </ul>
                         </details>

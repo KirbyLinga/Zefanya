@@ -104,8 +104,7 @@ class CheckoutCarrierSelectionTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertSee('Cross-province delivery is not available yet')
-            ->assertSee('Destination-provider links are required');
+            ->assertSee('Delivery from this shop to your address is not available yet');
     }
 
     public function test_no_carrier_blocks_checkout_with_a_clear_message(): void

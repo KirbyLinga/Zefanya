@@ -62,7 +62,7 @@
 
             <div class="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
                 <h3 class="text-sm font-semibold text-primary-900">Buyer delivery confirmation</h3>
-                <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">Send a six-digit code to the buyer's verified email. Ask for it only after handing over the parcel. Codes expire in 10 minutes; wait 60 seconds between requests.</p>
+                <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">Send a six-digit code to the buyer's order page in Zefanya. Ask for it only after handing over the parcel. Codes expire in 10 minutes; wait 60 seconds between requests.</p>
                 <form method="POST" action="{{ route('rider.deliveries.otp', $sellerOrder) }}" class="mt-3">
                     @csrf
                     <input type="hidden" name="verification_token" value="{{ $verificationToken }}">

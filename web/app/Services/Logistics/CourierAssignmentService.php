@@ -33,7 +33,8 @@ class CourierAssignmentService
     {
         DB::afterCommit(function () use ($parcel): void {
             $current = $parcel->fresh();
-            if ($current === null || $current->currentCustodyProviderId() === null) {
+            if ($current === null || $current->currentCustodyProviderId() === null
+                || ParcelIncidentService::movementBlockers($current)->exists()) {
                 return;
             }
             if ($current->status === OrderStatus::ReadyForPickup) {
@@ -120,7 +121,8 @@ class CourierAssignmentService
 
                 return ['status' => 'unavailable', 'courier' => null, 'message' => $message];
             }
-            $assignment = $current->deliveryAssignments()->where('role', $role)->latest('id')->firstOrFail();
+            // reorder(): the relation's created_at order would otherwise outrank id.
+            $assignment = $current->deliveryAssignments()->where('role', $role)->reorder('id', 'desc')->firstOrFail();
             $assignment->forceFill(['assigned_by_type' => 'system', 'assigned_by_id' => null,
                 'notes' => $role === 'pickup'
                     ? 'Reserved at pickup by the assigned logistics provider. Awaiting the assigned rider to confirm collection.'
@@ -134,6 +136,10 @@ class CourierAssignmentService
 
     public function deliveryReadyAtStation(SellerOrder $parcel, int $providerId): bool
     {
+        $route = $parcel->parcelRoute()->first();
+        if ($route && ! app(RouteExecutionService::class)->isAtFinalDestination($route)) {
+            return false;
+        }
         if (($parcel->currentCustodyProviderId() !== null && $parcel->currentCustodyProviderId() !== $providerId)
             || ($parcel->handoff_destination_provider_id !== null && $parcel->custody_provider_id === null)
             || $parcel->manifestItems()->whereNull('released_at')->exists()
@@ -280,7 +286,15 @@ class CourierAssignmentService
             if ($order === null) {
                 return null;
             }
-            if ($reserveOnly && $order->status !== OrderStatus::Sorted) {
+            // For same-provider delivery, status must be Sorted. For cross-provider
+            // (destination provider with custody), allow AtSortingCenter or Sorted.
+            $isDestinationProvider = $order->currentCustodyProviderId() !== null
+                && ($provider === null || (int) $provider->id === (int) $order->currentCustodyProviderId());
+            if ($reserveOnly && ! $isDestinationProvider && $order->status !== OrderStatus::Sorted) {
+                return null;
+            }
+            if ($reserveOnly && $isDestinationProvider
+                && ! in_array($order->status, [OrderStatus::AtSortingCenter, OrderStatus::Sorted], true)) {
                 return null;
             }
             if ($rescheduled && (! SellerOrderStatusService::canRetryDelivery($order)
@@ -304,7 +318,7 @@ class CourierAssignmentService
                     $this->status->transition($order, OrderStatus::AssignedToRider,
                         note: 'Logistics confirmed the reserved delivery Rider.',
                         actor: OrderActor::Logistics, actorId: $owner->id, source: 'web');
-                    $assignment = $order->deliveryAssignments()->where('role', 'delivery')->latest('id')->first();
+                    $assignment = $order->deliveryAssignments()->where('role', 'delivery')->reorder('id', 'desc')->first();
 
                     return $existing;
                 }
@@ -651,7 +665,7 @@ class CourierAssignmentService
             $assignment = $current->deliveryAssignments()
                 ->where('role', 'pickup')
                 ->where('courier_id', $courier->id)
-                ->latest('id')
+                ->reorder('id', 'desc')
                 ->first();
             if ($assignment === null) {
                 return null;

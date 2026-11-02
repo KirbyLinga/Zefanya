@@ -10,11 +10,12 @@
 --}}
 @props(['notifications' => collect(), 'unreadCount' => 0])
 
-<div class="sp-bell-wrapper" style="position: relative;">
+<div id="seller-notification-bell" class="sp-bell-wrapper" style="position: relative;" data-recent-url="{{ route('seller.notifications.recent') }}">
     <button
         type="button"
         class="sp-icon-btn"
         id="sp-bell-btn"
+        aria-haspopup="true"
         aria-controls="sp-notif-dropdown"
         aria-expanded="false"
         aria-label="Notifications, {{ $unreadCount }} unread"
@@ -22,11 +23,7 @@
     >
         <i data-lucide="bell" class="w-[18px] h-[18px]" aria-hidden="true"></i>
 
-        @if($unreadCount > 0)
-            <span class="sp-bell-badge" aria-hidden="true">
-                {{ $unreadCount > 9 ? '9+' : $unreadCount }}
-            </span>
-        @endif
+        <span id="sp-bell-badge" class="sp-bell-badge" aria-hidden="true" @if ($unreadCount <= 0) hidden @endif>{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>
     </button>
 
     {{-- ── Dropdown ── --}}
@@ -39,14 +36,13 @@
     >
         <div class="sp-notif-dropdown__header flex items-center justify-between gap-3">
             <span>Notifications</span>
-            @if ($unreadCount > 0)
-                <form method="POST" action="{{ route('seller.notifications.readAll') }}">
+                <form data-seller-mark-all method="POST" action="{{ route('seller.notifications.readAll') }}" @if ($unreadCount <= 0) hidden @endif>
                     @csrf
                     <button type="submit" class="text-xs font-semibold text-primary-700 underline">Mark all as read</button>
                 </form>
-            @endif
         </div>
 
+        <div id="sp-notif-list">
         @if($notifications->isEmpty())
             <div class="sp-notif-empty" data-notif-empty>
                 <i data-lucide="bell-off" class="w-[28px] h-[28px]" style="color: var(--icon-soft);" aria-hidden="true"></i>
@@ -62,7 +58,7 @@
                         $message = $data['message'] ?? '';
                     @endphp
                     <li class="sp-notif-item relative" role="listitem">
-                        <a href="{{ $view['actionUrl'] ?? route('seller.notifications.index') }}" class="block rounded-lg p-2 no-underline transition-colors hover:bg-[var(--bg-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
+                        <a href="{{ $view['actionUrl'] ?? route('seller.notifications.index') }}" class="block [&>span]:block rounded-lg p-2 no-underline transition-colors hover:bg-[var(--bg-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
                         <span class="sp-notif-item__title">{{ $view['title'] }}</span>
                         @if($message)
                             <span class="sp-notif-item__message">{{ $message }}</span>
@@ -72,7 +68,7 @@
                         </span>
                         </a>
                         @if ($notification->read_at === null)
-                            <form method="POST" action="{{ route('seller.notifications.read', $notification->id) }}" class="mt-2">
+                            <form data-notification-read method="POST" action="{{ route('seller.notifications.read', $notification->id) }}" class="mt-2">
                                 @csrf
                                 <button type="submit" class="text-xs font-semibold text-primary-700 underline">Mark as read</button>
                             </form>
@@ -83,6 +79,7 @@
                 @endforeach
             </ul>
         @endif
+        </div>
         <a href="{{ route('seller.notifications.index') }}" class="block border-t border-[var(--border-strong)] px-4 py-3 text-center text-sm font-semibold text-primary-700">View all notifications</a>
     </div>
 </div>

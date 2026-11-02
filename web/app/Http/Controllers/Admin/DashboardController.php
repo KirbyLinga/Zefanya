@@ -143,9 +143,9 @@ class DashboardController extends Controller
             ->join('seller_orders', 'seller_orders.id', '=', 'cod_remittances.seller_order_id')
             ->where('cod_remittances.created_at', '>=', Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc())
             ->groupBy('cod_remittances.logistics_provider_id')
-            ->selectRaw('cod_remittances.logistics_provider_id, SUM(cod_remittances.amount_minor) as cod_minor, SUM(seller_orders.shipping_fee_minor) as shipping_minor')
+            ->selectRaw('cod_remittances.logistics_provider_id, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
             ->selectRaw('SUM(CASE WHEN cod_remittances.status = ? THEN 1 ELSE 0 END) as with_riders', [CodRemittance::PENDING_REMITTANCE])
-            ->selectRaw('SUM(CASE WHEN cod_remittances.zefanya_received_at IS NOT NULL THEN cod_remittances.amount_minor - seller_orders.shipping_fee_minor ELSE 0 END) as received_minor')
+            ->selectRaw('SUM(CASE WHEN cod_remittances.zefanya_received_at IS NOT NULL THEN cod_remittances.amount_minor - ('.CodRemittance::KEPT_SHIPPING_SQL.') ELSE 0 END) as received_minor')
             ->with('provider:id,business_name')
             ->get()
             ->map(fn (CodRemittance $row): array => [

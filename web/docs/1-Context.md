@@ -264,6 +264,8 @@ Each item was checked in the current code. "Verified" means the file/line was re
 ### Decisions (dated)
 | Date | Decision |
 |---|---|
+| 2026-10-31 | **Hub-to-hub Courier belongs to the sending Logistics provider** and is assigned to a transfer trip that carries parcels between hubs. Custody stays with the sender until the receiving hub's verified scan. Not built yet. |
+| 2026-10-31 | **Cross-provider shipping fees stay pending allocation:** no automatic 50/50 split and no provider keeps the whole fee. When the delivering company differs from `carrier_provider_id`, it remits the full COD to Zefanya, which holds the fee (`CodRemittance::keptShippingMinor()`, `LogisticsRemittanceService::pendingAllocation()`). |
 | 2026-10-16 | **One account per browser** — signing in on one guard clears the other three; logout clears all (`ClearsOtherGuards`). |
 | 2026-10-16 | Only `PaymentMethod::Cod` is **integrated**; GCash / Bank transfer / Card are selectable, stored `pending`, and labelled so checkout never blocks. |
 | 2026-10-23 | **Delivery policy clarified:** two total attempts (initial delivery + one retry). The second failure requires Logistics return; not two reschedules or a third failure. Counting/enforcement are centralized in `SellerOrderStatusService`. |
@@ -294,6 +296,7 @@ Each item was checked in the current code. "Verified" means the file/line was re
 8. **Registration test failures** — fix the 403-vs-302 + `postal_code` assertions, or accept?
 9. **Test baseline** — establish the true pass/fail count.
 10. **Money on returned parcels** — the Logistics company keeps the shipping fee and the rest of the cash still goes to Zefanya, which refunds the buyer. Both Earnings and Settlements label these parcels. The panel has not confirmed who bears the delivery cost of a return.
+11. **Cross-provider shipping allocation** — how a fee held as pending allocation is divided between the carrier and the delivering company, and how it is paid out. Non-COD parcels and the existing wording that every company "keeps" its fee need revisiting with that policy.
 
 ---
 

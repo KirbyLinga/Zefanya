@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ParcelIncident\StoreIncidentRequest;
 use App\Models\Rider\Courier;
@@ -13,6 +12,7 @@ use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\LogisticsStatusOverrideService;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelReturnService;
+use App\Services\Logistics\RouteExecutionService;
 use App\Services\Rider\RiderNotifier;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
@@ -106,13 +106,14 @@ class DeliveryAssignmentsController extends Controller
             'order.buyer', 'seller', 'payment', 'orderItems.product', 'orderItems.variant',
         ]);
 
-        $openIncident = $this->incident->hasOpenIncident($parcel);
+        $openIncident = ParcelIncidentService::movementBlockers($parcel)->exists();
 
         return view('Logistics.DeliveryMonitoring.show', [
             'sellerOrder' => $parcel,
+            'routeDetails' => app(RouteExecutionService::class)->trackingSummary($parcel),
             'overrideOptions' => app(LogisticsStatusOverrideService::class)->options($parcel),
             'openIncident' => $openIncident,
-            'incident' => $openIncident ? $parcel->incidentSet()->where('status', ParcelIncidentStatus::Open->value)->latest('id')->first() : null,
+            'incident' => $openIncident ? ParcelIncidentService::movementBlockers($parcel)->latest('id')->first() : null,
         ]);
     }
 

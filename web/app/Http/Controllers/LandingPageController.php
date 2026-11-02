@@ -17,8 +17,7 @@ class LandingPageController extends Controller
         }
 
         $products = Product::query()->withBuyerCardData()
-            ->activeInStock()
-            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
+            ->discoverable()
             ->with(['images', 'seller', 'variants.optionValues'])
             ->latest('id')
             ->limit(4)

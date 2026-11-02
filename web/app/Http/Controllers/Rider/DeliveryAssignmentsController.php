@@ -142,10 +142,10 @@ class DeliveryAssignmentsController extends Controller
         } catch (\Exception $exception) {
             report($exception);
 
-            return back()->with('error', 'The delivery code could not be emailed. Try again.');
+            return back()->with('error', 'The delivery code could not be sent. Try again.');
         }
 
-        return back()->with('success', 'Delivery code sent to the buyer. It expires in 10 minutes.');
+        return back()->with('success', 'Delivery code sent to the buyer\'s order page. It expires in 10 minutes.');
     }
 
     public function deliver(

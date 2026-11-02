@@ -267,16 +267,39 @@ class ProviderHandoffSchemaService
             $parcel = $handoff->sellerOrder;
             $isReturn = $parcel?->hasActiveReturn() ?? false;
             $this->require(($handoff->direction === 'return') === $isReturn, 'direction', 'Return and outgoing custody movements cannot be mixed.');
+            $arrival = $isReturn ? $parcel->parcelHandoffs()
+                ->where('direction', 'forward')
+                ->where('status', ParcelHandoffStatus::Received->value)
+                ->where('origin_provider_id', $handoff->destination_provider_id)
+                ->where('destination_provider_id', $handoff->origin_provider_id)
+                ->reorder('id', 'desc')
+                ->first() : null;
+
             if ($isReturn) {
-                $this->require((int) $handoff->destination_provider_id === (int) $parcel->parcelReturn->origin_provider_id
-                    && (int) $handoff->receiving_hub_id === (int) $parcel->parcelReturn->origin_hub_id, 'handoff', 'Reverse custody must return directly to the original Seller provider and hub.');
+                $toOriginal = (int) $handoff->destination_provider_id === (int) $parcel->parcelReturn->origin_provider_id;
+                $this->require(
+                    $toOriginal
+                        ? (int) $handoff->receiving_hub_id === (int) $parcel->parcelReturn->origin_hub_id
+                        : $arrival !== null && (int) $handoff->receiving_hub_id === (int) $arrival->sending_hub_id,
+                    'handoff',
+                    'Reverse custody must return to the original Seller hub, or step back along this parcel\'s verified path.',
+                );
             }
 
-            $link = LogisticsProviderLink::query()->find($handoff->logistics_provider_link_id);
-            $this->require($link !== null && $link->status === LogisticsProviderLink::ACTIVE, 'link', 'New handoffs require an active approved link.');
-            $this->validateLink($link);
-            $this->require((int) $link->origin_provider_id === (int) $handoff->origin_provider_id
-                && (int) $link->destination_provider_id === (int) $handoff->destination_provider_id, 'link', 'Handoff providers must match the directed link.');
+            if ($handoff->logistics_provider_link_id === null) {
+                // Only an Admin-authorized return, back along this parcel's own path, moves without a link.
+                $this->require(
+                    $arrival !== null && app(ParcelReturnService::class)->reverseRouteAuthorized($parcel->parcelReturn),
+                    'link',
+                    'New handoffs require an active approved link.',
+                );
+            } else {
+                $link = LogisticsProviderLink::query()->find($handoff->logistics_provider_link_id);
+                $this->require($link !== null && $link->status === LogisticsProviderLink::ACTIVE, 'link', 'New handoffs require an active approved link.');
+                $this->validateLink($link);
+                $this->require((int) $link->origin_provider_id === (int) $handoff->origin_provider_id
+                    && (int) $link->destination_provider_id === (int) $handoff->destination_provider_id, 'link', 'Handoff providers must match the directed link.');
+            }
             foreach (['sending' => 'origin', 'receiving' => 'destination'] as $hubSide => $providerSide) {
                 $hub = LogisticsHub::query()->find($handoff->{$hubSide.'_hub_id'});
                 $this->require($hub !== null && $hub->isOperational()

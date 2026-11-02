@@ -107,8 +107,10 @@
                  class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-neutral-50 via-neutral-50/60 to-transparent pointer-events-none"></div>
         </div>
 
+<p id="product-load-status" role="status" aria-live="polite" class="mb-4 text-sm text-buyer-ink-soft" hidden></p>
+
         {{-- Active filters chips --}}
-        @if ($searchTerm || request('category') || request('sort') !== 'relevance')
+        @if ($searchTerm || $onSaleOnly || request('category') || request()->filled('sort') && request('sort') !== 'relevance')
             <div class="mb-8">
                 @if ($searchTerm)
                     <div class="mb-4 flex items-center justify-between">
@@ -129,6 +131,17 @@
                         </div>
                     @endif
 
+                @if ($onSaleOnly)
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
+                        On sale
+                        <a href="{{ request()->fullUrlWithQuery(['on_sale' => null, 'page' => 1]) }}"
+                           aria-label="Remove on sale filter"
+                           class="hover:text-primary-900">
+                            <i data-lucide="x" width="14" height="14"></i>
+                        </a>
+                    </div>
+                @endif
+
                 @if (request('category'))
                     @php
                         $selectedCat = $categories->firstWhere('id', request('category'));
@@ -145,7 +158,7 @@
                     @endif
                 @endif
 
-                @if (request('sort') !== 'relevance')
+                @if (request()->filled('sort') && request('sort') !== 'relevance')
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
                         Sort: {{ $currentLabel }}
                         <a href="{{ request()->fullUrlWithQuery(['sort' => 'relevance', 'page' => 1]) }}"
@@ -167,7 +180,7 @@
 
         {{-- Products grid or empty state --}}
         @if ($products->isNotEmpty())
-            <div data-products-grid data-layout="grid" class="group/products grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-12">
+            <div data-products-grid data-layout="grid" class="group/products grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 mb-12">
                 @foreach ($products as $product)
                     @include('Components.buyer.product-card', [
                         'product' => $product,
@@ -176,9 +189,21 @@
                 @endforeach
             </div>
 
-            {{-- Pagination --}}
-            <div class="flex justify-center mt-16">
-                {{ $products->links() }}
+            {{-- Results counter and Load More button --}}
+            <div class="flex flex-col items-center gap-4 mt-16">
+                <p class="text-[13px] text-buyer-ink-soft">
+                    <span id="js-products-showing">{{ $products->count() }}</span> of <span id="js-products-total">{{ $products->total() }}</span> products
+                </p>
+
+                @if ($products->hasMorePages())
+                    <button type="button"
+                            id="js-load-more-btn"
+                            data-load-more
+                            data-next-page="{{ $products->currentPage() + 1 }}"
+                            class="px-8 py-3 bg-primary-800 text-white rounded-lg font-semibold text-[13px] hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Load More Products
+                    </button>
+                @endif
             </div>
         @else
             {{-- Empty state --}}
@@ -206,7 +231,7 @@
 </style>
 
 @push('scripts')
-    @vite(['resources/js/buyer/category-scroll.js'])
+    @vite(['resources/js/buyer/category-scroll.js', 'resources/js/buyer/products-load-more.js'])
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             // Sort dropdown toggle

@@ -13,7 +13,8 @@
 
             @if (session('error'))
                 <div role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-900">
-                    {{ session('error') }}
+                    <p>{{ session('error') }}</p>
+                    <p class="mt-2 text-xs">Before retrying, <a href="{{ route('buyer.orders.index') }}" class="font-semibold underline">check My Orders</a> if you already submitted an order. Review the details below, <a href="{{ route('buyer.account.address') }}" class="font-semibold underline">check your address</a>, or <a href="{{ route('buyer.cart.index') }}" class="font-semibold underline">return to your cart</a>.</p>
                 </div>
             @endif
 
@@ -30,6 +31,7 @@
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
+                    <a href="{{ route('buyer.cart.index') }}" class="mt-2 inline-block text-xs font-semibold underline">Review items and vouchers in your cart</a>
                 </div>
             @endif
 
@@ -40,6 +42,7 @@
                 <form method="POST" action="{{ route('buyer.checkout.store') }}" id="checkout-form"
                       data-checkout-carriers
                       data-merchandise-minor="{{ $merchandiseTotalMinor ?? $summary->totalCentavos }}"
+                      data-merchandise-savings-minor="{{ $summary->discountCentavos }}"
                       data-shipping-voucher-type="{{ $shippingVoucher?->type->value }}"
                       data-shipping-voucher-value="{{ $shippingVoucher?->value }}">
                     @csrf
@@ -304,9 +307,9 @@
                                         <span class="text-neutral-400">Shipping</span>
                                         <span class="font-semibold text-buyer-ink" data-checkout-shipping-total>
                                             @if ($shippingTotalMinor ?? 0)
-                                                ₱{{ number_format((($shippingTotalMinor ?? 0) - ($shippingDiscountMinor ?? 0)) / 100, 2) }}
+                                                ₱{{ number_format(($shippingTotalMinor ?? 0) / 100, 2) }}
                                             @else
-                                                Select a carrier
+                                                {{ ($carriersAvailable ?? false) ? 'Free' : 'Select a carrier' }}
                                             @endif
                                         </span>
                                     </div>
@@ -319,13 +322,18 @@
                                         </div>
                                     @endif
 
+                                    <div class="flex items-center justify-between gap-3 text-[12.5px] text-tertiary-700" data-checkout-savings-row @if (($summary->discountCentavos + ($shippingDiscountMinor ?? 0)) <= 0) hidden @endif>
+                                        <span>Total voucher savings</span>
+                                        <span class="font-semibold" data-checkout-savings>₱{{ number_format(($summary->discountCentavos + ($shippingDiscountMinor ?? 0)) / 100, 2) }}</span>
+                                    </div>
+
                                     <div class="flex items-end justify-between border-t border-buyer-line pt-4 mt-2">
                                         <span class="text-[13px] font-semibold text-buyer-ink">Total</span>
-                                        <span class="font-serif text-[26px] font-semibold text-buyer-ink" data-checkout-payable-total>
+                                        <span class="font-serif text-[26px] font-semibold text-buyer-ink" data-checkout-payable-total aria-live="polite" aria-atomic="true">
                                             ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}
                                         </span>
                                     </div>
-                                    <p class="mt-2 text-[11px] text-neutral-400">Merchandise total is charged at place-order today. Carrier assignment is saved for fulfilment in the next release.</p>
+                                    <p class="mt-2 text-[11px] text-neutral-400">Items minus product vouchers, plus shipping minus any shipping voucher. Only the final total is due. You can track your parcel from My Orders once your order is placed.</p>
                                 </div>
 
                                 <p class="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">

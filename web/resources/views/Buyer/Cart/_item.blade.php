@@ -36,12 +36,12 @@
   </div>
 
   {{-- Thumbnail with the category chip pinned to its bottom-right corner --}}
-  <div class="relative h-[88px] w-[70px] shrink-0 overflow-hidden rounded-xl bg-secondary-100">
+  <div class="relative h-[100px] w-[100px] shrink-0 overflow-hidden rounded-xl bg-secondary-100">
     @if ($imageUrl)
       <img src="{{ $imageUrl }}" alt="{{ $product->name }}" class="h-full w-full object-cover">
     @else
       <div class="flex h-full w-full items-center justify-center text-primary-300">
-        <i data-lucide="package" width="26" height="26"></i>
+        <i data-lucide="package" width="32" height="32"></i>
       </div>
     @endif
     @if ($catLabel)
@@ -66,7 +66,7 @@
 
     {{-- Variant label ("Red / M") for variant lines; legacy lines show the
          multi-quantity hint only. --}}
-    <p class="mt-0.5 text-[11.5px] text-neutral-400">
+    <p class="mt-1 text-[12px] font-medium text-neutral-600">
       @if ($unavailable)
         @if ($item->requiresVariantReselection())
           Variation unavailable. Choose a color or size on the product page first.
@@ -86,10 +86,16 @@
     </p>
 
     @if (! $unavailable && ($regularPrice = $item->resolvedPrice()?->formattedRegular()))
-      <p class="mt-1 text-[11.5px]">
-        <span class="text-price-muted line-through">{{ $regularPrice }}</span>
-        <span class="font-semibold text-primary-700">₱{{ number_format($unit / 100, 2) }} each</span>
+      <p class="mt-1.5 text-[12px] leading-snug">
+        <span class="text-price-muted line-through text-[11px]">{{ $regularPrice }}</span>
+        <span class="block font-semibold text-primary-700">₱{{ number_format($unit / 100, 2) }} each</span>
       </p>
+    @else
+      @unless($unavailable)
+      <p class="mt-1.5 text-[12px] font-semibold text-primary-700">
+        ₱{{ number_format($unit / 100, 2) }} each
+      </p>
+      @endunless
     @endif
 
     @if (! $unavailable && ($item->quantity > $stock || ($stock > 0 && $stock <= $product?->low_stock_threshold)))
@@ -110,37 +116,44 @@
       <div class="inline-flex items-center rounded-full border border-buyer-line bg-buyer-cream">
         <button
           type="button"
-          class="js-cartpage-qty-down flex h-7 w-7 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100 disabled:opacity-30"
+          class="js-cartpage-qty-down flex h-8 w-8 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100 disabled:opacity-30"
           data-item-id="{{ $item->id }}"
           data-stock="{{ $stock }}"
           aria-label="Decrease quantity of {{ $product->name }}"
           @disabled($item->quantity <= 1)
         >
-          <i data-lucide="minus" width="11" height="11"></i>
+          <i data-lucide="minus" width="12" height="12"></i>
         </button>
-        <span class="js-cartpage-qty-display w-8 text-center text-[13px] font-semibold text-buyer-ink"
-              aria-live="polite"
-              aria-label="Quantity of {{ $product->name }}">{{ $item->quantity }}</span>
+        <input
+          type="number"
+          class="js-cartpage-qty-input w-10 text-center text-[13px] font-semibold text-buyer-ink bg-transparent border-0 outline-none"
+          data-item-id="{{ $item->id }}"
+          data-stock="{{ $stock }}"
+          value="{{ $item->quantity }}"
+          min="1"
+          max="{{ $stock }}"
+          aria-label="Quantity of {{ $product->name }}"
+        >
         <button
           type="button"
-          class="js-cartpage-qty-up flex h-7 w-7 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100 disabled:opacity-30"
+          class="js-cartpage-qty-up flex h-8 w-8 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100 disabled:opacity-30"
           data-item-id="{{ $item->id }}"
           data-stock="{{ $stock }}"
           aria-label="Increase quantity of {{ $product->name }}"
           @disabled($item->quantity >= $stock)
         >
-          <i data-lucide="plus" width="11" height="11"></i>
+          <i data-lucide="plus" width="12" height="12"></i>
         </button>
       </div>
     @endunless
 
     <button
       type="button"
-      class="js-cartpage-remove flex items-center gap-1 text-[11.5px] text-neutral-400 transition-colors hover:text-primary-700"
+      class="js-cartpage-remove flex items-center gap-1 text-[12px] font-medium text-primary-700 transition-all hover:text-primary-900 hover:underline"
       data-item-id="{{ $item->id }}"
       aria-label="Remove {{ $product?->name ?? 'this item' }} from cart"
     >
-      <i data-lucide="trash-2" width="12" height="12"></i>
+      <i data-lucide="trash-2" width="13" height="13"></i>
       Remove
     </button>
   </div>

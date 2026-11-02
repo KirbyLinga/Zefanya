@@ -16,9 +16,10 @@ class LogisticsRemittanceController extends Controller
     {
         return view('Admin.LogisticsRemittances.index', [
             'waiting' => LogisticsRemittance::query()->where('status', LogisticsRemittance::SUBMITTED)
-                ->with(['provider:id,business_name', 'codRemittances.sellerOrder:id,tracking_number,shipping_fee_minor', 'codRemittances.sellerOrder.parcelReturn'])
+                ->with(['provider:id,business_name', 'codRemittances.sellerOrder:id,tracking_number,shipping_fee_minor,carrier_provider_id', 'codRemittances.sellerOrder.parcelReturn'])
                 ->orderBy('id')->get(),
             'unsent' => $remittances->unsentByProvider(),
+            'pendingAllocation' => $remittances->pendingAllocation(),
             'payoutsWaiting' => SellerPayoutRequest::query()->where('status', SellerPayoutRequest::PENDING)->count(),
             'history' => LogisticsRemittance::query()->where('status', '!=', LogisticsRemittance::SUBMITTED)
                 ->with(['provider:id,business_name', 'decidedBy:id,name'])

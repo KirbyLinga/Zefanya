@@ -4,13 +4,16 @@ namespace App\Services\Logistics;
 
 use App\Enums\ManifestStatus;
 use App\Enums\OrderStatus;
+use App\Enums\ParcelIncidentType;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\Manifest;
+use App\Models\Logistics\ManifestAuditLog;
 use App\Models\Logistics\ManifestItem;
 use App\Models\Shared\SellerOrder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -124,8 +127,37 @@ class ManifestService
         }
 
         return $query->get()
-            ->filter(fn (SellerOrder $parcel): bool => $this->currentHubId($parcel) === $originHubId)
+            ->filter(function (SellerOrder $parcel) use ($originHubId): bool {
+                // Parcel must be picked up and at the origin hub
+                return $this->ineligibilityReason($parcel, $originHubId) === null;
+            })
             ->values();
+    }
+
+    /**
+     * Check if a parcel is eligible for manifest (pickup confirmed + at origin hub).
+     * Returns null if eligible, or an ineligibility reason string if not.
+     *
+     * Eligibility requires:
+     * - Pickup confirmed (handover_at !== null)
+     * - Parcel is at the origin hub (custody_hub_id equals origin hub)
+     */
+    public function ineligibilityReason(SellerOrder $parcel, int $originHubId): ?string
+    {
+        if ($parcel->handover_at === null) {
+            return 'Not yet picked up';
+        }
+
+        $current = $this->currentHubId($parcel);
+        if ($current === null) {
+            return 'Hub custody not established';
+        }
+
+        if ($current !== $originHubId) {
+            return 'At another hub';
+        }
+
+        return null;
     }
 
     /**
@@ -236,6 +268,14 @@ class ManifestService
                     ]);
                 }
 
+                // Enforce pickup eligibility
+                $reason = $this->ineligibilityReason($parcel, (int) $locked->origin_hub_id);
+                if ($reason !== null) {
+                    throw ValidationException::withMessages([
+                        'seller_order_id' => $reason,
+                    ]);
+                }
+
                 if ($currentHubId === (int) $locked->destination_hub_id) {
                     throw ValidationException::withMessages([
                         'seller_order_id' => 'This parcel is already at the destination hub.',
@@ -298,14 +338,20 @@ class ManifestService
      *
      * @param  array<int|string, mixed>  $tokens  item id => verification token
      */
-    public function dispatch(Manifest $manifest, LogisticsProvider $provider, array $tokens): Manifest
+    public function dispatch(Manifest $manifest, LogisticsProvider $provider, array $tokens, ?Request $request = null): Manifest
     {
         $this->assertManifestOwner($manifest, $provider);
+
+        if ($manifest->fresh()->status === ManifestStatus::Draft) {
+            foreach ($manifest->items()->whereNull('released_at')->with('sellerOrder')->get() as $item) {
+                app(ParcelIncidentService::class)->detectUnavailableDeparture($item->sellerOrder, $provider);
+            }
+        }
 
         $items = new EloquentCollection;
         $consumed = [];
 
-        DB::transaction(function () use ($manifest, $provider, $tokens, &$items, &$consumed): void {
+        DB::transaction(function () use ($manifest, $provider, $tokens, $request, &$items, &$consumed): void {
             $locked = $this->lockManifest($manifest);
             $this->assertManifestOwner($locked, $provider);
             $this->assertDraft($locked, 'This manifest has already been dispatched.');
@@ -326,6 +372,7 @@ class ManifestService
             foreach ($items as $item) {
                 $item->setRelation('sellerOrder', SellerOrder::query()->whereKey($item->seller_order_id)->lockForUpdate()->firstOrFail());
                 ParcelIncidentService::assertOperationsAllowed($item->sellerOrder);
+                app(RoutePlannerService::class)->requireAvailableDeparture($item->sellerOrder);
                 if ($item->received_at !== null || $item->released_at !== null) {
                     throw ValidationException::withMessages([
                         'manifest' => 'Every parcel on this manifest must still be active and unreceived before dispatch.',
@@ -334,18 +381,26 @@ class ManifestService
 
                 $token = $tokens[$item->id] ?? $tokens[(string) $item->id] ?? null;
 
+                // Recheck parcel is at origin hub before dispatch
                 if ($this->currentHubId($item->sellerOrder) !== (int) $locked->origin_hub_id) {
                     throw ValidationException::withMessages([
                         'verification_token' => 'A parcel is no longer in the custody of the manifest origin hub. Refresh the manifest and scan again.',
                     ]);
                 }
 
+                // Verify the token
                 $this->handoff->assertValidForManifestItem(
                     $provider,
                     $item,
                     ParcelHandoffVerification::ACTION_MANIFEST_DISPATCH,
                     is_string($token) ? $token : null,
                     (int) $locked->origin_hub_id,
+                );
+
+                // Store persistent verification
+                $item->markVerifiedForDispatch(
+                    ParcelHandoffVerification::ACTOR_LOGISTICS,
+                    (int) $provider->id,
                 );
 
                 $consumed[] = [$item, is_string($token) ? $token : null];
@@ -361,6 +416,10 @@ class ManifestService
                 app(ParcelReturnService::class)->movement($returnItem->sellerOrder, $returnItem);
             }
 
+            // Record audit log for dispatch
+            if ($request !== null) {
+                ManifestAuditLog::record($provider, 'dispatched', $locked, null, $request, 'qr_scan');
+            }
         });
 
         foreach ($consumed as [$item, $token]) {
@@ -514,6 +573,7 @@ class ManifestService
         LogisticsProvider $provider,
         ManifestItem $item,
         ?string $token,
+        ?Request $request = null,
     ): array {
         $this->assertManifestOwner($manifest, $provider);
 
@@ -521,11 +581,19 @@ class ManifestService
             abort(404);
         }
 
+        $currentItem = $item->fresh(['sellerOrder']);
+        if ($currentItem->received_at === null && $currentItem->sellerOrder->parcelRoute()->exists()) {
+            $this->handoff->assertValidForManifestItem($provider, $currentItem,
+                ParcelHandoffVerification::ACTION_MANIFEST_RECEIVE, $token, (int) $manifest->destination_hub_id);
+            app(ParcelIncidentService::class)->detectReceiptDiscrepancy($currentItem->sellerOrder,
+                (int) $manifest->origin_hub_id, (int) $manifest->destination_hub_id, $provider, $currentItem);
+        }
+
         $completed = false;
         $receivedItem = null;
         $method = ParcelHandoffVerification::METHOD_MANUAL;
 
-        DB::transaction(function () use ($manifest, $provider, $item, $token, &$completed, &$receivedItem, &$method): void {
+        DB::transaction(function () use ($manifest, $provider, $item, $token, $request, &$completed, &$receivedItem, &$method): void {
             $locked = $this->lockManifest($manifest);
             $this->assertManifestOwner($locked, $provider);
 
@@ -542,9 +610,10 @@ class ManifestService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            ParcelIncidentService::assertOperationsAllowed(
-                SellerOrder::query()->whereKey($lockedItem->seller_order_id)->lockForUpdate()->firstOrFail(),
-            );
+            $parcel = SellerOrder::query()->whereKey($lockedItem->seller_order_id)->lockForUpdate()->firstOrFail();
+            $lockedItem->setRelation('sellerOrder', $parcel);
+            ParcelIncidentService::assertReceivingAllowed($parcel);
+            app(ParcelLegService::class)->requireReceiptOrigin($parcel, (int) $provider->id, (int) $locked->origin_hub_id);
 
             if ($lockedItem->received_at !== null) {
                 throw ValidationException::withMessages([
@@ -575,6 +644,7 @@ class ManifestService
                 'custody_provider_id' => $provider->id,
                 'custody_hub_id' => $locked->destination_hub_id,
             ])->save();
+            app(ParcelLegService::class)->advanceAfterReceipt($lockedItem->sellerOrder, $lockedItem);
             app(ParcelReturnService::class)->movement($lockedItem->sellerOrder->fresh(), $lockedItem);
             $receivedItem = $lockedItem;
 
@@ -592,6 +662,11 @@ class ManifestService
                     'received_by_id' => $provider->id,
                 ])->save();
                 $completed = true;
+            }
+
+            // Record audit log for receive
+            if ($request !== null) {
+                ManifestAuditLog::record($provider, 'received', $locked, $lockedItem, $request, $method);
             }
         });
 
@@ -611,6 +686,196 @@ class ManifestService
             'completed' => $completed,
             'method' => $method,
         ];
+    }
+
+    /**
+     * Report an issue (missing or damaged) on a received item.
+     */
+    public function reportIssue(Manifest $manifest, ManifestItem $item, string $issueType, string $note, string $actorType, ?int $actorId = null, ?string $token = null): void
+    {
+        $provider = auth('logistics')->user();
+        $this->assertManifestOwner($manifest, $provider);
+        abort_unless((int) $item->manifest_id === (int) $manifest->id, 404);
+        $currentItem = $item->fresh(['sellerOrder']);
+        if ($issueType === 'damaged' && $currentItem->received_at === null && $currentItem->sellerOrder->parcelRoute()->exists()) {
+            $this->handoff->assertValidForManifestItem($provider, $currentItem,
+                ParcelHandoffVerification::ACTION_MANIFEST_RECEIVE, $token, (int) $manifest->destination_hub_id);
+            app(ParcelIncidentService::class)->detectReceiptDiscrepancy($currentItem->sellerOrder,
+                (int) $manifest->origin_hub_id, (int) $manifest->destination_hub_id, $provider, $currentItem);
+        }
+
+        DB::transaction(function () use ($manifest, $item, $issueType, $note, $actorType, $actorId, $token): void {
+            $locked = $this->lockManifest($manifest);
+            $this->assertManifestOwner($locked, auth('logistics')->user());
+
+            $lockedItem = ManifestItem::query()
+                ->whereKey($item->id)
+                ->where('manifest_id', $locked->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! in_array($issueType, ['missing', 'damaged'], true)) {
+                throw ValidationException::withMessages(['issue_type' => 'Invalid issue type.']);
+            }
+
+            if (blank(trim($note)) || mb_strlen($note) > 500) {
+                throw ValidationException::withMessages(['issue_note' => 'Provide a note of 1-500 characters.']);
+            }
+
+            $provider = auth('logistics')->user();
+            abort_unless($actorType === 'logistics' && (int) $actorId === (int) $provider->id, 403);
+            $parcel = SellerOrder::query()->whereKey($lockedItem->seller_order_id)->lockForUpdate()->firstOrFail();
+            $lockedItem->setRelation('sellerOrder', $parcel);
+            if ($lockedItem->issue_type !== null) {
+                return;
+            }
+            if ($locked->status !== ManifestStatus::Dispatched || $lockedItem->received_at !== null || $lockedItem->released_at !== null) {
+                throw ValidationException::withMessages(['manifest' => 'Only an active dispatched parcel can receive an issue report.']);
+            }
+            if ($issueType === 'damaged') {
+                ParcelIncidentService::assertReceivingAllowed($parcel);
+                $this->handoff->assertValidForManifestItem($provider, $lockedItem,
+                    ParcelHandoffVerification::ACTION_MANIFEST_RECEIVE, $token, (int) $locked->destination_hub_id);
+                app(ParcelLegService::class)->requireReceiptOrigin($parcel, (int) $provider->id, (int) $locked->origin_hub_id);
+            }
+
+            if ($issueType === 'missing') {
+                // Missing: release without receiving
+                $lockedItem->markMissing(trim($note));
+            } else {
+                // Damaged: receive into custody with flag
+                $lockedItem->markDamaged(trim($note), $actorType, $actorId);
+                $lockedItem->sellerOrder->forceFill([
+                    'custody_provider_id' => $locked->logistics_provider_id,
+                    'custody_hub_id' => $locked->destination_hub_id,
+                ])->save();
+            }
+
+            app(ParcelIncidentService::class)->recordRoutingBlocker($parcel->fresh(),
+                $issueType === 'missing' ? ParcelIncidentType::Missing : ParcelIncidentType::Damaged,
+                trim($note), (int) $provider->id);
+
+            // Update manifest status if all items are resolved
+            $this->updateManifestStatusForExceptions($locked);
+        });
+    }
+
+    /**
+     * Update manifest status based on whether all items are resolved and if any have issues.
+     */
+    public function updateManifestStatusForExceptions(Manifest $manifest): void
+    {
+        $allResolved = ! ManifestItem::query()
+            ->where('manifest_id', $manifest->id)
+            ->where(function ($q): void {
+                $q->whereNull('received_at')
+                    ->whereNull('released_at');
+            })
+            ->exists();
+
+        if (! $allResolved) {
+            return;
+        }
+
+        $hasIssues = ManifestItem::query()
+            ->where('manifest_id', $manifest->id)
+            ->whereNotNull('issue_type')
+            ->exists();
+
+        if ($hasIssues) {
+            $manifest->forceFill(['status' => ManifestStatus::ReceivedWithExceptions->value])->save();
+        } elseif ($manifest->status === ManifestStatus::Dispatched) {
+            $manifest->forceFill(['status' => ManifestStatus::Received->value])->save();
+        }
+    }
+
+    /**
+     * Delete a DRAFT manifest and release all its items.
+     * The manifest row is hard-deleted.
+     */
+    public function deleteManifest(Manifest $manifest, LogisticsProvider $provider, ?Request $request = null): void
+    {
+        DB::transaction(function () use ($manifest, $provider, $request): void {
+            $locked = $this->lockManifest($manifest);
+            $this->assertDraft($locked, 'Only draft manifests can be deleted.');
+
+            // Record audit log for deletion BEFORE deleting
+            if ($request !== null) {
+                ManifestAuditLog::record($provider, 'deleted', $locked, null, $request, 'manual');
+            }
+
+            // Delete all items first (they have FK to manifest)
+            ManifestItem::query()
+                ->where('manifest_id', $locked->id)
+                ->delete();
+
+            // Delete the manifest
+            $locked->delete();
+        });
+    }
+
+    /**
+     * Cancel a DISPATCHED manifest with a required reason.
+     * Sets status to CANCELLED, releases all items, records the cancellation.
+     * Can only cancel if no parcels have been received.
+     */
+    public function cancelManifest(Manifest $manifest, LogisticsProvider $provider, string $reason, ?Request $request = null): Manifest
+    {
+        return DB::transaction(function () use ($manifest, $provider, $reason, $request): Manifest {
+            $locked = $this->lockManifest($manifest);
+            $this->assertManifestOwner($locked, $provider);
+
+            if ($locked->status !== ManifestStatus::Dispatched) {
+                throw ValidationException::withMessages([
+                    'manifest' => 'Only dispatched manifests can be cancelled.',
+                ]);
+            }
+
+            // Check that no parcels have been received
+            if ($locked->items()->whereNotNull('received_at')->exists()) {
+                throw ValidationException::withMessages([
+                    'manifest' => 'Cannot cancel: some parcels have already been received.',
+                ]);
+            }
+
+            // Validate reason
+            if (blank(trim($reason)) || mb_strlen($reason) > 1000) {
+                throw ValidationException::withMessages([
+                    'cancellation_reason' => 'Provide a cancellation reason of 1000 characters or fewer.',
+                ]);
+            }
+
+            foreach ($locked->items()->whereNull('received_at')->with('sellerOrder')->get() as $item) {
+                app(ParcelIncidentService::class)->recordRoutingBlocker($item->sellerOrder,
+                    ParcelIncidentType::FailedTransfer, 'Dispatched transfer cancelled: '.trim($reason), (int) $provider->id);
+            }
+
+            // Release all items and clear verifications
+            ManifestItem::query()
+                ->where('manifest_id', $locked->id)
+                ->update([
+                    'released_at' => now(),
+                    'verified_for_dispatch_at' => null,
+                    'verified_for_dispatch_by_type' => null,
+                    'verified_for_dispatch_by_id' => null,
+                ]);
+
+            // Record cancellation
+            $locked->forceFill([
+                'status' => ManifestStatus::Cancelled,
+                'cancelled_at' => now(),
+                'cancelled_by_type' => 'logistics',
+                'cancelled_by_id' => $provider->id,
+                'cancellation_reason' => trim($reason),
+            ])->save();
+
+            // Record audit log for cancellation
+            if ($request !== null) {
+                ManifestAuditLog::record($provider, 'cancelled', $locked, null, $request, 'manual');
+            }
+
+            return $locked;
+        });
     }
 
     /**
@@ -723,6 +988,24 @@ class ManifestService
             OrderStatus::Returned,
             OrderStatus::Cancelled,
         ];
+    }
+
+    /**
+     * Generate a context-aware next-step message for the user after receiving a manifest item.
+     * Guides the operator on what happens next based on manifest completion and destination hub type.
+     */
+    public function nextStepMessage(Manifest $manifest, ManifestItem $item, bool $isCompleted): string
+    {
+        if (! $isCompleted) {
+            return 'Parcel received. Awaiting receipt of remaining items before this manifest is closed.';
+        }
+
+        // Manifest is complete; provide guidance based on destination hub type
+        if ($manifest->destinationHub?->hub_type === LogisticsHub::PROVINCE) {
+            return 'Manifest complete. Parcels are now in custody at the destination province hub. They will be sorted and distributed to station hubs.';
+        }
+
+        return 'Manifest complete. Parcels are now at their delivery station and ready for courier assignment.';
     }
 
     private function isActiveMembershipViolation(QueryException $e): bool

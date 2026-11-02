@@ -272,7 +272,7 @@ class BuyerSearchTest extends TestCase
     #[DataProvider('pages')]
     public function test_srch_page_links_keep_the_search_and_drop_a_rejected_price(string $route): void
     {
-        foreach (range(1, 13) as $i) {
+        foreach (range(1, 21) as $i) {
             $this->product("Silk Item {$i}");
         }
 

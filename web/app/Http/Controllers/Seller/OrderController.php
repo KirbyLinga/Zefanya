@@ -36,6 +36,7 @@ class OrderController extends Controller
                 'orderItems.product',
                 'courier',
                 'deliveryCourier',
+                'parcelReturn',
             ]);
         $this->firstComeFirstServed($query);
 

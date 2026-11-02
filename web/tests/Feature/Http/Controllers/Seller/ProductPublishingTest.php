@@ -68,7 +68,7 @@ class ProductPublishingTest extends TestCase
         $this->assertSame(1, $product->images()->where('is_primary', true)->count());
         $this->assertSame(2, $product->images()->whereNull('variant_id')->count());
         $this->assertSame(12, $product->images()->whereNotNull('variant_id')->count());
-        $this->assertCount(5, Storage::disk('public')->allFiles());
+        $this->assertCount(5, Storage::disk('public')->allFiles('products'));
         $this->assertDatabaseCount('inventory_transactions', 12);
         foreach (['Black', 'White', 'Beige'] as $color) {
             $paths = $product->variants()->whereHas('optionValues', fn ($query) => $query->where('value', $color))
@@ -254,7 +254,7 @@ class ProductPublishingTest extends TestCase
             $this->assertCount(1, $variant->images);
             Storage::disk('public')->assertExists($variant->images->first()->path);
         }
-        $this->assertCount(5, Storage::disk('public')->allFiles());
+        $this->assertCount(5, Storage::disk('public')->allFiles('products'));
         $this->assertSame(100, $product->fresh()->stock_quantity);
     }
 }

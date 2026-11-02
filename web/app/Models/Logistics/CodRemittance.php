@@ -14,6 +14,9 @@ class CodRemittance extends Model
 
     public const REMITTED_TO_LOGISTICS = 'REMITTED_TO_LOGISTICS';
 
+    /** SQL twin of keptShippingMinor(), for queries joined to seller_orders. */
+    public const KEPT_SHIPPING_SQL = 'CASE WHEN seller_orders.carrier_provider_id IS NOT NULL AND seller_orders.carrier_provider_id <> cod_remittances.logistics_provider_id THEN 0 ELSE seller_orders.shipping_fee_minor END';
+
     protected $fillable = [
         'payment_id',
         'seller_order_id',
@@ -29,6 +32,28 @@ class CodRemittance extends Model
             'confirmed_at' => 'datetime',
             'zefanya_received_at' => 'datetime',
         ];
+    }
+
+    /** Delivered by a company other than the carrier the buyer chose at checkout. */
+    public function isCrossProvider(): bool
+    {
+        $carrierId = $this->sellerOrder?->carrier_provider_id;
+
+        return $carrierId !== null && (int) $carrierId !== (int) $this->logistics_provider_id;
+    }
+
+    /**
+     * Shipping fee the collecting company may keep. A cross-provider fee has no
+     * agreed split yet, so it goes to Zefanya in full, pending allocation.
+     */
+    public function keptShippingMinor(): int
+    {
+        return $this->isCrossProvider() ? 0 : (int) $this->sellerOrder?->shipping_fee_minor;
+    }
+
+    public function dueToZefanyaMinor(): int
+    {
+        return $this->amount_minor - $this->keptShippingMinor();
     }
 
     public function payment(): BelongsTo

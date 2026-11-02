@@ -2,11 +2,8 @@
     PDP Buy-box partial.
     Expects: $product, $price, $variantAxes (null|array), $variantData (null|array)
 --}}
-@use('App\Services\Buyer\BuyerPurchaseLimit')
 @php
-    $purchasedQuantity = (int) ($purchasedQuantity ?? 0);
-    $cartQuantity = (int) ($cartQuantity ?? 0);
-    $quantityMax = max(0, min($product->buyerStockQuantity(), BuyerPurchaseLimit::MAX - $purchasedQuantity - $cartQuantity));
+    $quantityMax = $product->buyerStockQuantity();
 @endphp
 <div class="flex flex-col gap-5 rounded-3xl border border-buyer-line bg-white p-6">
 
@@ -62,7 +59,7 @@
   @endif
 
   {{-- Shared error line: variant validation + Buy Now failures --}}
-  <p id="pdp-variant-error" class="mt-2 hidden text-[11.5px] font-semibold text-red-500" @if ($variantAxes !== null) data-selection-message="Please select a variation" @endif data-limit-message="{{ BuyerPurchaseLimit::MESSAGE }}"></p>
+  <p id="pdp-variant-error" class="mt-2 hidden text-[11.5px] font-semibold text-red-500" @if ($variantAxes !== null) data-selection-message="Please select a variation" @endif></p>
 
   {{-- Low-stock warning (single-SKU products) --}}
   @if ($variantAxes === null && $product->buyerIsLowStock())
@@ -91,6 +88,29 @@
     @endif
   </div>
 
+  <section class="rounded-2xl border border-buyer-line bg-secondary-50 p-4" aria-label="Delivery availability">
+    <h2 class="text-sm font-semibold text-buyer-ink">Delivery to your address</h2>
+    @guest('buyer')
+      <p class="mt-2 text-sm text-buyer-ink-soft">Sign in to check whether this item can be delivered to your address.</p>
+    @else
+      @if (($shippingAvailability['route'] ?? 'incomplete') === 'incomplete')
+        <p class="mt-2 text-sm text-buyer-ink-soft">{{ $deliveryAddressComplete ? 'Delivery availability cannot be confirmed until the seller completes the pickup address.' : 'Add a complete delivery address to check availability.' }}</p>
+      @else
+        <p class="mt-2 text-sm text-buyer-ink-soft">{{ $deliveryAddress }}</p>
+        <p class="mt-2 text-sm font-semibold {{ $shippingAvailability['available'] ? 'text-emerald-700' : 'text-amber-800' }}" role="status" data-delivery-available="{{ $shippingAvailability['available'] ? 'true' : 'false' }}">
+          {{ $shippingAvailability['available'] ? 'Delivery available' : 'Delivery unavailable to this address' }}
+        </p>
+        @unless ($shippingAvailability['available'])
+          <p class="mt-1 text-xs text-buyer-ink-soft">{{ $shippingAvailability['message'] }}</p>
+        @endunless
+        <p class="mt-2 text-xs text-buyer-ink-soft">Checked for your default address. Delivery options are confirmed again at checkout.</p>
+      @endif
+      <a href="{{ route('buyer.account.address') }}" class="mt-2 inline-block text-xs font-semibold text-primary-800 underline">Change delivery address</a>
+    @endguest
+  </section>
+
+  <p class="text-xs leading-relaxed text-buyer-ink-soft">Stock is checked again when you order. Adding an item to your cart does not reserve it. <a href="#returns" class="font-semibold text-primary-800 underline">Delivery and return policy</a></p>
+
   {{-- Quantity + CTA --}}
   <div class="flex flex-col gap-3">
     {{-- Qty stepper --}}
@@ -102,7 +122,7 @@
                 aria-label="Decrease quantity">
           <i data-lucide="minus" width="13" height="13"></i>
         </button>
-        <input id="pdp-qty" type="number" inputmode="numeric" min="1" max="{{ $quantityMax }}" step="1" value="1" aria-label="Quantity" data-purchase-max="{{ BuyerPurchaseLimit::MAX }}" data-purchased="{{ $purchasedQuantity }}" data-cart-total="{{ $cartQuantity }}" data-cart-quantity="{{ $cartQuantity }}" data-limit-message="{{ BuyerPurchaseLimit::MESSAGE }}" @disabled($variantAxes !== null || $quantityMax < 1 || $product->buyerIsOutOfStock() || $product->isOnVacation()) class="w-12 border-0 bg-transparent text-center text-[13px] font-semibold text-buyer-ink">
+        <input id="pdp-qty" type="number" inputmode="numeric" min="1" max="{{ $quantityMax }}" step="1" value="1" aria-label="Quantity" @disabled($variantAxes !== null || $quantityMax < 1 || $product->buyerIsOutOfStock() || $product->isOnVacation()) class="w-12 border-0 bg-transparent text-center text-[13px] font-semibold text-buyer-ink">
         <button type="button" id="pdp-qty-up"
                 class="flex h-8 w-8 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100"
                 aria-label="Increase quantity">

@@ -37,6 +37,11 @@
     @if ($record->exception_reason)
         <p class="mt-3 text-xs text-red-800">Unresolved: {{ $record->exception_reason }}</p>
         <form method="POST" action="{{ route('admin.returns.resolve', $record) }}" class="mt-3 flex flex-wrap gap-2">@csrf<input name="resolution_note" required maxlength="1000" placeholder="Resolution evidence" aria-label="Resolution evidence" class="min-w-0 flex-1 rounded-sm border border-[var(--border-strong)] p-2 text-xs"><button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Record exception resolution</button></form>
+        <form method="POST" action="{{ route('admin.returns.reverse-route', $record) }}" class="mt-3 space-y-2">@csrf
+            <label class="block text-xs text-[var(--text-ink)]" for="reverse-route-{{ $record->id }}">No reverse partnership? Authorize this parcel to go back to the provider that handed it over.</label>
+            <input id="reverse-route-{{ $record->id }}" name="note" required minlength="10" maxlength="1000" placeholder="Why this return is authorized" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+            <button type="submit" class="rounded-sm border border-primary-700 px-3 py-2 text-xs font-semibold text-primary-800">Authorize reverse route</button>
+        </form>
     @else<p class="mt-3 text-xs text-[var(--text-muted)]">No unresolved routing exception. Resolution does not confirm Seller receipt.</p>@endif
     @if (blank($record->seller_address['full'] ?? null) && $record->status->value === 'RETURN_REQUESTED')
         <form method="POST" action="{{ route('admin.returns.origin', $record) }}" class="mt-4 grid gap-2 sm:grid-cols-2">@csrf

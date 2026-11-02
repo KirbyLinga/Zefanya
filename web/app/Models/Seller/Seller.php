@@ -12,6 +12,7 @@ use App\Models\Shared\SellerOrder;
 use Carbon\Carbon;
 use Database\Factories\Seller\SellerFactory;
 use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -66,6 +67,12 @@ class Seller extends Authenticatable
         'remember_token',
         'email_verification_code',
     ];
+
+    /** Approved and not on vacation: the store's products may be promoted to buyers. */
+    public function scopeOpenForBusiness(Builder $query): Builder
+    {
+        return $query->where('status', 'approved')->where('is_on_vacation', false);
+    }
 
     protected function casts(): array
     {

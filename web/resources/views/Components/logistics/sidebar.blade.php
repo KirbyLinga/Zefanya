@@ -12,6 +12,7 @@
             ['route' => 'logistics.parcel-sorting.index', 'icon' => 'archive', 'label' => 'Parcel sorting'],
             ['route' => 'logistics.delivery-assignments.index', 'icon' => 'map-pin', 'label' => 'Assign deliveries'],
             ['route' => 'logistics.delivery-monitoring.index', 'icon' => 'activity', 'label' => 'Delivery tracking'],
+            ['route' => 'logistics.exceptions.index', 'icon' => 'alert-triangle', 'label' => 'Parcel exceptions'],
         ]],
         ['label' => 'More tools', 'items' => [
             ['route' => 'logistics.earnings.index', 'icon' => 'wallet', 'label' => 'Earnings'],
@@ -26,6 +27,7 @@
         ['label' => 'Team & network', 'icon' => 'network', 'collapsible' => true, 'items' => [
             ['route' => 'logistics.riders.index', 'icon' => 'users', 'label' => 'Riders'],
             ['route' => 'logistics.hubs.index', 'icon' => 'network', 'label' => 'Hubs & stations'],
+            ['route' => 'logistics.transport-connections.index', 'icon' => 'route', 'label' => 'Transport connections'],
             ['route' => 'logistics.partnerships.index', 'icon' => 'handshake', 'label' => 'Provider partnerships'],
             ['route' => 'logistics.areas.index', 'icon' => 'map', 'label' => 'Delivery areas'],
             ['route' => 'logistics.shipping-rates.index', 'icon' => 'receipt', 'label' => 'Shipping rates'],

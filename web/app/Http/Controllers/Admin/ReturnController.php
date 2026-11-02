@@ -40,6 +40,14 @@ class ReturnController extends Controller
         return back()->with('success', 'Exception resolution recorded. Custody, Seller receipt and payment states were not changed.');
     }
 
+    public function authorizeReverseRoute(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate(['note' => ['required', 'string', 'min:10', 'max:1000']]);
+        $service->authorizeReverseRoute($request->user('admin'), $return, $data['note']);
+
+        return back()->with('success', 'Reverse route authorized for this parcel. The provider holding it can now request the return handoff.');
+    }
+
     public function resolveDispute(Request $request, ParcelReturn $return, ParcelReturnService $service)
     {
         $data = $request->validate([

@@ -19,6 +19,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Logistics to Zefanya money: a company keeps each parcel's shipping fee and
  * sends Zefanya the rest of the cash. Zefanya confirms what actually arrived.
+ * A cross-provider fee is not kept by anyone; see CodRemittance::keptShippingMinor().
  */
 class LogisticsRemittanceService
 {
@@ -46,7 +47,7 @@ class LogisticsRemittanceService
                 .'WHEN cod_remittances.logistics_remittance_id IS NOT NULL THEN ? ELSE ? END as stage',
                 [CodRemittance::PENDING_REMITTANCE, self::STAGE_RIDER, self::STAGE_SETTLED, self::STAGE_SENT, self::STAGE_READY],
             )
-            ->selectRaw('COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM(seller_orders.shipping_fee_minor) as shipping_minor')
+            ->selectRaw('COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
             ->groupBy('stage')
             ->get();
 
@@ -70,7 +71,7 @@ class LogisticsRemittanceService
     public function unsentByProvider(): Collection
     {
         return $this->withShipping($this->readyQuery(CodRemittance::query()))
-            ->selectRaw('cod_remittances.logistics_provider_id, COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM(seller_orders.shipping_fee_minor) as shipping_minor')
+            ->selectRaw('cod_remittances.logistics_provider_id, COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
             ->groupBy('cod_remittances.logistics_provider_id')
             ->with('provider:id,business_name')
             ->get()
@@ -84,6 +85,22 @@ class LogisticsRemittanceService
     }
 
     /**
+     * Cross-provider shipping fees waiting for a settlement policy to allocate them.
+     *
+     * @return array{parcels: int, shippingMinor: int}
+     */
+    public function pendingAllocation(): array
+    {
+        $row = $this->withShipping(CodRemittance::query())
+            ->whereNotNull('seller_orders.carrier_provider_id')
+            ->whereColumn('seller_orders.carrier_provider_id', '<>', 'cod_remittances.logistics_provider_id')
+            ->selectRaw('COUNT(*) as parcels, COALESCE(SUM(seller_orders.shipping_fee_minor), 0) as shipping_minor')
+            ->first();
+
+        return ['parcels' => (int) $row?->parcels, 'shippingMinor' => (int) $row?->shipping_minor];
+    }
+
+    /**
      * Parcels the company can include in its next payment, oldest first.
      *
      * @return Collection<int, CodRemittance>
@@ -91,7 +108,7 @@ class LogisticsRemittanceService
     public function readyParcels(LogisticsProvider $provider): Collection
     {
         return $this->readyQuery(CodRemittance::query()->where('logistics_provider_id', $provider->getKey()))
-            ->with('sellerOrder:id,tracking_number,shipping_fee_minor')
+            ->with('sellerOrder:id,tracking_number,shipping_fee_minor,carrier_provider_id')
             ->orderBy('id')->get();
     }
 
@@ -120,14 +137,14 @@ class LogisticsRemittanceService
 
             $parcels = $this->readyQuery(CodRemittance::query()->where('logistics_provider_id', $provider->getKey()))
                 ->whereKey(array_unique($parcelIds))
-                ->with('sellerOrder:id,shipping_fee_minor')
+                ->with('sellerOrder:id,shipping_fee_minor,carrier_provider_id')
                 ->orderBy('id')->lockForUpdate()->get();
             if ($parcelIds === [] || $parcels->count() !== count(array_unique($parcelIds))) {
                 throw ValidationException::withMessages(['remittance' => 'One of these parcels can no longer be sent. Check the list and try again.']);
             }
 
             $cod = (int) $parcels->sum('amount_minor');
-            $shipping = (int) $parcels->sum(fn (CodRemittance $parcel): int => (int) $parcel->sellerOrder?->shipping_fee_minor);
+            $shipping = (int) $parcels->sum(fn (CodRemittance $parcel): int => $parcel->keptShippingMinor());
             $amount = $cod - $shipping;
             if ($amount !== $expectedMinor) {
                 throw ValidationException::withMessages(['remittance' => 'The amount due changed. Check the new amount before recording your payment.']);

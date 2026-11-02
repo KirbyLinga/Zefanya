@@ -203,7 +203,25 @@ class ParcelTrackingVerificationService
             ];
         }
 
-        if ($order->status === OrderStatus::AtSortingCenter && $stationHubId !== null) {
+        /** @var RouteExecutionService $execution */
+        $execution = app(RouteExecutionService::class);
+        $sortingBlocked = $order->status === OrderStatus::AtSortingCenter ? $execution->sortingBlockedReason($order) : null;
+
+        if ($sortingBlocked !== null) {
+            $context = 'transfer';
+            $next = ($route = $order->parcelRoute()->first()) !== null ? $execution->nextDestination($route) : null;
+
+            if ($next !== null && $execution->currentLocation($route) !== null) {
+                $internal = (int) $next->logistics_provider_id === (int) $provider->id;
+                $actions[] = [
+                    'key' => $internal ? 'open_manifests' : 'open_handoffs',
+                    'label' => ($internal ? 'Create manifest to ' : 'Request handoff to ').$next->name,
+                    'method' => 'GET',
+                    'url' => route($internal ? 'logistics.manifests.create' : 'logistics.handoffs.index'),
+                    'confirm_message' => null,
+                ];
+            }
+        } elseif ($order->status === OrderStatus::AtSortingCenter && $stationHubId !== null) {
             $context = 'sorting';
             $token = $this->parcelVerify->issueForLogistics(
                 $provider,
@@ -240,6 +258,7 @@ class ParcelTrackingVerificationService
             'context' => $context,
             'message' => match ($context) {
                 'station_receipt' => 'Parcel verified. Confirm receipt to receive it at the hub.',
+                'transfer' => $sortingBlocked,
                 'sorting' => 'Parcel already received at the hub. You may proceed with sorting.',
                 'assign_delivery' => 'Parcel already received and sorted. Open Parcel Sorting to assign a delivery rider.',
                 default => 'Scan blocked: no hub receipt or sorting action is allowed while this parcel is '.$order->status->label().'.',

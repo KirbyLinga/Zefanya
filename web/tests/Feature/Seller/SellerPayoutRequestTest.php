@@ -545,7 +545,8 @@ class SellerPayoutRequestTest extends TestCase
         $this->postJson(route('seller.payout-requests.store'), $this->submission('100'))->assertUnauthorized();
         $seller = Seller::factory()->pending()->create();
         $this->actingAs($seller, 'seller')->post(route('seller.payout-requests.store'), $this->submission('100'))
-            ->assertRedirect();
+            ->assertForbidden()->assertSee('under review');
+        $this->assertAuthenticatedAs($seller, 'seller');
 
         $this->assertDatabaseCount('seller_payout_requests', 0);
     }

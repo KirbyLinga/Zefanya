@@ -17,6 +17,7 @@ use App\Models\Shared\OrderItem;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
+use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -287,8 +288,13 @@ class F2ScanEnforcedLifecycleTest extends TestCase
             ->assertOk()
             ->json('actions.0.verification_token');
 
+        $this->post(route('rider.deliveries.otp', $parcel), ['verification_token' => $podToken])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $code = Notification::sent($this->buyer, DeliveryOtpCode::class)->sole()->code;
+
         $this->actingAs($this->rider, 'rider')
             ->post(route('rider.deliveries.deliver', $parcel), [
+                'delivery_otp' => $code,
                 'verification_token' => $podToken,
                 'proof_photo' => UploadedFile::fake()->create('pod.jpg', 120, 'image/jpeg'),
                 'received_by' => 'Buyer',

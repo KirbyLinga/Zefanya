@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -199,6 +200,45 @@ class Product extends Model
         return $query->where('status', 'active')->whereNull('restriction_reason')->whereHas('purchasableVariants');
     }
 
+    /** The one rule for promoted listings; a seller's storefront and direct links do not use it. */
+    public function scopeFromOpenStore(Builder $query): Builder
+    {
+        return $query->whereHas('seller', fn ($seller) => $seller->openForBusiness());
+    }
+
+    /** Buyable now and promoted across the catalog. Returns on its own when a store reopens. */
+    public function scopeDiscoverable(Builder $query): Builder
+    {
+        return $query->activeInStock()->fromOpenStore();
+    }
+
+    /**
+     * SQL twin of a non-null ResolvedPrice::badge(), so the filter can paginate:
+     * a purchasable variant must really cost less under the running sale, which
+     * still has slots if it is a flash sale. Keep in step with PriceResolver.
+     */
+    public function scopeWithRealSaleDiscount(Builder $query): Builder
+    {
+        return $query->whereExists(
+            ProductVariant::query()
+                ->join('store_sales', 'store_sales.product_id', '=', 'product_variants.product_id')
+                ->whereColumn('product_variants.product_id', $this->getTable().'.id')
+                ->where('product_variants.is_available', true)->where('product_variants.stock_quantity', '>', 0)
+                ->where('store_sales.starts_at', '<=', now())
+                ->where('store_sales.ends_at', '>', now())
+                ->where(fn ($query) => $query->whereNull('store_sales.variant_id')
+                    ->orWhereColumn('store_sales.variant_id', 'product_variants.id'))
+                ->where($this->saleHasFlashSlots())
+                ->whereRaw(
+                    'CASE
+                        WHEN store_sales.type = ? THEN ROUND(product_variants.price * store_sales.value / 100, 2) > 0
+                        ELSE store_sales.value < ROUND(product_variants.price * 100)
+                    END',
+                    [StoreSaleType::Percent->value],
+                )
+        );
+    }
+
     /** Price filters and both sort directions use the advertised starting price. */
     public function scopeWithBuyerPriceFilters(Builder $query, array $filters): Builder
     {
@@ -220,8 +260,8 @@ class Product extends Model
     /**
      * SQL twin of PriceResolver for sorting and filtering, which cannot run PHP
      * per row. Keep the two in step: the joined sale is the one that applies to
-     * the variant, percent discounts round to the centavo, and a fixed price
-     * never raises the regular price.
+     * the variant and still has flash slots, percent discounts round to the
+     * centavo, and a fixed price never raises the regular price.
      */
     private function buyerStartingPriceQuery(): Builder
     {
@@ -240,10 +280,23 @@ class Product extends Model
                     ->where('store_sales.starts_at', '<=', now())
                     ->where('store_sales.ends_at', '>', now())
                     ->where(fn ($query) => $query->whereNull('store_sales.variant_id')
-                        ->orWhereColumn('store_sales.variant_id', 'product_variants.id'));
+                        ->orWhereColumn('store_sales.variant_id', 'product_variants.id'))
+                    ->where($this->saleHasFlashSlots());
             })
             ->whereColumn('product_variants.product_id', $this->getTable().'.id')
             ->where('product_variants.is_available', true)->where('product_variants.stock_quantity', '>', 0);
+    }
+
+    /** SQL twin of OfferPricing::slotsLeft(): a sold-out flash sale stops discounting. */
+    private function saleHasFlashSlots(): \Closure
+    {
+        $unitsSold = OrderItem::query()
+            ->whereColumn('order_items.store_sale_id', 'store_sales.id')
+            ->whereHas('sellerOrder', fn ($query) => $query->where('status', '!=', OrderStatus::Cancelled->value))
+            ->selectRaw('COALESCE(SUM(order_items.quantity), 0)');
+
+        return fn ($query) => $query->whereNull('store_sales.flash_quantity')
+            ->orWhere($unitsSold, '<', DB::raw('store_sales.flash_quantity'));
     }
 
     public function buyerStockQuantity(): int
@@ -301,7 +354,7 @@ class Product extends Model
         return $this->buyerPrice()?->formatted() ?? 'Unavailable';
     }
 
-    public function catalogImageUrl(?Collection $images = null, bool $requireExistingFile = true): ?string
+    public function catalogImageUrl(?Collection $images = null, bool $requireExistingFile = true, bool $thumbnail = false): ?string
     {
         $disk = Storage::disk('public');
         $image = ($images ?? $this->images)->sortByDesc('is_primary')
@@ -316,12 +369,13 @@ class Product extends Model
         if ($image === null) {
             return null;
         }
-        $url = $disk->url($image->path);
+        $path = $thumbnail && filled($image->thumbnail_path) ? $image->thumbnail_path : $image->path;
+        $url = $disk->url($path);
 
         // Local uploads are served by this site; never send buyers to the
         // configured development host (for example localhost:8000).
         return config('filesystems.disks.public.driver') === 'local'
-            ? (parse_url($url, PHP_URL_PATH) ?: '/storage/'.ltrim($image->path, '/'))
+            ? (parse_url($url, PHP_URL_PATH) ?: '/storage/'.ltrim($path, '/'))
             : $url;
     }
 

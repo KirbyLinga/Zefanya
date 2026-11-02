@@ -116,7 +116,7 @@
 
     @if ($metricResults !== null)
         <section id="metric-results" class="mb-6 scroll-mt-5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
-            <h2 class="text-base font-semibold text-[var(--text-ink)]">{{ ['hub' => 'Parcels in hub', 'transit' => 'Parcels in transit', 'delivered' => 'Delivered parcels', 'riders' => 'Available fleet riders'][$metric] }} ({{ $metricResults->total() }})</h2>
+            <h2 class="text-base font-semibold text-[var(--text-ink)]">{{ ['hub' => 'Parcels in hub', 'transit' => 'Parcels in transit', 'delivered' => 'Delivered parcels', 'riders' => 'Available fleet riders', 'stalled' => 'Shipments with no update for 24 hours'][$metric] }} ({{ $metricResults->total() }})</h2>
             <p class="mt-1 text-xs text-[var(--text-muted)]">Matches the selected dashboard card and filters.</p>
             <ul class="mt-4 divide-y divide-[var(--border-strong)]">
                 @forelse ($metricResults as $result)
@@ -125,7 +125,7 @@
                             <span class="font-semibold text-[var(--text-ink)]">{{ $result->name }}</span>
                             <span class="rounded-full bg-teal-50 px-3 py-1 text-xs text-teal-900">Available</span>
                         @else
-                            <span class="font-mono text-[var(--text-ink)]">{{ $result->tracking_number ?? 'Order #'.$result->id }}</span>
+                            <a href="{{ route('logistics.delivery-monitoring.show', $result) }}" class="font-mono font-semibold text-[var(--text-ink)] underline">{{ $result->tracking_number ?? 'Order #'.$result->id }}</a>
                             <span class="rounded-full bg-primary-50 px-3 py-1 text-xs text-primary-900">{{ $result->status->label() }}</span>
                         @endif
                     </li>
@@ -138,23 +138,23 @@
     @endif
     <div class="grid grid-cols-[2fr_1fr] gap-5 mb-5 max-lg:grid-cols-1">
 
-        {{-- ======================= DELIVERY ACTIVITY ====================== --}}
-        {{-- Mirrors the seller dashboard's sales chart: a placeholder chart is
-             NOT rendered — it would read as fake data, so an empty state
-             stands in until the delivery pipeline exists. --}}
-        <section class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm flex flex-col">
-            <div class="flex items-center justify-between mb-5">
-                <h2 class="font-sans text-base font-semibold text-[var(--text-ink)]">Delivery activity</h2>
-                <span class="font-sans text-[11.5px] font-semibold text-[var(--text-muted)] bg-[var(--bg-chip)] rounded-full px-1 px-3">Last 7 days</span>
+        <section class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm" aria-label="Operational queues">
+            <h2 class="text-base font-semibold text-[var(--text-ink)]">Work needing attention</h2>
+            <p class="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">Queues use the selected facility and the last update date filters. Incoming transfers remain with their sending provider until verified receipt.</p>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                @foreach ($actionQueues as $queue)
+                    <a href="{{ $queue['url'] }}" data-operation-queue="{{ $queue['key'] }}" data-queue-count="{{ $queue['count'] }}" class="rounded-lg border border-[var(--border-strong)] p-3 text-sm no-underline transition-colors hover:border-primary-700 focus-visible:outline-2 focus-visible:outline-primary-700">
+                        <span class="block font-semibold text-[var(--text-ink)]">{{ $queue['label'] }}</span>
+                        <span class="mt-1 block text-2xl font-semibold tabular-nums text-[var(--text-ink)]">{{ number_format($queue['count']) }}</span>
+                        <span class="mt-1 block text-xs leading-relaxed text-[var(--text-muted)]">{{ $queue['hint'] }}</span>
+                    </a>
+                @endforeach
             </div>
-
-            <div class="flex flex-col items-center justify-center text-center p-10 px-4">
-                <i data-lucide="line-chart" class="w-[28px] h-[28px] text-[var(--icon-soft)] mb-3"></i>
-                <p class="font-sans text-sm font-semibold text-[var(--text-ink)] mb-1">No delivery data yet</p>
-                <p class="font-sans text-[12.5px] text-[var(--text-muted)] max-w-[320px]">
-                    Delivery trends will appear here once parcels start moving through your hub.
-                </p>
-            </div>
+            @if (collect($actionQueues)->sum('count') === 0)
+                <p class="mt-4 text-sm font-semibold text-[var(--text-ink)]">No pending operational work matches these filters.</p>
+                @if ($recentParcels->isEmpty())<p class="mt-1 text-xs text-[var(--text-muted)]">No delivery data yet</p>@endif
+                <a href="{{ route('logistics.dashboard') }}" class="mt-2 inline-block text-sm font-semibold text-primary-800 underline">View all facilities and dates</a>
+            @endif
         </section>
 
         {{-- ======================= RIDER APPLICATIONS ===================== --}}

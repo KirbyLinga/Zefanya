@@ -50,9 +50,22 @@
                 <label for="destination_hub_id" class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)]">Destination hub</label>
                 <select id="destination_hub_id" name="destination_hub_id" required class="w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-page)] px-3 py-2.5 font-sans text-[13px] text-[var(--text-ink)]">
                     <option value="">Select where these parcels are going</option>
-                    @foreach ($hubs as $hub)
-                        <option value="{{ $hub->id }}" @selected((string) old('destination_hub_id') === (string) $hub->id)>{{ $hub->name }} — {{ $hub->hub_type === \App\Models\Logistics\LogisticsHub::PROVINCE ? 'Province Hub' : 'Station Hub' }}</option>
-                    @endforeach
+                    @if ($recentDestinations->count())
+                        <optgroup label="Recently used from this origin">
+                            @foreach ($recentDestinations as $hub)
+                                <option value="{{ $hub->id }}" @selected((string) old('destination_hub_id') === (string) $hub->id)>{{ $hub->name }} — {{ $hub->hub_type === \App\Models\Logistics\LogisticsHub::PROVINCE ? 'Province Hub' : 'Station Hub' }}</option>
+                            @endforeach
+                        </optgroup>
+                        <optgroup label="All hubs">
+                            @foreach ($hubs as $hub)
+                                <option value="{{ $hub->id }}" @selected((string) old('destination_hub_id') === (string) $hub->id)>{{ $hub->name }} — {{ $hub->hub_type === \App\Models\Logistics\LogisticsHub::PROVINCE ? 'Province Hub' : 'Station Hub' }}</option>
+                            @endforeach
+                        </optgroup>
+                    @else
+                        @foreach ($hubs as $hub)
+                            <option value="{{ $hub->id }}" @selected((string) old('destination_hub_id') === (string) $hub->id)>{{ $hub->name }} — {{ $hub->hub_type === \App\Models\Logistics\LogisticsHub::PROVINCE ? 'Province Hub' : 'Station Hub' }}</option>
+                        @endforeach
+                    @endif
                 </select>
                 @error('destination_hub_id')<p class="mt-1 font-sans text-[11px] text-rose-700">{{ $message }}</p>@enderror
             </div>
@@ -69,4 +82,63 @@
         </div>
     </form>
 @endif
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const originSelect = document.getElementById('origin_hub_id');
+        const destinationSelect = document.getElementById('destination_hub_id');
+        
+        if (!originSelect || !destinationSelect) return;
+        
+        originSelect.addEventListener('change', async function () {
+            const originHubId = this.value;
+            
+            if (!originHubId) {
+                // Reset to full hub list if origin is cleared
+                location.reload();
+                return;
+            }
+            
+            try {
+                const response = await fetch(
+                    '{{ route("logistics.manifests.suggest-destinations") }}?origin_hub_id=' + originHubId
+                );
+                const data = await response.json();
+                
+                if (data.suggestions && data.suggestions.length > 0) {
+                    // Rebuild destination select with recent suggestions
+                    const currentValue = destinationSelect.value;
+                    destinationSelect.innerHTML = '<option value="">Select where these parcels are going</option>';
+                    
+                    // Add recent destinations group
+                    const recentGroup = document.createElement('optgroup');
+                    recentGroup.label = 'Recently used from this origin';
+                    data.suggestions.forEach(hub => {
+                        const option = document.createElement('option');
+                        option.value = hub.id;
+                        option.textContent = hub.name + ' — ' + hub.type_label;
+                        recentGroup.appendChild(option);
+                    });
+                    destinationSelect.appendChild(recentGroup);
+                    
+                    // Add all hubs group
+                    const allGroup = document.createElement('optgroup');
+                    allGroup.label = 'All hubs';
+                    @json($hubs->map(fn ($hub) => ['id' => $hub->id, 'label' => $hub->name.' — '.($hub->hub_type === \App\Models\Logistics\LogisticsHub::PROVINCE ? 'Province Hub' : 'Station Hub')])->values()).forEach(hub => {
+                        const allOption = document.createElement('option');
+                        allOption.value = hub.id;
+                        allOption.textContent = hub.label;
+                        allGroup.appendChild(allOption);
+                    });
+                    destinationSelect.appendChild(allGroup);
+                    
+                    // Restore previous selection if still valid
+                    if (currentValue) destinationSelect.value = currentValue;
+                }
+            } catch (error) {
+                console.error('Error fetching destination suggestions:', error);
+            }
+        });
+    });
+</script>
 @endsection

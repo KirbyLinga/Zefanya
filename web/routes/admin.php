@@ -125,6 +125,7 @@ Route::middleware('auth:admin')->group(function () {
             Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
             Route::post('/returns/{return}/origin', [ReturnController::class, 'verifyOrigin'])->name('returns.origin');
             Route::post('/returns/{return}/resolve', [ReturnController::class, 'resolve'])->name('returns.resolve');
+            Route::post('/returns/{return}/reverse-route', [ReturnController::class, 'authorizeReverseRoute'])->name('returns.reverse-route');
             Route::post('/returns/{return}/dispute', [ReturnController::class, 'resolveDispute'])->name('returns.dispute');
             Route::post('/returns/{return}/refund', [ReturnController::class, 'recordRefund'])->name('returns.refund');
             Route::post('/returns/{return}/stock', [ReturnController::class, 'stock'])->name('returns.stock');

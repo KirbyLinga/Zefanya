@@ -410,6 +410,39 @@ class MobileRiderRegistrationTest extends TestCase
         $this->assertSame('pending', $rider->fresh()->status);
     }
 
+    public function test_foreign_rejection_is_not_found_whatever_the_reason_and_changes_nothing(): void
+    {
+        [$rider] = $this->pending();
+        $url = route('api.logistics.rider-applications.reject', $rider);
+        $this->actingAs(LogisticsProvider::factory()->create(['status' => 'approved']), 'logistics');
+
+        foreach ([[], ['reason' => 'Short'], ['reason' => 'Document is unreadable.']] as $payload) {
+            $this->postJson($url, $payload)->assertNotFound()->assertJsonMissingPath('errors')
+                ->assertDontSee($rider->email)->assertDontSee($rider->license_no);
+        }
+        $this->assertDatabaseHas('riders', ['id' => $rider->id, 'status' => 'pending', 'rejection_reason' => null, 'decided_by' => null]);
+    }
+
+    public function test_guests_and_unapproved_logistics_cannot_reject_applications(): void
+    {
+        [$rider] = $this->pending();
+        $url = route('api.logistics.rider-applications.reject', $rider);
+        $this->postJson($url, ['reason' => 'Document is unreadable.'])->assertUnauthorized();
+        $rider->provider->forceFill(['status' => 'pending'])->save();
+
+        $this->actingAs($rider->provider, 'logistics')->postJson($url, ['reason' => 'Document is unreadable.'])->assertForbidden();
+        $this->assertSame('pending', $rider->fresh()->status);
+    }
+
+    public function test_owner_cannot_reject_an_application_in_an_invalid_state(): void
+    {
+        [$rider] = $this->register();
+
+        $this->actingAs($rider->provider, 'logistics')->postJson(route('api.logistics.rider-applications.reject', $rider), ['reason' => 'Document is unreadable.'])
+            ->assertUnprocessable()->assertJsonValidationErrors(['status']);
+        $this->assertSame('unverified', $rider->fresh()->status);
+    }
+
     public static function nonLogisticsRoles(): array
     {
         return ['buyer' => [Buyer::class, 'buyer'], 'seller' => [Seller::class, 'seller'], 'admin' => [Admin::class, 'admin'], 'rider' => [Rider::class, 'rider']];
@@ -461,8 +494,9 @@ class MobileRiderRegistrationTest extends TestCase
     public function test_pending_riders_cannot_access_existing_rider_protected_routes(): void
     {
         [$rider] = $this->pending();
-        $this->actingAs($rider, 'rider')->get(route('rider.dashboard'))->assertRedirect();
-        $this->assertGuest('rider');
+        $this->actingAs($rider, 'rider')->get(route('rider.dashboard'))
+            ->assertForbidden()->assertSee('Your account is under review');
+        $this->assertAuthenticatedAs($rider, 'rider');
         $this->assertSame('pending', $rider->fresh()->status);
     }
 

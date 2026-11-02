@@ -3,7 +3,9 @@
 namespace Tests\Feature\Seller;
 
 use App\Models\Seller\Seller;
+use App\Notifications\Seller\LowStockAlert;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -64,12 +66,17 @@ class SellerDashboardHeroTest extends TestCase
 
     public function test_hero_contains_notification_bell_with_correct_aria_label(): void
     {
-        $response = $this->actingAs($this->approvedSeller(), 'seller')
+        $seller = $this->approvedSeller();
+        $response = $this->actingAs($seller, 'seller')
             ->get(route('seller.dashboard'));
 
         $response->assertOk();
-        $response->assertSee('aria-label="Notifications"', false);
+        $response->assertSee('aria-label="Notifications, 0 unread"', false);
         $response->assertSee('aria-haspopup="true"', false);
+        $response->assertSee('aria-controls="sp-notif-dropdown"', false);
+
+        $seller->notifications()->create(['id' => (string) Str::uuid(), 'type' => LowStockAlert::class, 'data' => ['type' => 'low_stock', 'title' => 'Low stock', 'message' => 'Only 2 left.']]);
+        $this->get(route('seller.dashboard'))->assertSee('aria-label="Notifications, 1 unread"', false);
     }
 
     public function test_dashboard_shows_empty_state_when_there_are_no_notifications(): void
@@ -82,7 +89,7 @@ class SellerDashboardHeroTest extends TestCase
         // Blade emits hardcoded text verbatim — no entity encoding on apostrophes.
         // assertSee($value, false) searches the raw HTML string.
         $response->assertSee("You're all caught up", false);
-        $response->assertSee('New order alerts will show up here.', false);
+        $response->assertSee('Low-stock alerts and store updates will show up here.', false);
         $response->assertSee('data-notif-empty', false);
     }
 

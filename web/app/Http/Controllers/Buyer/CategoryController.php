@@ -44,10 +44,9 @@ class CategoryController extends Controller
         $preservedFilters = request()->only(['min_price', 'max_price']);
 
         $query = Product::query()->withBuyerCardData()
-            ->activeInStock()
+            ->discoverable()
             ->where('category_id', $category->id)
             ->with(['images', 'seller', 'category'])
-            ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
             ->withBuyerPriceFilters($preservedFilters + ['sort' => $sort]);
 
         if ($sort === 'popular') {

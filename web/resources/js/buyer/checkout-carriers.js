@@ -20,6 +20,10 @@
         var root = document.querySelector('[data-checkout-carriers]');
         if (!root) return;
 
+        var submitting = false;
+        var merchandiseSavings = parseInt(root.getAttribute('data-merchandise-savings-minor') || '0', 10) || 0;
+        var savingsRow = document.querySelector('[data-checkout-savings-row]');
+        var savingsEl = document.querySelector('[data-checkout-savings]');
         var merchandise = parseInt(root.getAttribute('data-merchandise-minor') || '0', 10) || 0;
         var shippingVoucherType = root.getAttribute('data-shipping-voucher-type') || '';
         var shippingVoucherValue = parseInt(root.getAttribute('data-shipping-voucher-value') || '0', 10) || 0;
@@ -68,7 +72,7 @@
             var discount = blocked ? 0 : shippingDiscount(grossShipping);
             var netShipping = blocked ? 0 : Math.max(0, grossShipping - discount);
             if (shippingEl) {
-                shippingEl.textContent = blocked ? 'Select a carrier' : pesos(netShipping);
+                shippingEl.textContent = blocked ? 'Select a carrier' : pesos(grossShipping);
             }
             if (shippingDiscountRow) {
                 shippingDiscountRow.hidden = blocked || discount <= 0;
@@ -84,8 +88,10 @@
                     ? payableLabel(merchandise)
                     : payableLabel(merchandise + netShipping);
             }
+            if (savingsRow) savingsRow.hidden = merchandiseSavings + discount <= 0;
+            if (savingsEl) savingsEl.textContent = payableLabel(merchandiseSavings + discount);
             placeButtons.forEach(function (btn) {
-                btn.disabled = blocked || merchandise === 0;
+                btn.disabled = submitting || blocked || merchandise === 0;
                 var label = btn.querySelector('[data-checkout-place-label]');
                 if (label && !blocked) {
                     label.textContent = 'Place Order — ' + payableLabel(merchandise + netShipping);
@@ -104,6 +110,22 @@
             }
         });
 
+        root.addEventListener('submit', function (event) {
+            if (submitting) { event.preventDefault(); return; }
+            if (selectedShippingMinor() === null || merchandise === 0) { event.preventDefault(); refresh(); return; }
+            submitting = true;
+            root.setAttribute('aria-busy', 'true');
+            placeButtons.forEach(function (button) {
+                button.disabled = true;
+                var label = button.querySelector('[data-checkout-place-label]');
+                if (label) label.textContent = 'Placing order...';
+            });
+        });
+        window.addEventListener('pageshow', function () {
+            submitting = false;
+            root.setAttribute('aria-busy', 'false');
+            refresh();
+        });
         refresh();
     }
 

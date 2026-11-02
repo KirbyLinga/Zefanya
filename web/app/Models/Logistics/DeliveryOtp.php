@@ -8,10 +8,10 @@ class DeliveryOtp extends Model
 {
     protected $guarded = ['*'];
 
-    protected $hidden = ['code_hash'];
+    protected $hidden = ['code_hash', 'code_encrypted'];
 
     protected function casts(): array
     {
-        return ['expires_at' => 'datetime', 'sent_at' => 'datetime', 'used_at' => 'datetime', 'attempts' => 'integer'];
+        return ['code_encrypted' => 'encrypted', 'expires_at' => 'datetime', 'sent_at' => 'datetime', 'used_at' => 'datetime', 'attempts' => 'integer'];
     }
 }

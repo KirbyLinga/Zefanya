@@ -11,6 +11,7 @@
     @if (trim((string) $description) !== '')
       <a href="#description" aria-current="false" class="{{ $specTabClass }}">Description</a>
     @endif
+    <a href="#returns" aria-current="false" class="{{ $specTabClass }}">Returns</a>
     <a href="#reviews" aria-current="false" class="{{ $specTabClass }}">Reviews <span class="ml-1 text-[12px] font-normal text-buyer-ink-soft">{{ number_format($product->reviews_count) }}</span></a>
   </nav>
 
@@ -66,4 +67,18 @@
       <p class="whitespace-pre-line text-[14px] leading-relaxed text-buyer-ink-soft">{{ $description }}</p>
     </div>
   @endif
+  <div id="returns" class="scroll-mt-24 border-t border-buyer-line px-5 py-4">
+    <h2 class="mb-2 font-serif text-[15px] font-semibold text-buyer-ink">Delivery and returns</h2>
+    <p class="text-sm leading-relaxed text-buyer-ink-soft">Check delivery availability above for your saved address. Carrier options and shipping fees are confirmed at checkout.</p>
+    <p class="mt-2 text-sm leading-relaxed text-buyer-ink-soft">Request an eligible return from My Orders within {{ intdiv(\App\Services\Buyer\AutomaticBuyerReceiptService::WAIT_HOURS, 24) }} days of verified delivery, before confirming receipt. Add a description and 1 to 5 clear JPG or PNG photos. The seller reviews the request; an approved return follows the existing collection and return process.</p>
+    <details class="mt-3 text-sm text-buyer-ink-soft">
+      <summary class="cursor-pointer font-semibold text-primary-800">Eligible return reasons</summary>
+      <ul class="mt-2 list-disc space-y-1 pl-5">
+        @foreach (\App\Services\Logistics\ParcelReturnService::BUYER_REASONS as $reason)
+          <li>{{ $reason }}</li>
+        @endforeach
+      </ul>
+    </details>
+    @auth('buyer')<a href="{{ route('buyer.orders.index') }}" class="mt-3 inline-block text-sm font-semibold text-primary-800 underline">Manage returns in My Orders</a>@endauth
+  </div>
 </section>

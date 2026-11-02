@@ -178,7 +178,10 @@ trait BootstrapsCrossProviderHandoffs
             'tracking_number' => $trackingNumber,
         ]);
 
-        $parcel->forceFill(['status' => $status->value])->save();
+        $parcel->forceFill([
+            'status' => $status->value,
+            'handover_at' => now(),  // Pickup confirmed
+        ])->save();
 
         return $parcel->fresh(['order.buyer', 'seller']);
     }

@@ -40,7 +40,7 @@
             function searchUrl() {
                 const current = new URL(window.location.href);
                 const destination = new URL('/buyer/products', current);
-                ['category', 'seller', 'sort', 'min_price', 'max_price'].forEach(key => {
+                ['category', 'seller', 'sort', 'min_price', 'max_price', 'on_sale'].forEach(key => {
                     if (current.searchParams.has(key)) destination.searchParams.set(key, current.searchParams.get(key));
                 });
                 const category = current.pathname.match(/^\/buyer\/categories\/(\d+)\/?$/)?.[1];

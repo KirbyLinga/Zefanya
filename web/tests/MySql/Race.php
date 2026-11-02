@@ -60,7 +60,7 @@ final class Race
     public static function run(array $a, array $b, bool $bothHeld = false, bool $rejectionWithoutLock = false): array
     {
         $runRoot = match ($a['action'] ?? '') {
-            'dispatch' => '/storage/logs/phase6-races/', 'payout_request', 'settlement' => '/storage/logs/payout-races/', 'return_request', 'return_receipt' => '/storage/logs/phase7-races/', default => '/.codex/t05-runs/'
+            'dispatch', 'phase6_reroute', 'phase6_receive' => '/storage/logs/phase6-races/', 'payout_request', 'settlement' => '/storage/logs/payout-races/', 'return_request', 'return_receipt' => '/storage/logs/phase7-races/', default => '/.codex/t05-runs/'
         };
         $directory = dirname(__DIR__, 2).$runRoot.bin2hex(random_bytes(8));
         mkdir($directory, 0700, true);
@@ -103,6 +103,7 @@ final class Race
                             'variant' => str_contains($sql, 'from `product_variants`') && str_contains($sql, 'for update'),
                             'seller' => str_contains($sql, 'from `sellers`') && str_contains($sql, 'for update'),
                             'token' => str_starts_with($sql, 'update `checkout_tokens`'),
+                            'cartread' => str_contains($sql, 'from `cart_items`') && str_contains($sql, 'for update'),
                             'cartwrite' => str_starts_with($sql, 'update `cart_items`'),
                             default => false,
                         };
