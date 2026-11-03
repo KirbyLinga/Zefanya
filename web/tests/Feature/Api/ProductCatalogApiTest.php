@@ -209,7 +209,7 @@ class ProductCatalogApiTest extends TestCase
     public function test_an_unapproved_sellers_product_is_neither_listed_nor_openable(): void
     {
         [$product] = $this->product();
-        $product->seller->update(['status' => 'pending_approval']);
+        $product->seller->forceFill(['status' => 'pending_approval'])->save();
 
         // Not a 403: a shop window says "not here" about an item it will not show,
         // and a 403 would confirm the id exists.

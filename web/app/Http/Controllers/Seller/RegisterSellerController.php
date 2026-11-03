@@ -20,7 +20,7 @@ class RegisterSellerController extends Controller
         $idPath = $request->file('upload_id')->store('seller-ids', 'local');
         $permitPath = $request->file('business_permit')->store('business-permits', 'local');
 
-        $seller = Seller::create([
+        $seller = new Seller([
             'last_name' => $data['last_name'],
             'first_name' => $data['first_name'],
             'middle_initial' => $data['middle_initial'] ?? null,
@@ -44,8 +44,11 @@ class RegisterSellerController extends Controller
             'line_of_business_id' => $data['line_of_business_id'],
             'upload_id_path' => $idPath,
             'business_permit_path' => $permitPath,
-            'status' => 'pending_verification',
         ]);
+
+        // status is guarded — set explicitly, never via mass-assignment.
+        $seller->status = 'pending_verification';
+        $seller->save();
 
         $otp = $seller->issueOtp();
         $seller->notify(new SellerRegistrationOtp($otp));

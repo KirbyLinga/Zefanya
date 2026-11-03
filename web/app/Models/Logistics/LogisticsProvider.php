@@ -44,7 +44,6 @@ class LogisticsProvider extends Authenticatable
         'license_path',
         'or_cr_path',
         'dti_permit_path',
-        'status',
         'is_online',
         'reverification_required',
         // Set only by the admin approval/rejection actions (never from request
@@ -53,6 +52,14 @@ class LogisticsProvider extends Authenticatable
         'rejection_reason',
         'approved_by',
         'approved_at',
+    ];
+
+    /** @var list<string> */
+    protected $guarded = [
+        'status',
+        'email_verified_at',
+        'is_admin',
+        'role',
     ];
 
     protected $hidden = [

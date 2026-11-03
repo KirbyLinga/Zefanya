@@ -38,7 +38,14 @@ class Seller extends Authenticatable
         'line_of_business_id',
         'upload_id_path',
         'business_permit_path',
+    ];
+
+    /** @var list<string> */
+    protected $guarded = [
         'status',
+        'email_verified_at',
+        'is_admin',
+        'role',
     ];
 
     protected $hidden = [

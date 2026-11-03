@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Database\Factories\BuyerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
@@ -51,7 +52,14 @@ class Buyer extends Authenticatable
         'upload_id_path',
         'email_verification_code',
         'email_verification_expires_at',
+    ];
+
+    /** @var list<string> */
+    protected $guarded = [
         'status',
+        'email_verified_at',
+        'is_admin',
+        'role',
     ];
 
     protected $hidden = [
@@ -128,7 +136,7 @@ class Buyer extends Authenticatable
         return $this->hasMany(BuyerAddress::class);
     }
 
-    public function defaultAddress(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function defaultAddress(): HasOne
     {
         return $this->hasOne(BuyerAddress::class)->where('is_default', true);
     }
@@ -306,7 +314,7 @@ class Buyer extends Authenticatable
      */
     public static function createFromRegistration(array $data, string $uploadIdPath): self
     {
-        return static::create([
+        $buyer = new static([
             'last_name' => $data['last_name'],
             'first_name' => $data['first_name'],
             'middle_initial' => $data['middle_initial'] ?? null,
@@ -327,7 +335,12 @@ class Buyer extends Authenticatable
             'house_number' => $data['house_number'] ?? null,
             'address_detail' => $data['address_detail'] ?? null,
             'upload_id_path' => $uploadIdPath,
-            'status' => 'pending_verification',
         ]);
+
+        // status and email_verified_at are guarded: set explicitly, not via mass-assignment.
+        $buyer->status = 'pending_verification';
+        $buyer->save();
+
+        return $buyer;
     }
 }

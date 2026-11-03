@@ -89,12 +89,12 @@ class RegistrationController extends Controller
 
     public function approveBuyer(Buyer $buyer)
     {
-        $buyer->update([
+        $buyer->forceFill([
             'status' => 'approved',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => null,
-        ]);
+        ])->save();
 
         $buyer->notify(new BuyerRegistrationDecision('approved'));
 
@@ -107,12 +107,12 @@ class RegistrationController extends Controller
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $buyer->update([
+        $buyer->forceFill([
             'status' => 'rejected',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => $request->rejection_reason,
-        ]);
+        ])->save();
 
         $buyer->notify(new BuyerRegistrationDecision('rejected', $request->rejection_reason));
 
@@ -121,12 +121,12 @@ class RegistrationController extends Controller
 
     public function approveSeller(Seller $seller)
     {
-        $seller->update([
+        $seller->forceFill([
             'status' => 'approved',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => null,
-        ]);
+        ])->save();
 
         $seller->notify(new SellerRegistrationDecision('approved'));
 
@@ -139,12 +139,12 @@ class RegistrationController extends Controller
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $seller->update([
+        $seller->forceFill([
             'status' => 'rejected',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => $request->rejection_reason,
-        ]);
+        ])->save();
 
         $seller->notify(new SellerRegistrationDecision('rejected', $request->rejection_reason));
 
@@ -153,12 +153,12 @@ class RegistrationController extends Controller
 
     public function approveLogistics(LogisticsProvider $logisticsProvider)
     {
-        $logisticsProvider->update([
+        $logisticsProvider->forceFill([
             'status' => 'approved',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => null,
-        ]);
+        ])->save();
 
         $logisticsProvider->notify(new LogisticsRegistrationDecision('approved'));
 
@@ -171,12 +171,12 @@ class RegistrationController extends Controller
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $logisticsProvider->update([
+        $logisticsProvider->forceFill([
             'status' => 'rejected',
             'approved_by' => Auth::guard('admin')->id(),
             'approved_at' => now(),
             'rejection_reason' => $request->rejection_reason,
-        ]);
+        ])->save();
 
         $logisticsProvider->notify(new LogisticsRegistrationDecision('rejected', $request->rejection_reason));
 

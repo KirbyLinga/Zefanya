@@ -21,7 +21,7 @@ class RegisterLogisticsController extends Controller
         $idPath = $request->file('upload_id')->store('logistics-ids', 'local');
         $permitPath = $request->file('dti_permit_upload')->store('logistics-permits', 'local');
 
-        $provider = LogisticsProvider::create([
+        $provider = new LogisticsProvider([
             'last_name' => $data['last_name'],
             'first_name' => $data['first_name'],
             'middle_initial' => $data['middle_initial'] ?? null,
@@ -45,8 +45,11 @@ class RegisterLogisticsController extends Controller
             'address_detail' => $data['address_detail'] ?? null,
             'upload_id_path' => $idPath,
             'dti_permit_path' => $permitPath,
-            'status' => LogisticsProviderStatus::PendingVerification,
         ]);
+
+        // status is guarded — set explicitly, never via mass-assignment.
+        $provider->status = LogisticsProviderStatus::PendingVerification;
+        $provider->save();
 
         $otp = $provider->issueOtp();
         $provider->notify(new LogisticsRegistrationOtp($otp));

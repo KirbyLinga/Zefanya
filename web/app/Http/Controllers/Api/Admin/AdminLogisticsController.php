@@ -8,7 +8,6 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Notifications\Logistics\LogisticsRegistrationDecision;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * GET /api/v1/admin/logistics/pending
@@ -47,12 +46,12 @@ class AdminLogisticsController extends Controller
         $admin = auth('admin')->user();
         abort_unless($admin !== null, 403, 'Admin authentication required.');
 
-        $logisticsProvider->update([
+        $logisticsProvider->forceFill([
             'status' => LogisticsProviderStatus::Approved->value,
             'approved_by' => $admin->id,
             'approved_at' => now(),
             'rejection_reason' => null,
-        ]);
+        ])->save();
 
         $logisticsProvider->notify(new LogisticsRegistrationDecision('approved'));
 
@@ -72,12 +71,12 @@ class AdminLogisticsController extends Controller
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $logisticsProvider->update([
+        $logisticsProvider->forceFill([
             'status' => LogisticsProviderStatus::Rejected->value,
             'approved_by' => $admin->id,
             'approved_at' => now(),
             'rejection_reason' => $request->rejection_reason,
-        ]);
+        ])->save();
 
         $logisticsProvider->notify(new LogisticsRegistrationDecision('rejected', $request->rejection_reason));
 

@@ -35,7 +35,7 @@ class CourierRegistrationService
 
         $businessName = $data['company'] ?? $data['business_name'] ?? trim("{$data['first_name']} {$data['last_name']} Courier");
 
-        return LogisticsProvider::create([
+        $provider = new LogisticsProvider([
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
             'middle_initial' => $data['middle_initial'] ?? null,
@@ -61,9 +61,14 @@ class CourierRegistrationService
             'license_path' => $licensePath ?? $idPath,
             'or_cr_path' => $orCrPath ?? $idPath,
             'dti_permit_path' => $licensePath ?? $idPath, // Satisfies non-null web column without schema breakage
-            'status' => LogisticsProviderStatus::PendingApproval,
             'is_online' => false,
             'reverification_required' => false,
         ]);
+
+        // status is guarded — set explicitly, never via mass-assignment.
+        $provider->status = LogisticsProviderStatus::PendingApproval;
+        $provider->save();
+
+        return $provider;
     }
 }

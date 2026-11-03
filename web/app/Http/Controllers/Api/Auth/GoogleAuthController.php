@@ -156,7 +156,7 @@ class GoogleAuthController extends Controller
 
     /**
      * @param  list<string>  $clientIds
-     * @return string|null  a short category for the log, or null when valid
+     * @return string|null a short category for the log, or null when valid
      */
     private function claimsProblem(array $claims, array $clientIds): ?string
     {
@@ -276,7 +276,7 @@ class GoogleAuthController extends Controller
 
         $birthday = Carbon::parse($request->input('birthday'));
 
-        $buyer = Buyer::create([
+        $buyer = new Buyer([
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
             'middle_initial' => $request->input('middle_initial'),
@@ -293,8 +293,11 @@ class GoogleAuthController extends Controller
             'barangay_name' => $request->input('barangay_name'),
             'street' => $request->input('street'),
             'upload_id_path' => $idPath,
-            'status' => 'pending_approval',
         ]);
+
+        // status and email_verified_at are guarded — set explicitly.
+        $buyer->status = 'pending_approval';
+        $buyer->save();
 
         $buyer->forceFill([
             'email_verified_at' => now(),

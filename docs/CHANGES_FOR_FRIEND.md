@@ -147,3 +147,14 @@ The api group now has a floor: `throttle:api-default` (60/min per actor) is appe
 | `php artisan test` (fix/security-hardening) | 391 passed, 0 failed |
 | `flutter test` (feature/phase-f + H8 fix) | 760 passed, 0 failed |
 | `flutter analyze` | 0 errors, 0 warnings (3 pre-existing info hints) |
+
+---
+
+## Step 2: Mass Assignment Hardening (integration/hardened)
+
+### Touched your tests
+
+- `web/tests/Feature/Api/ProductCatalogApiTest.php`:
+  - **Reason**: `$product->seller->update(['status' => 'pending_approval'])` silently dropped the status after `status` was moved to `$guarded` on the `Seller` model. The test setup now uses `forceFill` to match the service-layer pattern.
+  - **Change**: Test setup line changed from `->update(['status' => 'pending_approval'])` to `->forceFill(['status' => 'pending_approval'])->save()`.
+  - **Assertion**: Completely unchanged.
