@@ -6,6 +6,7 @@
 //   -> auth state lives at lib/state/auth_state.dart  => '../../state/auth_state.dart'
 //   -> registration lives at lib/screens/auth/...      => 'registration_screen.dart' (same folder)
 
+import 'package:zefanya/config/dev_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -342,11 +343,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
+                          if (!kUseLiveApi)
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () {
-                                // TODO: forgot-password flow
+                                // TODO: forgot-password flow (mock only)
                               },
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.textSecondary,

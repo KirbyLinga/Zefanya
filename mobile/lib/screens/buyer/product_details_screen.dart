@@ -494,7 +494,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             _buildAppBar(context),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: AppSpacing.s24),
+                padding: EdgeInsets.only(
+                  // Reserve space for the bottom action bar plus the device's
+                  // safe-area inset so the quantity stepper is always reachable.
+                  bottom: MediaQuery.of(context).padding.bottom + 80 + AppSpacing.s24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
