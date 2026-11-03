@@ -47,7 +47,7 @@ class GoogleApiTokenVerifier implements GoogleIdTokenVerifier
             throw new InvalidArgumentException('Google ID token is required.');
         }
 
-        $client = new Client();
+        $client = new Client;
         try {
             // The client fetches Google's certificates and verifies the JWT
             // signature. It does not need a client secret for an ID token.
@@ -88,13 +88,6 @@ class GoogleApiTokenVerifier implements GoogleIdTokenVerifier
             throw new InvalidArgumentException(self::INVALID);
         }
 
-        // Google returns a boolean; the string "true" is not proof.
-        if (($payload['email_verified'] ?? null) !== true) {
-            Log::warning('Google ID token rejected.', ['reason' => 'email_not_verified']);
-
-            throw new InvalidArgumentException(self::INVALID);
-        }
-
         $email = strtolower(trim((string) ($payload['email'] ?? '')));
         $sub = (string) ($payload['sub'] ?? '');
         if ($email === '' || $sub === '') {
@@ -106,7 +99,7 @@ class GoogleApiTokenVerifier implements GoogleIdTokenVerifier
         return [
             'sub' => $sub,
             'email' => $email,
-            'email_verified' => true,
+            'email_verified' => ($payload['email_verified'] ?? null) === true,
             'name' => trim((string) ($payload['name'] ?? $payload['given_name'] ?? 'Google User')),
             'given_name' => isset($payload['given_name']) ? (string) $payload['given_name'] : null,
             'family_name' => isset($payload['family_name']) ? (string) $payload['family_name'] : null,
