@@ -258,29 +258,6 @@ class AccessControlTest extends TestCase
         );
     }
 
-    // ── Secrets hygiene (OK) ──────────────────────────────────────────────
+    // Secrets hygiene: see scripts/check-secrets.ps1
 
-    /** OK — no .env, private keys, or SQL dumps tracked in git. */
-    public function test_no_secrets_tracked_in_git(): void
-    {
-        // The worktree root is two levels above base_path() (which is web/).
-        // `git -C <worktree>` automatically reads the .git file that points to
-        // the common git dir, so it works whether this is a worktree or not.
-        $worktreeRoot = realpath(base_path('/..'));  // web/ -> zefanya-security/ (worktree root)
-        $tracked      = (string) shell_exec(
-            'git -C ' . escapeshellarg($worktreeRoot)
-            . ' ls-files -- "*.env" "*.key" "*.pem" "*google-services.json*" "*.sql" "backups/*" 2>&1'
-        );
-
-        $lines     = array_filter(explode("\n", trim($tracked)));
-        $dangerous = array_values(array_filter($lines, function ($line) {
-            // The .xcconfig.example is a public template, not a credential
-            return ! str_contains($line, '.xcconfig.example');
-        }));
-
-        $this->assertEmpty(
-            $dangerous,
-            'Secrets tracked in git: '.implode(', ', $dangerous)
-        );
-    }
 }
