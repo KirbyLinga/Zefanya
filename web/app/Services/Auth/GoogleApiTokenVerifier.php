@@ -21,7 +21,9 @@ class GoogleApiTokenVerifier implements GoogleIdTokenVerifier
     /** @var list<string> */
     private array $clientIds;
 
-    public function __construct()
+    private ?Client $googleClient;
+
+    public function __construct(?Client $googleClient = null)
     {
         $raw = config('services.google.client_ids', '');
 
@@ -34,6 +36,8 @@ class GoogleApiTokenVerifier implements GoogleIdTokenVerifier
                 'trim',
                 explode(',', (string) $raw),
             ), fn (string $id): bool => $id !== ''));
+
+        $this->googleClient = $googleClient;
     }
 
     public function verify(string $idToken): array
@@ -47,7 +51,7 @@ class GoogleApiTokenVerifier implements GoogleIdTokenVerifier
             throw new InvalidArgumentException('Google ID token is required.');
         }
 
-        $client = new Client;
+        $client = $this->googleClient ?? new Client;
         try {
             // The client fetches Google's certificates and verifies the JWT
             // signature. It does not need a client secret for an ID token.
