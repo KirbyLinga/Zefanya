@@ -162,3 +162,4 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - The Laravel app lives in web/, not the repo root. Run php artisan test, composer, and artisan commands from web/. Backups go to backups\ at the repo root (gitignored).
 - Phase branches merge into integration/mobile-backend with git merge --ff-only after their report is accepted. Next phases branch from integration/mobile-backend.
 - Never change a test that belongs to the web app (web/tests) unless it fails on the base branch for an environment reason, the assertion is unchanged, and the change is listed in docs/CHANGES_FOR_FRIEND.md under "Touched your tests".
+- Database backups (mysqldump .sql files) go to ..\zefanya-backups\ (one level ABOVE the repo root), NOT inside the repo. The backups\ folder inside the repo is gitignored but should remain empty. Run: New-Item -ItemType Directory -Force "..\zefanya-backups"; mysqldump ... > "..\zefanya-backups\<name>.sql"
