@@ -41,6 +41,7 @@ class CourierRegistrationService
             'middle_initial' => $data['middle_initial'] ?? null,
             'sex' => strtolower($data['sex']),
             'email' => strtolower(trim($data['email'])),
+            'google_sub' => $data['google_sub'] ?? null,
             'password' => Hash::make($data['password']),
             'contact_no' => $cleanPhone,
             'birthday' => $birthday->format('Y-m-d'),

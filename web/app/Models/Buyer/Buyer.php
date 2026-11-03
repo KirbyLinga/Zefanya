@@ -27,6 +27,7 @@ class Buyer extends Authenticatable
         'middle_initial',
         'sex',
         'email',
+        'google_sub',
         'pending_email',
         'pending_email_code',
         'pending_email_expires_at',
@@ -79,6 +80,25 @@ class Buyer extends Authenticatable
         $middle = $this->middle_initial ? " {$this->middle_initial}." : '';
 
         return trim("{$this->first_name}{$middle} {$this->last_name}");
+    }
+
+    /**
+     * A display name for public surfaces (reviews), not a credential check.
+     *
+     * First letters only, with the rest of each name replaced: "Juan Dela
+     * Cruz" becomes "J*** D***". The full name and email are never part of a
+     * review payload.
+     */
+    public function maskedName(): string
+    {
+        $first = trim((string) $this->first_name);
+        $last = trim((string) $this->last_name);
+
+        $mask = static fn (string $value): string => $value === ''
+            ? ''
+            : mb_substr($value, 0, 1).'***';
+
+        return trim($mask($first).' '.$mask($last));
     }
 
     public function isEmailVerified(): bool

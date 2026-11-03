@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\Seller\Seller;
 use App\Models\SellerOrder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -107,10 +108,34 @@ class CourierHandoverApiTest extends TestCase
      */
     private function advance(SellerOrder $job, array $body)
     {
-        return $this->patchJson(
+        if (strtoupper((string) ($body['milestone'] ?? '')) === 'DELIVERED'
+            && ! isset($body['proof_photo'])) {
+            $body['proof_photo'] = UploadedFile::fake()->create('proof.jpg', 100, 'image/jpeg');
+        }
+
+        return $this->patch(
             route('api.courier.jobs.milestone', $job),
             $body,
+            ['Accept' => 'application/json'],
         );
+    }
+
+    /**
+     * Issue a real server-side pass as the parcel's buyer.
+     *
+     * @return array{code: string, token: string, expires_at: string}
+     */
+    private function issuePass(SellerOrder $job): array
+    {
+        $buyer = $job->order->buyer;
+
+        Sanctum::actingAs($buyer);
+
+        $pass = $this->postJson(route('api.orders.delivery-pass', $job))
+            ->assertOk()
+            ->json('data');
+
+        return $pass;
     }
 
     // ── Job resource ─────────────────────────────────────────────────────────
@@ -324,9 +349,8 @@ class CourierHandoverApiTest extends TestCase
     public function test_delivery_requires_the_buyers_code(): void
     {
         $courier = $this->courier();
-        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY', [
-            'delivery_otp_hash' => Hash::make('482913'),
-        ]);
+        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $this->issuePass($job);
 
         Sanctum::actingAs($courier);
 
@@ -340,9 +364,8 @@ class CourierHandoverApiTest extends TestCase
     public function test_a_five_digit_code_is_a_format_error_not_a_wrong_code(): void
     {
         $courier = $this->courier();
-        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY', [
-            'delivery_otp_hash' => Hash::make('482913'),
-        ]);
+        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $this->issuePass($job);
 
         Sanctum::actingAs($courier);
 
@@ -357,9 +380,8 @@ class CourierHandoverApiTest extends TestCase
     public function test_a_wrong_code_counts_toward_the_lock(): void
     {
         $courier = $this->courier();
-        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY', [
-            'delivery_otp_hash' => Hash::make('482913'),
-        ]);
+        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $this->issuePass($job);
 
         Sanctum::actingAs($courier);
 
@@ -377,9 +399,8 @@ class CourierHandoverApiTest extends TestCase
     public function test_five_wrong_codes_lock_entry_for_fifteen_minutes(): void
     {
         $courier = $this->courier();
-        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY', [
-            'delivery_otp_hash' => Hash::make('482913'),
-        ]);
+        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
 
         Sanctum::actingAs($courier);
 
@@ -397,7 +418,7 @@ class CourierHandoverApiTest extends TestCase
         // Even the correct code is refused while the lock is on.
         $this->advance($job, [
             'milestone' => 'DELIVERED',
-            'delivery_otp' => '482913',
+            'delivery_otp' => $pass['code'],
         ])->assertStatus(423);
 
         $this->assertSame('OUT_FOR_DELIVERY', $job->fresh()->status->value);
@@ -406,24 +427,26 @@ class CourierHandoverApiTest extends TestCase
     public function test_the_code_works_again_exactly_when_the_lock_expires(): void
     {
         $courier = $this->courier();
-        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY', [
-            'delivery_otp_hash' => Hash::make('482913'),
+        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
+
+        $job->forceFill([
             'delivery_otp_attempts' => 5,
             'delivery_otp_locked_until' => now()->addMinutes(15),
-        ]);
+        ])->save();
 
         Sanctum::actingAs($courier);
 
         $this->advance($job, [
             'milestone' => 'DELIVERED',
-            'delivery_otp' => '482913',
+            'delivery_otp' => $pass['code'],
         ])->assertStatus(423);
 
         $this->travel(15)->minutes();
 
         $this->advance($job, [
             'milestone' => 'DELIVERED',
-            'delivery_otp' => '482913',
+            'delivery_otp' => $pass['code'],
         ])->assertOk()
             ->assertJsonPath('milestone', 'DELIVERED');
 
@@ -439,12 +462,15 @@ class CourierHandoverApiTest extends TestCase
     {
         $courier = $this->courier();
         $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
         $payment = $this->payment($job, 70000);
 
         Sanctum::actingAs($courier);
 
-        $this->advance($job, ['milestone' => 'DELIVERED'])
-            ->assertStatus(422);
+        $this->advance($job, [
+            'milestone' => 'DELIVERED',
+            'delivery_otp' => $pass['code'],
+        ])->assertStatus(422);
 
         $this->assertSame(PaymentStatus::Pending, $payment->fresh()->status);
         $this->assertSame('OUT_FOR_DELIVERY', $job->fresh()->status->value);
@@ -454,6 +480,7 @@ class CourierHandoverApiTest extends TestCase
     {
         $courier = $this->courier();
         $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
         $payment = $this->payment($job, 70000);
 
         Sanctum::actingAs($courier);
@@ -461,6 +488,7 @@ class CourierHandoverApiTest extends TestCase
         foreach ([699.99, 700.01] as $wrong) {
             $this->advance($job, [
                 'milestone' => 'DELIVERED',
+                'delivery_otp' => $pass['code'],
                 'cod_amount' => $wrong,
             ])->assertStatus(422);
         }
@@ -473,12 +501,14 @@ class CourierHandoverApiTest extends TestCase
     {
         $courier = $this->courier();
         $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
         $payment = $this->payment($job, 70000);
 
         Sanctum::actingAs($courier);
 
         $this->advance($job, [
             'milestone' => 'DELIVERED',
+            'delivery_otp' => $pass['code'],
             'cod_amount' => 700.00,
         ])->assertOk()
             ->assertJsonPath('milestone', 'DELIVERED')
@@ -497,22 +527,24 @@ class CourierHandoverApiTest extends TestCase
     {
         $courier = $this->courier();
         $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
         $payment = $this->payment($job, 70000);
         $payment->markPaid();
 
         Sanctum::actingAs($courier);
 
-        $this->advance($job, ['milestone' => 'DELIVERED'])
-            ->assertOk()
+        $this->advance($job, [
+            'milestone' => 'DELIVERED',
+            'delivery_otp' => $pass['code'],
+        ])->assertOk()
             ->assertJsonPath('payment_status', 'paid');
     }
 
     public function test_the_otp_and_cod_are_checked_together(): void
     {
         $courier = $this->courier();
-        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY', [
-            'delivery_otp_hash' => Hash::make('482913'),
-        ]);
+        $job = $this->assignJob($courier, 'OUT_FOR_DELIVERY');
+        $pass = $this->issuePass($job);
         $payment = $this->payment($job, 70000);
 
         Sanctum::actingAs($courier);
@@ -520,7 +552,7 @@ class CourierHandoverApiTest extends TestCase
         // Right code, wrong cash: still not delivered, and payment stays open.
         $this->advance($job, [
             'milestone' => 'DELIVERED',
-            'delivery_otp' => '482913',
+            'delivery_otp' => $pass['code'],
             'cod_amount' => 699.00,
         ])->assertStatus(422);
 
@@ -529,7 +561,7 @@ class CourierHandoverApiTest extends TestCase
         // Both right: one transaction settles both facts.
         $this->advance($job, [
             'milestone' => 'DELIVERED',
-            'delivery_otp' => '482913',
+            'delivery_otp' => $pass['code'],
             'cod_amount' => 700.00,
         ])->assertOk();
 

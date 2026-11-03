@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\OrderDeliveryOverrideController;
 use App\Http\Controllers\Admin\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,4 +30,9 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/registrations/seller/{seller}/reject', [RegistrationController::class, 'rejectSeller'])->name('registrations.seller.reject');
     Route::post('/registrations/logistics/{logistics_provider}/approve', [RegistrationController::class, 'approveLogistics'])->name('registrations.logistics.approve');
     Route::post('/registrations/logistics/{logistics_provider}/reject', [RegistrationController::class, 'rejectLogistics'])->name('registrations.logistics.reject');
+
+    // The only administrator path into DELIVERED (reason + proof + audit row).
+    Route::post('/orders/{sellerOrder}/deliver-override', [OrderDeliveryOverrideController::class, 'store'])
+        ->middleware('admin.role:admin')
+        ->name('orders.deliver-override');
 });

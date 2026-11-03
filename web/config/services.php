@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_ids' => env('GOOGLE_CLIENT_IDS', ''),
+    ],
+
 ];

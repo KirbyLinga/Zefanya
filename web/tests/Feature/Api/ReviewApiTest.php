@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -37,7 +38,7 @@ class ReviewApiTest extends TestCase
      *
      * @return array{buyer: Buyer, sellerOrder: SellerOrder, product: Product}
      */
-    private function purchase(): array
+    private function purchase(bool $delivered = true): array
     {
         $buyer = Buyer::factory()->create();
 
@@ -66,6 +67,13 @@ class ReviewApiTest extends TestCase
             'seller_id' => $seller->id,
             'subtotal_minor' => 50000,
         ]);
+
+        if ($delivered) {
+            // Reviews are only allowed after delivery (H4). This is fixture
+            // state, not an assertion change: every upsert test starts from a
+            // finished purchase, as the app's post-delivery screen does.
+            $sellerOrder->forceFill(['status' => OrderStatus::Delivered])->save();
+        }
 
         OrderItem::query()->create([
             'seller_order_id' => $sellerOrder->id,

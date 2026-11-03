@@ -39,21 +39,42 @@ class ReviewResource extends JsonResource
             'product_id' => $this->product_id !== null ? (string) $this->product_id : null,
             'stars' => (int) $this->stars,
             'comment' => (string) ($this->comment ?? ''),
-            'photo_url' => $this->photoUrl(),
+            'photo_url' => $this->photoUrls()[0] ?? null,
+            'photo_urls' => $this->photoUrls(),
+            'verified_purchase' => (bool) $this->verified_purchase,
+            // Masked on the server so a future public review list cannot leak
+            // the buyer's full name or email by rendering the row directly.
+            'reviewer_name' => $this->buyer?->maskedName() ?: 'Verified buyer',
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
 
-    private function photoUrl(): ?string
+    /**
+     * Server-stored photo paths, resolved to public URLs. `photo_path` is the
+     * legacy single-photo column; it is read only when the new list is empty.
+     *
+     * @return list<string>
+     */
+    private function photoUrls(): array
     {
-        if ($this->photo_path === null) {
-            return null;
+        $paths = $this->photo_paths ?? [];
+
+        if ($paths === [] && $this->photo_path !== null) {
+            $paths = [$this->photo_path];
         }
 
-        // Already-absolute URLs (seeded or externally hosted) pass through;
-        // uploaded paths are resolved through the public disk.
-        return str_starts_with($this->photo_path, 'http://') || str_starts_with($this->photo_path, 'https://')
-            ? $this->photo_path
-            : Storage::disk('public')->url($this->photo_path);
+        $urls = [];
+
+        foreach ($paths as $path) {
+            if (! is_string($path) || $path === '') {
+                continue;
+            }
+
+            $urls[] = str_starts_with($path, 'http://') || str_starts_with($path, 'https://')
+                ? $path
+                : Storage::disk('public')->url($path);
+        }
+
+        return $urls;
     }
 }

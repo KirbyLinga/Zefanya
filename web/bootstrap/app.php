@@ -35,10 +35,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // session cookie secure in production. Kept separate from the aliases below.
         $middleware->trustProxies(at: '*');
 
+        // Every route in the api group inherits the 60/min default bucket.
+        // Specific routes add stricter named buckets on top; the group default
+        // is what a newly added endpoint gets without remembering to ask.
+        $middleware->api(append: 'throttle:api-default');
+
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
             'seller.approved' => EnsureSellerApproved::class,
+            'courier.approved' => \App\Http\Middleware\Courier\EnsureCourierApproved::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

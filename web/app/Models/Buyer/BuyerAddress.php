@@ -5,6 +5,7 @@ namespace App\Models\Buyer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Database\Factories\BuyerAddressFactory;
 
 class BuyerAddress extends Model
 {
@@ -88,5 +89,13 @@ class BuyerAddress extends Model
             trim($prov),
             trim((string) $this->postal_code),
         ]));
+    }
+    /**
+     * Laravel cannot auto-resolve the factory because the model lives under
+     * App\Models\Buyer\ but the factory is in the root factories namespace.
+     */
+    protected static function newFactory(): BuyerAddressFactory
+    {
+        return BuyerAddressFactory::new();
     }
 }

@@ -131,4 +131,4 @@ Route::post('/logout', [UnifiedLoginController::class, 'logout'])
 // Federated / Social Auth alias for mobile / web
 Route::post('/auth/google', [\App\Http\Controllers\Api\Auth\GoogleAuthController::class, 'handle'])
     ->name('auth.google')
-    ->middleware('throttle:15,1');
+    ->middleware('throttle:api-google');

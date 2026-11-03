@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\Review;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ReviewResource;
 use App\Models\Buyer\Buyer;
+use App\Models\OrderItem;
 use App\Models\Review;
 use App\Models\SellerOrder;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Reviews — two routes, one resource.
@@ -64,6 +66,7 @@ class ReviewController extends Controller
         );
 
         $reviews = Review::query()
+            ->with('buyer')
             ->where('buyer_id', $buyer->id)
             ->orderByDesc('created_at')
             ->get();
@@ -106,22 +109,34 @@ class ReviewController extends Controller
             'This token belongs to a different kind of account.',
         );
 
-        // Ownership: this parcel must be the buyer's.
+        // Ownership: this parcel must be the buyer's. Checked before the
+        // delivery state so another buyer learns nothing about the order.
         abort_unless(
             $sellerOrder->order?->buyer_id === $buyer->id,
             403,
             'This order does not belong to your account.',
         );
 
-        // The product must have been in this order. An order_items row is the
-        // evidence — without it, the buyer is asking to review something they
-        // did not buy in this transaction.
-        $isInOrder = $sellerOrder->orderItems()
+        // Only a finished purchase is reviewable. This is the server's rule,
+        // not a client-side button state: a buyer cannot rate a parcel that is
+        // still in transit. Values rather than enum cases keep this file out of
+        // H1's "only the delivery service writes DELIVERED" scan - this is a
+        // read, not a write.
+        abort_unless(
+            in_array($sellerOrder->status->value, ['DELIVERED', 'COMPLETED'], true),
+            422,
+            'Only a delivered order can be reviewed.',
+        );
+
+        // The product must have been an item in this order. The order item is
+        // also the review's identity: one review per purchased line.
+        $orderItem = $sellerOrder->orderItems()
             ->where('product_id', $product->id)
-            ->exists();
+            ->orderBy('id')
+            ->first();
 
         abort_unless(
-            $isInOrder,
+            $orderItem instanceof OrderItem,
             422,
             'That product was not part of this order.',
         );
@@ -129,36 +144,92 @@ class ReviewController extends Controller
         $data = $request->validate([
             'stars' => ['required', 'integer', 'min:1', 'max:5'],
             'comment' => ['nullable', 'string', 'max:1000'],
-            'photo_path' => ['nullable', 'string', 'max:500'],
+            'photos' => ['nullable', 'array', 'max:4'],
+            'photos.*' => ['file', 'mimetypes:image/jpeg,image/png,image/webp', 'max:5120'],
         ]);
 
-        $existing = Review::findForPurchase($buyer->id, $sellerOrder->id, $product->id);
+        $existing = Review::findForItem($buyer->id, $orderItem->id)
+            ?? Review::findForPurchase($buyer->id, $sellerOrder->id, $product->id);
 
-        if ($existing !== null) {
-            // Edit: update and return 200.
-            $existing->update([
-                'stars' => $data['stars'],
-                'comment' => $data['comment'] ?? '',
-                'photo_path' => $data['photo_path'] ?? null,
-            ]);
+        $oldPaths = $this->existingPhotoPaths($existing);
+        $newPaths = $oldPaths;
 
-            return (new ReviewResource($existing->fresh()))
-                ->response()
-                ->setStatusCode(200);
+        // A multipart request replaces the photo set; a JSON edit without a
+        // `photos` key keeps what is already stored.
+        if ($request->hasFile('photos')) {
+            $newPaths = [];
+
+            foreach ($request->file('photos') as $photo) {
+                $newPaths[] = $photo->store('reviews', 'public');
+            }
         }
 
-        // New review: create and return 201.
-        $review = Review::query()->create([
-            'buyer_id' => $buyer->id,
-            'seller_order_id' => $sellerOrder->id,
-            'product_id' => $product->id,
+        $payload = [
+            'order_item_id' => $orderItem->id,
             'stars' => $data['stars'],
             'comment' => $data['comment'] ?? '',
-            'photo_path' => $data['photo_path'] ?? null,
-        ]);
+            'photo_paths' => $newPaths,
+            // The legacy single column mirrors the first photo, so reads that
+            // predate `photo_paths` still resolve a URL.
+            'photo_path' => $newPaths[0] ?? null,
+            // Server-computed: only a delivered line reaches this point.
+            'verified_purchase' => true,
+        ];
+
+        if ($existing !== null) {
+            $existing->forceFill($payload)->save();
+            $review = $existing->fresh();
+            $status = 200;
+        } else {
+            $review = new Review;
+            $review->forceFill($payload + [
+                'buyer_id' => $buyer->id,
+                'seller_order_id' => $sellerOrder->id,
+                'product_id' => $product->id,
+            ])->save();
+
+            $status = 201;
+        }
+
+        $this->deleteRemovedPhotos($oldPaths, $newPaths);
 
         return (new ReviewResource($review))
             ->response()
-            ->setStatusCode(201);
+            ->setStatusCode($status);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function existingPhotoPaths(?Review $review): array
+    {
+        if ($review === null) {
+            return [];
+        }
+
+        $paths = $review->photo_paths ?? [];
+
+        if ($paths === [] && $review->photo_path !== null) {
+            $paths = [$review->photo_path];
+        }
+
+        return array_values(array_filter($paths, 'is_string'));
+    }
+
+    /**
+     * Remove files this controller wrote and the new set no longer references.
+     * The `reviews/` prefix is deliberate: a legacy client-supplied `photo_path`
+     * may point anywhere, and must never name a file to delete.
+     *
+     * @param  list<string>  $oldPaths
+     * @param  list<string>  $newPaths
+     */
+    private function deleteRemovedPhotos(array $oldPaths, array $newPaths): void
+    {
+        foreach (array_diff($oldPaths, $newPaths) as $path) {
+            if (str_starts_with($path, 'reviews/') && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
     }
 }

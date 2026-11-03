@@ -31,16 +31,20 @@ class Review extends Model
     protected $fillable = [
         'buyer_id',
         'seller_order_id',
+        'order_item_id',
         'product_id',
         'stars',
         'comment',
         'photo_path',
+        'photo_paths',
     ];
 
     protected function casts(): array
     {
         return [
             'stars' => 'integer',
+            'photo_paths' => 'array',
+            'verified_purchase' => 'boolean',
         ];
     }
 
@@ -54,6 +58,15 @@ class Review extends Model
     public function sellerOrder(): BelongsTo
     {
         return $this->belongsTo(SellerOrder::class);
+    }
+
+    /**
+     * The purchased line this review is about. Nullable only for rows written
+     * before H4; every new review is created through an order item.
+     */
+    public function orderItem(): BelongsTo
+    {
+        return $this->belongsTo(OrderItem::class);
     }
 
     /**
@@ -80,6 +93,18 @@ class Review extends Model
             ->where('buyer_id', $buyerId)
             ->where('seller_order_id', $sellerOrderId)
             ->where('product_id', $productId)
+            ->first();
+    }
+
+    /**
+     * The one review for a purchased line, or null. This is the identity H4
+     * writes on; `findForPurchase` stays for old rows that predate the column.
+     */
+    public static function findForItem(int $buyerId, int $orderItemId): ?self
+    {
+        return self::query()
+            ->where('buyer_id', $buyerId)
+            ->where('order_item_id', $orderItemId)
             ->first();
     }
 }
