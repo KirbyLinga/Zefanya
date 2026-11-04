@@ -10,6 +10,7 @@ use App\Models\Seller\Seller;
 use App\Models\SellerOrder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -160,21 +161,20 @@ class RouteMatrixTest extends TestCase
 
     // ── Another user's resource → 403 ─────────────────────────────────────
 
-    public function test_buyer_b_cannot_read_buyer_a_orders_milestone(): void
+    private function parcelFor(Buyer $buyer, string $status = 'OUT_FOR_DELIVERY', ?string $proofPath = null): SellerOrder
     {
-        $buyerA = Buyer::factory()->create(['status' => 'approved']);
-        $buyerB = Buyer::factory()->create(['status' => 'approved']);
-
         $seller = Seller::factory()->create(['status' => 'approved']);
+
         $order = Order::query()->create([
-            'buyer_id' => $buyerA->id,
+            'buyer_id' => $buyer->id,
             'reference' => Order::generateUniqueReference(),
             'shipping_address' => ['name' => 'A', 'full' => 'A'],
             'subtotal_minor' => 10000,
             'discount_minor' => 0,
             'total_minor' => 10000,
         ]);
-        $so = SellerOrder::query()->create([
+
+        $sellerOrder = SellerOrder::query()->create([
             'order_id' => $order->id,
             'seller_id' => $seller->id,
             'subtotal_minor' => 10000,
@@ -182,8 +182,100 @@ class RouteMatrixTest extends TestCase
             'delivery_area' => 'Test',
         ]);
 
+        $sellerOrder->forceFill([
+            'status' => $status,
+            'delivery_proof_path' => $proofPath,
+        ])->save();
+
+        return $sellerOrder->fresh();
+    }
+
+    public function test_buyer_b_cannot_read_buyer_a_orders_milestone(): void
+    {
+        $buyerA = Buyer::factory()->create(['status' => 'approved']);
+        $buyerB = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyerA);
+
         Sanctum::actingAs($buyerB, [], 'sanctum');
         $this->getJson('/api/v1/buyer/orders/'.$so->id.'/milestone')->assertStatus(403);
+    }
+
+    public function test_buyer_b_cannot_request_buyer_a_delivery_pass(): void
+    {
+        $buyerA = Buyer::factory()->create(['status' => 'approved']);
+        $buyerB = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyerA);
+
+        Sanctum::actingAs($buyerB, [], 'sanctum');
+        $this->postJson('/api/v1/buyer/orders/'.$so->id.'/delivery-pass')->assertStatus(403);
+    }
+
+    public function test_buyer_b_cannot_download_buyer_a_delivery_proof(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('delivery-proofs/proof.jpg', 'fake-image-bytes');
+
+        $buyerA = Buyer::factory()->create(['status' => 'approved']);
+        $buyerB = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyerA, 'DELIVERED', 'delivery-proofs/proof.jpg');
+
+        Sanctum::actingAs($buyerB, [], 'sanctum');
+        $this->getJson('/api/v1/buyer/orders/'.$so->id.'/delivery-proof')->assertStatus(403);
+    }
+
+    // ── Delivery pass / proof ─────────────────────────────────────────────
+
+    public function test_delivery_pass_is_refused_before_out_for_delivery(): void
+    {
+        $buyer = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyer, 'PLACED');
+
+        Sanctum::actingAs($buyer, [], 'sanctum');
+        $this->postJson('/api/v1/buyer/orders/'.$so->id.'/delivery-pass')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'This parcel is not out for delivery.');
+    }
+
+    public function test_delivery_pass_returns_a_six_digit_code_and_signed_token(): void
+    {
+        $buyer = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyer);
+
+        Sanctum::actingAs($buyer, [], 'sanctum');
+        $response = $this->postJson('/api/v1/buyer/orders/'.$so->id.'/delivery-pass')
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['code', 'token', 'expires_at']]);
+
+        $this->assertMatchesRegularExpression('/^\d{6}$/', (string) $response->json('data.code'));
+        $this->assertNotSame('', (string) $response->json('data.token'));
+    }
+
+    public function test_delivery_proof_returns_the_owners_stored_photo(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('delivery-proofs/proof.jpg', 'fake-image-bytes');
+
+        $buyer = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyer, 'DELIVERED', 'delivery-proofs/proof.jpg');
+
+        Sanctum::actingAs($buyer, [], 'sanctum');
+        $this->get('/api/v1/buyer/orders/'.$so->id.'/delivery-proof')
+            ->assertOk()
+            ->assertDownload('proof.jpg');
+    }
+
+    public function test_delivery_pass_is_throttled_after_the_api_default_floor(): void
+    {
+        $buyer = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyer);
+
+        Sanctum::actingAs($buyer, [], 'sanctum');
+
+        for ($i = 0; $i < 60; $i++) {
+            $this->postJson('/api/v1/buyer/orders/'.$so->id.'/delivery-pass')->assertOk();
+        }
+
+        $this->postJson('/api/v1/buyer/orders/'.$so->id.'/delivery-pass')->assertStatus(429);
     }
 
     // ── Invalid input → 422 ───────────────────────────────────────────────
