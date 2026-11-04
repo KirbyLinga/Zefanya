@@ -22,6 +22,19 @@
 | 1d-issuer-verifier | GoogleApiTokenVerifier issuer check removed | test_wrong_issuer_throws (GoogleApiTokenVerifierTest) | Failed asserting that exception of type "ErrorException" matches expected exception "InvalidArgumentException". | Tests:    1 passed (1 assertions) |
 | 1d-audience-verifier | GoogleApiTokenVerifier audience check removed | test_wrong_audience_throws + test_d4_audience_check_is_present_in_verifier (GoogleApiTokenVerifierTest) | Failed asserting that exception of type "InvalidArgumentException" is thrown. | Tests:    2 passed (2 assertions) |
 
+## Hardening session (integration/hardened, 2026-11-04)
+
+Each mutation was applied to the source, the named test was run, the mutation was reverted, and the test was run again. The PASS column is the post-revert run.
+
+| Mutation | File:Line | Test Name | FAIL Line | PASS Line |
+|---------|-----------|-----------|-----------|-----------|
+| H1-status-fillable | Buyer.php `$fillable` (+`status`) and `createFromRegistration()` reads `$data['status']` | test_buyer_profile_update_ignores_status | `fill() accepted a guarded status attribute.` | Tests: 1 passed (3 assertions) |
+| H4-pass-owner | OrderController.php deliveryPass ownership check + OrderDeliveryService.php `assertBuyerOwns()` both removed | test_buyer_b_cannot_request_buyer_a_delivery_pass | Expected response status code [403] but received 200. | Tests: 1 passed (1 assertion) |
+| H4-proof-owner | OrderController.php deliveryProof ownership check removed | test_buyer_b_cannot_download_buyer_a_delivery_proof | Expected response status code [403] but received 200. | Tests: 1 passed (1 assertion) |
+| H5-admin-audit | OrderDeliveryService.php:149 `audit()` call removed from `adminOverride()` | test_admin_override_delivers_with_a_reason_photo_and_audit_row | Failed asserting that null is not null. | Tests: 1 passed (9 assertions) |
+| H5-delivered-writer | OrderController.php temporary `$sellerOrder->status = 'delivered';` | test_only_whitelisted_files_assign_delivered_status | Non-whitelisted files assign the delivered status. Route all delivered writes through OrderDeliveryService. Files: app/Http/Controllers/Api/Order/OrderController.php | Tests: 1 passed (1 assertion) |
+| H5-route-guard | routes/api.php bare `api.v1.mutation-probe` with no auth middleware | test_every_v1_route_has_auth_or_is_on_allowlist | These /api/v1 routes lack auth middleware: api.v1.mutation-probe | Tests: 1 passed (1 assertion) |
+
 ## New tests added (step 1d)
 - GoogleApiTokenVerifierTest (8 unit tests): runs REAL GoogleApiTokenVerifier with stubbed Google\Client — valid, email_verified false, wrong audience, wrong issuer, expired, client throws, d1 re-run, d4 re-run
 - GoogleApiTokenVerifier refactored: accepts optional ?Client $googleClient for testability (production uses new Client by default)
