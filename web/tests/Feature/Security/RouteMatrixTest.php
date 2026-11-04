@@ -11,6 +11,7 @@ use App\Models\SellerOrder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -42,7 +43,7 @@ class RouteMatrixTest extends TestCase
 
     public function test_every_v1_route_has_auth_or_is_on_allowlist(): void
     {
-        $routes   = Route::getRoutes()->getRoutesByName();
+        $routes = Route::getRoutes()->getRoutesByName();
         $v1Routes = array_filter(
             $routes,
             fn ($name) => str_starts_with($name, 'api.v1.'),
@@ -55,7 +56,7 @@ class RouteMatrixTest extends TestCase
                 continue;
             }
             $middleware = $route->gatherMiddleware();
-            $hasAuth    = collect($middleware)->contains(
+            $hasAuth = collect($middleware)->contains(
                 fn ($m) => str_contains($m, 'auth:sanctum') || $m === 'auth',
             );
             if (! $hasAuth) {
@@ -73,7 +74,7 @@ class RouteMatrixTest extends TestCase
 
     public function test_every_v1_route_has_throttle_middleware(): void
     {
-        $routes   = Route::getRoutes()->getRoutesByName();
+        $routes = Route::getRoutes()->getRoutesByName();
         $v1Routes = array_filter(
             $routes,
             fn ($name) => str_starts_with($name, 'api.v1.'),
@@ -82,7 +83,7 @@ class RouteMatrixTest extends TestCase
 
         $missing = [];
         foreach ($v1Routes as $name => $route) {
-            $middleware  = app('router')->gatherRouteMiddleware($route);
+            $middleware = app('router')->gatherRouteMiddleware($route);
             $hasThrottle = collect($middleware)->contains(
                 fn ($m) => is_string($m) && str_contains($m, 'ThrottleRequests'),
             );
@@ -101,7 +102,7 @@ class RouteMatrixTest extends TestCase
 
     // ── Unauthenticated → 401 ─────────────────────────────────────────────
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('protectedRouteProvider')]
+    #[DataProvider('protectedRouteProvider')]
     public function test_unauthenticated_returns_401(string $method, string $uri): void
     {
         $response = $this->json($method, $uri);
@@ -115,18 +116,20 @@ class RouteMatrixTest extends TestCase
     public static function protectedRouteProvider(): array
     {
         return [
-            'buyer me'               => ['GET',   '/api/v1/buyer/me'],
-            'buyer logout'           => ['POST',  '/api/v1/buyer/logout'],
-            'buyer orders index'     => ['GET',   '/api/v1/buyer/orders'],
-            'buyer orders store'     => ['POST',  '/api/v1/buyer/orders'],
-            'buyer addresses index'  => ['GET',   '/api/v1/buyer/addresses'],
-            'buyer addresses store'  => ['POST',  '/api/v1/buyer/addresses'],
-            'buyer wishlist index'   => ['GET',   '/api/v1/buyer/wishlist'],
-            'buyer reviews mine'     => ['GET',   '/api/v1/buyer/reviews/mine'],
-            'courier me'             => ['GET',   '/api/v1/courier/me'],
-            'courier logout'         => ['POST',  '/api/v1/courier/logout'],
-            'courier jobs index'     => ['GET',   '/api/v1/courier/jobs'],
-            'seller orders index'    => ['GET',   '/api/v1/seller/orders'],
+            'buyer me' => ['GET',   '/api/v1/buyer/me'],
+            'buyer logout' => ['POST',  '/api/v1/buyer/logout'],
+            'buyer orders index' => ['GET',   '/api/v1/buyer/orders'],
+            'buyer orders store' => ['POST',  '/api/v1/buyer/orders'],
+            'buyer delivery pass' => ['POST',  '/api/v1/buyer/orders/1/delivery-pass'],
+            'buyer delivery proof' => ['GET',   '/api/v1/buyer/orders/1/delivery-proof'],
+            'buyer addresses index' => ['GET',   '/api/v1/buyer/addresses'],
+            'buyer addresses store' => ['POST',  '/api/v1/buyer/addresses'],
+            'buyer wishlist index' => ['GET',   '/api/v1/buyer/wishlist'],
+            'buyer reviews mine' => ['GET',   '/api/v1/buyer/reviews/mine'],
+            'courier me' => ['GET',   '/api/v1/courier/me'],
+            'courier logout' => ['POST',  '/api/v1/courier/logout'],
+            'courier jobs index' => ['GET',   '/api/v1/courier/jobs'],
+            'seller orders index' => ['GET',   '/api/v1/seller/orders'],
             'admin logistics pending' => ['GET',  '/api/v1/admin/logistics/pending'],
         ];
     }
@@ -163,20 +166,20 @@ class RouteMatrixTest extends TestCase
         $buyerB = Buyer::factory()->create(['status' => 'approved']);
 
         $seller = Seller::factory()->create(['status' => 'approved']);
-        $order  = Order::query()->create([
-            'buyer_id'         => $buyerA->id,
-            'reference'        => Order::generateUniqueReference(),
+        $order = Order::query()->create([
+            'buyer_id' => $buyerA->id,
+            'reference' => Order::generateUniqueReference(),
             'shipping_address' => ['name' => 'A', 'full' => 'A'],
-            'subtotal_minor'   => 10000,
-            'discount_minor'   => 0,
-            'total_minor'      => 10000,
+            'subtotal_minor' => 10000,
+            'discount_minor' => 0,
+            'total_minor' => 10000,
         ]);
         $so = SellerOrder::query()->create([
-            'order_id'           => $order->id,
-            'seller_id'          => $seller->id,
-            'subtotal_minor'     => 10000,
+            'order_id' => $order->id,
+            'seller_id' => $seller->id,
+            'subtotal_minor' => 10000,
             'delivery_fee_minor' => 8500,
-            'delivery_area'      => 'Test',
+            'delivery_area' => 'Test',
         ]);
 
         Sanctum::actingAs($buyerB, [], 'sanctum');
