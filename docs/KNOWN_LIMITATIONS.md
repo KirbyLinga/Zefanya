@@ -132,3 +132,8 @@ The following features are referenced in `docs/api-contract.md` or other documen
 
 ### Voucher stacking on orders
 - `POST /orders` accepts one `voucher_code`. The mobile app supports stacked vouchers locally but the live repository sends none. Any local multi-voucher saving is not recorded server-side.
+
+### Live-mode voucher hiding (step 6)
+- With `kUseLiveApi=true`, the cart's voucher entry banner, the "Saved" strip in the cart summary bar, and the voucher discount rows in checkout are hidden via `VoucherUiVisibility(show: !kUseLiveApi)`. Checkout totals are computed without locally-applied vouchers — only server-returned totals are shown.
+- "Forgot password?" on the login screen is hidden in live mode (`if (!kUseLiveApi)`), since no backend forgot-password route exists.
+- Mock mode (`kUseLiveApi=false`, the default) keeps all of the above visible.

@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/dev_flags.dart' show kUseLiveApi;
 import '../../config/pricing.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart' show Order, Voucher, VoucherScope;
@@ -305,7 +306,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         cart.items.where((i) => i.selected && i.isAvailable).toList();
     final quote = quoteCart(
       selectedItems,
-      widget.checkoutItems == null ? cart.appliedVouchers : const <Voucher>[],
+      // In live mode the server owns totals: don't apply local vouchers.
+      (!kUseLiveApi && widget.checkoutItems == null)
+          ? cart.appliedVouchers
+          : const <Voucher>[],
       buyerUsesFor: (voucher) => cart.buyerUsesFor(voucher.code),
     );
 
@@ -665,17 +669,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             const Divider(height: 24),
             _orderLine(theme, 'Subtotal', formatPeso(quote.merchandise)),
-            for (final discount in quote.voucherDiscounts)
-              _orderLine(
-                theme,
-                '${switch (discount.voucher.scope) {
-                  VoucherScope.store => 'Store',
-                  VoucherScope.platform => 'Platform',
-                  VoucherScope.shipping => 'Shipping',
-                }} voucher (${discount.voucher.code})',
-                '- ${formatPeso(discount.amount)}',
-                valueColor: AppColors.successText,
-              ),
+            // In live mode the server owns all discount computation; the
+            // client must not show locally-computed savings it cannot verify.
+            if (!kUseLiveApi)
+              for (final discount in quote.voucherDiscounts)
+                _orderLine(
+                  theme,
+                  '${switch (discount.voucher.scope) {
+                    VoucherScope.store => 'Store',
+                    VoucherScope.platform => 'Platform',
+                    VoucherScope.shipping => 'Shipping',
+                  }} voucher (${discount.voucher.code})',
+                  '- ${formatPeso(discount.amount)}',
+                  valueColor: AppColors.successText,
+                ),
             _orderLine(
               theme,
               'Shipping fee',

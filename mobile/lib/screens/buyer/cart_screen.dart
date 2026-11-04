@@ -10,12 +10,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/pricing.dart' show CartQuote;
+import '../../config/dev_flags.dart' show kUseLiveApi;
 import '../../state/cart_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/free_shipping_meter.dart';
 import '../../widgets/motion/ease_in_frame.dart';
+import '../../widgets/voucher_ui_visibility.dart';
 import 'checkout_screen.dart';
 import 'vouchers_screen.dart';
 import 'widgets/product_card.dart';
@@ -199,7 +201,13 @@ class _CartScreenState extends State<CartScreen> {
                       const SizedBox(height: 8),
                       FreeShippingMeter(subtotal: cart.subtotal),
                       const SizedBox(height: 12),
-                      _buildVoucherBanner(theme, ext, cart),
+                      // Voucher entry is a mock-only feature: the server
+                      // computes discounts in live mode and the client must
+                      // not invent savings it cannot verify.
+                      VoucherUiVisibility(
+                        show: !kUseLiveApi,
+                        child: _buildVoucherBanner(theme, ext, cart),
+                      ),
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -604,7 +612,7 @@ class _CartScreenState extends State<CartScreen> {
                     'Total ($selectedCount item${selectedCount == 1 ? '' : 's'})',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (quote.hasVoucherDiscount)
+                  if (!kUseLiveApi && quote.hasVoucherDiscount)
                     Text(
                       'Saved ${formatPeso(quote.discount)}',
                       style: theme.textTheme.bodySmall?.copyWith(
