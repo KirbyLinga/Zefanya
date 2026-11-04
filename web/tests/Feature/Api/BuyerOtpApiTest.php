@@ -3,7 +3,9 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Buyer\Buyer;
+use App\Notifications\Buyer\BuyerVerifyOtp;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
@@ -144,7 +146,7 @@ class BuyerOtpApiTest extends TestCase
 
     public function test_resend_issues_a_new_code_and_retires_the_old_one(): void
     {
-        \Illuminate\Support\Facades\Notification::fake();
+        Notification::fake();
         [$buyer, $oldCode] = $this->awaitingVerification();
 
         $newCode = null;
@@ -152,9 +154,9 @@ class BuyerOtpApiTest extends TestCase
             ->assertOk()
             ->assertJson(['ok' => true, 'message' => 'A new code has been sent.']);
 
-        \Illuminate\Support\Facades\Notification::assertSentTo(
+        Notification::assertSentTo(
             $buyer->fresh(),
-            \App\Notifications\Buyer\BuyerVerifyOtp::class,
+            BuyerVerifyOtp::class,
             function ($notification) use (&$newCode) {
                 $newCode = $notification->code;
 
@@ -199,5 +201,18 @@ class BuyerOtpApiTest extends TestCase
             route('register.buyer.verify-otp', $buyer->id),
             ['otp' => $code],
         )->assertOk()->assertJson(['ok' => true, 'already_verified' => true]);
+    }
+
+    public function test_the_web_otp_route_is_throttled(): void
+    {
+        [$buyer] = $this->awaitingVerification();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson(route('register.buyer.verify-otp', $buyer->id), ['otp' => '000000'])
+                ->assertStatus(422);
+        }
+
+        $this->postJson(route('register.buyer.verify-otp', $buyer->id), ['otp' => '000000'])
+            ->assertStatus(429);
     }
 }

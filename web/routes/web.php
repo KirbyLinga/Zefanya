@@ -2,6 +2,7 @@
 
 // Add to routes/web.php
 
+use App\Http\Controllers\Api\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\LoginChoiceController;
 use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\Buyer\RegisterBuyerController;
@@ -44,7 +45,8 @@ Route::get('/register/buyer/check-email', function () {
 
 // POST: validate the 6-digit code (JSON for the modal).
 Route::post('/register/buyer/verify-otp/{buyer}', [VerifyBuyerOtpController::class, 'verify'])
-    ->name('register.buyer.verify-otp');
+    ->name('register.buyer.verify-otp')
+    ->middleware('throttle:10,1');
 
 // POST: generate a fresh code + resend email (throttled).
 Route::post('/register/buyer/verify-otp/{buyer}/resend', [VerifyBuyerOtpController::class, 'resend'])
@@ -129,6 +131,6 @@ Route::post('/logout', [UnifiedLoginController::class, 'logout'])
     ->middleware('throttle:5,1');
 
 // Federated / Social Auth alias for mobile / web
-Route::post('/auth/google', [\App\Http\Controllers\Api\Auth\GoogleAuthController::class, 'handle'])
+Route::post('/auth/google', [GoogleAuthController::class, 'handle'])
     ->name('auth.google')
     ->middleware('throttle:api-google');
