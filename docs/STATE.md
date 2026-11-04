@@ -1,11 +1,11 @@
 # State
 
-Branch: integration/hardened  HEAD: 968aa77  Date: 2026-11-04
+Branch: integration/hardened  HEAD: 1c65cce  Date: 2026-11-04
 
 Base branch is integration/hardened. Never branch from feature/phase-f or snapshot/pre-hardening-merge. The snapshot holds a checkout voucher UI, a tracking map and web/app/Services code that have NOT been security-reviewed.
 
-## Test counts (HEAD 968aa77)
-- php artisan test: 419 passed, 0 failed (1890 assertions)
+## Test counts (HEAD 1c65cce)
+- php artisan test: 433 passed, 0 failed (2060 assertions)
 - flutter test: 753 passed, 0 failed
 - flutter analyze: 0 issues
 
