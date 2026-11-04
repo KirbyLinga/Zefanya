@@ -158,3 +158,82 @@ The api group now has a floor: `throttle:api-default` (60/min per actor) is appe
   - **Reason**: `$product->seller->update(['status' => 'pending_approval'])` silently dropped the status after `status` was moved to `$guarded` on the `Seller` model. The test setup now uses `forceFill` to match the service-layer pattern.
   - **Change**: Test setup line changed from `->update(['status' => 'pending_approval'])` to `->forceFill(['status' => 'pending_approval'])->save()`.
   - **Assertion**: Completely unchanged.
+
+---
+
+## Hardening H1–H6 (integration/hardened, 2026-11-04)
+
+Base for this ledger: `web-api-master` at `4e2cb05`. "Touched" means the file differs from that base. No web file was deleted.
+
+### Touched your files
+
+| File | Why it changed |
+|---|---|
+| `web/AGENTS.md` | H6 branch policy now names `integration/hardened`, requires `--ff-only` merges, and forbids branching from `feature/phase-f` / `snapshot/pre-hardening-merge`. |
+| `web/app/Enums/LogisticsProviderStatus.php` | Added `Suspended = 'suspended'` and its label. |
+| `web/app/Http/Controllers/Admin/RegistrationController.php` | Buyer/seller/logistics approve and reject writes now use `forceFill()->save()` for guarded decision fields. |
+| `web/app/Http/Controllers/Admin/SellerRegistrationController.php` | Seller approve/reject writes now use `forceFill()->save()`. |
+| `web/app/Http/Controllers/Api/Auth/LoginController.php` | `/me` recognises logistics-provider tokens and returns the courier gate/payload; buyer-only guard remains for buyer tokens. |
+| `web/app/Http/Controllers/Logistics/RegisterLogisticsController.php` | `status` is set explicitly after construction because it is guarded, never mass-assigned. |
+| `web/app/Http/Controllers/Seller/RegisterSellerController.php` | `status` is set explicitly after construction because it is guarded, never mass-assigned. |
+| `web/app/Http/Resources/ProductResource.php` | Added `stock`, `rating_avg`, `rating_count`, and seller `maker_note`. |
+| `web/app/Models/Admin/Admin.php` | H1: moved `role` and `email_verified_at` from `$fillable` to `$guarded`; removed unused `AdminFactory` import. |
+| `web/app/Models/Buyer/Buyer.php` | Added pending email/phone change fields and helpers; `status`, `email_verified_at`, `is_admin`, `role` are guarded; registration writes `status` explicitly. |
+| `web/app/Models/Logistics/LogisticsProvider.php` | Added Sanctum tokens, rider/licence fields, status helpers; H1 removed approval metadata from `$fillable`. |
+| `web/app/Models/Product.php` | Added `reviews()` relation and `priceCentavos()`. |
+| `web/app/Models/Seller/Seller.php` | Moved privileged attributes (`status`, `email_verified_at`, `is_admin`, `role`) to `$guarded`. |
+| `web/app/Models/SellerOrder.php` | Added handover/assignment columns, hid OTP hash and proof path, added casts and transition helpers. |
+| `web/app/Providers/AppServiceProvider.php` | Google verifier binding, HTTPS enforcement, named API rate limiters, and H1 `preventSilentlyDiscardingAttributes()` guard. |
+| `web/bootstrap/app.php` | Appends `throttle:api-default` to the API group; registers `courier.approved`. |
+| `web/composer.json` | Added `google/apiclient:2.14`. |
+| `web/composer.lock` | Lockfile for the Google client dependency. |
+| `web/config/services.php` | Added `services.google.client_ids` from `GOOGLE_CLIENT_IDS`. |
+| `web/database/factories/LogisticsProviderFactory.php` | Added `rejected()` and `suspended()` states. |
+| `web/phpunit.xml` | Added a test `APP_KEY` so encrypted features run without a local `.env`. |
+| `web/routes/admin.php` | Added the admin delivery-override route (reason + proof + audit row). |
+| `web/routes/api.php` | Added mobile/`v1` auth, PSGC, address, wishlist, review, order, courier, seller and admin endpoints, including delivery-pass/proof and throttles. |
+| `web/routes/seller.php` | Added seller order confirm/ready routes. |
+| `web/routes/web.php` | Added the `/auth/google` web alias. |
+| `web/tests/Feature/Api/ProductCatalogApiTest.php` | Setup-only `forceFill` change; assertion unchanged (details below). |
+| `web/tests/Feature/HttpsUrlGenerationTest.php` | Environment setup only; assertion unchanged (details below). |
+
+### Touched your tests
+
+- `web/tests/Feature/Api/ProductCatalogApiTest.php`
+  - **Reason**: `status` is guarded on `Seller`, so `update(['status' => ...])` now throws instead of silently discarding.
+  - **Diff**:
+    ```diff
+    -        $product->seller->update(['status' => 'pending_approval']);
+    +        $product->seller->forceFill(['status' => 'pending_approval'])->save();
+    ```
+  - **Assertion**: Completely unchanged.
+
+- `web/tests/Feature/HttpsUrlGenerationTest.php`
+  - **Reason**: `AppServiceProvider::boot()` reads `$this->app->environment()`, not `config('app.env')`; the old setup could not actually enter production mode.
+  - **Change**: Sets `$this->app['env'] = 'production'`, then restores both `$this->app['env']` and `config('app.env')` in `finally`.
+  - **Assertion**: Completely unchanged.
+
+- `web/tests/Feature/MassAssignmentGuardTest.php`
+  - **Reason**: H1 makes guarded mass assignment throw outside production. The old probes asserted silent discard, which is the behaviour being removed.
+  - **Changed assertions**: Three existing probes (`test_buyer_profile_update_ignores_status`, `test_admin_approval_uses_forcefill_not_mass_assignment`, `test_seller_approval_uses_forcefill_not_mass_assignment`) now expect `MassAssignmentException` containing the guarded attribute name. The allowed attributes and the `forceFill` half of each test are unchanged.
+  - **Added tests**: `test_admin_role_is_not_mass_assignable`, `test_logistics_approval_metadata_is_not_mass_assignable`.
+  - **Note**: This is an intentional exception to the "never change web tests" rule: the old assertions encoded the silent discard that H1 removes. No assertion was weakened.
+
+- `web/tests/Feature/Security/DeliveryHandoverSecurityTest.php`
+  - **Reason**: `Admin::create(['role' => ...])` now throws because `role` is guarded.
+  - **Change**: Three admin setups create the row, then call `forceFill(['role' => ...])->save()`.
+  - **Assertion**: Completely unchanged.
+
+- `web/tests/Feature/EndToEndAcceptanceTest.php`
+  - **Reason**: Same guarded `role` setup as above.
+  - **Change**: One admin setup now uses `forceFill(['role' => 'admin'])->save()`. Pint also removed three unused imports (`PsgcSeeder`, `Hash`, `PersonalAccessToken`), reordered the `Category` import, and removed one stray blank line; no test logic changed.
+  - **Assertion**: Completely unchanged.
+
+- `web/tests/Feature/Security/RouteMatrixTest.php`
+  - **Reason**: H4 requires the delivery-pass/proof routes to have explicit 403, 422, success and throttle coverage.
+  - **Added tests** (six): buyer-B cannot request another buyer's pass (403); buyer-B cannot download another buyer's proof (403); pass is refused before `OUT_FOR_DELIVERY` (422); pass returns a 6-digit code and token; owner can download the stored proof; the 61st `api-default` request is throttled (429).
+  - **Refactor**: Extracted `parcelFor()`; the existing milestone test uses it. Its assertion is unchanged.
+
+- `web/tests/Feature/AdminApprovalFlowTest.php`
+  - **New file** (three tests): seller approval persists `status`/`approved_at`/`approved_by` and sends the decision notification; seller rejection persists the reason; a buyer cannot approve.
+
