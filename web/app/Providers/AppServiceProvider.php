@@ -6,6 +6,7 @@ use App\Models\CartItem;
 use App\Services\Auth\GoogleApiTokenVerifier;
 use App\Services\Auth\GoogleIdTokenVerifier;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
@@ -32,6 +33,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A guarded attribute passed to create()/update() must fail loudly outside
+        // production instead of being dropped. In production the default remains
+        // fail-open for availability, but every caller below is exercised by the
+        // test suite with this guard on.
+        Model::preventSilentlyDiscardingAttributes(! app()->isProduction());
+
         $this->configureRateLimiting();
 
         // In production every generated URL (routes, assets, pagination, password

@@ -368,8 +368,8 @@ class DeliveryHandoverSecurityTest extends TestCase
             'name' => 'Override Admin',
             'email' => 'override@zefanya.local',
             'password' => 'AdminSecret123!',
-            'role' => 'admin',
         ]);
+        $admin->forceFill(['role' => 'admin'])->save();
         $job = $this->job($this->buyer(), $this->courier());
 
         $this->actingAs($admin, 'admin')
@@ -403,8 +403,8 @@ class DeliveryHandoverSecurityTest extends TestCase
             'name' => 'Override Admin',
             'email' => 'override2@zefanya.local',
             'password' => 'AdminSecret123!',
-            'role' => 'admin',
         ]);
+        $admin->forceFill(['role' => 'admin'])->save();
         $job = $this->job($this->buyer(), $this->courier());
 
         $this->actingAs($admin, 'admin')
@@ -422,8 +422,8 @@ class DeliveryHandoverSecurityTest extends TestCase
             'name' => 'Support Agent',
             'email' => 'support@zefanya.local',
             'password' => 'AdminSecret123!',
-            'role' => 'support',
         ]);
+        $support->forceFill(['role' => 'support'])->save();
         $job = $this->job($this->buyer(), $this->courier());
 
         $this->actingAs($support, 'admin')

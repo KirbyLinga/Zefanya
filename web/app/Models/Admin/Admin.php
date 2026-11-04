@@ -2,7 +2,6 @@
 
 namespace App\Models\Admin;
 
-use Database\Factories\AdminFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -15,7 +14,12 @@ class Admin extends Authenticatable
         'name',
         'email',
         'password',
+    ];
+
+    /** @var list<string> */
+    protected $guarded = [
         'role',
+        'email_verified_at',
     ];
 
     protected $hidden = [

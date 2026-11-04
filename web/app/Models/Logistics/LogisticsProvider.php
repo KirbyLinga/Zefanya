@@ -46,12 +46,6 @@ class LogisticsProvider extends Authenticatable
         'dti_permit_path',
         'is_online',
         'reverification_required',
-        // Set only by the admin approval/rejection actions (never from request
-        // data — RegistrationController writes these explicitly). Without them in
-        // the allow-list Model::update() silently drops the decision metadata.
-        'rejection_reason',
-        'approved_by',
-        'approved_at',
     ];
 
     /** @var list<string> */

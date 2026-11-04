@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\LogisticsProviderStatus;
+use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Services\Auth\GoogleIdTokenVerifier;
+use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -21,7 +23,8 @@ use Tests\TestCase;
  * that key being applied.
  *
  * Mutation: if 'status' is put back in $fillable on Buyer, the
- * test_buyer_registration_ignores_status test fails.
+ * test_buyer_profile_update_ignores_status test fails because fill()
+ * stops throwing MassAssignmentException.
  */
 class MassAssignmentGuardTest extends TestCase
 {
@@ -155,8 +158,15 @@ class MassAssignmentGuardTest extends TestCase
         ]);
 
         // There is currently no profile-update route on the API, but we test
-        // the model layer directly: fill() with status should not apply it.
-        $buyer->fill(['status' => 'rejected', 'first_name' => 'Updated']);
+        // the model layer directly: fill() with a guarded attribute must fail
+        // loudly now that preventSilentlyDiscardingAttributes is on in tests.
+        try {
+            $buyer->fill(['status' => 'rejected', 'first_name' => 'Updated']);
+            $this->fail('fill() accepted a guarded status attribute.');
+        } catch (MassAssignmentException $e) {
+            $this->assertStringContainsString('status', $e->getMessage());
+        }
+
         $this->assertNotSame('rejected', $buyer->status);
         $this->assertSame('Updated', $buyer->first_name);
     }
@@ -170,7 +180,13 @@ class MassAssignmentGuardTest extends TestCase
         $courier = LogisticsProvider::factory()->pendingApproval()->create();
 
         // Simulate what fill() would do (wrong — mass-assignment path):
-        $courier->fill(['status' => LogisticsProviderStatus::Approved->value]);
+        try {
+            $courier->fill(['status' => LogisticsProviderStatus::Approved->value]);
+            $this->fail('fill() accepted a guarded status attribute.');
+        } catch (MassAssignmentException $e) {
+            $this->assertStringContainsString('status', $e->getMessage());
+        }
+
         $this->assertNotEquals(
             LogisticsProviderStatus::Approved,
             $courier->status,
@@ -190,12 +206,57 @@ class MassAssignmentGuardTest extends TestCase
     {
         $seller = Seller::factory()->create(['status' => 'pending_approval']);
 
-        // fill() with status should not apply it (guarded):
-        $seller->fill(['status' => 'approved']);
+        // fill() with status must fail loudly (guarded):
+        try {
+            $seller->fill(['status' => 'approved']);
+            $this->fail('fill() accepted a guarded status attribute.');
+        } catch (MassAssignmentException $e) {
+            $this->assertStringContainsString('status', $e->getMessage());
+        }
+
         $this->assertNotSame('approved', $seller->status);
 
         // forceFill does apply it:
         $seller->forceFill(['status' => 'approved'])->save();
         $this->assertSame('approved', $seller->fresh()->status);
+    }
+
+    // ── Admin and approval metadata ──────────────────────────────────────────
+
+    public function test_admin_role_is_not_mass_assignable(): void
+    {
+        try {
+            Admin::create([
+                'name' => 'Escalated Admin',
+                'email' => 'escalated'.uniqid().'@example.com',
+                'password' => 'AdminSecret123!',
+                'role' => 'super_admin',
+            ]);
+            $this->fail('Admin::create() accepted a guarded role attribute.');
+        } catch (MassAssignmentException $e) {
+            $this->assertStringContainsString('role', $e->getMessage());
+        }
+
+        $this->assertSame(0, Admin::count());
+    }
+
+    public function test_logistics_approval_metadata_is_not_mass_assignable(): void
+    {
+        $provider = LogisticsProvider::factory()->pendingApproval()->create();
+
+        try {
+            $provider->fill([
+                'approved_at' => now(),
+                'approved_by' => 1,
+                'rejection_reason' => 'forged',
+            ]);
+            $this->fail('fill() accepted guarded approval metadata.');
+        } catch (MassAssignmentException $e) {
+            $this->assertStringContainsString('approved_at', $e->getMessage());
+        }
+
+        $this->assertNull($provider->approved_at);
+        $this->assertNull($provider->approved_by);
+        $this->assertNull($provider->rejection_reason);
     }
 }

@@ -7,7 +7,6 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
-use App\Models\Shared\Category;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Product;
 use App\Models\Psgc\PsgcBarangay;
@@ -16,14 +15,12 @@ use App\Models\Psgc\PsgcProvince;
 use App\Models\Psgc\PsgcRegion;
 use App\Models\Seller\Seller;
 use App\Models\SellerOrder;
+use App\Models\Shared\Category;
 use App\Models\Voucher;
-use Database\Seeders\PsgcSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
 /**
@@ -133,8 +130,8 @@ class EndToEndAcceptanceTest extends TestCase
             'name' => 'Super Admin',
             'email' => 'admin@zefanya.local',
             'password' => 'AdminSecret123!',
-            'role' => 'admin',
         ]);
+        $admin->forceFill(['role' => 'admin'])->save();
         $this->actingAs($admin, 'admin')
             ->post(route('admin.registrations.buyer.approve', $buyer))
             ->assertRedirect();
@@ -339,7 +336,6 @@ class EndToEndAcceptanceTest extends TestCase
                 'milestone' => 'DELIVERED',
                 'payment_status' => 'paid',
             ]);
-
 
         $sellerOrder->refresh();
         $this->assertSame(OrderStatus::Delivered, $sellerOrder->status);
