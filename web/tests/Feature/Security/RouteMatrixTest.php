@@ -264,6 +264,18 @@ class RouteMatrixTest extends TestCase
             ->assertDownload('proof.jpg');
     }
 
+    public function test_delivery_proof_is_404_when_the_parcel_has_no_photo(): void
+    {
+        Storage::fake('local');
+
+        $buyer = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyer, 'DELIVERED');
+
+        Sanctum::actingAs($buyer, [], 'sanctum');
+        $this->getJson('/api/v1/buyer/orders/'.$so->id.'/delivery-proof')
+            ->assertStatus(404);
+    }
+
     public function test_delivery_pass_is_throttled_after_the_api_default_floor(): void
     {
         $buyer = Buyer::factory()->create(['status' => 'approved']);
@@ -276,6 +288,23 @@ class RouteMatrixTest extends TestCase
         }
 
         $this->postJson('/api/v1/buyer/orders/'.$so->id.'/delivery-pass')->assertStatus(429);
+    }
+
+    public function test_delivery_proof_is_throttled_after_the_api_default_floor(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('delivery-proofs/proof.jpg', 'fake-image-bytes');
+
+        $buyer = Buyer::factory()->create(['status' => 'approved']);
+        $so = $this->parcelFor($buyer, 'DELIVERED', 'delivery-proofs/proof.jpg');
+
+        Sanctum::actingAs($buyer, [], 'sanctum');
+
+        for ($i = 0; $i < 60; $i++) {
+            $this->get('/api/v1/buyer/orders/'.$so->id.'/delivery-proof')->assertOk();
+        }
+
+        $this->get('/api/v1/buyer/orders/'.$so->id.'/delivery-proof')->assertStatus(429);
     }
 
     // ── Invalid input → 422 ───────────────────────────────────────────────
