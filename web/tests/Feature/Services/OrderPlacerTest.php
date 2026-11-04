@@ -230,4 +230,24 @@ class OrderPlacerTest extends TestCase
 
         app(OrderPlacer::class)->place(Buyer::factory()->create(), []);
     }
+
+    public function test_only_one_place_wins_the_last_unit(): void
+    {
+        $product = $this->product($this->seller('Loom & Larder'), stock: 1);
+
+        app(OrderPlacer::class)->place(Buyer::factory()->create(), [
+            ['product_id' => $product->id, 'quantity' => 1],
+        ]);
+        $this->assertSame(0, $product->fresh()->stock_quantity);
+
+        $this->expectException(CheckoutException::class);
+        app(OrderPlacer::class)->place(Buyer::factory()->create(), [
+            ['product_id' => $product->id, 'quantity' => 1],
+        ]);
+
+        // The failed attempt wrote nothing: still one order, one parcel, one ledger row.
+        $this->assertSame(1, Order::query()->count());
+        $this->assertSame(1, SellerOrder::query()->count());
+        $this->assertSame(1, InventoryTransaction::query()->count());
+    }
 }
