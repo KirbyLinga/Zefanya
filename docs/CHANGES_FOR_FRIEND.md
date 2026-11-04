@@ -231,7 +231,7 @@ Base for this ledger: `web-api-master` at `4e2cb05`. "Touched" means the file di
 
 - `web/tests/Feature/Security/RouteMatrixTest.php`
   - **Reason**: H4 requires the delivery-pass/proof routes to have explicit 403, 422, success and throttle coverage.
-  - **Added tests** (six): buyer-B cannot request another buyer's pass (403); buyer-B cannot download another buyer's proof (403); pass is refused before `OUT_FOR_DELIVERY` (422); pass returns a 6-digit code and token; owner can download the stored proof; the 61st `api-default` request is throttled (429).
+  - **Added tests** (eight): buyer-B cannot request another buyer's pass (403); buyer-B cannot download another buyer's proof (403); pass is refused before `OUT_FOR_DELIVERY` (422); pass returns a 6-digit code and token; owner can download the stored proof; proof is 404 when no photo is stored; the 61st pass request is throttled (429); the 61st proof request is throttled (429). `delivery-proof` has no 422 branch; its negative cases are 403 (not owner) and 404 (no photo).
   - **Refactor**: Extracted `parcelFor()`; the existing milestone test uses it. Its assertion is unchanged.
 
 - `web/tests/Feature/AdminApprovalFlowTest.php`
