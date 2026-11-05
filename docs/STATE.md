@@ -1,7 +1,5 @@
-# State
-
 Branch: feature/s1-lite  HEAD: ef7caf1  Date: 2026-11-05
-Stage: S3-lite DONE (3.1 demo:seed, 3.3 mock parity, 3.4 docs/demo-script.md, 3.5 docs/limitations-for-presentation.md). Next: S4 (intro gate, banners, brand mark, loaders).
+Stage: S4 IN PROGRESS (4.1 intro gate DONE, 4.2 banners DONE, 4.3 brand mark DONE, 4.4 loaders: replace CircularProgressIndicator with ZefanyaLoader, add skeletons to Orders list, add loader/skeleton tests).
 Base check: branch cut from integration/hardened @ 6a9605a.
 
 ## Test counts (HEAD ef7caf1)
@@ -23,6 +21,12 @@ Base check: branch cut from integration/hardened @ 6a9605a.
 - 3.3 mock parity — mock repositories support all demo flows (auth, catalog, cart, orders, addresses, reviews, chat, courier, returns). 762 Flutter tests pass.
 - 3.4 docs/demo-script.md — 7 min per role (buyer, rider, seller, admin), mock-mode + live for LIVE-READY features, failure plans, pre-demo checklist, build instructions.
 - 3.5 docs/limitations-for-presentation.md — one page: push notifications, deep links, payment gateway, chat, flash-sale creation, live tracking, each with one sentence.
+
+## S4 in progress
+- 4.1 Intro gate: landing_screen.dart with two-beat animation, reduced motion support, tests exist.
+- 4.2 Banners: PromoCarousel on Home, auto-advance, manual swipe, dots.
+- 4.3 Brand mark: ZefanyaMark (static) and ZefanyaLoader (animated) widgets.
+- 4.4 Loaders TODO: replace CircularProgressIndicator (5 remaining), skeletons on Orders list, loader/skeleton tests.
 
 ## Open
 - API admin logistics approve/reject has no success test; Admin lacks HasApiTokens. Recorded for S6 route/test sweep.

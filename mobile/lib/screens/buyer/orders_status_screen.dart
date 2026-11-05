@@ -30,6 +30,7 @@ import '../../utils/timed_snackbar.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/shimmer_box.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import '../shared/chat_screen.dart';
 import 'cart_screen.dart';
@@ -114,6 +115,22 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
       return Scaffold(
         backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
         body: SafeArea(child: _OrdersLoadFailure(error: failure)),
+      );
+    }
+
+    // Skeletons while the first load or a refresh is in flight — never an
+    // empty list that could be mistaken for "no orders yet".
+    if (orderState.isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: AppSpacing.s24),
+              ...List.generate(4, (i) => EaseInFrame(index: i, child: _OrderSkeleton())),
+            ],
+          ),
+        ),
       );
     }
 
@@ -348,6 +365,43 @@ class _StageNode extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Skeleton placeholder for an order card while the list is loading —
+/// same shape as [_OrderCard] so the layout doesn't jump when data arrives.
+class _OrderSkeleton extends StatelessWidget {
+  const _OrderSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s8, AppSpacing.s20, AppSpacing.s8),
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppSpacing.s12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ShimmerBox(child: Container(height: AppSpacing.s14, width: 120)),
+          const SizedBox(height: AppSpacing.s8),
+          ShimmerBox(child: Container(height: AppSpacing.s12, width: double.infinity)),
+          const SizedBox(height: AppSpacing.s8),
+          ShimmerBox(child: Container(height: AppSpacing.s10, width: 80)),
+          const SizedBox(height: AppSpacing.s16),
+          Row(
+            children: [
+              ShimmerBox(child: Container(height: AppSpacing.s10, width: 40)),
+              const SizedBox(width: AppSpacing.s8),
+              ShimmerBox(child: Container(height: AppSpacing.s10, width: 100)),
+            ],
+          ),
+        ],
       ),
     );
   }

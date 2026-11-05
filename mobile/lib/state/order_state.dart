@@ -76,6 +76,13 @@ class OrderState extends ChangeNotifier {
   /// Synchronous on purpose: this getter is called from `build()`.
   List<Order> _orders = const [];
 
+  /// Whether a load or refresh is in flight. Used by the Orders screen to
+  /// show skeletons instead of an empty list while data arrives.
+  bool _loading = false;
+
+  /// Whether orders are currently being loaded or refreshed.
+  bool get isLoading => _loading;
+
   List<Order> get orders => List.unmodifiable(_orders);
 
   /// Every catalogue item this buyer has ordered, across all orders.
@@ -185,11 +192,17 @@ class OrderState extends ChangeNotifier {
   /// own comment has always said: an empty Orders tab that reports the error when
   /// it is actually opened.
   Future<void> load() async {
+    _loading = true;
+    notifyListeners();
     await Future.wait([_repository.load(), returns.load()]);
 
     try {
       _orders = await _repository.orders();
       _loadFailure = null;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
     } on ApiNotConfiguredException {
       // A live build with no base URL is a *build* mistake rather than a runtime
       // condition: no screen can do anything sensible with it, and the person who
@@ -210,6 +223,8 @@ class OrderState extends ChangeNotifier {
   /// so a reader that cannot handle a throw (a `notifyListeners`-driven rebuild)
   /// still has something true to render.
   Future<void> refresh() async {
+    _loading = true;
+    notifyListeners();
     try {
       _orders = await _repository.orders();
       _loadFailure = null;
@@ -217,6 +232,7 @@ class OrderState extends ChangeNotifier {
       _loadFailure = error;
       rethrow;
     } finally {
+      _loading = false;
       notifyListeners();
     }
   }
