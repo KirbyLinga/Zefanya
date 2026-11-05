@@ -1,10 +1,10 @@
 # State
 
-Branch: integration/hardened  HEAD: d5c21bf  Date: 2026-11-05
+Branch: integration/hardened  HEAD: 721aabf  Date: 2026-11-05
 Stage: S0-lite DONE (0.1, 0.6, 0.7). Next: S1-lite (1.1 + 1.2 High only), then REVIEW STOP 1.
 Base check: 6dfa162 is an ancestor of HEAD; the branch had 13 later commits (H1-H6, WO-0) at stage start.
 
-## Test counts (HEAD d5c21bf)
+## Test counts (HEAD 721aabf)
 - php artisan test: 439 passed, 0 failed (2082 assertions)
 - flutter test: 753 passed, 0 failed
 - flutter analyze: 4 issues found (all in uncommitted mobile/lib/services/media_picker.dart; HEAD's mobile tree is unchanged)
