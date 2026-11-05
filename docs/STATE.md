@@ -1,127 +1,20 @@
 # State
 
-Branch: integration/hardened  HEAD: 41e40c0  Date: 2026-11-04
+Branch: integration/hardened  HEAD: d5c21bf  Date: 2026-11-05
+Stage: S0-lite DONE (0.1, 0.6, 0.7). Next: S1-lite (1.1 + 1.2 High only), then REVIEW STOP 1.
+Base check: 6dfa162 is an ancestor of HEAD; the branch had 13 later commits (H1-H6, WO-0) at stage start.
 
-Base branch is integration/hardened. Never branch from feature/phase-f or snapshot/pre-hardening-merge. The snapshot holds a checkout voucher UI, a tracking map and web/app/Services code that have NOT been security-reviewed.
-
-## Test counts (HEAD 41e40c0)
-- php artisan test: 434 passed, 0 failed (2062 assertions)
+## Test counts (HEAD d5c21bf)
+- php artisan test: 439 passed, 0 failed (2082 assertions)
 - flutter test: 753 passed, 0 failed
-- flutter analyze: 0 issues
+- flutter analyze: 4 issues found (all in uncommitted mobile/lib/services/media_picker.dart; HEAD's mobile tree is unchanged)
 
-## Worktrees
-- Main only
+## S0-lite done
+- 0.1: guard already live; audited 5 auth/role models and all create/update/fill sites; added 5 e2e tests (web buyer/seller/logistics registration, admin buyer approve/reject). Mutation S0-plain-update caught (500 MassAssignmentException). See docs/mass-assignment-audit.md.
+- 0.6: root AGENTS.md branch baseline; docs/MASTER_PLAN.md committed.
+- 0.7: spec workbook present; all 39 sheets exported to docs/qa/csv as UTF-8 without BOM.
 
-## Provenance (step 6)
-- storeProof null check created in 929bf46 (H1), always intact.
-- fix/security-hardening and integration/hardened: check present, never commented out.
-- feature/phase-f and snapshot/pre-hardening-merge: file didn't exist yet.
-
-## Mutations verified (step 3, integration/hardened e036a01)
-- d1 email_verified in claimsProblem -> CAUGHT: 401 expected, got 200
-- d2 email_verified in GoogleApiTokenVerifier only -> PASSES (claimsProblem catches); d3 (both removed) -> CAUGHT
-- d4 audience in claimsProblem -> CAUGHT: 401 expected, got 200
-- d5 issuer in claimsProblem -> NOT CAUGHT by integration test; caught by new ClaimsProblemTest unit test
-- d5 expiry in claimsProblem -> CAUGHT: 401 expected, got 200
-- f assigned-courier in service -> NOT CAUGHT by HTTP test (controller checks); new AssignedCourierServiceTest catches directly
-- g1 token expiry -> CAUGHT: 422 expected, got 200
-- g2 token version -> CAUGHT: 422 expected, got 200
-- j-courier courier.approved middleware removed -> CAUGHT: 403 expected, got 200
-- j-review DELIVERED requirement removed -> CAUGHT: 422 expected, got 201
-- Duplicate email_verified check removed from GoogleApiTokenVerifier; canonical check in claimsProblem only
-
-## Mutations verified (step 1, integration/hardened 968aa77)
-- 1a-issuer: ClaimsProblemTest test_wrong_issuer_is_rejected -> CAUGHT
-- 1b-controller: CourierMilestoneController abort_unless removed -> PASS (service catches it — duplicate)
-- 1b-service: OrderDeliveryService assigned-courier removed -> AssignedCourierServiceTest CAUGHT
-- 1c-tokeninfo: GoogleAuthController catch block re-enables tokeninfo -> Http::assertNothingSent CAUGHT
-- 1d-issuer-verifier: GoogleApiTokenVerifierTest test_wrong_issuer_throws -> CAUGHT
-- 1d-audience-verifier: GoogleApiTokenVerifierTest test_wrong_audience_throws + test_d4_audience -> CAUGHT
-- 2-mass-assignment: status back in $fillable + createFromRegistration accepts $data['status'] -> MassAssignmentGuardTest CAUGHT
-- 3-delivered-writers: $order->status='delivered' in controller -> DeliveredWritersTest CAUGHT
-- 5-route-mutation: bare /api/v1 route with no auth -> RouteMatrixTest CAUGHT
-
-## HTTP BOM proof (step 4)
-- GET /api/v1/psgc/regions: first byte 0x7B (JSON)
-- GET /api/v1/buyer/me (no token): first byte 0x7B (JSON, 401)
-
-## Snapshot diff (step 5)
-- 2 test files only on snapshot: checkout_voucher_test.dart (5 tests), tracking_map_test.dart (6 tests)
-- 4 non-test files only on snapshot: 2 mobile/lib, 1 mobile/test/support, 1 web/app/Services
-- See docs/snapshot-diff.md
-
-## Route reality (step 5)
-- Total routes: 173
-- /api/v1 routes: 37 (audit had 35)
-- New since audit: api.v1.buyer.orders.delivery-pass, api.v1.buyer.orders.delivery-proof
-- Auth guard test: RouteMatrixTest iterates Route::getRoutes() (dynamic)
-- Throttle guard test: ApiRateLimitingTest iterates $router->getRoutes() (dynamic)
-- Mutation: bare /api/v1 route with no auth -> RouteMatrixTest catches
-
-## New tests added this session
-- web/tests/Unit/ClaimsProblemTest.php (9 tests)
-- web/tests/Feature/AssignedCourierServiceTest.php (1 test)
-- web/tests/Unit/GoogleApiTokenVerifierTest.php (8 tests)
-- web/tests/Feature/MassAssignmentGuardTest.php (7 tests)
-- web/tests/Feature/Security/DeliveredWritersTest.php (1 test)
-- mobile/test/live_mode_honesty_test.dart (4 tests)
-- RouteMatrixTest: added delivery-pass/proof to 401 data provider
-
-## Tests that must exist (step 4) — all present
-- Admin override writes audit row: test_admin_override_delivers_with_a_reason_photo_and_audit_row
-- DELIVERED requires verified code AND proof photo: test_success_requires_and_stores_a_proof_photo
-- Valid photo with null hash refused: test_null_hash_never_allows_delivery
-
-## Delivered writers (step 3)
-- See docs/delivered-writers.md
-- Only OrderDeliveryService.php and OrderStatus.php assign delivered status
-
-## Mass assignment (step 2)
-- status, email_verified_at, is_admin, role removed from $fillable on Buyer, LogisticsProvider, Seller
-- Admin controllers use forceFill()->save() instead of update()
-- ProductCatalogApiTest setup line changed (listed in CHANGES_FOR_FRIEND.md)
-
-## Open items
-1. Forgot password: dead stub, hidden in live mode only
-2. Chat, promotions, returns: no backend
-3. Voucher stacking: app shows local savings server doesn't record (hidden in live mode)
-
-## Worktrees
-- Main only
-
-## Provenance (step 6)
-- storeProof null check created in 929bf46 (H1), always intact.
-- fix/security-hardening and integration/hardened: check present, never commented out.
-- feature/phase-f and snapshot/pre-hardening-merge: file didn't exist yet.
-
-## Mutations verified (step 3, integration/hardened e036a01)
-- d1 email_verified in claimsProblem -> CAUGHT: 401 expected, got 200
-- d2 email_verified in GoogleApiTokenVerifier only -> PASSES (claimsProblem catches); d3 (both removed) -> CAUGHT
-- d4 audience in claimsProblem -> CAUGHT: 401 expected, got 200
-- d5 issuer in claimsProblem -> NOT CAUGHT by integration test; caught by new ClaimsProblemTest unit test
-- d5 expiry in claimsProblem -> CAUGHT: 401 expected, got 200
-- f assigned-courier in service -> NOT CAUGHT by HTTP test (controller checks); new AssignedCourierServiceTest catches directly
-- g1 token expiry -> CAUGHT: 422 expected, got 200
-- g2 token version -> CAUGHT: 422 expected, got 200
-- j-courier courier.approved middleware removed -> CAUGHT: 403 expected, got 200
-- j-review DELIVERED requirement removed -> CAUGHT: 422 expected, got 201
-- Duplicate email_verified check removed from GoogleApiTokenVerifier; canonical check in claimsProblem only
-
-## HTTP BOM proof (step 4)
-- GET /api/v1/psgc/regions: first byte 0x7B (JSON)
-- GET /api/v1/buyer/me (no token): first byte 0x7B (JSON, 401)
-
-## Snapshot diff (step 5)
-- 2 test files only on snapshot: checkout_voucher_test.dart (5 tests), tracking_map_test.dart (6 tests)
-- 4 non-test files only on snapshot: 2 mobile/lib, 1 mobile/test/support, 1 web/app/Services
-- See docs/snapshot-diff.md
-
-## New tests added this session
-- web/tests/Unit/ClaimsProblemTest.php (9 tests)
-- web/tests/Feature/AssignedCourierServiceTest.php (1 test)
-
-## Open items
-1. Mass assignment: Buyer::$fillable still has 'status' — not hardened at model level
-2. Forgot password: dead stub, hidden in live mode only
-3. Chat, promotions, returns: no backend
-4. Voucher stacking: app shows local savings server doesn't record
+## Open
+- API admin logistics approve/reject has no success test; Admin lacks HasApiTokens. Web admin routes covered; recorded for the S6 route/test sweep.
+- Pre-existing uncommitted S2.1 media-picker changes were left untouched (source of the 4 analyze issues).
+- S1-lite artifacts (docs/feature-status.md rewrite, docs/spec-conformance.md) not started; docs/feature-truth-table.md is the older WO-0 table, not the S1 deliverable.
