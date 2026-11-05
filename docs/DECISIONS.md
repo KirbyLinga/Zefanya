@@ -158,3 +158,9 @@ All rate limits are named buckets in `AppServiceProvider::configureRateLimiting(
 - **Classification:** fixture bug. The assertion (`expect '3'`) is correct stock-clamp logic. The taps silently no-op'd, leaving quantity at 1, so `find.text('3')` found nothing.
 - **Fix:** `tester.ensureVisible(plusButton)` before each tap scrolls the stepper into the visible, hit-testable area. The assertion is unchanged.
 - **Pre-existing check:** The same failure reproduces on `feature/phase-f` (the base of fix/security-hardening). It was introduced when the screen's bottom-action area height increased; the test was never updated. Not a security-branch regression.
+
+## S0-lite (integration/hardened, 2026-11-05)
+
+1. **Base check deviation:** `integration/hardened` was at `69dc883` (13 commits after `6dfa162`; H1-H6 and WO-0) when S0-lite started. `6dfa162` was verified as an ancestor. Continued instead of stopping because those later commits are the hardening work S0.1 audits and the architect asked to resume at the first unfinished stage. Recorded in `docs/STATE.md`.
+2. **Mutation restore:** restored only the mutated file (`git restore web/app/Http/Controllers/Admin/RegistrationController.php`) instead of `git restore .`, because the working tree held pre-existing uncommitted S2.1 media-picker work that must not be discarded.
+3. **Flutter analyze:** the 4 reported issues are all in the pre-existing uncommitted `mobile/lib/services/media_picker.dart`; S0-lite changed no mobile file. S2.1 owns that cleanup.
