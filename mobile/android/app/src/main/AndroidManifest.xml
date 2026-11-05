@@ -77,5 +77,20 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
+        <!-- Image capture (camera) for MediaPicker: on Android 11+
+             package visibility is needed to resolve the camera intent. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
+        </intent>
+        <!-- Media picker (gallery / photo picker) for MediaPicker: on Android 11+
+             package visibility is needed to resolve image pick intents. -->
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT"/>
+            <data android:mimeType="image/*"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT"/>
+            <data android:mimeType="image/*"/>
+        </intent>
     </queries>
 </manifest>

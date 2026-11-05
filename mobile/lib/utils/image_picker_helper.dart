@@ -8,91 +8,56 @@
 // meant to persist (a saved avatar path, in particular) needs its own
 // stable copy rather than trusting the original path to still exist
 // next launch.
+//
+// All picking now routes through [MediaPicker] (lib/services/media_picker.dart),
+// which owns permissions, denial handling, re-encoding, validation and
+// storage. This helper remains as a thin compatibility wrapper so existing
+// call sites (registration, profile, review, rider documents, chat) keep
+// working while all image logic lives in one service.
 
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import '../theme/app_theme.dart';
-import '../widgets/editorial_shapes.dart';
+
+import '../services/media_picker.dart';
 
 /// Shows a bottom sheet to pick Camera or Gallery, then returns the
 /// picked image copied into permanent app storage — or null if the
 /// user cancelled at any point.
+///
+/// All picking is handled by [MediaPicker], which:
+///   - requests the camera permission before launching the camera,
+///   - shows a friendly message with Open Settings on denial,
+///   - re-encodes to max 1280 px, JPEG quality 80, stripping EXIF/GPS,
+///   - rejects non-images and files over 5 MB.
 Future<File?> pickAndSaveImage(
   BuildContext context, {
   required String filenamePrefix,
   bool cameraOnly = false,
 }) async {
-  if (cameraOnly) {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-      maxWidth: 1600,
-      imageQuality: 85,
-    );
-    if (picked == null) return null;
-    return _savePicked(picked, filenamePrefix);
-  }
-
-  final source = await showModalBottomSheet<ImageSource>(
+  final media = MediaPicker();
+  final result = await media.pick(
     context: context,
-    backgroundColor: AppColors.surface,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(ShapeTier.hero.symmetric),
-      ),
-    ),
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.divider,
-              borderRadius: radiusOf(ShapeTier.pill),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: Icon(
-              Icons.photo_camera_outlined,
-              color: AppColors.primaryDark,
-            ),
-            title: const Text('Take a Photo'),
-            onTap: () => Navigator.of(context).pop(ImageSource.camera),
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.photo_library_outlined,
-              color: AppColors.primaryDark,
-            ),
-            title: const Text('Choose from Gallery'),
-            onTap: () => Navigator.of(context).pop(ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
+    filenamePrefix: filenamePrefix,
+    cameraOnly: cameraOnly,
   );
-
-  if (source == null) return null;
-
-  final picked = await ImagePicker().pickImage(
-    source: source,
-    maxWidth: 1600,
-    imageQuality: 85,
-  );
-  if (picked == null) return null;
-  return _savePicked(picked, filenamePrefix);
+  if (result == null) return null;
+  return result.file;
 }
 
-Future<File> _savePicked(XFile picked, String filenamePrefix) async {
-  final docsDir = await getApplicationDocumentsDirectory();
-  final ext = picked.path.split('.').last;
-  final filename =
-      '${filenamePrefix}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-  return File(picked.path).copy('${docsDir.path}/$filename');
+/// Re-thrown when [MediaPicker] refuses a pick for a user-facing reason.
+class ImagePickRefusal implements Exception {
+  final MediaProblem problem;
+  ImagePickRefusal(this.problem);
 }
+
+/// Whether [e] is a user-facing image-pick refusal.
+bool isImagePickRefusal(Object? e) => e is ImagePickRefusal;
+
+/// Extract the [MediaProblem] from a caught image-pick failure, or
+/// [MediaProblem.platformError] when it is not a refusal.
+MediaProblem imagePickProblemOf(Object? e) {
+  if (e is ImagePickRefusal) return e.problem;
+  return MediaProblem.platformError;
+}
+

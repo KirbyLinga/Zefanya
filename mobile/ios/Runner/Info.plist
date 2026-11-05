@@ -56,7 +56,9 @@
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Zefanya uses your location only when you tap Use my location to pin a delivery address.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Zefanya uses the camera to scan parcel QR codes for delivery tracking.</string>
+	<string>Zefanya uses the camera to scan parcel QR codes for delivery tracking and to take photos for avatars, reviews, and documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Zefanya needs access to your photo library to choose photos for avatars, reviews, and documents.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>
