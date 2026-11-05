@@ -6,11 +6,14 @@
 //   -> auth state lives at lib/state/auth_state.dart  => '../../state/auth_state.dart'
 //   -> registration lives at lib/screens/auth/...      => 'registration_screen.dart' (same folder)
 
-import 'package:zefanya/config/dev_flags.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:zefanya/config/dev_flags.dart' show GoogleConfig, kUseLiveApi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../data/api/api_exception.dart';
+import '../../data/api/api_exception.dart'
+    show ApiException, PendingApprovalException, RequestRejectedException;
 import '../../services/google_sign_in_service.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
@@ -42,6 +45,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordFocus = FocusNode();
 
   bool get _isBusy => _isSubmitting || _isGoogleSubmitting;
+
+  /// Google sign-in is usable when mock mode is on
+  /// (`MockGoogleSignInService` needs no client ID) or when a live build
+  /// supplies the web client ID. Never show a button that cannot complete.
+  bool get _googleAvailable => !kUseLiveApi || GoogleConfig.current.isConfigured;
+
+  /// Friendly copy shown when Google sign-in cannot complete in this build.
+  static const String _googleNotAvailableMessage =
+      'Google sign-in is not available right now. Please use email and password.';
 
   @override
   void dispose() {
@@ -178,10 +190,35 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on GoogleSignInFailure catch (e) {
       if (!mounted || e.cancelled) return;
-      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
-    } on ApiException catch (e) {
+      // Configuration error: the flow cannot complete in this build.
+      if (e.message.contains('configured')) {
+        showTimedSnackBar(context, SnackBar(content: Text(_googleNotAvailableMessage)));
+      } else {
+        showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+      }
+    } on RequestRejectedException catch (e) {
       if (!mounted) return;
-      showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+      // Account conflict: this Google identity is linked to a different account.
+      if (e.statusCode == 409) {
+        showTimedSnackBar(context, const SnackBar(
+          content: Text(
+            'This Google account is already linked to a different account. '
+            'Please sign in with email and password instead.',
+          ),
+        ));
+      } else {
+        showTimedSnackBar(context, SnackBar(content: Text(e.message)));
+      }
+    } on SocketException catch (_) {
+      if (!mounted) return;
+      showTimedSnackBar(context, const SnackBar(
+        content: Text('No internet connection. Please check your network and try again.'),
+      ));
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
+      showTimedSnackBar(context, const SnackBar(
+        content: Text('The request timed out. Please try again.'),
+      ));
     } catch (_) {
       if (!mounted) return;
       showTimedSnackBar(
@@ -381,28 +418,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                StaggeredReveal(
-                  index: 2,
-                  child: OutlinedButton(
-                    key: const ValueKey('login-google-button'),
-                    onPressed: _isBusy ? null : _continueWithGoogle,
-                    child: _isGoogleSubmitting
-                        ? ZefanyaLoader(
-                            size: 18,
-                            color: AppColors.textPrimary,
-                            strokeWidth: 4,
-                          )
-                        : const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              GoogleMark(size: 18),
-                              SizedBox(width: 10),
-                              Text('Continue with Google'),
-                            ],
-                          ),
+                if (_googleAvailable) ...[
+                  const SizedBox(height: 14),
+                  StaggeredReveal(
+                    index: 2,
+                    child: OutlinedButton(
+                      key: const ValueKey('login-google-button'),
+                      onPressed: _isBusy ? null : _continueWithGoogle,
+                      child: _isGoogleSubmitting
+                          ? ZefanyaLoader(
+                              size: 18,
+                              color: AppColors.textPrimary,
+                              strokeWidth: 4,
+                            )
+                          : const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GoogleMark(size: 18),
+                                SizedBox(width: 10),
+                                Text('Continue with Google'),
+                              ],
+                            ),
                   ),
-                ),
+                  )],
+
+
                 const SizedBox(height: 28),
                 const StaggeredReveal(index: 3, child: _OrDivider()),
                 const SizedBox(height: 18),

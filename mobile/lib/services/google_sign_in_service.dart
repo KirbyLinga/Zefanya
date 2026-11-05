@@ -13,7 +13,7 @@
 
 import 'package:google_sign_in/google_sign_in.dart' hide GoogleIdentity;
 
-import '../config/dev_flags.dart';
+import '../config/dev_flags.dart' show kMockGoogleEmail;
 import '../data/google_identity.dart';
 
 /// A Google sign-in failure with a sentence safe to show.
@@ -45,8 +45,8 @@ abstract class GoogleSignInService {
 /// Real Google Sign-In. Used only in live builds.
 class NativeGoogleSignInService implements GoogleSignInService {
   NativeGoogleSignInService({
-    this.clientId = kGoogleIosClientId,
-    this.serverClientId = kGoogleServerClientId,
+    this.clientId = '',
+    this.serverClientId = '',
   });
 
   final String clientId;

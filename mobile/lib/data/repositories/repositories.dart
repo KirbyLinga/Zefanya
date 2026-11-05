@@ -32,6 +32,7 @@
 // `live_stub.dart`) rather than guessing. A live build is therefore runnable
 // and honest, not complete.
 
+import '../../config/dev_flags.dart' show GoogleConfig;
 import '../../services/google_sign_in_service.dart';
 import '../api/api_client.dart';
 import '../api/token_store.dart';
@@ -130,7 +131,10 @@ class Repositories {
     auth: LiveAuthRepository(client),
     accountSecurity: LiveAccountSecurityRepository(client),
     googleAuth: LiveGoogleAuthRepository(client),
-    googleSignIn: NativeGoogleSignInService(),
+    googleSignIn: NativeGoogleSignInService(
+      clientId: GoogleConfig.current.iosClientId,
+      serverClientId: GoogleConfig.current.serverClientId,
+    ),
     catalog: LiveCatalogRepository(client),
     cart: LiveCartRepository(client),
     address: LiveAddressRepository(client),
