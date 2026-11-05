@@ -1,11 +1,11 @@
-Branch: feature/s1-lite  HEAD: ef7caf1  Date: 2026-11-05
-Stage: S4 IN PROGRESS (4.1 intro gate DONE, 4.2 banners DONE, 4.3 brand mark DONE, 4.4 loaders: replace CircularProgressIndicator with ZefanyaLoader, add skeletons to Orders list, add loader/skeleton tests).
+Branch: feature/s1-lite  HEAD: a6b91b8  Date: 2026-11-05
+Stage: S4 DONE, S5-lite IN PROGRESS (5.1 avatar, 5.2 settings, 5.4 cart count, 5.5 chat entry mock only, 5.6).
 Base check: branch cut from integration/hardened @ 6a9605a.
 
-## Test counts (HEAD ef7caf1)
+## Test counts (HEAD a6b91b8)
 - php artisan test: 439 passed, 0 failed (2082 assertions)
-- flutter test: 762 passed, 0 failed
-- flutter analyze: No issues found
+- flutter test: 765 passed, 0 failed
+- flutter analyze: 5 info-level suggestions only (sized_box_for_whitespace, no errors/warnings)
 
 ## S1-lite done
 - 1.1: docs/feature-status.md rewritten — 35 mobile screens table.
@@ -22,11 +22,18 @@ Base check: branch cut from integration/hardened @ 6a9605a.
 - 3.4 docs/demo-script.md — 7 min per role (buyer, rider, seller, admin), mock-mode + live for LIVE-READY features, failure plans, pre-demo checklist, build instructions.
 - 3.5 docs/limitations-for-presentation.md — one page: push notifications, deep links, payment gateway, chat, flash-sale creation, live tracking, each with one sentence.
 
-## S4 in progress
+## S4 done
 - 4.1 Intro gate: landing_screen.dart with two-beat animation, reduced motion support, tests exist.
 - 4.2 Banners: PromoCarousel on Home, auto-advance, manual swipe, dots.
 - 4.3 Brand mark: ZefanyaMark (static) and ZefanyaLoader (animated) widgets.
-- 4.4 Loaders TODO: replace CircularProgressIndicator (5 remaining), skeletons on Orders list, loader/skeleton tests.
+- 4.4 Loaders: replaced CircularProgressIndicator with ZefanyaLoader in 4 screens (registration, address form, QR scanner, edit profile); added skeletons to Orders list with isLoading flag in OrderState; added loader/skeleton tests.
+
+## S5-lite in progress
+- 5.1 Avatar: AvatarPicker (Take photo, Choose from gallery, Remove) built on MediaPicker.
+- 5.2 Settings: gear icon on Profile opens SettingsScreen with working items only.
+- 5.4 Cart Count: replace quantity-sum count with distinct product count.
+- 5.5 Chat Entry: FeatureFlags.chatLive = false in live mode, chat icon in Home header in mock mode.
+- 5.6: Long product descriptions collapse after 3 lines with "Read more"; destructive actions ask for confirmation.
 
 ## Open
 - API admin logistics approve/reject has no success test; Admin lacks HasApiTokens. Recorded for S6 route/test sweep.
