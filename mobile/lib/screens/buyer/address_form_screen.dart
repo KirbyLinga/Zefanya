@@ -28,6 +28,7 @@ import '../../utils/validators.dart';
 import '../../widgets/dirty_guard.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/ph_address_fields.dart';
+import '../../widgets/zefanya_mark.dart';
 
 class AddressFormScreen extends StatefulWidget {
   const AddressFormScreen({
@@ -249,7 +250,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         appBar: AppBar(),
         body: SafeArea(
           child: _loadingCatalog
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: ZefanyaLoader())
               : _catalogError != null
               ? _CatalogError(onRetry: _retryCatalog)
               : Form(

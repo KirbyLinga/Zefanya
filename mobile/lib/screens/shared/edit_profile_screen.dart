@@ -384,7 +384,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_catalogLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: ZefanyaLoader()),
       );
     }
     final catalog = _catalog;

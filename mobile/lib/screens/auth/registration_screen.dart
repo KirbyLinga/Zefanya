@@ -1595,7 +1595,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (_catalogLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: ZefanyaLoader()),
       );
     }
     final catalog = _catalog;

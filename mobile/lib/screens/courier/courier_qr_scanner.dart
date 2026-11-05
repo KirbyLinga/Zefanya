@@ -10,6 +10,8 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../widgets/zefanya_mark.dart';
+
 class CourierQrScanner extends StatefulWidget {
   /// The value the caller expects to match. The scanner itself does not
   /// validate it; the caller decides whether a returned code is correct.
@@ -333,7 +335,7 @@ class _CourierQrScannerState extends State<CourierQrScanner> {
                 ],
               ),
               placeholderBuilder: (context) =>
-                  const Center(child: CircularProgressIndicator()),
+                  const Center(child: ZefanyaLoader()),
               errorBuilder: (context, error) =>
                   error.errorCode == MobileScannerErrorCode.permissionDenied
                   ? _buildPermissionError(context)
