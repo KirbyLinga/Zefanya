@@ -1,0 +1,38 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+RID-DLV-001,Delivery & Status Updates,Deliver with proof in sequence,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). The P-02 parcel is At Sorting Center, Sorted to Area A and Assigned to Rider 1 for delivery.","1. Collect the parcel at the sorting center by scanning its waybill.
+2. Mark Out for Delivery.
+3. At ADDR-1, take the POD photo.
+4. Ask Buyer 1 for the OTP and enter it.
+5. Enter COD ₱500.00 and mark Delivered.
+6. Check Buyer 1's, Seller 1's and Logistics 1's views.","Photo: pod_photo.jpg
+OTP: from Buyer 1's order screen
+COD: ₱500.00","Each status is shown in all views with times. After Delivered: Buyer 1 sees Delivered with the photo, Rider 1's COD balance rises by ₱500.00 and pay by ₱50.00.","A10, A32, A33, A42",,Not Run,
+RID-DLV-002,Delivery & Status Updates,Skipping a status,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). A delivery job is Assigned, not yet Out for Delivery.","1. Look for Delivered.
+2. Send the Delivered request directly if possible.",,Delivered is not available and a direct request is rejected. Status unchanged.,"A10, M11",,Not Run,
+RID-DLV-003,Delivery & Status Updates,Photo is required,Equivalence Partitioning,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). A job is Out for Delivery.","1. Enter the OTP and COD without a photo and tap Delivered.
+2. Attach a 5.1 MB photo.",,Both are blocked with a message. The status stays Out for Delivery.,"A16, A32",,Not Run,
+RID-DLV-004,Delivery & Status Updates,OTP checks,Boundary Value Analysis,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). A job is Out for Delivery.","1. Enter 12345 (5 digits).
+2. Enter a wrong 6-digit OTP 5 times.
+3. Enter the correct OTP immediately after.
+4. Enter it again after 15 minutes.",,"5 digits is rejected. Each wrong OTP is rejected. After the 5th wrong entry, entry is locked for 15 minutes (the correct OTP is also refused). After 15 minutes the correct OTP works.",A32,,Not Run,
+RID-DLV-005,Delivery & Status Updates,COD amount must match,Boundary Value Analysis,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). COD job for ₱500.00.","1. Enter ₱499.99 and submit.
+2. Enter ₱500.01 and submit.
+3. Enter ₱500.00 and submit.",,₱499.99 and ₱500.01 are rejected with a mismatch message. Only ₱500.00 completes delivery.,A24,,Not Run,
+RID-DLV-006,Delivery & Status Updates,Prepaid order has no COD,Equivalence Partitioning,Medium,"Logged in as Rider 1 (Active, Online, 0 active jobs). Prepaid job.",1. Open the job and complete delivery.,,"COD shows ₱0.00 / Paid; no amount is asked for, and the COD balance does not change.",,,Not Run,
+RID-DLV-007,Delivery & Status Updates,Cannot update another rider's job,Error Guessing,High,"Logged in as Rider 1 (Active, Online, 0 active jobs).",1. Send a status update for a job assigned to Rider 2.,,Rejected. Rider 2's job is unchanged.,A22,,Not Run,
+RID-DLV-008,Delivery & Status Updates,[Mobile] Proof-of-delivery photo must be taken live,Equivalence Partitioning,High,Logged in as Rider 1. A job is Out for Delivery. pod_photo.jpg is in the phone's Photos.,"1. Try to attach pod_photo.jpg from the gallery.
+2. Take the photo with the in-app camera and complete the delivery.",pod_photo.jpg,"The gallery is not offered, or the gallery photo is refused. The live photo is accepted and Buyer 1 sees it with the delivery time.","A32, M14",,Not Run,
+RID-DLV-009,Delivery & Status Updates,[Mobile] Mark Delivered with no internet,Error Guessing,High,Logged in as Rider 1. A COD job for ₱500.00 is Out for Delivery and Buyer 1's OTP is known.,"1. Turn on Airplane mode. Take the POD photo, enter the OTP and ₱500.00, and tap Delivered.
+2. Close and reopen the app.
+3. Turn Airplane mode off and wait (or tap Retry).","COD: ₱500.00
+OTP: from Buyer 1's order screen","Step 1: the app clearly shows the delivery is not yet sent (or blocks it with a message) and keeps the photo, OTP and amount. Step 3: Delivered is recorded once with the photo; the COD balance rises by ₱500.00 and pay by ₱50.00 once. Nothing is lost when the app is reopened.","A37, M5",,Not Run,
+RID-DLV-010,Delivery & Status Updates,[Mobile] Call or message the buyer from the job,Use Case Testing,Medium,Logged in as Rider 1. A job is Out for Delivery to Buyer 1.,"1. Tap Call on the job.
+2. Go back and tap Message (SMS or chat).",,The phone dialer opens with Buyer 1's number (or a masked relay number). Messaging opens a conversation with Buyer 1. No other buyer's number is shown.,A22,,Not Run,
+RID-DLV-011,Delivery & Status Updates,[Mobile] Delivery location is recorded,Use Case Testing,Low,Logged in as Rider 1 with location allowed. A job to ADDR-1 is Out for Delivery.,"1. Complete the delivery at ADDR-1.
+2. As Logistics 1, open the delivery record.",,"The record shows the GPS location and time of the delivery, close to ADDR-1.",M13,,Not Run,
+RID-DLV-012,Delivery & Status Updates,Collect the parcel at the sorting center,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). The P-02 parcel for ADDR-1 is Assigned to Rider 1 at the sorting center.","1. Look for Out for Delivery before collecting the parcel.
+2. Scan another rider's waybill.
+3. Scan the correct waybill.
+4. Mark Out for Delivery.",Other waybill: Rider 2's ADDR-2 parcel,"Step 1: Out for Delivery is not available. Step 2: rejected with 'tracking number does not match this job'. Steps 3 and 4: the status becomes Out for Delivery once, Buyer 1 sees the OTP and gets one notification.","A10, A23, A32, A42",,Not Run,
+RID-DLV-013,Delivery & Status Updates,Delivery details shown with the assignment,Use Case Testing,Medium,"Logged in as Rider 1 (Active, Online, 0 active jobs). The P-02 parcel is Assigned to Rider 1.","1. Open the delivery job.
+2. Tap Navigate.",,"Shows the recipient name, delivery address (ADDR-1), contact number, tracking number, COD ₱500.00 and delivery pay ₱50.00. Navigate opens the phone's map app at ADDR-1. Nothing from another buyer's order is shown.","A33, A42, M13",,Not Run,

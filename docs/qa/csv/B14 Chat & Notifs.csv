@@ -1,0 +1,18 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-CHAT-001,Chat & Notifications,Chat with a seller from a product,Use Case Testing,Medium,Logged in as Buyer 1.,"1. On P-02 tap Chat.
+2. Send a message and an image.","Hi, available pa po ba?
+review_photo.jpg",Seller 1 receives both in order. The chat shows the P-02 product card.,,,Not Run,
+BUY-CHAT-002,Chat & Notifications,Invalid attachments and message length,Boundary Value Analysis,Low,Logged in as Buyer 1.,"1. Attach installer.exe and size_5.1MB.jpg.
+2. Send 1,001 characters.",,All are rejected; nothing is sent.,"A16, A25",,Not Run,
+BUY-CHAT-003,Chat & Notifications,Order status notifications,State Transition,High,Logged in as Buyer 1.,"1. Move an order through Accepted, Picked Up, Out for Delivery and Delivered.",,Exactly one notification per change. Each opens the right order.,A23,,Not Run,
+BUY-CHAT-004,Chat & Notifications,Flash-sale reminder,Equivalence Partitioning,Low,Logged in as Buyer 1. Set a reminder for P-02's flash sale.,1. Wait for the slot to start.,,A reminder arrives before the slot starts and links to P-02.,,,Not Run,
+BUY-CHAT-005,Chat & Notifications,Mark notifications as read,Use Case Testing,Low,Logged in as Buyer 1. 3 unread notifications.,"1. Open one notification.
+2. Tap Mark all as read.",,Unread count goes 3 → 2 → 0.,,,Not Run,
+BUY-CHAT-006,Chat & Notifications,[Mobile] Chat message while the app is in the background,Use Case Testing,Medium,Logged in as Buyer 1 with notifications allowed.,"1. Put the app in the background.
+2. Seller 1 sends a chat message.
+3. Tap the push notification.","Seller 1: Opo, available pa.",A push notification shows Seller 1's name and a preview of the message. Tapping it opens that chat with the message shown once.,"A23, M10",,Not Run,
+BUY-CHAT-007,Chat & Notifications,[Mobile] Notifications turned off in phone Settings,Equivalence Partitioning,Low,Logged in as Buyer 1.,"1. Turn off notifications for the app in phone Settings.
+2. Move one of Buyer 1's orders to Picked Up.
+3. Open the app's notification list.",,"No push notification arrives, and the app neither crashes nor keeps asking. The in-app notification list still shows the update.","M6, M10",,Not Run,
+BUY-CHAT-008,Chat & Notifications,[Mobile] Send a chat message with no internet,Error Guessing,Low,Logged in as Buyer 1. A chat with Seller 1 is open.,"1. Turn on Airplane mode and send a message.
+2. Turn Airplane mode off.",Hello po,"The message is marked not sent with a retry option, or is sent automatically once online. Seller 1 receives it exactly once.",M5,,Not Run,

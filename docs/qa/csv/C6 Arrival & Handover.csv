@@ -1,0 +1,18 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+COU-ARR-001,Arrival & Handover,Arrive and hand over every parcel,Use Case Testing,High,TRIP-1 is In Transit. Courier 1 is within 500 m of HUB-PSG.,"1. Tap Arrived.
+2. Hub staff (Logistics 1 at HUB-PSG) enter seal BH-0004521 and scan the 5 parcels in.
+3. Hub staff tap Close Receiving.
+4. Check Buyer 1's, Seller 1's and Courier 1's views.",Seal: BH-0004521,"TRIP-1 goes Arrived → Completed. Each parcel is At Hub (HUB-PSG) on Buyer 1's timeline and in Seller 1's order. Courier 1's pay rises by ₱1,000.00 and Courier 1 can take a new trip.","A38, A41",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-ARR-002,Arrival & Handover,Seal number does not match,State Transition,High,TRIP-1 is Arrived at HUB-PSG.,"1. Hub staff enter BH-0004522.
+2. Try to continue without a note, then add a note.
+3. Check the audit log.","Seal entered: BH-0004522 (trip seal BH-0004521)
+Note: Seal number differs from the manifest.",TRIP-1 is flagged Seal Discrepancy and Logistics 1 is notified. Receiving continues only after a note. The discrepancy is logged.,"A35, A40",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-ARR-003,Arrival & Handover,Parcel missing at unloading,State Transition,High,TRIP-1 is Arrived at HUB-PSG.,"1. Hub staff scan in 4 of the 5 parcels and tap Close Receiving.
+2. Courier 1 opens the trip.
+3. Check Seller 1's notifications.",Courier note: Parcel was loaded at HUB-QC; not found in the truck.,"Closing asks for confirmation and lists the missing parcel. That parcel becomes Missing in Transit, TRIP-1 is Completed with Discrepancy, Logistics 1 and Seller 1 are notified, and Courier 1 must add a note.",A40,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-ARR-004,Arrival & Handover,Damaged parcel at unloading,Equivalence Partitioning,Medium,TRIP-1 is Arrived at HUB-PSG.,"1. Hub staff mark one parcel Damaged without a photo.
+2. Add incident_photo.jpg and save.",incident_photo.jpg,Step 1 is blocked. Step 2 saves the photo; the parcel shows Damaged and the trip is Completed with Discrepancy.,"A16, A40",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-ARR-005,Arrival & Handover,Parcel scanned in at the wrong hub,Error Guessing,Medium,A TRIP-1 parcel is In Transit to HUB-PSG.,1. Logistics 1 staff at HUB-STR scan it in.,,Rejected with a message that the parcel belongs to HUB-PSG. Its status does not change.,A38,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-ARR-006,Arrival & Handover,Courier cannot confirm their own handover,Error Guessing,High,TRIP-1 is Arrived.,"1. With a proxy tool, send the Close Receiving request using Courier 1's session.",,Refused (403). TRIP-1 stays Arrived until hub staff close receiving.,"A22, A39, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-ARR-007,Arrival & Handover,[Mobile] Trip-completed push notification,Use Case Testing,Low,TRIP-1 is Arrived. The courier app is in the background.,"1. Hub staff close receiving with all 5 parcels.
+2. Tap the notification on Courier 1's phone.",,"Courier 1 gets one push notification that TRIP-1 is completed with ₱1,000.00 earned. Tapping it opens the trip summary.","A23, M10",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).

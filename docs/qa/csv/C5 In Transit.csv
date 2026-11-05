@@ -1,0 +1,21 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+COU-TRN-001,In Transit,Live location visible to Logistics,Use Case Testing,High,TRIP-1 is In Transit.,"1. Travel (or move the phone) for 5 minutes.
+2. As Logistics 1, open TRIP-1 on the map.
+3. As Buyer 1, open the ADDR-2 order.",,"Logistics 1 sees Courier 1's location moving and an ETA. Buyer 1 sees In Transit only, without the courier's location.","A38, M13",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-TRN-002,In Transit,Report a delay,State Transition,Medium,TRIP-1 is In Transit.,"1. Tap Report Delay, choose Heavy traffic, set the ETA 1 hour later and submit.
+2. As Logistics 1, open TRIP-1.","Reason: Heavy traffic
+New ETA: now + 1 hour",Logistics 1 is notified with the reason and new ETA. TRIP-1 shows Delayed with the new ETA and is still In Transit.,A41,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-TRN-003,In Transit,Delay report validation,Boundary Value Analysis,Medium,TRIP-1 is In Transit.,"1. Submit with no reason.
+2. Submit with an ETA 1 minute in the past.
+3. Submit with an ETA 1 minute in the future.",,Steps 1 and 2 are blocked with a message. Step 3 is accepted.,A41,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-TRN-004,In Transit,Vehicle breakdown and reassignment,State Transition,High,TRIP-1 is In Transit with Courier 1. Courier 2 is On Duty with no trip.,"1. Courier 1 reports Vehicle breakdown with a photo.
+2. Logistics 1 reassigns TRIP-1 to Courier 2.
+3. Courier 2 tries to continue, then scans the 5 parcels and continues.
+4. Complete the handover at HUB-PSG and check both couriers' pay and the audit log.",Photo: incident_photo.jpg,"Courier 1 is told the trip was reassigned. Courier 2 cannot continue until all 5 parcels are scanned again. The parcels stay In Transit. The reassignment is logged with the reason. The ₱1,000.00 pay goes to Courier 2 only.","A35, A41",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-TRN-005,In Transit,Cannot mark Arrived far from the destination hub,Error Guessing,High,TRIP-1 is In Transit. Courier 1 is about 3 km from HUB-PSG.,1. Tap Arrived.,,Blocked with a message that the courier must be at HUB-PSG. The trip stays In Transit.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-TRN-006,In Transit,[Mobile] App closed during the trip,State Transition,Medium,TRIP-1 is In Transit.,"1. Swipe the app away for 10 minutes.
+2. As Logistics 1, open TRIP-1.
+3. Reopen the courier app.",,"While closed, Logistics 1 sees the last known location and time. Reopening shows TRIP-1 still In Transit with the same parcels and seal, and location updates resume.",M13,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-TRN-007,In Transit,[Mobile] No signal on the route,Error Guessing,Medium,TRIP-1 is In Transit.,"1. Turn on Airplane mode for 10 minutes while moving.
+2. Turn it off.
+3. As Logistics 1, open the trip map.",,"The app shows it is offline and does not crash. Afterwards the route fills in (or shows a clear gap), the trip status is unchanged and no event is duplicated.","M5, M13",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).

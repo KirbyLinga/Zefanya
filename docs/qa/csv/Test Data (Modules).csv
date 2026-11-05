@@ -1,0 +1,114 @@
+Test data,,,,,
+"Shared by all five module workbooks. All people, stores, numbers and addresses are fictional. Seed these products, vouchers and rates before testing, or replace them with your own and update the Test Data column on the module sheets.",,,,,
+,,,,,
+Accounts (created in the Account Creation test set),,,,,
+Ref,Role,Name / store,Login email,Password,Status / notes
+Buyer 1,Buyer,Juan Miguel Dela Cruz,juanmiguel.delacruz@example.com,Mamimili@2026,Approved by the Admin. Main buyer.
+Buyer 2,Buyer,Ana Marie Reyes,anamarie.reyes@example.com,Suki#2026Ana,Approved by the Admin. Second buyer for concurrency and access tests.
+Seller 1,Seller,Maria Clara Handicrafts (Maria Clara Santos),mariaclara.santos@example.com,Tindahan@2026,"Approved. Pickup: Commonwealth, Quezon City (NCR). Main seller."
+Seller 2,Seller,RV Gadget Hub (Roberto Villanueva),roberto.villanueva@example.com,Gadget#Hub26,"Approved. Pickup: Lahug, Cebu City (Visayas)."
+Seller 3,Seller,Tindahan ni Lola (test),seller.test01@example.com,Tindahan@2026,Pending Approval. For the unverified-seller cases.
+Logistics 1,Logistics,Bilis Hatid Express Inc. (Carlos Antonio Mendoza),operations@bilishatid.example.com,Hatid@2026,Approved. Serves NCR and CALABARZON. Main logistics account.
+Logistics 2,Logistics,Agila Cargo Movers Corp. (Liza Mae Fernandez),admin@agilacargo.example.com,Agila#Cargo26,Approved. Serves Davao. Used for cross-company access tests.
+Rider 1,Rider,"Pedro Jose Garcia (Motorcycle, 123ABC)",pedrojose.garcia@example.com,Rider@2026,"Active, under Logistics 1. Main rider. Assigned area: AREA-A."
+Rider 2,Rider,"Mark Anthony Bautista (Van, NBC1234)",markanthony.bautista@example.com,Hatid#Mark26,"Active, under Logistics 1. Second rider for concurrency tests. Assigned area: AREA-B."
+Rider 3,Rider,"Ramon Cruz (Motorcycle, 456DEF)",rider.test01@example.com,Rider@2026,Suspended by Logistics 1. For blocked-rider cases.
+Admin,Admin,Seeded admin,Use the admin account already seeded in your system,,Creates platform vouchers PLAT100 and FREESHIP.
+,,,,,
+Buyer addresses,,,,,
+Ref,Owner,Label,Address,Recipient / phone,Notes
+ADDR-1,Buyer 1,Home (default),"45 Kalayaan Ave., Brgy. Central, Quezon City, Metro Manila, NCR 1100",Juan Miguel Dela Cruz / 09171234567,Zone NCR
+ADDR-2,Buyer 1,Office,"12F Pacific Tower, 6750 Ayala Ave., Brgy. San Lorenzo, Makati City, Metro Manila, NCR 1223",Juan Miguel Dela Cruz / 09171234567,Zone NCR
+ADDR-3,Buyer 2,Home (default),"78 Osmeña Blvd., Brgy. Capitol Site, Cebu City, Cebu, Region VII 6000",Ana Marie Reyes / 09173456789,Zone Visayas
+ADDR-4,Buyer 1,Province,"Purok 2, Brgy. Raele, Itbayat, Batanes, Region II 3905",Juan Miguel Dela Cruz / 09171234567,Unserviceable area (no logistics zone covers it)
+,,,,,
+Store categories (Seller 1),,,,,
+Ref,Category,Parent,Visible,Products,Notes
+CAT-1,Bags,,Yes,P-01,
+CAT-2,Home Decor,,Yes,,Parent category
+CAT-3,Lamps,Home Decor,Yes,P-03,Subcategory (level 2)
+CAT-4,Baskets,Home Decor,Yes,P-02,Subcategory (level 2)
+CAT-5,Kitchen & Dining,,Yes,P-04,
+,,,,,
+Products,,,,,
+Ref,Seller,Product,Price / variants,Stock,Weight and size / other
+P-01,Seller 1,Abaca Woven Tote Bag,"Color: Natural, Black × Size: S ₱199, M ₱249, L ₱299 (6 variants). SKU MCH-TOTE-<COLOR>-<SIZE>","Natural-S 10, Natural-M 8, Natural-L 5, Black-S 10, Black-M 0, Black-L 3",0.4 kg; 40 × 35 × 5 cm. Platform category: Women's Bags
+P-02,Seller 1,Rattan Fruit Basket,₱450.00 (no variants),20,0.8 kg; 30 × 30 × 15 cm. Platform category: Home & Living
+P-03,Seller 1,Capiz Shell Lamp,"₱1,250.00",1 (for the oversell case),1.5 kg; 30 × 30 × 40 cm
+P-04,Seller 1,Banig Placemat Set of 4,₱350.00,0 (out of stock),0.5 kg
+P-05,Seller 2,USB-C Fast Charger 20W,₱399.00,50,0.2 kg; 10 × 8 × 5 cm
+P-06,Seller 2,Wireless Earbuds X2,"Color: Black, White; ₱1,499.00 each","Black 10, White 10",0.3 kg
+P-07,Seller 2,Power Bank 10000mAh,₱899.00; per-buyer purchase limit 2,5,0.4 kg
+,,,,,
+Vouchers,,,,,
+Code,Owner / funded by,Type,Rule,Limits / validity,Display
+MCH50,Seller 1 / seller,Fixed ₱50 off,Min spend ₱300; all Seller 1 products,"100 total, 1 per buyer; valid this month",Claimable
+MCH10,Seller 1 / seller,"10% off, cap ₱100",Min spend ₱500,"50 total, 1 per buyer; valid this month",Claimable
+RVSECRET,Seller 2 / seller,Fixed ₱100 off,"Min spend ₱1,000","20 total, 1 per buyer",Code-only (hidden)
+MCHOLD,Seller 1 / seller,Fixed ₱30 off,Min spend ₱200,Expired yesterday,Claimable
+MCHSOON,Seller 1 / seller,Fixed ₱30 off,Min spend ₱200,Starts tomorrow,Claimable
+MCHMAX,Seller 1 / seller,Fixed ₱20 off,Min spend ₱100,"Total usage limit 1, already used by Buyer 2",Claimable
+PLAT100,Admin / platform,Fixed ₱100 off,"Min spend ₱1,000 (whole order)",1 per buyer,Claimable
+FREESHIP,Admin / platform,"Shipping, up to ₱50 off",Min spend ₱300,1 per buyer,Claimable
+,,,,,
+Shipping rate table (test rates),,,,,
+Route,First kg,Each additional kg,Example,,Notes
+Within NCR,₱50.00,₱15.00,1.2 kg → 2 kg → ₱65.00,,Seller 1 to ADDR-1 or ADDR-2
+Visayas to NCR,₱120.00,₱40.00,0.2 kg → 1 kg → ₱120.00,,Seller 2 to ADDR-1
+NCR to Visayas,₱120.00,₱40.00,0.4 kg → 1 kg → ₱120.00,,Seller 1 to ADDR-3
+Within Visayas,₱60.00,₱20.00,,,Seller 2 to ADDR-3
+,,,,,
+"Worked checkout example (used in Buyer B7/B8, Seller S12 and Cross-cutting X3)",,,,,
+Line,Item,Amount,How it is calculated,,
+1,Seller 1: Abaca Tote Natural-M × 1 + Rattan Basket × 1,₱699.00,249 + 450,,
+2,Seller 2: USB-C Charger × 1,₱399.00,,,
+3,Merchandise subtotal,"₱1,098.00",699 + 399,,
+4,"Shipping, Seller 1 (1.2 kg, within NCR)",₱65.00,50 + 15,,
+5,"Shipping, Seller 2 (0.2 kg, Visayas to NCR)",₱120.00,,,
+6,Store voucher MCH50 (Seller 1),−₱50.00,Seller 1 subtotal 699 ≥ 300,,
+7,Platform voucher PLAT100,−₱100.00,"Order subtotal 1,098 ≥ 1,000",,
+8,Shipping voucher FREESHIP,−₱50.00,Capped at ₱50,,
+9,Total to pay,"₱1,083.00","1,098 + 185 − 50 − 100 − 50",,
+10,Seller 1 net earnings for this order,₱616.55,(699 − 50) = 649 gross after seller vouchers; 5% commission = 32.45,,
+11,Seller 2 net earnings for this order,₱379.05,399 − 5% commission (19.95),,
+,,,,,
+Other values,,,,,
+Item,Value,,,,Notes
+Delivery OTP,Shown in Buyer 1's order screen when Out for Delivery,,,,6 digits (A32)
+Rider pay,"₱50.00 per delivery, ₱30.00 per pickup, ₱0.00 per failed attempt",,,,A33
+PLAT100 split (worked example),Seller 1 order ₱63.66; Seller 2 order ₱36.34,,,,"100 × 699/1,098 and 100 × 399/1,098 (A8)"
+Spare emails,buyer.test01@example.com to buyer.test10@example.com,,,,"Same pattern for seller.test, logistics.test, rider.test"
+Spare mobile numbers,09170000001 to 09170000020,,,,
+Long text samples,Generate with any 'lorem ipsum' tool to the exact character count,,,,Check the count in a character counter before pasting
+Script and injection strings,"<script>alert(1)</script>
+' OR '1'='1
+""><img src=x onerror=alert(1)>",,,,Must be shown as text and never run
+,,,,,
+Couriers (created in the Account Creation test set),,,,,
+Ref,Role,Name / store,Login email,Password,Status / notes
+Courier 1,Courier,"Ernesto Villareal (4-Wheeler Closed Van Truck, NAB4521, 3,000 kg)",ernesto.villareal@example.com,Courier@2026,"Active, under Logistics 1, home hub HUB-QC. Main courier. [NOT USED: no courier login]"
+Courier 2,Courier,"Rogelio Dimaculangan (Van, CAV7788, 800 kg)",rogelio.dimaculangan@example.com,Linehaul#Rog26,"Active, under Logistics 1, home hub HUB-PSG. Second courier for reassignment tests. [NOT USED: no courier login]"
+Courier 3,Courier,"Danilo Ramos (Van, DAN3030, 800 kg)",courier.test01@example.com,Courier@2026,Suspended by Logistics 1. For blocked-courier cases. [NOT USED: no courier login]
+Courier 4,Courier,"Joel Abellana (Van, AGL5050, 800 kg)",courier.test02@example.com,Courier@2026,"Active, under Logistics 2, home hub HUB-DVO. For cross-company cases. [NOT USED: no courier login]"
+,,,,,
+Hubs,,,,,
+Ref,Hub,Address,Logistics company,Serves,Notes
+HUB-QC,Bilis Hatid QC First-Mile Hub,"1200 Commonwealth Ave., Brgy. Holy Spirit, Quezon City, NCR 1127",Logistics 1,Pickups from Quezon City sellers (Seller 1); deliveries to Quezon City (ADDR-1),"Origin hub of TRIP-1 | Used as the sorting center of Logistics 1 (scan in, sort, assign by area)."
+HUB-PSG,Bilis Hatid Pasig Main Hub,"Unit 5B, 88 West Capitol Drive, Brgy. Kapitolyo, Pasig City, NCR 1603",Logistics 1,"Deliveries to Makati, Pasig and Mandaluyong (ADDR-2)",Destination hub of TRIP-1 [NOT USED: the ERP has one sorting center per logistics company (HUB-QC)]
+HUB-STR,Bilis Hatid Sta. Rosa Hub,"Lot 3, Balibago Complex, Brgy. Balibago, Santa Rosa, Laguna 4026",Logistics 1,CALABARZON deliveries,Used for wrong-hub cases [NOT USED: the ERP has one sorting center per logistics company (HUB-QC)]
+HUB-DVO,Agila Davao Hub,"Door 3, 210 Sampaguita St., Brgy. Buhangin, Davao City 8000",Logistics 2,Davao deliveries,Used for cross-company cases
+,,,,,
+Linehaul trip and courier values,,,,,
+Ref,Item,Value,Details,Weight,Notes
+TRIP-1,Linehaul trip,HUB-QC → HUB-PSG,"5 COD parcels from Seller 1 to ADDR-2 (Buyer 1, Makati): 4 orders of 1 × P-02 and 1 order of 1 × P-01 Natural-M",3.6 kg (4 × 0.8 + 0.4),"Courier 1; seal BH-0004521; pay ₱1,000.00 [NOT USED: no courier login]"
+P-08,Load-test product (Seller 1),"Narra Coffee Table, ₱4,500.00, stock 50",Seed only for the trip-capacity case,25.0 kg each,4 parcels = 100.0 kg
+Courier pay,Per completed trip,"Van ₱600.00; 4-Wheeler Closed Van Truck ₱1,000.00; 6-Wheeler Truck ₱1,500.00","Declined, cancelled or reassigned-away trips ₱0.00",,A41 [NOT USED: no courier login]
+Seal number,Format,BH- followed by 7 digits,Example: BH-0004521,,A40
+Pre-trip checklist,Items,"Tires, Lights, Brakes, Fuel, Cargo door lock",Each OK or Not OK; Not OK needs a note,,A39
+Spare couriers,Emails and mobiles,courier.test03@example.com to courier.test10@example.com,09170000021 to 09170000025,,
+,,,,,
+Delivery areas (added for the ERP flow),,,,,
+Ref,Area,Covers,Logistics company,Assigned rider,Notes
+AREA-A,Area A,Quezon City (ADDR-1),Logistics 1,Rider 1,Sorted here from HUB-QC
+AREA-B,Area B,"Makati, Pasig, Mandaluyong (ADDR-2)",Logistics 1,Rider 2,
+AREA-C,Area C,Marikina (use any Marikina address),Logistics 1,None,For the area-without-a-rider cases

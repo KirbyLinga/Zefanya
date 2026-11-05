@@ -1,0 +1,24 @@
+Upload files to prepare,,,,
+"Prepare these files before testing uploads. Use sample images only. The size limit is 5 MB, which is 5,120 KB or 5,242,880 bytes. Copy every file to the test phone before testing: PDFs and other documents to Files / Downloads, and images to Photos (gallery) so they can be picked from either place.",,,,
+,,,,
+File name,Type,Size,Used for,Expected result
+product_front.jpg,JPG,1.2 MB,Product image,Accept
+product_side.png,PNG,2.4 MB,Product image,Accept
+store_logo.png,PNG,300 KB,Store logo,Accept
+store_banner.jpg,JPG,1.8 MB,Store banner,Accept
+review_photo.jpg,JPG,1.5 MB,Review photo / return evidence / chat attachment,Accept
+return_video.mp4,MP4,8 MB,Return evidence video (if videos are supported),Accept per your rule
+pod_photo.jpg,JPG,1.1 MB,Rider proof of delivery,Accept
+size_4.9MB.jpg,JPG,"4.9 MB (5,138,022 bytes)",Just under the size limit,Accept
+size_5.0MB.jpg,JPG,"5.0 MB (5,242,880 bytes)",Exactly at the size limit,Accept
+size_5.1MB.jpg,JPG,"5.1 MB (5,347,738 bytes)",Just over the size limit,Reject
+price_list.docx,DOCX,320 KB,Wrong file type (Word document),Reject
+installer.exe,EXE,2.1 MB,Wrong file type (program),Reject
+renamed_exe.jpg,JPG (really an EXE),2.1 MB,Program renamed to .jpg,Reject
+pro_license.jpg,JPG,1.4 MB,Courier's professional driver's license,Accept
+pro_license.png,PNG,2.1 MB,Courier's professional driver's license in PNG,Accept
+truck_or_cr.pdf,PDF,950 KB,Courier's truck Official Receipt and Certificate of Registration,Accept
+nbi_clearance.pdf,PDF,600 KB,Courier's NBI Clearance,Accept
+incident_photo.jpg,JPG,1.3 MB,Courier breakdown report / damaged parcel at unloading,Accept
+(take with the phone camera),JPG / HEIC,Often 3–12 MB at full resolution,Camera photo taken inside the app,"Compressed to 5 MB or less and accepted, or rejected with a size message (M7)"
+(screenshot taken on the phone),PNG,Usually under 1 MB,Image picked from the gallery,Accept

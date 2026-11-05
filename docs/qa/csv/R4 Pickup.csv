@@ -1,0 +1,21 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+RID-PICK-001,Pickup,Pickup details shown,Use Case Testing,Medium,"Logged in as Rider 1 (Active, Online, 0 active jobs). The pickup job above is Assigned to Rider 1.",1. Open the job.,,"Shows Seller 1's name, pickup address, contact number, tracking number and 1 parcel.",,,Not Run,
+RID-PICK-002,Pickup,Confirm pickup by scanning,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs).","1. At Seller 1, scan the waybill barcode.
+2. Seller 1 taps Confirm Rider Pickup.
+3. Check the job, Seller 1's order and Buyer 1's order.",Tracking number from the waybill,Status is Picked Up with the scan time in all three views. Buyer 1's order moves to To Receive. Seller 1 can no longer cancel. Rider 1 earns ₱30.00.,"A6, A10, A33, A43",,Not Run,
+RID-PICK-003,Pickup,Confirm pickup by typing the tracking number,State Transition,Medium,"Logged in as Rider 1 (Active, Online, 0 active jobs).",1. Type the tracking number instead of scanning.,,Status becomes Picked Up exactly as with a scan.,,,Not Run,
+RID-PICK-004,Pickup,Wrong tracking number,Equivalence Partitioning,High,"Logged in as Rider 1 (Active, Online, 0 active jobs).","1. Scan or type another order's tracking number.
+2. Type a random value.",TRK-0000000,Both are rejected with 'tracking number does not match this job'. Status stays Assigned.,,,Not Run,
+RID-PICK-005,Pickup,Double scan at pickup,Error Guessing,Low,"Logged in as Rider 1 (Active, Online, 0 active jobs).",1. Scan the same waybill twice.,,One Picked Up event only; the second scan shows 'already picked up'. Pay counted once.,A37,,Not Run,
+RID-PICK-006,Pickup,[Mobile] Camera access denied for the waybill scan,Equivalence Partitioning,Medium,Logged in as Rider 1. A pickup job is Assigned. Camera access for the app is off.,"1. Tap Scan.
+2. Type the tracking number.",Tracking number from the waybill,"No crash. A message explains that camera access is needed and links to Settings. Typing the tracking number gives Picked Up, as in RID-PICK-003.","M6, M14",,Not Run,
+RID-PICK-007,Pickup,[Mobile] Pickup with no internet,Error Guessing,High,Logged in as Rider 1. A pickup job is Assigned.,"1. At Seller 1, turn on Airplane mode and scan the waybill.
+2. Turn Airplane mode off.",Tracking number from the waybill,"The scan is either blocked with a no-internet message, or saved as pending and sent once online with the original scan time. In the end there is one Picked Up event, and pickup pay is counted once.","A37, M5",,Not Run,
+RID-PICK-008,Pickup,Hand the parcel over at the sorting center,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). The P-02 parcel is Picked Up and Rider 1 is at the sorting center (HUB-QC).","1. Hand the parcel to the sorting center staff.
+2. Logistics 1 scans the parcel in.
+3. Scan the same parcel a second time.
+4. Check Rider 1's job list and the Buyer 1, Seller 1 and Logistics 1 views.",,"The parcel is At Sorting Center with the scan time in all views. The job leaves Rider 1's active jobs. Pickup pay stays ₱30.00, paid once. The second scan shows 'already scanned' and adds no second event.","A10, A33, A37, A42, A43",,Not Run,
+RID-PICK-009,Pickup,Seller confirms the handover,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). The pickup job is Assigned and Rider 1 is at Seller 1, who has marked the order Ready for Pickup.","1. Seller 1 taps Confirm Rider Pickup before Rider 1 scans.
+2. Check the status.
+3. Rider 1 scans the waybill.
+4. Repeat with a new parcel in the opposite order (rider scans first, then Seller 1 confirms).",,"After only one of the two confirmations the status stays Ready for Pickup. After both, in either order, it becomes Picked Up once, with one time and one ₱30.00 pickup pay.","A6, A10, A33, A43",,Not Run,

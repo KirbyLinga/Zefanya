@@ -1,0 +1,23 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+COU-LOAD-001,Loading & Departure,Load by scanning every parcel,Use Case Testing,High,Courier 1 accepted TRIP-1 and is at HUB-QC.,"1. Tap Start Loading.
+2. Scan the 5 waybills one by one.",5 parcels of TRIP-1,TRIP-1 becomes Loading. The counter goes from 0/5 to 5/5 and each scanned parcel is ticked.,A38,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-002,Loading & Departure,Scan a parcel that is not in this trip,Equivalence Partitioning,High,TRIP-1 is Loading.,"1. Scan a parcel for ADDR-1 that is waiting at HUB-QC.
+2. Type TRK-0000000.",ADDR-1 parcel; TRK-0000000,Both are rejected ('not in this trip' / 'not found'). The counter does not change.,A38,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-003,Loading & Departure,Scan the same parcel twice,Error Guessing,Medium,TRIP-1 is Loading.,1. Scan the same waybill twice.,,The second scan warns 'already loaded'. The parcel is counted once.,A37,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-004,Loading & Departure,Depart with a parcel not loaded,State Transition,High,TRIP-1 is Loading with 4 of 5 parcels scanned.,"1. Tap Depart.
+2. As Logistics 1, remove the 5th parcel from TRIP-1.
+3. Enter the seal and tap Depart again.",Seal: BH-0004521,"Step 1 is blocked and lists the parcel not yet loaded. After the removal the counter shows 4/4, the removed parcel is back At Hub (HUB-QC) with no trip, and Depart works.","A38, A39",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-005,Loading & Departure,Seal number format,Boundary Value Analysis,High,TRIP-1 is Loading with every parcel scanned.,"1. Enter each seal number and tap Depart, one per attempt.","Empty (reject)
+BH-000452 (6 digits, reject)
+BH-00045210 (8 digits, reject)
+BH-ABC4521 (reject)
+BH-0004521 (accept)","Only BH-0004521 is accepted. Each 'reject' shows the format BH- followed by 7 digits, and the trip stays Loading.",A40,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-006,Loading & Departure,Depart updates every parcel,State Transition,High,TRIP-1 is Loading with every parcel scanned. Courier 1 is at HUB-QC.,"1. Enter seal BH-0004521 and tap Depart.
+2. Check Buyer 1's order (ADDR-2), Seller 1's order and Logistics 1's trip list.",Seal: BH-0004521,"TRIP-1 is In Transit with the departure time. Each parcel shows In Transit (HUB-QC → HUB-PSG) once on Buyer 1's timeline, in Seller 1's order and in Logistics 1's view. The courier's name and location are not shown to the buyer.","A10, A38",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-007,Loading & Departure,Depart away from the origin hub,Error Guessing,Medium,TRIP-1 is Loading with every parcel scanned. Courier 1 is more than 500 m from HUB-QC.,1. Tap Depart.,,Blocked with a message that the courier must be at HUB-QC. The trip stays Loading.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-008,Loading & Departure,"[Mobile] Scan with the camera, flashlight and manual entry",Use Case Testing,High,TRIP-1 is Loading.,"1. Scan a waybill with the camera.
+2. Scan another in low light using the flashlight toggle.
+3. Type the tracking number of a crumpled waybill.",,"Each parcel is loaded once, whether scanned or typed. The flashlight toggle works.",M14,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-LOAD-009,Loading & Departure,[Mobile] Loading scans with no internet,Error Guessing,High,TRIP-1 is Loading.,"1. Turn on Airplane mode and scan 2 parcels.
+2. Try to tap Depart.
+3. Turn Airplane mode off.",,"Scans are blocked with a no-internet message, or kept as pending and sent once online. Depart is not possible while scans are pending. In the end each parcel is loaded once.","A37, M5",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).

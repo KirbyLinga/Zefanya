@@ -1,0 +1,18 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-RATE-001,Ratings & Reviews,Rate a completed order,Use Case Testing,High,Logged in as Buyer 1. An order with P-02 is Completed.,"1. Tap Rate.
+2. Choose 5 stars, add text and a photo.
+3. Submit.
+4. Open P-02's reviews as Buyer 2.","Text: Matibay at maganda!
+Photo: review_photo.jpg","The review appears on P-02 with 5 stars, the text, the photo, the variant and Buyer 1's (masked) name.",A12,,Not Run,
+BUY-RATE-002,Ratings & Reviews,Rating not allowed before completion,State Transition,High,Logged in as Buyer 1. The order is To Receive.,"1. Look for Rate.
+2. Try the request directly.",,Not available; a direct request is rejected.,"A12, M11",,Not Run,
+BUY-RATE-003,Ratings & Reviews,One review per item,Equivalence Partitioning,Medium,Logged in as Buyer 1. P-02 already reviewed in this order.,1. Try to rate it again.,,Blocked; only Edit is offered.,A12,,Not Run,
+BUY-RATE-004,Ratings & Reviews,"Stars, text and photo limits",Boundary Value Analysis,Medium,Logged in as Buyer 1.,"1. Submit with 0 stars.
+2. Submit 500 characters of text, then 501.
+3. Attach 5 photos, then try a 6th.",,0 stars is blocked. 500 characters and 5 photos are accepted; 501 characters and a 6th photo are not.,A12,,Not Run,
+BUY-RATE-005,Ratings & Reviews,Edit once within the window,State Transition,Low,Logged in as Buyer 1.,"1. Edit the review once.
+2. Try to edit again.
+3. On another review older than 30 days, try to edit.",,The first edit saves. A second edit and an edit after 30 days are not possible.,A12,,Not Run,
+BUY-RATE-006,Ratings & Reviews,Average rating updates,Use Case Testing,Medium,P-02 has one 4-star review.,1. Buyer 2 adds a 2-star review.,,Average becomes 3.0 and the count 2 on the product screen and search card.,,,Not Run,
+BUY-RATE-007,Ratings & Reviews,[Mobile] Review photos from the camera and a multi-select,Boundary Value Analysis,Low,Logged in as Buyer 1. An order with P-02 is Completed and not yet reviewed.,"1. Tap Rate and take 1 photo with the camera.
+2. Open the gallery and select 5 more photos at once.",,"No more than 5 photos can be attached: the gallery stops at 4 more, or a message says only 5 are allowed. The review saves with 5 photos.","A12, M7",,Not Run,

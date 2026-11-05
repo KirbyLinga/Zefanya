@@ -1,0 +1,26 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-PDP-001,Product Detail Page,All variation types must be selected,Decision Table,High,Logged in as Buyer 1. P-01 is open.,"1. Tap Add to Cart with nothing selected.
+2. Select Color only and tap Add to Cart.
+3. Select Size too and tap Add to Cart.
+4. Repeat the first two steps with Buy Now.",,"Without both selections, Add to Cart and Buy Now show 'Please select a variation' and nothing is added. With both, the item is added once.",,,Not Run,
+BUY-PDP-002,Product Detail Page,"Selecting a variant updates price, stock and image",Equivalence Partitioning,High,Logged in as Buyer 1.,"1. Select Natural-S, then Natural-L, then Black-S.",P-01,Price: ₱199 → ₱299 → ₱199. Stock: 10 → 5 → 10. Image switches to the colour's image.,,,Not Run,
+BUY-PDP-003,Product Detail Page,Out-of-stock variant disabled,Equivalence Partitioning,High,Logged in as Buyer 1.,1. Select Black and try to tap M.,Black-M stock 0,M is disabled for Black and cannot be selected.,,,Not Run,
+BUY-PDP-004,Product Detail Page,Quantity limits,Boundary Value Analysis,High,Logged in as Buyer 1. P-02 stock is 20.,"1. Type each quantity and tap Add to Cart.
+2. Use the + button to go past 20.","0 (reject)
+-1 (reject)
+1 (accept)
+20 (accept)
+21 (reject)
+1.5 (reject)
+abc (reject)",Only 1 and 20 are added. The + button stops at 20. Invalid values show a message and the cart is unchanged.,A17,,Not Run,
+BUY-PDP-005,Product Detail Page,Per-buyer purchase limit,Boundary Value Analysis,High,Logged in as Buyer 1. Buyer 1 has not bought P-07 before.,"1. Add 2 × P-07 and buy them.
+2. Try to add 1 more P-07.",P-07 limit 2,"The first 2 are bought. The 3rd is blocked with a limit message, including in a new cart.",,,Not Run,
+BUY-PDP-006,Product Detail Page,"Sale price, countdown and vouchers shown",Equivalence Partitioning,Medium,A flash sale is live on P-02 (₱299). MCH50 is claimable.,1. Open P-02.,,"Shows ₱299 with ₱450 struck through, a countdown to the slot end, the flash units left, and MCH50 with a Claim button.",A5,,Not Run,
+BUY-PDP-007,Product Detail Page,Buy Now checks out only that item,Use Case Testing,Medium,Logged in as Buyer 1. Cart already has P-05.,1. Select P-01 Natural-M and tap Buy Now.,,Checkout opens with only P-01 Natural-M × 1. P-05 stays in the cart and is not in this checkout.,,,Not Run,
+BUY-PDP-008,Product Detail Page,Product screen of an unavailable product,Error Guessing,Medium,Logged in as Buyer 1.,1. Open the share link of a deleted product and of an inactive product (copied with Share before the change).,,Both open a clear 'unavailable' screen with no Add to Cart. No crash or error screen.,M11,,Not Run,
+BUY-PDP-009,Product Detail Page,[Mobile] Swipe and zoom product images,Use Case Testing,Low,Logged in as Buyer 1. P-01 is open with Natural-M selected.,"1. Swipe left and right through the images.
+2. Tap an image and pinch to zoom.
+3. Close the zoomed view.",P-01,Images change in the uploaded order with a position indicator. Zoom works and the image stays sharp. Closing returns to P-01 with Natural-M still selected.,M12,,Not Run,
+BUY-PDP-010,Product Detail Page,[Mobile] Share link opens the product in the app,Use Case Testing,Medium,Buyer 1 is on phone A. Buyer 2 has the app on phone B.,"1. On P-02, tap Share and send the link to phone B (for example by SMS or Messenger).
+2. On phone B, tap the link.
+3. Open the same link on a phone without the app.",P-02,"Phone B opens P-02 directly in the app. Without the app, the link opens a mobile web page for P-02 or the app's store page. Never a blank or error page.",M11,,Not Run,

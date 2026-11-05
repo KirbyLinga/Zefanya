@@ -1,0 +1,217 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+TC-RID-001,Add Rider Form,Create a rider with all valid data,Use Case Testing,High,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in every field with the test data.
+2. Tap Save.","First Name: Pedro Jose
+Last Name: Garcia
+Date of Birth: 03/22/1995
+Email: pedrojose.garcia@example.com
+Mobile Number: 09451239876
+Driver's License No.: N01-23-456789
+License Expiry Date: 03/22/2030
+Vehicle Type: Motorcycle
+Plate Number: 123ABC
+Driver's License (upload): drivers_license.jpg (1.5 MB)
+Vehicle OR/CR (upload): or_cr.pdf (900 KB)
+Assigned Area: Area A (Quezon City)",The rider is saved with no validation errors and appears in the rider list of Bilis Hatid Express Inc. with status Pending Activation. An activation email is sent to pedrojose.garcia@example.com. The rider list shows the Assigned Area Area A (Quezon City).,"A1, A13",,Not Run,
+TC-RID-002,Required Fields,Submit a completely empty form,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Leave every field blank and every dropdown on its default option.
+2. Tap Save.",All fields blank,Saving is blocked. A required-field message is shown for every mandatory field. No rider is created and no email is sent.,A1,,Not Run,
+TC-RID-003,Required Fields,Leave one required field blank at a time,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all fields with valid data.
+2. Clear one required field.
+3. Tap Save.
+4. Repeat for each field in the test data.","Clear in turn:
+First Name
+Last Name
+Date of Birth
+Email
+Mobile Number
+Driver's License No.
+License Expiry Date
+Vehicle Type
+Plate Number
+Driver's License (upload)
+Vehicle OR/CR (upload)","Each time, saving is blocked and a required-field message is shown on the blank field only. Other entered values (except uploads) are kept. No rider is created.",A1,,Not Run,
+TC-RID-004,Name,Name with numbers or symbols,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all other fields with valid data.
+2. Enter the test data in the name fields.
+3. Tap Save.","First Name: Pedro Jose99
+Last Name: Dela Cruz@#",Saving is blocked. A message on each name field says only letters are allowed.,A2,,Not Run,
+TC-RID-005,Name,Name length at the limits,Boundary Value Analysis,Medium,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each first name in the test data, one per attempt.
+3. Tap Save.","1 character: P (reject)
+2 characters: Po (accept)
+50 characters: Maria Cristina Angelica Bernadette Josefina Leonor (accept)
+51 characters: Maria Cristina Angelica Bernadette Josefina Leonora (reject)",1 and 51 characters are rejected with a length message. 2 and 50 characters are accepted.,A2,,Not Run,
+TC-RID-006,Date of Birth,Age at the 18-year limit,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each date of birth in the test data, one per attempt.
+3. Tap Save.","Born 11/05/2008 (17 years old, reject)
+Born 11/04/2008 (turns 18 today, accept)
+Born 11/03/2008 (18 years and 1 day, accept)",The 17-year-old date is rejected with a message that the person must be at least 18. The other two dates are accepted.,A6,,Not Run,
+TC-RID-007,Email,Email in an invalid format,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all other fields with valid data.
+2. Enter each email in the test data, one per attempt.
+3. Tap Save.","pedrojose.garciaexample.com (no @)
+pedrojose.garcia@ (no domain)
+@example.com (no name)
+pedrojose.garcia@example (no .com)
+pedrojose garcia@example.com (space)",Each value is rejected with a message asking for a valid email address. No rider is created.,A3,,Not Run,
+TC-RID-008,Email,Email already used by an account of another role,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The buyer account juanmiguel.delacruz@example.com already exists.,"1. Fill in all other fields with valid data.
+2. Enter the existing email.
+3. Tap Save.",Email: juanmiguel.delacruz@example.com,Saving is blocked. A message says the email is already in use. No rider is created.,A3,,Not Run,
+TC-RID-009,Mobile Number,Mobile number in an invalid format,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all other fields with valid data.
+2. Enter each mobile number in the test data, one per attempt.
+3. Tap Save.","0917ABC4567 (letters)
+0917-123-456 (symbols, too short)
+12345678901 (does not start with 09)
+02-8123-4567 (landline)",Each value is rejected with a message asking for a valid mobile number.,A4,,Not Run,
+TC-RID-010,Mobile Number,Mobile number length at the limits,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each mobile number in the test data, one per attempt.
+3. Tap Save.","10 digits: 0917123456 (reject)
+11 digits: 09170000001 (accept)
+12 digits: 091712345678 (reject)",10 and 12 digits are rejected with a length message. 11 digits is accepted.,A4,,Not Run,
+TC-RID-011,Mobile Number,Mobile number that is already registered,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. An account already exists with mobile number 09171234567.,"1. Fill in all other fields with valid data.
+2. Enter the existing mobile number.
+3. Tap Save.",Mobile: 09171234567,Saving is blocked. A message says the mobile number is already in use.,A4,,Not Run,
+TC-RID-012,License and Vehicle,Driver's license number in an invalid format,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all other fields with valid data.
+2. Enter each license number in the test data, one per attempt.
+3. Tap Save.","N01-23-45678 (one digit short)
+N01-23-4567890 (one digit extra)
+101-23-456789 (no letter)
+N0123456789X (letter at the end)",Each value is rejected with a message showing the format A00-00-000000.,A15,,Not Run,
+TC-RID-013,License and Vehicle,Driver's license number already registered,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The rider pedrojose.garcia@example.com already exists.,"1. Fill in all other fields with valid data.
+2. Enter the existing license number.
+3. Tap Save.",Driver's License No.: N01-23-456789,Saving is blocked. A message says the license number is already registered.,A14,,Not Run,
+TC-RID-014,License and Vehicle,License expiry date at the limit,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each expiry date in the test data, one per attempt.
+3. Tap Save.","Expiry 11/03/2026 (yesterday, reject)
+Expiry 11/04/2026 (today, accept)
+Expiry 11/05/2026 (tomorrow, accept)",Yesterday's date is rejected with a message that the license is expired. Today's and tomorrow's dates are accepted.,A15,,Not Run,
+TC-RID-015,License and Vehicle,Plate number already registered,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The rider pedrojose.garcia@example.com already exists.,"1. Fill in all other fields with valid data.
+2. Enter the existing plate number.
+3. Tap Save.",Plate Number: 123ABC,Saving is blocked. A message says the plate number is already registered.,A14,,Not Run,
+TC-RID-016,Document Upload,Upload documents in each accepted file type,Equivalence Partitioning,High,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Upload the files in the test data.
+3. Tap Save.","Driver's License: drivers_license.jpg (1.5 MB), then drivers_license.png (2.0 MB), then drivers_license.pdf (700 KB)
+Vehicle OR/CR: or_cr.pdf (900 KB)",Each file is accepted and its name or preview is shown. The rider is saved.,A10,,Not Run,
+TC-RID-017,Document Upload,Upload a file type that is not accepted,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all other fields with valid data.
+2. Try to upload each file in the test data to Driver's License, one per attempt.
+3. Tap Save.","price_list.docx (320 KB)
+store_banner.gif (480 KB)
+installer.exe (2.1 MB)","Each file is rejected with a message listing the accepted types (JPG, PNG, PDF). No rider is created.",A10,,Not Run,
+TC-RID-018,Document Upload,File size at the limit,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Upload each file in the test data to Driver's License, one per attempt.
+3. Tap Save.","size_4.9MB.jpg (accept)
+size_5.0MB.jpg, exactly 5,120 KB (accept)
+size_5.1MB.jpg (reject)",The 4.9 MB and 5.0 MB files are accepted. The 5.1 MB file is rejected with a maximum-size message.,A10,,Not Run,
+TC-RID-019,Add Rider Form,Tap Save several times quickly,Error Guessing,Medium,"The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all fields with the Account 2 data from the Test Data sheet.
+2. Tap Save three times in quick succession.","Account 2 data (Test Data sheet, column G)",Only one rider is created and only one activation email is sent.,A3,,Not Run,
+TC-RID-020,Account Activation,Rider activates the account with a valid password,State Transition,High,The rider pedrojose.garcia@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. On the rider's phone, open the activation link from the email within 24 hours.
+2. Enter and confirm the password.
+3. Tap Activate.","Password: Rider@2026
+Confirm Password: Rider@2026","The password is saved. The rider's status changes from Pending Activation to Active, and the login screen opens with a success message.","A5, A13",,Not Run,
+TC-RID-021,Account Activation,Set a password that breaks the password rule,Decision Table,High,The rider pedrojose.garcia@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. Open the activation link.
+2. Enter each password in both fields, one per attempt.
+3. Tap Activate.","7 characters: Ride@26
+No uppercase: rider@2026
+No lowercase: RIDER@2026
+No number: Rider@abcd
+No special character: Rider2026",Each password is rejected with a message stating the password rule. The rider stays Pending Activation.,A5,,Not Run,
+TC-RID-022,Account Activation,Confirm Password does not match,Equivalence Partitioning,Medium,The rider pedrojose.garcia@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. Open the activation link.
+2. Enter the test data in Password and Confirm Password.
+3. Tap Activate.","Password: Rider@2026
+Confirm Password: Rider@2027",Activation is blocked. A message says the passwords do not match.,A5,,Not Run,
+TC-RID-023,Account Activation,Open an expired activation link,Boundary Value Analysis,High,The rider pedrojose.garcia@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. Wait until more than 24 hours have passed since the email was sent (or set the link's expiry time back in the test database).
+2. Open the activation link.",Activation link sent 24 hours and 1 minute ago,A message says the link has expired. No password can be set and the rider stays Pending Activation.,A13,,Not Run,
+TC-RID-024,Account Activation,Logistics resends the activation email,State Transition,Medium,The rider pedrojose.garcia@example.com has status Pending Activation. The logistics account operations@bilishatid.example.com is logged in.,"1. Open the rider list.
+2. Tap Resend Activation for Pedro Jose Garcia.
+3. Open the first link.
+4. Open the second link.","First activation link, then the link from the second email",A new activation email is sent. The first link no longer works. The second link opens the set-password screen.,A13,,Not Run,
+TC-RID-025,Account Activation,Reuse the activation link after activating,State Transition,Medium,The rider pedrojose.garcia@example.com is already Active.,1. Open the activation link that was already used.,Activation link from the email that was used to activate,A message says the link is invalid or already used. The password cannot be changed through this link.,A13,,Not Run,
+TC-RID-026,Account Activation,Rider logs in before activating,State Transition,High,The rider pedrojose.garcia@example.com has status Pending Activation.,"1. Open the login screen.
+2. Enter the email and password.
+3. Tap Log In.","Email: pedrojose.garcia@example.com
+Password: Rider@2026",Login is denied. The rider is not given access to any screen.,A13,,Not Run,
+TC-RID-027,Access Control,Rider logs in after activating,Use Case Testing,High,The rider pedrojose.garcia@example.com is Active.,"1. Open the login screen.
+2. Enter the email and password.
+3. Tap Log In.","Email: pedrojose.garcia@example.com
+Password: Rider@2026",Login succeeds. The rider dashboard opens and shows Pedro Jose Garcia and Bilis Hatid Express Inc.,A13,,Not Run,
+TC-RID-028,Access Control,Rider is visible only to the company that created it,Error Guessing,High,Bilis Hatid Express Inc. created the rider Pedro Jose Garcia. Agila Cargo Movers Corp. is also an Approved logistics account.,"1. Log in as the first company and open the rider list.
+2. Log out.
+3. Log in as the second company and open the rider list.","First: operations@bilishatid.example.com / Hatid@2026
+Second: admin@agilacargo.example.com / Agila#Cargo26",Pedro Jose Garcia appears in the rider list of Bilis Hatid Express Inc. and does not appear in the rider list of Agila Cargo Movers Corp.,A13,,Not Run,
+TC-RID-029,Access Control,No public rider registration,Error Guessing,High,No user is logged in.,"1. Open the app's Sign Up screen and check the role choices.
+2. While logged out, open the Add Rider deep link on the phone.","Add Rider deep link (copy it while logged in as logistics, if the app has one)",Rider is not offered as a self-registration role. The Add Rider deep link opens the login screen.,"A13, M11",,Not Run,
+TC-RID-030,Access Control,Buyer or seller opens the Add Rider form,Error Guessing,High,The buyer account juanmiguel.delacruz@example.com is logged in.,"1. Check the buyer's tabs and menus for Add Rider.
+2. Open the Add Rider deep link on the buyer's phone.
+3. With a proxy tool, send the Add Rider request using the buyer's session.
+4. Repeat while logged in as the seller mariaclara.santos@example.com.",Add Rider deep link and Add Rider API request,"Add Rider is not shown. The deep link and the request are refused each time (401/403, access-denied screen or redirect). No rider can be created.","A16, M11",,Not Run,
+TC-RID-031,Access Control,Pending logistics account tries to add a rider,State Transition,High,"A logistics account with status Pending Approval is logged in (register admin@agilacargo.example.com and verify it, but do not approve it yet).","1. Look for the Add Rider option.
+2. Open the Add Rider deep link, or send the Add Rider request with a proxy tool.",Add Rider deep link or API request,The Add Rider option is not available. The deep link or request is denied or shows the under-review notice. No rider can be created.,"A12, A13, M11",,Not Run,
+TC-RID-032,Access Control,Open another role's screens,Error Guessing,Medium,The Active rider account pedrojose.garcia@example.com is logged in.,"1. Check every tab and menu for logistics, seller or admin functions.
+2. Open each deep link in the test data on the rider's phone, one at a time.
+3. If a proxy tool is available, replay one logistics request using the rider's session.","Logistics dashboard deep link
+Seller dashboard deep link
+Admin dashboard deep link",No other role's menus are shown. Each deep link shows an access-denied message or returns to the rider home screen. The API request is refused (401/403). No data from the other role is shown.,"A16, M11",,Not Run,
+TC-RID-033,Add Rider Form,[Mobile] Each field opens the right keyboard,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Tap each field in turn, from top to bottom.
+2. Note the keyboard that opens and whether word suggestions appear.","Email: email keyboard with @
+Mobile Number: number pad
+Driver's License No., Plate Number: letters and numbers, capitals
+First / Last Name: capitalises each word",Each field opens the keyboard listed in the test data. Password fields show no autocorrect or word suggestions. No field opens a keyboard that cannot type its valid value.,M2,,Not Run,
+TC-RID-034,Add Rider Form,[Mobile] Keyboard never hides the active field or Save,Error Guessing,Low,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. On the smallest test phone, tap each field from top to bottom.
+2. With the keyboard open on the last field, scroll to Save.
+3. Tap Done or tap outside the fields.",Any valid values,"The focused field always scrolls into view above the keyboard, with its error message visible. Save can be reached and tapped. The keyboard closes when Done or the background is tapped.","M2, M12",,Not Run,
+TC-RID-035,Add Rider Form,[Mobile] App sent to the background while filling the form,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Fill in about half the fields with Account 1 data.
+2. Press Home and open another app for 1 minute, then return.
+3. Lock the screen for 1 minute (or receive a phone call), then return.",Account 1 data (Test Data sheet),"Each time, the app returns to the same form with every typed value still there (passwords may be cleared). The app does not restart, crash or jump to the login screen. No rider is created until Save is tapped.",M4,,Not Run,
+TC-RID-036,Add Rider Form,[Mobile] Rotate the phone while the form has data,Error Guessing,Low,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Fill in several fields and tap Save with one field blank, so an error message shows.
+2. Turn on auto-rotate and rotate the phone to landscape, then back.",Account 1 data with Email left blank,"Either the app stays in portrait, or the layout switches to landscape and back keeping every value and the error message. Nothing is cleared and the app does not crash.",M4,,Not Run,
+TC-RID-037,Add Rider Form,[Mobile] Save with no internet connection,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open. The values in the test data are not yet registered.,"1. Fill in every field with the test data.
+2. Turn on Airplane mode (Wi-Fi and mobile data off).
+3. Tap Save.
+4. Turn Airplane mode off and tap Save again.","Email: rider.test03@example.com
+Mobile Number: 09170000014
+Driver's License No.: M26-00-000001
+Plate Number: MOB100
+Other fields: Account 1 values","Step 3: a clear no-internet message is shown, the typed data stays on the form, the app does not crash, and no rider is created. Step 4: the rider is saved once: exactly one rider and one activation email.","M5, A13",,Not Run,
+TC-RID-038,Add Rider Form,[Mobile] Connection drops right after tapping Save,Error Guessing,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open. The values in the test data are not yet registered.,"1. Fill in every field with the test data.
+2. Tap Save, then turn on Airplane mode within a second.
+3. Turn Airplane mode off. If the form is still shown, tap Save again.
+4. Check the mail catcher and the rider list.","Email: rider.test04@example.com
+Mobile Number: 09170000015
+Driver's License No.: M26-00-000002
+Plate Number: MOB200
+Other fields: Account 1 values","The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one rider exists with this email. If the first attempt was saved, the app continues normally (or says the rider already exists and lets the user continue); the rider is never left in a state the user cannot reach.","M5, A13",,Not Run,
+TC-RID-039,Add Rider Form,[Mobile] System Back on the Add Rider form,State Transition,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Fill in a few fields, then press Android Back (or swipe back on iPhone).
+2. Tap Cancel in the prompt, then press Back again and confirm leaving.
+3. Open the rider list.",Any valid values,"Leaving the form with typed data asks first, and Cancel keeps every value. After confirming, no rider is created and the rider list is unchanged.",M8,,Not Run,
+TC-RID-040,Document Upload,"[Mobile] Upload with the camera, the Files app and the gallery",Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open. The values in the test data are not yet registered.,"1. For Driver's License, choose Take Photo and photograph a printed sample of the document.
+2. For Vehicle OR/CR, choose Files (Browse) and pick or_cr.pdf copied to the phone.
+3. Fill in the other fields and tap Save.","Email: rider.test07@example.com
+Mobile Number: 09170000017
+Driver's License No.: M26-00-000005
+Plate Number: MOB500
+Other fields: Account 1 values
+Vehicle OR/CR: or_cr.pdf","Each source (camera, Files, gallery) is offered and works. The camera photo shows a preview and is accepted (compressed to 5 MB or less if needed). The PDF and the gallery image show their names or previews. Save continues normally.","A10, M6, M7",,Not Run,
+TC-RID-041,Document Upload,[Mobile] Camera or photo access denied,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Tap the Driver's License upload, choose Take Photo, and tap Don't Allow when asked for camera access.
+2. Choose Gallery and deny photo access too.
+3. Choose Files and pick drivers_license.jpg.
+4. Choose Take Photo again.",drivers_license.jpg copied to the phone,No crash. A message explains why the permission is needed and offers a link to the phone's Settings. Files still works and the file is accepted. Asking again shows the system prompt again or the Settings message.,M6,,Not Run,
+TC-RID-042,Document Upload,[Mobile] Full-resolution camera photo bigger than 5 MB,Boundary Value Analysis,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Set the camera to its highest resolution and take the Driver's License photo inside the app, or pick size_5.1MB.jpg from Photos.
+2. Fill in the other fields and tap Save.","Camera photo over 5 MB, or size_5.1MB.jpg in Photos","The app either compresses the photo to 5 MB or less and accepts it (the saved image is still readable), or rejects it with the maximum-size message. It never uploads a file over 5 MB and never fails without a message. Write your rule in Assumption M7, column D.","A10, M7",,Not Run,
+TC-RID-043,Add Rider Form,[Mobile] Large system font on a small screen,Error Guessing,Low,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Rider form is open.,"1. Set the phone's font size and display size to the largest setting.
+2. Open the Add Rider form and tap Save with every field empty.",All fields blank,"All labels, placeholders, error messages and buttons can be read in full; none are cut off or overlapping. The screen scrolls to every field and Save can be tapped.",M12,,Not Run,
+TC-RID-044,Account Activation,[Mobile] Activation link opened on the rider's phone with the app installed,Use Case Testing,High,The rider markanthony.bautista@example.com (created with the Account 2 data) is Pending Activation. The app is installed on the rider's phone and the activation email is open there.,"1. On the rider's phone, tap the activation link.
+2. Enter the password in both fields and tap Activate.
+3. Log in to the app.","Password: Hatid#Mark26
+Confirm Password: Hatid#Mark26","The link opens the app's Set Password screen (or a mobile web page that leads back to the app). Activation succeeds, the status becomes Active, and the rider logs in to the rider home screen showing Mark Anthony Bautista.","A13, M11",,Not Run,
+TC-RID-045,Account Activation,[Mobile] Activation link opened on a phone without the app,Error Guessing,Low,A rider created with spare values is Pending Activation. The phone used does not have the app installed.,1. Open the activation link on that phone.,Activation link from the mail catcher,"The link opens a mobile web page to set the password, or the app's store page with clear instructions. No blank or error page.","A13, M11",,Not Run,
+TC-RID-046,Access Control,[Mobile] Stay logged in after closing the app or restarting the phone,State Transition,Medium,The rider pedrojose.garcia@example.com is Active and logged in to the app on the rider's test phone.,"1. Swipe the app away from recent apps (force close) and reopen it.
+2. Restart the phone and reopen the app.","Email: pedrojose.garcia@example.com
+Password: Rider@2026","Each time the app opens on the rider home screen still logged in, showing Pedro Jose Garcia. It does not ask to log in again and shows no other user's data.",M9,,Not Run,
+TC-RID-047,Access Control,[Mobile] Back after logging out,State Transition,High,The rider pedrojose.garcia@example.com is Active and logged in to the app on the rider's test phone.,"1. Tap Log Out.
+2. Press Android Back (or swipe back) several times.
+3. Reopen the app from recent apps.","Email: pedrojose.garcia@example.com
+Password: Rider@2026","The login screen stays. No screen with account data appears again, and the app does not log back in by itself.","M8, M9",,Not Run,
+TC-RID-049,Required Fields,Leave the Assigned Area empty,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Fill in all other fields with valid data.
+2. Leave Assigned Area on its default.
+3. Tap Save.",Assigned Area: not selected,Saving is blocked. A message on the Assigned Area field says an area is required. No rider is created.,"A1, A20",,Not Run,
+TC-RID-050,Add Rider Form,Assigned Area list shows only the company's own areas,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in and the Add Rider form is open.,"1. Open the Assigned Area picker.
+2. Compare it with the delivery areas of Logistics 2 (Agila Cargo Movers).
+3. If a proxy tool is available, save a rider with an area ID of Logistics 2.","Areas of Logistics 1: Area A, Area B, Area C
+Area of Logistics 2: any Davao area",Only the areas of Bilis Hatid are listed. Areas of Logistics 2 are not offered. The direct request is rejected and no rider is created.,"A20, A16, M11",,Not Run,

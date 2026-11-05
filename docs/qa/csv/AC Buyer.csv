@@ -1,0 +1,193 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+TC-BUY-001,Registration Form,Register with all valid data,Use Case Testing,High,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in every field with the test data.
+2. Tap Register.","First Name: Juan Miguel
+Last Name: Dela Cruz
+Email: juanmiguel.delacruz@example.com
+Mobile Number: 09171234567
+Date of Birth: 05/14/1998
+Password: Mamimili@2026
+Confirm Password: Mamimili@2026
+Terms and Privacy Policy: Ticked","The form is accepted with no validation errors. A success message is shown, a 6-digit OTP is sent to the email, and the email verification screen opens. The account is saved with status Unverified.","A1, A9, A12",,Not Run,
+TC-BUY-002,Required Fields,Submit a completely empty form,Equivalence Partitioning,High,The buyer registration screen is open.,"1. Leave every field blank and every dropdown on its default option.
+2. Tap Register.",All fields blank,Registration is blocked. A required-field message is shown for every mandatory field. No account is created and no OTP is sent.,A1,,Not Run,
+TC-BUY-003,Required Fields,Leave one required field blank at a time,Equivalence Partitioning,High,The buyer registration screen is open.,"1. Fill in all fields with valid data.
+2. Clear one required field.
+3. Tap Register.
+4. Repeat for each field in the test data.","Clear in turn:
+First Name
+Last Name
+Email
+Mobile Number
+Date of Birth
+Password
+Confirm Password","Each time, registration is blocked and a required-field message is shown on the blank field only. Other entered values (except passwords and uploads) are kept. No account is created.",A1,,Not Run,
+TC-BUY-004,Name,Name with numbers or symbols,Equivalence Partitioning,Medium,The buyer registration screen is open.,"1. Fill in all other fields with valid data.
+2. Enter the test data in the name fields.
+3. Tap Register.","First Name: Juan Miguel123
+Last Name: Dela Cruz@#",Registration is blocked. A message on each name field says only letters are allowed.,A2,,Not Run,
+TC-BUY-005,Name,Name with ñ and allowed punctuation,Equivalence Partitioning,Low,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter the test data in the name fields.
+3. Tap Register.","First Name: Niño Angelo
+Last Name: Peñaflor-O'Hara","The names are accepted and saved exactly as typed, including ñ.",A2,,Not Run,
+TC-BUY-006,Name,Name length at the limits,Boundary Value Analysis,Medium,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each first name in the test data, one per attempt.
+3. Tap Register.","1 character: J (reject)
+2 characters: Jo (accept)
+50 characters: Maria Cristina Angelica Bernadette Josefina Leonor (accept)
+51 characters: Maria Cristina Angelica Bernadette Josefina Leonora (reject)",1 and 51 characters are rejected with a length message. 2 and 50 characters are accepted.,A2,,Not Run,
+TC-BUY-007,Date of Birth,Age at the 18-year limit,Boundary Value Analysis,High,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each date of birth in the test data, one per attempt.
+3. Tap Register.","Born 11/05/2008 (17 years old, reject)
+Born 11/04/2008 (turns 18 today, accept)
+Born 11/03/2008 (18 years and 1 day, accept)",The 17-year-old date is rejected with a message that the person must be at least 18. The other two dates are accepted.,A6,,Not Run,
+TC-BUY-008,Date of Birth,Date of birth in the future,Equivalence Partitioning,Medium,The buyer registration screen is open.,"1. Fill in all other fields with valid data.
+2. Enter the date of birth in the test data.
+3. Tap Register.",Date of Birth: 11/05/2026 (tomorrow),"Registration is blocked. A message asks for a valid date of birth. If a date picker is used, future dates cannot be selected.",A6,,Not Run,
+TC-BUY-009,Email,Email in an invalid format,Equivalence Partitioning,High,The buyer registration screen is open.,"1. Fill in all other fields with valid data.
+2. Enter each email in the test data, one per attempt.
+3. Tap Register.","juanmiguel.delacruzexample.com (no @)
+juanmiguel.delacruz@ (no domain)
+@example.com (no name)
+juanmiguel.delacruz@example (no .com)
+juanmiguel delacruz@example.com (space)",Each value is rejected with a message asking for a valid email address. No account is created.,A3,,Not Run,
+TC-BUY-010,Email,Email that is already registered,Equivalence Partitioning,High,The buyer registration screen is open. The buyer account juanmiguel.delacruz@example.com already exists.,"1. Fill in all other fields with valid data.
+2. Enter the existing email.
+3. Tap Register.",Email: juanmiguel.delacruz@example.com,Registration is blocked. A message says the email is already in use. No account is created.,A3,,Not Run,
+TC-BUY-011,Email,Registered email typed in capital letters,Error Guessing,Medium,The buyer registration screen is open. The buyer account juanmiguel.delacruz@example.com already exists.,"1. Fill in all other fields with valid data.
+2. Enter the same email in capital letters.
+3. Tap Register.",Email: JUANMIGUEL.DELACRUZ@EXAMPLE.COM,The email is treated as a duplicate. Registration is blocked.,A3,,Not Run,
+TC-BUY-012,Email,Email with spaces before and after,Error Guessing,Low,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Type two spaces before and after the email.
+3. Tap Register.","Email: ""  buyer.test01@example.com  """,The spaces are removed and the email is saved as buyer.test01@example.com.,A3,,Not Run,
+TC-BUY-013,Mobile Number,Mobile number in an invalid format,Equivalence Partitioning,High,The buyer registration screen is open.,"1. Fill in all other fields with valid data.
+2. Enter each mobile number in the test data, one per attempt.
+3. Tap Register.","0917ABC4567 (letters)
+0917-123-456 (symbols, too short)
+12345678901 (does not start with 09)
+02-8123-4567 (landline)",Each value is rejected with a message asking for a valid mobile number.,A4,,Not Run,
+TC-BUY-014,Mobile Number,Mobile number length at the limits,Boundary Value Analysis,High,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each mobile number in the test data, one per attempt.
+3. Tap Register.","10 digits: 0917123456 (reject)
+11 digits: 09170000001 (accept)
+12 digits: 091712345678 (reject)",10 and 12 digits are rejected with a length message. 11 digits is accepted.,A4,,Not Run,
+TC-BUY-015,Mobile Number,Mobile number that is already registered,Equivalence Partitioning,Medium,The buyer registration screen is open. An account already exists with mobile number 09171234567.,"1. Fill in all other fields with valid data.
+2. Enter the existing mobile number.
+3. Tap Register.",Mobile: 09171234567,Registration is blocked. A message says the mobile number is already in use.,A4,,Not Run,
+TC-BUY-016,Mobile Number,Registered number entered in +63 format,Error Guessing,Medium,The buyer registration screen is open. An account already exists with mobile number 09171234567.,"1. Fill in all other fields with valid data.
+2. Enter the same number in +63 format.
+3. Tap Register.",Mobile: +639171234567,The +63 format is recognised as the same number. Registration is blocked. A message says the mobile number is already in use.,A4,,Not Run,
+TC-BUY-017,Password,Password length at the limit,Boundary Value Analysis,High,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each password in both password fields, one per attempt.
+3. Tap Register.","7 characters: Bili@26 (reject)
+8 characters: Bili@202 (accept)",7 characters is rejected with a minimum-length message. 8 characters is accepted.,A5,,Not Run,
+TC-BUY-018,Password,Password missing a required character type,Decision Table,High,The buyer registration screen is open.,"1. Fill in all other fields with valid data.
+2. Enter each password in both password fields, one per attempt.
+3. Tap Register.","No uppercase: mamimili@2026
+No lowercase: MAMIMILI@2026
+No number: Mamimili@abcd
+No special character: Mamimili2026",Each password is rejected with a message stating the password rule. No account is created.,A5,,Not Run,
+TC-BUY-019,Password,Confirm Password does not match,Equivalence Partitioning,High,The buyer registration screen is open.,"1. Fill in all other fields with valid data.
+2. Enter the test data in Password and Confirm Password.
+3. Tap Register.","Password: Mamimili@2026
+Confirm Password: Mamimili@2027",Registration is blocked. A message says the passwords do not match.,A5,,Not Run,
+TC-BUY-020,Password,Password is hidden while typing,Error Guessing,Low,The buyer registration screen is open.,"1. Type the password.
+2. If a show/hide icon is provided, tap it twice.",Password: Mamimili@2026,"Characters are hidden as dots by default. The icon reveals the password, then hides it again.",A5,,Not Run,
+TC-BUY-021,Terms and Privacy Policy,Register without accepting the terms,Equivalence Partitioning,Medium,The buyer registration screen is open.,"1. Fill in all fields with valid data.
+2. Leave the Terms and Privacy Policy checkbox unticked.
+3. Tap Register.",Terms and Privacy Policy: unticked,Registration is blocked. A message says the Terms and Privacy Policy must be accepted.,A1,,Not Run,
+TC-BUY-022,Registration Form,Tap Register several times quickly,Error Guessing,Medium,"The buyer registration screen is open. The email, mobile number and other unique values in the test data are not yet registered.","1. Fill in all fields with the Account 2 data from the Test Data sheet.
+2. Tap Register three times in quick succession.","Account 2 data (Test Data sheet, column G)",Only one account is created and only one OTP email is sent. No duplicate-email error screen appears.,A3,,Not Run,
+TC-BUY-023,Email Verification (OTP),Verify with the correct OTP,State Transition,High,The buyer account juanmiguel.delacruz@example.com was just registered and is Unverified. The verification screen is open and the OTP email has been read from the mail catcher.,"1. Enter the OTP from the email within 5 minutes.
+2. Tap Verify.",OTP: the code in the email (for example 482913),Verification succeeds. The account status changes from Unverified to Pending Approval (not Active). A message says the account is waiting for admin approval and the login screen opens. The buyer home screen does not open yet.,"A9, A12",,Not Run,
+TC-BUY-024,Email Verification (OTP),Verify with an incorrect OTP,Equivalence Partitioning,High,The buyer account juanmiguel.delacruz@example.com was just registered and is Unverified. The verification screen is open and the OTP email has been read from the mail catcher.,"1. Enter a code different from the one in the email.
+2. Tap Verify.",OTP: 000000 (use 111111 if the real code is 000000),Verification fails with an invalid-code message. The account stays Unverified.,A9,,Not Run,
+TC-BUY-025,Email Verification (OTP),OTP in the wrong format,Equivalence Partitioning,Medium,The buyer account juanmiguel.delacruz@example.com was just registered and is Unverified. The verification screen is open and the OTP email has been read from the mail catcher.,"1. Enter each value in the test data, one per attempt.
+2. Tap Verify.","5 digits: 48291
+7 digits: 4829137
+Letters: 48A91B
+Blank",Each value is rejected. The account stays Unverified.,A9,,Not Run,
+TC-BUY-026,Email Verification (OTP),Verify with an expired OTP,Boundary Value Analysis,High,The buyer account juanmiguel.delacruz@example.com was just registered and is Unverified. The verification screen is open and the OTP email has been read from the mail catcher.,"1. Wait until 5 minutes and 1 second have passed since the OTP was sent.
+2. Enter the OTP from the email.
+3. Tap Verify.","OTP: the correct code, entered at 5:01 or later","Verification fails with a message that the code has expired, and a Resend option is offered. The account stays Unverified.",A9,,Not Run,
+TC-BUY-027,Email Verification (OTP),Resend OTP,State Transition,Medium,The buyer account juanmiguel.delacruz@example.com was just registered and is Unverified. The verification screen is open and the OTP email has been read from the mail catcher.,"1. Tap Resend OTP.
+2. Enter the first code and tap Verify.
+3. Enter the second code and tap Verify.","First code (for example 482913), then the second code (for example 907356)",A new OTP email arrives. The first code is rejected. The second code is accepted and the account is verified.,A9,,Not Run,
+TC-BUY-028,Email Verification (OTP),Log in before verifying the email,State Transition,High,The buyer account juanmiguel.delacruz@example.com exists with status Unverified.,"1. Open the login screen.
+2. Log in with the unverified account.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026",The user is not given access. The verification screen or a message asking to verify the email is shown.,"A9, A12",,Not Run,
+TC-BUY-029,Access Control,Log in with the new approved account,Use Case Testing,High,The buyer account juanmiguel.delacruz@example.com is verified and has been Approved by the Admin.,"1. Open the login screen.
+2. Enter the email and password.
+3. Tap Log In.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026",Login succeeds. The buyer home screen opens and the name Juan Miguel is shown.,A12,,Not Run,
+TC-BUY-030,Access Control,Open another role's screens,Error Guessing,High,The buyer account juanmiguel.delacruz@example.com is logged in.,"1. Check every tab and menu for seller, logistics, rider or admin functions.
+2. Open each deep link in the test data on the phone, one at a time (tap it in a notes app, or on Android run adb shell am start -a android.intent.action.VIEW -d <link>).
+3. If a proxy tool is available, replay one seller API request using the buyer's session.","Seller dashboard deep link
+Logistics dashboard deep link
+Rider home deep link
+Admin dashboard deep link (or the admin panel's web address)",No other role's menus are shown. Each deep link shows an access-denied message or returns to the buyer home screen. The API request is refused (401/403). No data from the other role is shown.,"A16, M11",,Not Run,
+TC-BUY-031,Registration Form,[Mobile] Each field opens the right keyboard,Error Guessing,Medium,The buyer Sign Up screen is open in the app on the test phone.,"1. Tap each field in turn, from top to bottom.
+2. Note the keyboard that opens and whether word suggestions appear.","Email: email keyboard with @
+Mobile Number: number pad
+OTP (on the next screen): number pad
+Password / Confirm Password: no autocorrect or suggestions
+First / Last Name: capitalises each word",Each field opens the keyboard listed in the test data. Password fields show no autocorrect or word suggestions. No field opens a keyboard that cannot type its valid value.,M2,,Not Run,
+TC-BUY-032,Registration Form,[Mobile] Keyboard never hides the active field or Register,Error Guessing,Low,The buyer Sign Up screen is open in the app on the test phone.,"1. On the smallest test phone, tap each field from top to bottom.
+2. With the keyboard open on the last field, scroll to Register.
+3. Tap Done or tap outside the fields.",Any valid values,"The focused field always scrolls into view above the keyboard, with its error message visible. Register can be reached and tapped. The keyboard closes when Done or the background is tapped.","M2, M12",,Not Run,
+TC-BUY-033,Registration Form,[Mobile] App sent to the background while filling the form,Error Guessing,Medium,The buyer Sign Up screen is open in the app on the test phone.,"1. Fill in about half the fields with Account 1 data.
+2. Press Home and open another app for 1 minute, then return.
+3. Lock the screen for 1 minute (or receive a phone call), then return.",Account 1 data (Test Data sheet),"Each time, the app returns to the same form with every typed value still there (passwords may be cleared). The app does not restart, crash or jump to the login screen. No account is created until Register is tapped.",M4,,Not Run,
+TC-BUY-034,Registration Form,[Mobile] Rotate the phone while the form has data,Error Guessing,Low,The buyer Sign Up screen is open in the app on the test phone.,"1. Fill in several fields and tap Register with one field blank, so an error message shows.
+2. Turn on auto-rotate and rotate the phone to landscape, then back.",Account 1 data with Email left blank,"Either the app stays in portrait, or the layout switches to landscape and back keeping every value and the error message. Nothing is cleared and the app does not crash.",M4,,Not Run,
+TC-BUY-035,Registration Form,[Mobile] Register with no internet connection,Equivalence Partitioning,High,The buyer Sign Up screen is open in the app on the test phone. The values in the test data are not yet registered.,"1. Fill in every field with the test data.
+2. Turn on Airplane mode (Wi-Fi and mobile data off).
+3. Tap Register.
+4. Turn Airplane mode off and tap Register again.","Email: buyer.test03@example.com
+Mobile Number: 09170000002","Step 3: a clear no-internet message is shown, the typed data stays on the form, the app does not crash, and no account is created. Step 4: the account is saved once: exactly one account and one OTP email.","M5, A3",,Not Run,
+TC-BUY-036,Registration Form,[Mobile] Connection drops right after tapping Register,Error Guessing,High,The buyer Sign Up screen is open in the app on the test phone. The values in the test data are not yet registered.,"1. Fill in every field with the test data.
+2. Tap Register, then turn on Airplane mode within a second.
+3. Turn Airplane mode off. If the form is still shown, tap Register again.
+4. Check the mail catcher and try to log in.","Email: buyer.test04@example.com
+Mobile Number: 09170000003","The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one account exists with this email. If the first attempt was saved, the app continues normally (or says the account already exists and lets the user continue); the account is never left in a state the user cannot reach.","M5, A3",,Not Run,
+TC-BUY-037,Email Verification (OTP),[Mobile] Paste the OTP copied from the mail app,Use Case Testing,Medium,A buyer account registered with the test data is Unverified. The verification screen is open in the app and the OTP email is open in a mail app or the mail catcher on the same phone.,"1. In the mail app, long-press the 6-digit code and copy it.
+2. Return to the app, long-press the OTP field and tap Paste (or tap the code suggested above the keyboard).
+3. Tap Verify if it does not verify by itself.","Email: buyer.test05@example.com
+Mobile Number: 09170000004
+OTP: the code in the email","All 6 digits fill the OTP field (every box, in order, when it is split into boxes). Verification succeeds and the status changes exactly as in the correct-OTP case.","M3, A9",,Not Run,
+TC-BUY-038,Email Verification (OTP),[Mobile] OTP countdown after switching to the mail app,Boundary Value Analysis,High,A buyer account registered with the test data is Unverified and the verification screen has just opened.,"1. Note the time left on the verification screen.
+2. Switch to the mail app for 2 minutes, then return.
+3. Lock the screen until more than 5 minutes have passed since the code was sent, unlock, enter the code and tap Verify.","Email: buyer.test06@example.com
+Mobile Number: 09170000005
+OTP: the code in the email",After step 2 the verification screen is still open and shows about 3 minutes left (the countdown kept running; it did not restart at 5:00). In step 3 the code is rejected as expired and Resend is offered.,"M3, M4, A9",,Not Run,
+TC-BUY-039,Email Verification (OTP),[Mobile] System Back on the form and the verification screen,State Transition,Medium,The buyer Sign Up screen is open in the app on the test phone.,"1. Fill in a few fields, then press Android Back (or swipe back on iPhone).
+2. Tap Cancel in the prompt, then press Back again and confirm leaving.
+3. Register with a spare email to reach the verification screen and press Back.
+4. Log in with that account.",Spare email from the Test Data sheet (for example buyer.test09@example.com),"Leaving a form with typed data asks first, and Cancel keeps every value. Back from the verification screen does not create a second account; the account stays Unverified, and the next login brings the user back to verification.","M8, A9",,Not Run,
+TC-BUY-040,Registration Form,[Mobile] Large system font on a small screen,Error Guessing,Low,The buyer Sign Up screen is open in the app on the test phone.,"1. Set the phone's font size and display size to the largest setting.
+2. Open the buyer Sign Up screen and tap Register with every field empty.",All fields blank,"All labels, placeholders, error messages and buttons can be read in full; none are cut off or overlapping. The screen scrolls to every field and Register can be tapped.",M12,,Not Run,
+TC-BUY-041,Access Control,[Mobile] Stay logged in after closing the app or restarting the phone,State Transition,Medium,"The buyer account juanmiguel.delacruz@example.com is verified and Active, and is logged in on the test phone.","1. Swipe the app away from recent apps (force close) and reopen it.
+2. Restart the phone and reopen the app.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026","Each time the app opens on the buyer home screen still logged in, showing Juan Miguel. It does not ask to log in again and shows no other user's data.",M9,,Not Run,
+TC-BUY-042,Access Control,[Mobile] Back after logging out,State Transition,High,"The buyer account juanmiguel.delacruz@example.com is verified and Active, and is logged in on the test phone.","1. Tap Log Out.
+2. Press Android Back (or swipe back) several times.
+3. Reopen the app from recent apps.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026","The login screen stays. No screen with account data appears again, and the app does not log back in by itself.","M8, M9",,Not Run,
+TC-BUY-043,Admin Approval,Log in while the account is waiting for approval,State Transition,High,The buyer account juanmiguel.delacruz@example.com is verified with the OTP and has status Pending Approval.,"1. Open the login screen.
+2. Enter the email and password.
+3. Tap Log In.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026","Login is blocked. A message says the account is waiting for admin approval. The buyer home screen does not open, no product or order data is shown, and the status stays Pending Approval.","A12, A19",,Not Run,
+TC-BUY-044,Admin Approval,Admin approves the buyer,Use Case Testing,High,The buyer account juanmiguel.delacruz@example.com has status Pending Approval. The Admin is logged in on the admin panel (M1).,"1. As Admin, open the pending buyer applications and open this one.
+2. Tap Approve.
+3. On the phone, log in as the buyer.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026",The status changes to Approved and the buyer is notified by email. Login succeeds and the buyer home screen opens. The application is no longer in the Admin's pending list.,"A12, A19, A23",,Not Run,
+TC-BUY-045,Admin Approval,Admin rejects the buyer,State Transition,High,A buyer account has status Pending Approval. The Admin is logged in on the admin panel (M1).,"1. As Admin, open the application and tap Reject without a reason.
+2. Enter the reason and tap Reject.
+3. On the phone, log in as the buyer.","Reason: Details could not be verified, please check them.",Step 1 is blocked because a reason is required (10 to 300 characters). After step 2 the status is Rejected and the buyer is told by email with the reason. Login is blocked with a message that the application was rejected. The buyer home screen does not open.,"A12, A19",,Not Run,
+TC-BUY-046,Admin Approval,Rejected buyer corrects the details and resubmits,State Transition,Medium,The buyer account has status Rejected.,"1. Log in with the rejected account.
+2. Correct the details and tap Resubmit.
+3. As Admin, open the pending buyer applications.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026",The buyer can correct the details and resubmit. The status goes back to Pending Approval and the Admin sees one application for this buyer (no duplicate account).,"A12, A19",,Not Run,
+TC-BUY-047,Admin Approval,[Mobile] Waiting for approval: close and reopen the app,State Transition,Medium,A buyer has just verified the OTP on the phone and is Pending Approval.,"1. Close the app completely and reopen it.
+2. As Admin, approve the buyer.
+3. Reopen the app and log in.","Email: juanmiguel.delacruz@example.com
+Password: Mamimili@2026","Step 1: the login or waiting-for-approval screen shows, never the buyer home screen. Step 3: login succeeds and the home screen opens.","M9, A12, A19",,Not Run,

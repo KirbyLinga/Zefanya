@@ -1,0 +1,20 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-TRK-001,Order Tracking & History,Orders appear in the correct tab,State Transition,High,Logged in as Buyer 1. Orders exist in each status.,"1. Open each tab: To Pay, To Ship, To Receive, Completed, Cancelled, Return/Refund.
+2. Compare tab counts with rows.",,Each order is in exactly one tab matching its status; counts match.,A10,,Not Run,
+BUY-TRK-002,Order Tracking & History,"Timeline matches seller, rider and sorting center updates",State Transition,High,"Logged in as Buyer 1. A COD order to ADDR-2 (Makati, Area B, delivered by Rider 2) is Ready for Pickup.","1. Logistics 1 assigns Rider 1 for the pickup; Rider 1 picks up and drops the parcel at the sorting center (HUB-QC), which scans it in, sorts it to Area B and assigns Rider 2; Rider 2 collects it and goes Out for Delivery.
+2. Pull to refresh Buyer 1's order after each step.",,"Each event appears once, in order, with its time: Picked Up, At Sorting Center, Sorted, Assigned to Rider, Out for Delivery. The order moves to To Receive at Picked Up.","A10, A42, A43",,Not Run,
+BUY-TRK-003,Order Tracking & History,Order Received button,State Transition,High,Logged in as Buyer 1. An order is Delivered.,"1. Tap Order Received and confirm.
+2. Check Seller 1's earnings.",,The order moves to Completed and the Rate button appears. Seller 1's earnings for it become Available.,"A11, A15",,Not Run,
+BUY-TRK-004,Order Tracking & History,Order Received not available before delivery,State Transition,Medium,Logged in as Buyer 1. An order is Out for Delivery.,"1. Look for Order Received.
+2. Try the request directly if possible.",,Not shown; a direct request is rejected.,"A11, M11",,Not Run,
+BUY-TRK-005,Order Tracking & History,Automatic completion,Boundary Value Analysis,Medium,An order was Delivered.,1. Check it just before and just after 7 days.,,"To Receive before 7 days; Completed after, and earnings are released.",A11,,Not Run,
+BUY-TRK-006,Order Tracking & History,Cannot open another buyer's order,Error Guessing,High,Logged in as Buyer 1.,1. Change the order ID in the deep link or API request to Buyer 2's order.,,Denied. No details of Buyer 2's order are shown.,"A22, M11",,Not Run,
+BUY-TRK-007,Order Tracking & History,[Mobile] Push notification opens the order,State Transition,High,Logged in as Buyer 1 with notifications allowed. A COD order is Ready for Pickup.,"1. Close the app (swipe it away). Rider 1 marks the parcel Picked Up.
+2. Tap the push notification.
+3. With the app open on the home screen, Rider 1 marks Out for Delivery.",,"Step 1: a push notification for the change arrives, including on the lock screen. Step 2: the app opens on that order's tracking screen. Step 3: an in-app banner appears and the order screen updates. Exactly one notification per change.","A23, M10",,Not Run,
+BUY-TRK-008,Order Tracking & History,Full order flow from the ERP: placed to completed,Use Case Testing,High,"Buyer 1 is Approved. Seller 1 has P-02 in stock (20). Logistics 1, Rider 1 (Area A, Online) and Rider 2 (Area B, Online) are Active.","1. Buyer 1 places a COD order for P-02 to ADDR-2.
+2. Seller 1 accepts, prepares and packs it, and marks it Ready for Pickup.
+3. Logistics 1 assigns Rider 1; Seller 1 hands over and confirms; Rider 1 scans the waybill.
+4. Rider 1 delivers the parcel to the sorting center; it is scanned in, sorted to Area B and assigned to Rider 2.
+5. Rider 2 collects it, goes Out for Delivery and delivers with the photo, OTP and COD.
+6. Buyer 1 taps Order Received.","P-02 × 1, COD, ADDR-2","Each role sees the statuses in this order, once each, with times: Placed, Confirmed, Preparing, Ready for Pickup, Picked Up, At Sorting Center, Sorted, Assigned to Rider, Out for Delivery, Delivered, Completed. Buyer 1's tab goes To Ship, then To Receive at Picked Up, then Completed. Only the roles involved are notified at each step. P-02 stock is 19 and Seller 1's earnings become Available at Completed.","A3, A10, A15, A23, A42, A43",,Not Run,

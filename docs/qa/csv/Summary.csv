@@ -1,0 +1,82 @@
+"Black-Box Test Cases: Account Creation, Buyer and Rider Modules (Mobile App)",,,,,,
+"Multi-role e-commerce and logistics mobile app (Buyer, Seller, Logistics, Rider). Courier cases are parked: the app has no courier login.",,,,,,
+,,,,,,
+Test run details,,,,,,
+System under test,,,,,,
+App version / build number,,,,,,
+"Test device (model, OS version) and network (Wi-Fi / mobile data)",,,,,,
+Tester,,,,,,
+Date tested,,,,,,
+,,,,,,
+Results by sheet,,,,,,
+Sheet,Total test cases,Pass,Fail,Blocked,Not Run,Pass rate (Pass / Total)
+Account creation,,,,,,
+AC Buyer,47,0,0,0,47,0
+AC Rider,49,0,0,0,49,0
+Buyer modules,,,,,,
+B1 Account,12,0,0,0,12,0
+B2 Address Book,11,0,0,0,11,0
+B3 Browse & Search,13,0,0,0,13,0
+B4 Product Detail,10,0,0,0,10,0
+B5 Wishlist & Follow,5,0,0,0,5,0
+B6 Cart,12,0,0,0,12,0
+B7 Vouchers,12,0,0,0,12,0
+B8 Checkout,13,0,0,0,13,0
+B9 Payment,9,0,0,0,9,0
+B10 Order Tracking,8,0,0,0,8,0
+B11 Cancellation,6,0,0,0,6,0
+B12 Return & Refund,6,0,0,0,6,0
+B13 Ratings & Reviews,7,0,0,0,7,0
+B14 Chat & Notifs,8,0,0,0,8,0
+Rider modules,,,,,,
+R1 Profile & Vehicle,8,0,0,0,8,0
+R2 Availability,7,0,0,0,7,0
+R3 Job Assignment,13,0,0,0,13,0
+R4 Pickup,9,0,0,0,9,0
+R5 Delivery,13,0,0,0,13,0
+R6 Failed Delivery,6,0,0,0,6,0
+R7 Earnings & COD,6,0,0,0,6,0
+Total (active sheets),290,0,0,0,290,0
+,,,,,,
+Parked (no courier login),,,,,,
+AC Courier (parked),52,0,0,52,0,0
+C1 Profile & Vehicle,8,0,0,8,0,0
+C2 Shift & Availability,7,0,0,7,0,0
+C3 Trip Assignment,8,0,0,8,0,0
+C4 Loading & Departure,9,0,0,9,0,0
+C5 In Transit,7,0,0,7,0,0
+C6 Arrival & Handover,7,0,0,7,0,0
+C7 Trip History & Pay,6,0,0,6,0,0
+Total (parked),104,0,0,104,0,0
+Total (all sheets),394,0,0,104,290,0
+,,,,,,
+How to use this workbook,,,,,,
+"1. Work through the sheets in this order: account creation (AC Buyer, AC Rider), then the Buyer modules (B1–B14) and Rider modules (R1–R7). The module cases use the accounts created in the first step, and a buyer must be approved by the Admin before login. Riders need orders that sellers have marked Ready for Pickup.",,,,,,
+"2. Strict pass rule: a case passes only if EVERY point in its Expected Result is true. If any point is false, or something happens that the Expected Result does not mention (an extra record, a stock change, a wrong notification, an app crash or freeze, a server error), mark it Fail.",,,,,,
+"3. Check side effects, not just the screen: after each case, confirm the stock, order status, voucher usage, balances and the other roles' views named in the Expected Result. 'Nothing is saved' means the record is missing after a pull-to-pull-to-refresh, or after closing and reopening the screen.",,,,,,
+"4. Error messages must appear next to the field (or at the top of the form) and say what is wrong and how to fix it. A generic 'Something went wrong', a blank screen, an app crash, or a 500 error is a Fail even when the action was correctly blocked.",,,,,,
+"5. For 'Error Guessing' security cases, a correct block shows a 403 screen, a 'not found' screen or a redirect, and shows NO data from the other user's record anywhere on the screen.",,,,,,
+"6. Read both Assumptions sheets first: Assumptions (Account) for the AC sheets and Assumptions (Modules) for the B, R and C sheets. The A-numbers in the Assumption Ref column mean different things in each, so use the sheet that matches the case. Write your real rule in column D where it differs.",,,,,,
+"7. Seed the accounts, products, vouchers, delivery areas and shipping rates on Test Data (Modules) before the module cases. Test Data (Account) lists the registration fields. Emails use example.com; read them from a mail catcher such as Mailtrap.",,,,,,
+"8. Test Case IDs follow <ROLE>-<MODULE>-<NNN>. Each module has positive, negative and boundary cases.",,,,,,
+"9. Fill in only the yellow cells: Actual Result, Status and Remarks. Pick the Status from the dropdown (Pass, Fail, Blocked, Not Run).",,,,,,
+"10. Pass = actual matches expected. Fail = it does not (describe what happened and add a screenshot or bug number in Remarks). Blocked = the case could not be run, for example because an earlier case failed.",,,,,,
+11. The Results by sheet table above updates automatically from the Status column of each sheet.,,,,,,
+"12. Colour key in the first cell of each case row: orange = edited to match the ERP flow, green = new case, grey = parked. See the ERP Changes sheet for the reason behind each change.",,,,,,
+13. The Courier cases (AC Courier (parked) and C1–C7) are Blocked because the app has no courier login. They are kept in case a courier role is added. The Total (active sheets) row leaves them out.,,,,,,
+,,,,,,
+Black-box techniques used,,,,,,
+Equivalence Partitioning,"Inputs are grouped into valid and invalid classes, and one value from each class is tested.",,,,,
+Boundary Value Analysis,"Values at and just beyond a limit are tested, for example ₱0.99, ₱1.00 and ₱1.01 for a ₱1.00 minimum price.",,,,,
+Decision Table,"Combinations of conditions are tested, for example which vouchers can stack.",,,,,
+State Transition,"Changes in order or shipment status are tested, including transitions that must be blocked.",,,,,
+Use Case Testing,A complete user flow is tested from start to finish with valid data.,,,,,
+Error Guessing,"Likely mistakes are tested based on experience, for example double-tapping Place Order or changing an ID in a deep link or API request.",,,,,
+,,,,,,
+Mobile app testing notes,,,,,,
+"1. Install the build under test on at least one Android phone, and on an iPhone if your system supports iOS. Write the phone model, OS version and app build number in the Test run details above, and test on the same build throughout.",,,,,,
+2. Copy every file on the Test Files sheets to the phone before testing: documents to the Files / Downloads folder and images to Photos (gallery).,,,,,,
+"3. Rows whose Test Scenario starts with [Mobile] are new mobile-only cases (keyboard, interruptions, no internet, permissions, camera, Back button, push notifications, deep links). Filter the Test Scenario column on '[Mobile]' to run them as a group. Assumptions M1 to M14 describe the rules they check.",,,,,,
+"4. 'Tap' is a single tap and 'double-tap' is two quick taps on the same button. 'Pull to refresh' means dragging the screen down from the top; if a screen has none, go back and reopen it. Use Airplane mode for the no-internet cases and turn it off before the next case.",,,,,,
+"5. Cases that send or capture an API request need a proxy tool on the phone (Assumption M11). If your group cannot capture app traffic, mark those cases Blocked and write 'no proxy' in Remarks.",,,,,,
+"6. Evidence: use the phone's screenshot or built-in screen recorder and name each file by case ID (for example buy-010.png or buy-031.mp4). Screen recordings are best for timing, interruption and no-internet cases.",,,,,,

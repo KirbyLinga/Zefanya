@@ -1,0 +1,29 @@
+Upload files to prepare,,,,
+"Prepare these files before testing the document uploads. Use sample or blank documents, not anyone's real ID or certificate. The size limit is 5 MB, which is 5,120 KB or 5,242,880 bytes. Copy every file to the test phone before testing: PDFs and other documents to Files / Downloads, and images to Photos (gallery) so they can be picked from either place.",,,,
+,,,,
+File name,Type,Size,Used for,Expected result
+govt_id_front.jpg,JPG,1.2 MB,Valid government ID,Accept
+govt_id_front.png,PNG,2.4 MB,Valid government ID in PNG,Accept
+dti_certificate.pdf,PDF,850 KB,DTI Certificate of Business Name Registration,Accept
+dti_certificate_clear.pdf,PDF,1.0 MB,Replacement document for the resubmit test (seller),Accept
+sec_certificate.pdf,PDF,1.0 MB,SEC Certificate of Registration,Accept
+bir_2303.pdf,PDF,1.1 MB,BIR Certificate of Registration (Form 2303),Accept
+mayors_permit.pdf,PDF,1.3 MB,Mayor's / Business Permit,Accept
+mayors_permit_2026.pdf,PDF,1.2 MB,Replacement document for the resubmit test (logistics),Accept
+drivers_license.jpg,JPG,1.5 MB,Rider's driver's license,Accept
+drivers_license.png,PNG,2.0 MB,Rider's driver's license in PNG,Accept
+drivers_license.pdf,PDF,700 KB,Rider's driver's license in PDF,Accept
+or_cr.pdf,PDF,900 KB,Vehicle Official Receipt and Certificate of Registration,Accept
+size_4.9MB.jpg,JPG,"4.9 MB (5,138,022 bytes)",Just under the size limit,Accept
+size_5.0MB.jpg,JPG,"5.0 MB (5,242,880 bytes)",Exactly at the size limit,Accept
+size_5.1MB.jpg,JPG,"5.1 MB (5,347,738 bytes)",Just over the size limit,Reject
+price_list.docx,DOCX,320 KB,Wrong file type (Word document),Reject
+store_banner.gif,GIF,480 KB,Wrong file type (GIF image),Reject
+installer.exe,EXE,2.1 MB,Wrong file type (program),Reject
+pro_license.jpg,JPG,1.4 MB,Courier's professional driver's license,Accept
+pro_license.png,PNG,2.1 MB,Courier's professional driver's license in PNG,Accept
+truck_or_cr.pdf,PDF,950 KB,Courier's truck Official Receipt and Certificate of Registration,Accept
+nbi_clearance.pdf,PDF,600 KB,Courier's NBI Clearance,Accept
+incident_photo.jpg,JPG,1.3 MB,Courier breakdown report / damaged parcel at unloading,Accept
+(take with the phone camera),JPG / HEIC,Often 3–12 MB at full resolution,Camera photo taken inside the app,"Compressed to 5 MB or less and accepted, or rejected with a size message (M7)"
+(screenshot taken on the phone),PNG,Usually under 1 MB,Image picked from the gallery,Accept

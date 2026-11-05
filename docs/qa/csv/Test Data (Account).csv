@@ -1,0 +1,109 @@
+Test data and input details,,,,,,
+"Every form field per role, with its rule and two complete sets of valid data. Account 1 is the main account in the test cases. Account 2 is for cases that need a second account. All people, companies, numbers and addresses are fictional.",,,,,,
+,,,,,,
+Buyer: Self-registration,,,,,,
+Role,Field,Required,Input type,Format / rule,Account 1 (valid),Account 2 (valid)
+Buyer,First Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Juan Miguel,Ana Marie
+Buyer,Last Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Dela Cruz,Reyes
+Buyer,Email,Yes,Email,Valid email format; unique,juanmiguel.delacruz@example.com,anamarie.reyes@example.com
+Buyer,Mobile Number,Yes,Text,09XXXXXXXXX or +639XXXXXXXXX; unique,09171234567,09173456789
+Buyer,Date of Birth,Yes,Date picker,At least 18 years old,05/14/1998,11/02/2001
+Buyer,Password,Yes,Password,"Min 8 characters; uppercase, lowercase, number, special character",Mamimili@2026,Suki#2026Ana
+Buyer,Confirm Password,Yes,Password,Must match Password,Mamimili@2026,Suki#2026Ana
+Buyer,Terms and Privacy Policy,Yes,Checkbox,Must be ticked,Ticked,Ticked
+,,,,,,
+"Seller: Self-registration, then admin approval",,,,,,
+Role,Field,Required,Input type,Format / rule,Account 1 (valid),Account 2 (valid)
+Seller,First Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Maria Clara,Roberto
+Seller,Last Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Santos,Villanueva
+Seller,Email,Yes,Email,Valid email format; unique,mariaclara.santos@example.com,roberto.villanueva@example.com
+Seller,Mobile Number,Yes,Text,09XXXXXXXXX or +639XXXXXXXXX; unique,09189876543,09194567890
+Seller,Shop Name,Yes,Text,3 to 30 characters; unique,Maria Clara Handicrafts,RV Gadget Hub
+Seller,Shop Category,Yes,Dropdown (picker),One main category,Home & Living,Mobiles & Gadgets
+Seller,Seller Type,Yes,Dropdown (picker),"Individual, Sole Proprietorship or Corporation",Sole Proprietorship,Corporation
+Seller,TIN,Yes,Text,000-000-000-000 (12 digits); unique,123-456-789-000,456-789-012-000
+Seller,Region,Yes,Dropdown (picker),Philippine regions,National Capital Region (NCR),Region VII (Central Visayas)
+Seller,Province,Yes,Dropdown (picker),Filtered by Region,Metro Manila,Cebu
+Seller,City / Municipality,Yes,Dropdown (picker),Filtered by Province,Quezon City,Cebu City
+Seller,Barangay,Yes,Dropdown (picker),Filtered by City / Municipality,Commonwealth,Lahug
+Seller,Street Address,Yes,Text,"House, unit or lot number and street","Blk 12 Lot 8, Sampaguita St.","2F, 45 Gorordo Ave."
+Seller,Postal Code,Yes,Text,Exactly 4 digits,1121,6000
+Seller,Government-issued ID (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",govt_id_front.jpg (1.2 MB),govt_id_front.png (2.4 MB)
+Seller,DTI Certificate (upload),Sole Proprietorship only,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",dti_certificate.pdf (850 KB),Not applicable
+Seller,SEC Certificate (upload),Corporation only,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",Not applicable,sec_certificate.pdf (1.0 MB)
+Seller,BIR Form 2303 (upload),Sole Proprietorship and Corporation,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",bir_2303.pdf (1.1 MB),bir_2303.pdf (1.1 MB)
+Seller,Password,Yes,Password,"Min 8 characters; uppercase, lowercase, number, special character",Tindahan@2026,Gadget#Hub26
+Seller,Confirm Password,Yes,Password,Must match Password,Tindahan@2026,Gadget#Hub26
+Seller,Terms and Privacy Policy,Yes,Checkbox,Must be ticked,Ticked,Ticked
+,,,,,,
+"Logistics: Self-registration, then admin approval",,,,,,
+Role,Field,Required,Input type,Format / rule,Account 1 (valid),Account 2 (valid)
+Logistics,Company Name,Yes,Text,Unique,Bilis Hatid Express Inc.,Agila Cargo Movers Corp.
+Logistics,SEC Registration No.,Yes,Text,2 letters followed by 9 digits; unique,CS202012345,CS201998765
+Logistics,TIN,Yes,Text,000-000-000-000 (12 digits); unique,234-567-890-000,567-890-123-000
+Logistics,Region,Yes,Dropdown (picker),Philippine regions,National Capital Region (NCR),Region XI (Davao Region)
+Logistics,Province,Yes,Dropdown (picker),Filtered by Region,Metro Manila,Davao del Sur
+Logistics,City / Municipality,Yes,Dropdown (picker),Filtered by Province,Pasig City,Davao City
+Logistics,Barangay,Yes,Dropdown (picker),Filtered by City / Municipality,Kapitolyo,Buhangin
+Logistics,Street Address,Yes,Text,"House, unit or lot number and street","Unit 5B, 88 West Capitol Drive","Door 3, 210 Sampaguita St."
+Logistics,Postal Code,Yes,Text,Exactly 4 digits,1603,8000
+Logistics,Contact Person First Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Carlos Antonio,Liza Mae
+Logistics,Contact Person Last Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Mendoza,Fernandez
+Logistics,Position,Yes,Text,Job title of the contact person,Operations Manager,General Manager
+Logistics,Email,Yes,Email,Valid email format; unique,operations@bilishatid.example.com,admin@agilacargo.example.com
+Logistics,Mobile Number,Yes,Text,09XXXXXXXXX or +639XXXXXXXXX; unique,09285551234,09396667890
+Logistics,Service Areas,Yes,Multi-select (picker),At least one region,NCR; Region IV-A (CALABARZON),Region XI (Davao Region)
+Logistics,SEC Certificate (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",sec_certificate.pdf (1.0 MB),sec_certificate.pdf (1.0 MB)
+Logistics,BIR Form 2303 (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",bir_2303.pdf (1.1 MB),bir_2303.pdf (1.1 MB)
+Logistics,Mayor's / Business Permit (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",mayors_permit.pdf (1.3 MB),mayors_permit.pdf (1.3 MB)
+Logistics,Valid ID of Authorized Representative (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",govt_id_front.jpg (1.2 MB),govt_id_front.png (2.4 MB)
+Logistics,Password,Yes,Password,"Min 8 characters; uppercase, lowercase, number, special character",Hatid@2026,Agila#Cargo26
+Logistics,Confirm Password,Yes,Password,Must match Password,Hatid@2026,Agila#Cargo26
+Logistics,Terms and Privacy Policy,Yes,Checkbox,Must be ticked,Ticked,Ticked
+,,,,,,
+Rider: Created by an Approved logistics account,,,,,,
+Role,Field,Required,Input type,Format / rule,Account 1 (valid),Account 2 (valid)
+Rider,First Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Pedro Jose,Mark Anthony
+Rider,Last Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Garcia,Bautista
+Rider,Date of Birth,Yes,Date picker,At least 18 years old,03/22/1995,08/09/1999
+Rider,Email,Yes,Email,Valid email format; unique,pedrojose.garcia@example.com,markanthony.bautista@example.com
+Rider,Mobile Number,Yes,Text,09XXXXXXXXX or +639XXXXXXXXX; unique,09451239876,09662345678
+Rider,Driver's License No.,Yes,Text,A00-00-000000; unique,N01-23-456789,D05-19-123456
+Rider,License Expiry Date,Yes,Date picker,Today or later,03/22/2030,08/09/2031
+Rider,Vehicle Type,Yes,Dropdown (picker),"Motorcycle, Car or Van",Motorcycle,Van
+Rider,Plate Number,Yes,Text,Unique,123ABC,NBC1234
+Rider,Driver's License (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",drivers_license.jpg (1.5 MB),drivers_license.png (2.0 MB)
+Rider,Vehicle OR/CR (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",or_cr.pdf (900 KB),or_cr.pdf (900 KB)
+Rider,Password (set by the rider at activation),Yes,Password,"Min 8 characters; uppercase, lowercase, number, special character",Rider@2026,Hatid#Mark26
+,,,,,,
+Other values,,,,,,
+Spare emails for repeat attempts,,"buyer.test01@example.com to buyer.test10@example.com (same pattern for seller.test, logistics.test and rider.test)",,,,
+Spare mobile numbers for repeat attempts,,09170000001 to 09170000020,,,,
+Admin account for approval tests,,Use the admin account already seeded in your system,,,,
+,,,,,,
+Courier: Created by an Approved logistics account (drives parcels from hub to hub),,,,,,
+Role,Field,Required,Input type,Format / rule,Account 1 (valid),Account 2 (valid)
+Courier,First Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Ernesto,Rogelio
+Courier,Last Name,Yes,Text,"2 to 50 characters; letters, spaces, hyphen, apostrophe, period",Villareal,Dimaculangan
+Courier,Date of Birth,Yes,Date picker,At least 18 years old,07/15/1988,02/28/1985
+Courier,Email,Yes,Email,Valid email format; unique across all roles,ernesto.villareal@example.com,rogelio.dimaculangan@example.com
+Courier,Mobile Number,Yes,Text,09XXXXXXXXX or +639XXXXXXXXX; unique,09276543210,09381122334
+Courier,Driver's License No.,Yes,Text,A00-00-000000; unique across riders and couriers,N02-15-345678,D10-12-654321
+Courier,License Type,Yes,Dropdown (picker),Professional only,Professional,Professional
+Courier,DL Codes,Yes,Multi-select (picker),Must cover the vehicle type (A18),"B, B2, C","B, B2"
+Courier,License Expiry Date,Yes,Date picker,Today or later,07/15/2029,02/28/2031
+Courier,Vehicle Type,Yes,Dropdown (picker),"Van, 4-Wheeler Closed Van Truck or 6-Wheeler Truck",4-Wheeler Closed Van Truck,Van
+Courier,Plate Number,Yes,Text,Unique across riders and couriers,NAB4521,CAV7788
+Courier,Load Capacity (kg),Yes,Number,"Whole kg; Van 100–1,000, 4-Wheeler 100–4,000, 6-Wheeler 100–10,000",3000,800
+Courier,Home Hub,Yes,Dropdown (picker),Only the hubs of the logistics company creating the courier,HUB-QC (Bilis Hatid QC First-Mile Hub),HUB-PSG (Bilis Hatid Pasig Main Hub)
+Courier,Professional Driver's License (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",pro_license.jpg (1.4 MB),pro_license.png (2.1 MB)
+Courier,Vehicle OR/CR (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",truck_or_cr.pdf (950 KB),or_cr.pdf (900 KB)
+Courier,NBI Clearance (upload),Yes,"File (camera, gallery or Files)","JPG, PNG or PDF; max 5 MB",nbi_clearance.pdf (600 KB),nbi_clearance.pdf (600 KB)
+Courier,Password (set by the courier at activation),Yes,Password,"Min 8 characters; uppercase, lowercase, number, special character",Courier@2026,Linehaul#Rog26
+,,,,,,
+Courier values,,,,,,
+Hubs to seed for the Home Hub field,"Logistics 1 (Bilis Hatid): HUB-QC QC First-Mile Hub, HUB-PSG Pasig Main Hub, HUB-STR Sta. Rosa Hub. Logistics 2 (Agila): HUB-DVO Davao Hub.",,,,,
+Spare courier emails and mobile numbers,courier.test03@example.com to courier.test10@example.com; 09170000021 to 09170000025,,,,,
+,,,,,,
+Added for the ERP flow (rider area),,,,,,
+Rider,Assigned Area,Yes,Dropdown (picker),One of the delivery areas of the logistics company creating the rider,Area A (Quezon City),Area B (Makati)

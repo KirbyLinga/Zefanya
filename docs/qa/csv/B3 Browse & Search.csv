@@ -1,0 +1,33 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-SRCH-001,"Browse, Search & Filter",Browse a platform category,Use Case Testing,Medium,Logged in as Buyer 1.,1. Open the platform category Home & Living.,,"Every Active product in Home & Living is listed, including P-02. No product from other categories appears.",,,Not Run,
+BUY-SRCH-002,"Browse, Search & Filter",Store screen with store categories,Use Case Testing,Medium,Logged in as Buyer 1.,"1. Open Seller 1's store screen.
+2. Tap Home Decor, then Lamps.",,Store categories match CAT-1 to CAT-5. Lamps shows P-03 only.,,,Not Run,
+BUY-SRCH-003,"Browse, Search & Filter",Search: exact and partial match,Equivalence Partitioning,High,Logged in as Buyer 1.,1. Search each term.,"Rattan Fruit Basket
+rattan
+RATTAN
+'  rattan  '",P-02 appears for all four terms (case and outer spaces do not matter).,,,Not Run,
+BUY-SRCH-004,"Browse, Search & Filter",Search: typo and no results,Equivalence Partitioning,Medium,Logged in as Buyer 1.,1. Search each term.,"Ratan baskit
+zzqxw","The typo returns P-02 or a 'Did you mean rattan basket?' suggestion. zzqxw shows a clear 'no results' state, not an error.",,,Not Run,
+BUY-SRCH-005,"Browse, Search & Filter",Search: special characters and injection,Error Guessing,High,Logged in as Buyer 1.,"1. Search each string.
+2. Check the screen and the app log (Android Logcat or Xcode console, if available).","%
+' OR '1'='1
+<script>alert(1)</script>
+""><img src=x onerror=alert(1)>","Each returns no results or literal matches. No error screen, no pop-up, no list of all products from the SQL string, and the app log shows no script run.",,,Not Run,
+BUY-SRCH-006,"Browse, Search & Filter",Empty search,Error Guessing,Low,Logged in as Buyer 1.,1. Tap Search with an empty box and with spaces only.,,The search is not submitted (or the normal listing is shown). No error screen.,,,Not Run,
+BUY-SRCH-007,"Browse, Search & Filter",Price range filter,Boundary Value Analysis,High,Logged in as Buyer 1.,1. Apply each price range.,"₱300 – ₱450 (P-02 included)
+₱451 – ₱1,000 (P-02 excluded)
+₱450 – ₱450 (P-02 only)
+Min ₱1,000, Max ₱100
+Min -1",Range ends are inclusive. Min greater than Max and negative values are rejected with a message and the results are not filtered by them.,,,Not Run,
+BUY-SRCH-008,"Browse, Search & Filter",Combined filters,Decision Table,Medium,Logged in as Buyer 1.,"1. Apply rating 4+, category Home & Living and location Metro Manila together.
+2. Clear one filter at a time.",,Only products matching all active filters are shown. Clearing filters widens the results correctly.,,,Not Run,
+BUY-SRCH-009,"Browse, Search & Filter",Sort and loading more results,Equivalence Partitioning,Medium,Logged in as Buyer 1.,"1. Sort by price low–high, high–low, latest and best-selling.
+2. Scroll down until more results load (or go to the next page of results), then scroll back to the top.",,Each sort orders the results correctly. No product repeats or disappears as more results load or when scrolling back.,,,Not Run,
+BUY-SRCH-010,"Browse, Search & Filter","Inactive, deleted and draft products never appear",Error Guessing,High,"Seller 1 has one inactive product, one deleted product and one draft.","1. Search for each by exact name.
+2. Browse their category and the store screen.
+3. Open each product's share link (copied with Share before it was hidden or deleted).",,"None appears in search, category or store screens. Each share link opens an 'unavailable' or 'not found' screen in the app.",M11,,Not Run,
+BUY-SRCH-011,"Browse, Search & Filter",Products of a vacation store,Equivalence Partitioning,Low,Seller 1 is on vacation.,1. Search for P-02.,,P-02 appears with the 'On vacation' label and cannot be added to the cart.,A18,,Not Run,
+BUY-SRCH-012,"Browse, Search & Filter",[Mobile] Search key on the keyboard and pull to refresh,Use Case Testing,Low,Logged in as Buyer 1.,"1. Type 'rattan' and tap the Search key on the keyboard (not an on-screen button).
+2. Pull down on the results.",rattan,Step 1 runs the search and closes the keyboard. Step 2 reloads the results; the same products appear with no duplicates.,M2,,Not Run,
+BUY-SRCH-013,"Browse, Search & Filter",[Mobile] Search with no internet,Error Guessing,Medium,Logged in as Buyer 1.,"1. Turn on Airplane mode and search for 'rattan'.
+2. Turn Airplane mode off and tap Retry (or search again).",rattan,"Step 1 shows a no-internet message, not an empty 'no results' state and not a crash. Step 2 shows P-02.",M5,,Not Run,

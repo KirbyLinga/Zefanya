@@ -1,0 +1,19 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-RET-001,Return & Refund Request,Request a return within the window,Use Case Testing,High,Logged in as Buyer 1. A P-02 order was Delivered 2 days ago.,"1. Tap Return/Refund.
+2. Choose the item, reason, description and upload 2 photos.
+3. Submit.","Reason: Damaged item
+Description: Basket arrived with a broken rim.
+Photos: review_photo.jpg, product_front.jpg",The request is submitted. The order moves to Return/Refund. Seller 1 is notified. The order can no longer be completed automatically while the request is open.,"A11, A31",,Not Run,
+BUY-RET-002,Return & Refund Request,Return not allowed before delivery,State Transition,High,Logged in as Buyer 1. An order is To Ship.,1. Look for Return/Refund.,,Not available.,A11,,Not Run,
+BUY-RET-003,Return & Refund Request,Return window boundary,Boundary Value Analysis,High,Logged in as Buyer 1.,"1. Request on day 7 after Delivered.
+2. Try on another order 7 days + 1 hour after Delivered (now Completed).",,Allowed on day 7. Not available after the window or once Completed.,A11,,Not Run,
+BUY-RET-004,Return & Refund Request,Evidence and description rules,Boundary Value Analysis,Medium,Logged in as Buyer 1.,"1. Submit with 0 photos.
+2. Submit with 6 photos.
+3. Submit a 5.1 MB photo.
+4. Submit a 9-character description.",,Each is blocked with a message. 1 to 5 valid photos and 10+ characters are required.,A31,,Not Run,
+BUY-RET-005,Return & Refund Request,Track request status,State Transition,Medium,A request exists.,"1. Seller 1 rejects with a reason.
+2. Open the request.",,Status Rejected with the seller's exact reason and an Escalate button.,A31,,Not Run,
+BUY-RET-006,Return & Refund Request,[Mobile] Return evidence from the camera and the gallery,Use Case Testing,Medium,Logged in as Buyer 1. A P-02 order was Delivered 2 days ago. review_photo.jpg and product_front.jpg are in Photos.,"1. In the return form, take 1 photo with the camera.
+2. Add 2 photos from the gallery in one multi-select.
+3. Remove one photo, then submit.","Reason: Damaged item
+Description: Basket arrived with a broken rim.","Photos are attached in the chosen order with previews, and a photo can be removed before submitting. The request is submitted with 2 photos and Seller 1 sees the same 2 photos.","A31, M6, M7",,Not Run,

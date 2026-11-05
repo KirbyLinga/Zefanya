@@ -1,0 +1,81 @@
+Changes made to match the ERP flow,,,,,
+All six test workbooks are combined in this file. Each row below says what changed and which ERP step it comes from.,,,,,
+,,,,,
+Decisions used,,,,,
+1. The buyer needs admin approval before login (stated by you; it matches the ERP).,,,,,
+"2. The app has no courier login, so every Courier case is parked as Blocked and the courier rules are marked not used.",,,,,
+"3. Where the ERP and the old cases disagreed, the ERP is the requirement. Rules the ERP does not mention were kept.",,,,,
+,,,,,
+Colour key (first cell of the row),,,,,
+Orange = existing row edited,,,,,
+Green = new row added,,,,,
+Grey = parked / not used (no courier login),,,,,
+,,,,,
+Sheet,Row / rule,Type,What changed,Why (ERP reference),Please confirm?
+Assumptions (Account),A12,Edited,Rule text changed,"ERP: Buyer Registration, Admin Approval, then Login (buyers were Active right after the OTP).",
+Assumptions (Account),A17,Not used,Marked not used,No courier login in the app.,
+Assumptions (Account),A18,Not used,Marked not used,No courier login in the app.,
+Assumptions (Account),A19,New,Buyer admin approval (ERP),"ERP: Buyer Registration, Admin Approval, Login.",Yes: rejection reason and resubmission are assumed
+AC Buyer,TC-BUY-023,Edited,Changed: Expected Result,ERP: admin approval comes before login.,
+AC Buyer,TC-BUY-029,Edited,"Changed: Test Scenario, Preconditions",ERP: only an approved buyer can log in.,
+AC Buyer,TC-BUY-043,New,Log in while the account is waiting for approval,ERP: Admin Approval before Login.,
+AC Buyer,TC-BUY-044,New,Admin approves the buyer,ERP: Admin Approval before Login.,
+AC Buyer,TC-BUY-045,New,Admin rejects the buyer,ERP: Admin Approval before Login.,Yes: rejection reason is assumed
+AC Buyer,TC-BUY-046,New,Rejected buyer corrects the details and resubmits,ERP: Admin Approval before Login.,Yes: resubmission is assumed
+AC Buyer,TC-BUY-047,New,[Mobile] Waiting for approval: close and reopen the app,ERP: Admin Approval before Login; mobile session behaviour.,
+Assumptions (Account),A13,Edited,Rule text changed,ERP: the rider is assigned to a delivery area.,
+Assumptions (Account),A20,New,Rider delivery area (ERP),ERP: Identify the rider assigned to that area; assign the parcel to that rider.,"Yes: assumed from the ERP, please confirm"
+Test Data (Account),Rider / Assigned Area,New,New required field with two sample values,ERP: each rider covers an area.,
+AC Rider,TC-RID-001,Edited,"Changed: Test Data, Expected Result",ERP: each rider is assigned to a delivery area.,
+AC Rider,TC-RID-049,New,Leave the Assigned Area empty,"ERP: parcels are assigned to riders by area, so every rider needs one.",
+AC Rider,TC-RID-050,New,Assigned Area list shows only the company's own areas,ERP: rider assigned to an area of the same logistics company.,
+Assumptions (Modules),A1,Edited,Rule text changed,No courier login; the ERP has buyers approved by an admin.,
+Assumptions (Modules),A10,Edited,Rule text changed,"ERP status list (PLACED to RETURNED) and sorting-center step; At Hub renamed At Sorting Center, Sorted and Assigned to Rider added.",Yes: pickup-job state 'Assigned' kept as a rider-side state only
+Assumptions (Modules),A14,Edited,Rule text changed,ERP: pickup is accepted by the rider; delivery is assigned by area at the sorting center.,
+Assumptions (Modules),A22,Edited,Rule text changed,No courier role.,
+Assumptions (Modules),A34,Edited,Rule text changed,ERP: the sorting center assigns the delivery rider by area.,Yes: rule for a suspended rider's delivery parcels is assumed
+Assumptions (Modules),A38,Not used,Marked not used,No courier login in the app (hub-to-hub trips are not in the ERP).,
+Assumptions (Modules),A39,Not used,Marked not used,No courier login in the app (hub-to-hub trips are not in the ERP).,
+Assumptions (Modules),A40,Not used,Marked not used,No courier login in the app (hub-to-hub trips are not in the ERP).,
+Assumptions (Modules),A41,Not used,Marked not used,No courier login in the app (hub-to-hub trips are not in the ERP).,
+Assumptions (Modules),A42,New,Delivery areas and assignment (ERP),ERP: Sort parcel by destination area; assign to the rider of that area.,"Yes: assumed from the ERP, please confirm"
+Assumptions (Modules),A43,New,Pickup handover (ERP),ERP: seller confirms rider pickup; rider scans the parcel and delivers it to the sorting center.,"Yes: assumed from the ERP, please confirm"
+Assumptions (Modules),A44,New,Return after a failed delivery (ERP),"ERP: Delivery Failed, reason recorded, then Reschedule Delivery or Return Parcel (RETURNED).","Yes: assumed from the ERP, please confirm"
+Test Data (Modules),Buyer 1,Edited,Status changed from Active to Approved by the Admin,ERP: buyer needs admin approval.,
+Test Data (Modules),Buyer 2,Edited,Status changed from Active to Approved by the Admin,ERP: buyer needs admin approval.,
+Test Data (Modules),Rider 1,Edited,Added Assigned area: AREA-A.,ERP: each rider is assigned to a delivery area.,
+Test Data (Modules),Rider 2,Edited,Added Assigned area: AREA-B.,ERP: each rider is assigned to a delivery area.,
+Test Data (Modules),Courier 1,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),Courier 2,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),Courier 3,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),Courier 4,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),HUB-PSG,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),HUB-STR,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),TRIP-1,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),Courier pay,Not used,Marked not used,No courier login / hub-to-hub trips are not in the ERP.,
+Test Data (Modules),HUB-QC,Edited,Marked as the sorting center,"ERP: one sorting center scans in, sorts and assigns.",
+Test Data (Modules),AREA-A,New,"Area A: Quezon City (ADDR-1), rider Rider 1","ERP example table: parcel, area, assigned rider.",
+Test Data (Modules),AREA-B,New,"Area B: Makati, Pasig, Mandaluyong (ADDR-2), rider Rider 2","ERP example table: parcel, area, assigned rider.",
+Test Data (Modules),AREA-C,New,"Area C: Marikina (use any Marikina address), rider None","ERP example table: parcel, area, assigned rider.",
+B10 Order Tracking,BUY-TRK-002,Edited,"Changed: Test Scenario, Preconditions, Test Steps, Expected Result, Assumption Ref","ERP route: pickup, sorting center, sorted, assigned rider, delivery (no hub-to-hub courier trip).",
+B10 Order Tracking,BUY-TRK-008,New,Full order flow from the ERP: placed to completed,"ERP summary line: buyer orders, seller prepares, rider picks up, sorting center sorts and assigns, rider delivers, buyer confirms.",
+R3 Job Assignment,RID-JOB-010,New,Delivery assignment by area,"ERP: sort by destination area, then assign to the rider of that area.",Yes: no accept/decline for delivery jobs is assumed
+R3 Job Assignment,RID-JOB-011,New,Sorting by the delivery address,"ERP example table: parcel, delivery address, area, assigned rider.",
+R3 Job Assignment,RID-JOB-012,New,Area with no assigned rider,ERP: assignment depends on the rider assigned to the area.,Yes: the 'no rider' behaviour is assumed
+R3 Job Assignment,RID-JOB-013,New,Cannot open a parcel of another rider's area,ERP: only the assigned rider handles the parcel.,
+R4 Pickup,RID-PICK-002,Edited,"Changed: Test Steps, Assumption Ref",ERP: the seller confirms the rider pickup as well as the rider scanning the parcel.,Yes: both confirmations are assumed
+R4 Pickup,RID-PICK-008,New,Hand the parcel over at the sorting center,ERP: the rider delivers the parcel to the sorting center.,
+R4 Pickup,RID-PICK-009,New,Seller confirms the handover,"ERP: hand over parcel, confirm rider pickup, status Picked Up.",Yes: needing both confirmations is assumed
+R5 Delivery,RID-DLV-001,Edited,"Changed: Preconditions, Test Steps, Assumption Ref","ERP: the rider collects the parcel from the sorting center, then marks Out for Delivery (At Hub renamed At Sorting Center).",
+R5 Delivery,RID-DLV-012,New,Collect the parcel at the sorting center,"ERP: pick up the parcel from the sorting center, then mark Out for Delivery.",
+R5 Delivery,RID-DLV-013,New,Delivery details shown with the assignment,"ERP: Rider Receives Assignment, View Delivery Address.",
+R6 Failed Delivery,5 rows,Edited,Status renamed from Failed Delivery to Delivery Failed,ERP status name DELIVERY_FAILED.,
+R6 Failed Delivery,RID-FAIL-006,New,Logistics returns the parcel instead of rescheduling,"ERP: Delivery Failed, reason recorded, then Reschedule Delivery or Return Parcel.",Yes: who chooses Return Parcel is assumed
+AC Courier (parked),all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C1 Profile & Vehicle,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C2 Shift & Availability,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C3 Trip Assignment,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C4 Loading & Departure,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C5 In Transit,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C6 Arrival & Handover,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,
+C7 Trip History & Pay,all rows,Not used,Every case set to Blocked with a Remarks note,No courier login in the app; the ERP has no courier role.,

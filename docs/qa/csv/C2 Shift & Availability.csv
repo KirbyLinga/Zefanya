@@ -1,0 +1,17 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+COU-SHIFT-001,Shift & Availability,Go On Duty after a passed pre-trip checklist,State Transition,High,"Logged in as Courier 1, Off Duty, at HUB-QC, location allowed.","1. Tap Go On Duty.
+2. Mark all 5 checklist items OK and submit.
+3. As Logistics 1, open the courier list.","Tires, Lights, Brakes, Fuel, Cargo door lock: all OK",Courier 1 is On Duty. Logistics 1 sees Courier 1 On Duty with the current location and the checklist time.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-SHIFT-002,Shift & Availability,Checklist item marked Not OK,Decision Table,High,"Logged in as Courier 1, Off Duty.","1. Tap Go On Duty, mark Brakes Not OK with no note and submit.
+2. Add the note and submit.
+3. As Logistics 1, check notifications and Assign Courier.","Note: Brake pedal feels soft, needs checking.",Step 1 is blocked: a note is required. Step 2: Courier 1 stays Off Duty and cannot be assigned. Logistics 1 is notified with the item and the note.,"A25, A39",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-SHIFT-003,Shift & Availability,Checklist not finished,Equivalence Partitioning,Medium,"Logged in as Courier 1, Off Duty.","1. Tap Go On Duty, answer 4 items and leave Fuel unanswered.
+2. Submit.",,Blocked with a message to answer every item. Courier 1 stays Off Duty.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-SHIFT-004,Shift & Availability,Off Duty is blocked during an active trip,State Transition,High,Logged in as Courier 1 with TRIP-1 In Transit.,1. Tap Go Off Duty.,,Blocked with a message that the trip must be handed over first. Courier 1 stays On Duty.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-SHIFT-005,Shift & Availability,Go Off Duty with no trip,State Transition,Medium,"Logged in as Courier 1 (Active, On Duty, no active trip).","1. Tap Go Off Duty.
+2. As Logistics 1, open Assign Courier for a new trip.",,Courier 1 is Off Duty and is not listed for assignment.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-SHIFT-006,Shift & Availability,[Mobile] Location permission needed to go On Duty,Equivalence Partitioning,High,"Logged in as Courier 1, Off Duty. Location access for the app is set to Don't Allow.","1. Tap Go On Duty.
+2. Allow location 'While using the app' (and 'All the time' if asked) and tap Go On Duty again.",,Step 1 is blocked with a message that location is needed and a link to Settings; no crash. Step 2 continues to the checklist.,"M6, M13",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-SHIFT-007,Shift & Availability,[Mobile] App force-closed while On Duty,State Transition,Medium,"Logged in as Courier 1 (Active, On Duty, no active trip).","1. Swipe the app away from recent apps.
+2. Wait 5 minutes. As Logistics 1, open the courier list and Assign Courier.
+3. Reopen the courier app.",,Within 5 minutes Courier 1 shows Offline (or 'location unknown') and cannot be assigned. Reopening the app shows the duty status clearly.,M13,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).

@@ -1,0 +1,21 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+RID-AVAIL-001,Availability,Go Online,State Transition,High,"Logged in as Rider 1, Offline. Rider 2 is Offline.","1. Toggle Online.
+2. As Logistics 1, open the rider list.
+3. Seller 1 has a COD order for P-02 to ADDR-1 (total ₱500.00) marked Ready for Pickup. Run auto-assign.",,Logistics 1 sees Rider 1 as Online within a few seconds. Rider 1 receives the offer.,A14,,Not Run,
+RID-AVAIL-002,Availability,Go Offline,State Transition,High,"Logged in as Rider 1 (Active, Online, 0 active jobs). Rider 2 is Online.","1. Toggle Offline.
+2. Logistics 1 runs auto-assign for a new job.
+3. Logistics 1 opens Manual Assign.",,"Rider 1 receives no offer, and is not listed in Manual Assign. The job goes to Rider 2.",A14,,Not Run,
+RID-AVAIL-003,Availability,Go Offline with an active job,State Transition,Medium,"Logged in as Rider 1 (Active, Online, 0 active jobs). Rider 1 has a Picked Up parcel.","1. Toggle Offline.
+2. Open My Jobs.",,Offline is allowed. The Picked Up job stays with Rider 1 and can still be delivered. No new offers arrive.,A14,,Not Run,
+RID-AVAIL-004,Availability,Offline after logout or session timeout,Error Guessing,Low,"Logged in as Rider 1 (Active, Online, 0 active jobs).","1. Log out.
+2. As Logistics 1, check the rider list and run auto-assign.",,Rider 1 shows Offline and gets no offer.,A22,,Not Run,
+RID-AVAIL-005,Availability,[Mobile] Location permission needed to go Online,Equivalence Partitioning,High,"Logged in as Rider 1, Offline. Location access for the app is set to Don't Allow.","1. Toggle Online.
+2. Allow location 'While using the app' and toggle Online.
+3. If the app asks for background ('All the time') location, allow it.
+4. As Logistics 1, open the rider list.",,Step 1: Online is blocked with a message that location is needed and a link to Settings; no crash. Step 2: Rider 1 goes Online. Logistics 1 sees Rider 1 Online with a current location.,"M6, M13",,Not Run,
+RID-AVAIL-006,Availability,[Mobile] Location turned off while Online,Error Guessing,Medium,"Logged in as Rider 1, Online, 0 active jobs.","1. Turn off Location in the phone's quick settings.
+2. Wait 1 minute. Logistics 1 runs auto-assign for a new job.
+3. Turn Location back on.",,"The app warns that location is off. Rider 1 gets no new offer while location is off. After turning it back on, the rider can receive offers again.",M13,,Not Run,
+RID-AVAIL-007,Availability,[Mobile] App force-closed while Online,State Transition,Medium,"Logged in as Rider 1, Online, with 1 accepted (Assigned) job.","1. Swipe the app away from recent apps.
+2. Wait 5 minutes. As Logistics 1, check the rider list and run auto-assign for a new job.
+3. Reopen the rider app.",,Within 5 minutes Rider 1 shows Offline and gets no new offer. The Assigned job stays with Rider 1 and is shown again when the app is reopened.,M13,,Not Run,

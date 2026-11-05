@@ -1,0 +1,21 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+RID-PROF-001,"Profile, Vehicle & Documents","View profile, vehicle and verification status",Use Case Testing,Medium,Logged in as Rider 1.,"1. Open My Profile.
+2. Open each uploaded document.",,"Shows Pedro Jose Garcia, license N01-23-456789, expiry 03/22/2030, Motorcycle, plate 123ABC, company Bilis Hatid Express Inc., status Active. Both documents open.",A1,,Not Run,
+RID-PROF-002,"Profile, Vehicle & Documents",Update vehicle details,State Transition,Medium,Logged in as Rider 1.,"1. Change the plate number and upload a new OR/CR.
+2. Save.
+3. As Logistics 1, open Rider 1's record.","Plate: 789GHI
+OR/CR: or_cr.pdf (900 KB)","The change is saved and shown to Logistics 1 with the new OR/CR, flagged for re-verification. The old plate is no longer shown.",,,Not Run,
+RID-PROF-003,"Profile, Vehicle & Documents",Plate number already used,Equivalence Partitioning,Medium,Logged in as Rider 1.,1. Change the plate to each value and save.,"NBC1234
+nbc1234",Both are blocked as already registered. The plate stays 123ABC.,,,Not Run,
+RID-PROF-004,"Profile, Vehicle & Documents",License expiry boundary,Boundary Value Analysis,High,Logged in as Rider 1.,"1. Set the license expiry to yesterday and save.
+2. Set it to today and save.",,Yesterday is rejected with an expiry message. Today is accepted.,,,Not Run,
+RID-PROF-005,"Profile, Vehicle & Documents",Document upload rules,Boundary Value Analysis,Medium,Logged in as Rider 1.,1. Upload each file as the driver's license.,"size_5.0MB.jpg (accept)
+size_5.1MB.jpg (reject)
+price_list.docx (reject)
+renamed_exe.jpg (reject)",Only the 5.0 MB JPG is accepted; the others are rejected and the previous document is kept.,A16,,Not Run,
+RID-PROF-006,"Profile, Vehicle & Documents",Suspended rider cannot work,State Transition,High,Logged in as Rider 3 (Suspended).,"1. Try to go Online.
+2. Logistics 1 creates a job near Rider 3 and runs auto-assign.",,Rider 3 cannot go Online and sees a suspension message. Rider 3 receives no offer and is not selectable for manual assignment.,A14,,Not Run,
+RID-PROF-007,"Profile, Vehicle & Documents",Rider cannot see another rider's profile,Error Guessing,High,Logged in as Rider 1.,"1. With a proxy tool on the phone, change the rider ID in the profile request to Rider 2's and resend it.",,Denied. No Rider 2 data is shown.,A22,,Not Run,
+RID-PROF-008,"Profile, Vehicle & Documents",[Mobile] Update documents with the camera and the Files app,Use Case Testing,Medium,Logged in as Rider 1. or_cr.pdf is in the phone's Files.,"1. Replace the driver's license using Take Photo.
+2. Replace the OR/CR from Files.
+3. As Logistics 1, open Rider 1's record.",or_cr.pdf,"Both are accepted with previews, and Logistics 1 sees the new documents flagged for re-verification, as in RID-PROF-002.","A16, M6, M7",,Not Run,

@@ -1,0 +1,29 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-CHK-001,Checkout,Checkout with the worked example,Use Case Testing,High,"Logged in as Buyer 1. Cart holds the worked checkout example items (Seller 1: Tote Natural-M, Rattan Basket; Seller 2: USB-C Charger). MCH50, PLAT100 and FREESHIP are claimed. ADDR-1 is default.","1. Open checkout with ADDR-1.
+2. Apply MCH50, PLAT100 and FREESHIP.
+3. Choose COD and tap Place Order.
+4. Open both new orders.",Worked checkout example,"Summary: merchandise ₱1,098.00, shipping ₱185.00 (₱65 + ₱120), store voucher −₱50.00, platform voucher −₱100.00, shipping voucher −₱50.00, total ₱1,083.00. Two orders are created, one per store, whose totals add up to ₱1,083.00. Cart no longer has these items.","A2, A8, A20",,Not Run,
+BUY-CHK-002,Checkout,Shipping fee per store and per address,Equivalence Partitioning,High,Logged in as Buyer 1.,"1. Check out P-02 with ADDR-1.
+2. Switch to ADDR-3.",,ADDR-1 (NCR): ₱50.00. ADDR-3 (Visayas): ₱120.00. The total updates immediately.,A20,,Not Run,
+BUY-CHK-003,Checkout,Shipping weight at the 1 kg boundary,Boundary Value Analysis,Medium,"Logged in as Buyer 2 (ADDR-3, Visayas).","1. Check out 5 × P-05 from Seller 2.
+2. Change the quantity to 6.","P-05 is 0.2 kg: 5 units = 1.0 kg, 6 units = 1.2 kg",1.0 kg is charged as 1 kg: ₱60.00. 1.2 kg is charged as 2 kg: ₱80.00.,A20,,Not Run,
+BUY-CHK-004,Checkout,Unserviceable address,Equivalence Partitioning,High,Logged in as Buyer 1.,"1. Select ADDR-4 (Itbayat, Batanes).",,A message says the area is not serviceable and Place Order is disabled. No order can be created.,,,Not Run,
+BUY-CHK-005,Checkout,Note to seller length,Boundary Value Analysis,Low,Logged in as Buyer 1.,"1. Enter 200 characters and place the order.
+2. Try 201 characters.",Note: Paki-wrap po as gift … (to 200),200 characters are saved and shown in full on the seller's order. 201 cannot be entered or is rejected.,A25,,Not Run,
+BUY-CHK-006,Checkout,No payment method selected,Equivalence Partitioning,Medium,Logged in as Buyer 1.,1. Clear the payment method (if possible) and tap Place Order.,,Blocked until a payment method is chosen.,,,Not Run,
+BUY-CHK-007,Checkout,Double-tap Place Order,Error Guessing,High,Logged in as Buyer 1. P-02 stock is 20.,"1. Double-tap Place Order.
+2. Tap Back (or use the Android Back button / iOS swipe back) and tap Place Order again.",,Exactly one order exists. P-02 stock is 19. The resubmit shows the existing order or a message; it does not create another.,A37,,Not Run,
+BUY-CHK-008,Checkout,Price changed during checkout,Error Guessing,High,Logged in as Buyer 1. Checkout screen open with P-02 at ₱450.,"1. Seller 1 changes P-02 to ₱480.
+2. Tap Place Order.",,The order is not placed at ₱450. A message shows the new price and the summary updates to ₱480 for the buyer to confirm.,,,Not Run,
+BUY-CHK-009,Checkout,Stock ran out during checkout,Error Guessing,High,Buyer 1's checkout is open with P-03 (stock 1).,"1. Buyer 2 buys P-03 first.
+2. Buyer 1 taps Place Order.",,Buyer 1's order is blocked with an out-of-stock message. Stock is 0.,A3,,Not Run,
+BUY-CHK-010,Checkout,Voucher becomes invalid during checkout,Error Guessing,Medium,Logged in as Buyer 1. MCH50 applied on the checkout screen.,"1. Seller 1 ends MCH50.
+2. Tap Place Order.",,The order is not placed with MCH50. A message says the voucher is no longer valid and the total is updated.,A27,,Not Run,
+BUY-CHK-011,Checkout,Tampered price or total in the request,Error Guessing,High,Logged in as Buyer 1.,"1. Capture the Place Order request and change the item price or total to ₱1.00.
+2. Send it.",,The server ignores or rejects the tampered amount. Any created order uses the real price.,"A22, M11",,Not Run,
+BUY-CHK-012,Checkout,[Mobile] Connection lost after tapping Place Order,Error Guessing,High,Logged in as Buyer 1. Checkout for 1 × P-02 (COD) is open. P-02 stock is 20.,"1. Tap Place Order and turn on Airplane mode at once.
+2. Turn Airplane mode off.
+3. Tap Place Order again if the checkout is still shown.
+4. Open My Orders and check P-02 stock.","P-02 × 1, COD","The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one order exists and P-02 stock is 19.","A37, M5",,Not Run,
+BUY-CHK-013,Checkout,[Mobile] App interrupted on the checkout screen,Error Guessing,Medium,Logged in as Buyer 1. Checkout is open with the worked example items and vouchers applied.,"1. Press Home and open another app for 5 minutes (or take a phone call).
+2. Return to the app.",Worked checkout example,"The checkout screen still shows the same address, vouchers, payment method and total ₱1,083.00, or it reloads them and tells the buyer what changed. No order is placed without tapping Place Order.",M4,,Not Run,

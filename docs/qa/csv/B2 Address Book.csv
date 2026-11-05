@@ -1,0 +1,26 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-ADDR-001,Address Book,Add an address with valid data,Use Case Testing,High,Logged in as Buyer 1. Address Book is open with ADDR-1 only.,"1. Tap Add Address.
+2. Select Region, Province, City and Barangay in order.
+3. Fill in street, recipient and phone.
+4. Save and pull-to-refresh.",ADDR-2 (Makati office),ADDR-2 is listed with exactly the entered values and is not default. ADDR-1 is still default.,A30,,Not Run,
+BUY-ADDR-002,Address Book,Region → city → barangay cascade,Equivalence Partitioning,High,Logged in as Buyer 1.,"1. Select NCR; open the City list.
+2. Select Makati; open the Barangay list.
+3. Change Region to Region VII.",,Each list shows only places under the one above (no Cebu cities under NCR). Changing Region clears City and Barangay.,,,Not Run,
+BUY-ADDR-003,Address Book,Each required field left blank,Equivalence Partitioning,High,Logged in as Buyer 1.,"1. Fill in all fields, clear one and save; repeat for each.","Clear in turn: Recipient, Phone, Region, City, Barangay, Street",Each attempt is blocked with a message on the blank field. No address is added.,,,Not Run,
+BUY-ADDR-004,Address Book,Phone number format,Equivalence Partitioning,Medium,Logged in as Buyer 1.,1. Enter each phone number and save.,"0917123 (reject)
+091712345678 (reject)
+09171234567 (accept)
++639171234567 (accept)",Only the two valid formats save.,,,Not Run,
+BUY-ADDR-005,Address Book,Address book limit,Boundary Value Analysis,Low,Logged in as Buyer 1. 9 addresses exist.,"1. Add a 10th.
+2. Try an 11th.",,The 10th saves. The 11th is blocked with a limit message.,A30,,Not Run,
+BUY-ADDR-006,Address Book,Set a different default address,State Transition,Medium,Logged in as Buyer 1.,"1. Set ADDR-2 as default.
+2. Open checkout.",ADDR-2,Only ADDR-2 shows Default and checkout pre-selects it.,A30,,Not Run,
+BUY-ADDR-007,Address Book,Delete the default address,State Transition,High,Logged in as Buyer 1. ADDR-1 is default; ADDR-2 exists.,"1. Try to delete ADDR-1.
+2. Set ADDR-2 as default, then delete ADDR-1.",,The first attempt is blocked with a message to choose another default first. The second succeeds. There is always exactly one default.,A30,,Not Run,
+BUY-ADDR-008,Address Book,Edit or delete an address used by an active order,Error Guessing,High,Logged in as Buyer 1. A To Ship order uses ADDR-2.,"1. Change ADDR-2's street, then delete ADDR-2.
+2. Open the order as Buyer 1 and Seller 1, and print the waybill.",Street: 14F Pacific Tower,"The order, the seller's view and the waybill still show the original ADDR-2 exactly.",A30,,Not Run,
+BUY-ADDR-009,Address Book,Cannot open another buyer's address,Error Guessing,High,Logged in as Buyer 1.,1. Open Edit on ADDR-1 and change the address ID in the deep link or API request to ADDR-3's (Buyer 2).,,Access is denied. No part of ADDR-3 is shown.,"A22, M11",,Not Run,
+BUY-ADDR-010,Address Book,[Mobile] Use My Location with permission allowed and denied,Equivalence Partitioning,Low,"Logged in as Buyer 1. Add Address is open. Location is on. (If the app has no location feature, mark Not Run and write 'Not supported' in Remarks.)","1. Tap Use My Location (or the map pin) and allow location access.
+2. Discard the draft, turn off location access for the app in phone Settings, and tap Use My Location again.",,"Step 1: Region, City and Barangay are filled from the location and can still be edited before saving. Step 2: no crash; a message explains that location is off; the address can still be entered by hand.",M6,,Not Run,
+BUY-ADDR-011,Address Book,[Mobile] Keyboard on the address form,Error Guessing,Low,Logged in as Buyer 1. Add Address is open.,"1. Tap Phone, then Street, then Recipient.
+2. With the keyboard open, scroll to Save.",,Phone opens a number pad. Street and Recipient open a text keyboard. Save can be reached and tapped while the keyboard is open or after tapping Done.,"M2, M12",,Not Run,

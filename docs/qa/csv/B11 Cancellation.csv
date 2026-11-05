@@ -1,0 +1,9 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-CAN-001,Cancellation,Cancel a COD order before shipping,State Transition,High,Logged in as Buyer 1. A COD order for 2 × P-02 is Accepted; stock is 18.,"1. Tap Cancel, choose 'Changed my mind', confirm.
+2. Check stock and Seller 1's notifications.",,The order is Cancelled on both sides. Stock is 20. Seller 1 is notified with the reason.,"A3, A6, A23",,Not Run,
+BUY-CAN-002,Cancellation,Reason is required,Equivalence Partitioning,Medium,Logged in as Buyer 1.,1. Tap Cancel and confirm without a reason.,,Blocked until a reason is chosen. The order is unchanged.,,,Not Run,
+BUY-CAN-003,Cancellation,Cancel a prepaid order,State Transition,High,Logged in as Buyer 1. A paid e-wallet order with MCH50 is To Ship.,1. Cancel with a reason.,,The order is Cancelled and a refund for the exact amount paid is started. MCH50 returns to the wallet.,"A6, A21",,Not Run,
+BUY-CAN-004,Cancellation,No cancel after Ready for Pickup,State Transition,High,Logged in as Buyer 1. Seller marked Ready for Pickup.,"1. Look for Cancel.
+2. Try the cancel request directly if possible.",,No Cancel option; a direct request is rejected and the status is unchanged.,"A6, M11",,Not Run,
+BUY-CAN-005,Cancellation,No cancel after shipping,State Transition,High,Logged in as Buyer 1. Rider picked up the parcel.,1. Look for Cancel.,,No Cancel option.,A6,,Not Run,
+BUY-CAN-006,Cancellation,Double-tap Cancel,Error Guessing,Low,Logged in as Buyer 1.,1. Double-tap Confirm Cancel.,,One cancellation; stock restored once (not twice).,A37,,Not Run,

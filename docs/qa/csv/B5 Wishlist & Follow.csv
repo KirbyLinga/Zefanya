@@ -1,0 +1,13 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-WISH-001,Wishlist & Follow Store,Add and remove a wishlist item,Use Case Testing,Medium,Logged in as Buyer 1.,"1. Add P-02 to the wishlist.
+2. Open Wishlist.
+3. Remove P-02 and pull-to-refresh.",,"P-02 appears once, then is gone after removal. The heart on P-02's screen matches each state.",,,Not Run,
+BUY-WISH-002,Wishlist & Follow Store,Add the same item twice quickly,Error Guessing,Low,Logged in as Buyer 1.,"1. Double-tap the wishlist heart on P-02.
+2. Open Wishlist.",,"P-02 appears at most once, and the heart reflects the final state.",A37,,Not Run,
+BUY-WISH-003,Wishlist & Follow Store,Wishlist item goes out of stock or is deleted,State Transition,Medium,P-02 and P-05 are in Buyer 1's wishlist.,"1. Seller 1 sets P-02 stock to 0. Seller 2 deletes P-05.
+2. Open Wishlist.",,P-02 shows Sold out with Add to Cart disabled. P-05 stays listed as Unavailable with no Add to Cart. The screen shows no error.,,,Not Run,
+BUY-WISH-004,Wishlist & Follow Store,Follow and unfollow a store,Use Case Testing,Medium,Logged in as Buyer 1. Seller 1 has N followers.,"1. Follow Seller 1.
+2. Check the follower count and Following list.
+3. Unfollow and check again.",,"Count becomes N+1 and Seller 1 is in Following; after unfollowing, N and removed.",,,Not Run,
+BUY-WISH-005,Wishlist & Follow Store,Wishlist and follow require login,Error Guessing,Low,Logged out.,"1. Tap the wishlist heart on P-02.
+2. Tap Follow on Seller 1.",,Each opens the login screen; nothing is saved without an account.,,,Not Run,

@@ -1,0 +1,28 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-VOU-001,Vouchers & Promotions,Claim a voucher into the wallet,Use Case Testing,High,Logged in as Buyer 1.,"1. On Seller 1's store screen, claim MCH50.
+2. Open My Vouchers.
+3. Try to claim MCH50 again.",,MCH50 is in the wallet with its rule and end date. The button changes to Claimed and a second claim is not possible.,,,Not Run,
+BUY-VOU-002,Vouchers & Promotions,Apply a store voucher,Use Case Testing,High,Logged in as Buyer 1. MCH50 claimed. Cart: P-02 (₱450).,1. Open checkout and apply MCH50.,,Seller 1's group shows −₱50.00 and the total is ₱450 + ₱50 shipping − ₱50 = ₱450.00.,,,Not Run,
+BUY-VOU-003,Vouchers & Promotions,Stacking per the agreed rule,Decision Table,High,"Logged in as Buyer 1. Cart holds the worked checkout example items (Seller 1: Tote Natural-M, Rattan Basket; Seller 2: USB-C Charger). MCH50, PLAT100 and FREESHIP are claimed. ADDR-1 is default.","1. Apply MCH50, PLAT100 and FREESHIP.
+2. Select MCH10 for Seller 1 as well.
+3. Apply RVSECRET to Seller 2.",Worked checkout example,"MCH50 + PLAT100 + FREESHIP apply; total ₱1,083.00. Selecting MCH10 replaces MCH50 (Seller 1 ₱699 ≥ ₱500 → −₱69.90; total ₱1,063.10); never both. RVSECRET is not applicable (Seller 2 subtotal ₱399 < ₱1,000).",A2,,Not Run,
+BUY-VOU-004,Vouchers & Promotions,Minimum spend at the boundary,Boundary Value Analysis,High,Logged in as Buyer 1. MCH50 claimed (min ₱300). Only check the checkout screen; do not place these orders (MCH50 is 1 per buyer).,"1. Seller 1 sets P-02 price to ₱299.99. Check out 1 × P-02 and try MCH50.
+2. Seller 1 sets the price to ₱300.00. Check out again.
+3. Seller 1 sets the price to ₱300.01. Check out again.",P-02 at ₱299.99 / ₱300.00 / ₱300.01,"₱299.99: not applicable, with 'Spend ₱0.01 more'. ₱300.00 and ₱300.01: ₱50.00 off.",,,Not Run,
+BUY-VOU-005,Vouchers & Promotions,"Expired, not started, limit reached, invalid code",Equivalence Partitioning,High,Logged in as Buyer 1.,1. Try to apply each voucher.,"MCHOLD (expired)
+MCHSOON (starts tomorrow)
+MCHMAX (total limit reached)
+NOSUCHCODE (invalid)",Each is rejected with its own specific message. No discount is applied.,,,Not Run,
+BUY-VOU-006,Vouchers & Promotions,Per-buyer limit reached,Equivalence Partitioning,Medium,Buyer 1 used MCH50 on a Completed order.,1. Try MCH50 on a new order.,,Rejected: already used. Buyer 2 can still use it.,,,Not Run,
+BUY-VOU-007,Vouchers & Promotions,Removing an item drops below the minimum spend,State Transition,High,MCH50 applied to a ₱450 checkout (P-02).,"1. Go back, replace P-02 with P-01 Natural-S (₱199).
+2. Return to checkout.",,MCH50 is removed automatically with a notice. Total is ₱199 + ₱50 = ₱249.00.,,,Not Run,
+BUY-VOU-008,Vouchers & Promotions,Percentage voucher respects its cap,Boundary Value Analysis,High,"Logged in as Buyer 1. MCH10 claimed (10%, cap ₱100, min ₱500). Only check the checkout screen; do not place these orders.","1. Seller 1 sets P-02 price to ₱499.99; check out 1 × P-02 with MCH10.
+2. Set ₱999.00 and check out.
+3. Set ₱1,000.00 and check out.
+4. Check out 1 × P-03 (₱1,250).","P-02 at ₱499.99 / ₱999.00 / ₱1,000.00; P-03","₱499.99: not applicable. ₱999.00 → ₱99.90 off. ₱1,000.00 → ₱100.00 off. ₱1,250 → ₱100.00 off (cap, not ₱125.00).",,,Not Run,
+BUY-VOU-009,Vouchers & Promotions,Shipping voucher larger than shipping,Boundary Value Analysis,Medium,"Logged in as Buyer 1. FREESHIP claimed (up to ₱50, min ₱300).","1. Check out 1 × P-02 to ADDR-1 (0.8 kg, ₱50 shipping) with FREESHIP.
+2. Check out P-02 + P-01 Natural-M to ADDR-1 (1.2 kg, ₱65 shipping) with FREESHIP.",,₱50 shipping → ₱0.00 shipping (not negative). ₱65 shipping → ₱15.00. Merchandise amounts are unchanged.,,,Not Run,
+BUY-VOU-010,Vouchers & Promotions,Total never negative,Error Guessing,Medium,"Seller 1 sets P-02 price to ₱100.00 and creates voucher MCHT100: ₱100 off, min spend ₱100.",1. Check out 1 × P-02 with MCHT100.,,"Merchandise total is ₱0.00, never negative; shipping is still charged.",,,Not Run,
+BUY-VOU-011,Vouchers & Promotions,Voucher on items already on sale,Decision Table,Medium,P-02 on sale at ₱360. MCH50 claimed.,1. Check out 1 × P-02 with MCH50.,,"MCH50 applies (₱360 ≥ ₱300). Merchandise ₱310.00, total ₱360.00 with ₱50 shipping.",A4,,Not Run,
+BUY-VOU-012,Vouchers & Promotions,Voucher returned after cancellation,State Transition,Medium,An order used MCH50 and is still cancellable.,"1. Cancel the order.
+2. Open My Vouchers.",,"MCH50 is back in the wallet, usable again before it expires.",A21,,Not Run,

@@ -1,0 +1,18 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-PAY-001,Payment,COD order,Use Case Testing,High,Logged in as Buyer 1.,"1. Place an order for P-02 with COD.
+2. Open the order.",,The order goes straight to To Ship. Payment shows COD ₱500.00 to collect on delivery.,,,Not Run,
+BUY-PAY-002,Payment,E-wallet or card payment succeeds,Use Case Testing,High,Logged in as Buyer 1.,"1. Choose the e-wallet (sandbox).
+2. Complete payment.",Use the gateway's sandbox account or test card,The order moves To Pay → To Ship and stores a payment reference. The amount charged equals the order total exactly.,,,Not Run,
+BUY-PAY-003,Payment,Payment fails,Equivalence Partitioning,High,Logged in as Buyer 1.,1. Use the sandbox's declined card or failure option.,,The order stays To Pay with 'Payment failed' and Pay Again. It is not marked paid and the seller cannot ship it.,,,Not Run,
+BUY-PAY-004,Payment,Buyer cancels at the gateway,Equivalence Partitioning,Medium,Logged in as Buyer 1.,1. On the gateway screen tap Cancel / Back.,,Buyer returns to the order in To Pay. No duplicate order is created.,A37,,Not Run,
+BUY-PAY-005,Payment,App closed on the gateway screen,Error Guessing,Medium,Logged in as Buyer 1.,"1. On the gateway screen (or in the e-wallet app), complete payment, then immediately force-close the marketplace app (swipe it away from recent apps).
+2. Reopen the app and open My Orders.",,The order shows To Ship once the gateway confirms. It is charged once only.,"A37, M4",,Not Run,
+BUY-PAY-006,Payment,Unpaid order auto-cancels,State Transition,High,Logged in as Buyer 1. An e-wallet order for P-02 with MCH50 is To Pay; stock is 19.,"1. Wait past 1 hour.
+2. Check the order, P-02 stock and My Vouchers.",,The order is Cancelled (reason: unpaid). Stock is 20. MCH50 is back in the wallet.,"A3, A6, A21",,Not Run,
+BUY-PAY-007,Payment,Pay just before vs after the auto-cancel time,Boundary Value Analysis,Medium,Logged in as Buyer 1.,"1. Pay one order at 59 minutes.
+2. Try to pay another at 61 minutes.",,The 59-minute payment succeeds. The 61-minute order is already Cancelled and Pay is not available.,A6,,Not Run,
+BUY-PAY-008,Payment,[Mobile] Pay in the e-wallet app and switch back,Use Case Testing,High,Logged in as Buyer 1. The e-wallet sandbox opens a wallet app or an in-app browser.,"1. Place an order for P-02 with the e-wallet.
+2. Complete payment in the wallet app (or in-app browser).
+3. Return to the marketplace app (automatic redirect, or switch apps by hand).",Use the gateway's sandbox account,"The app returns to the order, which shows To Ship with the payment reference and is charged once. When returning by hand, the order updates (after a pull-to-refresh at most) and Pay is not offered again.","A37, M4",,Not Run,
+BUY-PAY-009,Payment,[Mobile] Back button while payment is processing,Error Guessing,Medium,Logged in as Buyer 1. An e-wallet order for P-02 is To Pay.,"1. Tap Pay and, while the processing indicator shows, press Android Back (or swipe back) twice.
+2. Open the order.",,"The app asks before leaving, or ignores Back while processing. In the end the order is either paid once or still To Pay with Pay Again; never two payments or two orders.","A37, M8",,Not Run,

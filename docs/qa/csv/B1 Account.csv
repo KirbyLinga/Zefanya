@@ -1,0 +1,49 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-ACCT-001,Account & Security,Edit profile with valid data,Use Case Testing,Medium,Logged in as Buyer 1. My Profile is open.,"1. Change First Name to the test data and upload the photo.
+2. Tap Save.
+3. Pull to refresh, then log out and log back in.","First Name: Juan Miguel Jr.
+Photo: review_photo.jpg",A success message is shown. After a pull-to-refresh and re-login the new name and photo are shown on the profile screen and the account (Me) tab. Email and phone are unchanged.,A16,,Not Run,
+BUY-ACCT-002,Account & Security,Profile field validation,Equivalence Partitioning,Medium,Logged in as Buyer 1. My Profile is open.,"1. Enter each value, one per attempt, and save.","First Name: empty (reject)
+First Name: Juan123 (reject)
+First Name: J (reject)
+Photo: size_5.1MB.jpg (reject)
+Photo: renamed_exe.jpg (reject)",Each is rejected with a field message; the saved profile is unchanged after a pull-to-refresh.,A16,,Not Run,
+BUY-ACCT-003,Account & Security,Change password with the correct old password,Use Case Testing,High,Logged in as Buyer 1.,"1. Open Change Password and enter the test data.
+2. Save.
+3. Log out. Log in with the old password.
+4. Log in with the new password.","Old: Mamimili@2026
+New: Mamimili@2027
+Confirm: Mamimili@2027",Password changes with a success message. The old password is rejected; the new one works.,,,Not Run,
+BUY-ACCT-004,Account & Security,Change password with a wrong old password,Equivalence Partitioning,High,Logged in as Buyer 1.,"1. Enter a wrong old password and a valid new one.
+2. Save.
+3. Log out and log in with Mamimili@2026.","Old: Wrong@2026
+New: Mamimili@2027",Blocked with 'current password is incorrect'. The original password still works.,,,Not Run,
+BUY-ACCT-005,Account & Security,New password breaks the rule,Decision Table,High,Logged in as Buyer 1.,"1. Enter the correct old password and each new password, one per attempt.","Mami@26 (7 characters)
+mamimili@2027 (no uppercase)
+MAMIMILI@2027 (no lowercase)
+Mamimili@abcd (no number)
+Mamimili2027 (no special)
+Confirm: Mamimili@2028 (does not match)
+New = old: Mamimili@2026",Each is rejected with the specific rule that failed. The password is unchanged.,,,Not Run,
+BUY-ACCT-006,Account & Security,Change email with verification,State Transition,High,Logged in as Buyer 1.,"1. Change the email to the spare email.
+2. Before entering the OTP, log out and log in with the old email.
+3. Enter the OTP from the new email.
+4. Log out and log in with each email.",New email: buyer.test01@example.com,"Before verification the old email still logs in and the profile still shows it. After the correct OTP, only the new email logs in; the old one is rejected.",,,Not Run,
+BUY-ACCT-007,Account & Security,Change email: wrong or expired OTP,Boundary Value Analysis,Medium,Logged in as Buyer 1.,"1. Request the change and enter a wrong OTP.
+2. Wait 5 minutes and enter the correct (now expired) OTP.",Wrong OTP: 000000,Both are rejected. The email is not changed.,,,Not Run,
+BUY-ACCT-008,Account & Security,Change email to one already used,Equivalence Partitioning,Medium,Logged in as Buyer 1.,1. Change the email to each value.,"anamarie.reyes@example.com
+MARIACLARA.SANTOS@example.com (seller, different case)",Both are blocked with 'email already in use' and no OTP is sent.,,,Not Run,
+BUY-ACCT-009,Account & Security,Change phone with verification and format,State Transition,Medium,Logged in as Buyer 1.,1. Change the phone to each value; complete the OTP for the valid one.,"0917123 (reject)
+09173456789 (Buyer 2's, reject)
+09170000001 (accept after OTP)",Invalid and duplicate numbers are rejected without an OTP. The valid number is saved only after verification.,,,Not Run,
+BUY-ACCT-010,Account & Security,[Mobile] Change the profile photo with the camera and the gallery,Use Case Testing,Medium,Logged in as Buyer 1 on the test phone. My Profile is open. review_photo.jpg is in the phone's Photos.,"1. Tap the photo, choose Take Photo, take a picture and save.
+2. Tap the photo again, choose Gallery, pick review_photo.jpg and save.
+3. Turn off camera access for the app in phone Settings and tap Take Photo again.",review_photo.jpg,Steps 1 and 2: the new photo shows on the profile and is still there after the app is closed and reopened. Step 3: no crash; a message says camera access is off and offers Settings; Gallery still works.,"A16, M6, M7",,Not Run,
+BUY-ACCT-011,Account & Security,[Mobile] Password change ends the session on the other phone,State Transition,High,Buyer 1 is logged in on two phones (or a phone and an emulator).,"1. On phone A, change the password to Mamimili@2027.
+2. On phone B, pull to refresh or open any screen.
+3. On phone B, log in with the old password, then the new one.
+4. Change the password back to Mamimili@2026.","Old: Mamimili@2026
+New: Mamimili@2027",Phone B's session ends and the login screen is shown. The old password is rejected and the new one works. Phone A stays logged in.,M9,,Not Run,
+BUY-ACCT-012,Account & Security,"[Mobile] Stay logged in, then log out and press Back",State Transition,High,Logged in as Buyer 1.,"1. Force-close the app (swipe it away) and reopen it.
+2. Tap Log Out.
+3. Press Android Back (or swipe back) several times, then reopen the app from recent apps.",,"Step 1: the app opens on the home screen, still logged in as Juan Miguel. Steps 2–3: the login screen stays; no account screen appears again and the app does not log back in by itself.","M8, M9",,Not Run,

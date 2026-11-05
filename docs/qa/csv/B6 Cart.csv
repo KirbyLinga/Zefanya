@@ -1,0 +1,25 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+BUY-CART-001,Cart,Same variant added twice merges,Equivalence Partitioning,High,Logged in as Buyer 1. Cart is empty.,"1. Add P-01 Natural-M × 1.
+2. Add P-01 Natural-M × 2.
+3. Open the cart.",,"One line, Natural-M × 3, subtotal ₱747.00.",,,Not Run,
+BUY-CART-002,Cart,Different variants stay separate,Equivalence Partitioning,High,Logged in as Buyer 1. Cart is empty.,1. Add P-01 Natural-M and P-01 Black-S.,,Two separate lines with their own prices (₱249 and ₱199).,,,Not Run,
+BUY-CART-003,Cart,Items grouped by store,Use Case Testing,Medium,Logged in as Buyer 1.,1. Add P-02 (Seller 1) and P-05 (Seller 2).,,"Two store groups with store names, each listing only its own items.",,,Not Run,
+BUY-CART-004,Cart,Select and deselect items for checkout,Decision Table,High,"Logged in as Buyer 1. Cart has P-01 Natural-M, P-02 and P-05, all deselected.","1. Select P-05 only and note the subtotal.
+2. Tap Seller 1's store checkbox.
+3. Deselect P-05.
+4. Tap Check Out.",,"Subtotals: ₱399, then ₱1,098, then ₱699. Checkout contains only P-01 and P-02; P-05 stays in the cart.",,,Not Run,
+BUY-CART-005,Cart,Change quantity at the limits,Boundary Value Analysis,High,"Logged in as Buyer 1. P-02 in the cart, stock 20.","1. Set quantity 0, 1, 20 and 21.",,0 is not accepted (or asks to remove the item). 1 and 20 are accepted. 21 is blocked with 'only 20 available'.,A17,,Not Run,
+BUY-CART-006,Cart,Price changes while in the cart,State Transition,High,P-02 (₱450) in the cart.,"1. Seller 1 changes P-02 to ₱420.
+2. Pull to refresh the cart.",,The cart shows ₱420.00 and the subtotal updates.,,,Not Run,
+BUY-CART-007,Cart,Item goes out of stock or is deleted while in the cart,State Transition,High,"P-02 and P-05 in the cart, plus P-06.","1. Seller 1 sets P-02 stock to 0. Seller 2 deletes P-05.
+2. Open the cart and try to select P-02 and P-05.
+3. Check out P-06.",,P-02 and P-05 are marked unavailable and cannot be selected. P-06 checks out normally.,,,Not Run,
+BUY-CART-008,Cart,Cart persists after logout and on another device,State Transition,Medium,Logged in as Buyer 1. Cart has 2 items.,"1. Log out and back in.
+2. Log in on a second phone.",,The same 2 items and quantities appear in both phones.,,,Not Run,
+BUY-CART-009,Cart,Remove an item,Use Case Testing,Low,Logged in as Buyer 1.,1. Tap Delete on a line and confirm.,,The line is gone after a pull-to-refresh and the subtotal updates.,,,Not Run,
+BUY-CART-010,Cart,Cannot change another buyer's cart,Error Guessing,High,Logged in as Buyer 1.,1. Capture the update-quantity request and change the cart line ID to one of Buyer 2's.,,Rejected (403 or not found). Buyer 2's cart is unchanged.,"A22, M11",,Not Run,
+BUY-CART-011,Cart,[Mobile] Change quantity with no internet,Error Guessing,Medium,Logged in as Buyer 1. Cart has P-02 × 1.,"1. Turn on Airplane mode and change P-02 to 3.
+2. Turn Airplane mode off and pull to refresh the cart.",P-02 quantity 3,Step 1: a no-internet message; the quantity goes back to 1 or is clearly marked not saved. Step 2: the cart shows what the server saved. The phone never shows 3 while the server has 1.,M5,,Not Run,
+BUY-CART-012,Cart,[Mobile] Cart badge count,Use Case Testing,Low,Logged in as Buyer 1. Cart is empty.,"1. Add P-02, then P-05.
+2. Remove P-02.
+3. Force-close and reopen the app.",,"The cart icon badge shows 1, 2, then 1, and still 1 after reopening. (Note in Remarks whether the badge counts lines or units.)",,,Not Run,

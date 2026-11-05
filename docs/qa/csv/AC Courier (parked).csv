@@ -1,0 +1,254 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+TC-COU-001,Add Courier Form,Create a courier with all valid data,Use Case Testing,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in every field with the test data.
+2. Tap Save.","First Name: Ernesto
+Last Name: Villareal
+Date of Birth: 07/15/1988
+Email: ernesto.villareal@example.com
+Mobile Number: 09276543210
+Driver's License No.: N02-15-345678
+License Type: Professional
+DL Codes: B, B2, C
+License Expiry Date: 07/15/2029
+Vehicle Type: 4-Wheeler Closed Van Truck
+Plate Number: NAB4521
+Load Capacity: 3000 kg
+Home Hub: HUB-QC (Bilis Hatid QC First-Mile Hub)
+Professional Driver's License (upload): pro_license.jpg (1.4 MB)
+Vehicle OR/CR (upload): truck_or_cr.pdf (950 KB)
+NBI Clearance (upload): nbi_clearance.pdf (600 KB)","The courier is saved with no validation errors and appears in the courier list of Bilis Hatid Express Inc. with status Pending Activation, home hub HUB-QC, 4-Wheeler Closed Van Truck and 3,000 kg. An activation email is sent to ernesto.villareal@example.com.","A1, A17, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-002,Required Fields,Submit a completely empty form,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Leave every field blank and every picker on its default option.
+2. Tap Save.",All fields blank,Saving is blocked. A required-field message is shown for every mandatory field. No courier is created and no email is sent.,A1,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-003,Required Fields,Leave one required field blank at a time,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in all fields with valid data.
+2. Clear one required field.
+3. Tap Save.
+4. Repeat for each field in the test data.","Clear in turn:
+First Name
+Last Name
+Date of Birth
+Email
+Mobile Number
+Driver's License No.
+License Type
+DL Codes
+License Expiry Date
+Vehicle Type
+Plate Number
+Load Capacity
+Home Hub
+Professional Driver's License (upload)
+Vehicle OR/CR (upload)
+NBI Clearance (upload)","Each time, saving is blocked and a required-field message is shown on the blank field only. Other entered values (except uploads) are kept. No courier is created.","A1, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-004,Name,Name with numbers or symbols,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in all other fields with valid data.
+2. Enter the test data in the name fields.
+3. Tap Save.","First Name: Ernesto99
+Last Name: Dela Cruz@#",Saving is blocked. A message on each name field says only letters are allowed.,A2,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-005,Name,Name length at the limits,Boundary Value Analysis,Medium,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","1 character: E (reject)
+2 characters: Er (accept)
+50 characters: Maria Cristina Angelica Bernadette Josefina Leonor (accept)
+51 characters: Maria Cristina Angelica Bernadette Josefina Leonora (reject)",1 and 51 characters are rejected with a length message. 2 and 50 characters are accepted.,A2,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-006,Date of Birth,Age at the 18-year limit,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","Born 11/05/2008 (17 years old, reject)
+Born 11/04/2008 (turns 18 today, accept)
+Born 11/03/2008 (18 years and 1 day, accept)",The 17-year-old date is rejected with a message that the person must be at least 18. The other two dates are accepted. A future date cannot be picked.,A6,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-007,Email,Email in an invalid format,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","ernesto.villarealexample.com (no @)
+ernesto.villareal@ (no domain)
+@example.com (no name)
+ernesto.villareal@example (no .com)
+ernesto villareal@example.com (space)",Each value is rejected with a message asking for a valid email address. No courier is created.,A3,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-008,Email,Email already used by a rider or a buyer,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. Rider 1 pedrojose.garcia@example.com and the buyer juanmiguel.delacruz@example.com already exist.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","pedrojose.garcia@example.com (rider)
+JUANMIGUEL.DELACRUZ@EXAMPLE.COM (buyer, capital letters)",Both are blocked with a message that the email is already in use. The same person cannot be both a rider and a courier with one email. No courier is created.,"A3, A17",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-009,Mobile Number,Mobile number in an invalid format,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","0927ABC3210 (letters)
+0927-654-321 (symbols, too short)
+12345678901 (does not start with 09)
+02-8123-4567 (landline)",Each value is rejected with a message asking for a valid mobile number.,A4,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-010,Mobile Number,Mobile number length at the limits,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","10 digits: 0927654321 (reject)
+11 digits: 09170000021 (accept)
+12 digits: 092765432101 (reject)",10 and 12 digits are rejected with a length message. 11 digits is accepted.,A4,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-011,Mobile Number,Mobile number already used by a rider,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. Rider 1 already uses 09451239876.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","09451239876
++639451239876",Both are blocked with a message that the mobile number is already in use (the +63 form is the same number).,"A4, A17",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-012,License and Vehicle,Driver's license number in an invalid format,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","N02-15-34567 (one digit short)
+N02-15-3456789 (one digit extra)
+102-15-345678 (no letter)
+N0215345678X (letter at the end)",Each value is rejected with a message showing the format A00-00-000000.,"A15, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-013,License and Vehicle,License number already used by a courier or a rider,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. Courier 1 (N02-15-345678) and Rider 1 (N01-23-456789) already exist.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","N02-15-345678 (Courier 1)
+N01-23-456789 (Rider 1)",Both are blocked with a message that the license number is already registered.,"A14, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-014,License and Vehicle,License expiry date at the limit,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","Expiry 11/03/2026 (yesterday, reject)
+Expiry 11/04/2026 (today, accept)
+Expiry 11/05/2026 (tomorrow, accept)",Yesterday's date is rejected with a message that the license is expired. Today's and tomorrow's dates are accepted.,"A15, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-015,License and Vehicle,Only a professional license is accepted,Decision Table,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","License Type: Professional (accept)
+License Type: Non-professional (reject)
+License Type: Student permit (reject, if listed)",Only Professional is accepted. The others are rejected with a message that couriers need a professional license.,A18,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-016,License and Vehicle,DL codes must cover the vehicle type,Decision Table,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each vehicle type and DL code combination, one per attempt.
+3. Tap Save.","Van + B (accept)
+Van + B2 (accept)
+Van + A only (reject)
+4-Wheeler Closed Van Truck + B, B2 (reject)
+4-Wheeler Closed Van Truck + C (accept)
+6-Wheeler Truck + C (accept)
+Any vehicle + no codes (reject)",Only the 'accept' combinations save. Each 'reject' shows a message naming the DL code the vehicle needs.,A18,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-017,License and Vehicle,Load capacity at the limits for each vehicle type,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","Van: 99 (reject), 100 (accept), 1000 (accept), 1001 (reject)
+4-Wheeler Closed Van Truck: 4000 (accept), 4001 (reject)
+6-Wheeler Truck: 10000 (accept), 10001 (reject)
+Any vehicle: 0, -1, 1500.5, abc (reject)","Only the 'accept' values save, exactly as typed. Each 'reject' shows a message with the allowed range for the chosen vehicle type.",A18,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-018,License and Vehicle,Changing the vehicle type re-checks capacity and DL codes,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Choose 6-Wheeler Truck, DL code C and capacity 8000.
+2. Change the vehicle type to Van.
+3. Tap Save.","6-Wheeler Truck, C, 8000 kg → Van","After the change, Load Capacity shows an error (Van maximum 1,000 kg) and the DL codes are checked again (Van needs B or B2). Saving is blocked until both are fixed.",A18,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-019,License and Vehicle,Plate number already used by a courier or a rider,Equivalence Partitioning,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. Courier 1 (NAB4521) and Rider 1 (123ABC) already exist.,"1. Fill in all other fields with valid data.
+2. Enter each value in the test data, one per attempt.
+3. Tap Save.","NAB4521 (Courier 1)
+nab4521 (lower case)
+123ABC (Rider 1)",All three are blocked with a message that the plate number is already registered.,"A14, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-020,Home Hub,Home hub list shows only the company's own hubs,Error Guessing,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Open the Home Hub picker.
+2. With a proxy tool, send the save request with Agila's hub HUB-DVO as the home hub.","Bilis Hatid hubs: HUB-QC, HUB-PSG, HUB-STR
+Agila hub: HUB-DVO","The picker lists only HUB-QC, HUB-PSG and HUB-STR. The request with HUB-DVO is rejected and no courier is created.","A17, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-021,Document Upload,Upload documents in each accepted file type,Equivalence Partitioning,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Upload the files in the test data.
+3. Tap Save.","Professional Driver's License: pro_license.jpg (1.4 MB), then pro_license.png (2.1 MB)
+Vehicle OR/CR: truck_or_cr.pdf (950 KB)
+NBI Clearance: nbi_clearance.pdf (600 KB)",Each file is accepted and its name or preview is shown. The courier is saved.,"A10, A18",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-022,Document Upload,Upload a file type that is not accepted,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in all other fields with valid data.
+2. Try to upload each file in the test data to NBI Clearance, one per attempt.
+3. Tap Save.","price_list.docx (320 KB)
+store_banner.gif (480 KB)
+installer.exe (2.1 MB)","Each file is rejected with a message listing the accepted types (JPG, PNG, PDF). No courier is created.",A10,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-023,Document Upload,File size at the limit,Boundary Value Analysis,High,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all other fields with valid data.
+2. Upload each file in the test data to NBI Clearance, one per attempt.
+3. Tap Save.","size_4.9MB.jpg (accept)
+size_5.0MB.jpg, exactly 5,120 KB (accept)
+size_5.1MB.jpg (reject)",The 4.9 MB and 5.0 MB files are accepted. The 5.1 MB file is rejected with a maximum-size message.,A10,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-024,Add Courier Form,Tap Save several times quickly,Error Guessing,Medium,"The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The email, mobile number, license number and plate number in the test data are not yet registered.","1. Fill in all fields with the Account 2 data from the Test Data sheet.
+2. Tap Save three times in quick succession.","Account 2 data (Test Data sheet, column G)",Only one courier is created and only one activation email is sent.,A3,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-025,Account Activation,Courier activates the account with a valid password,State Transition,High,The courier ernesto.villareal@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. On the courier's phone, open the activation link from the email within 24 hours.
+2. Enter and confirm the password.
+3. Tap Activate.","Password: Courier@2026
+Confirm Password: Courier@2026","The password is saved. The courier's status changes from Pending Activation to Active, and the login screen opens with a success message.","A5, A17",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-026,Account Activation,Set a password that breaks the password rule,Decision Table,High,The courier ernesto.villareal@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. Open the activation link.
+2. Enter each password in both fields, one per attempt.
+3. Tap Activate.","7 characters: Cour@26
+No uppercase: courier@2026
+No lowercase: COURIER@2026
+No number: Courier@abcd
+No special character: Courier2026",Each password is rejected with a message stating the password rule. The courier stays Pending Activation.,A5,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-027,Account Activation,Confirm Password does not match,Equivalence Partitioning,Medium,The courier ernesto.villareal@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. Open the activation link.
+2. Enter the test data in Password and Confirm Password.
+3. Tap Activate.","Password: Courier@2026
+Confirm Password: Courier@2027",Activation is blocked. A message says the passwords do not match.,A5,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-028,Account Activation,Open an expired activation link,Boundary Value Analysis,High,The courier ernesto.villareal@example.com has status Pending Activation and the activation email has been read from the mail catcher.,"1. Wait until more than 24 hours have passed since the email was sent (or set the link's expiry time back in the test database).
+2. Open the activation link.",Activation link sent 24 hours and 1 minute ago,A message says the link has expired. No password can be set and the courier stays Pending Activation.,A17,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-029,Account Activation,Logistics resends the activation email,State Transition,Medium,The courier ernesto.villareal@example.com has status Pending Activation. The logistics account operations@bilishatid.example.com is logged in.,"1. Open the courier list.
+2. Tap Resend Activation for Ernesto Villareal.
+3. Open the first link.
+4. Open the second link.","First activation link, then the link from the second email",A new activation email is sent. The first link no longer works. The second link opens the Set Password screen.,A17,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-030,Account Activation,Reuse the activation link after activating,State Transition,Medium,The courier ernesto.villareal@example.com is already Active.,1. Open the activation link that was already used.,Activation link from the email that was used to activate,A message says the link is invalid or already used. The password cannot be changed through this link.,A17,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-031,Account Activation,Courier logs in before activating,State Transition,High,The courier ernesto.villareal@example.com has status Pending Activation.,"1. Open the login screen.
+2. Enter the email and password.
+3. Tap Log In.","Email: ernesto.villareal@example.com
+Password: Courier@2026",Login is denied. The courier is not given access to any screen.,A17,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-032,Access Control,Courier logs in after activating,Use Case Testing,High,The courier ernesto.villareal@example.com is Active.,"1. Open the login screen.
+2. Enter the email and password.
+3. Tap Log In.","Email: ernesto.villareal@example.com
+Password: Courier@2026","Login succeeds. The courier home screen opens and shows Ernesto Villareal, Bilis Hatid Express Inc., home hub HUB-QC, the truck NAB4521 and the status Off Duty. No rider job offers or rider screens are shown.",A17,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-033,Access Control,Courier is visible only to the company that created it,Error Guessing,High,Bilis Hatid Express Inc. created the courier Ernesto Villareal. Agila Cargo Movers Corp. is also an Approved logistics account.,"1. Log in as the first company and open the courier list.
+2. Log out.
+3. Log in as the second company and open the courier list.","First: operations@bilishatid.example.com / Hatid@2026
+Second: admin@agilacargo.example.com / Agila#Cargo26",Ernesto Villareal appears in the courier list of Bilis Hatid Express Inc. and does not appear in the courier list of Agila Cargo Movers Corp.,A17,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-034,Access Control,No public courier registration,Error Guessing,High,No user is logged in.,"1. Open the app's Sign Up screen and check the role choices.
+2. While logged out, open the Add Courier deep link on the phone.","Add Courier deep link (copy it while logged in as logistics, if the app has one)",Courier is not offered as a self-registration role. The Add Courier deep link opens the login screen.,"A17, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-035,Access Control,"Buyer, seller or rider opens the Add Courier form",Error Guessing,High,The buyer account juanmiguel.delacruz@example.com is logged in.,"1. Check the menus for Add Courier.
+2. Open the Add Courier deep link.
+3. With a proxy tool, send the Add Courier request using this session.
+4. Repeat while logged in as the seller mariaclara.santos@example.com and as Rider 1 pedrojose.garcia@example.com.",Add Courier deep link and Add Courier API request,"Add Courier is not shown. The deep link and the request are refused each time (401/403, access-denied screen or redirect). No courier can be created.","A16, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-036,Access Control,Pending logistics account tries to add a courier,State Transition,High,"A logistics account with status Pending Approval is logged in (register admin@agilacargo.example.com and verify it, but do not approve it yet).","1. Look for the Add Courier option.
+2. Open the Add Courier deep link, or send the Add Courier request with a proxy tool.",Add Courier deep link or API request,The Add Courier option is not available. The deep link or request is denied or shows the under-review notice. No courier can be created.,"A12, A17, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-037,Access Control,"Open another role's screens, including rider jobs",Error Guessing,Medium,The Active courier ernesto.villareal@example.com is logged in.,"1. Check every tab and menu for rider, logistics, seller or admin functions.
+2. Open each deep link in the test data on the courier's phone, one at a time.
+3. With a proxy tool, send a rider 'accept job' request using the courier's session.","Rider home deep link
+Logistics dashboard deep link
+Seller dashboard deep link
+Admin dashboard deep link",No other role's menus are shown. Each deep link shows an access-denied message or returns to the courier home screen. The accept-job request is refused (401/403); a courier cannot take rider jobs. No data from the other roles is shown.,"A16, A17, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-038,Add Courier Form,[Mobile] Each field opens the right keyboard,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Tap each field in turn, from top to bottom.
+2. Note the keyboard that opens and whether word suggestions appear.","Email: email keyboard with @
+Mobile Number, Load Capacity: number pad
+Driver's License No., Plate Number: letters and numbers, capitals
+First / Last Name: capitalises each word",Each field opens the keyboard listed in the test data. Password fields show no autocorrect or word suggestions. No field opens a keyboard that cannot type its valid value.,M2,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-039,Add Courier Form,[Mobile] Keyboard never hides the active field or Save,Error Guessing,Low,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. On the smallest test phone, tap each field from top to bottom.
+2. With the keyboard open on the last field, scroll to Save.
+3. Tap Done or tap outside the fields.",Any valid values,"The focused field always scrolls into view above the keyboard, with its error message visible. Save can be reached and tapped. The keyboard closes when Done or the background is tapped.","M2, M12",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-040,Add Courier Form,[Mobile] App sent to the background while filling the form,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in about half the fields with Account 1 data.
+2. Press Home and open another app for 1 minute, then return.
+3. Lock the screen for 1 minute (or receive a phone call), then return.",Account 1 data (Test Data sheet),"Each time, the app returns to the same form with every typed value still there (passwords may be cleared). The app does not restart, crash or jump to the login screen. No courier is created until Save is tapped.",M4,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-041,Add Courier Form,[Mobile] Rotate the phone while the form has data,Error Guessing,Low,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in several fields and tap Save with one field blank, so an error message shows.
+2. Turn on auto-rotate and rotate the phone to landscape, then back.",Account 1 data with Email left blank,"Either the app stays in portrait, or the layout switches to landscape and back keeping every value and the error message. Nothing is cleared and the app does not crash.",M4,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-042,Add Courier Form,[Mobile] Save with no internet connection,Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The values in the test data are not yet registered.,"1. Fill in every field with the test data.
+2. Turn on Airplane mode (Wi-Fi and mobile data off).
+3. Tap Save.
+4. Turn Airplane mode off and tap Save again.","Email: courier.test03@example.com
+Mobile Number: 09170000021
+Driver's License No.: M27-00-000001
+Plate Number: CMB100
+Other fields: Account 1 values","Step 3: a clear no-internet message is shown, the typed data stays on the form, the app does not crash, and no courier is created. Step 4: the courier is saved once: exactly one courier and one activation email.","M5, A17",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-043,Add Courier Form,[Mobile] Connection drops right after tapping Save,Error Guessing,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The values in the test data are not yet registered.,"1. Fill in every field with the test data.
+2. Tap Save, then turn on Airplane mode within a second.
+3. Turn Airplane mode off. If the form is still shown, tap Save again.
+4. Check the mail catcher and the courier list.","Email: courier.test04@example.com
+Mobile Number: 09170000022
+Driver's License No.: M27-00-000002
+Plate Number: CMB200
+Other fields: Account 1 values","The app shows a connection error or a waiting state, never a frozen screen. In the end exactly one courier exists with this email. If the first attempt was saved, the app continues normally (or says the courier already exists and lets the user continue); the courier is never left in a state the user cannot reach.","M5, A17",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-044,Add Courier Form,[Mobile] System Back on the Add Courier form,State Transition,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Fill in a few fields, then press Android Back (or swipe back on iPhone).
+2. Tap Cancel in the prompt, then press Back again and confirm leaving.
+3. Open the courier list.",Any valid values,"Leaving the form with typed data asks first, and Cancel keeps every value. After confirming, no courier is created and the courier list is unchanged.",M8,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-045,Document Upload,"[Mobile] Upload with the camera, the Files app and the gallery",Equivalence Partitioning,High,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open. The values in the test data are not yet registered.,"1. For Vehicle OR/CR, choose Take Photo and photograph a printed sample of the document.
+2. For NBI Clearance, choose Files (Browse) and pick nbi_clearance.pdf copied to the phone.
+3. For Professional Driver's License, choose Gallery / Photos and pick the JPG.
+4. Fill in the other fields and tap Save.","Email: courier.test07@example.com
+Mobile Number: 09170000024
+Driver's License No.: M27-00-000005
+Plate Number: CMB500
+Other fields: Account 1 values
+NBI Clearance: nbi_clearance.pdf
+Professional Driver's License: pro_license.jpg (from Photos)","Each source (camera, Files, gallery) is offered and works. The camera photo shows a preview and is accepted (compressed to 5 MB or less if needed). The PDF and the gallery image show their names or previews. Save continues normally.","A10, M6, M7",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-046,Document Upload,[Mobile] Camera or photo access denied,Error Guessing,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Tap the Professional Driver's License upload, choose Take Photo, and tap Don't Allow when asked for camera access.
+2. Choose Gallery and deny photo access too.
+3. Choose Files and pick pro_license.jpg.
+4. Choose Take Photo again.",pro_license.jpg copied to the phone,No crash. A message explains why the permission is needed and offers a link to the phone's Settings. Files still works and the file is accepted. Asking again shows the system prompt again or the Settings message.,M6,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-047,Document Upload,[Mobile] Full-resolution camera photo bigger than 5 MB,Boundary Value Analysis,Medium,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Set the camera to its highest resolution and take the Vehicle OR/CR photo inside the app, or pick size_5.1MB.jpg from Photos.
+2. Fill in the other fields and tap Save.","Camera photo over 5 MB, or size_5.1MB.jpg in Photos","The app either compresses the photo to 5 MB or less and accepts it (the saved image is still readable), or rejects it with the maximum-size message. It never uploads a file over 5 MB and never fails without a message. Write your rule in Assumption M7, column D.","A10, M7",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-048,Add Courier Form,[Mobile] Large system font on a small screen,Error Guessing,Low,The Approved logistics account operations@bilishatid.example.com is logged in on the test phone and the Add Courier form is open.,"1. Set the phone's font size and display size to the largest setting.
+2. Open the Add Courier form and tap Save with every field empty.",All fields blank,"All labels, placeholders, error messages and buttons can be read in full; none are cut off or overlapping. The screen scrolls to every field and Save can be tapped.",M12,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-049,Account Activation,[Mobile] Activation link opened on the courier's phone with the app installed,Use Case Testing,High,The courier rogelio.dimaculangan@example.com (created with the Account 2 data) is Pending Activation. The app is installed on the courier's phone and the activation email is open there.,"1. On the courier's phone, tap the activation link.
+2. Enter the password in both fields and tap Activate.
+3. Log in to the app.","Password: Linehaul#Rog26
+Confirm Password: Linehaul#Rog26","The link opens the app's Set Password screen (or a mobile web page that leads back to the app). Activation succeeds, the status becomes Active, and the courier logs in to the courier home screen showing Rogelio Dimaculangan.","A17, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-050,Account Activation,[Mobile] Activation link opened on a phone without the app,Error Guessing,Low,A courier created with spare values is Pending Activation. The phone used does not have the app installed.,1. Open the activation link on that phone.,Activation link from the mail catcher,"The link opens a mobile web page to set the password, or the app's store page with clear instructions. No blank or error page.","A17, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-051,Access Control,[Mobile] Stay logged in after closing the app or restarting the phone,State Transition,Medium,The courier ernesto.villareal@example.com is Active and logged in to the app on the courier's test phone.,"1. Swipe the app away from recent apps (force close) and reopen it.
+2. Restart the phone and reopen the app.","Email: ernesto.villareal@example.com
+Password: Courier@2026","Each time the app opens on the courier home screen still logged in, showing Ernesto Villareal. It does not ask to log in again and shows no other user's data.",M9,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+TC-COU-052,Access Control,[Mobile] Back after logging out,State Transition,High,The courier ernesto.villareal@example.com is Active and logged in to the app on the courier's test phone.,"1. Tap Log Out.
+2. Press Android Back (or swipe back) several times.
+3. Reopen the app from recent apps.","Email: ernesto.villareal@example.com
+Password: Courier@2026","The login screen stays. No screen with account data appears again, and the app does not log back in by itself.","M8, M9",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).

@@ -1,0 +1,24 @@
+Test Case ID,Module,Test Scenario,Technique,Priority,Preconditions,Test Steps,Test Data,Expected Result,Assumption Ref,Actual Result,Status,Remarks
+COU-PROF-001,"Profile, Vehicle & Documents","View profile, vehicle and documents",Use Case Testing,Medium,Logged in as Courier 1.,"1. Open My Profile.
+2. Open each uploaded document.",,"Shows Ernesto Villareal, license N02-15-345678 (Professional; codes B, B2, C), expiry 07/15/2029, 4-Wheeler Closed Van Truck, plate NAB4521, capacity 3,000 kg, home hub HUB-QC, company Bilis Hatid Express Inc., status Active. All three documents open.","A1, A39",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-002,"Profile, Vehicle & Documents",Update load capacity and OR/CR,State Transition,Medium,"Logged in as Courier 1, Off Duty.","1. Change Load Capacity to 2500 and upload a new OR/CR.
+2. Save.
+3. As Logistics 1, open Courier 1's record.
+4. Change the capacity back to 3000.","Capacity: 2500 kg
+OR/CR: truck_or_cr.pdf","The change is saved and Logistics 1 sees 2,500 kg and the new OR/CR, flagged for re-verification. The old values are no longer shown.",A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-003,"Profile, Vehicle & Documents",Plate number already used by a courier or a rider,Equivalence Partitioning,Medium,Logged in as Courier 1.,1. Change the plate to each value and save.,"CAV7788 (Courier 2)
+cav7788
+123ABC (Rider 1)",All three are blocked as already registered. The plate stays NAB4521.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-004,"Profile, Vehicle & Documents",License expiry boundary,Boundary Value Analysis,High,"Logged in as Courier 1, Off Duty.","1. Set the license expiry to yesterday and save.
+2. Set it to today and save.
+3. Set it back to 07/15/2029.",Yesterday's date; today's date,Yesterday is rejected with an expiry message. Today is accepted.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-005,"Profile, Vehicle & Documents",Document upload rules,Boundary Value Analysis,Medium,Logged in as Courier 1.,"1. Upload each file as the NBI Clearance, one at a time.","size_5.0MB.jpg (accept)
+size_5.1MB.jpg (reject)
+price_list.docx (reject)
+renamed_exe.jpg (reject)",Only the 5.0 MB JPG is accepted; the others are rejected and the previous document is kept.,A16,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-006,"Profile, Vehicle & Documents",Suspended courier cannot work,State Transition,High,Logged in as Courier 3 (Suspended).,"1. Try to go On Duty.
+2. Logistics 1 creates a trip from HUB-PSG and opens Assign Courier.",,Courier 3 cannot go On Duty and sees a suspension message. Courier 3 is not listed for assignment.,A39,,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-007,"Profile, Vehicle & Documents",Courier cannot see another courier's profile,Error Guessing,High,Logged in as Courier 1.,"1. With a proxy tool on the phone, change the courier ID in the profile request to Courier 2's and resend it.",Courier 2's ID,Denied. No Courier 2 data is shown.,"A22, M11",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
+COU-PROF-008,"Profile, Vehicle & Documents",[Mobile] Update documents with the camera and the Files app,Use Case Testing,Medium,Logged in as Courier 1. truck_or_cr.pdf is in the phone's Files.,"1. Replace the Professional Driver's License using Take Photo.
+2. Replace the OR/CR from Files.
+3. As Logistics 1, open Courier 1's record.",truck_or_cr.pdf,"Both are accepted with previews, and Logistics 1 sees the new documents flagged for re-verification.","A16, M6, M7",,Blocked,Out of scope: the app has no courier login (see ERP Changes sheet).
