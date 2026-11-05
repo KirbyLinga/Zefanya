@@ -388,17 +388,17 @@ class _OrderSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ShimmerBox(child: Container(height: AppSpacing.s14, width: 120)),
+          ShimmerBox(child: Container(height: AppSpacing.s12, width: 120)),
           const SizedBox(height: AppSpacing.s8),
           ShimmerBox(child: Container(height: AppSpacing.s12, width: double.infinity)),
           const SizedBox(height: AppSpacing.s8),
-          ShimmerBox(child: Container(height: AppSpacing.s10, width: 80)),
+          ShimmerBox(child: Container(height: AppSpacing.s8, width: 80)),
           const SizedBox(height: AppSpacing.s16),
           Row(
             children: [
-              ShimmerBox(child: Container(height: AppSpacing.s10, width: 40)),
+              ShimmerBox(child: Container(height: AppSpacing.s8, width: 40)),
               const SizedBox(width: AppSpacing.s8),
-              ShimmerBox(child: Container(height: AppSpacing.s10, width: 100)),
+              ShimmerBox(child: Container(height: AppSpacing.s8, width: 100)),
             ],
           ),
         ],

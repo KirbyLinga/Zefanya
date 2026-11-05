@@ -35,7 +35,6 @@ void main() {
 
   testWidgets('ShimmerBox does not sweep during the first 150 ms',
       (tester) async {
-    var sweepStarted = false;
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(),
