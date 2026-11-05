@@ -35,6 +35,14 @@ Each mutation was applied to the source, the named test was run, the mutation wa
 | H5-delivered-writer | OrderController.php temporary `$sellerOrder->status = 'delivered';` | test_only_whitelisted_files_assign_delivered_status | Non-whitelisted files assign the delivered status. Route all delivered writes through OrderDeliveryService. Files: app/Http/Controllers/Api/Order/OrderController.php | Tests: 1 passed (1 assertion) |
 | H5-route-guard | routes/api.php bare `api.v1.mutation-probe` with no auth middleware | test_every_v1_route_has_auth_or_is_on_allowlist | These /api/v1 routes lack auth middleware: api.v1.mutation-probe | Tests: 1 passed (1 assertion) |
 
+## S0-lite session (integration/hardened, 2026-11-05)
+
+Mutation applied on a temporary branch (`tmp/mutation`), the named test run, the file restored, and the test run again. Only the mutated file was restored; no other working-tree change was touched.
+
+| Mutation | File:Line | Test Name | FAIL Line | PASS Line |
+|---------|-----------|-----------|-----------|-----------|
+| S0-plain-update | `Admin/RegistrationController.php:92` `approveBuyer()` uses `$buyer->update([...])` instead of `forceFill()->save()` | `AdminApprovalFlowTest::test_admin_approves_a_buyer_and_the_decision_is_persisted` | `Expected response status code [201, 301, 302, 303, 307, 308] but received 500.` + `MassAssignmentException: Add fillable property [status, approved_by, approved_at, rejection_reason] ... on [App\Models\Buyer\Buyer]` | Tests: 1 passed (5 assertions) |
+
 ## New tests added (step 1d)
 - GoogleApiTokenVerifierTest (8 unit tests): runs REAL GoogleApiTokenVerifier with stubbed Google\Client — valid, email_verified false, wrong audience, wrong issuer, expired, client throws, d1 re-run, d4 re-run
 - GoogleApiTokenVerifier refactored: accepts optional ?Client $googleClient for testability (production uses new Client by default)

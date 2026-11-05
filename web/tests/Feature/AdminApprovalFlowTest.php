@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Seller\Seller;
+use App\Notifications\Buyer\BuyerRegistrationDecision;
 use App\Notifications\Seller\SellerRegistrationDecision;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -27,6 +28,45 @@ class AdminApprovalFlowTest extends TestCase
             'email' => 'approval'.uniqid().'@example.com',
             'password' => 'AdminSecret123!',
         ]);
+    }
+
+    public function test_admin_approves_a_buyer_and_the_decision_is_persisted(): void
+    {
+        Notification::fake();
+
+        $buyer = Buyer::factory()->create(['status' => 'pending_approval']);
+
+        $this->actingAs($this->admin(), 'admin')
+            ->post(route('admin.registrations.buyer.approve', $buyer))
+            ->assertRedirect();
+
+        $buyer->refresh();
+
+        $this->assertSame('approved', $buyer->status);
+        $this->assertNotNull($buyer->approved_at);
+        $this->assertNotNull($buyer->approved_by);
+        Notification::assertSentTo($buyer, BuyerRegistrationDecision::class);
+    }
+
+    public function test_admin_rejects_a_buyer_with_a_reason(): void
+    {
+        Notification::fake();
+
+        $buyer = Buyer::factory()->create(['status' => 'pending_approval']);
+
+        $this->actingAs($this->admin(), 'admin')
+            ->post(route('admin.registrations.buyer.reject', $buyer), [
+                'rejection_reason' => 'The uploaded ID is unreadable.',
+            ])
+            ->assertRedirect();
+
+        $buyer->refresh();
+
+        $this->assertSame('rejected', $buyer->status);
+        $this->assertSame('The uploaded ID is unreadable.', $buyer->rejection_reason);
+        $this->assertNotNull($buyer->approved_at);
+        $this->assertNotNull($buyer->approved_by);
+        Notification::assertSentTo($buyer, BuyerRegistrationDecision::class);
     }
 
     public function test_admin_approves_a_seller_and_the_decision_is_persisted(): void

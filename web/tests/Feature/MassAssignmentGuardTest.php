@@ -7,6 +7,7 @@ use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Category;
 use App\Services\Auth\GoogleIdTokenVerifier;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -94,6 +95,96 @@ class MassAssignmentGuardTest extends TestCase
         // The column doesn't exist on buyers, but the request must not fail
         // or expose any admin escalation.
         $this->assertSame(1, Buyer::count());
+    }
+
+    private function sellerPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'sex' => 'male',
+            'email' => 'seller'.uniqid().'@example.com',
+            'password' => 'Password1!',
+            'password_confirmation' => 'Password1!',
+            'contact_no' => '09181234567',
+            'birthday' => '1990-01-15',
+            'address_mode' => 'manual',
+            'street' => '456 Mabini Ave.',
+            'business_name' => 'Test Store '.uniqid(),
+            'line_of_business_id' => Category::query()->value('id'),
+            'upload_id' => UploadedFile::fake()->create('id.pdf', 100, 'application/pdf'),
+            'business_permit' => UploadedFile::fake()->create('permit.pdf', 100, 'application/pdf'),
+        ], $overrides);
+    }
+
+    private function logisticsPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'first_name' => 'Liza',
+            'last_name' => 'Ramos',
+            'sex' => 'female',
+            'email' => 'logistics'.uniqid().'@example.com',
+            'password' => 'Password1!',
+            'password_confirmation' => 'Password1!',
+            'contact_no' => '09171234567',
+            'birthday' => '1995-06-20',
+            'business_name' => 'Ramos Logistics '.uniqid(),
+            'address_mode' => 'manual',
+            'street' => '123 Rizal St.',
+            'upload_id' => UploadedFile::fake()->create('id.pdf', 100, 'application/pdf'),
+            'dti_permit_upload' => UploadedFile::fake()->create('permit.pdf', 100, 'application/pdf'),
+        ], $overrides);
+    }
+
+    // ── Web registration doors ───────────────────────────────────────────────
+
+    public function test_web_buyer_registration_ignores_status_and_verification(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+
+        $this->post(
+            route('register.buyer.store'),
+            $this->buyerPayload([
+                'status' => 'approved',
+                'email_verified_at' => now()->toDateTimeString(),
+            ]),
+            ['Accept' => 'application/json'],
+        )->assertOk();
+
+        $buyer = Buyer::sole();
+        $this->assertSame('pending_verification', $buyer->status);
+        $this->assertNull($buyer->email_verified_at);
+    }
+
+    public function test_web_seller_registration_ignores_status_and_verification(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+
+        $this->postJson(route('register.seller.store'), $this->sellerPayload([
+            'status' => 'approved',
+            'email_verified_at' => now()->toDateTimeString(),
+        ]))->assertStatus(201);
+
+        $seller = Seller::sole();
+        $this->assertSame('pending_verification', $seller->status);
+        $this->assertNull($seller->email_verified_at);
+    }
+
+    public function test_web_logistics_registration_ignores_status_and_verification(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+
+        $this->postJson(route('register.logistics.store'), $this->logisticsPayload([
+            'status' => 'approved',
+            'email_verified_at' => now()->toDateTimeString(),
+        ]))->assertStatus(201);
+
+        $provider = LogisticsProvider::sole();
+        $this->assertSame(LogisticsProviderStatus::PendingVerification, $provider->status);
+        $this->assertNull($provider->email_verified_at);
     }
 
     // ── Google registration ──────────────────────────────────────────────────
