@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'config/dev_flags.dart';
 import 'data/ph_address_catalog.dart';
@@ -39,6 +40,18 @@ void main() async {
   // runApp — without this, plugin channels (shared_preferences here)
   // aren't guaranteed ready yet.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Portrait lock: the app is a full-screen consumer (catalogue, orders,
+  // tracking), never a split-screen or slide-over app. Locking orientation
+  // here, before any route is pushed, keeps the nav bar aligned to the
+  // screen's shorter edge and guarantees that 360x640 (the smallest
+  // supported phone) resolves as a portrait Window. Nothing below calls
+  // SystemChrome.setPreferredOrientations, so this is the single
+  // orientation contract for the entire app.
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   // The one place the mock/real decision is made.
   final repositories = Repositories.forMode(
