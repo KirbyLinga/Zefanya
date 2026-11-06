@@ -167,16 +167,16 @@ const String kGoogleIosClientId = String.fromEnvironment(
 /// committed. With no server client ID the ID token has no audience to verify
 /// against, so the Google flow cannot complete and the button must stay hidden.
 class GoogleConfig {
-  GoogleConfig({
+  const GoogleConfig({
     required this.serverClientId,
     required this.iosClientId,
   });
 
   /// Build-time values from the dart-defines. Empty when the build does not
   /// supply them.
-  GoogleConfig.fromEnvironment()
-      : serverClientId = String.fromEnvironment('zefanya.googleServerClientId'),
-        iosClientId = String.fromEnvironment('zefanya.googleIosClientId');
+  const GoogleConfig.fromEnvironment()
+      : serverClientId = kGoogleServerClientId,
+        iosClientId = kGoogleIosClientId;
 
   /// The web (server) OAuth client ID — the ID token audience on Android.
   final String serverClientId;
@@ -190,7 +190,7 @@ class GoogleConfig {
 
   /// The build-time configuration. Empty in builds that do not supply the
   /// dart-defines.
-  static final GoogleConfig current = GoogleConfig.fromEnvironment();
+  static const GoogleConfig current = GoogleConfig.fromEnvironment();
 }
 
 /// The mock Google account, chosen at build time.

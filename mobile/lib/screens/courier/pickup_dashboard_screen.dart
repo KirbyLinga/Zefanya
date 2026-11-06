@@ -37,10 +37,13 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
 
   Future<void> _refresh() async {
     setState(() => _isLoading = true);
-    // TODO: replace with a real assignment feed fetch (websocket/polling).
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      await context.read<CourierState>().refreshJobs();
+    } on ApiException {
+      // loadFailure is set by refreshJobs; _buildEmptyState reads it.
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

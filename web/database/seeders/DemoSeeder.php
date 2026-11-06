@@ -12,7 +12,7 @@ use App\Models\Buyer\BuyerAddress;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
-use App\Models\Seller\Product;
+use App\Models\Product;
 use App\Models\Voucher;
 use App\Services\OrderDeliveryService;
 use App\Services\OrderPlacer;
@@ -187,6 +187,76 @@ class DemoSeeder extends Seeder
             );
         }
 
+        // Riders (logistics providers) — approved, email verified
+        $riders = [
+            [
+                'email' => 'pedrojose.garcia@example.com',
+                'first_name' => 'Pedro Jose',
+                'last_name' => 'Garcia',
+                'contact_no' => '09201112222',
+                'password' => 'Rider@Pedro26',
+                'birthday' => '1993-08-10',
+                'province_name' => 'Metro Manila',
+                'municipality_name' => 'Quezon City',
+                'barangay_name' => 'Batasan Hills',
+                'street' => '12 Batasan Rd.',
+                'vehicle_type' => 'motorcycle',
+                'plate_number' => 'ABC 1234',
+                'license_number' => 'N01-23-456789',
+                'license_expiry' => '2028-08-10',
+            ],
+            [
+                'email' => 'markanthony.bautista@example.com',
+                'first_name' => 'Mark Anthony',
+                'last_name' => 'Bautista',
+                'contact_no' => '09203334444',
+                'password' => 'Rider@Mark26',
+                'birthday' => '1996-02-20',
+                'province_name' => 'Metro Manila',
+                'municipality_name' => 'Pasig City',
+                'barangay_name' => 'Kapitolyo',
+                'street' => '88 Shaw Blvd.',
+                'vehicle_type' => 'motorcycle',
+                'plate_number' => 'XYZ 5678',
+                'license_number' => 'N01-23-789012',
+                'license_expiry' => '2027-02-20',
+            ],
+        ];
+
+        foreach ($riders as $r) {
+            LogisticsProvider::updateOrCreate(
+                ['email' => $r['email']],
+                [
+                    'first_name' => $r['first_name'],
+                    'last_name' => $r['last_name'],
+                    'sex' => 'male',
+                    'password' => $password($r['password']),
+                    'contact_no' => $r['contact_no'],
+                    'birthday' => $r['birthday'],
+                    'age' => Carbon::parse($r['birthday'])->age,
+                    'address_mode' => 'manual',
+                    'province_name' => $r['province_name'],
+                    'municipality_name' => $r['municipality_name'],
+                    'barangay_name' => $r['barangay_name'],
+                    'street' => $r['street'],
+                    'business_name' => $r['first_name'].' '.$r['last_name'].' Delivery',
+                    'vehicle_type' => $r['vehicle_type'],
+                    'plate_number' => $r['plate_number'],
+                    'license_number' => $r['license_number'],
+                    'license_expiry' => $r['license_expiry'],
+                    'upload_id_path' => 'ids/test.jpg',
+                    'dti_permit_path' => 'dti/test.jpg',
+                    'license_path' => 'licenses/test.jpg',
+                    'or_cr_path' => 'orcr/test.jpg',
+                    'email_verified_at' => $now,
+                    'approved_at' => $now,
+                    'status' => LogisticsProviderStatus::Approved->value,
+                    'is_online' => false,
+                    'reverification_required' => false,
+                ],
+            );
+        }
+
     }
 
     private function seedAddresses(): void
@@ -197,7 +267,8 @@ class DemoSeeder extends Seeder
                 'recipient' => 'Juan Miguel Dela Cruz',
                 'phone' => '09171234567',
                 'label' => 'Home (default)',
-                'province' => 'Metro Manila',
+                'region' => 'National Capital Region (NCR)',
+                'province' => null,
                 'city' => 'Quezon City',
                 'barangay' => 'Central',
                 'street' => '45 Kalayaan Ave.',
@@ -209,7 +280,8 @@ class DemoSeeder extends Seeder
                 'recipient' => 'Juan Miguel Dela Cruz',
                 'phone' => '09171234567',
                 'label' => 'Office',
-                'province' => 'Metro Manila',
+                'region' => 'National Capital Region (NCR)',
+                'province' => null,
                 'city' => 'Makati City',
                 'barangay' => 'San Lorenzo',
                 'street' => '12F Pacific Tower, 6750 Ayala Ave.',
@@ -221,6 +293,7 @@ class DemoSeeder extends Seeder
                 'recipient' => 'Ana Marie Reyes',
                 'phone' => '09173456789',
                 'label' => 'Home (default)',
+                'region' => 'Region VII (Central Visayas)',
                 'province' => 'Cebu',
                 'city' => 'Cebu City',
                 'barangay' => 'Capitol Site',
@@ -233,6 +306,7 @@ class DemoSeeder extends Seeder
                 'recipient' => 'Juan Miguel Dela Cruz',
                 'phone' => '09171234567',
                 'label' => 'Province',
+                'region' => 'Region II (Cagayan Valley)',
                 'province' => 'Batanes',
                 'city' => 'Itbayat',
                 'barangay' => 'Raele',
@@ -253,7 +327,8 @@ class DemoSeeder extends Seeder
                 [
                     'recipient' => $a['recipient'],
                     'phone' => $a['phone'],
-                    'province_name' => $a['province'],
+                    'region' => $a['region'],
+                    'province' => $a['province'],
                     'city' => $a['city'],
                     'barangay' => $a['barangay'],
                     'street' => $a['street'],
@@ -573,11 +648,11 @@ class DemoSeeder extends Seeder
         foreach ($statuses as $index => $status) {
             $reference = 'ORD-DEMO-'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT);
 
-            $orderId = DB::table('orders')->updateOrInsert(
+            DB::table('orders')->updateOrInsert(
                 ['reference' => $reference],
                 [
                     'buyer_id' => $buyer1->id,
-                    'shipping_address' => $shippingAddress,
+                    'shipping_address' => json_encode($shippingAddress),
                     'subtotal_minor' => 69900,
                     'discount_minor' => 0,
                     'total_minor' => 69900,
@@ -587,108 +662,64 @@ class DemoSeeder extends Seeder
                 ],
             );
 
-            $orderId = is_numeric($orderId) ? $orderId : $orderId->id;
+            $orderId = DB::table('orders')->where('reference', $reference)->value('id');
 
-            // One seller order per order (Seller 1)
-            $sellerOrderRef = $reference.'-SO1';
+            // One seller order per order (Seller 1).
+            // tracking_number is unique — derive it from the reference so re-runs
+            // hit updateOrInsert rather than failing on the unique constraint.
+            $sellerOrderTracking = $status === OrderStatus::ReadyForPickup
+                || $status === OrderStatus::OutForDelivery
+                || $status === OrderStatus::Delivered
+                || $status === OrderStatus::Completed
+                    ? $reference.'-TRK'
+                    : null;
+
             DB::table('seller_orders')->updateOrInsert(
-                ['tracking_number' => $sellerOrderRef],
+                ['order_id' => $orderId, 'seller_id' => $seller1->id],
                 [
-                    'order_id' => $orderId,
-                    'seller_id' => $seller1->id,
-                    'subtotal_minor' => 69900,
+                    'subtotal_minor' => 24900,
                     'assigned_courier_id' => null,
                     'delivery_fee_minor' => 6500,
                     'delivery_area' => 'AREA-A',
-                    'tracking_number' => $status->value === 'READY_FOR_PICKUP' ? $sellerOrderRef : null,
+                    'tracking_number' => $sellerOrderTracking,
                     'status' => $status->value,
                     'created_at' => $now->subDays(count($statuses) - $index),
                     'updated_at' => $now,
                 ],
             );
 
-            // Order item
+            $sellerOrderId = DB::table('seller_orders')
+                ->where('order_id', $orderId)
+                ->where('seller_id', $seller1->id)
+                ->value('id');
+
+            // Order item — actual columns: seller_order_id, product_id,
+            // product_name (snapshot), quantity, price_minor.
             DB::table('order_items')->updateOrInsert(
-                ['seller_order_id' => $orderId, 'product_id' => $product1?->id],
+                ['seller_order_id' => $sellerOrderId, 'product_id' => $product1?->id],
                 [
-                    'product_id' => $product1?->id,
+                    'product_name' => $product1?->name ?? 'Abaca Woven Tote Bag',
                     'quantity' => 1,
-                    'unit_price_minor' => 24900,
-                    'line_total_minor' => 24900,
+                    'price_minor' => 24900,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ],
             );
 
-            // Payment (per seller order)
+            // Payment — actual columns: seller_order_id, amount_minor,
+            // method, status, paid_at.
+            $isDelivered = in_array($status, [OrderStatus::Delivered, OrderStatus::Completed]);
             DB::table('payments')->updateOrInsert(
-                ['seller_order_id' => $orderId],
+                ['seller_order_id' => $sellerOrderId],
                 [
                     'method' => PaymentMethod::Cod->value,
-                    'amount_minor' => 69900,
-                    'status' => $status->value === OrderStatus::Delivered->value ? PaymentStatus::Paid->value : PaymentStatus::Pending->value,
-                    'paid_at' => $status->value === OrderStatus::Delivered->value ? $now : null,
+                    'amount_minor' => 24900,
+                    'status' => $isDelivered ? PaymentStatus::Paid->value : PaymentStatus::Pending->value,
+                    'paid_at' => $isDelivered ? $now : null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ],
             );
-
-            // Delivered orders are created through OrderDeliveryService,
-            // never by direct status assignment.
-            if ($status === OrderStatus::Delivered) {
-                $this->createDeliveredDemoOrder($buyer1, $seller1, $product2, $product3, $now);
-            }
         }
-    }
-
-    /**
-     * Create one delivered demo order through OrderDeliveryService so the
-     * delivered status and its handover facts come from the real service,
-     * never by direct status assignment.
-     */
-    private function createDeliveredDemoOrder(
-        Buyer $buyer,
-        Seller $seller,
-        ?Product $product2,
-        ?Product $product3,
-        Carbon $now,
-    ): void {
-        $placer = app(OrderPlacer::class);
-
-        $order = $placer->place(
-            $buyer,
-            [
-                ['product_id' => $product2?->id, 'quantity' => 1],
-                ['product_id' => $product3?->id, 'quantity' => 1],
-            ],
-        );
-
-        $sellerOrder = $order->sellerOrders()->first();
-        if ($sellerOrder === null) {
-            Log::warning('DemoSeeder: placed order has no seller order; skipping delivery handover.');
-            return;
-        }
-
-        $sellerOrder->confirm();
-        $sellerOrder->markPreparing();
-        $sellerOrder->markReadyForPickup('ZEF-'.$sellerOrder->id.'-01');
-
-        $courier = LogisticsProvider::where('email', 'pedrojose.garcia@example.com')->first();
-        if ($courier !== null) {
-            $sellerOrder->assignCourier($courier, 6500, 'AREA-A');
-        }
-
-        // Move to Out for Delivery then Delivered via the delivery service.
-        $sellerOrder->forceFill(['status' => OrderStatus::OutForDelivery->value])->save();
-
-        $deliveryService = app(OrderDeliveryService::class);
-        $deliveryService->issuePass($sellerOrder, $buyer);
-
-        $deliveryService->markDelivered(
-            $sellerOrder,
-            $courier ?? LogisticsProvider::first(),
-            ['cod_amount' => $sellerOrder->subtotal_minor / 100],
-            null,
-        );
     }
 }

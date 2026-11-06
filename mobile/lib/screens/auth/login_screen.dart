@@ -69,9 +69,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // The mode is never sent as the role: the server/repository decides role
-      // from the account credentials.
+      // The role selector determines which endpoint to call: buyers hit
+      // /login/buyer, riders hit /login/courier.
       await context.read<AuthState>().login(
+        role: _isRiderMode ? UserRole.courier : UserRole.buyer,
         email: _identifierController.text.trim(),
         password: _passwordController.text,
       );
