@@ -45,6 +45,10 @@ class Microcopy {
     return '$compliment Added to your cart.';
   }
 
+  /// A second tap on Add to Cart for a line that is already there. Says what
+  /// changed without pretending a new product arrived.
+  static const String quantityUpdated = 'Quantity updated';
+
   /// Gentle confirmation when saving an item to favorites / wishlist.
   static const List<String> favoriteCompliments = [
     'Saved, good eye.',

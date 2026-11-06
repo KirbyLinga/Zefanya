@@ -173,7 +173,8 @@ class _CartScreenState extends State<CartScreen> {
                             ),
                             const Spacer(),
                             Text(
-                              '${items.length} item(s)',
+                              '${cart.productCount} '
+                              'product${cart.productCount == 1 ? '' : 's'}',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -216,7 +217,13 @@ class _CartScreenState extends State<CartScreen> {
             ),
       bottomNavigationBar: items.isEmpty
           ? null
-          : _buildSummaryBar(context, theme, selectedCount, quote),
+          : _buildSummaryBar(
+              context,
+              theme,
+              selectedCount,
+              cart.selectedProductCount,
+              quote,
+            ),
     );
   }
 
@@ -580,6 +587,7 @@ class _CartScreenState extends State<CartScreen> {
     BuildContext context,
     ThemeData theme,
     int selectedCount,
+    int selectedProducts,
     CartQuote quote,
   ) {
     return Container(
@@ -609,7 +617,8 @@ class _CartScreenState extends State<CartScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Total ($selectedCount item${selectedCount == 1 ? '' : 's'})',
+                    'Total ($selectedProducts '
+                    'product${selectedProducts == 1 ? '' : 's'})',
                     style: theme.textTheme.bodySmall,
                   ),
                   if (!kUseLiveApi && quote.hasVoucherDiscount)

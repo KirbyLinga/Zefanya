@@ -370,7 +370,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     });
 
     final sku = _selectedSku;
-    context.read<CartState>().addItem(
+    final outcome = context.read<CartState>().addItem(
       _product,
       variant: _selectedVariant,
       quantity: _quantity,
@@ -378,6 +378,24 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       variantStock: sku?.stock,
       variantImage: sku?.image,
     );
+
+    if (outcome == CartAddOutcome.rejected) return false;
+
+    // The product was already in the cart, so nothing new arrived. Flying a
+    // second copy into the badge would say otherwise, and bumping the badge
+    // would animate a number that did not change.
+    if (outcome == CartAddOutcome.quantityUpdated) {
+      if (showSnackBar) {
+        showTimedSnackBar(
+          context,
+          SnackBar(
+            content: const Text(Microcopy.quantityUpdated),
+            persist: false,
+          ),
+        );
+      }
+      return true;
+    }
 
     // Light impact on add — the same confirmation weight as copy-ID
     // and the nav tap, fired with the flight rather than the snackbar.

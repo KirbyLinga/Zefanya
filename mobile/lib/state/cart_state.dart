@@ -102,6 +102,20 @@ class CartItem implements PricedLine {
   double? get shippingFee => product.shippingFee;
 }
 
+/// Distinct products in [lines].
+///
+/// A cart badge answers "how many things am I buying", not "how many units
+/// are in the bag": two colours of one shirt is one product, and raising a
+/// line from one to three is still one product. Counting quantities made the
+/// badge jump on every stepper tap, which read as extra items being added.
+int cartProductCount(Iterable<CartItem> lines) =>
+    lines.map((line) => line.product.id).toSet().length;
+
+/// What [CartState.addItem] did, so the product screen can tell a first add
+/// (celebrate: flight, haptic, badge bounce) from a quantity change (be quiet:
+/// the line was already there) and from a refusal.
+enum CartAddOutcome { added, quantityUpdated, rejected }
+
 /// Why an apply attempt failed, or that it succeeded.
 enum VoucherApplyStatus {
   applied,
@@ -194,13 +208,19 @@ class CartState extends ChangeNotifier {
 
   List<CartItem> get items => List.unmodifiable(_items);
   bool get isEmpty => _items.isEmpty;
-  int get itemCount => _items.fold(0, (sum, i) => sum + i.quantity);
+
+  /// Distinct products in the cart, with variants counted once. This is the
+  /// badge number and the number every "N products" label uses.
+  int get productCount => cartProductCount(_items);
 
   /// Selected lines that can actually be checked out.
   List<CartItem> get selectedItems => [
     for (final item in _items)
       if (item.selected && item.isAvailable) item,
   ];
+
+  /// Distinct selected products, for the cart total and checkout summary.
+  int get selectedProductCount => cartProductCount(selectedItems);
 
   double get subtotal =>
       selectedItems.fold(0.0, (sum, item) => sum + item.lineTotal);
@@ -604,7 +624,12 @@ class CartState extends ChangeNotifier {
 
   /// Adds a line. Refuses a product that is not currently sellable so the same
   /// rule covers the product screen, a future quick-add, and a stale catalogue.
-  void addItem(
+  ///
+  /// Returns [CartAddOutcome.quantityUpdated] rather than [CartAddOutcome.added]
+  /// when the product (and variant) already has a line: the product screen
+  /// uses that to skip the flight animation and the badge bounce, because
+  /// nothing new arrived in the cart.
+  CartAddOutcome addItem(
     Product product, {
     String variant = '',
     int quantity = 1,
@@ -612,12 +637,12 @@ class CartState extends ChangeNotifier {
     int? variantStock,
     String? variantImage,
   }) {
-    if (quantity <= 0) return;
-    if (product.sellerOnVacation) return;
+    if (quantity <= 0) return CartAddOutcome.rejected;
+    if (product.sellerOnVacation) return CartAddOutcome.rejected;
     if (variantStock != null) {
-      if (variantStock <= 0) return;
+      if (variantStock <= 0) return CartAddOutcome.rejected;
     } else if (product.stock <= 0) {
-      return;
+      return CartAddOutcome.rejected;
     }
 
     final index = _items.indexWhere(
@@ -634,20 +659,24 @@ class CartState extends ChangeNotifier {
     if (index >= 0) {
       _items[index].quantity = math.min(cap, _items[index].quantity + quantity);
       _items[index].selected = true;
-    } else {
-      _items.add(
-        CartItem(
-          product: product,
-          variant: variant,
-          quantity: math.min(cap, quantity),
-          unitPrice: unitPrice,
-          variantStock: variantStock,
-          variantImage: variantImage,
-        ),
-      );
+      notifyListeners();
+      _save();
+      return CartAddOutcome.quantityUpdated;
     }
+
+    _items.add(
+      CartItem(
+        product: product,
+        variant: variant,
+        quantity: math.min(cap, quantity),
+        unitPrice: unitPrice,
+        variantStock: variantStock,
+        variantImage: variantImage,
+      ),
+    );
     notifyListeners();
     _save();
+    return CartAddOutcome.added;
   }
 
   /// How many units of [productId] are already in this cart.

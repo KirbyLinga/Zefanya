@@ -398,15 +398,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// Tappable summary header: collapsed is one row with the item
+  /// Tappable summary header: collapsed is one row with the product
   /// count; tapping reveals the per-line breakdown below. The bottom
   /// bar always carries the total, so nothing is lost either way.
   Widget _summaryHeader(ThemeData theme, double total, int count) {
+    final productLabel = count == 1 ? 'product' : 'products';
     return Semantics(
       button: true,
       expanded: _summaryExpanded,
       label:
-          'Order summary, $count items, '
+          'Order summary, $count $productLabel, '
           'total ${formatPeso(total)}',
       child: InkWell(
         onTap: () => setState(() => _summaryExpanded = !_summaryExpanded),
@@ -425,7 +426,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Text('Order Summary', style: theme.textTheme.titleSmall),
               ),
               Text(
-                '$count item${count == 1 ? '' : 's'}',
+                '$count $productLabel',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -630,7 +631,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _summaryHeader(theme, quote.total, items.length),
+          _summaryHeader(theme, quote.total, cartProductCount(items)),
           if (hasError) ...[
             const SizedBox(height: AppSpacing.s8),
             Row(
