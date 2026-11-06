@@ -90,6 +90,21 @@ This file records deviations from the repository's baseline instructions or deci
 
 2. **OTP storage:** Plain code never persisted. HMAC-SHA256 keyed on `APP_KEY` stored in `delivery_otp_hash`. Additive columns `delivery_otp_expires_at`, `delivery_otp_used_at`, `delivery_proof_path` added to `seller_orders`. New `delivery_handover_audits` table for full audit trail.
 
+
+
+## S8B-lite (feature/s1-lite, 2026-11-06)
+
+1. **Portrait lock:** `main.dart` locks the app to `portraitUp|portraitDown` via `SystemChrome.setPreferredOrientations([...])` before `runApp`. The app is a full-screen consumer (catalogue, orders, tracking) and never needs split-screen/slide-over.
+2. **No-internet banner with Retry:** `no_internet_banner.dart` shows a toolbar-height banner when the connection is offline. `connection_watcher.dart` probes `8.8.8.8` via `InternetAddress.lookup` every 3s and sets `connectionState`. Banner is silent when online.
+3. **Overflow sweep:** `overflow_sweep_test.dart` renders the 5 main buyer screens at 360x640 with textScale 1.3 and checks the top-level `RenderBox` for `hasVisualOverflow`. No real overflows found.
+4. **Error handling:** `NetworkException` in `api_exception.dart` already has `isRetryable = true`, allowing screens to show a Retry button. The no-internet banner complements this with a persistent top-of-shell alert.
+5. **Discard-changes confirm:** already exists in `dirty_guard.dart` (S8B L4). No new work needed.
+6. **Back behaviour after logout:** already correct in `AuthGate` (single Navigator root, `popUntil((route) => route.isFirst)`). No new work needed.
+
+## Open
+- Avatar is local-only: no server upload route exists (DEVIATION in DECISIONS.md).
+- API admin logistics approve/reject lacks a success test; Admin lacks HasApiTokens. Carry to S10.
+
 3. **Signed QR token:** Payload `{order_id, nonce, expires_at, version}`; HMAC-signed with app key; never contains the code; version is the truncated hash so a reissued code immediately stales all older tokens.
 
 4. **Admin override:** Available only to `role = 'admin'` (not `'support'`). Requires reason string + proof photo. Writes an audit row with `action = 'admin_override'`.
@@ -169,3 +184,14 @@ All rate limits are named buckets in `AppServiceProvider::configureRateLimiting(
 
 1. **`order_state.dart` syntax repair:** HEAD contained `try { ... } finally { ... } on ...`, which is invalid Dart and prevented the app compiling. Moved `finally` after the `on` clauses. No behaviour change: `_loading` still clears and notifies on every path.
 2. **`delivery_pass_handover_test.dart` teardown:** temp-directory deletion is now best-effort (`try/catch` around `deleteSync`). On Windows a still-open file handle made the old teardown fail a passing test. No assertion was changed, weakened, or removed.
+
+## S5-lite (feature/s1-lite, 2026-11-06)
+
+1. **Avatar upload is client-side only — DEVIATION:** the live API has no buyer avatar-upload route (only rider document uploads), so `AvatarPicker` stores the chosen image locally through `AuthState.updateProfile` / `persistProfile` and invents no endpoint. A server-backed avatar needs a new authenticated, throttled `POST /api/v1/buyer/account/avatar` with a form request, policy, resource and feature tests before the UI can claim upload. Until then the avatar is a local medallion and does not follow the buyer to another device.
+2. **Chat is mock-only:** `FeatureFlags.chatLive = !kUseLiveApi`. Every chat entry (Home inbox, product/seller, orders, order detail, buyer and rider trackers) is hidden in live mode because the server has no conversation endpoints. Order detail offers "Copy order ID" instead; nothing pretends a message was sent.
+3. **Rider Settings substitute:** the live account routes are buyer-only (`/api/v1/buyer/account/*`), so rider Settings shows Vehicle & documents rather than Account & Security/Addresses it cannot back. Add those rows when rider account endpoints exist.
+4. **Cart counts distinct products:** variants and quantity raises count once. Labels in cart and checkout say "N products" to match the badge, and a repeat Add to Cart says "Quantity updated" without the flight animation or badge bounce.
+5. **One chat entry on a product:** the seller row no longer repeats the Chat button that the bottom action bar already provides; the row keeps browse-the-shop navigation instead.
+6. **Developer options gesture is not gated on `kDebugMode`:** seven taps on About intentionally work in a demo release build. The tools are a local QR renderer and build-mode information, not privileged server actions; log out still requires confirmation and server session invalidation.
+7. **5.3 skipped per schedule override:** tab labels already meet the ≥12 sp requirement through the theme (`labelSmall`/`labelMedium` pinned to 12 sp); no navigation recomposition was done.
+8. **Test change — golden refresh:** 16 `screens_screenshot_test.dart` goldens were regenerated in a separate commit after inspecting the failure images. Diffs were intentional: Buyer Home (chat inbox button), Cart (product-count wording), Profile (avatar + edit badge + settings gear), Courier Home (dev QR FAB removed). No assertion, threshold, or test case was changed. Behaviour remains covered by targeted widget tests; goldens only re-baseline pixels.
