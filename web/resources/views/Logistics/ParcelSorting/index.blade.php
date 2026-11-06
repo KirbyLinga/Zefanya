@@ -5,6 +5,10 @@
 @use('App\Enums\OrderStatus')
 @use('App\Models\Seller\StoreSale')
 
+@section('logistics-toolbar')
+    <span hidden data-logistics-hosted-bell></span>
+@endsection
+
 @section('content')
 @include('Logistics._parcel-queue-assets')
 @php
@@ -21,13 +25,12 @@
 @endphp
 
 <div class="ip-canvas -m-4 min-h-screen sm:-m-6 xl:-m-8">
-<div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-4 sm:px-6 xl:px-8">
-    <h1 class="font-serif text-2xl font-semibold text-[var(--text-ink)]">Parcel Sorting</h1>
-    <a href="{{ route('logistics.scan.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-[var(--text-ink)] no-underline shadow-sm hover:bg-[var(--bg-page)]">
+<x-logistics.page-header title="Parcel Sorting">
+    <a href="{{ route('logistics.scan.index') }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3.5 font-sans text-[12.5px] font-semibold text-[var(--text-ink)] no-underline hover:bg-[var(--bg-page)]">
         <i data-lucide="barcode" class="h-4 w-4 text-[var(--text-muted)]"></i>
         Scan parcel
     </a>
-</div>
+</x-logistics.page-header>
 
 <div class="p-4 sm:p-6 xl:px-8">
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
@@ -130,91 +133,26 @@
                                     @if ($tab === 'sorting' && ($sortingBlocked[$shipment->id] ?? null))
                                         <p class="max-w-[260px] font-sans text-[12px] text-[var(--text-muted)] xl:text-right">{{ $sortingBlocked[$shipment->id] }}</p>
                                     @elseif ($tab === 'sorting' && $shipment->status === OrderStatus::AtSortingCenter)
-                                        <a href="{{ route('logistics.scan.index') }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">Scan to confirm</a>
-                                    @elseif ($tab === 'sorting' && $isSorted && ! $riderCourier)
-                                        @php
-                                            $dialogId = 'assign-rider-'.$shipment->id;
-                                            $assignable = $availableCouriers->filter(fn ($courier): bool => $shipment->destination_area_id === null
-                                                || (int) $courier->rider?->station_hub_id === (int) $shipment->destinationArea?->station_hub_id)->values();
-                                        @endphp
-                                        <button type="button" data-assign-open="{{ $dialogId }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">Assign Rider</button>
-                                        <dialog id="{{ $dialogId }}" aria-labelledby="{{ $dialogId }}-title"
-                                            class="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-0 text-left text-[var(--text-ink)] shadow-xl backdrop:bg-black/40">
-                                            <form method="POST" action="{{ route('logistics.parcel-sorting.assignDelivery', $shipment) }}" class="p-5">
-                                                @csrf
-                                                <div class="flex items-start justify-between gap-3">
-                                                    <div>
-                                                        <h2 id="{{ $dialogId }}-title" class="font-serif text-lg text-[var(--text-ink)]">Assign Rider</h2>
-                                                        <p class="mt-1 font-sans text-[12px] text-[var(--text-muted)]">
-                                                            Parcel #{{ $shipment->id }}@if ($shipment->destinationArea) · {{ $shipment->destinationArea->name }}@endif
-                                                        </p>
-                                                    </div>
-                                                    <button type="button" data-assign-close aria-label="Close" class="shrink-0 cursor-pointer rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--bg-page)] hover:text-[var(--text-ink)]">
-                                                        <i data-lucide="x" class="h-4 w-4"></i>
-                                                    </button>
-                                                </div>
-
-                                                <div class="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
-                                                    <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-strong)] p-3 hover:bg-[var(--bg-page)]">
-                                                        <input type="radio" name="courier_id" value="" checked class="mt-0.5 accent-primary-700">
-                                                        <span class="font-sans text-[13px] text-[var(--text-ink)]">
-                                                            Auto-assign by area
-                                                            <span class="block text-[12px] text-[var(--text-muted)]">Best available Rider for this parcel's destination area.</span>
-                                                        </span>
-                                                    </label>
-                                                    @forelse ($assignable as $courier)
-                                                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-strong)] p-3 hover:bg-[var(--bg-page)]">
-                                                            <input type="radio" name="courier_id" value="{{ $courier->id }}" class="mt-0.5 accent-primary-700">
-                                                            <span class="font-sans text-[13px] text-[var(--text-ink)]">
-                                                                {{ $courier->name }}
-                                                                <span class="block text-[12px] text-[var(--text-muted)]">
-                                                                    {{ $courier->area?->name ?? 'No area' }} · carrying {{ number_format($courier->activeWeightGrams()) }} of {{ number_format($courier->max_weight_grams) }} g
-                                                                </span>
-                                                            </span>
-                                                        </label>
-                                                    @empty
-                                                        <p class="rounded-lg border border-[var(--border-strong)] p-3 font-sans text-[12px] text-[var(--text-muted)]">
-                                                            No eligible Rider is available at this Station Hub.
-                                                        </p>
-                                                    @endforelse
-                                                </div>
-
-                                                <div class="mt-5 flex justify-end gap-2">
-                                                    <button type="button" data-assign-close class="{{ $quietButton }}">Cancel</button>
-                                                    <button type="submit" class="{{ $primaryButton }}">Assign Rider</button>
-                                                </div>
-                                            </form>
-                                        </dialog>
+                                        <a href="{{ route('logistics.scan.index', array_filter(['tracking' => $shipment->tracking_number])) }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">Scan to confirm</a>
                                     @elseif ($tab === 'sorting' && $isSorted)
-                                        <form method="POST" action="{{ route('logistics.parcel-sorting.assignDelivery', $shipment) }}">
-                                            @csrf
-                                            <button type="submit" class="{{ $primaryButton }}">Confirm delivery dispatch</button>
-                                        </form>
+                                        <a href="{{ route('logistics.delivery-assignments.index') }}#stage-{{ $riderCourier ? 'dispatch' : 'rider' }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">
+                                            Assign in Assign deliveries
+                                            <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+                                        </a>
                                     @elseif ($tab === 'assigned')
                                         <p class="font-sans text-[12.5px] text-[var(--text-muted)]">Waiting for Rider to start</p>
                                     @endif
                                 </div>
                             </div>
 
-                            @if ($shipment->needs_reassignment || (! $riderCourier && $isSorted))
-                                <div class="{{ $shipment->needs_reassignment ? 'ip-strip' : 'border-t border-[var(--border-strong)]' }} flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-                                    @if ($shipment->needs_reassignment)
-                                        <p role="status" class="flex min-w-0 flex-1 basis-[280px] items-start gap-2.5 font-sans text-[12px] text-[var(--text-ink)]">
-                                            <span class="ip-warn flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
-                                                <i data-lucide="triangle-alert" class="h-3 w-3"></i>
-                                            </span>
-                                            <span class="text-[var(--text-ink)]"><strong class="font-semibold">Needs attention:</strong> {{ $shipment->reassignment_reason }}</span>
-                                        </p>
-                                    @endif
-                                    @if (! $riderCourier && $isSorted)
-                                        <form method="POST" action="{{ route('logistics.dispatch.retry', [$shipment, 'delivery']) }}" class="ml-auto shrink-0">
-                                            @csrf
-                                            <button type="submit" class="ip-link inline-flex cursor-pointer items-center gap-1.5 font-sans text-[12px] font-semibold">
-                                                <i data-lucide="refresh-cw" class="h-3 w-3"></i>
-                                                Retry automatic dispatch
-                                            </button>
-                                        </form>
-                                    @endif
+                            @if ($shipment->needs_reassignment)
+                                <div class="ip-strip flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                                    <p role="status" class="flex min-w-0 flex-1 basis-[280px] items-start gap-2.5 font-sans text-[12px] text-[var(--text-ink)]">
+                                        <span class="ip-warn flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                                            <i data-lucide="triangle-alert" class="h-3 w-3"></i>
+                                        </span>
+                                        <span class="text-[var(--text-ink)]"><strong class="font-semibold">Needs attention:</strong> {{ $shipment->reassignment_reason }}</span>
+                                    </p>
                                 </div>
                             @endif
 
@@ -223,7 +161,7 @@
                                     <dl class="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-1.5 font-sans text-[13px]">
                                         <dt class="{{ $labelClass }}">Tracking</dt>
                                         <dd class="font-mono text-[12px] text-[var(--text-ink)]">{{ $shipment->tracking_number ?? 'Pending' }}</dd>
-                                        <dt class="{{ $labelClass }}">Pickup courier</dt>
+                                        <dt class="{{ $labelClass }}">Pickup rider</dt>
                                         <dd class="text-[var(--text-ink)]">{{ $shipment->courier ? $shipment->courier->name.' · '.ucfirst($shipment->courier->vehicle_type) : '—' }}</dd>
                                         @if ($shipment->destinationArea)
                                             <dt class="{{ $labelClass }}">Delivery area</dt>
@@ -263,33 +201,3 @@
 </div>
 </div>
 @endsection
-
-@push('scripts')
-<script>
-(function () {
-    function closeDialog(dialog) {
-        if (dialog && dialog.open) dialog.close();
-    }
-
-    document.addEventListener('click', function (event) {
-        var opener = event.target.closest('[data-assign-open]');
-        if (opener) {
-            var dialog = document.getElementById(opener.getAttribute('data-assign-open'));
-            if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
-            return;
-        }
-
-        var closer = event.target.closest('[data-assign-close]');
-        if (closer) {
-            closeDialog(closer.closest('dialog'));
-            return;
-        }
-
-        // A click on the dialog element itself (not its form content) is a backdrop click.
-        if (event.target instanceof HTMLDialogElement) {
-            closeDialog(event.target);
-        }
-    });
-})();
-</script>
-@endpush

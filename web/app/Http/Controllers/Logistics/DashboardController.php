@@ -19,7 +19,6 @@ use App\Services\Logistics\LogisticsHubService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
@@ -133,12 +132,6 @@ class DashboardController extends Controller
             ->limit(5)
             ->get(['id', 'first_name', 'last_name', 'created_at']);
 
-        $notificationsTableExists = Schema::hasTable('notifications');
-        $notifications = $notificationsTableExists
-            ? $provider->notifications()->latest()->limit(8)->get()
-            : collect();
-        $unreadCount = $notificationsTableExists ? $provider->unreadNotifications()->count() : 0;
-
         return view('Logistics.Dashboard.index', [
             'actionQueues' => $actionQueues,
             'metric' => $metric,
@@ -157,8 +150,6 @@ class DashboardController extends Controller
             'activeRiders' => $activeRiders,
             'recentParcels' => $recentParcels,
             'operationsReady' => $checklist['complete'],
-            'notifications' => $notifications,
-            'unreadCount' => $unreadCount,
         ]);
     }
 

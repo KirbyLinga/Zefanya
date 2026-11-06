@@ -14,7 +14,7 @@
     ></textarea>
     <div>
         <label for="messageImage" class="text-xs text-gray-500">Attach a photo (JPG or PNG, up to 5 MB)</label>
-        <input id="messageImage" type="file" name="image" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="block text-xs text-gray-700">
+        <input id="messageImage" type="file" name="image" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="upload-input">
     </div>
     <p id="messageError" role="alert" class="hidden text-sm text-red-600"></p>
     <div class="flex items-center justify-between">

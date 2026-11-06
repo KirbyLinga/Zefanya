@@ -1,6 +1,6 @@
 /**
  * Buyer Messages Badge and Polling
- * Updates the unread message badge count every 5 seconds
+ * Updates the unread message badge count every 30 seconds
  */
 
 let messagePollInterval = null;
@@ -33,8 +33,8 @@ function startMessagesPolling() {
     // Update badge on page load
     updateMessagesBadge();
     
-    // Poll every 5 seconds
-    messagePollInterval = setInterval(updateMessagesBadge, 5000);
+    // Poll every 30 seconds; returning to the tab refreshes straight away
+    messagePollInterval = setInterval(updateMessagesBadge, 30000);
 }
 
 function stopMessagesPolling() {

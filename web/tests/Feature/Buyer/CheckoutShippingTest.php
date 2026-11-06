@@ -170,12 +170,12 @@ class CheckoutShippingTest extends TestCase
         $this->assertSame(20000 + 7900, Order::query()->sole()->total_minor);
     }
 
-    public function test_chk_free_shipping_still_beats_the_rate_table(): void
+    public function test_chk_a_large_subtotal_does_not_beat_the_rate_table(): void
     {
-        config(['buyer.announcements.free_shipping_threshold_minor' => 15000]);
         [, $line] = $this->line(9000, 1, 200.00);
 
-        $this->assertSame(0, $this->openCheckout([$line])->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
+        // 9 kg: first kilo plus 8 additional. Free shipping is a voucher subsidy, never a ₱0 carrier fee.
+        $this->assertSame(4900 + 8 * 1500, $this->openCheckout([$line])->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
     }
 
     public function test_chk_cross_province_adds_its_per_kilo_rate_only_when_configured(): void
@@ -184,14 +184,14 @@ class CheckoutShippingTest extends TestCase
         $fee = new \ReflectionMethod($service, 'crossProvinceFeeMinor');
         $carrier = LogisticsProvider::factory()->create();
 
-        config(['buyer.cross_province' => ['fee_minor' => 12000, 'additional_kg_minor' => 3000, 'free_shipping_threshold_minor' => null]]);
+        config(['buyer.cross_province' => ['fee_minor' => 12000, 'additional_kg_minor' => 3000]]);
         $this->assertSame(12000, $fee->invoke($service, $carrier, 10000, 1000));
         $this->assertSame(12000 + 2 * 3000, $fee->invoke($service, $carrier, 10000, 2100));
 
-        config(['buyer.cross_province' => ['fee_minor' => 12000, 'additional_kg_minor' => 0, 'free_shipping_threshold_minor' => null]]);
+        config(['buyer.cross_province' => ['fee_minor' => 12000, 'additional_kg_minor' => 0]]);
         $this->assertSame(12000, $fee->invoke($service, $carrier, 10000, 2100));
 
-        config(['buyer.cross_province' => ['fee_minor' => null, 'additional_kg_minor' => 3000, 'free_shipping_threshold_minor' => null]]);
+        config(['buyer.cross_province' => ['fee_minor' => null, 'additional_kg_minor' => 3000]]);
         $this->assertNull($fee->invoke($service, $carrier, 10000, 2100));
     }
 
@@ -204,7 +204,7 @@ class CheckoutShippingTest extends TestCase
 
         $this->assertFalse($page->viewData('carriersAvailable'));
         $this->assertTrue($this->placeOrderIsDisabled($page));
-        $page->assertSee('Complete both the seller pickup address and your delivery address');
+        $page->assertSee('Your delivery address is missing a province or barangay');
 
         $this->post(route('buyer.checkout.store'), [
             'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
@@ -454,7 +454,7 @@ class CheckoutShippingTest extends TestCase
         $station = LogisticsHub::where('logistics_provider_id', $this->checkoutCarrier->id)
             ->where('hub_type', LogisticsHub::STATION)->firstOrFail();
         $this->actingAs($this->checkoutCarrier, 'logistics')
-            ->get(route('logistics.shipping-rates.index'))->assertOk()->assertSee('Add delivery zone');
+            ->get(route('logistics.earnings.index', ['tab' => 'shipping-rates']))->assertOk()->assertSee('Manage Delivery Areas');
         $this->post(route('logistics.areas.store'), [
             'station_hub_id' => $station->id, 'city_municipality_code' => '030540100',
             'barangay_codes' => ['0305401002'],

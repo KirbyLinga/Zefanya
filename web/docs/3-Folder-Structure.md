@@ -36,6 +36,7 @@
 ```
 app/
 ├── Console/Commands/OrdersResyncCommand.php      # orders:resync — repair status rollups / payments
+├── Console/Commands/RollMissedPickupWindowsCommand.php  # pickups:roll-missed-windows — reschedule parcels whose pickup window passed
 ├── Enums/
 │   ├── DeliveryFailureReason.php                 # recipient_unavailable, wrong_address, refused_by_recipient, unreachable_by_phone, damaged_parcel, other
 │   ├── LogisticsProviderStatus.php               # unverified, pending, approved, rejected
@@ -109,7 +110,7 @@ app/
 │   ├── Buyer/{Buyer,BuyerAddress,CartItem,CheckoutToken,Review,ReviewPhoto,StoreFollow,Wishlist}.php
 │   ├── Catalog/{InventoryTransaction,Product,ProductImage,ProductOption,ProductOptionValue,ProductVariant}.php
 │   ├── Concerns/…                                 # shared model traits, e.g. HasEmailOtp
-│   ├── Logistics/{Area,CodRemittance,DeliveryAssignment,DeliveryOtp,DeliveryProof,InventoryException,LogisticsHub,LogisticsHubLocationChange,LogisticsProvider,LogisticsProviderLink,LogisticsRemittance,LogisticsShippingRate,Manifest,ManifestItem,ParcelHandoff,ParcelHandoffException,ParcelReturn,ParcelReturnEvent,PickupAttempt}.php
+│   ├── Logistics/{Area,CodRemittance,DeliveryAssignment,DeliveryOtp,DeliveryProof,InventoryException,LogisticsHub,LogisticsHubLocationChange,LogisticsProvider,LogisticsProviderLink,LogisticsRemittance,LogisticsShippingRate,Manifest,ManifestItem,ParcelHandoff,ParcelHandoffException,ParcelReturn,ParcelReturnEvent,PickupAttempt,PickupSession}.php
 │   ├── Rider/{Courier,Rider}.php                  # Rider's stored class name stays App\Models\Rider (morph map in AppServiceProvider)
 │   ├── Seller/{Seller,SellerPayoutAllocation,SellerPayoutRequest,SellerPromotion,SellerSettlement,SellerShippingProvider,StoreCategory,StoreSale}.php
 │   └── Shared/{Category,Conversation,IncidentEvents,Incidents,Message,Order,OrderItem,Payment,SellerOrder,StatusHistory,User,Voucher,VoucherClaim}.php
@@ -120,10 +121,10 @@ app/
 ├── Policies/{BuyerOrderPolicy,ConversationPolicy,SellerOrderFleetPolicy,SellerOrderPolicy}.php
 ├── Providers/AppServiceProvider.php               # policies, buyer routes, rate config
 └── Services/
-    ├── Admin/{AccountStatusService,AdminVoucherService,BuyerRegistrationDecisionService,LogisticsRegistrationDecisionService,PlatformSettingService,SellerRegistrationDecisionService,TwoFactorAuthenticator}.php
+    ├── Admin/{AccountStatusService,AdminVoucherService,BuyerRegistrationDecisionService,LogisticsRegistrationDecisionService,PlatformFinanceService,PlatformSettingService,SellerRegistrationDecisionService,TwoFactorAuthenticator}.php
     ├── Buyer/{AutomaticBuyerReceiptService,BuyerAddressBook,BuyerShipmentConfirmation,CartSummary,CartVariantResolver,CatalogSearch,CheckoutCarrierService,ProductReviewService,PurchasedVariantSnapshot,StoreFollowService,VoucherApplication,VoucherSessionService}.php
-    ├── Logistics/{CodRemittanceService,CourierAssignmentService,DeliveryOtpService,LogisticsHubService,LogisticsRemittanceService,LogisticsStatusOverrideService,ManifestService,ParcelHandoffService,ParcelHandoffVerification,ParcelIncidentService,ParcelReturnService,ParcelTrackingVerificationService,ProviderHandoffSchemaService,ProviderProvinceService,ShippingRateService,WaybillQrCode}.php
-    ├── Rider/{RiderNotifier,RiderOperationsService,RiderRegistrationService}.php
+    ├── Logistics/{CodRemittanceService,CourierAssignmentService,DeliveryOtpService,LogisticsFinanceService,LogisticsHubService,LogisticsRemittanceService,LogisticsStatusOverrideService,ManifestService,ParcelHandoffService,ParcelHandoffVerification,ParcelIncidentService,ParcelReturnService,ParcelTrackingVerificationService,PickupPolicy,PickupSessionService,PickupWindowService,ProviderHandoffSchemaService,ProviderProvinceService,ShippingRateService,WaybillQrCode}.php
+    ├── Rider/{RiderCashService,RiderEarningService,RiderNotifier,RiderOperationsService,RiderRegistrationService}.php
     ├── Seller/{InventoryAlertService,ProductPublishingService,SellerEarningsService,SellerOrderStatusService,SellerPayoutRequestService,SellerPromotionService,SellerSalesTrend,SellerSettlementService,SellerShippingProviderService,SellerStoreProfileService,SellerVacationService,SellerVoucherService,StockService,StoreCategoryService,StoreSaleService,VariantSyncService}.php
     └── Shared/{AccountSessionService,CommissionFinalizationService,OfferPricing,PhilippineLocationService,PriceResolver,RegistrationResubmissionService,ResolvedPrice,VoucherFundingService}.php
 ```

@@ -37,11 +37,14 @@
          id="catCarousel" tabindex="0" role="region" aria-label="Categories">
       @foreach ($categories as $cat)
         <a href="{{ route('buyer.categories.show', $cat->id) }}"
-           class="group flex min-h-[120px] min-w-[110px] shrink-0 basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view))] snap-start flex-col items-center justify-center rounded-2xl border border-buyer-line bg-white px-4 py-6 text-center no-underline transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-1 hover:border-primary-700 hover:shadow-[0_12px_24px_-10px_rgba(58,37,41,0.20)] focus-visible:border-primary-700 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-          <div class="mb-2 inline-flex h-14 w-14 items-center justify-center rounded-full bg-secondary-100 transition-transform duration-200 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
-            <i data-lucide="{{ $cat->icon }}" width="24" height="24" class="text-primary-800"></i>
-          </div>
-          <span class="mt-2 w-full text-center text-[11px] font-semibold uppercase leading-[1.4] tracking-[1.1px] text-buyer-ink">
+           class="group relative isolate flex aspect-[4/5] min-w-[110px] shrink-0 basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view))] snap-start flex-col justify-end overflow-hidden rounded-2xl bg-primary-800 p-4 no-underline transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_12px_24px_-10px_rgba(58,37,41,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-5">
+          {{-- The label names the card, so the photo is decorative. The solid background keeps the label readable if it fails to load. --}}
+          {{-- Not lazy: the arrows should reveal cards already loaded, so only the priority differs. --}}
+          <img src="{{ $cat->image_url }}" srcset="{{ $cat->image_srcset }}" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 250px"
+               alt="" width="640" height="800" fetchpriority="{{ $loop->index < 5 ? 'high' : 'low' }}" decoding="async"
+               class="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+          <span class="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(58,37,41,0)_45%,rgba(58,37,41,0.2)_62%,rgba(58,37,41,0.68)_78%,rgba(58,37,41,0.9)_100%)]" aria-hidden="true"></span>
+          <span class="font-serif text-[17px] leading-[1.25] text-white [text-wrap:balance] sm:text-[19px]">
             {{ $cat->label }}
           </span>
         </a>

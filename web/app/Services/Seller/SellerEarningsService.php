@@ -4,6 +4,7 @@ namespace App\Services\Seller;
 
 use App\Enums\OrderStatus;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\SellerSettlement;
 use App\Models\Shared\OrderItem;
 use App\Models\Shared\SellerOrder;
@@ -27,6 +28,8 @@ class SellerEarningsService
      *     pendingMinor: int,
      *     availableMinor: int,
      *     reservedMinor: int,
+     *     debtMinor: int,
+     *     paidWithdrawalsMinor: int,
      *     grossMinor: int,
      *     salesMinor: int,
      *     sellerVoucherMinor: int,
@@ -89,6 +92,9 @@ class SellerEarningsService
             'pendingMinor' => $pendingMinor,
             'availableMinor' => $this->payouts->availableBalance($seller),
             'reservedMinor' => $this->payouts->reservedMinor($seller),
+            'debtMinor' => $this->payouts->outstandingDebtMinor($seller),
+            'paidWithdrawalsMinor' => (int) SellerPayoutRequest::query()->where('seller_id', $seller->id)
+                ->where('status', SellerPayoutRequest::PAID)->sum('amount_minor'),
             'grossMinor' => $grossMinor,
             'salesMinor' => $salesMinor,
             'sellerVoucherMinor' => $sellerVoucherMinor,
@@ -175,7 +181,9 @@ class SellerEarningsService
         if ($settlement?->status === SellerSettlement::PAID) {
             return 'paid';
         }
-        if ($settlement?->status === SellerSettlement::RELEASED || $order->parcelReturn?->releasesPendingEarnings()) {
+        // A partial refund leaves the Seller a positive net, which stays payable.
+        if ($settlement?->status === SellerSettlement::RELEASED
+            || ($order->parcelReturn?->releasesPendingEarnings() && (int) $order->seller_net_minor === 0)) {
             return 'released';
         }
         if (in_array((int) $order->id, $availableIds, true)) {

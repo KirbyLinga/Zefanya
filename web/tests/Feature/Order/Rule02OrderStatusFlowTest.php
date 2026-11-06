@@ -116,8 +116,11 @@ class Rule02OrderStatusFlowTest extends TestCase
         $parcel = SellerOrder::factory()->create()->fresh();
         $this->actingAs($parcel->seller, 'seller');
         foreach ([['accept', 'pack'], ['pack', 'markReady'], ['markReady', 'accept']] as [$next, $hidden]) {
-            foreach (['index', 'show'] as $screen) {
-                $this->get(route('seller.orders.'.$screen, $screen === 'show' ? $parcel : []))
+            foreach (['index', 'show', 'dashboard'] as $screen) {
+                $url = $screen === 'dashboard'
+                    ? route('seller.dashboard')
+                    : route('seller.orders.'.$screen, $screen === 'show' ? $parcel : []);
+                $this->get($url)
                     ->assertOk()->assertSee('action="'.route('seller.orders.'.$next, $parcel).'"', false)
                     ->assertDontSee('action="'.route('seller.orders.'.$hidden, $parcel).'"', false);
             }

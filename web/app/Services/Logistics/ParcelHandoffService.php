@@ -3,6 +3,7 @@
 namespace App\Services\Logistics;
 
 use App\Enums\ParcelHandoffStatus;
+use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
@@ -233,7 +234,7 @@ class ParcelHandoffService
             $locked = $this->lockHandoff($handoff);
 
             $this->assertDestinationProvider($locked, $destination);
-            $this->require($locked->status === ParcelHandoffStatus::Requested, 'status', 'Only requested handoffs can be accepted.');
+            $this->conflict($locked->status === ParcelHandoffStatus::Requested, 'status', 'Only requested handoffs can be accepted.');
             $this->assertOriginCustody($parcel, $locked->originProvider()->firstOrFail());
             $this->assertLinkStillServiceable($locked, $parcel);
 
@@ -266,7 +267,7 @@ class ParcelHandoffService
             $locked = $this->lockHandoff($handoff);
 
             $this->assertDestinationProvider($locked, $destination);
-            $this->require($locked->status === ParcelHandoffStatus::Requested, 'status', 'Only requested handoffs can be rejected.');
+            $this->conflict($locked->status === ParcelHandoffStatus::Requested, 'status', 'Only requested handoffs can be rejected.');
             $this->require(filled($reason) && mb_strlen($reason) <= 500, 'rejection_reason', 'Provide a rejection reason of 500 characters or fewer.');
 
             $locked->forceFill([
@@ -328,7 +329,7 @@ class ParcelHandoffService
 
         if ($phase === self::PHASE_DISPATCH) {
             $this->require((int) $handoff->origin_provider_id === (int) $provider->id, 'provider', 'Only the sending provider can dispatch this handoff.');
-            $this->require($handoff->status === ParcelHandoffStatus::Accepted, 'status', 'Only accepted handoffs can be dispatched.');
+            $this->conflict($handoff->status === ParcelHandoffStatus::Accepted, 'status', 'Only accepted handoffs can be dispatched.');
             $expectedHubId = (int) $handoff->sending_hub_id;
             $action = ParcelHandoffVerification::ACTION_HANDOFF_DISPATCH;
             $label = 'Dispatch to '.($handoff->destinationProvider?->business_name ?? 'destination provider');
@@ -398,7 +399,7 @@ class ParcelHandoffService
             $locked = $this->lockHandoff($handoff);
 
             $this->assertOriginProvider($locked, $origin);
-            $this->require($locked->status === ParcelHandoffStatus::Accepted, 'status', 'Only accepted handoffs can be dispatched.');
+            $this->conflict($locked->status === ParcelHandoffStatus::Accepted, 'status', 'Only accepted handoffs can be dispatched.');
             app(RoutePlannerService::class)->requireAvailableDeparture($parcel);
             $this->assertOriginCustody($parcel, $origin);
             $hub = $this->assertHandoffHub((int) $origin->id, (int) $locked->sending_hub_id, 'sending_hub_id');
@@ -454,7 +455,7 @@ class ParcelHandoffService
             $locked = $this->lockHandoff($handoff);
 
             $this->assertDestinationProvider($locked, $destination);
-            $this->require($locked->status === ParcelHandoffStatus::InTransit, 'status', 'Only an in-transit handoff can be received.');
+            $this->conflict($locked->status === ParcelHandoffStatus::InTransit, 'status', 'Only an in-transit handoff can be received.');
             $this->assertOriginCustody($parcel, $locked->originProvider()->firstOrFail());
             app(ParcelLegService::class)->requireReceiptOrigin($parcel, (int) $locked->origin_provider_id, (int) $locked->sending_hub_id);
             $hub = $this->assertHandoffHub((int) $destination->id, (int) $locked->receiving_hub_id, 'receiving_hub_id');
@@ -984,6 +985,14 @@ class ParcelHandoffService
             'item_count' => (int) $order->orderItems->sum('quantity'),
             'weight' => $order->formattedParcelWeight(),
         ];
+    }
+
+    /** The handoff moved on since the page rendered: 409 for JSON, same errors for forms. */
+    private function conflict(bool $condition, string $field, string $message): void
+    {
+        if (! $condition) {
+            throw StaleStateException::field($field, $message);
+        }
     }
 
     private function require(bool $condition, string $field, string $message): void

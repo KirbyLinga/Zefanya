@@ -1,6 +1,6 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Receive Manifest #'.$manifest->id)
+@section('title', 'Receive Batch #'.$manifest->id)
 
 @section('content')
 @use('App\Enums\ManifestStatus')
@@ -14,7 +14,7 @@
 
 <div class="mb-6 border-b border-[var(--border-strong)] pb-6">
     <a href="{{ route('logistics.manifests.show', $manifest) }}" class="mb-2 inline-flex items-center gap-1 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-700 hover:underline">
-        <i data-lucide="arrow-left" class="size-3"></i>Manifest #{{ $manifest->id }}
+        <i data-lucide="arrow-left" class="size-3"></i>Batch #{{ $manifest->id }}
     </a>
     <div class="flex flex-wrap items-center gap-3">
         <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Receiving at {{ $manifest->destinationHub?->name }}</h1>
@@ -57,7 +57,7 @@
         <div class="flex items-start gap-3">
             <i data-lucide="check-circle-2" class="mt-0.5 size-5 shrink-0 text-emerald-700"></i>
             <div>
-                <h2 class="font-serif text-lg text-emerald-900">Manifest fully received</h2>
+                <h2 class="font-serif text-lg text-emerald-900">Batch fully received</h2>
                 <p class="mt-1 font-sans text-xs leading-relaxed text-emerald-800">All {{ $counts['total'] }} parcels were verified at {{ $manifest->destinationHub?->name }} on {{ $manifest->received_at?->format('M j, Y g:i A') }}. This transfer did not change any parcel's delivery status.</p>
             </div>
         </div>
@@ -71,13 +71,13 @@
         />
     </div>
 @elseif ($isDispatched)
-    <section class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 font-sans text-xs text-amber-900">No pending parcels are available to receive. Refresh the manifest before scanning again.</section>
+    <section class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 font-sans text-xs text-amber-900">No pending parcels are available to receive. Refresh the batch before scanning again.</section>
 @else
     <section class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 font-sans text-xs leading-relaxed text-amber-900">
         @if ($manifest->status === ManifestStatus::Draft)
-            This manifest is still a draft. Dispatch it from the manifest page before receiving parcels.
+            This batch is still a draft. Dispatch it from the batch page before receiving parcels.
         @else
-            This manifest is {{ strtolower($manifest->status->label()) }} and cannot receive parcels.
+            This batch is {{ strtolower($manifest->status->label()) }} and cannot receive parcels.
         @endif
     </section>
 @endif
@@ -85,11 +85,11 @@
 <section class="overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm" aria-labelledby="receiving-list-title">
     <div class="border-b border-[var(--border-strong)] px-4 py-4">
         <h2 id="receiving-list-title" class="font-serif text-xl text-[var(--text-ink)]">Expected parcels</h2>
-        <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">Each parcel needs its own valid receiving scan. A dispatched manifest stays open until the final parcel is received.</p>
+        <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">Each parcel needs its own valid receiving scan. A dispatched batch stays open until the final parcel is received.</p>
     </div>
 
     @if ($items->isEmpty())
-        <div class="px-4 py-10 text-center font-sans text-xs text-[var(--text-muted)]">No parcels on this manifest.</div>
+        <div class="px-4 py-10 text-center font-sans text-xs text-[var(--text-muted)]">No parcels in this batch.</div>
     @else
         <div class="overflow-x-auto">
             <table class="w-full border-collapse text-left">

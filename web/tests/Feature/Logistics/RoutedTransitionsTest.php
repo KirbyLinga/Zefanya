@@ -57,7 +57,7 @@ class RoutedTransitionsTest extends TestCase
 
         $scan = $this->scan($origin, $parcel);
         $this->assertSame('transfer', $scan['context']);
-        $this->assertSame(['open_handoffs'], array_column($scan['actions'], 'key'));
+        $this->assertSame(['open_handoffs', 'open_details'], array_column($scan['actions'], 'key'));
         $this->assertStringContainsString('Quezon City Station Hub', $scan['message']);
 
         $this->actingAs($origin, 'logistics')->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => 'unused'])
@@ -69,7 +69,7 @@ class RoutedTransitionsTest extends TestCase
         $this->handoff($origin, $destination, $parcel);
 
         $scan = $this->scan($destination, $parcel);
-        $this->assertSame(['sort_parcel'], array_column($scan['actions'], 'key'));
+        $this->assertSame(['sort_parcel', 'open_details'], array_column($scan['actions'], 'key'));
         $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $scan['actions'][0]['verification_token']])
             ->assertSessionDoesntHaveErrors();
         $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
@@ -80,7 +80,7 @@ class RoutedTransitionsTest extends TestCase
         $provider = $this->provider('logistics-laguna');
         $parcel = $this->parcelAtOriginStation('seller-pila', 'buyer-pila', $provider, 'rider-pila');
 
-        $this->assertSame(['sort_parcel'], array_column($this->scan($provider, $parcel)['actions'], 'key'));
+        $this->assertSame(['sort_parcel', 'open_details'], array_column($this->scan($provider, $parcel)['actions'], 'key'));
     }
 
     public function test_parcel_travels_through_an_intermediate_provider_with_no_direct_partnership(): void

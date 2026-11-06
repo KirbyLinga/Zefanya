@@ -75,14 +75,22 @@ Route::middleware('auth:admin')->group(function () {
             Route::get('/logistics-remittances', [LogisticsRemittanceController::class, 'index'])->name('logistics-remittances.index');
             Route::post('/logistics-remittances/{remittance}/confirm', [LogisticsRemittanceController::class, 'confirm'])->name('logistics-remittances.confirm');
             Route::post('/logistics-remittances/{remittance}/reject', [LogisticsRemittanceController::class, 'reject'])->name('logistics-remittances.reject');
+            Route::post('/logistics-remittances/origin/{provider}/pay', [LogisticsRemittanceController::class, 'payOrigin'])->name('logistics-remittances.pay-origin');
+            Route::post('/logistics-remittances/historical/{parcel}/reconcile', [LogisticsRemittanceController::class, 'reconcileHistorical'])->name('logistics-remittances.reconcile-historical');
+            Route::post('/logistics-remittances/historical/{parcel}/pay-destination', [LogisticsRemittanceController::class, 'payDestination'])->name('logistics-remittances.pay-destination');
+            Route::post('/logistics-remittances/origin-payments/{payout}/reverse', [LogisticsRemittanceController::class, 'reverseOriginPayment'])->name('logistics-remittances.reverse-origin-payment');
 
             Route::get('/seller-payouts', [SellerPayoutController::class, 'index'])->name('seller-payouts.index');
             Route::post('/seller-payouts/{payout}/pay', [SellerPayoutController::class, 'pay'])->name('seller-payouts.pay');
             Route::post('/seller-payouts/{payout}/reject', [SellerPayoutController::class, 'reject'])->name('seller-payouts.reject');
 
-            Route::get('/settlements', [SellerSettlementController::class, 'index'])->name('settlements.index');
-            Route::post('/settlements/remittances/{remittance}', [SellerSettlementController::class, 'store'])->name('settlements.store');
-            Route::post('/settlements/{settlement}/confirm', [SellerSettlementController::class, 'confirm'])->name('settlements.confirm');
+            // JSON-only and without a screen. The Seller Payouts page is the normal way to pay a
+            // Seller, so these stay with super admins, who must give a reason for each direct payout.
+            Route::middleware('admin.role:super_admin')->group(function (): void {
+                Route::get('/settlements', [SellerSettlementController::class, 'index'])->name('settlements.index');
+                Route::post('/settlements/remittances/{remittance}', [SellerSettlementController::class, 'store'])->name('settlements.store');
+                Route::post('/settlements/{settlement}/confirm', [SellerSettlementController::class, 'confirm'])->name('settlements.confirm');
+            });
 
             // Private identity documents. Admin-only: moderators can decide
             // applications but must not stream raw IDs/permits. {document} is
@@ -90,6 +98,8 @@ Route::middleware('auth:admin')->group(function () {
             // written to admin_document_access_logs.
             Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
             Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
+            Route::get('/vouchers/code-availability', [VoucherController::class, 'codeAvailability'])
+                ->middleware('throttle:30,1')->name('vouchers.code-availability');
             Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
             Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
             Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
@@ -127,7 +137,11 @@ Route::middleware('auth:admin')->group(function () {
             Route::post('/returns/{return}/resolve', [ReturnController::class, 'resolve'])->name('returns.resolve');
             Route::post('/returns/{return}/reverse-route', [ReturnController::class, 'authorizeReverseRoute'])->name('returns.reverse-route');
             Route::post('/returns/{return}/dispute', [ReturnController::class, 'resolveDispute'])->name('returns.dispute');
+            Route::post('/returns/{return}/fault', [ReturnController::class, 'setFault'])->name('returns.fault');
             Route::post('/returns/{return}/refund', [ReturnController::class, 'recordRefund'])->name('returns.refund');
+            Route::post('/returns/{return}/refund/void', [ReturnController::class, 'voidRefund'])->name('returns.refund.void');
+            Route::post('/return-charges/{charge}/settle', [ReturnController::class, 'settleCharge'])->name('return-charges.settle');
+            Route::get('/returns/{return}/refund-proof', [ReturnController::class, 'refundProof'])->name('returns.refund-proof');
             Route::post('/returns/{return}/stock', [ReturnController::class, 'stock'])->name('returns.stock');
             Route::get('/partnerships', [PartnershipController::class, 'index'])->name('partnerships.index');
             Route::post('/partnerships/exceptions/{exception}/resolve', [PartnershipController::class, 'resolveException'])->name('partnerships.exceptions.resolve');
@@ -143,6 +157,7 @@ Route::middleware('auth:admin')->group(function () {
             Route::post('/users/seller/{seller}/reactivate', [UserAccountController::class, 'reactivateSeller'])->name('users.seller.reactivate');
             Route::post('/users/logistics/{logistics_provider}/suspend', [UserAccountController::class, 'suspendLogistics'])->name('users.logistics.suspend');
             Route::post('/users/logistics/{logistics_provider}/reactivate', [UserAccountController::class, 'reactivateLogistics'])->name('users.logistics.reactivate');
+            Route::post('/users/logistics/{logistics_provider}/rider-wind-down', [UserAccountController::class, 'riderWindDownLogistics'])->name('users.logistics.rider-wind-down');
 
             // ── Admin product oversight (SEL-13) ────────────────────────────────
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');

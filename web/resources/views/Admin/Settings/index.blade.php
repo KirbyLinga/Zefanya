@@ -13,8 +13,11 @@
     </div>
 
     <div class="mb-6 rounded-lg border border-primary-200 bg-white p-5 text-sm text-neutral-700">
-        These records are stored for administrative use. Saving them does not change the live website, email delivery,
-        commission, order timers, voucher calculations or Rider assignments. Payment details are shown to Logistics companies on their Earnings page.
+        Platform name, contact email and payment details are stored for administrative use and do not change the live website, email delivery,
+        commission, order timers or voucher calculations. Payment details are shown to Logistics companies on their Earnings page.
+        <span class="mt-2 block"><span class="font-semibold">Pickup windows and rider pay are live.</span> A new pickup window applies to parcels
+        marked ready after you save it, and a new rider rate applies to pickup sessions and deliveries created after you save it. Earnings already
+        recorded and sessions already open keep the rate they were created with. Every change is recorded below.</span>
     </div>
 
     @if (session('success'))
@@ -40,6 +43,9 @@
                 @method('PATCH')
                 <input type="hidden" name="expected_value" value="{{ $setting->value }}">
                 <label for="setting-{{ $setting->key }}" class="mb-2 block text-sm font-semibold text-neutral-950">{{ $definition['label'] }}</label>
+                @isset($definition['hint'])
+                    <p class="mb-2 text-xs text-neutral-600">{{ $definition['hint'] }}</p>
+                @endisset
                 @if ($definition['type'] === 'textarea')
                     <textarea id="setting-{{ $setting->key }}" name="value" rows="3" required placeholder="e.g. GCash: Zefanya Inc., 0917 123 4567"
                               class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-950 focus:border-primary-400 focus:ring-2 focus:ring-primary-400">{{ $setting->value }}</textarea>

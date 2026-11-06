@@ -2,6 +2,7 @@
 
 namespace App\Models\Rider;
 
+use App\Enums\LogisticsProviderStatus;
 use App\Models\Concerns\HasEmailOtp;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
@@ -59,6 +60,8 @@ class Rider extends Authenticatable
             'decided_at' => 'datetime',
             'status_changed_at' => 'datetime',
             'station_hub_id' => 'integer',
+            'is_online' => 'boolean',
+            'online_changed_at' => 'datetime',
         ];
     }
 
@@ -97,6 +100,17 @@ class Rider extends Authenticatable
         return in_array($this->status, self::ASSIGNABLE_STATUSES, true);
     }
 
+    /**
+     * Rider-controlled availability for NEW jobs. Deliberately not part of
+     * isEligibleForAssignment()/isOperational(): an offline Rider still signs
+     * in and finishes the jobs already assigned.
+     */
+    public function isOnline(): bool
+    {
+        // A missing attribute (row not yet refreshed) means the column default.
+        return (bool) ($this->is_online ?? true);
+    }
+
     public function isEmailVerified(): bool
     {
         return $this->email_verified_at !== null;
@@ -115,10 +129,44 @@ class Rider extends Authenticatable
 
     /**
      * A rider may receive parcels only when Logistics approved the account,
-     * the email is verified, and the rider belongs to an approved, active
-     * Station Hub owned by the same Logistics company.
+     * the email is verified, the rider belongs to an approved, active
+     * Station Hub owned by the same Logistics company, and that company is
+     * itself approved (a suspended company's riders stop working).
      */
     public function isEligibleForAssignment(): bool
+    {
+        return $this->meetsOwnEligibility() && $this->employer()?->allowsRiderOperations() === true;
+    }
+
+    /**
+     * A suspended company's rider inside an Admin-granted wind-down window:
+     * signed in only to finish parcels already out for delivery.
+     */
+    public function isInWindDown(): bool
+    {
+        return ! $this->isOperational()
+            && $this->meetsOwnEligibility()
+            && $this->employer()?->allowsRiderWindDown() === true
+            && $this->courier()->exists();
+    }
+
+    public function scopeEligibleForAssignment(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('status', self::ASSIGNABLE_STATUSES)
+            ->whereNotNull('email_verified_at')
+            ->whereNotNull('station_hub_id')
+            ->whereHas('provider', fn (Builder $provider) => $provider
+                ->where('status', LogisticsProviderStatus::Approved->value)
+                ->whereNull('archived_at'))
+            ->whereHas('station', fn (Builder $station) => $station
+                ->where('hub_type', LogisticsHub::STATION)
+                ->where('approval_status', LogisticsHub::APPROVAL_APPROVED)
+                ->where('is_active', true));
+    }
+
+    /** Rider-level checks: account, email, and an operational station of the same company. */
+    private function meetsOwnEligibility(): bool
     {
         if (! $this->isApprovedOrActive() || $this->email_verified_at === null || $this->station_hub_id === null) {
             return false;
@@ -131,15 +179,8 @@ class Rider extends Authenticatable
             && (int) $station->logistics_provider_id === (int) $this->logistics_provider_id;
     }
 
-    public function scopeEligibleForAssignment(Builder $query): Builder
+    private function employer(): ?LogisticsProvider
     {
-        return $query
-            ->whereIn('status', self::ASSIGNABLE_STATUSES)
-            ->whereNotNull('email_verified_at')
-            ->whereNotNull('station_hub_id')
-            ->whereHas('station', fn (Builder $station) => $station
-                ->where('hub_type', LogisticsHub::STATION)
-                ->where('approval_status', LogisticsHub::APPROVAL_APPROVED)
-                ->where('is_active', true));
+        return $this->relationLoaded('provider') ? $this->provider : $this->provider()->first();
     }
 }

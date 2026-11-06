@@ -81,6 +81,19 @@ class IncomingParcelsTest extends TestCase
             ->assertDontSee('#'.$sorting->id);
     }
 
+    public function test_index_renders_a_single_notification_bell_beside_the_page_title(): void
+    {
+        $html = $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.incoming-parcels.index'))
+            ->assertOk()
+            ->assertSee('Incoming Parcels', false)
+            ->assertSee('Scan parcel', false)
+            ->assertSee('id="lg-notification-bell"', false)
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, 'id="lg-notification-bell"'));
+    }
+
     public function test_legacy_pickup_route_is_removed_and_pickup_requires_rider_confirmation(): void
     {
         $ready = $this->order(OrderStatus::ReadyForPickup);
@@ -121,7 +134,7 @@ class IncomingParcelsTest extends TestCase
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.incoming-parcels.assignPickupRider', $ready), ['courier_id' => $courier->id])
             ->assertRedirect()
-            ->assertSessionHas('error', 'No eligible rider in your fleet serves this pickup area.');
+            ->assertSessionHas('error', $courier->rider->fullName().' cannot take new jobs: the Rider account is suspended, inactive or not yet approved.');
 
         $ready->refresh();
         $this->assertSame(OrderStatus::ReadyForPickup, $ready->status);

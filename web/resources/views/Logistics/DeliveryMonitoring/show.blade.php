@@ -127,7 +127,7 @@
             </div>
             <div>
                 <label for="photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (required for Damaged)</label>
-                <input id="photo" name="photo" type="file" @required(old('type') === 'damaged') accept="image/jpeg,image/png,image/webp" class="w-full text-sm">
+                <input id="photo" name="photo" type="file" @required(old('type') === 'damaged') accept="image/jpeg,image/png,image/webp" class="upload-input">
                 <p class="mt-1 text-xs text-[var(--text-muted)]">Required for Damaged; optional for Lost. JPEG, PNG or WebP up to 5 MB. Stored privately.</p>
             </div>
             <div class="flex justify-end">
@@ -171,7 +171,7 @@
             </div>
             <div>
                 <label for="exception_photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (required for Damaged)</label>
-                <input id="exception_photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm">
+                <input id="exception_photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="upload-input">
                 <p class="mt-1 text-xs text-[var(--text-muted)]">JPEG, PNG or WebP up to 5 MB. Stored privately.</p>
             </div>
             <div class="flex justify-end">

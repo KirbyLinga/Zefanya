@@ -59,7 +59,7 @@
                         {{-- Left column: address + payment --}}
                         <div class="flex min-w-0 flex-col gap-4">
                             {{-- Shipping address --}}
-                            <section class="rounded-2xl border border-buyer-line bg-white p-5">
+                            <section id="checkout-delivery-address" class="rounded-2xl border border-buyer-line bg-white p-5">
                                 <h2 class="font-serif text-[18px] font-semibold text-buyer-ink mb-4">Shipping Address</h2>
 
                                 @php
@@ -103,7 +103,7 @@
 
                                 {{-- Each choice reloads the page so fees and coverage are re-quoted by the server. --}}
                                 @if ($addresses->count() > 1)
-                                    <div class="mt-4" data-checkout-address-picker>
+                                    <div id="checkout-address-options" class="mt-4" data-checkout-address-picker>
                                         <p class="mb-2 text-[12.5px] font-semibold text-buyer-ink">Deliver somewhere else</p>
                                         <ul class="flex flex-col gap-2">
                                             @foreach ($addresses as $option)
@@ -132,7 +132,7 @@
                                 <p class="mb-4 text-[12.5px] text-neutral-400">Choose one carrier for each shop. Fees are calculated for your delivery address.</p>
 
                                 <p data-checkout-shipping-block class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900" @if($carriersAvailable ?? false) hidden @endif>
-                                    Select an available carrier for every shop, or update your delivery address, before placing the order.
+                                    Shipping must be available for every shop before you can place this order. Check each shop below for the issue and next step.
                                 </p>
 
                                 <div class="flex flex-col gap-4">
@@ -150,7 +150,7 @@
                                                         @elseif ($carrierGroup['route'] === 'cross_province')
                                                             Cross-province delivery
                                                         @else
-                                                            Address incomplete
+                                                            Delivery details need review
                                                         @endif
                                                         · Charged for {{ $carrierGroup['chargeable_kg'] }} kg
                                                     </p>
@@ -158,8 +158,26 @@
                                             </div>
 
                                             @if (! $carrierGroup['available'])
-                                                <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12.5px] text-rose-900">
-                                                    {{ $carrierGroup['message'] }}
+                                                @php
+                                                    $shippingReason = $carrierGroup['reason_code'] ?? 'route_unavailable';
+                                                    $shippingReasonTitle = match ($shippingReason) {
+                                                        'buyer_address_incomplete' => 'Complete your delivery address',
+                                                        'seller_address_incomplete', 'seller_shipping_settings' => 'Shop shipping not ready',
+                                                        'destination_coverage' => 'Address not covered',
+                                                        'shipping_rates_unavailable' => 'Shipping price not available',
+                                                        default => 'Delivery route unavailable',
+                                                    };
+                                                @endphp
+                                                <div data-shipping-reason="{{ $shippingReason }}" class="space-y-2 rounded-lg border border-[var(--status-warning)] bg-[var(--bg-page)] px-3 py-3">
+                                                    <h3 class="text-[12.5px] font-semibold text-[var(--text-ink)]">{{ $shippingReasonTitle }}</h3>
+                                                    <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ $carrierGroup['message'] }}</p>
+                                                    @if ($shippingReason === 'buyer_address_incomplete')
+                                                        <a href="{{ route('buyer.account.address') }}" class="inline-flex min-h-8 items-center text-xs font-semibold text-[var(--link)] underline">Update your delivery address</a>
+                                                    @elseif (in_array($shippingReason, ['destination_coverage', 'route_unavailable'], true))
+                                                        <p class="text-xs leading-relaxed text-[var(--text-muted)]">@if ($addresses->count() > 1)<a href="#checkout-address-options" class="font-semibold text-[var(--link)] underline">Choose another saved address</a> to check its delivery options.@else<a href="{{ route('buyer.account.address') }}" class="font-semibold text-[var(--link)] underline">Add another delivery address</a> to check its delivery options.@endif If this address must be used, contact the shop before retrying checkout.</p>
+                                                    @else
+                                                        <p class="text-xs leading-relaxed text-[var(--text-muted)]">Contact the shop about its shipping setup before retrying checkout. Changing your address may not resolve this shop's shipping availability.</p>
+                                                    @endif
                                                 </div>
                                             @else
                                                 <div class="flex flex-col gap-2">

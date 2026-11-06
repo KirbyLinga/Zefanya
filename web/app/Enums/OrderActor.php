@@ -59,12 +59,10 @@ enum OrderActor: string
                 [OrderStatus::DeliveryFailed, OrderStatus::Returned],
             ],
 
-            // Buyer confirms receipt, and may cancel before Ready for Pickup.
+            // Buyer confirms receipt, and may cancel until the seller accepts.
             self::Buyer => [
                 [OrderStatus::Delivered, OrderStatus::Completed],
                 [OrderStatus::Placed, OrderStatus::Cancelled],
-                [OrderStatus::Confirmed, OrderStatus::Cancelled],
-                [OrderStatus::Preparing, OrderStatus::Cancelled],
             ],
 
             // Automatic receipt completion after the waiting period.

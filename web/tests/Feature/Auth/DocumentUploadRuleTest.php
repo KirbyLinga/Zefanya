@@ -37,7 +37,7 @@ class DocumentUploadRuleTest extends TestCase
     {
         $this->assertFalse($this->fails($this->realFile('govt_id_front.png', self::PNG)));
         $this->assertFalse($this->fails($this->realFile('dti_certificate.pdf', "%PDF-1.4\n%%EOF\n")));
-        $this->assertFalse($this->fails(UploadedFile::fake()->create('govt_id_front.jpg', 100, 'image/jpeg')));
+        $this->assertFalse($this->fails(UploadedFile::fake()->image('govt_id_front.jpg')));
     }
 
     public function test_exactly_5120_kb_is_accepted_and_one_more_kilobyte_is_not(): void

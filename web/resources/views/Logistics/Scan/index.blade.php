@@ -7,8 +7,9 @@
 
     <x-parcel-scanner
         :verify-url="route('logistics.scan.verify')"
-        heading="Scan to Confirm"
-        subheading="Scan the waybill QR or enter the tracking number to verify Station receipt or sorting. Status changes only after you confirm."
+        :tracking="request()->query('tracking')"
+        heading="Scan parcel"
+        subheading="Scan the waybill QR or enter any tracking number. You'll see the parcel's status and its next step: confirm hub receipt or sorting here, or jump to the page that handles it. Status changes only after you confirm."
     />
 @endsection
 

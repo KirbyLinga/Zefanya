@@ -4,11 +4,12 @@
 
 @section('content')
 <div class="mx-auto w-full max-w-[1440px]">
-<div class="flex items-center justify-between mb-6">
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
     <div>
         <h1 class="font-serif text-2xl text-[var(--text-ink)]">Shipments</h1>
-        <p class="font-sans text-[12.5px] text-[var(--text-muted)] mt-1">Track shipment progress and print waybills before courier handover.</p>
+        <p class="font-sans text-[12.5px] text-[var(--text-muted)] mt-1">Track pickup windows, pickup and delivery riders, and parcel progress. Print waybills before courier handover.</p>
     </div>
+    <a href="{{ route('seller.orders.index') }}" class="inline-flex min-h-9 shrink-0 items-center gap-2 text-xs font-semibold text-[var(--link)] hover:underline">Prepare or cancel orders <i data-lucide="arrow-right" aria-hidden="true" class="size-3.5"></i></a>
 </div>
 
 <form method="GET" action="{{ route('seller.shipments.index') }}" class="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans">
@@ -33,14 +34,15 @@
     </div>
 @else
     <div class="border border-[var(--border-strong)] rounded-xl bg-[var(--bg-surface)] overflow-x-auto shadow-sm">
-        <table class="w-full min-w-[800px] table-fixed text-center [&_td]:align-middle">
+        <table class="w-full min-w-[980px] text-center [&_td]:align-middle">
             <thead class="bg-[var(--bg-hover)]">
                 <tr class="border-b border-[var(--border-strong)] text-[11px] uppercase tracking-[0.6px] text-[var(--text-muted)]">
                     <th class="px-4 py-4 font-semibold">Tracking</th>
                     <th class="px-4 py-4 font-semibold">Order</th>
 
                     <th class="px-4 py-4 font-semibold">Shipment status</th>
-                    <th class="px-4 py-4 font-semibold">Assigned courier</th>
+                    <th class="px-4 py-4 font-semibold">Pickup window &amp; rider</th>
+                    <th class="px-4 py-4 font-semibold">Delivery rider</th>
                     <th class="px-4 py-4 font-semibold text-center">Waybill</th>
                 </tr>
             </thead>
@@ -64,7 +66,8 @@
                             @endphp
                             <span class="inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[11px] font-semibold leading-relaxed ring-1 ring-inset {{ $statusTone }}">{{ $shipment->status->label() }}</span>
                         </td>
-                        <td class="px-4 py-4 font-sans text-[12.5px] text-[var(--text-muted)]">{{ $shipment->courier?->name ?? 'Not assigned' }}</td>
+                        <td class="min-w-60 max-w-80 px-4 py-4">@include('Seller.Orders._pickup-summary', ['pickupShipment' => $shipment, 'compactPickup' => true])</td>
+                        <td class="px-4 py-4 font-sans text-[12.5px] text-[var(--text-muted)]">{{ $shipment->deliveryCourier?->name ?? 'Not assigned' }}</td>
                         <td class="px-4 py-4 text-center">
                             <a href="{{ route('seller.shipments.label', $shipment) }}" target="_blank" rel="noopener"
                                class="inline-flex min-h-9 items-center justify-center rounded-lg border border-primary-200 bg-primary-50 px-4 font-sans text-[11.5px] font-semibold text-primary-900 transition-colors hover:border-primary-700 hover:bg-primary-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">

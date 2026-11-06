@@ -309,7 +309,7 @@ class ParcelScanTest extends TestCase
             ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
             ->assertOk()->json('actions.0.verification_token');
         $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
-            ->assertSessionHas('success', 'Parcel received at the hub. Pickup courier released.');
+            ->assertSessionHas('success', 'Parcel received at the hub. Pickup rider released.');
         $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
         $this->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
             ->assertOk()
@@ -328,7 +328,9 @@ class ParcelScanTest extends TestCase
         $this->actingAs($this->provider, 'logistics')
             ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
             ->assertOk()
-            ->assertJsonPath('actions', [])
+            ->assertJsonCount(1, 'actions')
+            ->assertJsonPath('actions.0.key', 'open_details')
+            ->assertJsonPath('actions.0.method', 'GET')
             ->assertJsonPath('message', 'Scan blocked: no hub receipt or sorting action is allowed while this parcel is Ready for pickup.');
         $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
             ->assertSessionHas('error', 'Scan blocked: this parcel must be picked up before it can be received at the hub.');
@@ -346,5 +348,28 @@ class ParcelScanTest extends TestCase
             ->assertForbidden();
         $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
         $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_scan_page_verifies_a_tracking_number_handed_over_by_another_page(): void
+    {
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.scan.index', ['tracking' => 'TRK-20261104-ABC123']))
+            ->assertOk()
+            ->assertSee('data-auto-verify', false)
+            ->assertSee('value="TRK-20261104-ABC123"', false);
+
+        $this->get(route('logistics.scan.index'))->assertOk()->assertDontSee('data-auto-verify', false);
+    }
+
+    public function test_sorted_parcel_scan_points_to_assign_deliveries(): void
+    {
+        $parcel = $this->parcel(OrderStatus::Sorted, $this->courier);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()
+            ->assertJsonPath('actions.0.key', 'open_assignments')
+            ->assertJsonPath('actions.0.url', route('logistics.delivery-assignments.index').'#stage-rider')
+            ->assertJsonPath('actions.1.key', 'open_details');
     }
 }

@@ -71,7 +71,7 @@ class BuyerTrackingReceiptTest extends TestCase
         $this->actingAs($buyer, 'buyer')
             ->get(route('buyer.orders.show', $parent))
             ->assertOk()
-            ->assertSee('Order Received');
+            ->assertSee('Confirm Received');
 
         $this->post(route('buyer.orders.confirmReceived', $parent), ['seller_order_id' => $parcel->id])
             ->assertRedirect()

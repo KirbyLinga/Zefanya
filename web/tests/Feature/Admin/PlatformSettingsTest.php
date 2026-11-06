@@ -44,7 +44,7 @@ class PlatformSettingsTest extends TestCase
             ->assertSee('Public contact email')->assertSee('Change history')
             ->assertSee(route('admin.settings.index'), false)->assertSee('No settings have been changed.');
 
-        $this->assertDatabaseCount('platform_settings', 3);
+        $this->assertDatabaseCount('platform_settings', 8);
         $this->assertSame(config('app.name'), $this->setting()->value);
         $this->assertSame(config('mail.from.address'), $this->setting('contact_email')->value);
         $this->assertDatabaseCount('platform_setting_histories', 0);
@@ -214,7 +214,7 @@ class PlatformSettingsTest extends TestCase
         $this->actingAs(Admin::factory()->create(), 'admin')
             ->patch(route('admin.settings.update', $key), ['value' => 'changed', 'expected_value' => 'original'])->assertNotFound();
 
-        $this->assertDatabaseCount('platform_settings', 3);
+        $this->assertDatabaseCount('platform_settings', 8);
         $this->assertDatabaseCount('platform_setting_histories', 0);
     }
 

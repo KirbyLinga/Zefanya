@@ -2,11 +2,14 @@
     'verifyUrl',
     'heading' => 'Scan parcel',
     'subheading' => 'Scan the waybill QR or type the tracking number. Verification alone does not change parcel status.',
+    // A tracking number handed over by another page; it is verified as soon as the page loads.
+    'tracking' => null,
 ])
 
 <section
     data-parcel-scanner
     data-verify-url="{{ $verifyUrl }}"
+    @if (filled($tracking)) data-auto-verify @endif
     class="space-y-4"
 >
     <div>
@@ -55,6 +58,7 @@
                     id="parcel-tracking-input"
                     type="text"
                     data-scan-tracking-input
+                    value="{{ \Illuminate\Support\Str::limit((string) $tracking, 64, '') }}"
                     maxlength="64"
                     autocomplete="off"
                     spellcheck="false"

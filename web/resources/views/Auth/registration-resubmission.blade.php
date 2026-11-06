@@ -67,7 +67,7 @@
             <div class="mt-4 space-y-4">
                 @foreach ($documents as $field => [$label, $column])
                     <label class="block font-sans text-sm" @if ($field === 'sec_certificate') id="resubmitSecFields" @endif>{{ $label }}
-                        <input type="file" name="{{ $field }}" accept=".jpg,.jpeg,.png,.pdf" @required(!$account->{$column} && $field !== 'sec_certificate') @if ($field === 'sec_certificate') id="resubmitSecCertificate" data-existing="{{ $account->{$column} ? '1' : '0' }}" @endif class="{{ $fieldClass }}">
+                        <input type="file" name="{{ $field }}" accept=".jpg,.jpeg,.png,.pdf" @required(!$account->{$column} && $field !== 'sec_certificate') @if ($field === 'sec_certificate') id="resubmitSecCertificate" data-existing="{{ $account->{$column} ? '1' : '0' }}" @endif class="upload-input">
                         <span class="mt-1 block text-xs text-neutral-500">{{ $account->{$column} ? 'Existing document will be kept unless replaced.' : 'No document on file. Upload a copy.' }}</span>
                     </label>
                 @endforeach

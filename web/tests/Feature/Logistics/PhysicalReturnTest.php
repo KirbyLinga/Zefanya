@@ -10,10 +10,12 @@ use App\Models\Admin\Admin;
 use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
+use App\Models\Logistics\LogisticsReturnCharge;
 use App\Models\Logistics\ParcelReturn;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerDebt;
 use App\Models\Shared\OrderItem;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
@@ -282,7 +284,11 @@ class PhysicalReturnTest extends TestCase
         $return = $this->twice($f);
         $this->moveHome($f, $return);
         foreach ([['buyer', $f['buyer'], route('buyer.orders.show', $f['parcel']->order)], ['seller', $f['seller'], route('seller.orders.show', $f['parcel'])]] as [$guard,$actor,$url]) {
-            $this->actingAs($actor, $guard)->get($url)->assertOk()->assertSeeInOrder(['Physical return requested', 'Return in transit to Seller', 'Return received at origin station'])->assertDontSee($f['courier']->name);
+            $response = $this->actingAs($actor, $guard)->get($url)->assertOk()->assertSeeInOrder(['Physical return requested', 'Return in transit to Seller', 'Return received at origin station']);
+            // Sellers may see who collects their parcel; Buyers never see Rider identity.
+            if ($guard === 'buyer') {
+                $response->assertDontSee($f['courier']->name);
+            }
         }
     }
 
@@ -723,6 +729,59 @@ class PhysicalReturnTest extends TestCase
         $this->assertSame(5, $f['variant']->fresh()->stock_quantity);
         $this->assertSame(1, InventoryTransaction::query()->where('reason', 'return')->count());
         $this->assertSame(['requested', 'seller_approved', 'collection_assigned', 'collected_from_buyer', 'in_transit', 'at_origin', 'awaiting_seller', 'completed'], $return->events()->pluck('event_key')->all());
+    }
+
+    public function test_a_failed_delivery_back_at_the_seller_charges_the_seller_and_pays_the_carrier_for_both_trips(): void
+    {
+        $f = $this->fixture();
+        $f['parcel']->forceFill(['shipping_fee_minor' => 5000])->save();
+        $return = $this->twice($f);
+        $this->moveHome($f, $return);
+        $this->assertSame(0, LogisticsReturnCharge::query()->count());
+
+        $token = $this->receiptToken($f, $return);
+        app(ParcelReturnService::class)->receiveBySeller($return, $f['seller'], 'pending_review', $token);
+
+        $charge = LogisticsReturnCharge::sole();
+        $this->assertSame(LogisticsReturnCharge::FAILED_DELIVERY, $charge->reason);
+        $this->assertSame(LogisticsReturnCharge::TO_PROVIDER, $charge->direction);
+        $this->assertSame(10000, $charge->amount_minor);
+        $this->assertSame((int) $f['parcel']->fresh()->carrier_provider_id, (int) $charge->logistics_provider_id);
+        $debt = SellerDebt::sole();
+        $this->assertSame(SellerDebt::FAILED_DELIVERY, $debt->reason);
+        $this->assertSame(10000, $debt->amount_minor);
+        $this->assertNull($debt->seller_settlement_id);
+
+        $this->actingAs($f['seller'], 'seller')->get(route('seller.returns.index'))->assertOk()
+            ->assertSee('No money was collected from the buyer, so there is nothing to refund.')
+            ->assertSee('₱100.00 is taken from your next payouts');
+        $this->actingAs($f['admin'], 'admin')->get(route('admin.returns.index'))->assertOk()
+            ->assertSee('Failed delivery attempt and trip back to the Seller')
+            ->assertDontSee(route('admin.returns.refund', $return), false);
+    }
+
+    public function test_a_completed_buyer_return_pays_the_collecting_company_the_return_trip(): void
+    {
+        $f = $this->fixture();
+        $f['parcel']->forceFill(['shipping_fee_minor' => 5000])->save();
+        $return = $this->buyerReturn($f);
+        $returns = app(ParcelReturnService::class);
+        $returns->approveBySeller($return, $f['seller']);
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+        $returns->confirmBuyerCollection($return, $f['rider'], $f['parcel']->tracking_number);
+        $this->moveHome($f, $return->fresh());
+        $this->assertSame(0, LogisticsReturnCharge::query()->count());
+
+        $returns->receiveBySeller($return->fresh(), $f['seller'], 'resellable', $this->receiptToken($f, $return->fresh(), 'resellable'));
+
+        $charge = LogisticsReturnCharge::sole();
+        $this->assertSame(LogisticsReturnCharge::RETURN_TRIP, $charge->reason);
+        $this->assertSame(5000, $charge->amount_minor);
+        $this->assertSame($f['b']['provider']->id, (int) $charge->logistics_provider_id);
+
+        $this->actingAs($f['b']['provider'], 'logistics')->get(route('logistics.earnings.index'))->assertOk()
+            ->assertSee('Return trip from the buyer to the Seller')
+            ->assertSee('Zefanya owes you ₱50.00 for return trips and failed deliveries.');
     }
 
     public function test_cross_provider_buyer_return_reaches_the_origin_provider(): void

@@ -14,8 +14,10 @@ use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Logistics\ParcelReturn;
 use App\Models\Logistics\ParcelRoute;
 use App\Models\Logistics\PickupAttempt;
+use App\Models\Logistics\PickupSession;
 use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerSettlement;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -68,9 +70,13 @@ class SellerOrder extends Model
             'pickup_address_snapshot' => 'array',
             'status' => OrderStatus::class,
             'handover_at' => 'datetime',
+            'pickup_window_starts_at' => 'datetime',
+            'pickup_window_ends_at' => 'datetime',
+            'pickup_missed_windows' => 'integer',
             'delivery_attempts' => 'integer',
             'needs_reassignment' => 'boolean',
             'reassignment_flagged_at' => 'datetime',
+            'returned_to_station_at' => 'datetime',
             'delivery_address_verification' => 'array',
         ];
     }
@@ -213,6 +219,12 @@ class SellerOrder extends Model
     public function courier(): BelongsTo
     {
         return $this->belongsTo(Courier::class);
+    }
+
+    /** The rider's visit to the seller that this parcel is collected in. */
+    public function pickupSession(): BelongsTo
+    {
+        return $this->belongsTo(PickupSession::class, 'pickup_session_id');
     }
 
     /**
@@ -418,9 +430,32 @@ class SellerOrder extends Model
         return $this->hasMany(ManifestItem::class)->orderBy('created_at');
     }
 
+    /** What the Seller owes back when this order was returned after they were paid. */
+    public function sellerDebt(): HasOne
+    {
+        return $this->hasOne(SellerDebt::class);
+    }
+
     public function parcelReturn(): HasOne
     {
         return $this->hasOne(ParcelReturn::class);
+    }
+
+    /**
+     * True when, after the latest failed delivery attempt, the Station Hub
+     * scanned the parcel back in. Until then the parcel is still physically
+     * with the Rider who attempted it, so it must not change hands.
+     */
+    public function isBackAtStationAfterFailure(): bool
+    {
+        if ($this->returned_to_station_at === null) {
+            return false;
+        }
+        $lastFailure = $this->statusHistories()
+            ->where('to_status', OrderStatus::DeliveryFailed->value)
+            ->reorder()->orderByDesc('id')->value('created_at');
+
+        return $lastFailure === null || $this->returned_to_station_at->gte($lastFailure);
     }
 
     public function hasActiveReturn(): bool
@@ -501,9 +536,9 @@ class SellerOrder extends Model
     }
 
     /** Customer-safe tracking: handoffs remain events, never delivery statuses. */
-    public function trackingEvents(): array
+    public function trackingEvents(bool $buyerFacing = false): array
     {
-        $this->loadMissing(['statusHistories', 'parcelHandoffs']);
+        $this->loadMissing(['statusHistories', 'parcelHandoffs.sendingHub', 'parcelHandoffs.receivingHub', 'originStation', 'custodyHub', 'manifestItems.manifest.destinationHub']);
         $events = [[
             'key' => 'created', 'type' => 'status', 'title' => 'Order created',
             'at' => $this->created_at, 'sequence' => 0,
@@ -513,13 +548,50 @@ class SellerOrder extends Model
             $events[] = [
                 'key' => 'status:'.$history->id,
                 'type' => 'status',
+                // One entry per transition with its exact step ("Ready for pickup",
+                // "Picked up"). The buyer's simplified stage (buyerLabel) belongs
+                // on the status pill and milestones, where it would otherwise
+                // repeat here (Confirmed/Preparing/Ready all read "Preparing").
                 'title' => $history->to_status === OrderStatus::Cancelled && $history->actor_type === 'buyer'
                     ? 'Cancelled by Buyer' : $history->to_status->label(),
-                'detail' => $history->to_status === OrderStatus::DeliveryFailed ? 'Failed delivery attempt '.(++$failedAttempt).' of 2.' : ($history->to_status === OrderStatus::Cancelled && $history->actor_type === 'buyer'
-                    ? Str::after((string) $history->note, 'Buyer cancelled: ') : null),
+                'detail' => match (true) {
+                    $history->to_status === OrderStatus::DeliveryFailed => 'Failed delivery attempt '.(++$failedAttempt).' of 2.',
+                    $history->to_status === OrderStatus::Cancelled && $history->actor_type === 'buyer' => Str::after((string) $history->note, 'Buyer cancelled: '),
+                    $history->to_status === OrderStatus::AtSortingCenter && $this->originStation !== null => 'Arrived at '.$this->originStation->name.'.',
+                    $history->to_status === OrderStatus::Sorted && $this->custodyHub !== null => ($buyerFacing ? 'Preparing the next delivery leg at ' : 'Sorted at ').$this->custodyHub->name.'.',
+                    default => null,
+                },
                 'at' => $history->created_at,
                 'sequence' => $history->to_status === OrderStatus::Returned ? 5 : (in_array($history->to_status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup, OrderStatus::PickedUp, OrderStatus::AtSortingCenter], true) ? 1 : 3),
             ];
+        }
+        // Rider assignment updates from the delivery_assignments history, never
+        // naming the Rider. A pickup reservation changes no status, so its first
+        // assignment is shown; the first delivery assignment is already the
+        // "Assigned to rider" status. A later row with a different Courier is a
+        // reassignment (a same-Rider reschedule is not).
+        $this->loadMissing('deliveryAssignments');
+        foreach ($this->deliveryAssignments->sortBy('id')->groupBy('role') as $role => $rows) {
+            $previous = null;
+            foreach ($rows->values() as $index => $row) {
+                $changed = $previous !== null && (int) $previous->courier_id !== (int) $row->courier_id;
+                $previous = $row;
+                [$title, $detail] = match (true) {
+                    $index === 0 && $role === 'pickup' => ['Pickup rider assigned', 'A rider will collect the parcel from the seller.'],
+                    $changed && $role === 'pickup' => ['Pickup rider changed', 'Another rider will now collect the parcel from the seller.'],
+                    $changed && $role === 'delivery' => ['Delivery rider changed', $buyerFacing ? 'Another rider will now deliver your parcel.' : 'Another rider will now deliver this parcel.'],
+                    default => [null, null],
+                };
+                if ($title !== null) {
+                    $events[] = [
+                        'key' => 'assignment:'.$row->id, 'type' => 'assignment', 'title' => $title, 'detail' => $detail,
+                        // Pickup: after a same-second "Ready for pickup" (stable
+                        // sort). Delivery: before same-second delivery statuses,
+                        // so "Delivered" stays the last entry.
+                        'at' => $row->created_at, 'sequence' => $role === 'pickup' ? 1 : 2.9,
+                    ];
+                }
+            }
         }
         foreach ($this->parcelHandoffs as $handoff) {
             foreach ([
@@ -529,12 +601,29 @@ class SellerOrder extends Model
                 'received_at' => 'Received by destination provider',
             ] as $field => $title) {
                 if ($handoff->{$field} !== null) {
+                    $hubName = match ($field) {
+                        'dispatched_at' => $handoff->sendingHub?->name,
+                        'received_at' => $handoff->receivingHub?->name,
+                        default => null,
+                    };
                     $events[] = [
                         'key' => 'handoff:'.$handoff->id.':'.$field,
+                        'detail' => $hubName === null ? null : ($field === 'received_at' ? 'Arrived at ' : 'Left ').$hubName.'.',
                         'type' => 'handoff', 'title' => $handoff->direction === 'return' ? 'Return: '.$title : $title, 'at' => $handoff->{$field},
                         'sequence' => $handoff->direction === 'return' ? ['requested_at' => 4.1, 'accepted_at' => 4.2, 'dispatched_at' => 4.3, 'received_at' => 4.5][$field] : 2,
                     ];
                 }
+            }
+        }
+
+        foreach ($this->manifestItems as $item) {
+            $manifest = $item->manifest;
+            if ($item->received_at !== null && $manifest !== null && $manifest->direction !== 'return' && $manifest->destinationHub !== null) {
+                $events[] = [
+                    'key' => 'manifest-arrival:'.$item->id, 'type' => 'status',
+                    'title' => 'Arrived at '.$manifest->destinationHub->name,
+                    'at' => $item->received_at, 'sequence' => 2,
+                ];
             }
         }
 

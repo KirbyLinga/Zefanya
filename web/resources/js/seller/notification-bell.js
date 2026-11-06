@@ -107,7 +107,7 @@
         } catch { /* Keep unread alerts when marking them read fails. */ }
         finally { changing = false; inFlight = false; refresh(true); }
     });
-    window.setInterval(() => refresh(), 10000);
+    window.setInterval(() => refresh(), 30000);
     window.addEventListener('focus', () => refresh());
     document.addEventListener('visibilitychange', () => refresh());
     refresh();

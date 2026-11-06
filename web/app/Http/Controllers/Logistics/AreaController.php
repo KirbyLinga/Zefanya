@@ -83,10 +83,16 @@ class AreaController extends Controller
                 : ($pendingByMunicipality[$area->municipality] ?? 0),
         ]);
 
+        $serviceableIds = $hubs->coverageSchemaAvailable()
+            ? Area::query()->where('logistics_provider_id', $provider->id)->operationalCoverage()->pluck('id')
+            : collect();
+        $serviceableAreas = $areas->whereIn('id', $serviceableIds);
+
         return view('Logistics.Areas.index', [
             'provider' => $provider,
             'convertingArea' => $convertingArea,
             'areas' => $areas,
+            'serviceableAreas' => $serviceableAreas,
             'couriers' => $couriers,
             'pendingPickups' => $pendingPickups,
             'stations' => $stations,
@@ -110,7 +116,7 @@ class AreaController extends Controller
             }
         }, 3);
 
-        return back()->with('success', 'Barangay coverage saved. Next: link riders to these barangays.');
+        return back()->with('success', 'Delivery areas saved. Next: link riders to these barangays.');
     }
 
     public function update(Request $request, Area $area, LogisticsHubService $hubs): RedirectResponse
@@ -129,7 +135,7 @@ class AreaController extends Controller
                 ->with('success', 'Legacy area converted to barangay coverage.');
         }
 
-        return back()->with('success', 'Barangay coverage updated.');
+        return back()->with('success', 'Delivery area updated.');
     }
 
     public function destroy(Request $request, Area $area, LogisticsHubService $hubs): RedirectResponse

@@ -22,6 +22,8 @@
         })();
     </script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
 
     @vite([
@@ -61,6 +63,7 @@
          sidebar toggle works on every seller page. --}}
     @vite('resources/js/seller/theme-toggle.js')
     @vite('resources/js/seller/sidebar-tooltips.js')
+    @vite('resources/js/submit-guard.js')
 
     @stack('scripts')
 </body>

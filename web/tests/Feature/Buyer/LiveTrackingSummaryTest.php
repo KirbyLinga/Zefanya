@@ -102,6 +102,7 @@ class LiveTrackingSummaryTest extends TestCase
     public static function finalDeliverySteps(): array
     {
         return [
+            'unverified attempt' => [OrderStatus::DeliveryFailed, 0, 'Logistics is reviewing the delivery attempt before deciding the next step.'],
             'first failure' => [OrderStatus::DeliveryFailed, 1, 'Awaiting Logistics to arrange the final delivery attempt or a return.'],
             'attempts exhausted' => [OrderStatus::DeliveryFailed, 2, 'Logistics will arrange return to the seller.'],
             'delivered' => [OrderStatus::Delivered, 0, 'Check your parcel, then confirm receipt.'],

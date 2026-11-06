@@ -181,7 +181,7 @@ class ShopVoucherOffersTest extends TestCase
         $this->assertDatabaseHas('voucher_claims', ['voucher_id' => $voucher->id, 'buyer_id' => $this->buyer->id]);
         $this->get(route('buyer.vouchers.index'))->assertOk()->assertSee('OFFER1')->assertSee('Ready to use');
         $this->postJson(route('buyer.orders.cancelSellerOrder', [$shipment->order_id, $shipment]), ['reason' => 'Again'])
-            ->assertStatus(422);
+            ->assertStatus(409);
         $this->assertSame(1, $voucher->claims()->count());
         $this->assertSame(0, $voucher->fresh()->times_used);
     }

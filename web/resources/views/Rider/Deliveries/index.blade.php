@@ -23,6 +23,13 @@
 
     <x-rider.flash />
 
+    @if ($windingDown ?? false)
+        <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 font-sans text-[12.5px] text-amber-900" data-rider-wind-down>
+            {{ \App\Http\Middleware\Rider\EnsureRiderActive::WIND_DOWN_MESSAGE }}
+            Cash you collect stays on your Money page until your company confirms receiving it.
+        </p>
+    @endif
+
     @if ($shipments->isEmpty())
         <section class="flex flex-col items-center rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-8 text-center shadow-sm">
             <i data-lucide="truck" class="mb-3 h-[32px] w-[32px] text-[var(--icon-soft)]"></i>

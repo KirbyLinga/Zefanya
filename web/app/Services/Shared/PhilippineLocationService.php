@@ -24,7 +24,7 @@ class PhilippineLocationService
      */
     public function getRegions(): array
     {
-        return Cache::remember('psgc:regions', $this->cacheTtl, function (): array {
+        return $this->remember('psgc:regions', function (): array {
             $response = Http::timeout(5)->get("{$this->baseUrl}/regions/");
             if (! $response->successful()) {
                 throw new \RuntimeException('PSGC regions API returned status '.$response->status());
@@ -51,7 +51,7 @@ class PhilippineLocationService
     {
         $cacheKey = 'psgc:provinces:'.($regionCode ?? 'all');
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($regionCode): array {
+        return $this->remember($cacheKey, function () use ($regionCode): array {
             // NCR does not have formal provinces; Metro Manila acts as the province level.
             if ($regionCode === '130000000') {
                 return [
@@ -100,7 +100,7 @@ class PhilippineLocationService
     {
         $cacheKey = 'psgc:cities:'.$provinceCode.':'.($regionCode ?? 'none');
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($provinceCode, $regionCode): array {
+        return $this->remember($cacheKey, function () use ($provinceCode, $regionCode): array {
             if ($provinceCode === '130000000' || $regionCode === '130000000') {
                 $url = "{$this->baseUrl}/regions/130000000/cities-municipalities/";
             } else {
@@ -133,7 +133,7 @@ class PhilippineLocationService
     {
         $cacheKey = 'psgc:barangays:'.$cityMunicipalityCode;
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($cityMunicipalityCode): array {
+        return $this->remember($cacheKey, function () use ($cityMunicipalityCode): array {
             $url = "{$this->baseUrl}/cities-municipalities/{$cityMunicipalityCode}/barangays/";
             $response = Http::timeout(5)->get($url);
             if (! $response->successful()) {
@@ -152,6 +152,45 @@ class PhilippineLocationService
                 'name' => (string) ($item['name'] ?? ''),
             ], $data);
         });
+    }
+
+    /**
+     * Fresh lookups live for the configured TTL. A successful response is also
+     * kept without expiry so an upstream outage can still serve the last good list.
+     *
+     * @param  callable(): array  $resolve
+     * @return list<array{code: string, name: string}>
+     */
+    private function remember(string $key, callable $resolve): array
+    {
+        $cached = Cache::get($key);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        try {
+            $value = $resolve();
+            if (! is_array($value)) {
+                throw new \RuntimeException('PSGC lookup returned invalid data');
+            }
+
+            Cache::put($key, $value, $this->cacheTtl);
+            Cache::forever($key.':fallback', $value);
+
+            return $value;
+        } catch (\Throwable $e) {
+            $fallback = Cache::get($key.':fallback');
+            if (is_array($fallback)) {
+                Log::warning('PSGC lookup failed; serving the last saved list.', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $fallback;
+            }
+
+            throw $e;
+        }
     }
 
     /**

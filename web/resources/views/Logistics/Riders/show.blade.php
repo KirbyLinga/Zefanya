@@ -35,6 +35,7 @@
             <div class="col-span-2 max-sm:col-span-1"><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Residential Address</p><p class="mt-0.5 text-neutral-900">{{ $addressParts !== '' ? $addressParts : 'Not provided' }}</p></div>
             <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Station Hub</p><p class="mt-0.5 text-neutral-900">{{ $rider->station?->name ?? 'Unassigned' }}</p></div>
             <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Coverage</p><p class="mt-0.5 text-neutral-900">{{ $rider->courier?->area?->name ?? 'No coverage linked' }}</p></div>
+            <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Availability</p><div class="mt-0.5">@include('Logistics.Riders.partials.availability', ['rider' => $rider])</div></div>
             @if ($rider->status_reason)
                 <div class="col-span-2 max-sm:col-span-1"><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Status Reason</p><p class="mt-0.5 text-neutral-900">{{ $rider->status_reason }}</p></div>
             @endif

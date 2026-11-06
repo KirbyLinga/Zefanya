@@ -29,12 +29,12 @@ class BuyerTrackingPresentationTest extends TestCase
         $response = $this->actingAs($buyer, 'buyer')->get(route('buyer.orders.index'));
 
         $response->assertOk()->assertSee('data-shipment-status="'.$status->value.'"', false)
-            ->assertSeeText($status->label())->assertDontSeeText('To Receive /')->assertDontSeeText('Cancelled / Returned');
+            ->assertSeeText($status->buyerLabel())->assertDontSeeText('To Receive /')->assertDontSeeText('Cancelled / Returned');
         if (in_array($status, [OrderStatus::Cancelled, OrderStatus::Returned, OrderStatus::DeliveryFailed], true)) {
             $response->assertDontSee('aria-label="Delivery milestones"', false);
         } else {
             $response->assertSee('aria-label="Delivery milestones"', false)
-                ->assertSeeTextInOrder(['Order placed', 'Ready for pickup', 'In transit', 'Delivered', 'Completed']);
+                ->assertSeeTextInOrder(['Preparing', 'Shipped', 'Out for delivery', 'Delivered']);
         }
     }
 
@@ -89,7 +89,7 @@ class BuyerTrackingPresentationTest extends TestCase
         $document = new \DOMDocument;
         @$document->loadHTML($response->getContent());
         $xpath = new \DOMXPath($document);
-        foreach ([$placed->id => 'Order placed', $delivered->id => 'Delivered'] as $id => $milestone) {
+        foreach ([$placed->id => 'Preparing', $delivered->id => 'Delivered'] as $id => $milestone) {
             $current = $xpath->query('//div[@data-shipment-id="'.$id.'"]//li[@aria-current="step"]');
             $this->assertSame(1, $current->length);
             $this->assertSame($milestone, trim($current->item(0)->textContent));

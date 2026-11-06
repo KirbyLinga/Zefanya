@@ -113,12 +113,34 @@ class CheckoutCarrierService
             'chargeable_kg' => self::chargeableKg($groupWeightGrams),
         ];
 
-        if (blank($seller->province_code) || blank($seller->barangay_code)
-            || blank($buyer->province_code) || blank($buyer->barangay_code)) {
+        if (blank($buyer->province_code) || blank($buyer->barangay_code)) {
             return $base + [
                 'route' => 'incomplete',
                 'available' => false,
-                'message' => 'Complete both the seller pickup address and your delivery address (province and barangay) before choosing a carrier.',
+                'reason_code' => 'buyer_address_incomplete',
+                'message' => 'Your delivery address is missing a province or barangay. Complete your saved address before choosing shipping.',
+                'carriers' => [],
+            ];
+        }
+
+        if (blank($seller->province_code) || blank($seller->barangay_code)) {
+            return $base + [
+                'route' => 'incomplete',
+                'available' => false,
+                'reason_code' => 'seller_address_incomplete',
+                'message' => 'This shop has not completed its pickup address. Contact the seller to finish shipping setup; changing your address will not fix this.',
+                'carriers' => [],
+            ];
+        }
+
+        $enabledProviders = $this->sellerShipping->enabledEligibleProviders($seller)
+            ->reject(fn (LogisticsProvider $provider): bool => $provider->archived_at !== null);
+        if ($enabledProviders->isEmpty()) {
+            return $base + [
+                'route' => (string) $seller->province_code === (string) $buyer->province_code ? 'same_province' : 'cross_province',
+                'available' => false,
+                'reason_code' => 'seller_shipping_settings',
+                'message' => 'No shipping carrier serves this route because this shop has no available pickup provider enabled. Contact the seller to enable shipping for its pickup address.',
                 'carriers' => [],
             ];
         }
@@ -127,7 +149,7 @@ class CheckoutCarrierService
             $carriers = [];
             $hasApprovedPath = false;
 
-            foreach ($this->sellerShipping->enabledEligibleProviders($seller) as $provider) {
+            foreach ($enabledProviders as $provider) {
                 if ($provider->archived_at !== null || ($rateSnapshot !== null && ! array_key_exists($provider->id, $rateSnapshot))) {
                     continue;
                 }
@@ -169,9 +191,10 @@ class CheckoutCarrierService
                 return $base + [
                     'route' => 'cross_province',
                     'available' => false,
+                    'reason_code' => $hasApprovedPath ? 'shipping_rates_unavailable' : 'route_unavailable',
                     'message' => $hasApprovedPath
                         ? 'Shipping rates for this delivery route are not available yet. Please try again later or choose another delivery address.'
-                        : 'Delivery from this shop to your address is not available yet. Please choose another delivery address.',
+                        : 'Delivery from this shop to your address is not available yet. The shop has enabled shipping, but no connected route covers this address. Choose another saved delivery address or contact the seller.',
                     'carriers' => [],
                 ];
             }
@@ -185,13 +208,18 @@ class CheckoutCarrierService
         }
 
         $carriers = [];
-        foreach ($this->sellerShipping->enabledEligibleProviders($seller) as $provider) {
-            if ($provider->archived_at !== null || ($rateSnapshot !== null && ! array_key_exists($provider->id, $rateSnapshot))) {
+        $destinationCovered = false;
+        $ratesAvailable = false;
+        foreach ($enabledProviders as $provider) {
+            if ($rateSnapshot !== null && ! array_key_exists($provider->id, $rateSnapshot)) {
                 continue;
             }
+            $ratesAvailable = true;
             if (! $this->hasDestinationCoverage($provider, (string) $buyer->barangay_code)) {
                 continue;
             }
+
+            $destinationCovered = true;
 
             // Phase 3: Check comprehensive route feasibility
             $feasibilityReason = $this->routeFeasibilityReason($seller, $buyer, $provider);
@@ -212,7 +240,12 @@ class CheckoutCarrierService
             return $base + [
                 'route' => 'same_province',
                 'available' => false,
-                'message' => 'No shipping carrier serves this route for '.$seller->business_name.'. Ask the seller to enable a provider that covers your barangay, or change your delivery address.',
+                'reason_code' => ! $ratesAvailable ? 'shipping_rates_unavailable' : ($destinationCovered ? 'route_unavailable' : 'destination_coverage'),
+                'message' => ! $ratesAvailable
+                    ? 'Shipping rates for this delivery route are not available yet. Refresh checkout to review shipping options.'
+                    : ($destinationCovered
+                        ? 'No shipping carrier serves this route because a connected transport route is not available yet. The shop has enabled shipping; choose another saved address or contact the seller.'
+                        : 'No shipping carrier serves this route because the enabled providers for this shop do not cover your delivery barangay. Choose another saved delivery address or contact the seller about coverage.'),
                 'carriers' => [],
             ];
         }
@@ -419,15 +452,6 @@ class CheckoutCarrierService
             return null;
         }
 
-        $threshold = config('buyer.cross_province.free_shipping_threshold_minor')
-            ?? config('buyer.cross_province_shipping_free_threshold_minor')
-            ?? config('buyer.cross_province_free_shipping_threshold_minor');
-        if ((is_int($threshold) || (is_string($threshold) && ctype_digit($threshold)))
-            && filter_var($threshold, FILTER_VALIDATE_INT) !== false && (int) $threshold >= 0
-            && $groupSubtotalMinor >= (int) $threshold) {
-            return 0;
-        }
-
         return $rate['first_kg_minor'] + $this->additionalKgFee($rate['additional_kg_minor'], $groupWeightGrams);
     }
 
@@ -437,11 +461,6 @@ class CheckoutCarrierService
      */
     private function feeMinor(LogisticsProvider $provider, Seller $seller, Buyer $buyer, int $groupSubtotalMinor, int $groupWeightGrams, ?array $rateSnapshot = null): int
     {
-        $threshold = (int) config('buyer.announcements.free_shipping_threshold_minor', 150000);
-        if ($groupSubtotalMinor >= $threshold) {
-            return 0;
-        }
-
         $sameMunicipality = filled($seller->municipality_code)
             && filled($buyer->municipality_code)
             && (string) $seller->municipality_code === (string) $buyer->municipality_code;

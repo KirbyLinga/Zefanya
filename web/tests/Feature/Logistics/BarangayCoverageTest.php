@@ -380,9 +380,10 @@ class BarangayCoverageTest extends TestCase
             'name' => 'Other provider area', 'municipality' => 'Elsewhere', 'is_active' => true]);
 
         $response = $this->actingAs($station->provider, 'logistics')->get(route('logistics.areas.index'))
-            ->assertOk()->assertSee('3 areas, 2 without riders')->assertSee('Legacy')
+            ->assertOk()->assertSee('0 serviceable barangays, 0 without riders')->assertSee('Legacy')
+            ->assertSee('2 inactive or not serviceable.')
             ->assertSee('Convert to barangays')->assertDontSee('Other provider area');
-        $this->assertSame(2, substr_count($response->getContent(), 'No rider, pickups here will fail'));
+        $this->assertSame(0, substr_count($response->getContent(), 'No rider assigned'));
 
         $this->get(route('logistics.areas.index', ['convert' => $legacy->id]))
             ->assertOk()->assertSee('Convert legacy area')

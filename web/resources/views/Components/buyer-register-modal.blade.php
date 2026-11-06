@@ -157,14 +157,14 @@
                 <p class="mb-4 font-sans text-xs text-neutral-500">Upload one clear valid ID to help keep Zefanya secure.</p>
 
                 <label for="uploadId" class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600">Upload valid ID *</label>
-                <label for="uploadId" class="mb-4 flex cursor-pointer items-center gap-3 rounded-sm border border-dashed border-neutral-300 bg-neutral-50 p-4 transition-colors hover:border-[#9c5c68]">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-white text-[#9c5c68] shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
+                <label for="uploadId" class="upload-zone mb-4 flex items-center gap-3">
+                    <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
                     <span>
                         <span class="block font-sans text-sm font-semibold text-neutral-800" id="uploadIdName">Choose a valid ID</span>
                         <span class="block font-sans text-xs text-neutral-500">JPG, JPEG, PNG or PDF · Max 5MB</span>
                     </span>
                 </label>
-                <input type="file" name="upload_id" id="uploadId" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" required class="hidden">
+                <input type="file" name="upload_id" id="uploadId" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" required class="sr-only">
                 <span class="field-error mb-4 block font-sans text-[11.5px] text-[#a5333d]"></span>
 
                 <p class="mb-6 rounded-sm bg-[#F7D6D0]/50 px-4 py-3 font-sans text-xs italic text-[#7a4550]">

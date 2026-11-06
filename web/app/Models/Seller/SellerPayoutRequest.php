@@ -21,7 +21,7 @@ class SellerPayoutRequest extends Model
 
     protected function casts(): array
     {
-        return ['amount_minor' => 'integer', 'cancelled_at' => 'datetime', 'paid_at' => 'datetime', 'rejected_at' => 'datetime'];
+        return ['amount_minor' => 'integer', 'debt_deducted_minor' => 'integer', 'cancelled_at' => 'datetime', 'paid_at' => 'datetime', 'rejected_at' => 'datetime'];
     }
 
     public function seller(): BelongsTo

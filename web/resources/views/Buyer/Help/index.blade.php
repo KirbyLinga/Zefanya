@@ -37,7 +37,7 @@
                                 Do you offer free shipping?
                             </summary>
                             <p class="mt-2 text-[12px] text-buyer-ink-soft leading-relaxed">
-                                Yes! We offer free shipping on orders over ₱1,500. Orders under ₱1,500 have standard shipping rates.
+                                No. Shipping is calculated from the route and parcel weight. A shipping voucher can reduce that fee. The order total does not.
                             </p>
                         </details>
                         <details class="group pb-3">

@@ -6,6 +6,7 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Models\Admin\Admin;
 use App\Models\Catalog\Product;
+use App\Models\Logistics\Area;
 use App\Models\Logistics\DeliveryAssignment;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Courier;
@@ -97,6 +98,43 @@ class AutomaticDispatchTest extends TestCase
         $this->assignableCourier($other, [], 'San Fernando', '030540100');
         $f['second']->forceFill(['max_weight_grams' => 100000])->save();
         $this->assertSame($f['first']->id, app(CourierAssignmentService::class)->dispatch($f['parcel'], 'pickup')['courier']->id);
+    }
+
+    // LOG-DISP-001: "nearest" is coverage closeness (PSGC codes), ahead of workload and rider id.
+    public function test_auto_assign_offers_the_nearest_rider_by_coverage_first(): void
+    {
+        $f = $this->fixture();
+        $exactArea = $f['first']->area;
+        // The two fixture Riders become station-wide (no barangay links).
+        foreach (['first', 'second'] as $key) {
+            $f[$key]->forceFill(['area_id' => null])->save();
+            $f[$key]->areas()->detach();
+        }
+        $cityWide = Area::query()->create([
+            'logistics_provider_id' => $f['provider']->id, 'station_hub_id' => $exactArea->station_hub_id,
+            'name' => 'San Fernando city-wide', 'municipality' => 'San Fernando (city-wide)',
+            'city_municipality_code' => $exactArea->city_municipality_code,
+            'is_active' => true, 'coverage_validated_at' => now(),
+        ]);
+        $municipal = $this->assignableCourier($f['provider'], ['max_weight_grams' => 20000], 'San Fernando', '030540100');
+        $municipal->forceFill(['area_id' => $cityWide->id])->save();
+        $nearest = $this->assignableCourier($f['provider'], ['max_weight_grams' => 20000], 'San Fernando', '030540100');
+        // Proximity outranks workload: the nearest Rider already holds a job.
+        SellerOrder::factory()->create(['seller_id' => $f['seller']->id, 'status' => OrderStatus::PickedUp->value, 'courier_id' => $nearest->id]);
+
+        $service = app(CourierAssignmentService::class);
+        $this->assertSame($nearest->id, $service->dispatch($f['parcel'], 'pickup')['courier']->id);
+
+        // Without an exact-barangay Rider, the municipality-wide Rider beats station-wide ones.
+        $nearest->forceFill(['area_id' => null])->save();
+        $nearest->areas()->detach();
+        // A different seller, so the open pickup session from the first parcel is not reused.
+        $next = SellerOrder::factory()->create([
+            'seller_id' => Seller::factory()->create(['barangay_code' => '0305401001'])->id, 'status' => OrderStatus::ReadyForPickup->value,
+            'carrier_provider_id' => $f['provider']->id, 'origin_station_hub_id' => $exactArea->station_hub_id,
+            'order_id' => Order::factory()->create(['shipping_address' => ['barangay_code' => '0305401001', 'municipality' => 'San Fernando']])->id,
+        ]);
+        $this->assertSame($municipal->id, $service->reservePickup($next, $f['provider'])->id);
     }
 
     public function test_suspended_inactive_and_pending_riders_are_excluded(): void

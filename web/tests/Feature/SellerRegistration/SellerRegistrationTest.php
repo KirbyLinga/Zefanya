@@ -733,7 +733,7 @@ class SellerRegistrationTest extends TestCase
     {
         Storage::fake('local');
         $response = $this->registerSeller([
-            'upload_id' => UploadedFile::fake()->create('govt_id_front.png', 2400, 'image/png'),
+            'upload_id' => UploadedFile::fake()->image('govt_id_front.png'),
             'business_permit' => $this->fakePdf('bir_2303.pdf', 1100),
         ]);
         $response->assertStatus(201);

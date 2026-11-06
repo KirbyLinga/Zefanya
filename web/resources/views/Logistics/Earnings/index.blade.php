@@ -6,10 +6,15 @@
 @use('App\Models\Logistics\LogisticsRemittance')
 @use('App\Models\Seller\StoreSale')
 
+@section('logistics-toolbar')
+    <span hidden data-logistics-hosted-bell></span>
+@endsection
+
 @section('content')
 @include('Logistics._parcel-queue-assets')
 @php
     $peso = fn (int $minor): string => '₱'.number_format($minor / 100, 2);
+    $riderRates = (new \App\Services\Logistics\PickupPolicy)->rates();
     $ready = $totals['ready'];
     $sent = $totals['sent'];
     $settled = $totals['settled'];
@@ -34,12 +39,30 @@
     ];
     $firstStage = request()->has('payments_page') ? 'payments' : 'fees';
     $th = 'px-4 py-2.5 font-semibold';
+    $onRates = ($tab ?? 'overview') === 'shipping-rates';
 @endphp
 
 <div class="ip-canvas -m-4 min-h-screen sm:-m-6 xl:-m-8">
-<div class="border-b border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-4 sm:px-6 xl:px-8">
-    <h1 class="font-serif text-2xl font-semibold text-[var(--text-ink)]">Earnings</h1>
-    <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">You keep the shipping fee on each delivered parcel and send Zefanya the rest of the cash. If another company was the buyer's chosen carrier, send the full amount: that fee is pending allocation.</p>
+<div class="border-b border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 pt-4 sm:px-6 xl:px-8">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+            <h1 class="font-serif text-2xl font-semibold text-[var(--text-ink)]">Earnings</h1>
+            <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">View shipping revenue, rider payments, remittances, and earnings summaries.</p>
+            @unless ($onRates)
+                <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">You keep the shipping fee on each delivered parcel and send Zefanya the rest of the cash. If another company was the buyer's chosen carrier, you keep 60% of the fee and that carrier's 40% goes to Zefanya with the cash.</p>
+                @if ($originShares['parcels'] > 0)
+                    <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">As the origin carrier on {{ $originShares['parcels'] }} {{ \Illuminate\Support\Str::plural('parcel', $originShares['parcels']) }} another company delivered, your 40% share is <span class="font-semibold text-[var(--text-ink)]">{{ $peso($originShares['shareMinor']) }}</span>. Zefanya has received {{ $peso($originShares['receivedMinor']) }} of it and paid you {{ $peso($originShares['paidMinor']) }}.</p>
+                @endif
+            @else
+                <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">Shipping rates are calculated automatically from the route and parcel weight.</p>
+            @endunless
+        </div>
+        <x-logistics.notification-bell />
+    </div>
+    <div role="tablist" aria-label="Earnings" class="mt-4 flex flex-wrap gap-x-6">
+        <a role="tab" href="{{ route('logistics.earnings.index') }}" aria-selected="{{ $onRates ? 'false' : 'true' }}" class="ip-tab -mb-px inline-flex min-h-11 items-center font-sans text-[13px] font-medium no-underline">Overview</a>
+        <a role="tab" href="{{ route('logistics.earnings.index', ['tab' => 'shipping-rates']) }}" aria-selected="{{ $onRates ? 'true' : 'false' }}" class="ip-tab -mb-px inline-flex min-h-11 items-center font-sans text-[13px] font-medium no-underline">Shipping Rates</a>
+    </div>
 </div>
 
 <div class="p-4 sm:p-6 xl:px-8">
@@ -47,6 +70,10 @@
 @if ($errors->any())
     <div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 font-sans text-[13px] text-red-900">@foreach ($errors->all() as $error)<p class="text-red-900">{{ $error }}</p>@endforeach</div>
 @endif
+
+@if ($onRates)
+    @include('Logistics.Earnings._shipping-rates')
+@else
 
 <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     @foreach ($tiles as $tile)
@@ -63,10 +90,57 @@
     @endforeach
 </div>
 
+<section class="mb-5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 shadow-sm" data-company-statement>
+    <h2 class="font-sans text-[15px] font-semibold text-[var(--text-ink)]">Your profit and loss</h2>
+    <p class="mt-0.5 font-sans text-[13px] text-[var(--text-muted)]">Rider pay is your own expense. It lowers your profit but never the cash you send Zefanya.</p>
+    <dl class="mt-3 divide-y divide-[var(--border-strong)] font-sans text-[13px] text-[var(--text-ink)]">
+        <div class="flex justify-between gap-4 py-2"><dt>Shipping kept as delivering company (gross)</dt><dd class="tabular-nums">+{{ $peso($statement['deliveredFeeMinor']) }}</dd></div>
+        <div class="flex justify-between gap-4 py-2"><dt>Origin 40% share on parcels others delivered (gross)</dt><dd class="tabular-nums">+{{ $peso($statement['originShareMinor']) }}</dd></div>
+        <div class="flex justify-between gap-4 py-2 font-semibold"><dt>Gross shipping earnings</dt><dd class="tabular-nums">+{{ $peso($statement['grossMinor']) }}</dd></div>
+        <div class="flex justify-between gap-4 py-2"><dt>Rider pickup pay ({{ $peso($riderRates['first_minor']) }} first + {{ $peso($riderRates['additional_minor']) }} additional)</dt><dd class="tabular-nums">−{{ $peso($statement['riderPickupMinor']) }}</dd></div>
+        <div class="flex justify-between gap-4 py-2"><dt>Rider delivery pay ({{ $peso($riderRates['delivery_minor']) }} each)</dt><dd class="tabular-nums">−{{ $peso($statement['riderDeliveryMinor']) }}</dd></div>
+        <div class="flex justify-between gap-4 py-2 font-semibold"><dt>Estimated net earnings</dt><dd class="tabular-nums {{ $statement['netMinor'] < 0 ? 'text-red-800' : '' }}">{{ $statement['netMinor'] < 0 ? '−' : '+' }}{{ $peso(abs($statement['netMinor'])) }}</dd></div>
+    </dl>
+    <dl class="mt-3 grid gap-2 font-sans text-[12.5px] text-[var(--text-muted)] sm:grid-cols-2 xl:grid-cols-4">
+        <div><dt>Rider pay paid</dt><dd class="font-semibold tabular-nums text-[var(--text-ink)]">{{ $peso($statement['riderPaidMinor']) }}</dd></div>
+        <div><dt>Rider pay still owed</dt><dd class="font-semibold tabular-nums text-[var(--text-ink)]">{{ $peso($statement['riderUnpaidMinor']) }}</dd></div>
+        <div><dt>Origin share waiting for Zefanya's cash</dt><dd class="font-semibold tabular-nums text-[var(--text-ink)]">{{ $peso($statement['originAwaitingZefanyaMinor']) }}</dd></div>
+        <div><dt>Origin share Zefanya owes you / has paid</dt><dd class="font-semibold tabular-nums text-[var(--text-ink)]">{{ $peso($statement['originReadyMinor']) }} / {{ $peso($statement['originPaidMinor']) }}</dd></div>
+    </dl>
+    <p class="mt-2 font-sans text-[12px] text-[var(--text-muted)]">Estimated: pay is counted when a pickup or delivery succeeds, shipping when the buyer's cash is collected.</p>
+</section>
+
+@if ($returnCharges->isNotEmpty())
+    @php
+        $open = $returnCharges->whereNull('settled_at');
+        $youOwe = (int) $open->where('direction', \App\Models\Logistics\LogisticsReturnCharge::TO_ZEFANYA)->sum('amount_minor');
+        $owedToYou = (int) $open->where('direction', \App\Models\Logistics\LogisticsReturnCharge::TO_PROVIDER)->sum('amount_minor');
+    @endphp
+    <section class="mb-5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 shadow-sm" data-return-charges>
+        <h2 class="font-sans text-[15px] font-semibold text-[var(--text-ink)]">Return charges</h2>
+        <p class="mt-1 font-sans text-[12px] text-[var(--text-muted)]">Zefanya owes you {{ $peso($owedToYou) }} for return trips and failed deliveries. You owe Zefanya {{ $peso($youOwe) }} for parcels damaged in transit. An Admin records each one when the money is sent.</p>
+        <ul class="mt-3 divide-y divide-[var(--border-strong)] font-sans text-[13px]">
+            @foreach ($returnCharges as $charge)
+                <li class="flex flex-wrap justify-between gap-2 py-2">
+                    <span class="text-[var(--text-ink)]"><span class="font-mono">{{ $charge->sellerOrder?->tracking_number ?? '#'.$charge->seller_order_id }}</span> · {{ $charge->label() }}</span>
+                    <span class="tabular-nums {{ $charge->owedToZefanya() ? 'text-red-800' : 'text-[var(--text-ink)]' }}">{{ $charge->owedToZefanya() ? 'You owe ' : 'Owed to you ' }}{{ $peso($charge->amount_minor) }} · {{ $charge->settled_at ? 'Settled, ref '.$charge->settlement_reference : 'Not settled' }}</span>
+                </li>
+            @endforeach
+        </ul>
+    </section>
+@endif
+
 @if ($ready['parcels'] > 0)
     <section class="mb-5 overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm">
         <div class="p-4">
             <h2 class="font-sans text-[15px] font-semibold text-[var(--text-ink)]">Send <span data-remit-total class="text-[var(--text-ink)]">{{ $peso($ready['dueMinor']) }}</span> to Zefanya</h2>
+            @php
+                $overdueCutoff = now()->subDays(\App\Services\Logistics\LogisticsRemittanceService::OVERDUE_AFTER_DAYS);
+                $overdueParcels = $readyParcels->filter(fn ($parcel) => $parcel->confirmed_at !== null && $parcel->confirmed_at->lt($overdueCutoff))->count();
+            @endphp
+            @if ($overdueParcels > 0)
+                <p role="status" class="mt-2 rounded-lg border border-red-300 bg-red-50 p-3 font-sans text-[13px] font-semibold text-red-900">{{ $overdueParcels }} {{ \Illuminate\Support\Str::plural('parcel', $overdueParcels) }} {{ $overdueParcels === 1 ? 'has' : 'have' }} been waiting more than {{ \App\Services\Logistics\LogisticsRemittanceService::OVERDUE_AFTER_DAYS }} days since you confirmed the rider's cash. Send Zefanya the money soon.</p>
+            @endif
             <p class="mt-0.5 font-sans text-[13px] text-[var(--text-muted)]">
                 You collected {{ $peso($ready['codMinor']) }} and keep {{ $peso($ready['shippingMinor']) }} in shipping. Choose the parcels this payment covers, send the money, then record its reference here.
             </p>
@@ -106,6 +180,68 @@
         </div>
     </section>
 @endif
+
+<section class="mb-5 overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm">
+    <div class="p-4">
+        <h2 class="font-sans text-[15px] font-semibold text-[var(--text-ink)]">Rider pay owed: {{ $peso((int) $riderUnpaid->sum('amountMinor')) }}</h2>
+        <p class="mt-0.5 font-sans text-[13px] text-[var(--text-muted)]">You pay your riders {{ $peso($riderRates['first_minor']) }} for the first parcel of each seller pickup, {{ $peso($riderRates['additional_minor']) }} for each additional parcel in that pickup, and {{ $peso($riderRates['delivery_minor']) }} per successful delivery. Failed attempts earn nothing. Each payment covers all of a rider's unpaid jobs, and a job can only be paid once. Paid this month: {{ $peso($riderPaidThisMonthMinor) }}.</p>
+    </div>
+    @if ($riderUnpaid->isNotEmpty())
+        <ul class="divide-y divide-[var(--border-strong)] border-t border-[var(--border-strong)]">
+            @foreach ($riderUnpaid as $row)
+                <li class="grid gap-3 px-4 py-3 font-sans text-[13px] text-[var(--text-ink)] lg:grid-cols-[minmax(0,1fr)_minmax(280px,520px)] lg:items-end">
+                    <div class="min-w-0">
+                        <p class="font-semibold text-[var(--text-ink)]">{{ $row['courier'] }}</p>
+                        <p class="text-[12px] text-[var(--text-muted)]">{{ $row['pickups'] }} {{ \Illuminate\Support\Str::plural('pickup', $row['pickups']) }} · {{ $row['deliveries'] }} {{ \Illuminate\Support\Str::plural('delivery', $row['deliveries']) }} · <span class="font-semibold tabular-nums text-[var(--text-ink)]">{{ $peso($row['amountMinor']) }}</span></p>
+                    </div>
+                    <form method="POST" action="{{ route('logistics.earnings.pay-rider', $row['courierId']) }}" class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end">
+                        @csrf
+                        <input type="hidden" name="through_id" value="{{ $row['throughId'] }}">
+                        <input type="hidden" name="expected_amount_minor" value="{{ $row['amountMinor'] }}">
+                        <label class="block min-w-0 text-[12px] font-semibold text-[var(--text-ink)]">
+                            Payment reference
+                            <input name="reference" required maxlength="100" placeholder="e.g. GCash 7012 3456" class="ip-field mt-1 h-9 w-full rounded-lg border border-[var(--border-strong)] px-2.5 text-[12.5px] font-normal text-[var(--text-ink)]">
+                        </label>
+                        <label class="block text-[12px] font-semibold text-[var(--text-ink)]">
+                            Date paid
+                            <input type="date" name="paid_on" required value="{{ now(StoreSale::TIMEZONE)->toDateString() }}" max="{{ now(StoreSale::TIMEZONE)->toDateString() }}" class="ip-field mt-1 h-9 w-full rounded-lg border border-[var(--border-strong)] px-2.5 text-[12.5px] font-normal text-[var(--text-ink)]">
+                        </label>
+                        <button type="submit" class="ip-primary inline-flex h-9 cursor-pointer items-center justify-center rounded-lg px-4 text-[12.5px] font-semibold">Mark {{ $peso($row['amountMinor']) }} paid</button>
+                    </form>
+                </li>
+            @endforeach
+        </ul>
+    @endif
+    @if ($riderPayouts->isNotEmpty())
+        <details class="border-t border-[var(--border-strong)] px-4 py-3 font-sans text-[13px] text-[var(--text-ink)]" @if(request()->has('rider_payouts_page') || (is_string(old('_reversal')) && str_starts_with(old('_reversal'), 'rider-'))) open @endif>
+            <summary class="cursor-pointer font-semibold text-[var(--text-ink)]">Recent rider payments</summary>
+            <ul class="mt-2 space-y-1 text-[12.5px] text-[var(--text-muted)]">
+                @foreach ($riderPayouts as $payout)
+                    <li class="border-b border-[var(--border-strong)] py-3 tabular-nums">
+                        <p class="text-[var(--text-muted)]">{{ $payout->paid_on->format('M j, Y') }} &middot; {{ $payout->courier?->name ?? 'Unknown rider' }} &middot; <span class="font-semibold text-[var(--text-ink)]">{{ $peso($payout->amount_minor) }}</span> for {{ $payout->earning_count }} {{ \Illuminate\Support\Str::plural('job', $payout->earning_count) }} &middot; Ref {{ $payout->reference }} &middot; {{ $payout->reversal ? 'Reversed' : 'Paid' }}</p>
+                        @if ($payout->reversal)
+                            <p class="mt-1 text-[var(--text-muted)]">Reversed by {{ $payout->reversal->actor_name }} on {{ $payout->reversal->created_at->timezone(StoreSale::TIMEZONE)->format('M j, Y g:i A') }}: {{ $payout->reversal->reason }}</p>
+                        @else
+                            <details class="mt-2" @if(old('_reversal') === 'rider-'.$payout->id) open @endif>
+                                <summary class="cursor-pointer font-semibold text-[var(--text-ink)]">Correct this payment record</summary>
+                                <p class="mt-2 text-[var(--text-muted)]">Reversing keeps this history and returns its jobs to unpaid. This does not refund money. Reconcile the actual payment before recording its replacement.</p>
+                                <form method="POST" action="{{ route('logistics.earnings.reverse-rider-payment', $payout) }}" class="mt-2 flex flex-col items-start gap-2">
+                                    @csrf
+                                    <input type="hidden" name="_reversal" value="rider-{{ $payout->id }}">
+                                    <label for="rider-reversal-{{ $payout->id }}" class="font-semibold text-[var(--text-ink)]">Reason for correction</label>
+                                    <textarea id="rider-reversal-{{ $payout->id }}" name="reason" required minlength="10" maxlength="500" rows="2" class="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2 text-[var(--text-ink)]">{{ old('_reversal') === 'rider-'.$payout->id && is_string(old('reason')) ? old('reason') : '' }}</textarea>
+                                    <label class="flex items-start gap-2 text-[var(--text-ink)]"><input type="checkbox" name="confirm_reversal" value="1" required class="mt-0.5">I confirm this record needs reversal and its jobs should become unpaid.</label>
+                                    <button type="submit" class="rounded-lg border border-[var(--border-strong)] px-3 py-2 font-semibold text-[var(--text-ink)]">Reverse payment record</button>
+                                </form>
+                            </details>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+            <div class="mt-3">{{ $riderPayouts->links() }}</div>
+        </details>
+    @endif
+</section>
 
 <div role="tablist" aria-label="Earnings records" class="mb-4 flex flex-wrap gap-x-6 border-b border-[var(--border-strong)]">
     <a role="tab" href="#stage-fees" data-ip-tab="fees" aria-selected="{{ $firstStage === 'fees' ? 'true' : 'false' }}" class="ip-tab -mb-px inline-flex min-h-11 items-center gap-2 font-sans text-[13px] font-medium no-underline">
@@ -155,11 +291,7 @@
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-[var(--text-muted)]">{{ $parcel->created_at->timezone(StoreSale::TIMEZONE)->format('M j, Y') }}</td>
                             <td class="px-4 py-3 text-right tabular-nums">{{ $peso($parcel->amount_minor) }}</td>
-                            @if ($parcel->isCrossProvider())
-                                <td class="px-4 py-3 text-right text-[12px] text-[var(--text-muted)]">Pending allocation</td>
-                            @else
-                                <td class="ip-emerald ip-tone-text px-4 py-3 text-right font-semibold tabular-nums">{{ $peso($parcel->keptShippingMinor()) }}</td>
-                            @endif
+                            <td class="ip-emerald ip-tone-text px-4 py-3 text-right font-semibold tabular-nums">{{ $peso($parcel->keptShippingMinor()) }}@if ($parcel->isCrossProvider())<span class="block text-[11px] font-normal text-[var(--text-muted)]">60% share</span>@endif</td>
                             <td class="px-4 py-3 text-right tabular-nums">{{ $peso($parcel->dueToZefanyaMinor()) }}</td>
                             <td class="px-4 py-3"><span class="{{ $look['tone'] }} ip-tinted inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold">{{ $look['label'] }}</span></td>
                         </tr>
@@ -198,6 +330,7 @@
         <div class="mt-4">{{ $payments->links() }}</div>
     @endif
 </section>
+@endif
 </div>
 </div>
 @endsection

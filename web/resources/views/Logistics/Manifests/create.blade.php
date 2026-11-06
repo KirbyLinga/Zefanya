@@ -1,15 +1,15 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Create Manifest')
+@section('title', 'Create Transfer Batch')
 
 @section('content')
 <div class="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-strong)] pb-6">
     <div>
         <p class="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-700">Internal movements</p>
-        <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Create Manifest</h1>
+        <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Create Transfer Batch</h1>
         <p class="mt-2 max-w-2xl font-sans text-xs leading-relaxed text-[var(--text-muted)]">Choose two operational hubs inside {{ $provider->business_name }}. Parcels are added after the draft is created.</p>
     </div>
-    <a href="{{ route('logistics.manifests.index') }}" class="inline-flex min-h-10 items-center rounded-sm border border-[var(--border-strong)] px-4 font-sans text-[11px] font-semibold text-[var(--text-ink)] hover:bg-[var(--bg-surface)]">Back to manifests</a>
+    <a href="{{ route('logistics.manifests.index') }}" class="inline-flex min-h-10 items-center rounded-sm border border-[var(--border-strong)] px-4 font-sans text-[11px] font-semibold text-[var(--text-ink)] hover:bg-[var(--bg-surface)]">Back to transfer batches</a>
 </div>
 
 @if ($errors->any())
@@ -23,7 +23,7 @@
     <section class="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface)] px-6 py-12 text-center">
         <i data-lucide="warehouse" class="mx-auto mb-4 size-8 text-primary-400"></i>
         <h2 class="font-serif text-lg text-[var(--text-ink)]">Two operational hubs are required</h2>
-        <p class="mx-auto mt-2 max-w-md font-sans text-xs leading-relaxed text-[var(--text-muted)]">A manifest needs an approved, active origin hub and a different destination hub. Add or activate hubs first.</p>
+        <p class="mx-auto mt-2 max-w-md font-sans text-xs leading-relaxed text-[var(--text-muted)]">A transfer batch needs an approved, active origin hub and a different destination hub. Add or activate hubs first.</p>
         <a href="{{ route('logistics.hubs.index') }}" class="mt-5 inline-flex min-h-9 items-center rounded-sm border border-[var(--border-strong)] px-4 font-sans text-[11px] font-semibold text-[var(--text-ink)] hover:bg-[var(--bg-page)]">Manage hubs</a>
     </section>
 @else
@@ -73,7 +73,7 @@
 
         <div class="mt-6 flex items-start gap-2 rounded-md border border-[var(--border-strong)] bg-[var(--bg-page)] px-3 py-2.5 font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">
             <i data-lucide="info" class="mt-0.5 size-3.5 shrink-0 text-primary-600"></i>
-            <p>Same-station deliveries do not require a manifest. Only parcels physically at the origin hub can be added while this manifest is a draft.</p>
+            <p>Same-station deliveries do not require a transfer batch. Only parcels physically at the origin hub can be added while this batch is a draft.</p>
         </div>
 
         <div class="mt-6 flex flex-wrap justify-end gap-3">

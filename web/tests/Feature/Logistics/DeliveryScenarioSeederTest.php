@@ -21,8 +21,6 @@ use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Buyer\DeliveryOtpCode;
-use App\Services\Logistics\ManifestService;
-use App\Services\Logistics\ParcelHandoffService;
 use Database\Seeders\DeliveryScenarioSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -136,7 +134,7 @@ class DeliveryScenarioSeederTest extends TestCase
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $this->riderScan($delivery, $parcel),
             'delivery_otp' => $code,
-            'proof_photo' => UploadedFile::fake()->create('proof.jpg', 20, 'image/jpeg'),
+            'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount' => number_format($payment->amount_minor / 100, 2, '.', ''),
         ])->assertRedirect(route('rider.deliveries.index'))->assertSessionHasNoErrors();
@@ -285,8 +283,12 @@ class DeliveryScenarioSeederTest extends TestCase
 
     private function cart(Buyer $buyer, Product $product): CartItem
     {
-        $cart = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'quantity' => 1]);
-        session([CheckoutController::SESSION_KEY => [$cart->id]]);
+        $this->actingAs($buyer, 'buyer')->get(route('buyer.search.index', ['q' => $product->name]))->assertOk()->assertSee($product->name);
+        $this->get(route('buyer.products.show', $product->id))->assertOk()->assertSee('Add to Cart');
+        $this->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 1])->assertOk()->assertJson(['success' => true]);
+        $cart = CartItem::query()->where('buyer_id', $buyer->id)->where('product_id', $product->id)->sole();
+        $this->get(route('buyer.cart.index'))->assertOk();
+        $this->get(route('buyer.checkout.index', ['items' => [$cart->id]]))->assertOk();
 
         return $cart;
     }
@@ -304,28 +306,26 @@ class DeliveryScenarioSeederTest extends TestCase
 
     private function moveByManifest(LogisticsProvider $owner, SellerOrder $parcel, int $from, LogisticsHub $to): void
     {
-        $service = app(ManifestService::class);
         $this->actingAs($owner, 'logistics')->post(route('logistics.manifests.store'), ['origin_hub_id' => $from, 'destination_hub_id' => $to->id])
             ->assertSessionHasNoErrors();
         $manifest = Manifest::query()->latest('id')->firstOrFail();
         $this->post(route('logistics.manifests.items.store', $manifest), ['seller_order_id' => $parcel->id])->assertSessionHasNoErrors();
         $item = $manifest->items()->sole();
-        $scan = $service->verifyScan($manifest, $owner, $parcel->tracking_number, 'dispatch');
+        $scan = $this->actingAs($owner, 'logistics')->postJson(route('logistics.manifests.scan.verify', $manifest), ['tracking_number' => $parcel->tracking_number, 'phase' => 'dispatch'])->assertOk()->json();
         $this->post(route('logistics.manifests.dispatch', $manifest), ['tokens' => [$item->id => $scan['verification_token']]])->assertSessionHasNoErrors();
-        $scan = $service->verifyScan($manifest->refresh(), $owner, $parcel->tracking_number, 'receive');
+        $scan = $this->actingAs($owner, 'logistics')->postJson(route('logistics.manifests.scan.verify', $manifest), ['tracking_number' => $parcel->tracking_number, 'phase' => 'receive'])->assertOk()->json();
         $this->post(route('logistics.manifests.receive.store', [$manifest, $item]), ['verification_token' => $scan['verification_token']])->assertSessionHasNoErrors();
     }
 
     private function moveByHandoff(LogisticsProvider $owner, LogisticsProvider $destination, SellerOrder $parcel): void
     {
-        $service = app(ParcelHandoffService::class);
         $this->actingAs($owner, 'logistics')->post(route('logistics.handoffs.store'), ['seller_order_id' => $parcel->id])->assertSessionHasNoErrors();
         $handoff = ParcelHandoff::query()->latest('id')->firstOrFail();
         $this->assertSame($destination->id, (int) $handoff->destination_provider_id);
         $this->actingAs($destination, 'logistics')->post(route('logistics.handoffs.accept', $handoff))->assertSessionHasNoErrors();
-        $scan = $service->verifyScan($handoff->refresh(), $owner, $parcel->tracking_number, 'dispatch');
+        $scan = $this->actingAs($owner, 'logistics')->postJson(route('logistics.handoffs.scan.verify', $handoff), ['tracking_number' => $parcel->tracking_number, 'phase' => 'dispatch'])->assertOk()->json();
         $this->actingAs($owner, 'logistics')->post(route('logistics.handoffs.dispatch', $handoff), ['verification_token' => $scan['verification_token']])->assertSessionHasNoErrors();
-        $scan = $service->verifyScan($handoff->refresh(), $destination, $parcel->tracking_number, 'receive');
+        $scan = $this->actingAs($destination, 'logistics')->postJson(route('logistics.handoffs.scan.verify', $handoff), ['tracking_number' => $parcel->tracking_number, 'phase' => 'receive'])->assertOk()->json();
         $this->actingAs($destination, 'logistics')->post(route('logistics.handoffs.receive', $handoff), ['verification_token' => $scan['verification_token']])->assertSessionHasNoErrors();
     }
 

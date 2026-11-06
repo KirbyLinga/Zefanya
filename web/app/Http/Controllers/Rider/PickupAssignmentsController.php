@@ -6,6 +6,7 @@ use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rider\PickupFailureRequest;
+use App\Models\Logistics\PickupSession;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Admin\PickupFailureException;
 use App\Notifications\Logistics\RiderParcelActivity;
@@ -13,6 +14,8 @@ use App\Notifications\Rider\PickupFailure;
 use App\Notifications\Seller\PickupFailed;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\PickupPolicy;
+use App\Services\Logistics\PickupSessionService;
 use App\Services\Rider\RiderOperationsService;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
@@ -32,11 +35,34 @@ class PickupAssignmentsController extends Controller
     public function index(Request $request, RiderOperationsService $operations): View
     {
         $rider = $request->user('rider');
+        $shipments = $operations->pickupAssignments($rider);
+
+        // One card per seller stop. A parcel with no session (booked before sessions existed) is its own stop.
+        $sessions = PickupPolicy::sessionsAvailable()
+            ? PickupSession::query()->whereKey($shipments->pluck('pickup_session_id')->filter()->unique()->all())->get()->keyBy('id')
+            : collect();
+        $summaries = $sessions->map(fn (PickupSession $session): array => app(PickupSessionService::class)->summary($session));
 
         return view('Rider.Pickups.index', [
             'rider' => $rider,
-            'shipments' => $operations->pickupAssignments($rider),
+            'shipments' => $shipments,
+            'sessions' => $sessions,
+            'summaries' => $summaries,
         ]);
+    }
+
+    /** The rider has finished at this seller. Parcels not collected wait for a later visit. */
+    public function finishStop(Request $request, PickupSession $pickupSession, PickupSessionService $sessions): RedirectResponse
+    {
+        $courier = $this->operations->operationalCourier($request->user('rider'));
+
+        try {
+            $sessions->finish($pickupSession, $courier);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return back()->with('success', 'Stop finished. Any parcel you did not collect stays assigned to you for the next visit.');
     }
 
     public function confirm(

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
+use App\Exceptions\StaleStateException;
 use App\Http\Controllers\Controller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
@@ -56,6 +57,9 @@ class OrderController extends Controller
     {
         $buyer = $request->user('buyer');
         $tab = $request->query('tab', 'all');
+        if (! in_array($tab, ['all', 'to_ship', 'to_receive', 'completed', 'cancelled', 'delivery_failed', 'returned'], true)) {
+            $tab = 'all';
+        }
         $search = trim((string) $request->query('search', ''));
 
         $baseQuery = Order::query()
@@ -249,7 +253,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Buyer cancels one seller_order slice before Ready for Pickup.
+     * Buyer cancels one seller_order slice before the seller accepts it.
      * Stock/payment side effects run through the shared
      * status service (same path as F1 seller decline).
      */
@@ -286,10 +290,10 @@ class OrderController extends Controller
                     abort(404);
                 }
 
-                if (! in_array($current->status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing], true)) {
-                    throw new \InvalidArgumentException(
-                        'Immediate cancellation is unavailable once this shipment is ready for pickup.'
-                    );
+                if ($current->status !== OrderStatus::Placed) {
+                    throw new StaleStateException($current->status === OrderStatus::Cancelled
+                        ? 'This shipment is already cancelled.'
+                        : 'This order can no longer be cancelled because the seller has already accepted it.');
                 }
 
                 $service->transition(
@@ -305,7 +309,18 @@ class OrderController extends Controller
             }, 3);
         } catch (\InvalidArgumentException $e) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => $e->getMessage()], 422);
+                if (! $e instanceof StaleStateException) {
+                    return response()->json(['message' => $e->getMessage()], 422);
+                }
+
+                // Let the page swap the stale Cancel button for the real status.
+                $status = $sellerOrder->fresh()->status;
+
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'status' => $status->value,
+                    'status_label' => $status->label(),
+                ], 409);
             }
 
             return back()->withErrors(['reason' => $e->getMessage()]);

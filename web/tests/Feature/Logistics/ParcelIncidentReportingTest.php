@@ -117,7 +117,7 @@ class ParcelIncidentReportingTest extends TestCase
     public function test_non_images_and_oversized_photos_are_rejected(): void
     {
         $parcel = $this->parcel();
-        foreach ([UploadedFile::fake()->create('evidence.pdf', 10, 'application/pdf'), UploadedFile::fake()->create('oversized.png', 5121, 'image/png')] as $photo) {
+        foreach ([UploadedFile::fake()->create('evidence.pdf', 10, 'application/pdf'), UploadedFile::fake()->image('oversized.png')->size(5223)] as $photo) {
             $this->actingAs($this->provider, 'logistics')->post(route('logistics.parcels.incidents.store', $parcel),
                 $this->payload('damaged') + ['photo' => $photo])->assertSessionHasErrors('photo');
         }

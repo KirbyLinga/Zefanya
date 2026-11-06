@@ -87,7 +87,7 @@
                 <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_BODY_LENGTH }} characters.</p>
 
                 <label class="block text-sm text-buyer-ink" for="review-photos">Photos (optional)</label>
-                <input id="review-photos" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="block w-full text-sm text-buyer-ink-soft">
+                <input id="review-photos" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="upload-input">
                 <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_PHOTOS }} JPG, PNG or WebP photos, 3 MB each.</p>
 
                 @include('Buyer.Products._review-errors')
@@ -168,7 +168,7 @@
                                 @endif
 
                                 <label class="block text-sm text-buyer-ink" for="edit-review-photos-{{ $myReview->id }}">Add photos (optional)</label>
-                                <input id="edit-review-photos-{{ $myReview->id }}" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="block w-full text-sm text-buyer-ink-soft">
+                                <input id="edit-review-photos-{{ $myReview->id }}" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="upload-input">
 
                                 @include('Buyer.Products._review-errors')
 

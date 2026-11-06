@@ -104,9 +104,11 @@ class LogisticsDashboardTest extends TestCase
         @$document->loadHTML($html);
         $xpath = new \DOMXPath($document);
 
-        foreach (['logistics.dashboard' => 'Dashboard', 'logistics.riders.index' => 'Riders'] as $name => $label) {
+        foreach (['logistics.dashboard' => 'Dashboard', 'logistics.riders.index' => 'Riders', 'logistics.earnings.index' => 'Earnings'] as $name => $label) {
             $this->assertSame(1, $xpath->query('//*[@id="logisticsNav"]//a[@href="'.route($name).'" and normalize-space(.)="'.$label.'"]')->length);
         }
+
+        $this->assertSame(0, $xpath->query('//*[@id="logisticsNav"]//a[contains(normalize-space(.), "Shipping rates")]')->length);
 
         foreach ($xpath->query('//*[@id="logisticsNav"]//a') as $link) {
             $href = $link->getAttribute('href');

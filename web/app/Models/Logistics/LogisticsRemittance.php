@@ -26,9 +26,17 @@ class LogisticsRemittance extends Model
             'shipping_total_minor' => 'integer',
             'amount_minor' => 'integer',
             'received_amount_minor' => 'integer',
+            'short_minor' => 'integer',
+            'left_out_count' => 'integer',
             'confirmed_at' => 'datetime',
             'rejected_at' => 'datetime',
         ];
+    }
+
+    /** Admin confirmed only some of the parcels because less money arrived than stated. */
+    public function isPartlyConfirmed(): bool
+    {
+        return $this->status === self::CONFIRMED && $this->left_out_count > 0;
     }
 
     public function provider(): BelongsTo

@@ -13,6 +13,7 @@
     @stack('styles')
 </head>
 <body class="min-h-screen bg-primary-50">
+    <a href="#adminMain" class="sr-only rounded-lg bg-primary-800 px-4 py-2 font-sans text-[13px] font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60]">Skip to content</a>
 
     <div class="flex min-h-screen">
 
@@ -23,8 +24,11 @@
             @php
                 $topBarAdmin = auth('admin')->user();
             @endphp
-            <header data-admin-topbar class="flex min-h-16 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 sm:px-8">
-                <p class="font-sans text-[13px] text-neutral-600">{{ now(\App\Models\Seller\StoreSale::TIMEZONE)->format('l, F j, Y') }}</p>
+            <header data-admin-topbar class="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 sm:px-8">
+                <div class="min-w-0">
+                    <p class="truncate font-sans text-sm font-semibold text-neutral-950">@yield('title', 'Zefanya Admin')</p>
+                    <p class="font-sans text-xs text-neutral-600">{{ now(\App\Models\Seller\StoreSale::TIMEZONE)->format('l, F j, Y') }}</p>
+                </div>
                 <details class="group relative">
                     <summary class="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2 transition-colors hover:bg-neutral-100 [&::-webkit-details-marker]:hidden">
                         <span class="hidden flex-col items-end sm:flex">
@@ -49,8 +53,10 @@
             </header>
 
             {{-- Main Content --}}
-            <main class="flex-1 p-8">
-                @yield('content')
+            <main id="adminMain" tabindex="-1" class="flex-1 p-4 focus:outline-none sm:p-6 lg:p-8">
+                <div class="mx-auto w-full max-w-[1400px]">
+                    @yield('content')
+                </div>
             </main>
         </div>
 
@@ -58,6 +64,7 @@
 
     <script src="{{ asset('js/lucide.min.js') }}"></script>
     <script>lucide.createIcons();</script>
+    @vite('resources/js/submit-guard.js')
     @stack('scripts')
 </body>
 </html>

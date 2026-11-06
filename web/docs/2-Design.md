@@ -17,8 +17,8 @@
   - **Services** hold the invariants: `SellerOrderStatusService` (the only writer of status), `CourierAssignmentService`, `StockService`, `VariantSyncService`, `CartSummary`.
   - **Models** hold relations, casts, small domain helpers (OTP, tracking-number generation, rollup computation).
   - **Middlewares** gate panel access by approval status and admin role.
-- **Background work:** none meaningful. `QUEUE_CONNECTION=sync`; notifications run inline. There is one artisan command, `orders:resync` (`app/Console/Commands/OrdersResyncCommand.php`).
-- **One scheduler?** `routes/console.php` registers only `inspire`. No scheduled tasks.
+- **Background work:** `config/queue.php` defaults to `database` and commits jobs after the surrounding transaction. Local `.env` may still set `QUEUE_CONNECTION=sync`, which runs work inline. A `database` connection needs `php artisan queue:work --tries=3`. Notifications stay synchronous unless a class implements `ShouldQueue`.
+- **Scheduler:** `routes/console.php` runs buyer auto-receipt, overdue return approval, and missed pickup-window rolling every five minutes, and daily pruning of expired Sanctum tokens and failed jobs. Each task records a cache heartbeat and emails admins on failure. Production cron is `* * * * * php artisan schedule:run`.
 
 ### 1.1 The service layer
 
@@ -181,7 +181,19 @@ All tables below are derived from `database/migrations/`. Notation: `NN` = NOT N
 
 **`logistics_remittances`** — one payment from a Logistics company to Zefanya: logistics_provider_id **FK (restrict)**, `parcel_count`, `cod_total_minor`, `shipping_total_minor`, `amount_minor` (cash minus the shipping it keeps), `reference`, `status` (`SUBMITTED`, `CONFIRMED`, `REJECTED`), `received_amount_minor`, `decided_by_admin_id` **FK (restrict)**, `confirmed_at`, `rejected_at`, `rejection_reason`. `cod_remittances` gains `logistics_remittance_id` and `zefanya_received_at`; seller payouts require `zefanya_received_at`. Companies record payments at `logistics/earnings`; Admin confirms the exact amount or rejects at `admin/logistics-remittances`.
 
-**`logistics_shipping_rates`** — id, logistics_provider_id **FK (cascade)**, `zone` (`same_municipality`, `same_province`, `cross_province`), `first_kg_minor` intU nullable, `additional_kg_minor` intU nullable. **Unique `(logistics_provider_id, zone)`**. Null means the company uses the marketplace rate from `config/buyer.php`. Edited at `logistics/shipping-rates`; placed orders keep `seller_orders.shipping_fee_minor`.
+**`rider_earnings`** — pay a Courier earned for one successful job: seller_order_id **FK**, courier_id **FK**, logistics_provider_id **FK** (all restrict), `job` (`pickup` | `delivery`), `amount_minor` (the rate in force when earned: pickup ₱30 first / ₱5 additional per session, delivery ₱50, all from Platform Settings), `earned_at`; **unique (seller_order_id, job)**. `pickup_session_id` FK nullable and `session_first` (1 only on a session's first-parcel payment), **unique (pickup_session_id, session_first)**. Failed attempts write no row. `rider_payout_id` FK nullable, set once when paid.
+
+**`pickup_sessions`** — one rider's visit to one seller in one pickup window: logistics_provider_id, seller_id, courier_id (**FK**, restrict), `pickup_address_hash`, `pickup_address`, `pickup_barangay_code`, `window_key`, `window_starts_at`, `window_ends_at`, `status` (`OPEN` | `IN_PROGRESS` | `COMPLETED` | `MISSED` | `CANCELLED`), rate snapshot `first_minor` / `additional_minor`, `first_payable`, `continuation_of_id`, `started_at`, `closed_at`, `close_reason`, and `open_key` (unique, set only while OPEN, so one open session per seller + address + provider + window + rider). `seller_orders` gains `pickup_session_id` (FK, null on delete), `pickup_window_key`, `pickup_window_starts_at`, `pickup_window_ends_at`, `pickup_missed_windows`. Platform Settings gain `pickup_window_morning`, `pickup_window_afternoon`, `rider_pickup_first_rate`, `rider_pickup_additional_rate`, `rider_delivery_rate`.
+
+**`rider_payouts`** — one payment from a Logistics company to a Courier for a batch of earnings: logistics_provider_id, courier_id **FK**, `earning_count`, `amount_minor`, `reference`, `paid_on` date, `status` (`PAID`).
+
+**`seller_debts`** — money a Seller was already paid for an order that was then returned or refunded: seller_id, `seller_order_id` *(unique)*, seller_settlement_id **FKs**, `amount_minor`, `settled_minor`, `reason`. `seller_payout_requests.debt_deducted_minor` is the part of a request that repays it; the debt is settled when Admin records the payout, not when the seller requests it.
+
+`parcel_returns` also keeps the refund: `refund_amount_minor`, `refund_recipient`, `refund_paid_on`, and `refund_proof_path` (private, shown only to Admin). `logistics_remittances.short_minor` and `left_out_count` record a partly confirmed payment. `cod_remittances.reconciliation` (`allocated` or `kept`), `reconciled_at`, `destination_share_minor` and `destination_paid_*` record the one-time decision on a parcel sent under the old full-fee rule.
+
+**`origin_share_payouts`** — one payment from Zefanya to an origin carrier for its 40% of cross-provider fees: logistics_provider_id **FK**, `parcel_count`, `amount_minor`, `reference` *(unique per provider)*, `paid_on` date, `status` (`PAID`), paid_by_admin_id **FK**. `cod_remittances` gained `kept_shipping_minor` and `origin_share_minor` (split frozen at delivery) and `origin_share_payout_id` (set once).
+
+**`logistics_shipping_rates`** — id, logistics_provider_id **FK (cascade)**, `zone` (`same_municipality`, `same_province`, `cross_province`), `first_kg_minor` intU nullable, `additional_kg_minor` intU nullable. **Unique `(logistics_provider_id, zone)`**. Null means the company uses the marketplace rate from `config/buyer.php`. Shown on Earnings → Shipping Rates (`/logistics/earnings?tab=shipping-rates`); `/logistics/shipping-rates` redirects there. Placed orders keep `seller_orders.shipping_fee_minor`.
 
 > Two parallel coverage models exist: the legacy `couriers.service_area` JSON and the newer `areas` table. The `areas` table supersedes it but `service_area` is still NOT NULL.
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\CodRemittance;
 use App\Services\Logistics\CodRemittanceService;
+use App\Services\Logistics\LogisticsRemittanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -36,7 +37,12 @@ class CodRemittanceController extends Controller
             ->orderBy('id')
             ->paginate(20)->withQueryString();
 
-        return view('Logistics.CodRemittances.index', compact('remittances', 'riderReconciliation', 'reconciliationTotals'));
+        $overdueDays = LogisticsRemittanceService::OVERDUE_AFTER_DAYS;
+        $overdueCutoff = now()->subDays($overdueDays);
+        $overdueCount = (clone $ledger)->where('status', CodRemittance::PENDING_REMITTANCE)
+            ->where('created_at', '<', $overdueCutoff)->count();
+
+        return view('Logistics.CodRemittances.index', compact('remittances', 'riderReconciliation', 'reconciliationTotals', 'overdueDays', 'overdueCutoff', 'overdueCount'));
     }
 
     public function confirm(

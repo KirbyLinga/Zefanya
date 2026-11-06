@@ -2,6 +2,7 @@
 
 namespace App\Models\Rider;
 
+use App\Enums\LogisticsProviderStatus;
 use App\Enums\OrderStatus;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
@@ -17,8 +18,11 @@ use Illuminate\Support\Facades\Schema;
 
 class Courier extends Model
 {
-    /** Legacy workload display cap; weight is the real assignment limit. */
-    public const ACTIVE_CAPACITY = 1;
+    /**
+     * Most active jobs (pickup + delivery legs) one Rider may hold at once.
+     * Weight is checked as well: both limits must allow a new job.
+     */
+    public const ACTIVE_CAPACITY = 3;
 
     protected static function booted(): void
     {
@@ -98,6 +102,12 @@ class Courier extends Model
     {
         return (int) ($this->active_pickups_count ?? $this->activePickups()->count())
             + (int) ($this->active_deliveries_count ?? $this->activeDeliveries()->count());
+    }
+
+    /** True when the Rider already holds the maximum number of active jobs. */
+    public function isAtJobLimit(): bool
+    {
+        return $this->activeWorkload() >= self::ACTIVE_CAPACITY;
     }
 
     /**
@@ -188,15 +198,25 @@ class Courier extends Model
             && $rider->isEligibleForAssignment();
     }
 
+    /**
+     * Couriers that may be offered a NEW job: the Rider rules of
+     * isEligibleForAssignment() plus the Rider being online. The instance
+     * check above ignores online status on purpose, so an offline Rider
+     * keeps and finishes the jobs already held.
+     */
     public function scopeEligibleForAssignment(Builder $query): Builder
     {
         return $query
             ->whereNotNull('couriers.rider_id')
             ->whereHas('rider', function (Builder $rider): void {
                 $rider->whereIn('status', Rider::ASSIGNABLE_STATUSES)
+                    ->where('is_online', true)
                     ->whereNotNull('email_verified_at')
                     ->whereNotNull('station_hub_id')
                     ->whereColumn('riders.logistics_provider_id', 'couriers.logistics_provider_id')
+                    ->whereHas('provider', fn (Builder $provider) => $provider
+                        ->where('status', LogisticsProviderStatus::Approved->value)
+                        ->whereNull('archived_at'))
                     ->whereHas('station', function (Builder $station): void {
                         $station->where('hub_type', LogisticsHub::STATION)
                             ->where('approval_status', LogisticsHub::APPROVAL_APPROVED)

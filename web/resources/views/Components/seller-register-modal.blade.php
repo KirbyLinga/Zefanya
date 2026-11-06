@@ -160,7 +160,7 @@
                 </div>
                 <div class="mb-5 hidden" id="sellerSecCertificateFields">
                     <label class="mb-2 block font-sans text-xs font-semibold text-neutral-600" for="sellerSecCertificate">SEC certificate (corporations) *</label>
-                    <input type="file" name="sec_certificate" id="sellerSecCertificate" accept=".jpg,.jpeg,.png,.pdf" disabled class="block w-full font-sans text-sm">
+                    <input type="file" name="sec_certificate" id="sellerSecCertificate" accept=".jpg,.jpeg,.png,.pdf" disabled class="upload-input">
                     <p class="mt-1 font-sans text-xs text-neutral-500">JPG, PNG or PDF, maximum 5 MB.</p>
                     <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-sec_certificate"></span>
                 </div>
@@ -197,27 +197,27 @@
 
                 <div class="mb-5">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerUploadId">Upload valid ID *</label>
-                    <div class="mb-1 flex items-center gap-3 rounded-sm border border-dashed border-neutral-300 bg-neutral-50 p-4 transition-colors hover:border-[#9c5c68]">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-white text-[#9c5c68] shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
+                    <div class="upload-zone mb-1 flex items-center gap-3">
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
                         <span>
                             <span class="block font-sans text-sm font-semibold text-neutral-800" id="sellerUploadIdName">Choose a valid ID</span>
                             <span class="block font-sans text-xs text-neutral-500">JPG, PNG, or PDF · Max 5MB</span>
                         </span>
                     </div>
-                    <input type="file" name="upload_id" id="sellerUploadId" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
+                    <input type="file" name="upload_id" id="sellerUploadId" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="sr-only">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-upload_id"></span>
                 </div>
 
                 <div class="mb-6">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerBusinessPermit">Upload business permit *</label>
-                    <div class="mb-1 flex items-center gap-3 rounded-sm border border-dashed border-neutral-300 bg-neutral-50 p-4 transition-colors hover:border-[#9c5c68]">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-white text-[#9c5c68] shadow-sm"><i data-lucide="file-text" width="18" height="18"></i></span>
+                    <div class="upload-zone mb-1 flex items-center gap-3">
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="file-text" width="18" height="18"></i></span>
                         <span>
                             <span class="block font-sans text-sm font-semibold text-neutral-800" id="sellerBusinessPermitName">Choose a business permit</span>
                             <span class="block font-sans text-xs text-neutral-500">JPG, PNG, or PDF · Max 5MB</span>
                         </span>
                     </div>
-                    <input type="file" name="business_permit" id="sellerBusinessPermit" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
+                    <input type="file" name="business_permit" id="sellerBusinessPermit" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="sr-only">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-business_permit"></span>
                 </div>
 

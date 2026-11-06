@@ -390,6 +390,114 @@ class SellerVoucherTest extends TestCase
         $this->get(route('seller.vouchers.edit', $voucher))->assertOk()->assertSee('name="code"', false);
     }
 
+    public function test_creation_is_a_modal_on_the_listing_and_the_create_url_opens_it(): void
+    {
+        $this->shopVoucher();
+        $this->actingAs($this->seller, 'seller');
+
+        $this->get(route('seller.vouchers.index'))->assertOk()
+            ->assertSee('id="create-voucher-dialog"', false)->assertSee('data-open="false"', false)
+            ->assertSee('aria-haspopup="dialog"', false)->assertSee('SHOP10');
+        $this->get(route('seller.vouchers.create'))->assertOk()
+            ->assertSee('data-open="true"', false)->assertSee('SHOP10');
+    }
+
+    public function test_creation_validation_reopens_the_modal_with_the_draft(): void
+    {
+        $this->from(route('seller.vouchers.index'))->createVoucher([
+            '_modal' => 'voucher-create', 'code' => 'RETRY99', 'percent' => 100, 'min_spend' => '123.45',
+        ])->assertRedirect(route('seller.vouchers.index'))->assertSessionHasErrors('percent');
+
+        $this->withCookie(config('session.cookie'), session()->getId())
+            ->get(route('seller.vouchers.index'))->assertOk()
+            ->assertSee('data-open="true"', false)->assertSee('value="RETRY99"', false)
+            ->assertSee('value="123.45"', false)->assertSee('The percentage must be a whole number from 1 to 99.');
+    }
+
+    public function test_listing_action_errors_do_not_open_the_creation_modal(): void
+    {
+        $voucher = $this->shopVoucher(['ended_at' => now()]);
+        $this->actingAs($this->seller, 'seller');
+
+        $this->get(route('seller.vouchers.edit', $voucher))->assertRedirect(route('seller.vouchers.index'))
+            ->assertSessionHasErrors('voucher');
+        $this->withCookie(config('session.cookie'), session()->getId())
+            ->get(route('seller.vouchers.index'))->assertOk()->assertSee('data-open="false"', false)
+            ->assertSee('This voucher has ended and can no longer be edited.');
+    }
+
+    public function test_code_availability_normalizes_and_rejects_codes_from_any_store(): void
+    {
+        Voucher::factory()->shop(Seller::factory()->create())->create(['code' => 'TAKEN123']);
+        Voucher::factory()->create(['code' => 'PLATFORM9']);
+        $this->actingAs($this->seller, 'seller');
+
+        $this->getJson(route('seller.vouchers.code-availability', ['code' => '  taken123  ']))
+            ->assertOk()->assertExactJson(['available' => false])->assertHeader('Cache-Control', 'no-store, private');
+        $this->getJson(route('seller.vouchers.code-availability', ['code' => 'PLATFORM9']))
+            ->assertOk()->assertExactJson(['available' => false]);
+        $this->getJson(route('seller.vouchers.code-availability', ['code' => 'FRESH123']))
+            ->assertOk()->assertExactJson(['available' => true]);
+    }
+
+    public function test_code_availability_validates_format_and_requires_an_approved_seller(): void
+    {
+        $url = route('seller.vouchers.code-availability', ['code' => 'FRESH123']);
+        $this->getJson($url)->assertUnauthorized();
+        $this->actingAs($this->buyer(), 'buyer')->getJson($url)->assertUnauthorized();
+        $this->actingAs(Seller::factory()->create(['status' => 'pending']), 'seller')->getJson($url)->assertForbidden();
+        $this->actingAs($this->seller, 'seller');
+
+        $this->getJson(route('seller.vouchers.code-availability', ['code' => 'BAD-CODE']))
+            ->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->getJson(route('seller.vouchers.code-availability', ['code' => ['ARRAY']]))
+            ->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
+
+    public function test_code_availability_is_rate_limited(): void
+    {
+        $this->actingAs($this->seller, 'seller');
+        $url = route('seller.vouchers.code-availability', ['code' => 'FRESH123']);
+
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            $this->getJson($url)->assertOk();
+        }
+        $this->getJson($url)->assertTooManyRequests();
+    }
+
+    public function test_create_page_defaults_limits_and_repopulates_failed_entries_without_exposing_other_stores(): void
+    {
+        $other = Product::factory()->create(['name' => 'Other Store Private Product']);
+        $this->product->images()->create(['path' => 'products/scarf.jpg', 'thumbnail_path' => 'products/scarf-thumb.jpg', 'is_primary' => true]);
+        $this->actingAs($this->seller, 'seller');
+
+        $page = $this->get(route('seller.vouchers.create'))->assertOk()
+            ->assertSee('/storage/products/scarf-thumb.jpg', false)->assertDontSee($other->name);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML($page->getContent());
+        $xpath = new \DOMXPath($dom);
+        $this->assertSame('1', $xpath->evaluate('string(//input[@name="per_buyer_limit"]/@value)'));
+        $this->assertSame('', $xpath->evaluate('string(//input[@name="usage_limit"]/@value)'));
+        $this->assertSame('', $xpath->evaluate('string(//input[@name="min_spend"]/@value)'));
+
+        $this->from(route('seller.vouchers.create'))->createVoucher([
+            'code' => 'RETRY99', 'percent' => 100, 'min_spend' => '123.45', 'usage_limit' => '', 'per_buyer_limit' => '',
+        ])->assertRedirect(route('seller.vouchers.create'))->assertSessionHasErrors('percent');
+        $this->get(route('seller.vouchers.create'))->assertOk()->assertSee('value="RETRY99"', false)->assertSee('value="123.45"', false);
+    }
+
+    public function test_optional_limits_remain_null_and_inactive_choice_is_saved(): void
+    {
+        $this->createVoucher(['min_spend' => '', 'usage_limit' => '', 'per_buyer_limit' => '', 'is_active' => '0'])
+            ->assertSessionHasNoErrors();
+
+        $voucher = Voucher::sole();
+        $this->assertNull($voucher->min_spend);
+        $this->assertNull($voucher->usage_limit);
+        $this->assertNull($voucher->per_buyer_limit);
+        $this->assertFalse($voucher->is_active);
+    }
+
     public function test_percent_cap_limits_the_discount_at_checkout(): void
     {
         $this->shopVoucher(['type' => VoucherType::Percent, 'value' => 50, 'max_discount' => 10000]);

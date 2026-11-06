@@ -8,6 +8,7 @@ use App\Models\Rider\Rider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
@@ -167,6 +168,23 @@ class BuyerRiderApiAuthenticationTest extends TestCase
             ->assertUnauthorized()->assertJsonPath('success', false);
         $this->assertSame(0, $account->tokens()->count());
         $this->assertGuest($role);
+    }
+
+    #[DataProvider('roles')]
+    public function test_password_reset_revokes_existing_tokens(string $role): void
+    {
+        $account = $this->account($role);
+        $account->createToken('api', [$role]);
+        $token = Password::broker($role === 'buyer' ? 'buyers' : 'riders')->createToken($account);
+
+        $this->post('/reset-password', [
+            'token' => $token,
+            'email' => $account->email,
+            'password' => 'New-Password1!',
+            'password_confirmation' => 'New-Password1!',
+        ])->assertRedirect();
+
+        $this->assertSame(0, $account->fresh()->tokens()->count());
     }
 
     #[DataProvider('roles')]

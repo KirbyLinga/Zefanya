@@ -82,6 +82,7 @@ class LogisticsProvider extends Authenticatable
             'approved_at' => 'datetime',
             'province_verified_at' => 'datetime',
             'archived_at' => 'datetime',
+            'rider_wind_down_until' => 'datetime',
             'password' => 'hashed',
             'status' => LogisticsProviderStatus::class,
         ];
@@ -170,6 +171,23 @@ class LogisticsProvider extends Authenticatable
     public function isApproved(): bool
     {
         return $this->status === LogisticsProviderStatus::Approved;
+    }
+
+    /** Whether this company's riders may work normally. */
+    public function allowsRiderOperations(): bool
+    {
+        return $this->isApproved() && $this->archived_at === null;
+    }
+
+    /**
+     * Suspended, but Admin granted a window in which its riders may only
+     * finish parcels already out for delivery.
+     */
+    public function allowsRiderWindDown(): bool
+    {
+        return $this->status === LogisticsProviderStatus::Suspended
+            && $this->archived_at === null
+            && $this->rider_wind_down_until?->isFuture() === true;
     }
 
     public function hasVerifiedProvince(): bool

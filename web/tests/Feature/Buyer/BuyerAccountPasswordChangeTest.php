@@ -125,6 +125,16 @@ class BuyerAccountPasswordChangeTest extends TestCase
         Notification::assertSentOnDemand(BuyerPasswordChanged::class);
     }
 
+    public function test_confirming_a_password_change_revokes_api_tokens(): void
+    {
+        $this->buyer->createToken('phone', ['buyer']);
+        $this->requestChange();
+
+        $this->confirm($this->latestCode())->assertRedirect(route('buyer.account.password'));
+
+        $this->assertSame(0, $this->buyer->tokens()->count());
+    }
+
     public function test_this_browser_stays_signed_in_and_other_sessions_are_signed_out(): void
     {
         $this->get(route('buyer.account.password'))->assertOk();

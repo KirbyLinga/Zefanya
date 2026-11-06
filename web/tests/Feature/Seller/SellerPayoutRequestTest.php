@@ -3,15 +3,18 @@
 namespace Tests\Feature\Seller;
 
 use App\Enums\OrderStatus;
+use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Admin\Admin;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerPayoutAllocation;
 use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\SellerSettlement;
@@ -19,6 +22,8 @@ use App\Models\Shared\Order;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\Voucher;
+use App\Services\Admin\PlatformFinanceService;
+use App\Services\Seller\SellerEarningsService;
 use App\Services\Seller\SellerPayoutRequestService;
 use App\Services\Seller\SellerSettlementService;
 use App\Services\Shared\CommissionFinalizationService;
@@ -314,9 +319,9 @@ class SellerPayoutRequestTest extends TestCase
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
         $payout = app(SellerPayoutRequestService::class)->request($seller, '100', (string) Str::uuid());
-        $admin = Admin::factory()->create(['role' => 'admin']);
+        $admin = Admin::factory()->create(['role' => 'super_admin']);
         $this->actingAs($admin, 'admin');
-        $input = ['amount_minor' => 61655, 'reference' => 'RULE09-DIRECT'];
+        $input = ['amount_minor' => 61655, 'reference' => 'RULE09-DIRECT', 'reason' => 'Seller asked for a direct transfer'];
 
         $this->postJson(route('admin.settlements.confirm', $settlement), $input)
             ->assertUnprocessable()->assertJsonValidationErrors('settlement');
@@ -480,8 +485,8 @@ class SellerPayoutRequestTest extends TestCase
         $service = app(SellerPayoutRequestService::class);
         $this->assertSame(0, $service->availableBalance($seller));
 
-        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin');
-        $input = ['amount_minor' => 61655, 'reference' => 'TOO-EARLY'];
+        $this->actingAs(Admin::factory()->create(['role' => 'super_admin']), 'admin');
+        $input = ['amount_minor' => 61655, 'reference' => 'TOO-EARLY', 'reason' => 'Seller asked for a direct transfer'];
         $this->postJson(route('admin.settlements.confirm', $settlement), $input)
             ->assertUnprocessable()->assertJsonValidationErrors('settlement');
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
@@ -566,6 +571,128 @@ class SellerPayoutRequestTest extends TestCase
         $this->get(route('seller.payout-requests.index'))->assertSee('₱616.55')->assertSee('Cancelled');
     }
 
+    public function test_admin_sees_what_platform_funded_vouchers_cost_against_commission(): void
+    {
+        $seller = Seller::factory()->create();
+        $settlement = $this->earnings($seller);
+        $settlement->forceFill(['marketplace_funded_discount_minor' => 10000])->save();
+        $this->earnings($seller)->forceFill(['marketplace_funded_discount_minor' => 0])->save();
+
+        $summary = app(SellerSettlementService::class)->subsidySummary();
+
+        $this->assertSame(10000, $summary['all']['subsidyMinor']);
+        $this->assertSame(10000, $summary['all']['pendingSubsidyMinor']);
+        $this->assertSame(0, $summary['all']['paidSubsidyMinor']);
+        $this->assertSame(1, $summary['all']['orders']);
+        $this->assertSame(6490, $summary['all']['commissionMinor']);
+        $this->assertSame(-3510, $summary['all']['netMinor']);
+        $this->assertSame($summary['all'], $summary['month']);
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->get(route('admin.logistics-remittances.index'))
+            ->assertOk()->assertSee('Platform voucher cost')->assertSee('₱100.00')->assertSee('₱35.10 short');
+    }
+
+    private function paidThenReturned(Seller $seller): SellerSettlement
+    {
+        $settlement = $this->earnings($seller);
+        $service = app(SellerPayoutRequestService::class);
+        $payout = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $service->pay($payout, Admin::factory()->create(['role' => 'admin']), 'FIRST-PAYOUT');
+        $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
+
+        ParcelReturn::query()->forceCreate([
+            'seller_order_id' => $settlement->seller_order_id,
+            'status' => ParcelReturnStatus::Requested->value,
+            'reason' => 'Item arrived damaged',
+            'requested_at' => now(),
+            'seller_decision' => ParcelReturn::APPROVED,
+        ]);
+        app(SellerSettlementService::class)->releasePendingForReturn($settlement->sellerOrder);
+
+        return $settlement->fresh();
+    }
+
+    public function test_a_return_after_the_seller_was_paid_becomes_a_debt_taken_from_later_payouts_once(): void
+    {
+        $seller = Seller::factory()->create();
+        $settlement = $this->paidThenReturned($seller);
+        $service = app(SellerPayoutRequestService::class);
+
+        $debt = SellerDebt::sole();
+        $this->assertSame(61655, $debt->amount_minor);
+        $this->assertSame($settlement->seller_order_id, $debt->seller_order_id);
+        $this->assertSame(SellerSettlement::PAID, $settlement->status, 'the paid settlement stays as the record');
+
+        app(SellerSettlementService::class)->releasePendingForReturn($settlement->sellerOrder);
+        $this->assertSame(1, SellerDebt::query()->count(), 'a repeat call does not add a second debt');
+        $this->assertSame(61655, $service->outstandingDebtMinor($seller));
+
+        $this->earnings($seller);
+        $request = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $this->assertSame(61655, $request->debt_deducted_minor);
+        $this->assertSame(61655, $service->outstandingDebtMinor($seller), 'nothing is repaid until Admin records the payout');
+
+        $service->cancel($seller, $request->id);
+        $this->assertSame(61655, $service->outstandingDebtMinor($seller));
+
+        $request = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $service->pay($request, Admin::factory()->create(['role' => 'admin']), 'REPAY-1');
+
+        $this->assertSame(0, $service->outstandingDebtMinor($seller));
+        $this->assertSame(61655, $debt->fresh()->settled_minor);
+        $this->assertSame(0, $request->fresh()->amount_minor - $request->fresh()->debt_deducted_minor);
+    }
+
+    public function test_only_the_part_of_a_payout_above_the_debt_is_sent_to_the_seller(): void
+    {
+        $seller = Seller::factory()->create();
+        $this->paidThenReturned($seller);
+        $this->earnings($seller);
+        $this->earnings($seller);
+        $service = app(SellerPayoutRequestService::class);
+
+        $request = $service->request($seller, '1000', (string) Str::uuid(), 'GCash 09171234567');
+
+        $this->assertSame(100000, $request->amount_minor);
+        $this->assertSame(61655, $request->debt_deducted_minor);
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->get(route('admin.seller-payouts.index'))
+            ->assertOk()->assertSee('Send only the amount above')->assertSee('383.45');
+    }
+
+    public function test_a_direct_payout_is_refused_while_the_seller_has_a_debt(): void
+    {
+        $seller = Seller::factory()->create();
+        $this->paidThenReturned($seller);
+        $settlement = $this->earnings($seller);
+
+        $this->actingAs(Admin::factory()->create(['role' => 'super_admin']), 'admin')
+            ->postJson(route('admin.settlements.confirm', $settlement), ['amount_minor' => 61655, 'reference' => 'DIRECT-1', 'reason' => 'Seller asked for a direct transfer'])
+            ->assertUnprocessable()->assertJsonValidationErrors('settlement');
+        $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
+    }
+
+    public function test_only_a_super_admin_with_a_reason_can_use_the_direct_settlement_payout(): void
+    {
+        $seller = Seller::factory()->create();
+        $settlement = $this->earnings($seller);
+        $input = ['amount_minor' => 61655, 'reference' => 'DIRECT-2'];
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.settlements.confirm', $settlement), $input + ['reason' => 'Seller asked for a direct transfer'])
+            ->assertForbidden();
+
+        $this->actingAs(Admin::factory()->create(['role' => 'super_admin']), 'admin');
+        $this->postJson(route('admin.settlements.confirm', $settlement), $input)
+            ->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
+
+        $this->postJson(route('admin.settlements.confirm', $settlement), $input + ['reason' => 'Seller asked for a direct transfer'])
+            ->assertOk()->assertJsonPath('status', SellerSettlement::PAID);
+        $this->assertDatabaseHas('operations_audit_logs', ['action' => 'seller_direct_payout']);
+    }
+
     private function submission(mixed $amount): array
     {
         return ['amount' => $amount, 'idempotency_key' => (string) Str::uuid(), 'destination' => 'GCash 09171234567'];
@@ -593,5 +720,19 @@ class SellerPayoutRequestTest extends TestCase
         app(CommissionFinalizationService::class)->finalize($order);
 
         return $settlement->fresh();
+    }
+
+    public function test_seller_earnings_show_debt_and_paid_withdrawals_and_platform_position_counts_the_debt(): void
+    {
+        $seller = Seller::factory()->create();
+        $this->paidThenReturned($seller);
+
+        $summary = app(SellerEarningsService::class)->summary($seller);
+        $this->assertSame(61655, $summary['debtMinor']);
+        $this->assertSame(61655, $summary['paidWithdrawalsMinor']);
+        $this->assertSame(61655, app(PlatformFinanceService::class)->position()['sellerDebtMinor']);
+
+        $this->actingAs($seller, 'seller')->get(route('seller.earnings.index'))
+            ->assertOk()->assertSee('Debt to Zefanya')->assertSee('Paid withdrawals')->assertSee('−₱616.55');
     }
 }

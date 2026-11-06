@@ -28,6 +28,10 @@ class OperationsAuditLog extends Model
         'logistics_remittance_submitted' => 'Payment to Zefanya recorded',
         'logistics_remittance_confirmed' => 'Payment to Zefanya confirmed',
         'logistics_remittance_rejected' => 'Payment to Zefanya rejected',
+        'rider_payout_paid' => 'Rider payout recorded',
+        'rider_payout_reversed' => 'Rider payout reversed',
+        'origin_share_paid' => 'Origin shipping share recorded',
+        'origin_share_reversed' => 'Origin shipping share reversed',
         'seller_payout_paid' => 'Seller payout paid',
         'seller_payout_rejected' => 'Seller payout rejected',
     ];

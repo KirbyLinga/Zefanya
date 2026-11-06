@@ -172,4 +172,20 @@ class LogisticsNotificationsTest extends TestCase
         $this->assertAuthenticatedAs($provider, 'logistics');
         $this->assertNull($row->fresh()->read_at);
     }
+
+    public function test_notifications_page_lists_own_alerts_filters_unread_and_bell_shows_on_other_pages(): void
+    {
+        $provider = $this->provider();
+        $this->notification($provider, ['title' => 'Unread hub alert']);
+        $this->notification($provider, ['title' => 'Old hub alert'], true);
+        $this->notification($this->provider(), ['title' => 'Foreign alert']);
+
+        $this->actingAs($provider, 'logistics')->get(route('logistics.notifications.index'))->assertOk()
+            ->assertSee('Unread hub alert')->assertSee('Old hub alert')->assertDontSee('Foreign alert')
+            ->assertSee('1 unread.');
+        $this->get(route('logistics.notifications.index', ['filter' => 'unread']))->assertOk()
+            ->assertViewHas('notifications', fn ($page) => $page->pluck('data.title')->all() === ['Unread hub alert']);
+        $this->get(route('logistics.scan.index'))->assertOk()
+            ->assertSee('id="lg-notification-bell"', false)->assertSee('Notifications, 1 unread');
+    }
 }

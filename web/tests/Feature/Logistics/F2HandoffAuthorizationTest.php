@@ -310,7 +310,7 @@ class F2HandoffAuthorizationTest extends TestCase
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
                 'delivery_otp' => $otp,
-                'proof_photo' => UploadedFile::fake()->create('pod.jpg', 80, 'image/jpeg'),
+                'proof_photo' => UploadedFile::fake()->image('pod.jpg'),
                 'cod_amount' => '1.00',
             ])
             ->assertSessionHasErrors('cod_amount_minor');
@@ -325,7 +325,7 @@ class F2HandoffAuthorizationTest extends TestCase
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
                 'delivery_otp' => $otp,
-                'proof_photo' => UploadedFile::fake()->create('pod2.jpg', 80, 'image/jpeg'),
+                'proof_photo' => UploadedFile::fake()->image('pod2.jpg'),
                 'cod_amount' => '1500.00',
             ])
             ->assertRedirect(route('rider.deliveries.index'))
@@ -341,7 +341,7 @@ class F2HandoffAuthorizationTest extends TestCase
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $token,
             'delivery_otp' => $otp,
-            'proof_photo' => UploadedFile::fake()->create('pod3.jpg', 80, 'image/jpeg'),
+            'proof_photo' => UploadedFile::fake()->image('pod3.jpg'),
             'cod_amount' => '1500.00',
         ])->assertRedirect();
         $this->assertSame(150000, Payment::query()->sole()->collected_amount_minor);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Seller;
 
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
+use App\Exceptions\StaleStateException;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Shared\SellerOrder;
@@ -186,9 +187,9 @@ class OrderController extends Controller
                 );
 
                 if (! $declinable) {
-                    throw new \InvalidArgumentException(
-                        'Only orders that have not been picked up can be declined.'
-                    );
+                    throw new StaleStateException($current->status === OrderStatus::Cancelled
+                        ? 'This order was already cancelled.'
+                        : 'Only orders that have not been picked up can be declined.');
                 }
 
                 $note = filled($validated['reason'] ?? null)

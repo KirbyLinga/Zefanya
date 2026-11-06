@@ -102,6 +102,23 @@ class AdminDocumentAuditTest extends TestCase
         $this->assertSame(0, DocumentAccessLog::query()->count());
     }
 
+    public function test_moderators_are_not_shown_document_links_they_cannot_open(): void
+    {
+        $seller = Seller::factory()->create(['status' => 'pending']);
+        $seller->forceFill(['upload_id_path' => self::SELLER_PATH])->save();
+        $url = route('admin.documents.stream', ['type' => 'seller', 'id' => $seller->id, 'document' => 'id']);
+
+        $this->actingAs(Admin::factory()->create(['role' => 'moderator']), 'admin')
+            ->get(route('admin.registrations.index', ['type' => 'seller']))
+            ->assertOk()
+            ->assertDontSee($url, false);
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->get(route('admin.registrations.index', ['type' => 'seller']))
+            ->assertOk()
+            ->assertSee($url, false);
+    }
+
     public function test_audit_rows_are_append_only(): void
     {
         $admin = Admin::factory()->create();

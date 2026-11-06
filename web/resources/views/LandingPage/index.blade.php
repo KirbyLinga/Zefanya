@@ -48,11 +48,12 @@
             <div class="[--cat-per-view:5] relative w-full overflow-hidden max-lg:[--cat-per-view:4] max-sm:[--cat-per-view:2]" id="catCarousel">
                 <div class="flex items-stretch gap-4 transition-transform duration-[450ms] will-change-transform" id="catTrack">
             @foreach ($categories as $cat)
-                <a href="{{ route('buyer.categories.show', $cat->id) }}" class="group basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view))] relative z-auto flex min-h-[120px] min-w-[120px] shrink-0 flex-col items-center justify-center rounded-lg border border-line bg-blush px-4 py-6 transition-[flex,padding,margin,box-shadow,border-color] duration-300 hover:z-[1] hover:grow-[0.3] hover:-mx-1 hover:px-5 hover:py-8 hover:border-primary-800 hover:shadow-[0_12px_32px_rgba(30,27,27,0.18)] hover:basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view)_*_1.3)]">
-                    <div class="mb-2 inline-flex h-16 w-16 items-center justify-center rounded-full bg-secondary-300 transition-transform duration-300 group-hover:scale-[1.2]">
-                        <i data-lucide="{{ $cat->icon }}" width="26" height="26" style="color: #79545c;"></i>
-                    </div>
-                    <div class="mt-2 flex w-full items-center justify-center whitespace-normal text-center font-sans text-xs font-semibold uppercase leading-[1.5] tracking-[1.2px] text-neutral-950 transition-[font-size,margin-top] duration-300 group-hover:mt-3 group-hover:text-sm">{{ $cat->label }}</div>
+                <a href="{{ route('buyer.categories.show', $cat->id) }}" class="group basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view))] relative isolate flex aspect-[4/5] min-w-[120px] shrink-0 flex-col justify-end overflow-hidden rounded-2xl bg-primary-800 p-4 focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white sm:p-5">
+                    {{-- The label names the card, so the photo is decorative. The solid background keeps the label readable if it fails to load. --}}
+                    {{-- Not lazy: the arrows should reveal cards already loaded, so only the priority differs. --}}
+                    <img src="{{ $cat->image_url }}" srcset="{{ $cat->image_srcset }}" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 250px" alt="" width="640" height="800" fetchpriority="{{ $loop->index < 5 ? 'high' : 'low' }}" decoding="async" class="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+                    <span class="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(58,37,41,0)_45%,rgba(58,37,41,0.2)_62%,rgba(58,37,41,0.68)_78%,rgba(58,37,41,0.9)_100%)]" aria-hidden="true"></span>
+                    <span class="font-serif text-[17px] leading-[1.25] text-white [text-wrap:balance] sm:text-[19px]">{{ $cat->label }}</span>
                 </a>
             @endforeach
                 </div>

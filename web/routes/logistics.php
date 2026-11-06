@@ -39,6 +39,8 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
 
         Route::get('/earnings', [EarningsController::class, 'index'])->name('earnings.index');
         Route::post('/earnings/remit', [EarningsController::class, 'remit'])->name('earnings.remit');
+        Route::post('/earnings/riders/{courier}/pay', [EarningsController::class, 'payRider'])->name('earnings.pay-rider');
+        Route::post('/earnings/rider-payments/{payout}/reverse', [EarningsController::class, 'reverseRiderPayment'])->name('earnings.reverse-rider-payment');
 
         // Read-only on purpose: the audit log has no edit or delete routes.
         Route::get('/audit-logs', [OperationsAuditLogController::class, 'index'])->name('audit-logs.index');
@@ -80,6 +82,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/handoffs/{handoff}/dispatch', [HandoffController::class, 'dispatch'])->name('handoffs.dispatch');
         Route::post('/handoffs/{handoff}/receive', [HandoffController::class, 'receive'])->name('handoffs.receive');
 
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
@@ -116,11 +119,13 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/parcel-sorting/{seller_order}/verify-address', [ParcelSortingController::class, 'verifyAddress'])->name('parcel-sorting.address.verify');
         Route::post('/parcel-sorting/{seller_order}/sort', [ParcelSortingController::class, 'sort'])->name('parcel-sorting.sort');
         Route::post('/parcel-sorting/{seller_order}/assign-delivery', [ParcelSortingController::class, 'assignDelivery'])->name('parcel-sorting.assignDelivery');
+        Route::post('/parcel-sorting/bulk-assign-delivery', [ParcelSortingController::class, 'bulkAssignDelivery'])->name('parcel-sorting.bulkAssignDelivery');
 
         // ── Rider delivery: delivery assignments ─────────────────────────────
         Route::get('/delivery-assignments', [DeliveryAssignmentsController::class, 'index'])->name('delivery-assignments.index');
         Route::post('/delivery-assignments/{seller_order}/reassign', [DeliveryAssignmentsController::class, 'reassign'])->name('delivery-assignments.reassign');
         Route::post('/delivery-assignments/{seller_order}/reschedule', [DeliveryAssignmentsController::class, 'reschedule'])->name('delivery-assignments.reschedule');
+        Route::post('/delivery-assignments/{seller_order}/receive-back', [DeliveryAssignmentsController::class, 'receiveBack'])->name('delivery-assignments.receive-back');
         Route::post('/delivery-assignments/{seller_order}/return', [DeliveryAssignmentsController::class, 'returnToSeller'])->name('delivery-assignments.return');
 
         // ── Parcel exceptions + authorized rerouting (Phase 5) ─────────────

@@ -20,6 +20,7 @@ class PayoutRequestController extends Controller
 
         return view('Seller.PayoutRequests.index', [
             'availableMinor' => $service->availableBalance($seller),
+            'debtMinor' => $service->outstandingDebtMinor($seller),
             'pending' => SellerPayoutRequest::query()->where('seller_id', $seller->id)
                 ->where('status', SellerPayoutRequest::PENDING)->first(),
             'payouts' => SellerPayoutRequest::query()->where('seller_id', $seller->id)->latest('id')->paginate(20),

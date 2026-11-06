@@ -21,10 +21,11 @@ use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\StoreSale;
 use App\Models\Shared\Incidents;
 use App\Models\Shared\SellerOrder;
-use App\Models\Shared\Voucher;
+use App\Services\Admin\PlatformFinanceService;
 use App\Support\RuntimeSchema;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -32,7 +33,7 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         /** @var Admin $admin */
         $admin = Auth::guard('admin')->user();
@@ -40,6 +41,7 @@ class DashboardController extends Controller
         $canManage = in_array($admin->role, ['admin', 'super_admin'], true);
         $canModerate = $canManage || $admin->role === 'moderator';
 
+        $period = $this->period($request->query('month'));
         $registrations = $this->pendingRegistrationsByRole();
         $accounts = $this->activeAccountsByRole();
         $openDisputes = $this->whenTable('parcel_returns', fn (): int => ParcelReturn::query()->where('status', ParcelReturnStatus::InDispute->value)->count());
@@ -53,8 +55,11 @@ class DashboardController extends Controller
             'pendingRegistrations' => array_sum($registrations),
             'openDisputes' => $openDisputes,
             'attention' => $canModerate ? $this->attention($registrations, $openDisputes, $canManage) : [],
-            'money' => $canManage ? $this->platformMoney() : null,
-            'settlements' => $canManage ? $this->logisticsSettlements() : collect(),
+            'period' => $period,
+            'periodOptions' => $this->periodOptions(),
+            'money' => $canManage ? $this->platformMoney($period) : null,
+            'position' => $canManage && RuntimeSchema::hasTable('seller_orders') ? app(PlatformFinanceService::class)->position() : null,
+            'settlements' => $canManage ? $this->logisticsSettlements($period) : collect(),
             ...$this->activity(),
         ]);
     }
@@ -92,6 +97,29 @@ class DashboardController extends Controller
         ]));
     }
 
+    /** The Philippine month the admin picked (`YYYY-MM`); anything invalid or in the future is this month. */
+    private function period(mixed $month): Carbon
+    {
+        $current = Carbon::now(StoreSale::TIMEZONE)->startOfMonth();
+        if (! is_string($month) || ! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+            return $current;
+        }
+        $picked = Carbon::createFromFormat('!Y-m', $month, StoreSale::TIMEZONE);
+
+        return $picked->greaterThan($current) ? $current : $picked;
+    }
+
+    /** @return list<array{value: string, label: string}> The last 12 months, newest first. */
+    private function periodOptions(): array
+    {
+        $start = Carbon::now(StoreSale::TIMEZONE)->startOfMonth();
+
+        return collect(range(0, 11))->map(fn (int $back): array => [
+            'value' => $start->copy()->subMonthsNoOverflow($back)->format('Y-m'),
+            'label' => $start->copy()->subMonthsNoOverflow($back)->format('F Y'),
+        ])->all();
+    }
+
     /**
      * Order activity in Philippine days, for roles that do not see the money panel.
      *
@@ -113,18 +141,20 @@ class DashboardController extends Controller
      *
      * @return array{commission: int, platformVouchers: int, shippingVouchers: int, net: int}
      */
-    private function platformMoney(): array
+    private function platformMoney(Carbon $period): array
     {
         if (! RuntimeSchema::hasTable('seller_orders')) {
             return ['commission' => 0, 'platformVouchers' => 0, 'shippingVouchers' => 0, 'net' => 0];
         }
 
-        $finalized = fn () => SellerOrder::query()->where('commission_finalized_at', '>=', Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc());
-        $commission = (int) $finalized()->sum('commission_minor');
-        $platform = (int) $finalized()->where('platform_voucher_funding_source', Voucher::FUNDING_MARKETPLACE)->sum('platform_voucher_discount_minor');
-        $shipping = (int) $finalized()->where('shipping_voucher_funding_source', Voucher::FUNDING_MARKETPLACE)->sum('shipping_voucher_discount_minor');
+        $earnings = app(PlatformFinanceService::class)->earnings(true, $period->copy()->utc());
 
-        return ['commission' => $commission, 'platformVouchers' => $platform, 'shippingVouchers' => $shipping, 'net' => $commission - $platform - $shipping];
+        return [
+            'commission' => $earnings['commissionMinor'],
+            'platformVouchers' => $earnings['platformVoucherMinor'],
+            'shippingVouchers' => $earnings['shippingVoucherMinor'],
+            'net' => $earnings['netMinor'],
+        ];
     }
 
     /**
@@ -133,7 +163,7 @@ class DashboardController extends Controller
      *
      * @return Collection<int, array{provider: string, codMinor: int, shippingMinor: int, receivedMinor: int, owedMinor: int, withRiders: int}>
      */
-    private function logisticsSettlements(): Collection
+    private function logisticsSettlements(Carbon $period): Collection
     {
         if (! RuntimeSchema::hasTable('cod_remittances')) {
             return collect();
@@ -141,7 +171,8 @@ class DashboardController extends Controller
 
         return CodRemittance::query()
             ->join('seller_orders', 'seller_orders.id', '=', 'cod_remittances.seller_order_id')
-            ->where('cod_remittances.created_at', '>=', Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc())
+            ->where('cod_remittances.created_at', '>=', $period->copy()->utc())
+            ->where('cod_remittances.created_at', '<', $period->copy()->addMonth()->utc())
             ->groupBy('cod_remittances.logistics_provider_id')
             ->selectRaw('cod_remittances.logistics_provider_id, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
             ->selectRaw('SUM(CASE WHEN cod_remittances.status = ? THEN 1 ELSE 0 END) as with_riders', [CodRemittance::PENDING_REMITTANCE])

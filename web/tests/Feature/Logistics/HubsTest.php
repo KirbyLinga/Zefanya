@@ -173,7 +173,7 @@ class HubsTest extends TestCase
         ]);
         Courier::factory()->create(['logistics_provider_id' => $this->provider->id, 'area_id' => $station->areas()->value('id')]);
         $this->actingAs($this->provider, 'logistics')->get(route('logistics.hubs.index'))
-            ->assertOk()->assertSee('San Fernando')->assertSee('Pending Approval')->assertSee('1 barangays')->assertSee('1 fleet riders');
+            ->assertOk()->assertSee('San Fernando')->assertSee('Pending Approval')->assertSee('1 barangays')->assertSee('1 rider');
     }
 
     public function test_province_hubs_can_no_longer_be_self_service_created(): void

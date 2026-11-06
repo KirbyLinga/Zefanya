@@ -296,7 +296,7 @@ class F2ScanEnforcedLifecycleTest extends TestCase
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'delivery_otp' => $code,
                 'verification_token' => $podToken,
-                'proof_photo' => UploadedFile::fake()->create('pod.jpg', 120, 'image/jpeg'),
+                'proof_photo' => UploadedFile::fake()->image('pod.jpg'),
                 'received_by' => 'Buyer',
                 'cod_amount' => '1500.00',
             ])

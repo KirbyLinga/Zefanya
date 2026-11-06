@@ -92,14 +92,15 @@
     </section>
     <section data-pf-step="2" hidden class="space-y-6">
         <h3 class="font-serif text-xl text-[var(--text-ink)]">Photos and versions</h3>
-        <div class="space-y-3"><div><h3 class="font-semibold text-[var(--text-ink)]">Main photos</h3><p class="mt-1 text-xs text-[var(--text-muted)]">Buyers see these first. Add up to 9 JPG or PNG photos, 5 MB each.</p></div>
+        <div class="space-y-3"><div><h3 class="font-semibold text-[var(--text-ink)]">Cover image and other angles</h3><p id="product-photo-help" class="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">Choose one cover image, then add 1 to 3 extra photos to show the front, back, side or close-up details. You can select photos together or add them one at a time. Up to 9 JPG or PNG photos in total, 5 MB each.</p></div>
             @if($product->exists)
                 <div class="flex flex-wrap gap-3" data-pf-existing-images>
                     @foreach($product->images->whereNull('variant_id') as $image)<figure class="w-20"><img src="{{ $pfPublicUrl($image->path) }}" alt="Existing product photo" class="aspect-square w-full rounded-sm border border-[var(--border-input)] object-cover">@if($image->is_primary)<figcaption class="mt-1 text-xs text-[var(--text-muted)]">Current cover</figcaption>@endif</figure>@endforeach
                 </div>
             @endif
-            <label for="images" class="text-[var(--text-ink)] flex cursor-pointer flex-col items-center gap-2 rounded-sm border border-dashed border-[var(--border-input)] bg-[var(--bg-soft)] p-4 text-center hover:border-[var(--brand)]"><span class="text-[var(--text-ink)] font-semibold">+ Choose product photos</span><span class="text-xs text-[var(--text-muted)]">{{ $product->exists ? 'New photos are added to your gallery. Choose a new cover only if needed.' : 'The first selected photo becomes your cover.' }}</span><input id="images" name="images[]" type="file" accept="image/jpeg,image/png" multiple data-pf-gallery-files class="sr-only"></label>
-            <div data-pf-gallery class="grid grid-cols-2 gap-3 sm:grid-cols-6"></div>
+            <label for="images" class="upload-zone text-[var(--text-ink)] flex flex-col items-center gap-2 text-center"><span class="text-[var(--text-ink)] font-semibold">+ Add cover or angle photos</span><span class="text-xs text-[var(--text-muted)]">{{ $product->exists ? 'New photos are added to your gallery. Choose a new cover only if needed.' : 'The first photo is your cover. Use the previews below to choose a different cover.' }}</span><input id="images" name="images[]" type="file" accept="image/jpeg,image/png" multiple data-pf-gallery-files aria-describedby="product-photo-help product-photo-count" class="sr-only"></label>
+            <p id="product-photo-count" data-pf-gallery-count role="status" class="text-xs text-[var(--text-muted)]"></p>
+            <div data-pf-gallery class="grid grid-cols-2 gap-3 sm:grid-cols-4"></div>
         </div>
         <fieldset class="space-y-3">
             <legend class="mb-3 font-semibold text-[var(--text-ink)]">Does this product come in different versions?</legend>

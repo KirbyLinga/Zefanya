@@ -1,13 +1,13 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Delivery Monitoring')
+@section('title', 'Delivery Tracking')
 
 @use('App\Enums\DeliveryFailureReason')
 @use('App\Enums\OrderStatus')
 
 @section('content')
 <div class="flex items-center justify-between mb-6">
-    <h1 class="font-serif text-2xl text-[var(--text-ink)]">Delivery Monitoring</h1>
+    <h1 class="font-serif text-2xl text-[var(--text-ink)]">Delivery Tracking</h1>
 </div>
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
@@ -40,7 +40,7 @@
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Order</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Seller</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Buyer · Destination</th>
-                    <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Pickup courier</th>
+                    <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Pickup rider</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Delivery rider</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Tracking</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Status</th>

@@ -149,7 +149,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);
@@ -176,7 +176,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);
@@ -200,7 +200,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);
@@ -232,7 +232,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);
@@ -263,7 +263,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);
@@ -353,7 +353,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
         ]);

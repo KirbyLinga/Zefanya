@@ -1,11 +1,11 @@
 @extends('Layouts.logistics')
 
-@section('title', 'COD Reconciliation')
+@section('title', 'COD Remittances')
 
 @section('content')
 <div class="flex flex-col gap-6">
     <header class="border-b border-[var(--border-strong)] pb-6">
-        <h1 class="font-serif text-[28px] text-[var(--text-ink)] sm:text-[32px]">COD Reconciliation</h1>
+        <h1 class="font-serif text-[28px] text-[var(--text-ink)] sm:text-[32px]">COD Remittances</h1>
         <p class="mt-2 font-sans text-sm text-[var(--text-muted)]">Compare COD collected and cash remitted per rider. Confirm each parcel receipt after receiving the full amount.</p>
     </header>
 
@@ -57,7 +57,7 @@
                     @forelse ($riderReconciliation as $row)
                         @php($balance = (int) $row->difference_minor)
                         <tr data-cod-rider="{{ $row->courier_id }}" class="{{ $balance > 0 ? 'bg-[var(--pill-danger-bg)]' : '' }}">
-                            <td class="px-4 py-4 font-semibold text-[var(--text-ink)]">{{ $row->courier?->rider?->fullName() ?: ($row->courier?->name ?: 'Courier #'.$row->courier_id) }}</td>
+                            <td class="px-4 py-4 font-semibold text-[var(--text-ink)]">{{ $row->courier?->rider?->fullName() ?: ($row->courier?->name ?: 'Rider #'.$row->courier_id) }}</td>
                             <td class="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[var(--text-ink)]">{{ $money((int) $row->collected_minor) }}</td>
                             <td class="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[var(--text-ink)]">{{ $money((int) $row->remitted_minor) }}</td>
                             <td class="whitespace-nowrap px-4 py-4 text-right font-semibold tabular-nums {{ $balance > 0 ? 'text-[var(--status-danger)]' : 'text-[var(--text-ink)]' }}">{{ $money($balance) }}</td>
@@ -75,6 +75,9 @@
     </section>
     <section aria-labelledby="pendingRemittancesTitle" class="flex flex-col gap-4">
         <h2 id="pendingRemittancesTitle" class="font-serif text-xl text-[var(--text-ink)]">Pending remittances ({{ $remittances->total() }})</h2>
+        @if ($overdueCount > 0)
+            <p role="status" class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900">{{ $overdueCount }} {{ \Illuminate\Support\Str::plural('remittance', $overdueCount) }} {{ $overdueCount === 1 ? 'has' : 'have' }} been waiting for more than {{ $overdueDays }} days. Ask the rider to hand over the cash.</p>
+        @endif
 
         <div class="overflow-x-auto rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)]">
             <table class="w-full text-left font-sans text-sm text-[var(--text-ink)]">
@@ -89,8 +92,12 @@
                 <tbody>
                     @forelse ($remittances as $remittance)
                         <tr class="border-b border-[var(--border-strong)] last:border-b-0">
-                            <td class="px-4 py-4">{{ $remittance->courier?->rider?->fullName() ?: ($remittance->courier?->name ?: 'Courier #'.$remittance->courier_id) }}</td>
-                            <td class="px-4 py-4">{{ $remittance->sellerOrder?->tracking_number ?? 'Unavailable' }}</td>
+                            <td class="px-4 py-4">{{ $remittance->courier?->rider?->fullName() ?: ($remittance->courier?->name ?: 'Rider #'.$remittance->courier_id) }}</td>
+                            <td class="px-4 py-4">{{ $remittance->sellerOrder?->tracking_number ?? 'Unavailable' }}
+                                @if ($remittance->created_at->lt($overdueCutoff))
+                                    <span class="ml-1 inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-900">Overdue &middot; {{ (int) $remittance->created_at->diffInDays(now()) }} days</span>
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">&#8369;{{ intdiv($remittance->amount_minor, 100) }}.{{ str_pad((string) ($remittance->amount_minor % 100), 2, '0', STR_PAD_LEFT) }}</td>
                             <td class="px-4 py-4">
                                 <form method="POST" action="{{ route('logistics.cod-remittances.confirm', $remittance) }}" class="flex flex-wrap items-end gap-3">

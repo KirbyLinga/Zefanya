@@ -66,7 +66,7 @@ class HubsUiTest extends TestCase
             $this->assertSame(1, $xpath->query('.//*[@name="'.$field.'"]', $stationForm)->length, $field);
         }
         $this->assertSame('030540000', $stationForm->getAttribute('data-locked-province-code'));
-        $this->assertSame(1, $xpath->query('//a[@href="'.route('logistics.areas.index').'" and contains(., "Barangay coverage")]')->length);
+        $this->assertSame(1, $xpath->query('//*[@data-hubs-page]//a[@href="'.route('logistics.areas.index').'" and contains(., "Delivery areas")]')->length);
     }
 
     public function test_province_hub_creation_is_no_longer_offered_or_routable(): void

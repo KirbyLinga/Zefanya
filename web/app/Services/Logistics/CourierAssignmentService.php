@@ -304,6 +304,15 @@ class CourierAssignmentService
             if ($order->status === OrderStatus::DeliveryFailed && ! SellerOrderStatusService::canRetryDelivery($order)) {
                 return null;
             }
+            // Custody-safe: until the Station Hub scans the parcel back in after
+            // the failed attempt, it is still with that Rider, so only they may
+            // take the final attempt (auto-assign keeps them too).
+            if ($rescheduled && $order->delivery_courier_id !== null && ! $order->isBackAtStationAfterFailure()) {
+                if ($preferredCourierId !== null && $preferredCourierId !== (int) $order->delivery_courier_id) {
+                    return null;
+                }
+                $preferredCourierId = (int) $order->delivery_courier_id;
+            }
             if ($order->delivery_courier_id !== null) {
                 if (! $rescheduled && $order->status === OrderStatus::Sorted && ! $reserveOnly) {
                     $existing = $order->deliveryCourier;
@@ -424,9 +433,13 @@ class CourierAssignmentService
         }
         $column = $role === 'pickup' ? 'courier_id' : 'delivery_courier_id';
         $expectedCourierId ??= (int) $sellerOrder->{$column};
+        // Custody-safe: a delivery that is OUT_FOR_DELIVERY is physically with
+        // the Rider, so it is never moved to another Rider directly. It comes
+        // back under Station custody through a recorded attempt (then a
+        // rescheduled final attempt) or an incident report.
         $statuses = $role === 'pickup'
             ? [OrderStatus::ReadyForPickup, OrderStatus::PickedUp]
-            : [OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery];
+            : [OrderStatus::Sorted, OrderStatus::AssignedToRider];
         $assignment = null;
         $previous = null;
         $courier = DB::transaction(function () use ($sellerOrder, $provider, $role, $preferredCourierId, $column, $statuses, &$assignment, &$previous, $reason, $expectedCourierId): ?Courier {
@@ -480,6 +493,11 @@ class CourierAssignmentService
                 'reassignment_flagged_at' => null,
             ])->save();
             $courier->forceFill(['is_available' => false])->save();
+            if ($role === 'pickup' && $order->status === OrderStatus::ReadyForPickup) {
+                // The parcel leaves the old rider's session and joins the new rider's.
+                app(PickupSessionService::class)->detach($order, 'reassigned');
+                app(PickupSessionService::class)->attach($order, $courier);
+            }
             $hasOtherTasks = SellerOrder::query()->where(function ($query) use ($previous): void {
                 $query->where(function ($pickup) use ($previous): void {
                     $pickup->where('courier_id', $previous->id)->whereIn('status', [OrderStatus::ReadyForPickup, OrderStatus::PickedUp]);
@@ -575,7 +593,21 @@ class CourierAssignmentService
                 return null;
             }
 
-            $courier = $this->candidateFor(
+            // A parcel from a seller that already has an open pickup session in this
+            // window goes to that session's rider when they can still take it, so one
+            // rider makes one visit. Coverage, approval and weight rules are the same
+            // ones a fresh match uses; a rider who no longer qualifies falls through.
+            $sessionCourierId = $preferredCourierId === null
+                ? app(PickupSessionService::class)->reusableCourierId($order, $providerIds)
+                : null;
+            $courier = $sessionCourierId === null ? null : $this->candidateFor(
+                $order,
+                $order->sellerBarangayCode(),
+                $sessionCourierId,
+                providerIds: $providerIds,
+                stationHubId: $order->origin_station_hub_id !== null ? (int) $order->origin_station_hub_id : null,
+            );
+            $courier ??= $this->candidateFor(
                 $order,
                 $order->sellerBarangayCode(),
                 $preferredCourierId,
@@ -605,6 +637,7 @@ class CourierAssignmentService
             }
             // Freeze origin Station Hub from coverage at routing time (never overwrite).
             $this->hubs->assignOriginStationIfMissing($order, (int) $courier->logistics_provider_id);
+            app(PickupSessionService::class)->attach($order, $courier);
 
             $assignment = $this->recordAssignment($order, $courier, 'pickup', $provider);
             if (filled($reason)) {
@@ -696,6 +729,42 @@ class CourierAssignmentService
         );
 
         return ['assignment' => $confirmed['assignment'], 'notified' => $notified];
+    }
+
+    /** The Station Hub that receives a parcel back after a failed delivery attempt. */
+    public function failedReturnStationId(SellerOrder $parcel): ?int
+    {
+        $id = $parcel->destinationArea?->station_hub_id ?? $parcel->custody_hub_id;
+
+        return $id !== null ? (int) $id : null;
+    }
+
+    /**
+     * Why a manually chosen Rider cannot take a NEW job (account not
+     * assignable, offline, or at the job limit), or null when nothing here
+     * blocks them. Coverage, station and weight are still checked by the
+     * assignment itself.
+     */
+    public function manualRiderBlockReason(?int $courierId, ?int $providerId = null): ?string
+    {
+        if ($courierId === null) {
+            return null;
+        }
+        $courier = Courier::query()->withWorkload()->with('rider')
+            ->when($providerId !== null, fn ($q) => $q->where('logistics_provider_id', $providerId))
+            ->find($courierId);
+        if ($courier === null) {
+            return null;
+        }
+        $name = $courier->rider?->fullName() ?? $courier->name;
+
+        return match (true) {
+            ! $courier->isEligibleForAssignment() => $name.' cannot take new jobs: the Rider account is suspended, inactive or not yet approved.',
+            ! $courier->rider->isOnline() => $name.' is offline and cannot take new jobs. Choose an online Rider.',
+            $courier->isAtJobLimit() => $name.' already has '.Courier::ACTIVE_CAPACITY
+                .' active jobs, the limit per Rider. Choose another Rider or wait until one is finished.',
+            default => null,
+        };
     }
 
     /**
@@ -817,10 +886,24 @@ class CourierAssignmentService
             $parcelWeight = $sellerOrder->parcelWeightGrams();
             $candidates = Courier::query()->eligibleForAssignment()
                 ->where('couriers.logistics_provider_id', $providerId)
-                // Weight, not the is_available busy flag or a one-parcel
-                // count, is the assignment constraint.
+                // The is_available busy flag is not a constraint. Two limits
+                // apply: at most ACTIVE_CAPACITY active jobs, and the
+                // cumulative weight check below.
                 ->withWorkload()
                 ->withActiveWeight()
+                // "Nearest" without GPS: how closely the Rider's linked
+                // coverage matches the parcel's address (PSGC codes).
+                ->withExists(['areas as covers_exact_barangay' => fn ($assigned) => $assigned
+                    ->where('logistics_provider_id', $providerId)
+                    ->where('station_hub_id', $area->station_hub_id)
+                    ->where('is_active', true)
+                    ->where('barangay_code', $barangayCode)])
+                ->withExists(['areas as covers_same_municipality' => fn ($assigned) => $assigned
+                    ->where('logistics_provider_id', $providerId)
+                    ->where('station_hub_id', $area->station_hub_id)
+                    ->where('is_active', true)
+                    ->whereNull('barangay_code')
+                    ->where('city_municipality_code', $area->city_municipality_code)])
                 ->when($excludedCourierId !== null, fn ($q) => $q->whereKeyNot($excludedCourierId))
                 ->where('couriers.max_weight_grams', '>=', $parcelWeight)
                 ->where(function ($q) use ($area, $barangayCode, $providerId): void {
@@ -833,9 +916,16 @@ class CourierAssignmentService
                 ->whereHas('rider', fn ($q) => $q->where('station_hub_id', $area->station_hub_id)
                     ->where('logistics_provider_id', $providerId))
                 ->when($preferredCourierId !== null, fn ($q) => $q->whereKey($preferredCourierId))
+                // Nearest first: linked to this exact barangay, then to a
+                // whole-municipality area covering it, then station-wide
+                // Riders with no links. Ties go to the lighter workload.
+                ->orderByDesc('covers_exact_barangay')->orderByDesc('covers_same_municipality')
                 ->orderByRaw('(active_pickups_count + active_deliveries_count) asc')->orderBy('couriers.rider_id')->orderBy('couriers.id')
                 ->lockForUpdate()->get();
             foreach ($candidates as $courier) {
+                if ($courier->isAtJobLimit()) {
+                    continue;
+                }
                 // Eligibility is cumulative: everything the Rider is already
                 // carrying plus this parcel must fit within their weight limit.
                 if ((int) $courier->active_parcel_weight_grams + $parcelWeight > (int) $courier->max_weight_grams) {
@@ -843,6 +933,7 @@ class CourierAssignmentService
                 }
                 $rider = Rider::query()->whereKey($courier->rider_id)->lockForUpdate()->first();
                 if ($rider === null || ! $rider->isApprovedOrActive() || $rider->email_verified_at === null
+                    || ! $rider->isOnline()
                     || (int) $rider->logistics_provider_id !== (int) $providerId
                     || (int) $rider->station_hub_id !== (int) $area->station_hub_id) {
                     continue;

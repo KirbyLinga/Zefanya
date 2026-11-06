@@ -98,7 +98,7 @@ class UnifiedLoginController extends Controller
         }
         $rider = Auth::guard('rider')->user();
         $pending = $rider && $rider->status === Rider::STATUS_PENDING && $rider->email_verified_at !== null;
-        if (! $rider || (! $pending && ! $rider->isOperational())) {
+        if (! $rider || (! $pending && ! $rider->isOperational() && ! $rider->isInWindDown())) {
             Auth::guard('rider')->logout();
             $request->session()->forget('password_hash_rider');
 

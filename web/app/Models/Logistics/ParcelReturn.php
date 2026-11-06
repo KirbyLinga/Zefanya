@@ -25,6 +25,15 @@ class ParcelReturn extends Model
 
     public const DISPUTE_OVERTURNED = 'overturned';
 
+    /** The Seller pays the refund and return shipping (wrong, defective, not as described). */
+    public const FAULT_SELLER = 'seller';
+
+    /** Damaged in transit: the Logistics company pays and the Seller is not charged. */
+    public const FAULT_LOGISTICS = 'logistics';
+
+    /** The buyer reason that names no fault, so an admin must decide who pays. */
+    public const REASON_OTHER = 'Other';
+
     protected $fillable = [
         'seller_order_id',
         'status',
@@ -41,7 +50,39 @@ class ParcelReturn extends Model
 
     protected function casts(): array
     {
-        return ['status' => ParcelReturnStatus::class, 'delivery_attempts' => 'integer', 'seller_address' => 'array', 'requested_at' => 'datetime', 'origin_arrived_at' => 'datetime', 'seller_received_at' => 'datetime', 'handover_expires_at' => 'datetime', 'stock_restored_at' => 'datetime', 'financial_review_required' => 'boolean', 'photos' => 'array', 'seller_response_due_at' => 'datetime', 'seller_decided_at' => 'datetime', 'collection_assigned_at' => 'datetime', 'collected_at' => 'datetime', 'escalated_at' => 'datetime', 'dispute_resolved_at' => 'datetime', 'refunded_at' => 'datetime'];
+        return ['status' => ParcelReturnStatus::class, 'delivery_attempts' => 'integer', 'seller_address' => 'array', 'requested_at' => 'datetime', 'origin_arrived_at' => 'datetime', 'seller_received_at' => 'datetime', 'handover_expires_at' => 'datetime', 'stock_restored_at' => 'datetime', 'financial_review_required' => 'boolean', 'photos' => 'array', 'seller_response_due_at' => 'datetime', 'seller_decided_at' => 'datetime', 'collection_assigned_at' => 'datetime', 'collected_at' => 'datetime', 'escalated_at' => 'datetime', 'dispute_resolved_at' => 'datetime', 'refunded_at' => 'datetime', 'refund_amount_minor' => 'integer', 'refund_paid_on' => 'date', 'fault_set_at' => 'datetime', 'return_shipping_fee_minor' => 'integer'];
+    }
+
+    /** A buyer's own request, as opposed to a failed delivery or incident going back to the Seller. */
+    public function isBuyerRequest(): bool
+    {
+        return $this->seller_response_due_at !== null;
+    }
+
+    public function isLogisticsFault(): bool
+    {
+        return $this->fault_party === self::FAULT_LOGISTICS;
+    }
+
+    /** "Other" names no fault, so no refund until an admin decides who pays. */
+    public function needsAdminFaultDecision(): bool
+    {
+        return $this->isBuyerRequest() && $this->reason === self::REASON_OTHER && $this->fault_set_by_admin_id === null;
+    }
+
+    /** Who pays can change until the refund is recorded or the request is rejected. */
+    public function faultCanChange(): bool
+    {
+        return $this->refunded_at === null && $this->status !== ParcelReturnStatus::Rejected;
+    }
+
+    public function faultLabel(): string
+    {
+        return match ($this->fault_party) {
+            self::FAULT_SELLER => 'Seller (wrong, defective or not as described)',
+            self::FAULT_LOGISTICS => 'Logistics (damaged in transit)',
+            default => 'Not decided yet',
+        };
     }
 
     public function sellerOrder(): BelongsTo
@@ -57,6 +98,18 @@ class ParcelReturn extends Model
     public function originHub(): BelongsTo
     {
         return $this->belongsTo(LogisticsHub::class, 'origin_hub_id');
+    }
+
+    /** Money this return moves between Zefanya and Logistics companies. */
+    public function returnCharges(): HasMany
+    {
+        return $this->hasMany(LogisticsReturnCharge::class)->orderBy('id');
+    }
+
+    /** True for a failed delivery sent back to the Seller, not a buyer's own request. */
+    public function isFailedDeliveryReturn(): bool
+    {
+        return ! $this->isBuyerRequest() && (int) $this->delivery_attempts > 0;
     }
 
     public function events(): HasMany

@@ -5,21 +5,18 @@
 @use('App\Enums\OrderStatus')
 
 @push('scripts')
+@include('Seller.Orders._confirm-dialog')
 <script>
     function confirmAccept(btn) {
-        if (confirm('Accept this order? You can pack it in the next step.')) {
-            btn.closest('form').submit();
-        }
+        sellerConfirm('Accept this order? You can pack it in the next step.', () => btn.closest('form').submit());
     }
     function confirmMarkReady(btn) {
-        if (confirm('Mark this order as packed and ready for pickup?')) {
-            btn.closest('form').submit();
-        }
+        sellerConfirm('Mark this packed parcel ready? This schedules the current eligible or next pickup window. Logistics arranges the pickup rider.', () => btn.closest('form').submit());
     }
     function confirmDecline(btn) {
         const form = btn.closest('form');
-        if (form.reportValidity() && confirm('Decline this order? Stock and any eligible voucher will be returned and the buyer will be notified. Other sellers on the same checkout are not affected.')) {
-            form.submit();
+        if (form.reportValidity()) {
+            sellerConfirm('Decline this order? Stock and any eligible voucher will be returned and the buyer will be notified. Other sellers on the same checkout are not affected.', () => form.submit());
         }
     }
 </script>
@@ -38,6 +35,19 @@
     <p class="mb-4 rounded-sm bg-[#dcfce7] px-3 py-2 font-sans text-[12.5px] text-[#15803d]">Order cancelled. Stock and any eligible voucher were returned and the buyer was notified.</p>
 @endif
 
+@if (in_array($sellerOrder->status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup], true))
+    @php($preparationStep = match ($sellerOrder->status) { OrderStatus::Placed => 1, OrderStatus::Confirmed => 2, OrderStatus::Preparing => 3, default => 4 })
+    <ol aria-label="Order preparation progress" class="mb-5 flex flex-wrap gap-3 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans text-xs">
+        @foreach (['Accept', 'Pack', 'Mark ready'] as $step)
+            <li @if ($preparationStep === $loop->iteration) aria-current="step" @endif class="flex items-center gap-2 rounded-md px-2 py-1 {{ $preparationStep === $loop->iteration ? 'bg-[var(--pill-primary-bg)]' : '' }}">
+                <span class="flex size-6 items-center justify-center rounded-full border border-[var(--border-strong)] text-[11px] font-semibold text-[var(--text-ink)]">@if ($preparationStep > $loop->iteration)<i data-lucide="check" aria-label="Done" class="size-3.5"></i>@else{{ $loop->iteration }}@endif</span>
+                <span class="font-semibold text-[var(--text-ink)]">{{ $step }}</span>
+            </li>
+        @endforeach
+        @if ($preparationStep === 4)<li class="flex items-center px-2 text-[var(--text-muted)]">Ready - awaiting pickup</li>@endif
+    </ol>
+@endif
+{{-- Includes "Pickup scheduled: Today, 8:00 AM – 12:00 PM" while awaiting pickup. --}}
 <x-seller.fulfillment-guidance :shipment="$sellerOrder" />
 
 <div class="grid grid-cols-1 items-start gap-6 xl:gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
@@ -138,6 +148,15 @@
             @endif
         </section>
 
+        <section aria-labelledby="pickup-plan-title" class="rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-6 2xl:p-8">
+            <h2 id="pickup-plan-title" class="mb-4 font-sans text-[11px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)]">Pickup plan</h2>
+            @include('Seller.Orders._pickup-summary', ['pickupShipment' => $sellerOrder, 'compactPickup' => false])
+            @if ($sellerOrder->deliveryCourier)
+                <p class="mt-4 border-t border-[var(--border-strong)] pt-3 text-xs text-[var(--text-muted)]"><span class="font-semibold text-[var(--text-ink)]">Delivery rider:</span> {{ $sellerOrder->deliveryCourier->name }}</p>
+            @endif
+            <a href="{{ route('seller.shipments.index') }}" class="mt-4 inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-[var(--link)] hover:underline">View shipment tracking <i data-lucide="arrow-right" aria-hidden="true" class="size-3.5"></i></a>
+        </section>
+
         @if ($sellerOrder->buyer_note)
             <section class="border border-[var(--border-strong)] rounded-2xl bg-[var(--bg-surface)] p-5 shadow-sm sm:p-6 2xl:p-8">
                 <h2 class="font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] mb-3">Note from buyer</h2>
@@ -150,6 +169,7 @@
             <h2 class="font-sans text-[11px] font-semibold tracking-[0.6px] uppercase text-[var(--text-muted)] mb-3">Actions</h2>
             <div class="flex flex-col gap-2">
                 @if($sellerOrder->status === OrderStatus::Placed)
+                    <p class="mb-1 text-xs leading-relaxed text-[var(--text-muted)]">Buyers may cancel only before you accept. Seller cancellation remains available until the rider confirms pickup.</p>
                     <form method="POST" action="{{ route('seller.orders.accept', $sellerOrder) }}" class="w-full">
                         @csrf
                         <button type="button"
@@ -168,7 +188,7 @@
                             <p class="mb-2 font-sans text-[12px] text-[#b91c1c]">{{ $message }}</p>
                         @enderror
                         <button type="button"
-                            class="w-full inline-flex items-center justify-center min-h-11 px-4 py-2 rounded-lg font-sans font-semibold text-[12px] tracking-[0.5px] uppercase text-primary-800 border border-primary-800 bg-transparent hover:bg-primary-50"
+                            class="w-full inline-flex items-center justify-center min-h-11 px-4 py-2 rounded-lg font-sans font-semibold text-[12px] tracking-[0.5px] uppercase text-[var(--link)] border border-[var(--link)] bg-transparent hover:bg-[var(--bg-page)]"
                             onclick="confirmDecline(this)">
                             Decline order
                         </button>
@@ -185,6 +205,7 @@
                         </form>
                     @else
                         <p class="font-sans text-[12.5px] text-[var(--text-muted)]">Waiting for a rider to pick up this parcel.</p>
+                        <p class="font-sans text-xs leading-relaxed text-[var(--text-muted)]">Cancellation is available until the rider confirms pickup.</p>
                     @endif
                     <form method="POST" action="{{ route('seller.orders.decline', $sellerOrder) }}" class="w-full">
                         @csrf
@@ -196,7 +217,7 @@
                             <p class="mb-2 font-sans text-[12px] text-[#b91c1c]">{{ $message }}</p>
                         @enderror
                         <button type="button"
-                            class="w-full inline-flex items-center justify-center min-h-11 px-4 py-2 rounded-lg font-sans font-semibold text-[12px] tracking-[0.5px] uppercase text-primary-800 border border-primary-800 bg-transparent hover:bg-primary-50"
+                            class="w-full inline-flex items-center justify-center min-h-11 px-4 py-2 rounded-lg font-sans font-semibold text-[12px] tracking-[0.5px] uppercase text-[var(--link)] border border-[var(--link)] bg-transparent hover:bg-[var(--bg-page)]"
                             onclick="confirmDecline(this)">
                             Decline order
                         </button>
@@ -213,6 +234,10 @@
                             No further action is needed for this order.
                         @endif
                     </p>
+                @endif
+
+                @if (in_array($sellerOrder->status, [OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed, OrderStatus::Delivered], true))
+                    <p class="font-sans text-xs leading-relaxed text-[var(--text-muted)]">Cancellation is unavailable because the rider has confirmed pickup.</p>
                 @endif
 
                 {{-- Message buyer button --}}

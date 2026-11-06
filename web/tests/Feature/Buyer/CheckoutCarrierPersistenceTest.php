@@ -58,13 +58,13 @@ class CheckoutCarrierPersistenceTest extends TestCase
         $this->post(route('buyer.checkout.store'), $payload)->assertSessionHasNoErrors();
 
         $order = Order::query()->sole();
-        $this->assertSame(164900, $order->total_minor);
-        $this->assertSame(164900, (int) Payment::query()->sum('amount_minor'));
+        $this->assertSame(169800, $order->total_minor);
+        $this->assertSame(169800, (int) Payment::query()->sum('amount_minor'));
         $parcels = $order->sellerOrders->keyBy('seller_id');
         $this->assertSame($this->checkoutCarrier->id, $parcels[$sellers[0]->id]->carrier_provider_id);
         $this->assertSame($second->id, $parcels[$sellers[1]->id]->carrier_provider_id);
         $this->assertSame(4900, $parcels[$sellers[0]->id]->shipping_fee_minor);
-        $this->assertSame(0, $parcels[$sellers[1]->id]->shipping_fee_minor);
+        $this->assertSame(4900, $parcels[$sellers[1]->id]->shipping_fee_minor);
         foreach ($parcels as $parcel) {
             $this->assertSame(OrderStatus::Placed, $parcel->status);
             $this->assertNull($parcel->courier_id);

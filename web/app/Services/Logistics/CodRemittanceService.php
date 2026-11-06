@@ -2,6 +2,7 @@
 
 namespace App\Services\Logistics;
 
+use App\Exceptions\StaleStateException;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\LogisticsProvider;
@@ -47,9 +48,7 @@ class CodRemittanceService
             }
 
             if ($locked->status !== CodRemittance::PENDING_REMITTANCE) {
-                throw ValidationException::withMessages([
-                    'remittance' => 'Only pending remittances can be confirmed.',
-                ]);
+                throw StaleStateException::field('remittance', 'Only pending remittances can be confirmed.');
             }
 
             $previousStatus = $locked->status;

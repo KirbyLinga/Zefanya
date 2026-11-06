@@ -36,13 +36,19 @@ class LogisticsPaymentDecided extends Notification
     private function title(): string
     {
         return $this->remittance->status === LogisticsRemittance::CONFIRMED
-            ? 'Zefanya confirmed your payment'
+            ? ($this->remittance->isPartlyConfirmed() ? 'Zefanya confirmed part of your payment' : 'Zefanya confirmed your payment')
             : 'Zefanya rejected your payment';
     }
 
     private function message(): string
     {
         $payment = '₱'.number_format($this->remittance->amount_minor / 100, 2).' (ref '.$this->remittance->reference.')';
+
+        if ($this->remittance->isPartlyConfirmed()) {
+            $received = '₱'.number_format($this->remittance->received_amount_minor / 100, 2);
+
+            return "Only {$received} of your payment of {$payment} was confirmed. {$this->remittance->left_out_count} parcel(s) are due again; send them with your next payment.";
+        }
 
         return $this->remittance->status === LogisticsRemittance::CONFIRMED
             ? "Your payment of {$payment} has arrived."

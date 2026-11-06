@@ -12,13 +12,15 @@
             <h1 class="font-serif text-3xl text-[var(--text-ink)]">Vouchers</h1>
             <p class="mt-2 text-sm text-[var(--text-muted)]">Shop vouchers apply to your products only, and you fund the discount. Times are Philippine time.</p>
         </div>
-        <a href="{{ route('seller.vouchers.create') }}" class="rounded-md bg-primary-800 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-900">New voucher</a>
+        <a id="open-create-voucher" aria-haspopup="dialog" aria-controls="create-voucher-dialog" href="{{ route('seller.vouchers.create') }}" class="rounded-md bg-primary-800 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-900">New voucher</a>
     </div>
+
+    <noscript><p class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-ink)]">Enable JavaScript to create a voucher in the modal, check its code, and review the discount before submitting.</p></noscript>
 
     @if(session('success'))
         <div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
     @endif
-    @if($errors->any())
+    @if($errors->any() && old('_modal') !== 'voucher-create')
         <div role="alert" class="rounded-md border border-error p-4 text-sm text-error">{{ $errors->first() }}</div>
     @endif
 
@@ -105,4 +107,9 @@
         </div>
     @endif
 </div>
+@include('Seller.Vouchers._create-modal', ['errors' => old('_modal') === 'voucher-create' ? $errors : new \Illuminate\Support\ViewErrorBag])
 @endsection
+
+@push('scripts')
+@include('Seller.Vouchers._create-script')
+@endpush

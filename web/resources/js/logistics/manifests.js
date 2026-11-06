@@ -174,7 +174,7 @@
         verifying = true;
         lastSubmitted = value;
         setError('');
-        setStatus(source === 'camera' ? 'QR detected — verifying against this manifest…' : 'Verifying tracking number…');
+        setStatus(source === 'camera' ? 'QR detected — verifying against this batch…' : 'Verifying tracking number…');
         stopCamera();
 
         try {
@@ -200,7 +200,7 @@
                 setError(
                     data.message
                     || data.errors?.tracking_number?.[0]
-                    || 'Could not verify that parcel against this manifest.'
+                    || 'Could not verify that parcel against this batch.'
                 );
                 setStatus('');
                 return;
@@ -214,7 +214,7 @@
 
             if (!tokenInput || !token) {
                 lastSubmitted = null;
-                setError('The verified parcel does not belong to this manifest.');
+                setError('The verified parcel does not belong to this batch.');
                 setStatus('');
                 return;
             }
@@ -254,7 +254,7 @@
     form.addEventListener('submit', (event) => {
         if (verifiedCount() < itemCount) {
             event.preventDefault();
-            setError('Verify every parcel on the manifest before dispatching.');
+            setError('Verify every parcel in the batch before dispatching.');
         }
     });
 

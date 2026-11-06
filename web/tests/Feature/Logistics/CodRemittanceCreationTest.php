@@ -127,7 +127,7 @@ class CodRemittanceCreationTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
         ]);
@@ -137,6 +137,9 @@ class CodRemittanceCreationTest extends TestCase
         $remittance = CodRemittance::first();
 
         $this->assertSame(CodRemittance::PENDING_REMITTANCE, $remittance->status);
+        // The shipping split is frozen when the parcel is delivered.
+        $this->assertSame((int) $this->sellerOrder->fresh()->shipping_fee_minor, $remittance->kept_shipping_minor);
+        $this->assertSame(0, $remittance->origin_share_minor);
 
         $this->assertSame($this->payment->id, $remittance->payment_id);
         $this->assertSame($this->sellerOrder->id, $remittance->seller_order_id);
@@ -156,7 +159,7 @@ class CodRemittanceCreationTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
         ]);
@@ -166,7 +169,7 @@ class CodRemittanceCreationTest extends TestCase
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
             'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
-            'photo' => UploadedFile::fake()->create('proof2.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof2.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
         ]);

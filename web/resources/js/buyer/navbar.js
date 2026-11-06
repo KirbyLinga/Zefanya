@@ -143,7 +143,7 @@
             finally { if (request === sequence) inFlight = false; }
         }
 
-        window.setInterval(() => loadNotifications(), 10000);
+        window.setInterval(() => loadNotifications(), 30000);
         window.addEventListener('focus', () => loadNotifications());
         document.addEventListener('visibilitychange', () => loadNotifications());
         loadNotifications();

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Admin\AccountStatusChanged;
 use App\Services\Admin\AccountStatusService;
 use App\Services\Logistics\ProviderProvinceService;
@@ -58,10 +60,22 @@ class UserAccountController extends Controller
         $paginator = $accounts->paginate(25)->withQueryString();
 
         $provinceBlockers = [];
+        $outForDelivery = [];
         if ($type === 'logistics') {
             foreach ($paginator as $account) {
                 $provinceBlockers[$account->id] = $provinces->provinceChangeBlockers($account);
             }
+
+            // Parcels a suspended company's riders still hold: what a wind-down would let them finish.
+            $outForDelivery = SellerOrder::query()
+                ->join('couriers', 'couriers.id', '=', 'seller_orders.delivery_courier_id')
+                ->whereIn('couriers.logistics_provider_id', $paginator->getCollection()->pluck('id'))
+                ->where('seller_orders.status', OrderStatus::OutForDelivery->value)
+                ->groupBy('couriers.logistics_provider_id')
+                ->selectRaw('couriers.logistics_provider_id, COUNT(*) as aggregate')
+                ->pluck('aggregate', 'couriers.logistics_provider_id')
+                ->map(fn ($count): int => (int) $count)
+                ->all();
         }
 
         return view('Admin.Users.index', [
@@ -71,6 +85,8 @@ class UserAccountController extends Controller
             'status' => $status,
             'statuses' => self::ACCOUNT_STATUSES,
             'provinceBlockers' => $provinceBlockers,
+            'outForDelivery' => $outForDelivery,
+            'maxWindDownHours' => AccountStatusService::MAX_RIDER_WIND_DOWN_HOURS,
         ]);
     }
 
@@ -102,6 +118,27 @@ class UserAccountController extends Controller
     public function reactivateLogistics(Request $request, LogisticsProvider $logisticsProvider): RedirectResponse
     {
         return $this->setStatus($request, $logisticsProvider, 'approved', 'logistics');
+    }
+
+    /**
+     * Let a suspended company's riders finish parcels already out for delivery
+     * for a limited time (0 hours ends the window).
+     */
+    public function riderWindDownLogistics(Request $request, LogisticsProvider $logisticsProvider): RedirectResponse
+    {
+        $data = $request->validate([
+            'hours' => ['required', 'integer', 'min:0', 'max:'.AccountStatusService::MAX_RIDER_WIND_DOWN_HOURS],
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+        $hours = (int) $data['hours'];
+
+        if (! $this->accountStatuses->setRiderWindDown($logisticsProvider, $request->user('admin'), $hours, $data['reason'])) {
+            return back()->with('error', 'A rider wind-down is only available for suspended logistics accounts.');
+        }
+
+        return back()->with('success', $hours === 0
+            ? "{$logisticsProvider->fullName()}'s rider wind-down ended. Its riders can no longer work."
+            : "{$logisticsProvider->fullName()}'s riders may finish parcels already out for delivery for the next {$hours} hours.");
     }
 
     private function queryAccounts(Builder $query, string $search, string $status, bool $withBusinessName = false): Builder

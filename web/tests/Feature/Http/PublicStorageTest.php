@@ -17,6 +17,12 @@ class PublicStorageTest extends TestCase
             ->assertStreamedContent('product image');
     }
 
+    public function test_public_image_urls_do_not_depend_on_the_configured_app_host(): void
+    {
+        $this->assertSame('/storage', config('filesystems.disks.public.url'));
+        $this->assertSame('/storage/products/15/photo.jpg', Storage::disk('public')->url('products/15/photo.jpg'));
+    }
+
     public function test_missing_public_images_return_not_found(): void
     {
         Storage::fake('public');

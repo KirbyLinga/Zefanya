@@ -47,7 +47,7 @@ class CrossProvinceCheckoutTest extends TestCase
     {
         parent::setUp();
 
-        config(['buyer.cross_province.fee_minor' => 19900, 'buyer.cross_province.free_shipping_threshold_minor' => null]);
+        config(['buyer.cross_province.fee_minor' => 19900]);
 
         $this->admin = Admin::factory()->create();
         $this->origin = $this->operationalHandoffProvider(

@@ -8,7 +8,7 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
 /**
- * A buyer cancelled their order with this shop before Ready for Pickup.
+ * A buyer cancelled their order with this shop before the shop accepted it.
  */
 class BuyerOrderCancelled extends Notification
 {

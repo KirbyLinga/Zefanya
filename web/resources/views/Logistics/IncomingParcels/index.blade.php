@@ -5,6 +5,10 @@
 @use('App\Enums\OrderStatus')
 @use('App\Models\Seller\StoreSale')
 
+@section('logistics-toolbar')
+    <span hidden data-logistics-hosted-bell></span>
+@endsection
+
 @section('content')
 @include('Logistics._parcel-queue-assets')
 @php
@@ -37,13 +41,12 @@
 @endphp
 
 <div class="ip-canvas -m-4 min-h-screen sm:-m-6 xl:-m-8">
-<div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-4 sm:px-6 xl:px-8">
-    <h1 class="font-serif text-2xl font-semibold text-[var(--text-ink)]">Incoming Parcels</h1>
-    <a href="{{ route('logistics.scan.index') }}" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-[var(--text-ink)] no-underline shadow-sm hover:bg-[var(--bg-page)]">
-        <i data-lucide="barcode" class="h-4 w-4 text-[var(--text-muted)]"></i>
+<x-logistics.page-header title="Incoming Parcels">
+    <a href="{{ route('logistics.scan.index') }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3.5 font-sans text-[12.5px] font-semibold text-[var(--text-ink)] no-underline hover:bg-[var(--bg-page)]">
+        <i data-lucide="barcode" class="h-4 w-4 text-[var(--text-muted)]" aria-hidden="true"></i>
         Scan parcel
     </a>
-</div>
+</x-logistics.page-header>
 
 <div class="p-4 sm:p-6 xl:px-8">
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
@@ -59,10 +62,10 @@
 @endif
 
 @if ($shipments->isEmpty())
-    <section class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-8 shadow-sm flex flex-col items-center text-center">
-        <i data-lucide="inbox" class="w-[32px] h-[32px] text-[var(--icon-soft)] mb-3"></i>
-        <p class="font-sans text-[13px] font-semibold text-[var(--text-ink)] mb-1">No parcels awaiting pickup</p>
-        <p class="font-sans text-[11.5px] text-[var(--text-muted)] max-w-[360px]">
+    <section class="flex flex-col items-center rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-6 py-14 text-center shadow-sm">
+        <i data-lucide="inbox" class="mb-3 h-8 w-8 text-[var(--icon-soft)]" aria-hidden="true"></i>
+        <p class="mb-1 font-sans text-[13px] font-semibold text-[var(--text-ink)]">No parcels awaiting pickup</p>
+        <p class="max-w-[360px] font-sans text-[12.5px] leading-5 text-[var(--text-muted)]">
             Parcels marked ready for pickup by sellers will appear here for you to collect and deliver to the sorting center.
         </p>
     </section>
@@ -121,6 +124,21 @@
                                             <i data-lucide="map-pin" class="h-3 w-3 shrink-0"></i>
                                             <span class="truncate text-[var(--text-muted)]">{{ $shipment->pickupAddress() ?? '—' }}</span>
                                         </p>
+                                        @php
+                                            $windowLabel = $shipment->status === OrderStatus::ReadyForPickup ? \App\Services\Logistics\PickupWindowService::label($shipment) : null;
+                                        @endphp
+                                        @if ($windowLabel)
+                                            <p data-pickup-schedule class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-[12px] text-[var(--text-muted)]">
+                                                <i data-lucide="clock" class="h-3 w-3 shrink-0"></i>
+                                                <span>Pickup {{ $windowLabel }}</span>
+                                                @if ($shipment->pickupSession)
+                                                    <span class="ip-chip rounded-md px-2 py-0.5 text-[11px] font-medium" title="Parcels this rider collects from this seller in this window">Session #{{ $shipment->pickupSession->id }} · {{ $shipment->pickupSession->parcels_count }} {{ \Illuminate\Support\Str::plural('parcel', $shipment->pickupSession->parcels_count) }}{{ $shipment->pickupSession->status === \App\Models\Logistics\PickupSession::IN_PROGRESS ? ' · rider at seller' : '' }}</span>
+                                                @endif
+                                                @if ($shipment->pickup_missed_windows > 0)
+                                                    <span class="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Rescheduled ×{{ $shipment->pickup_missed_windows }} (earlier window passed)</span>
+                                                @endif
+                                            </p>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -172,7 +190,7 @@
                                     @endif
 
                                     @if ($isPickedUp)
-                                        <a href="{{ route('logistics.scan.index') }}" class="{{ $key === 'arriving' ? $primaryButton : $quietButton }}">Scan at station</a>
+                                        <a href="{{ route('logistics.scan.index', array_filter(['tracking' => $shipment->tracking_number])) }}" class="{{ $key === 'arriving' ? $primaryButton : $quietButton }}">Scan at station</a>
                                     @endif
                                 </div>
                             </div>

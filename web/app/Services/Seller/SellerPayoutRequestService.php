@@ -6,10 +6,12 @@ use App\Enums\AdminRole;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\SellerSettlement;
 use App\Notifications\Seller\PayoutRequestDecided;
@@ -38,6 +40,17 @@ class SellerPayoutRequestService
             ->pluck('seller_order_id')
             ->map(fn ($id): int => (int) $id)
             ->all();
+    }
+
+    /** What the Seller still owes from orders returned after they were paid. */
+    public function outstandingDebtMinor(Seller $seller, bool $lock = false): int
+    {
+        $query = SellerDebt::query()->where('seller_id', $seller->id)->whereColumn('settled_minor', '<', 'amount_minor');
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return (int) $query->get()->sum(fn (SellerDebt $debt): int => $debt->outstandingMinor());
     }
 
     public function reservedMinor(Seller $seller): int
@@ -93,6 +106,8 @@ class SellerPayoutRequestService
                 'pending_seller_id' => $lockedSeller->id,
                 'idempotency_key' => $data['idempotency_key'],
                 'amount_minor' => $amountMinor,
+                // Repaid only when Admin records the payout; a rejection or cancel leaves the debt untouched.
+                'debt_deducted_minor' => min($amountMinor, $this->outstandingDebtMinor($lockedSeller, true)),
                 'status' => SellerPayoutRequest::PENDING,
                 'payout_destination' => filled($destination) ? trim($destination) : null,
             ])->save();
@@ -153,7 +168,7 @@ class SellerPayoutRequestService
                 return false;
             }
             if ($locked->status !== SellerPayoutRequest::PENDING) {
-                throw ValidationException::withMessages(['payout' => 'Only a pending request can be paid.']);
+                throw StaleStateException::field('payout', 'Only a pending request can be paid.');
             }
 
             $allocations = $locked->allocations()->orderBy('seller_settlement_id')->get();
@@ -178,6 +193,8 @@ class SellerPayoutRequestService
                 ])->save();
             }
 
+            $this->repayDebts($locked->seller_id, (int) $locked->debt_deducted_minor);
+
             $locked->forceFill([
                 'status' => SellerPayoutRequest::PAID,
                 'pending_seller_id' => null,
@@ -189,7 +206,7 @@ class SellerPayoutRequestService
             OperationsAuditLog::record(
                 $admin, 'seller_payout_paid', $locked, 'Payout #'.$locked->getKey(),
                 ['status' => 'Pending'],
-                ['status' => 'Paid', 'amount' => '₱'.number_format($locked->amount_minor / 100, 2), 'reference' => $reference],
+                ['status' => 'Paid', 'amount' => '₱'.number_format($locked->amount_minor / 100, 2), 'sent' => '₱'.number_format(($locked->amount_minor - $locked->debt_deducted_minor) / 100, 2), 'debt_repaid' => '₱'.number_format($locked->debt_deducted_minor / 100, 2), 'reference' => $reference],
             );
 
             return true;
@@ -202,6 +219,19 @@ class SellerPayoutRequestService
         return $paid;
     }
 
+    /** Oldest debt first. The deduction was capped by the debt at request time, so it cannot exceed it. */
+    private function repayDebts(int $sellerId, int $amountMinor): void
+    {
+        foreach (SellerDebt::query()->where('seller_id', $sellerId)->whereColumn('settled_minor', '<', 'amount_minor')->orderBy('id')->lockForUpdate()->get() as $debt) {
+            if ($amountMinor <= 0) {
+                return;
+            }
+            $applied = min($amountMinor, $debt->outstandingMinor());
+            $debt->forceFill(['settled_minor' => $debt->settled_minor + $applied])->save();
+            $amountMinor -= $applied;
+        }
+    }
+
     /** Releases the reservation, so the earnings can be requested again. */
     public function reject(SellerPayoutRequest $payout, Admin $admin, string $reason): void
     {
@@ -212,7 +242,7 @@ class SellerPayoutRequestService
             $locked = SellerPayoutRequest::query()->whereKey($payout->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== SellerPayoutRequest::PENDING) {
-                throw ValidationException::withMessages(['payout' => 'Only a pending request can be rejected.']);
+                throw StaleStateException::field('payout', 'Only a pending request can be rejected.');
             }
 
             $locked->forceFill([

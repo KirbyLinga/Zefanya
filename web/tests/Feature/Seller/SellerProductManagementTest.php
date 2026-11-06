@@ -187,7 +187,7 @@ class SellerProductManagementTest extends TestCase
             'oversized' => $this->publicationDefaults()['images'][0]->size(5223),
             'document' => UploadedFile::fake()->createWithContent('price_list.docx', 'document content'),
             'executable' => new UploadedFile($fakeExecutable->getPathname(), 'renamed_exe.jpg', null, null, true),
-            'webp' => UploadedFile::fake()->create('photo.webp', 10, 'image/webp'),
+            'webp' => UploadedFile::fake()->create('photo.webp', 20, 'image/webp'),
         };
         $this->actingAs($seller, 'seller')->post(route('seller.products.store'), $this->payload(['images' => [$image]]))->assertSessionHasErrors('images.0');
         $this->assertDatabaseCount('products', 0);

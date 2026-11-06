@@ -7,25 +7,14 @@ use App\Models\Logistics\LogisticsShippingRate;
 use App\Services\Logistics\ShippingRateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class ShippingRateController extends Controller
 {
     private const AMOUNT = 'regex:/\A\d{1,6}(?:\.\d{1,2})?\z/';
 
-    public function index(Request $request, ShippingRateService $rates): View
+    public function index(): RedirectResponse
     {
-        $own = LogisticsShippingRate::query()
-            ->where('logistics_provider_id', $request->user('logistics')->getKey())
-            ->get()->keyBy('zone');
-
-        return view('Logistics.ShippingRates.index', [
-            'zones' => collect(LogisticsShippingRate::ZONES)->map(fn (array $zone, string $key): array => $zone + [
-                'own' => $own->get($key),
-                'marketplace' => $rates->marketplaceRate($key),
-            ]),
-            'freeShippingMinor' => (int) config('buyer.announcements.free_shipping_threshold_minor', 150000),
-        ]);
+        return redirect()->route('logistics.earnings.index', ['tab' => 'shipping-rates']);
     }
 
     public function update(Request $request, ShippingRateService $rates): RedirectResponse
@@ -57,7 +46,7 @@ class ShippingRateController extends Controller
 
         $changed = $rates->save($request->user('logistics'), $input, $data['reason'] ?? null);
 
-        return redirect()->route('logistics.shipping-rates.index')->with(
+        return redirect()->route('logistics.earnings.index', ['tab' => 'shipping-rates'])->with(
             'success',
             $changed > 0 ? 'Shipping rates saved. Only checkouts started after this change use the new rates. Open checkouts and placed orders keep their rates.' : 'No rates were changed.',
         );

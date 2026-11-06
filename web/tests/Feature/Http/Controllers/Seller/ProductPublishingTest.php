@@ -52,6 +52,40 @@ class ProductPublishingTest extends TestCase
         ];
     }
 
+    #[DataProvider('anglePhotoCounts')]
+    public function test_product_keeps_one_selected_cover_and_all_additional_angles(int $additional): void
+    {
+        Storage::fake('public');
+        $seller = Seller::factory()->create();
+        $data = $this->payload();
+        $data['images'] = array_map(fn ($index) => $this->image('angle-'.$index.'.png'), range(0, $additional));
+        $data['cover_index'] = $additional;
+        $this->actingAs($seller, 'seller')->post(route('seller.products.store'), $data)
+            ->assertSessionHasNoErrors()->assertRedirect(route('seller.products.index'));
+        $product = Product::query()->sole();
+        $general = $product->images()->whereNull('variant_id')->orderBy('sort_order')->get();
+        $this->assertCount($additional + 1, $general);
+        $this->assertCount(1, $general->where('is_primary', true));
+        $this->assertTrue($general[$additional]->is_primary);
+        foreach ($general as $image) {
+            Storage::disk('public')->assertExists($image->path);
+        }
+        $this->get(route('buyer.products.show', $product))->assertOk()
+            ->assertViewHas('galleryImages', function ($images) use ($general, $additional): bool {
+                $this->assertSame(Storage::disk('public')->url($general[$additional]->path), $images[0]);
+                foreach ($general as $image) {
+                    $this->assertContains(Storage::disk('public')->url($image->path), $images);
+                }
+
+                return true;
+            });
+    }
+
+    public static function anglePhotoCounts(): array
+    {
+        return ['one extra angle' => [1], 'three extra angles' => [3]];
+    }
+
     public function test_publishing_saves_one_listing_twelve_combinations_and_shared_color_images(): void
     {
         Storage::fake('public');

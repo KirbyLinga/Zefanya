@@ -9,7 +9,6 @@ return [
 
     'announcements' => [
         'top_bar' => env('BUYER_ANNOUNCEMENT_TEXT', ''),
-        'free_shipping_threshold_minor' => env('BUYER_FREE_SHIPPING_THRESHOLD_MINOR', 150000), // in centavos (₱1,500)
     ],
 
     /*
@@ -42,11 +41,11 @@ return [
     | default: until fee_minor is configured, cross-province checkout remains
     | unavailable. Amounts are in centavos and are never read from the client.
     | fee_minor is the first kilo; additional_kg_minor applies to each one after.
+    | Order value never zeroes this fee. Free shipping is only a shipping voucher.
     |
     */
     'cross_province' => [
         'fee_minor' => env('BUYER_CROSS_PROVINCE_FEE_MINOR'),
         'additional_kg_minor' => (int) env('BUYER_CROSS_PROVINCE_ADDITIONAL_KG_MINOR', 0),
-        'free_shipping_threshold_minor' => env('BUYER_CROSS_PROVINCE_FREE_SHIPPING_THRESHOLD_MINOR'),
     ],
 ];

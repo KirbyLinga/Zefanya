@@ -10,6 +10,7 @@ use App\Http\Middleware\EnforceSingleBrowserAccount;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
 use App\Http\Middleware\RedirectIfAuthenticatedRole;
 use App\Http\Middleware\Rider\EnsureRiderActive;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -62,6 +63,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             EnforceSingleBrowserAccount::class,
             AuthenticateRoleSession::class,
+            SecurityHeaders::class,
+        ]);
+
+        $middleware->api(append: [
+            SecurityHeaders::class,
         ]);
 
         // Revoke stale credentials before route authentication can authorize a request.

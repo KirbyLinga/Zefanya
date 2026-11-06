@@ -63,6 +63,7 @@
 
     @vite('resources/js/seller/theme-toggle.js')
     @vite('resources/js/rider/sidebar-tooltips.js')
+    @vite('resources/js/submit-guard.js')
     @vite('resources/js/rider/notification-bell.js')
 
     @stack('scripts')

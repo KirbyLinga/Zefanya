@@ -20,9 +20,17 @@
             ['label' => 'Pending Registrations', 'value' => number_format($pendingRegistrations), 'hint' => $pendingRegistrations > 0 ? 'Waiting for approval' : 'None waiting', 'icon' => 'user-check', 'url' => $canModerate ? route('admin.registrations.index') : null],
             ['label' => 'Open Disputes', 'value' => number_format($openDisputes), 'hint' => 'Escalated return requests', 'icon' => 'scale', 'url' => $canModerate ? route('admin.returns.index') : null],
         ];
+        $isCurrent = $period->isSameMonth(now(\App\Models\Seller\StoreSale::TIMEZONE));
+        $periodLabel = $period->format('F Y');
         if ($money !== null) {
-            $cards[] = ['label' => 'Commission (This Month)', 'value' => $peso($money['commission']), 'hint' => (\App\Services\Shared\CommissionFinalizationService::COMMISSION_BPS / 100).'% of item subtotal after seller discounts', 'icon' => 'percent', 'url' => null];
+            $cards[] = ['label' => $isCurrent ? 'Commission (This Month)' : 'Commission ('.$periodLabel.')', 'value' => $peso($money['commission']), 'hint' => 'Revenue: '.(\App\Services\Shared\CommissionFinalizationService::COMMISSION_BPS / 100).'% of item subtotal after seller discounts', 'icon' => 'percent', 'url' => null];
+            if ($position !== null) {
+                $cards[] = ['label' => 'Zefanya Owes', 'value' => $peso($position['totalLiabilitiesMinor']), 'hint' => 'Seller payouts, logistics shares and refunds (live)', 'icon' => 'arrow-up-right', 'url' => route('admin.seller-payouts.index')];
+                $cards[] = ['label' => 'Cash Not Yet Received', 'value' => $peso($position['outstandingCashMinor']), 'hint' => 'With riders, companies or awaiting your confirmation (live)', 'icon' => 'arrow-down-left', 'url' => route('admin.logistics-remittances.index')];
+            }
         }
+        $waiting = collect($attention)->where('count', '>', 0)->sortByDesc('count')->values();
+        $quiet = collect($attention)->where('count', 0)->values();
     @endphp
 
     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -31,13 +39,46 @@
             <p class="mt-1 font-sans text-sm text-neutral-600">Here's what needs your attention across Zefanya.</p>
         </div>
         @if ($money !== null)
-            <span class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 font-sans text-[13px] font-semibold text-neutral-950">
-                <i data-lucide="calendar" class="size-4" aria-hidden="true"></i>{{ now(\App\Models\Seller\StoreSale::TIMEZONE)->format('F Y') }}
-            </span>
+            <form method="GET" action="{{ route('admin.dashboard') }}" class="flex items-center gap-2">
+                <label for="dashboardMonth" class="inline-flex items-center gap-2 font-sans text-[13px] font-semibold text-neutral-950"><i data-lucide="calendar" class="size-4" aria-hidden="true"></i>Month</label>
+                <select id="dashboardMonth" name="month" onchange="this.form.submit()" class="min-h-10 rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[13px] font-semibold text-neutral-950">
+                    @foreach ($periodOptions as $option)
+                        <option value="{{ $option['value'] }}" @selected($option['value'] === $period->format('Y-m'))>{{ $option['label'] }}</option>
+                    @endforeach
+                </select>
+                <noscript><button type="submit" class="min-h-10 rounded-lg border border-neutral-200 bg-white px-3 font-sans text-[13px] font-semibold">Apply</button></noscript>
+            </form>
         @endif
     </div>
 
-    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 {{ $money !== null ? 'xl:grid-cols-4' : 'xl:grid-cols-3' }}">
+    @if ($canModerate)
+        <section data-attention class="mt-6 {{ $panel }}">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="{{ $panelTitle }}">Needs your action</h2>
+                <p class="font-sans text-xs text-neutral-600">{{ $waiting->isEmpty() ? 'Nothing is waiting on you.' : $waiting->sum('count').' item'.($waiting->sum('count') === 1 ? '' : 's').' across '.$waiting->count().' queue'.($waiting->count() === 1 ? '' : 's') }}</p>
+            </div>
+            @if ($waiting->isEmpty())
+                <p class="mt-4 rounded-xl bg-primary-50 px-4 py-6 text-center font-sans text-[13px] text-neutral-600">You're all caught up. New work will appear here.</p>
+            @endif
+            <ul class="mt-3 grid grid-cols-1 gap-x-8 divide-y divide-neutral-200 xl:grid-cols-2 xl:divide-y-0">
+                @foreach ($waiting as $item)
+                    @include('Admin.partials.attention-row', ['item' => $item, 'dim' => false])
+                @endforeach
+            </ul>
+            @if ($quiet->isNotEmpty())
+                <details class="mt-3 rounded-xl bg-primary-50 px-4 py-3">
+                    <summary class="cursor-pointer font-sans text-xs font-semibold text-neutral-600">{{ $quiet->count() }} queue{{ $quiet->count() === 1 ? '' : 's' }} with nothing waiting</summary>
+                    <ul class="mt-2 divide-y divide-neutral-200">
+                        @foreach ($quiet as $item)
+                            @include('Admin.partials.attention-row', ['item' => $item, 'dim' => true])
+                        @endforeach
+                    </ul>
+                </details>
+            @endif
+        </section>
+    @endif
+
+    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 {{ $money !== null ? 'xl:grid-cols-3' : 'xl:grid-cols-3' }}">
         @foreach ($cards as $item)
             @if ($item['url'])
                 <a href="{{ $item['url'] }}" class="{{ $linkedCard }}">
@@ -58,38 +99,17 @@
     </div>
 
     <div class="mt-6 grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        @if ($canModerate)
-            <section data-attention class="{{ $panel }}">
-                <h2 class="{{ $panelTitle }}">Needs your action</h2>
-                <ul class="mt-3 divide-y divide-neutral-200">
-                    @foreach ($attention as $item)
-                        <li class="flex items-center gap-3 py-3">
-                            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-800">
-                                <i data-lucide="{{ $item['icon'] }}" class="size-[18px]" aria-hidden="true"></i>
-                            </span>
-                            <span class="min-w-0 flex-1">
-                                <span class="block font-sans text-[13px] font-semibold text-neutral-950">{{ $item['label'] }}</span>
-                                <span class="block font-sans text-xs text-neutral-600">{{ $item['detail'] }}</span>
-                            </span>
-                            <span class="font-serif text-lg font-bold {{ $item['count'] > 0 ? 'text-neutral-950' : 'text-neutral-400' }}">{{ number_format($item['count']) }}</span>
-                            @if ($item['url'])
-                                <a href="{{ $item['url'] }}" class="inline-flex min-h-9 w-[76px] shrink-0 items-center justify-center rounded-lg border border-neutral-200 font-sans text-xs font-semibold text-primary-800 no-underline transition-colors hover:border-primary-800">{{ $item['action'] }}</a>
-                            @else
-                                <span title="Coming soon" class="inline-flex min-h-9 w-[76px] shrink-0 cursor-default items-center justify-center font-sans text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Soon</span>
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
-            </section>
-        @endif
 
         @if ($money !== null)
             <section data-platform-money class="{{ $panel }}">
-                <h2 class="{{ $panelTitle }}">Platform money this month</h2>
+                <h2 class="{{ $panelTitle }}">Platform money {{ $isCurrent ? 'this month' : 'in '.$periodLabel }}</h2>
                 <p class="mt-1 font-sans text-xs text-neutral-600">What Zefanya earns and what it funds</p>
+                @if ($money['commission'] === 0 && $money['platformVouchers'] === 0 && $money['shippingVouchers'] === 0)
+                    <p class="mt-3 rounded-xl bg-primary-50 px-4 py-4 text-center font-sans text-[13px] text-neutral-600">No orders were finalized {{ $isCurrent ? 'this month yet' : 'in '.$periodLabel }}. Commission is counted when an order is completed.</p>
+                @endif
                 <dl class="mt-3 divide-y divide-neutral-200">
                     <div class="flex items-center justify-between gap-4 py-3">
-                        <dt class="font-sans text-[13px] font-semibold text-neutral-950">Commission earned<span class="block text-xs font-normal text-neutral-600">{{ \App\Services\Shared\CommissionFinalizationService::COMMISSION_BPS / 100 }}% on finalized orders</span></dt>
+                        <dt class="font-sans text-[13px] font-semibold text-neutral-950">Commission revenue<span class="block text-xs font-normal text-neutral-600">{{ \App\Services\Shared\CommissionFinalizationService::COMMISSION_BPS / 100 }}% on finalized orders</span></dt>
                         <dd class="font-sans text-sm font-semibold text-neutral-950">+ {{ $peso($money['commission']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 py-3">
@@ -102,7 +122,7 @@
                     </div>
                 </dl>
                 <div class="mt-2 flex items-center justify-between gap-4 rounded-xl bg-primary-50 px-4 py-4">
-                    <span class="font-sans text-[13px] font-semibold text-neutral-950">Platform net</span>
+                    <span class="font-sans text-[13px] font-semibold text-neutral-950">Platform net earnings<span class="block text-xs font-normal text-neutral-600">Commission revenue minus vouchers Zefanya funded</span></span>
                     <span class="font-serif text-xl font-bold text-neutral-950">{{ $peso($money['net']) }}</span>
                 </div>
                 <p class="mt-3 font-sans text-xs text-neutral-600">Store vouchers are seller-funded and never appear here.</p>
@@ -124,12 +144,37 @@
         @endif
     </div>
 
+    @if ($money !== null && $position !== null)
+        <section data-platform-position-section class="mt-6 {{ $panel }}">
+            <h2 class="{{ $panelTitle }}">Liabilities and money in transit <span class="font-normal text-neutral-600">(live, not filtered by month)</span></h2>
+            <p class="mt-1 font-sans text-xs text-neutral-600">Not revenue and not part of the net above. COD cash, seller payouts and origin shipping shares only pass through Zefanya.</p>
+            <dl data-platform-position class="mt-4 grid grid-cols-1 gap-4 font-sans text-[13px] text-neutral-950 md:grid-cols-3">
+                <div class="rounded-xl bg-primary-50 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600">Zefanya owes</p>
+                    <div class="mt-2 flex justify-between gap-4 py-1.5"><dt>Seller payouts owed</dt><dd class="font-semibold tabular-nums">{{ $peso($position['sellerPayableMinor']) }}</dd></div>
+                    <div class="flex justify-between gap-4 py-1.5"><dt>Logistics shares owed (origin 40% / old-parcel 60%)</dt><dd class="font-semibold tabular-nums">{{ $peso($position['originPayableMinor']) }} / {{ $peso($position['destinationPayableMinor']) }}</dd></div>
+                    <div class="flex justify-between gap-4 py-1.5"><dt>Refunds still to record ({{ $position['refundsToRecordCount'] }})</dt><dd class="font-semibold tabular-nums">{{ $peso($position['refundsToRecordMinor']) }}</dd></div>
+                    <div class="mt-1 flex justify-between gap-4 border-t border-neutral-200 pt-2.5"><dt class="font-semibold">Total owed by Zefanya</dt><dd class="font-serif text-lg font-bold tabular-nums">{{ $peso($position['totalLiabilitiesMinor']) }}</dd></div>
+                </div>
+                <div class="rounded-xl bg-primary-50 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600">Owed to Zefanya</p>
+                    <div class="mt-2 flex justify-between gap-4 py-1.5"><dt>Seller debts owed to Zefanya</dt><dd class="font-semibold tabular-nums">{{ $peso($position['sellerDebtMinor']) }}</dd></div>
+                </div>
+                <div class="rounded-xl bg-primary-50 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600">Cash in transit</p>
+                    <div class="mt-2 flex justify-between gap-4 py-1.5"><dt>Cash not yet received (riders {{ $peso($position['cashWithRidersMinor']) }}, companies {{ $peso($position['cashAtCompaniesMinor']) }}, awaiting confirmation {{ $peso($position['cashSentAwaitingMinor']) }})</dt><dd class="font-semibold tabular-nums">{{ $peso($position['outstandingCashMinor']) }}</dd></div>
+                </div>
+            </dl>
+            <p class="mt-3 font-sans text-xs text-neutral-600">Refund adjustments: {{ $peso($position['refundsRecordedMonthMinor']) }} refunded this month. Commission already counted on refunded orders: {{ $peso($position['commissionOnRefundedMinor']) }}, not removed from the net.</p>
+        </section>
+    @endif
+
     @if ($money !== null)
         <section data-settlements class="mt-6 {{ $panel }}">
             <h2 class="{{ $panelTitle }}">Logistics settlements</h2>
-            <p class="mt-1 font-sans text-xs text-neutral-600">COD collected this month, minus the shipping on those parcels and what Zefanya has confirmed receiving. <a href="{{ route('admin.logistics-remittances.index') }}" class="font-semibold text-primary-800 underline">Review payments</a></p>
+            <p class="mt-1 font-sans text-xs text-neutral-600">COD collected {{ $isCurrent ? 'this month' : 'in '.$periodLabel }}, minus the shipping on those parcels and what Zefanya has confirmed receiving. <a href="{{ route('admin.logistics-remittances.index') }}" class="font-semibold text-primary-800 underline">Review payments</a></p>
             @if ($settlements->isEmpty())
-                <p class="mt-4 rounded-xl bg-primary-50 px-4 py-6 text-center font-sans text-[13px] text-neutral-600">No cash on delivery collected this month.</p>
+                <p class="mt-4 rounded-xl bg-primary-50 px-4 py-6 text-center font-sans text-[13px] text-neutral-600">No cash on delivery {{ $isCurrent ? 'collected this month' : 'was collected in '.$periodLabel }}.</p>
             @else
                 <div class="mt-3 overflow-x-auto">
                     <table class="w-full min-w-[560px] border-collapse [&>tbody>tr:last-child>td]:border-b-0">

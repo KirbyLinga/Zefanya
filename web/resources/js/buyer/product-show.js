@@ -12,16 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedColorImage = null;
 
   thumbBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (event) => {
       const src = btn.dataset.src || '';
 
       // Swap main image
       if (mainImg) {
-        mainImg.style.opacity = '0';
-        setTimeout(() => {
-          mainImg.src = src;
-          mainImg.style.opacity = src ? '1' : '0';
-        }, 120);
+        mainImg.src = src;
+        mainImg.style.opacity = src ? '1' : '0';
       }
 
       // Update active ring
@@ -33,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.classList.add('border-buyer-ink');
       btn.classList.remove('border-transparent');
       btn.setAttribute('aria-pressed', 'true');
+      openImageModal(event);
     });
   });
 
@@ -381,11 +379,87 @@ document.addEventListener('DOMContentLoaded', () => {
     slideTo(0);
   }
 
-  // ── 8. Maximize button (simple new-tab open, no lightbox dependency) ─────
-  document.getElementById('pdp-maximize')?.addEventListener('click', () => {
-    const src = mainImg?.src;
-    if (src) window.open(src, '_blank', 'noopener');
-  });
+  // Product photos stay on the current page in a native modal dialog.
+  const imageDialog = document.getElementById('pdp-image-modal');
+  const modalImage = document.getElementById('pdp-modal-img');
+  const imageCounter = document.getElementById('pdp-image-counter');
+  const imageError = document.getElementById('pdp-image-error');
+  const previousPhoto = document.getElementById('pdp-image-prev');
+  const nextPhoto = document.getElementById('pdp-image-next');
+  let modalPhotos = [];
+  let modalIndex = 0;
+  let imageOpener = null;
+  let previousBodyOverflow = '';
+
+  function displayModalPhoto(index) {
+    modalIndex = (index + modalPhotos.length) % modalPhotos.length;
+    const src = modalPhotos[modalIndex];
+    modalImage.alt = (mainImg?.alt || 'Product') + ' - photo ' + (modalIndex + 1) + ' of ' + modalPhotos.length;
+    if (imageError) imageError.hidden = true;
+    modalImage.src = src;
+    if (imageCounter) imageCounter.textContent = 'Photo ' + (modalIndex + 1) + ' of ' + modalPhotos.length;
+    if (previousPhoto) previousPhoto.hidden = modalPhotos.length < 2;
+    if (nextPhoto) nextPhoto.hidden = modalPhotos.length < 2;
+    if (mainImg) { mainImg.src = src; mainImg.style.opacity = '1'; }
+    thumbBtns.forEach(button => {
+      const selected = button.dataset.src === src;
+      button.setAttribute('aria-pressed', String(selected));
+      button.classList.toggle('border-buyer-ink', selected);
+      button.classList.toggle('border-transparent', !selected);
+    });
+  }
+
+  function openImageModal(event) {
+    const current = mainImg?.getAttribute('src');
+    if (!current || !imageDialog || !modalImage || imageDialog.open) return;
+    modalPhotos = [...new Set([
+      generalImage,
+      ...Array.from(thumbBtns, button => button.dataset.src),
+      ...variantsData.flatMap(variant => variant.images || []),
+      current,
+    ].filter(Boolean))];
+    imageOpener = event?.currentTarget || document.activeElement;
+    previousBodyOverflow = document.body.style.overflow;
+    displayModalPhoto(Math.max(0, modalPhotos.indexOf(current)));
+    imageDialog.showModal();
+    document.body.style.overflow = 'hidden';
+  }
+
+  document.getElementById('pdp-image-open')?.addEventListener('click', openImageModal);
+  document.getElementById('pdp-maximize')?.addEventListener('click', openImageModal);
+  document.getElementById('pdp-image-close')?.addEventListener('click', () => imageDialog?.close());
+  previousPhoto?.addEventListener('click', () => displayModalPhoto(modalIndex - 1));
+  nextPhoto?.addEventListener('click', () => displayModalPhoto(modalIndex + 1));
+  if (imageDialog) {
+    imageDialog.addEventListener('keydown', event => {
+      if (event.key === 'Tab') {
+        const controls = [document.getElementById('pdp-image-close'), previousPhoto, nextPhoto]
+          .filter(button => button && !button.hidden && !button.disabled);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (first && event.shiftKey && document.activeElement === first) {
+          event.preventDefault(); last.focus();
+        } else if (last && !event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        displayModalPhoto(modalIndex + (event.key === 'ArrowLeft' ? -1 : 1));
+      }
+    });
+    imageDialog.addEventListener('click', event => {
+      if (event.target !== imageDialog) return;
+      const bounds = imageDialog.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) imageDialog.close();
+    });
+    imageDialog.addEventListener('close', () => {
+      document.body.style.overflow = previousBodyOverflow;
+      imageOpener?.focus();
+    });
+    modalImage?.addEventListener('error', () => { if (imageError && imageDialog.open) imageError.hidden = false; });
+    modalImage?.addEventListener('load', () => { if (imageError) imageError.hidden = true; });
+  }
 
   // Jump bar above the specifications: the links scroll natively, this marks the current one.
   const detailTabs = [...document.querySelectorAll('[data-pdp-tabs] a')];

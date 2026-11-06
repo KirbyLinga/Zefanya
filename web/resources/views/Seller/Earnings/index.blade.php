@@ -6,11 +6,15 @@
 @endphp
 <div class="space-y-6">
     <div>
-        <h1 class="font-serif text-3xl text-[var(--text-ink)]">Earnings</h1>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="font-serif text-3xl text-[var(--text-ink)]">Earnings</h1>
+            <a href="{{ route('seller.payout-requests.index') }}" class="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 text-xs font-semibold text-[var(--link)] hover:bg-[var(--bg-page)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">Withdraw available funds <i data-lucide="arrow-right" aria-hidden="true" class="size-3.5"></i></a>
+        </div>
+        <p class="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">Review order-level earnings, commission and when funds become available here. Use Payout Requests to withdraw available funds and track approval and payment.</p>
         <p class="mt-2 text-sm text-[var(--text-muted)]">Net is gross merchandise, minus your store sales and shop vouchers, minus 5% commission.</p>
     </div>
 
-    <section class="grid gap-4 sm:grid-cols-2">
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-5">
             <h2 class="text-sm text-[var(--text-muted)]">Pending</h2>
             <p class="mt-2 text-3xl font-semibold text-[var(--text-ink)]">{{ $peso($pendingMinor) }}</p>
@@ -19,10 +23,20 @@
         <article class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-5">
             <h2 class="text-sm text-[var(--text-muted)]">Available</h2>
             <p class="mt-2 text-3xl font-semibold text-[var(--text-ink)]">{{ $peso($availableMinor) }}</p>
-            <p class="mt-2 text-sm text-[var(--text-muted)]">Ready to withdraw from Payout Requests.</p>
+            <p class="mt-2 text-sm text-[var(--text-muted)]">Ready to withdraw from Payout Requests.@if ($debtMinor > 0) {{ $peso(min($debtMinor, $availableMinor)) }} of it will be kept against your debt.@endif</p>
             @if ($reservedMinor > 0)
                 <p class="mt-2 text-sm text-[var(--text-ink)]">{{ $peso($reservedMinor) }} is reserved by a payout request.</p>
             @endif
+        </article>
+        <article class="rounded-lg border {{ $debtMinor > 0 ? 'border-red-300 bg-red-50' : 'border-[var(--border-input)] bg-[var(--bg-surface)]' }} p-5">
+            <h2 class="text-sm text-[var(--text-muted)]">Debt to Zefanya</h2>
+            <p class="mt-2 text-3xl font-semibold text-[var(--text-ink)]">{{ $debtMinor > 0 ? '−' : '' }}{{ $peso($debtMinor) }}</p>
+            <p class="mt-2 text-sm text-[var(--text-muted)]">From returns and failed deliveries: money you were already paid, refunded and return shipping your earnings did not cover, and trips for failed deliveries sent back to you. It is taken from your next payouts.</p>
+        </article>
+        <article class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-5">
+            <h2 class="text-sm text-[var(--text-muted)]">Paid withdrawals</h2>
+            <p class="mt-2 text-3xl font-semibold text-[var(--text-ink)]">{{ $peso($paidWithdrawalsMinor) }}</p>
+            <p class="mt-2 text-sm text-[var(--text-muted)]">Requested amounts Zefanya has paid out.</p>
         </article>
     </section>
 

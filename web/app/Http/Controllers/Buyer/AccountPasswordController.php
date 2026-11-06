@@ -120,6 +120,8 @@ class AccountPasswordController extends Controller
             'pending_password_expires_at' => null,
         ])->save();
 
+        $buyer->tokens()->delete();
+
         $this->clearOtpFailures(self::OTP_SCOPE, $lockKey);
 
         // AuthenticateRoleSession signs out sessions holding the old password's

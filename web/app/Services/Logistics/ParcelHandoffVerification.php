@@ -41,6 +41,9 @@ class ParcelHandoffVerification
 
     public const ACTION_STATION_RECEIPT = 'confirm_station_receipt';
 
+    /** Station Hub receives a parcel back after a failed delivery attempt. */
+    public const ACTION_FAILED_RETURN_RECEIPT = 'failed_return_receipt';
+
     public const ACTION_SORT = 'sort_parcel';
 
     public const ACTION_MANIFEST_DISPATCH = 'manifest_dispatch';

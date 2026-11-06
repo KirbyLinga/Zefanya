@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Seller;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Catalog\Product;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Shared\SellerOrder;
 use App\Services\Seller\SellerSalesTrend;
+use App\Services\Seller\SellerShippingProviderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
@@ -97,6 +99,19 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
+        $shippingReady = app(SellerShippingProviderService::class)->canOfferShipping($seller);
+
+        $returnDecisions = ParcelReturn::query()
+            ->whereHas('sellerOrder', fn ($query) => $query->where('seller_id', $sellerId))
+            ->whereNull('seller_decision')
+            ->whereNotNull('seller_response_due_at');
+        $pendingReturnDecisionCount = (clone $returnDecisions)->count();
+        $pendingReturnDecisions = $returnDecisions
+            ->orderBy('seller_response_due_at')
+            ->orderBy('id')
+            ->limit(3)
+            ->get(['id', 'seller_order_id', 'seller_response_due_at']);
+
         $salesSummary = app(SellerSalesTrend::class)->forSeller($sellerId);
 
         // ── Notifications: only query if the table exists (Notifiable trait
@@ -112,6 +127,9 @@ class DashboardController extends Controller
 
         return view('Seller.Dashboard.index', [
             'seller' => $seller,
+            'shippingReady' => $shippingReady,
+            'pendingReturnDecisionCount' => $pendingReturnDecisionCount,
+            'pendingReturnDecisions' => $pendingReturnDecisions,
             'totalSales' => $totalSales,
             'totalOrders' => $totalOrders,
             'pendingOrders' => $pendingOrders,

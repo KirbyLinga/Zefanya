@@ -57,8 +57,8 @@
             @if ($canManage)
                 <x-admin.nav-item label="Vouchers" icon="ticket" route="admin.vouchers.index" :active="['admin.vouchers.*']" />
             @endif
-            <x-admin.nav-item :label="'Returns & disputes'" icon="message-square-warning" />
-            <x-admin.nav-item label="Parcel issues" icon="package-x" route="admin.incidents.index" :active="['admin.incidents.*', 'admin.returns.*']" />
+            <x-admin.nav-item label="Returns & disputes" icon="message-square-warning" route="admin.returns.index" :active="['admin.returns.*']" />
+            <x-admin.nav-item label="Parcel issues" icon="package-x" route="admin.incidents.index" :active="['admin.incidents.*']" />
         @endif
 
         @if ($canManage)

@@ -55,7 +55,7 @@
             @endforelse
         </div>
 
-        <div class="shrink-0 border-t border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 sm:px-6 sm:py-5 [&_textarea]:min-h-20 [&_textarea]:rounded-xl [&_textarea]:border-[var(--border-strong)] [&_textarea]:bg-[var(--bg-page)] [&_textarea]:p-3 [&_textarea]:text-[var(--text-ink)] [&_textarea]:focus:ring-primary-300 [&_input[type=file]]:mt-2 [&_input[type=file]]:max-w-full [&_input[type=file]]:file:mr-3 [&_input[type=file]]:file:cursor-pointer [&_input[type=file]]:file:rounded-lg [&_input[type=file]]:file:border-0 [&_input[type=file]]:file:bg-primary-50 [&_input[type=file]]:file:px-3 [&_input[type=file]]:file:py-2 [&_input[type=file]]:file:font-semibold [&_input[type=file]]:file:text-primary-900 [&_button]:min-h-10 [&_button]:rounded-lg [&_button]:px-6">
+        <div class="shrink-0 border-t border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 sm:px-6 sm:py-5 [&_textarea]:min-h-20 [&_textarea]:rounded-xl [&_textarea]:border-[var(--border-strong)] [&_textarea]:bg-[var(--bg-page)] [&_textarea]:p-3 [&_textarea]:text-[var(--text-ink)] [&_textarea]:focus:ring-primary-300 [&_button]:min-h-10 [&_button]:rounded-lg [&_button]:px-6">
             <label for="messageInput" class="mb-2 block text-xs font-semibold text-[var(--text-ink)]">Your message</label>
             @include('Messages._composer', ['role' => 'seller'])
         </div>

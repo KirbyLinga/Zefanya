@@ -196,27 +196,27 @@
 
                 <div class="mb-5">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsUploadId">Upload valid ID *</label>
-                    <label for="logisticsUploadId" class="mb-1 flex cursor-pointer items-center gap-3 rounded-sm border border-dashed border-neutral-300 bg-neutral-50 p-4 transition-colors hover:border-[#9c5c68]">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-white text-[#9c5c68] shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
+                    <label for="logisticsUploadId" class="upload-zone mb-1 flex items-center gap-3">
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
                         <span>
                             <span class="block font-sans text-sm font-semibold text-neutral-800" id="logisticsUploadIdName">Choose a valid ID</span>
                             <span class="block font-sans text-xs text-neutral-500">JPG, JPEG, PNG or PDF · Max 5MB</span>
                         </span>
                     </label>
-                    <input type="file" name="upload_id" id="logisticsUploadId" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
+                    <input type="file" name="upload_id" id="logisticsUploadId" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="sr-only">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-upload_id"></span>
                 </div>
 
                 <div class="mb-6">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="logisticsDtiPermit">Upload DTI permit *</label>
-                    <label for="logisticsDtiPermit" class="mb-1 flex cursor-pointer items-center gap-3 rounded-sm border border-dashed border-neutral-300 bg-neutral-50 p-4 transition-colors hover:border-[#9c5c68]">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-white text-[#9c5c68] shadow-sm"><i data-lucide="file-text" width="18" height="18"></i></span>
+                    <label for="logisticsDtiPermit" class="upload-zone mb-1 flex items-center gap-3">
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="file-text" width="18" height="18"></i></span>
                         <span>
                             <span class="block font-sans text-sm font-semibold text-neutral-800" id="logisticsDtiPermitName">Choose a DTI permit</span>
                             <span class="block font-sans text-xs text-neutral-500">JPG, JPEG, PNG or PDF · Max 5MB</span>
                         </span>
                     </label>
-                    <input type="file" name="dti_permit_upload" id="logisticsDtiPermit" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="hidden">
+                    <input type="file" name="dti_permit_upload" id="logisticsDtiPermit" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required class="sr-only">
                     <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-dti_permit_upload"></span>
                 </div>
 

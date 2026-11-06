@@ -1,7 +1,11 @@
 @extends('Layouts.seller')
 @section('title', 'Incoming Returns')
 @section('content')
-<h1 class="mb-6 font-serif text-2xl text-[var(--text-ink)]">Incoming Returns</h1>
+<div class="mb-6">
+    <h1 class="font-serif text-2xl text-[var(--text-ink)]">Incoming Returns</h1>
+    <p class="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--text-muted)]">Review each return request within 3 days. Approve it or give a reason for rejection here; requests without a decision are approved automatically at the deadline.</p>
+    <p class="mt-2 text-xs text-[var(--text-muted)]">Deadlines use Philippine time. Requests due within 24 hours are marked urgent. After the deadline, a decision is no longer available.</p>
+</div>
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 @if ($errors->any())<div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
 
@@ -9,7 +13,10 @@
 @forelse ($returns as $record)
 <section class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
     <x-return-summary :record="$record" />
-    <a href="{{ route('seller.orders.show', $record->sellerOrder) }}" class="mt-3 block text-xs underline">Parcel tracking</a>
+    @if ($record->awaitingSellerDecision() && $record->seller_response_due_at && $record->seller_response_due_at->lessThanOrEqualTo(now()->addDay()))
+        <p role="status" class="mt-3 inline-flex items-center gap-2 rounded-md bg-[var(--pill-warning-bg)] px-3 py-2 text-xs font-semibold text-[var(--status-warning)]"><i data-lucide="clock" aria-hidden="true" class="size-3.5"></i>{{ $record->sellerDecisionOverdue() ? 'Overdue - automatic approval pending' : 'Urgent: due within 24 hours' }}</p>
+    @endif
+    <a href="{{ route('seller.orders.show', $record->sellerOrder) }}" class="mt-3 inline-flex min-h-9 items-center text-xs font-semibold text-[var(--link)] underline">Parcel tracking</a>
 
     @if ($record->description || $record->photos)
         <div class="mt-4 space-y-2">
@@ -35,16 +42,16 @@
     @elseif ($record->awaitingSellerDecision())
         <div class="mt-4 space-y-3 rounded-md border border-[var(--border-strong)] p-4">
             @if ($record->sellerDecisionOverdue())
-                <p class="text-xs font-semibold text-[var(--text-ink)]">The 3-day deadline passed on {{ $record->seller_response_due_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. This request is being approved automatically.</p>
+                <p class="text-xs font-semibold text-[var(--text-ink)]">The 3-day deadline passed on {{ $record->seller_response_due_at->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, Y g:i A') }}. This request is being approved automatically.</p>
             @else
-                <p class="text-xs font-semibold text-[var(--text-ink)]">Respond by {{ $record->seller_response_due_at->timezone('Asia/Manila')->format('M j, Y g:i A') }} Philippine time ({{ $record->seller_response_due_at->diffForHumans() }}). If you don't, it is approved automatically.</p>
+                <p class="text-xs font-semibold text-[var(--text-ink)]">Respond by {{ $record->seller_response_due_at->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, Y g:i A') }} Philippine time ({{ $record->seller_response_due_at->diffForHumans() }}). If you don't, it is approved automatically.</p>
                 <form method="POST" action="{{ route('seller.returns.approve', $record) }}" onsubmit="return confirm('Approve this return? The parcel will start its way back to you.')">@csrf
                     <button type="submit" class="rounded-sm bg-primary-700 px-4 py-2 text-xs text-white">Approve return</button>
                 </form>
                 <form method="POST" action="{{ route('seller.returns.reject', $record) }}" class="space-y-2" onsubmit="return confirm('Reject this return? The buyer will see your reason.')">@csrf
-                    <label class="block text-xs" for="return-reject-{{ $record->id }}">Reason for rejecting (10–300 characters)</label>
+                    <label class="block text-xs text-[var(--text-ink)]" for="return-reject-{{ $record->id }}">Reason for rejecting (10–300 characters)</label>
                     <textarea id="return-reject-{{ $record->id }}" name="reason" required minlength="10" maxlength="300" rows="2" class="block w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2 text-xs text-[var(--text-ink)]"></textarea>
-                    <button type="submit" class="rounded-sm border border-primary-700 px-4 py-2 text-xs text-primary-700">Reject return</button>
+                    <button type="submit" class="rounded-sm border border-primary-700 px-4 py-2 text-xs text-[var(--link)]">Reject return</button>
                 </form>
             @endif
         </div>
@@ -68,7 +75,7 @@
         <p class="mt-3 text-xs text-[var(--text-ink)]">An admin approved this return after the buyer disputed your rejection.</p>
         <p class="mt-3 text-xs text-[var(--text-muted)]">Receipt confirmation is unavailable until verified origin arrival and physical handover.</p>
     @elseif ($record->seller_decision === \App\Models\Logistics\ParcelReturn::REJECTED)
-        <p class="mt-3 text-xs text-[var(--text-ink)]">You rejected this request on {{ $record->seller_decided_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reason: {{ $record->seller_decision_reason }}</p>
+        <p class="mt-3 text-xs text-[var(--text-ink)]">You rejected this request on {{ $record->seller_decided_at->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, Y g:i A') }}. Reason: {{ $record->seller_decision_reason }}</p>
         @if ($record->dispute_outcome === \App\Models\Logistics\ParcelReturn::DISPUTE_UPHELD)
             <p class="mt-1 text-xs text-[var(--text-ink)]">An admin agreed with your rejection. {{ $record->dispute_note }}</p>
         @endif
@@ -80,6 +87,7 @@
         @endif
         <p class="mt-3 text-xs text-[var(--text-muted)]">Receipt confirmation is unavailable until verified origin arrival and physical handover.</p>
     @endif
+    <x-return-money :record="$record" audience="seller" />
 </section>
 @empty<p class="text-sm text-[var(--text-muted)]">No incoming returns.</p>@endforelse
 </div><div class="mt-4">{{ $returns->links() }}</div>

@@ -226,6 +226,27 @@ class AdminDashboardStatsTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_the_month_picker_changes_the_money_figures_and_ignores_bad_values(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-10 04:00:00', 'UTC'));
+        $order = fn (array $values) => SellerOrder::factory()->status(OrderStatus::Completed)->create()->forceFill($values)->save();
+        $order(['commission_minor' => 1000, 'commission_finalized_at' => Carbon::parse('2026-11-05 04:00:00', 'UTC')]);
+        $order(['commission_minor' => 4000, 'commission_finalized_at' => Carbon::parse('2026-10-05 04:00:00', 'UTC')]);
+
+        $this->actingAs($this->admin, 'admin')->get(route('admin.dashboard', ['month' => '2026-10']))->assertOk()
+            ->assertViewHas('money', fn (array $money) => $money['commission'] === 4000)
+            ->assertSee('Platform money in October 2026')
+            ->assertSee('Commission (October 2026)');
+
+        foreach (['2027-01', 'garbage'] as $bad) {
+            $this->actingAs($this->admin, 'admin')->get(route('admin.dashboard', ['month' => $bad]))->assertOk()
+                ->assertViewHas('money', fn (array $money) => $money['commission'] === 1000)
+                ->assertSee('Platform money this month');
+        }
+
+        Carbon::setTestNow();
+    }
+
     public function test_an_empty_settlement_table_says_so(): void
     {
         $this->dashboard()->assertOk()->assertSee('No cash on delivery collected this month.');

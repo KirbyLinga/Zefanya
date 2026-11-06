@@ -32,13 +32,16 @@ class ParcelTrackingVerificationService
     public function verifyForRider(Rider $rider, string $trackingNumber, string $method = ParcelHandoffVerification::METHOD_MANUAL): array
     {
         $order = $this->findByTracking($trackingNumber);
-        $courier = $this->riderOps->operationalCourier($rider);
+        $courier = $this->riderOps->operationalCourier($rider, allowWindDown: true);
+        // A suspended company's wind-down rider may only finish parcels already out for delivery.
+        $windingDown = $this->riderOps->isWindingDown($rider);
 
-        $isPickup = (int) $order->courier_id === (int) $courier->id
+        $isPickup = ! $windingDown
+            && (int) $order->courier_id === (int) $courier->id
             && in_array($order->status, RiderOperationsService::PICKUP_STATUSES, true);
 
         $isDelivery = (int) $order->delivery_courier_id === (int) $courier->id
-            && in_array($order->status, [
+            && in_array($order->status, $windingDown ? [OrderStatus::OutForDelivery] : [
                 OrderStatus::AssignedToRider,
                 OrderStatus::OutForDelivery,
                 OrderStatus::DeliveryFailed,
@@ -244,13 +247,40 @@ class ParcelTrackingVerificationService
             && ($order->currentCustodyProviderId() !== null || $order->courier !== null || $order->deliveryCourier !== null)) {
             $context = 'assign_delivery';
             $actions[] = [
-                'key' => 'open_sorting',
-                'label' => 'Open Parcel Sorting',
+                'key' => 'open_assignments',
+                'label' => 'Open Assign deliveries',
                 'method' => 'GET',
-                'url' => route('logistics.parcel-sorting.index', ['tab' => 'sorting']),
+                'url' => route('logistics.delivery-assignments.index').'#stage-'.($order->delivery_courier_id ? 'dispatch' : 'rider'),
                 'confirm_message' => null,
             ];
         }
+
+        // A parcel back from a failed delivery attempt: the scan is the custody
+        // proof that lets its final attempt go to another Rider.
+        $failedReturnHubId = $order->status === OrderStatus::DeliveryFailed
+            ? app(CourierAssignmentService::class)->failedReturnStationId($order) : null;
+        if ($failedReturnHubId !== null && ! $order->hasActiveReturn() && ! $order->isBackAtStationAfterFailure()) {
+            $context = 'failed_return_receipt';
+            $actions[] = [
+                'key' => 'receive_failed_return',
+                'label' => 'Receive back at Station Hub',
+                'method' => 'POST',
+                'url' => route('logistics.delivery-assignments.receive-back', $order),
+                'confirm_message' => 'Confirm this parcel is physically back at the Station Hub after the failed delivery attempt?',
+                'verification_token' => $this->parcelVerify->issueForLogistics(
+                    $provider, $order, ParcelHandoffVerification::ACTION_FAILED_RETURN_RECEIPT, $method, $failedReturnHubId,
+                ),
+            ];
+        }
+
+        // Every scan can open the parcel's full record, including scans that allow no action here.
+        $actions[] = [
+            'key' => 'open_details',
+            'label' => 'View parcel details',
+            'method' => 'GET',
+            'url' => route('logistics.delivery-monitoring.show', $order),
+            'confirm_message' => null,
+        ];
 
         return [
             'parcel' => $this->parcelSummary($order),
@@ -260,7 +290,8 @@ class ParcelTrackingVerificationService
                 'station_receipt' => 'Parcel verified. Confirm receipt to receive it at the hub.',
                 'transfer' => $sortingBlocked,
                 'sorting' => 'Parcel already received at the hub. You may proceed with sorting.',
-                'assign_delivery' => 'Parcel already received and sorted. Open Parcel Sorting to assign a delivery rider.',
+                'assign_delivery' => 'Parcel already received and sorted. Assign its delivery rider in Assign deliveries.',
+                'failed_return_receipt' => 'Parcel verified after a failed delivery attempt. Receive it back at the Station Hub so its final attempt can go to any Rider.',
                 default => 'Scan blocked: no hub receipt or sorting action is allowed while this parcel is '.$order->status->label().'.',
             },
         ];

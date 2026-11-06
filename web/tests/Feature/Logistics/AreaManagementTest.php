@@ -198,7 +198,7 @@ class AreaManagementTest extends TestCase
         $this->post(route('logistics.areas.store'), [
             'station_hub_id' => $this->first->station_hub_id,
             'city_municipality_code' => '030540100', 'barangay_codes' => ['0305401003'],
-        ])->assertSessionHasNoErrors()->assertSessionHas('success', 'Barangay coverage saved. Next: link riders to these barangays.');
+        ])->assertSessionHasNoErrors()->assertSessionHas('success', 'Delivery areas saved. Next: link riders to these barangays.');
 
         $this->assertDatabaseHas('areas', ['logistics_provider_id' => $this->provider->id, 'barangay_code' => '0305401003', 'name' => 'San Fernando']);
     }
@@ -212,8 +212,57 @@ class AreaManagementTest extends TestCase
         ]);
 
         $this->get(route('logistics.areas.index'))->assertOk()
-            ->assertSee('1/1 busy')->assertSee('Approved')->assertSee('Select all available')
+            ->assertSee('1/'.Courier::ACTIVE_CAPACITY.' busy')->assertSee('Approved')->assertSee('Select all available')
             ->assertSee('data-confirm=', false)->assertSee('1 rider and 1 pending pickup')
             ->assertSee('Link rider to selected barangays')->assertSee('Second');
+    }
+
+    public function test_summary_excludes_legacy_inactive_and_unvalidated_coverage(): void
+    {
+        Area::create([
+            'logistics_provider_id' => $this->provider->id,
+            'name' => 'Legacy municipality', 'municipality' => 'Legacy municipality',
+            'is_active' => true,
+        ]);
+        foreach (['Inactive' => ['is_active' => false], 'Unvalidated' => ['coverage_validated_at' => null]] as $name => $attributes) {
+            $area = $this->second->replicate();
+            $area->fill(array_merge(['name' => $name, 'barangay_code' => $name], $attributes))->save();
+        }
+
+        $this->get(route('logistics.areas.index'))
+            ->assertViewHas('serviceableAreas', fn ($areas) => $areas->values()->modelKeys() === [$this->first->id, $this->second->id])
+            ->assertSee('2 serviceable barangays, 1 without riders')
+            ->assertSee('2 inactive or not serviceable.')
+            ->assertSee('href="#areas-panel-attention"', false)
+            ->assertSee('href="#areas-panel-legacy"', false)
+            ->assertSee('Legacy municipality')
+            ->assertSee('Add / change rider');
+    }
+
+    public function test_inactive_parent_hub_removes_barangays_from_serviceable_summary_and_assignment_choices(): void
+    {
+        $this->first->station->parent->update(['is_active' => false]);
+
+        $response = $this->get(route('logistics.areas.index'))
+            ->assertViewHas('serviceableAreas', fn ($areas) => $areas->isEmpty())
+            ->assertSee('0 serviceable barangays, 0 without riders')
+            ->assertSee('No serviceable barangays yet.');
+
+        $this->assertStringNotContainsString('data-assign-area=', $response->getContent());
+        $this->assertStringNotContainsString('data-link-area data-station=', $response->getContent());
+    }
+
+    public function test_serviceable_summary_and_assignment_choices_respect_selected_station_and_provider(): void
+    {
+        $otherStation = $this->first->station->replicate();
+        $otherStation->name = 'Other station';
+        $otherStation->save();
+        $this->second->update(['station_hub_id' => $otherStation->id]);
+        $this->assignableCourier(LogisticsProvider::factory()->create(['status' => 'approved']));
+
+        $this->get(route('logistics.areas.index', ['station' => $this->first->station_hub_id]))
+            ->assertViewHas('serviceableAreas', fn ($areas) => $areas->modelKeys() === [$this->first->id])
+            ->assertSee('1 serviceable barangays, 0 without riders')
+            ->assertDontSee('data-assign-area="'.$this->second->id.'"', false);
     }
 }

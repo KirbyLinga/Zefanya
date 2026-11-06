@@ -196,7 +196,7 @@ class EndToEndLogisticsStabilizationTest extends TestCase
         $token = $this->riderScan($delivery, $parcel);
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $token, 'delivery_otp' => $code,
-            'proof_photo' => UploadedFile::fake()->create('proof.jpg', 20, 'image/jpeg'),
+            'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer', 'cod_amount' => number_format($payment->amount_minor / 100, 2, '.', ''),
         ])->assertRedirect(route('rider.deliveries.index'))->assertSessionHasNoErrors();
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);

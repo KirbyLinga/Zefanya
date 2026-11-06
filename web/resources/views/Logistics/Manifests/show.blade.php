@@ -1,6 +1,6 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Manifest #'.$manifest->id)
+@section('title', 'Batch Details #'.$manifest->id)
 
 @section('content')
 @if ($manifest->direction === 'return')<p class="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Reverse physical return transport. Normal outgoing dispatch is blocked.</p>@endif
@@ -22,10 +22,10 @@
 <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-[var(--border-strong)] pb-6">
     <div class="min-w-0">
         <a href="{{ route('logistics.manifests.index') }}" class="mb-2 inline-flex items-center gap-1 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-700 hover:underline">
-            <i data-lucide="arrow-left" class="size-3"></i>Manifests
+            <i data-lucide="arrow-left" class="size-3"></i>Transfer Batches
         </a>
         <div class="flex flex-wrap items-center gap-3">
-            <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Manifest #{{ $manifest->id }}</h1>
+            <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Batch #{{ $manifest->id }}</h1>
             <span class="inline-flex rounded-full border px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.5px] {{ $statusStyles[$manifest->status->value] ?? $statusStyles['DRAFT'] }}">{{ $manifest->status->label() }}</span>
         </div>
         <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">{{ $manifest->created_at?->format('M j, Y g:i A') }} · {{ $actorName }}</p>
@@ -99,8 +99,8 @@
 @if ($isDraft)
     <section class="mb-6 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm" aria-labelledby="dispatch-title" data-manifest-dispatch data-verify-url="{{ route('logistics.manifests.scan.verify', $manifest) }}" data-item-count="{{ $items->count() }}">
         <div class="border-b border-[var(--border-strong)] px-4 py-4">
-            <h2 id="dispatch-title" class="font-serif text-xl text-[var(--text-ink)]">Dispatch this manifest</h2>
-            <p class="mt-1 max-w-2xl font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">Every parcel must be scanned at {{ $manifest->originHub?->name ?? 'the origin hub' }}. Verification does not change delivery status; it only proves the parcel is on this manifest.</p>
+            <h2 id="dispatch-title" class="font-serif text-xl text-[var(--text-ink)]">Dispatch this batch</h2>
+            <p class="mt-1 max-w-2xl font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">Every parcel must be scanned at {{ $manifest->originHub?->name ?? 'the origin hub' }}. Verification does not change delivery status; it only proves the parcel is in this batch.</p>
         </div>
 
         @if ($items->isEmpty())
@@ -159,7 +159,7 @@
                     <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                         <p class="font-sans text-[11px] text-[var(--text-muted)]"><span data-manifest-verified-count>0</span> of {{ $items->count() }} parcels verified</p>
                         <button type="submit" data-manifest-dispatch-submit disabled class="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-primary-700 px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-white opacity-50 hover:bg-primary-800 disabled:cursor-not-allowed">
-                            <i data-lucide="truck" class="size-3.5"></i>Dispatch Manifest
+                            <i data-lucide="truck" class="size-3.5"></i>Dispatch Batch
                         </button>
                     </div>
                 </form>
@@ -169,8 +169,8 @@
 
     <section class="mb-6 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm" aria-labelledby="add-parcels-title">
         <div class="border-b border-[var(--border-strong)] px-4 py-4">
-            <h2 id="add-parcels-title" class="font-serif text-xl text-[var(--text-ink)]">Add parcels</h2>
-            <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">Only parcels currently at {{ $manifest->originHub?->name ?? 'the origin hub' }} and not on another active manifest can be added.</p>
+            <h2 id="add-parcels-title" class="font-serif text-xl text-[var(--text-ink)]">Add Parcels</h2>
+            <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">Only parcels currently at {{ $manifest->originHub?->name ?? 'the origin hub' }} and not in another active batch can be added.</p>
         </div>
 
         @if ($eligibleParcels->isEmpty())
@@ -216,7 +216,7 @@
     <div class="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--border-strong)] px-4 py-4">
         <div>
             <h2 id="movement-history-title" class="font-serif text-xl text-[var(--text-ink)]">Parcel movement history</h2>
-            <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">Manifest movement is separate from the parcel's canonical delivery status.</p>
+            <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">Batch movement is separate from the parcel's canonical delivery status.</p>
         </div>
         <p class="font-sans text-[10px] text-[var(--text-muted)]">{{ $counts['received'] }} received · {{ $counts['pending'] }} pending · {{ $counts['total'] }} total</p>
     </div>
@@ -224,7 +224,7 @@
     @if ($items->isEmpty())
         <div class="px-4 py-10 text-center">
             <i data-lucide="package-open" class="mx-auto mb-3 size-7 text-primary-400"></i>
-            <p class="font-sans text-xs text-[var(--text-muted)]">No parcels on this manifest.</p>
+            <p class="font-sans text-xs text-[var(--text-muted)]">No parcels in this batch.</p>
         </div>
     @else
         <div class="overflow-x-auto">

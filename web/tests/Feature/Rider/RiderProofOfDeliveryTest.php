@@ -19,7 +19,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
 {
     private function photo(string $name = 'proof.jpg'): UploadedFile
     {
-        return UploadedFile::fake()->create($name, 120, 'image/jpeg');
+        return UploadedFile::fake()->image($name);
     }
 
     public function test_proof_photo_is_required(): void
@@ -267,6 +267,31 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $this->actingAs($otherProvider, 'logistics')
             ->get(route('logistics.proofs.show', $proof))
             ->assertNotFound();
+    }
+
+    public function test_a_client_supplied_mime_type_is_not_served(): void
+    {
+        $parcel = $this->outForDelivery();
+
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            'proof_photo' => $this->photo(),
+        ]))->assertRedirect();
+
+        $proof = DeliveryProof::query()->where('seller_order_id', $parcel->id)->firstOrFail();
+        $this->assertSame('image/jpeg', $proof->photo_mime);
+        $proof->forceFill(['photo_mime' => 'text/html'])->save();
+
+        $this->actingAsRider()
+            ->get(route('rider.proofs.show', $proof))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
+            ->assertHeader('content-security-policy', "default-src 'none'; sandbox");
+
+        Storage::disk('local')->put($proof->photo_path, '<html><script>alert(1)</script></html>');
+
+        $this->actingAsRider()
+            ->get(route('rider.proofs.show', $proof))
+            ->assertStatus(415);
     }
 
     public function test_delivery_rolls_the_parent_order_status_up(): void

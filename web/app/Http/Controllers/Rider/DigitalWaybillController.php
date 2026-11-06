@@ -22,7 +22,7 @@ class DigitalWaybillController extends Controller
         RiderOperationsService $operations,
     ): View|Response {
         $rider = $request->user('rider');
-        $courier = $operations->operationalCourier($rider);
+        $courier = $operations->operationalCourier($rider, allowWindDown: true);
 
         $sellerOrder->load([
             'order.buyer',

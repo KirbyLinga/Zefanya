@@ -62,8 +62,32 @@ enum OrderStatus: string
     }
 
     /**
-     * Broad bucket used by seller/buyer UIs to group statuses into tabs.
+     * Customer-facing stage without changing operational status labels.
      */
+    public function buyerLabel(): string
+    {
+        return match ($this) {
+            self::Placed, self::Confirmed, self::Preparing, self::ReadyForPickup => 'Preparing',
+            self::PickedUp, self::AtSortingCenter, self::Sorted, self::AssignedToRider => 'Shipped',
+            default => $this->label(),
+        };
+    }
+
+    /** Shipment-state filter used by the buyer order list. */
+    public function buyerTab(): string
+    {
+        return match ($this) {
+            self::Placed, self::Confirmed, self::Preparing, self::ReadyForPickup => 'to_ship',
+            self::PickedUp, self::AtSortingCenter, self::Sorted, self::AssignedToRider,
+            self::OutForDelivery, self::Delivered => 'to_receive',
+            self::Completed => 'completed',
+            self::DeliveryFailed => 'delivery_failed',
+            self::Returned => 'returned',
+            self::Cancelled => 'cancelled',
+        };
+    }
+
+    /** Broad operational bucket used by seller pages. */
     public function bucket(): string
     {
         return match ($this) {

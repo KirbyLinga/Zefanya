@@ -32,6 +32,7 @@ class DeliveryAssignmentsController extends Controller
         return view('Rider.Deliveries.index', [
             'rider' => $rider,
             'shipments' => $operations->deliveryAssignments($rider),
+            'windingDown' => $operations->isWindingDown($rider),
         ]);
     }
 
@@ -84,7 +85,7 @@ class DeliveryAssignmentsController extends Controller
         ParcelHandoffVerification $handoffVerify,
     ): View|RedirectResponse {
         $rider = $request->user('rider');
-        $courier = $operations->operationalCourier($rider);
+        $courier = $operations->operationalCourier($rider, allowWindDown: true);
 
         abort_if(
             (int) $sellerOrder->delivery_courier_id !== (int) $courier->id,
@@ -209,7 +210,7 @@ class DeliveryAssignmentsController extends Controller
         ParcelHandoffVerification $handoffVerify,
     ): View|RedirectResponse {
         $rider = $request->user('rider');
-        $courier = $operations->operationalCourier($rider);
+        $courier = $operations->operationalCourier($rider, allowWindDown: true);
 
         abort_if(
             (int) $sellerOrder->delivery_courier_id !== (int) $courier->id,

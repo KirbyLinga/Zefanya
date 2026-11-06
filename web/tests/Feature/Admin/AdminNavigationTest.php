@@ -73,8 +73,8 @@ class AdminNavigationTest extends TestCase
 
         $content = $this->get(route('admin.dashboard'))->getContent();
 
-        $this->assertSame(2, substr_count($content, 'aria-disabled="true" title="'));
-        foreach (['Returns &amp; disputes', 'Finance'] as $label) {
+        $this->assertSame(1, substr_count($content, 'aria-disabled="true" title="'));
+        foreach (['Finance'] as $label) {
             $this->assertStringContainsString('<span data-admin-nav-item aria-disabled="true" title="'.$label.': coming soon"', $content);
         }
         $this->assertStringNotContainsString(route('admin.settlements.index'), $content);
@@ -119,7 +119,7 @@ class AdminNavigationTest extends TestCase
             'hubs' => ['admin.hubs.index', 'Logistics network'],
             'partnerships' => ['admin.partnerships.index', 'Logistics network'],
             'incidents' => ['admin.incidents.index', 'Parcel issues'],
-            'return exceptions' => ['admin.returns.index', 'Parcel issues'],
+            'returns' => ['admin.returns.index', 'Returns &amp; disputes'],
             'new voucher' => ['admin.vouchers.create', 'Vouchers'],
         ];
     }

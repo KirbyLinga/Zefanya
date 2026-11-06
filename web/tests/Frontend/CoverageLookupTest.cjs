@@ -95,3 +95,91 @@ test('canceling the impact confirmation stops the action', async () => {
     assert.equal(prevented, true);
     assert.equal(result.confirmationText(), 'Unlink affects 1 rider and 2 pending pickups');
 });
+
+
+test('row assignment selects its barangay only after choosing a rider in the matching station', () => {
+    const form = new Element();
+    form.dataset.targetArea = 'area-1';
+    const rider = new Element();
+    rider.selectedOptions = [{ dataset: {} }];
+    const areas = ['area-1', 'area-2', 'area-3'].map((value, index) => {
+        const input = new Element();
+        input.value = value;
+        input.dataset.station = index === 2 ? 'station-2' : 'station-1';
+        input.closest = () => new Element();
+        return input;
+    });
+    form.querySelector = () => rider;
+    form.querySelectorAll = () => areas;
+    const document = new Element();
+    document.querySelectorAll = selector => selector === '[data-rider-link-form]' ? [form] : [];
+    vm.runInNewContext(fs.readFileSync('resources/js/logistics/coverage-lookup.js', 'utf8'), { document });
+    document.emit('DOMContentLoaded');
+    assert.equal(areas.every(input => input.disabled && !input.checked), true);
+
+    rider.selectedOptions = [{ dataset: { station: 'station-1' } }];
+    rider.emit('change');
+    assert.deepEqual(areas.filter(input => input.checked).map(input => input.value), ['area-1']);
+    assert.equal(areas[1].disabled, false);
+    assert.equal(areas[2].disabled, true);
+
+    rider.selectedOptions = [{ dataset: { station: 'station-2' } }];
+    rider.emit('change');
+    assert.equal(areas.some(input => input.checked), false);
+    assert.equal(areas[0].disabled, true);
+});
+
+
+test('summary cards open matching tabs and coverage resets filters to serviceable barangays', () => {
+    const tabs = ['coverage', 'riders', 'attention', 'legacy'].map(tab => {
+        const element = new Element();
+        element.dataset.tab = tab;
+        element.setAttribute = (key, value) => { element[key] = value; };
+        element.scrollIntoView = () => {};
+        return element;
+    });
+    const panels = tabs.map(tab => ({ dataset: { tabPanel: tab.dataset.tab } }));
+    const filters = ['search', 'station', 'rider', 'coverage'].map(name => {
+        const element = new Element();
+        element.dataset.areaFilter = name;
+        element.value = name === 'coverage' ? 'serviceable' : '';
+        return element;
+    });
+    const rows = ['serviceable', 'unready'].map(coverage => ({ dataset: { search: 'barangay', station: '1', rider: 'none', coverage } }));
+    const links = ['coverage', 'attention', 'legacy', 'riders'].map(tab => {
+        const element = new Element();
+        element.dataset.summaryTab = tab;
+        element.getAttribute = () => '#areas-panel-' + tab;
+        return element;
+    });
+    const root = new Element();
+    root.querySelectorAll = selector => ({ '[data-tab]': tabs, '[data-tab-panel]': panels, '[data-area-filter]': filters, '[data-area-row]': rows }[selector] || []);
+    root.querySelector = () => new Element();
+    const document = new Element();
+    document.querySelector = () => root;
+    document.querySelectorAll = selector => selector === '[data-summary-tab]' ? links : [];
+    const source = fs.readFileSync('resources/views/Logistics/Areas/index.blade.php', 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+    let hash;
+    vm.runInNewContext(source, {
+        document,
+        window: { location: { hash: '' }, history: { replaceState: (_state, _title, value) => { hash = value; } }, addEventListener() {} },
+    });
+    assert.equal(rows[0].hidden, false);
+    assert.equal(rows[1].hidden, true);
+    for (const tab of ['attention', 'legacy', 'riders']) {
+        links.find(link => link.dataset.summaryTab === tab).emit('click', { preventDefault() {} });
+        assert.deepEqual(panels.filter(panel => !panel.hidden).map(panel => panel.dataset.tabPanel), [tab]);
+        assert.equal(hash, '#areas-panel-' + tab);
+    }
+    filters[0].value = 'no match';
+    filters[2].value = 'assigned';
+    filters[3].value = 'unready';
+    links[0].emit('click', { preventDefault() {} });
+    assert.equal(filters[0].value, '');
+    assert.equal(filters[2].value, '');
+    assert.equal(filters[3].value, 'serviceable');
+    assert.equal(rows[0].hidden, false);
+    assert.equal(rows[1].hidden, true);
+    assert.equal(tabs[0]['aria-selected'], 'true');
+    assert.equal(tabs[0].focused, true);
+});

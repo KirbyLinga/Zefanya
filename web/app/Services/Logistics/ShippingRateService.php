@@ -54,6 +54,24 @@ class ShippingRateService
             : $this->marketplaceRate($zone);
     }
 
+    /**
+     * Zone cards for the Earnings shipping-rates tab: own rate if set, else marketplace.
+     *
+     * @return Collection<string, array{label: string, help: string, own: ?LogisticsShippingRate, marketplace: ?array{first_kg_minor: int, additional_kg_minor: int}}>
+     */
+    public function zonesFor(LogisticsProvider $provider): Collection
+    {
+        $own = LogisticsShippingRate::query()
+            ->where('logistics_provider_id', $provider->getKey())
+            ->get()
+            ->keyBy('zone');
+
+        return collect(LogisticsShippingRate::ZONES)->map(fn (array $zone, string $key): array => $zone + [
+            'own' => $own->get($key),
+            'marketplace' => $this->marketplaceRate($key),
+        ]);
+    }
+
     /** @return array{first_kg_minor: int, additional_kg_minor: int}|null */
     public function marketplaceRate(string $zone): ?array
     {

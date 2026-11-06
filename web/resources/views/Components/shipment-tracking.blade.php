@@ -1,9 +1,10 @@
-@props(['shipment', 'compact' => false])
+@props(['shipment', 'compact' => false, 'buyerFacing' => false])
 
 @use('App\Enums\OrderStatus')
 
 @php
     $status = $shipment->status;
+    $hubName = ($shipment->custodyHub ?? $shipment->originStation)?->name;
     $phase = match ($status) {
         OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing => 0,
         OrderStatus::ReadyForPickup => 1,
@@ -20,8 +21,8 @@
         OrderStatus::Preparing => 'The seller is preparing your items.',
         OrderStatus::ReadyForPickup => 'Your parcel is ready for the pickup courier.',
         OrderStatus::PickedUp => 'The pickup courier has collected your parcel.',
-        OrderStatus::AtSortingCenter => 'Your parcel has arrived at a sorting center.',
-        OrderStatus::Sorted => 'Your parcel has been sorted for the next delivery stage.',
+        OrderStatus::AtSortingCenter => $hubName ? "Your parcel has arrived at {$hubName}." : 'Your parcel has arrived at a sorting center.',
+        OrderStatus::Sorted => $hubName ? "Your parcel has been sorted at {$hubName} for the next delivery stage." : 'Your parcel has been sorted for the next delivery stage.',
         OrderStatus::AssignedToRider => 'A delivery courier has been assigned to your parcel.',
         OrderStatus::OutForDelivery => 'Your courier is on the way to deliver your parcel.',
         OrderStatus::Delivered => 'Your parcel was delivered. Order completion is still pending.',
@@ -31,6 +32,27 @@
         OrderStatus::Cancelled => 'This shipment was cancelled. It will not continue through delivery.',
     };
     $milestones = ['Order placed', 'Ready for pickup', 'In transit', 'Out for delivery', 'Delivered', 'Completed'];
+    if ($buyerFacing) {
+        $milestones = ['Preparing', 'Shipped', 'Out for delivery', 'Delivered'];
+        $phase = match ($status) {
+            OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup => 0,
+            OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider => 1,
+            OrderStatus::OutForDelivery => 2,
+            OrderStatus::Delivered, OrderStatus::Completed => 3,
+            default => null,
+        };
+        $description = match ($status) {
+            OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup => 'The seller is preparing your parcel for shipping.',
+            OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider => 'Your parcel is moving through the delivery network. See the updates below for its latest location.',
+            OrderStatus::Delivered => 'Your parcel was delivered. Order completion is still pending. Confirm receipt after you have checked it.',
+            OrderStatus::Completed => 'Receipt is complete for this shipment. See your order details for eligible product reviews.',
+            OrderStatus::DeliveryFailed => 'Delivery needs attention. Check the updates below for the next step.',
+            default => $description,
+        };
+        if ($status === OrderStatus::Delivered && $shipment->hasActiveReturn()) {
+            $description = 'Your parcel was delivered. An open return pauses receipt confirmation and automatic completion.';
+        }
+    }
     $milestoneCount = count($milestones);
     $trackInset = 100 / ($milestoneCount * 2);
     $trackSpan = 100 - ($trackInset * 2);
@@ -41,14 +63,14 @@
     @unless ($compact)
         <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Current status</span>
-            <x-shipment-status-badge :status="$status" />
+            <x-shipment-status-badge :status="$status" :buyer-facing="$buyerFacing" />
         </div>
     @endunless
 
     <p class="{{ $compact ? '' : 'mt-2' }} font-sans text-xs leading-relaxed text-[var(--text-muted)]">{{ $description }}</p>
 
     @if ($phase !== null)
-        <ol class="relative mt-5 grid grid-cols-6" aria-label="Delivery milestones">
+        <ol class="relative mt-5 grid {{ $buyerFacing ? 'grid-cols-4' : 'grid-cols-6' }}" aria-label="Delivery milestones">
             {{-- Connected track: the muted line runs behind every step. --}}
             <span aria-hidden="true"
                   class="absolute top-2.5 h-0.5 -translate-y-1/2 rounded-full bg-secondary-300"
@@ -60,8 +82,9 @@
 
             @foreach ($milestones as $index => $milestone)
                 @php
-                    $isComplete = $index < $phase;
-                    $isCurrent = $index === $phase;
+                    $receiptComplete = $buyerFacing && $status === OrderStatus::Completed;
+                    $isComplete = $index < $phase || ($receiptComplete && $index === $phase);
+                    $isCurrent = $index === $phase && ! $receiptComplete;
                 @endphp
                 <li class="relative z-10 flex min-w-0 flex-col items-center text-center" @if ($isCurrent) aria-current="step" @endif>
                     <span class="flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors
@@ -89,7 +112,7 @@
 
 @if (! $compact)
 <ol class="mt-5 space-y-3">
-    @foreach ($shipment->trackingEvents() as $event)
+    @foreach ($shipment->trackingEvents($buyerFacing) as $event)
         <li class="border-l border-[var(--border-strong)] pl-3">
             <p class="font-sans text-xs font-semibold text-[var(--text-ink)]">{{ $event['title'] }}</p>
             <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">{{ $event['at']->format('M d, Y h:i A') }}@if ($event['type'] === 'handoff') · Provider handoff @endif</p>
@@ -99,6 +122,6 @@
         </li>
     @endforeach
 </ol>
-<p class="mt-3 font-sans text-xs text-[var(--text-muted)]">Current: <span class="font-semibold text-[var(--text-ink)]">{{ $shipment->status->label() }}</span></p>
+<p class="mt-3 font-sans text-xs text-[var(--text-muted)]">Current: <span class="font-semibold text-[var(--text-ink)]">{{ $buyerFacing ? $shipment->status->buyerLabel() : $shipment->status->label() }}</span></p>
 
 @endif

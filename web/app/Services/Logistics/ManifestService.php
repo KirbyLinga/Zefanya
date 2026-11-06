@@ -508,7 +508,7 @@ class ManifestService
 
             $expectedHubId = (int) $manifest->origin_hub_id;
             $action = ParcelHandoffVerification::ACTION_MANIFEST_DISPATCH;
-            $label = 'Dispatch Manifest';
+            $label = 'Dispatch Batch';
             $url = route('logistics.manifests.dispatch', $manifest);
             $confirm = 'Confirm this parcel is physically on the manifest at the origin hub?';
             $context = 'manifest_dispatch';

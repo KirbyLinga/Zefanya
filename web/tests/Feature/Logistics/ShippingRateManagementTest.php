@@ -51,7 +51,7 @@ class ShippingRateManagementTest extends TestCase
     private function save(array $rates, array $extra = []): TestResponse
     {
         return $this->actingAs($this->carrier, 'logistics')
-            ->from(route('logistics.shipping-rates.index'))
+            ->from(route('logistics.earnings.index', ['tab' => 'shipping-rates']))
             ->put(route('logistics.shipping-rates.update'), ['rates' => $rates] + $extra);
     }
 
@@ -64,9 +64,18 @@ class ShippingRateManagementTest extends TestCase
 
     public function test_the_page_shows_each_zone_with_the_marketplace_rate_it_falls_back_to(): void
     {
-        $this->actingAs($this->carrier, 'logistics')->get(route('logistics.shipping-rates.index'))
+        $this->actingAs($this->carrier, 'logistics')
+            ->get(route('logistics.shipping-rates.index'))
+            ->assertRedirect(route('logistics.earnings.index', ['tab' => 'shipping-rates']));
+
+        $this->followingRedirects()
+            ->get(route('logistics.shipping-rates.index'))
             ->assertOk()
-            ->assertSeeInOrder(['Same city or municipality', '₱49.00', 'Same province', '₱69.00', 'Another province', "you don't offer this route"], false);
+            ->assertSee('Overview', false)
+            ->assertSee('Shipping Rates', false)
+            ->assertSee('Manage Delivery Areas', false)
+            ->assertDontSee('>Shipping rates<', false)
+            ->assertSeeInOrder(['Same city or municipality', '₱49.00', 'Same province', '₱69.00', 'Another province', 'Not offered: no marketplace rate is set for this route'], false);
     }
 
     public function test_a_carrier_with_no_rates_still_charges_the_marketplace_rate(): void
@@ -77,7 +86,7 @@ class ShippingRateManagementTest extends TestCase
     public function test_a_saved_rate_prices_checkout_by_zone_and_weight(): void
     {
         $this->save(['same_municipality' => ['first_kg' => '60', 'additional_kg' => '12.50']])
-            ->assertRedirect(route('logistics.shipping-rates.index'))
+            ->assertRedirect(route('logistics.earnings.index', ['tab' => 'shipping-rates']))
             ->assertSessionHasNoErrors()
             ->assertSessionHas('success');
 
@@ -89,13 +98,13 @@ class ShippingRateManagementTest extends TestCase
         $this->assertSame(6900, $this->feeFor(1000));
     }
 
-    public function test_the_free_shipping_rule_still_applies_first(): void
+    public function test_order_value_does_not_waive_the_carrier_fee(): void
     {
         $this->save(['same_municipality' => ['first_kg' => '60', 'additional_kg' => '10']]);
 
         $options = app(CheckoutCarrierService::class)->optionsForSellerGroup($this->buyer->fresh(), $this->seller->fresh(), 150000, 1000);
 
-        $this->assertSame(0, $options['carriers'][0]['fee_minor']);
+        $this->assertSame(6000, $options['carriers'][0]['fee_minor']);
     }
 
     public function test_one_company_rates_do_not_touch_another(): void

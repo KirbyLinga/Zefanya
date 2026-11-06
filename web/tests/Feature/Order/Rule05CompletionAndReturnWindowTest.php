@@ -214,7 +214,7 @@ class Rule05CompletionAndReturnWindowTest extends TestCase
         $this->travelTo(Carbon::parse('2026-10-22 16:00:00', 'UTC'));
         $this->actingAs($parcel->order->buyer, 'buyer')->post(route('buyer.orders.confirmReceived', $parcel->order), ['seller_order_id' => $parcel->id])->assertRedirect();
         $financials = $parcel->fresh()->getRawOriginal();
-        $this->postJson($this->returnUrl($parcel), $this->returnPayload())->assertUnprocessable();
+        $this->postJson($this->returnUrl($parcel), $this->returnPayload())->assertStatus(409);
         try {
             app(ParcelReturnService::class)->requestByBuyer($stale, $parcel->order->buyer, 'Stale request');
             $this->fail('The service must recheck completion under the shipment lock.');
@@ -254,7 +254,7 @@ class Rule05CompletionAndReturnWindowTest extends TestCase
         $this->artisan('orders:auto-complete-receipts')->assertSuccessful();
         $financials = $parcel->fresh()->getRawOriginal();
 
-        $this->actingAs($parcel->order->buyer, 'buyer')->postJson($this->returnUrl($parcel), $this->returnPayload())->assertUnprocessable();
+        $this->actingAs($parcel->order->buyer, 'buyer')->postJson($this->returnUrl($parcel), $this->returnPayload())->assertStatus(409);
 
         $this->assertSame($financials, $parcel->fresh()->getRawOriginal());
         $this->assertDatabaseCount('parcel_returns', 0);

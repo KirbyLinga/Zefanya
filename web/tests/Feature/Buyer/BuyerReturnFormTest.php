@@ -106,7 +106,7 @@ class BuyerReturnFormTest extends TestCase
             $parcel->forceFill(['status' => $status])->save();
             $url = route('buyer.orders.requestReturn', [$parcel->order, $parcel]);
             $this->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertDontSee('action="'.$url.'"', false);
-            $this->postJson($url, $this->payload())->assertUnprocessable()->assertJsonValidationErrors('return');
+            $this->postJson($url, $this->payload())->assertStatus(409)->assertJsonValidationErrors('return');
         }
     }
 }

@@ -1,4 +1,4 @@
-@props(['status'])
+@props(['status', 'buyerFacing' => false])
 
 @use('App\Enums\OrderStatus')
 
@@ -14,4 +14,4 @@
 @endphp
 
 <span {{ $attributes->class(['inline-flex items-center rounded-md border px-2.5 py-1 font-sans text-xs font-semibold', $tone]) }}
-      data-shipment-status="{{ $status->value }}">{{ $status->label() }}</span>
+      data-shipment-status="{{ $status->value }}">{{ $buyerFacing ? $status->buyerLabel() : $status->label() }}</span>

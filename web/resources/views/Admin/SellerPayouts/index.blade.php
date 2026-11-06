@@ -38,7 +38,10 @@
                 <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
                     <div class="min-w-0">
                         <p class="font-sans text-sm font-semibold text-neutral-950">{{ $payout->seller?->business_name ?? 'Unknown seller' }}</p>
-                        <p class="mt-1 font-sans text-2xl font-semibold tabular-nums text-neutral-950">{{ $peso($payout->amount_minor) }}</p>
+                        <p class="mt-1 font-sans text-2xl font-semibold tabular-nums text-neutral-950">{{ $peso($payout->amount_minor - $payout->debt_deducted_minor) }}</p>
+                        @if ($payout->debt_deducted_minor > 0)
+                            <p class="mt-1 text-[13px] font-semibold text-amber-800">Requested {{ $peso($payout->amount_minor) }}. {{ $peso($payout->debt_deducted_minor) }} is kept to repay returned orders the seller was already paid for. Send only the amount above.</p>
+                        @endif
                         <p class="mt-1 text-[13px] text-neutral-600">Send to: <span class="font-semibold text-neutral-950">{{ $payout->payout_destination ?? 'No details given. Reject and ask the seller to request again.' }}</span></p>
                         <p class="text-[13px] text-neutral-600">Requested {{ $when($payout->created_at) }}</p>
                         <details class="mt-2 text-[13px] text-neutral-600">
@@ -90,7 +93,7 @@
                             @endphp
                             <tr>
                                 <td class="{{ $td }} font-semibold">{{ $payout->seller?->business_name ?? 'Unknown seller' }}</td>
-                                <td class="{{ $td }} text-right tabular-nums">{{ $peso($payout->amount_minor) }}</td>
+                                <td class="{{ $td }} text-right tabular-nums">{{ $peso($payout->amount_minor - $payout->debt_deducted_minor) }}@if ($payout->debt_deducted_minor > 0)<span class="block text-[12px] text-neutral-600">of {{ $peso($payout->amount_minor) }}</span>@endif</td>
                                 <td class="{{ $td }}">
                                     <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $isPaid ? 'bg-green-100 text-green-900' : 'bg-rose-100 text-rose-900' }}">{{ $isPaid ? 'Paid' : 'Rejected' }}</span>
                                     <p class="mt-1 text-[12px] text-neutral-600">{{ $isPaid ? 'Ref '.$payout->payout_reference : $payout->rejection_reason }}</p>

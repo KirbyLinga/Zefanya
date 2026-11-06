@@ -87,7 +87,7 @@ class BuyerOrderLifecycleTest extends TestCase
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
             ->assertSee($order->reference)
-            ->assertSee('Placed');
+            ->assertSee('Preparing');
     }
 
     public function test_buyer_cannot_see_other_buyers_orders(): void
@@ -208,7 +208,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertSee('Order Received')
+            ->assertSee('Confirm Received')
             ->assertSee('name="seller_order_id" value="'.$sliceB->id.'"', false)
             ->assertDontSee('name="seller_order_id" value="'.$sliceA->id.'"', false);
 
@@ -229,7 +229,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertDontSee('Order Received')
+            ->assertDontSee('Confirm Received')
             ->assertDontSee('name="seller_order_id"', false);
     }
 
@@ -243,7 +243,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
-            ->assertDontSee('Order Received')
+            ->assertDontSee('Confirm Received')
             ->assertDontSee('name="seller_order_id"', false);
     }
 

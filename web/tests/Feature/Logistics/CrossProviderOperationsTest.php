@@ -110,7 +110,7 @@ class CrossProviderOperationsTest extends TestCase
         $code = Notification::sent($f['buyer'], DeliveryOtpCode::class)->sole()->code;
         $operations->completeDelivery($courier->rider, $parcel->fresh(), [
             'delivery_otp' => $code,
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer', 'cod_amount_minor' => 44900,
         ]);
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
@@ -181,10 +181,16 @@ class CrossProviderOperationsTest extends TestCase
         $this->assertSame(['Order created', 'Handoff requested', 'Handoff accepted', 'Dispatched to destination provider', 'Received by destination provider'], array_column($events, 'title'));
         $this->assertCount(5, array_unique(array_column($events, 'key')));
         foreach ([['buyer', $f['buyer'], route('buyer.orders.show', $parcel->order)], ['seller', $f['seller'], route('seller.orders.show', $parcel)]] as [$guard, $actor, $url]) {
-            $this->actingAs($actor, $guard)->get($url)->assertOk()
+            $response = $this->actingAs($actor, $guard)->get($url)->assertOk()
                 ->assertSeeInOrder(['Handoff requested', 'Handoff accepted', 'Dispatched to destination provider', 'Received by destination provider'])
-                ->assertDontSee($f['pickup']->name)->assertDontSee($f['pickup']->phone);
+                ->assertDontSee($f['pickup']->phone);
+            // Sellers may see who collects their parcel; Buyers never see Rider identity.
+            if ($guard === 'buyer') {
+                $response->assertDontSee($f['pickup']->name);
+            }
         }
+        // The shared timeline itself never names the Rider.
+        $this->assertStringNotContainsString($f['pickup']->name, collect($events)->map(fn (array $e): string => $e['title'].' '.($e['detail'] ?? ''))->implode(' '));
     }
 
     public function test_admin_exception_resolution_is_audited_and_cannot_transfer_custody(): void

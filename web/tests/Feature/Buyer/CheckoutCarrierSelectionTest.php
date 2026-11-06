@@ -10,8 +10,11 @@ use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
 use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\Voucher;
 use App\Services\Buyer\CartSummary;
 use App\Services\Buyer\CheckoutCarrierService;
+use App\Services\Buyer\VoucherSessionService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
@@ -192,7 +195,7 @@ class CheckoutCarrierSelectionTest extends TestCase
         ])->assertRedirect(route('buyer.checkout.success', Order::query()->sole()));
     }
 
-    public function test_fee_is_free_when_group_subtotal_meets_threshold(): void
+    public function test_a_large_subtotal_does_not_waive_the_carrier_fee(): void
     {
         $this->bootstrapCheckoutCarriers($this->buyer, [$this->sellerA]);
         $this->productA->variants()->sole()->update(['price' => 1500.00]);
@@ -204,10 +207,40 @@ class CheckoutCarrierSelectionTest extends TestCase
             'quantity' => 1,
         ]);
 
-        $this->actingAs($this->buyer, 'buyer')
+        // Free shipping is a voucher subsidy only; the carrier's gross fee is never zeroed.
+        $options = $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertSee('Free');
+            ->assertSee('₱49.00')
+            ->viewData('carrierOptions');
+
+        $this->assertSame(4900, $options[0]['carriers'][0]['fee_minor']);
+    }
+
+    public function test_a_shipping_voucher_reduces_buyer_payable_but_not_the_carrier_fee(): void
+    {
+        $carrier = $this->bootstrapCheckoutCarriers($this->buyer, [$this->sellerA]);
+        $cart = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 1,
+        ]);
+        $voucher = Voucher::factory()->shipping()->fixed(4900)->create();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->withSession([
+                CheckoutController::SESSION_KEY => [$cart->id],
+                VoucherSessionService::SESSION_KEY => ['shipping' => $voucher->code],
+            ])
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'carriers' => [$this->sellerA->id => $carrier->id],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $parcel = SellerOrder::query()->sole();
+        $this->assertSame(4900, $parcel->shipping_fee_minor);
+        $this->assertSame(4900, $parcel->shipping_discount_minor);
     }
 
     public function test_forged_shipping_price_fields_are_rejected(): void
@@ -363,8 +396,8 @@ class CheckoutCarrierSelectionTest extends TestCase
         );
 
         $this->assertSame(4900, $quote['fees'][$this->sellerA->id]);
-        $this->assertSame(0, $quote['fees'][$this->sellerB->id]);
-        $this->assertSame(4900, $quote['shipping_total_minor']);
+        $this->assertSame(4900, $quote['fees'][$this->sellerB->id]);
+        $this->assertSame(9800, $quote['shipping_total_minor']);
     }
 
     public function test_array_carrier_payload_is_rejected(): void

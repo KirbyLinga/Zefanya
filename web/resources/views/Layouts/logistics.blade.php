@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Logistics Panel') — Zefanya</title>
 
     {{-- Theme init MUST run before the stylesheet paints: reads THIS panel's own
@@ -40,6 +41,19 @@
 
         {{-- ============================ MAIN ============================= --}}
         <div class="flex-1 min-w-0 p-4 sm:p-6 xl:p-8 bg-[var(--bg-page)]">
+            {{-- Pages that host the bell in their own header define a non-empty
+                 @section('logistics-toolbar'). An empty section does not pass
+                 @hasSection, so those pages put a hidden marker in it.
+                 The dashboard already has the bell in the welcome banner. --}}
+            @hasSection('logistics-toolbar')
+                @yield('logistics-toolbar')
+            @elseif (! request()->routeIs('logistics.dashboard'))
+                @auth('logistics')
+                    <div class="relative z-30 mb-4 flex justify-end">
+                        <x-logistics.notification-bell />
+                    </div>
+                @endauth
+            @endif
             @yield('content')
         </div>
     </div>
@@ -54,6 +68,10 @@
          seller layout's script loading. --}}
     @vite('resources/js/seller/theme-toggle.js')
     @vite('resources/js/logistics/sidebar-tooltips.js')
+    @vite('resources/js/submit-guard.js')
+    @auth('logistics')
+        @vite('resources/js/logistics/notification-bell.js')
+    @endauth
 
     @stack('scripts')
 </body>

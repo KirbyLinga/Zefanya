@@ -5,6 +5,8 @@ namespace Tests\Feature\Admin;
 use App\Enums\VoucherScope;
 use App\Enums\VoucherType;
 use App\Models\Admin\Admin;
+use App\Models\Buyer\Buyer;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\Voucher;
@@ -99,6 +101,109 @@ class AdminVoucherTest extends TestCase
         $this->assertNotNull($shop->fresh());
     }
 
+    public function test_admin_listing_and_create_use_the_shared_modal_with_catalog_thumbnails_and_defaults(): void
+    {
+        $product = Product::factory()->create(['name' => 'Full Catalog Scarf']);
+        $product->images()->create(['path' => 'products/scarf.jpg', 'thumbnail_path' => 'products/scarf-thumb.jpg', 'is_primary' => true]);
+        $this->actingAs($this->admin(), 'admin');
+
+        $page = $this->get(route('admin.vouchers.index'))->assertOk()
+            ->assertSee('id="create-voucher-dialog"', false)->assertSee('data-open="false"', false)
+            ->assertSee('data-marketplace="true"', false)->assertSee('aria-haspopup="dialog"', false)
+            ->assertSee('/storage/products/scarf-thumb.jpg', false)
+            ->assertSee(route('admin.vouchers.code-availability'), false)
+            ->assertSee('Marketplace voucher discovery and claiming are not currently available');
+        $dom = new \DOMDocument;
+        @$dom->loadHTML($page->getContent());
+        $xpath = new \DOMXPath($dom);
+        $this->assertSame('1', $xpath->evaluate('string(//input[@name="per_buyer_limit"]/@value)'));
+        $this->assertSame('', $xpath->evaluate('string(//input[@name="usage_limit"]/@value)'));
+        $this->assertSame('', $xpath->evaluate('string(//input[@name="min_spend"]/@value)'));
+        $this->assertSame('code_only', $xpath->evaluate('string(//input[@name="availability"][@checked]/@value)'));
+        $this->assertSame('platform', $xpath->evaluate('string(//input[@name="scope"][@checked]/@value)'));
+        $this->get(route('admin.vouchers.create'))->assertOk()->assertSee('data-open="true"', false);
+    }
+
+    public function test_admin_creation_validation_reopens_the_shipping_draft_and_listing_errors_stay_separate(): void
+    {
+        $this->actingAs($this->admin(), 'admin')->from(route('admin.vouchers.index'))
+            ->post(route('admin.vouchers.store'), $this->payload([
+                '_modal' => 'admin-voucher-create', 'code' => 'RETRY99', 'scope' => 'shipping', 'percent' => 100, 'min_spend' => '123.45',
+            ]))->assertRedirect(route('admin.vouchers.index'))->assertSessionHasErrors('percent');
+
+        $this->withCookie(config('session.cookie'), session()->getId())->get(route('admin.vouchers.index'))
+            ->assertOk()->assertSee('data-open="true"', false)->assertSee('value="RETRY99"', false)
+            ->assertSee('value="123.45"', false)->assertSee('value="shipping" checked', false)
+            ->assertSee('The percentage must be a whole number from 1 to 99.');
+
+        $voucher = Voucher::factory()->platform()->create(['ended_at' => now()]);
+        $this->get(route('admin.vouchers.edit', $voucher))->assertRedirect(route('admin.vouchers.index'))->assertSessionHasErrors('voucher');
+        $this->withCookie(config('session.cookie'), session()->getId())->get(route('admin.vouchers.index'))
+            ->assertOk()->assertSee('data-open="false"', false)->assertSee('This voucher has ended and can no longer be edited.');
+    }
+
+    public function test_admin_code_availability_is_normalized_global_and_validated(): void
+    {
+        Voucher::factory()->shop(Seller::factory()->create())->create(['code' => 'SHOPTAKEN']);
+        Voucher::factory()->shipping()->create(['code' => 'SHIPTAKEN']);
+        $this->actingAs($this->admin(), 'admin');
+
+        $this->getJson(route('admin.vouchers.code-availability', ['code' => '  shoptaken  ']))
+            ->assertOk()->assertExactJson(['available' => false])->assertHeader('Cache-Control', 'no-store, private');
+        $this->getJson(route('admin.vouchers.code-availability', ['code' => 'SHIPTAKEN']))
+            ->assertOk()->assertExactJson(['available' => false]);
+        $this->getJson(route('admin.vouchers.code-availability', ['code' => 'FRESH123']))
+            ->assertOk()->assertExactJson(['available' => true]);
+        $this->getJson(route('admin.vouchers.code-availability', ['code' => 'BAD-CODE']))
+            ->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->getJson(route('admin.vouchers.code-availability', ['code' => ['ARRAY']]))
+            ->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->getJson(route('admin.vouchers.code-availability'))->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
+
+    public function test_admin_code_availability_requires_admin_authentication_and_two_factor_enrolment_when_enforced(): void
+    {
+        $url = route('admin.vouchers.code-availability', ['code' => 'TEST123']);
+        $this->getJson($url)->assertUnauthorized();
+        $this->actingAs(Seller::factory()->create(['status' => 'approved']), 'seller')->getJson($url)->assertUnauthorized();
+        $this->actingAs(Buyer::factory()->create(), 'buyer')->getJson($url)->assertUnauthorized();
+        config(['admin.require_two_factor' => true]);
+        $this->actingAs($this->admin(), 'admin')->getJson($url)->assertRedirect(route('admin.two-factor.show'));
+
+        $enrolled = Admin::factory()->superAdmin()->create(['two_factor_secret' => 'TESTENROLLEDSECRET', 'two_factor_confirmed_at' => now()]);
+        $this->actingAs($enrolled, 'admin')->getJson($url)->assertOk()->assertExactJson(['available' => true]);
+    }
+
+    public function test_admin_code_availability_is_rate_limited(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $url = route('admin.vouchers.code-availability', ['code' => 'TEST123']);
+
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            $this->getJson($url)->assertOk();
+        }
+        $this->getJson($url)->assertTooManyRequests();
+    }
+
+    public function test_admin_fixed_shipping_voucher_preserves_optional_blanks_and_inactive_choice(): void
+    {
+        $this->actingAs($this->admin(), 'admin')->post(route('admin.vouchers.store'), $this->payload([
+            'scope' => 'shipping', 'type' => 'fixed', 'percent' => null, 'max_discount' => null,
+            'fixed_amount' => '75.25', 'min_spend' => '', 'usage_limit' => '', 'per_buyer_limit' => '', 'is_active' => '0',
+        ]))->assertSessionHasNoErrors()->assertRedirect(route('admin.vouchers.index'));
+
+        $voucher = Voucher::sole();
+        $this->assertSame(VoucherScope::Shipping, $voucher->scope);
+        $this->assertSame(VoucherType::Fixed, $voucher->type);
+        $this->assertSame(7525, $voucher->value);
+        $this->assertSame(Voucher::FUNDING_MARKETPLACE, $voucher->funding_source);
+        $this->assertNull($voucher->max_discount);
+        $this->assertNull($voucher->min_spend);
+        $this->assertNull($voucher->usage_limit);
+        $this->assertNull($voucher->per_buyer_limit);
+        $this->assertFalse($voucher->is_active);
+    }
+
     public function test_a_shop_scope_is_rejected(): void
     {
         $this->actingAs($this->admin(), 'admin')
@@ -119,6 +224,7 @@ class AdminVoucherTest extends TestCase
         $this->actingAs($this->admin($role), 'admin');
 
         $this->get(route('admin.vouchers.index'))->assertForbidden();
+        $this->getJson(route('admin.vouchers.code-availability', ['code' => 'TEST123']))->assertForbidden();
         $this->post(route('admin.vouchers.store'), $this->payload())->assertForbidden();
         $this->get(route('admin.dashboard'))->assertDontSee(route('admin.vouchers.index'), false);
         $this->assertSame(0, Voucher::query()->count());

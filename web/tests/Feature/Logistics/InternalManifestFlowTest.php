@@ -102,11 +102,11 @@ class InternalManifestFlowTest extends TestCase
 
         $this->get(route('logistics.manifests.index'))
             ->assertOk()
-            ->assertSee('Manifests');
+            ->assertSee('Transfer Batches');
 
         $this->get(route('logistics.manifests.create'))
             ->assertOk()
-            ->assertSee('Create Manifest');
+            ->assertSee('Create Transfer Batch');
 
         $this->post(route('logistics.manifests.store'), [
             'origin_hub_id' => $this->calamba->id,
@@ -353,8 +353,8 @@ class InternalManifestFlowTest extends TestCase
 
         $this->get(route('logistics.manifests.show', $manifest))
             ->assertOk()
-            ->assertSee('Add parcels')
-            ->assertSee('Dispatch this manifest')
+            ->assertSee('Add Parcels')
+            ->assertSee('Dispatch this batch')
             ->assertSee($this->parcel->tracking_number);
 
         $this->dispatchManifest($manifest, [
@@ -377,7 +377,7 @@ class InternalManifestFlowTest extends TestCase
 
         $this->get(route('logistics.manifests.receive.index', $manifest))
             ->assertOk()
-            ->assertSee('Manifest fully received');
+            ->assertSee('Batch fully received');
     }
 
     public function test_cross_provider_carrier_parcels_are_rejected(): void

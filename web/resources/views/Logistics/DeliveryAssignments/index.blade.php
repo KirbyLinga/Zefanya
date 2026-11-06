@@ -1,6 +1,6 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Delivery Assignments')
+@section('title', 'Assign Deliveries')
 
 @use('App\Enums\OrderStatus')
 @use('App\Enums\DeliveryFailureReason')
@@ -8,6 +8,10 @@
 @use('App\Enums\PaymentStatus')
 @use('App\Models\Seller\StoreSale')
 @use('App\Services\Seller\SellerOrderStatusService')
+
+@section('logistics-toolbar')
+    <span hidden data-logistics-hosted-bell></span>
+@endsection
 
 @section('content')
 @include('Logistics._parcel-queue-assets')
@@ -21,7 +25,8 @@
         'done' => ['title' => 'Delivered', 'help' => 'Finished deliveries, with their proof and cash collected.', 'showing' => 'delivered', 'empty' => 'No delivered parcels yet.', 'alert' => null],
     ];
 
-    $reassignable = [OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery];
+    // Out-for-delivery parcels are with the Rider: no direct reassignment (custody-safe).
+    $reassignable = [OrderStatus::Sorted, OrderStatus::AssignedToRider];
     $grouped = $shipments->getCollection()->groupBy(fn ($shipment) => match (true) {
         $shipment->status === OrderStatus::DeliveryFailed => 'failed',
         in_array($shipment->status, [OrderStatus::Delivered, OrderStatus::Completed], true) => 'done',
@@ -51,9 +56,7 @@
 @endphp
 
 <div class="ip-canvas -m-4 min-h-screen sm:-m-6 xl:-m-8">
-<div class="border-b border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-4 sm:px-6 xl:px-8">
-    <h1 class="font-serif text-2xl font-semibold text-[var(--text-ink)]">Delivery Assignments</h1>
-</div>
+<x-logistics.page-header title="Assign Deliveries" />
 
 <div class="p-4 sm:p-6 xl:px-8">
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
@@ -92,6 +95,20 @@
                     <p class="font-sans text-[13px] text-[var(--text-muted)]">{{ $stage['help'] }}</p>
                     <p class="font-sans text-[11.5px] text-[var(--text-muted)]">Displaying {{ $stageCount }} {{ \Illuminate\Support\Str::plural('parcel', $stageCount) }} {{ $stage['showing'] }}{{ $shipments->hasPages() ? ' on this page' : '' }}</p>
                 </div>
+                @if ($key === 'rider' && $grouped[$key]->contains(fn ($s) => $s->status === OrderStatus::Sorted && ! $s->delivery_courier_id))
+                    <form id="bulk-assign-form" method="POST" action="{{ route('logistics.parcel-sorting.bulkAssignDelivery') }}" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-3">
+                        @csrf
+                        <p class="font-sans text-[12.5px] font-semibold text-[var(--text-ink)]">Bulk assign selected parcels</p>
+                        <select name="courier_id" required aria-label="Rider for the selected parcels" class="{{ $fieldClass }} max-w-[360px] flex-1">
+                            <option value="">Choose a Rider</option>
+                            @foreach ($availableCouriers as $candidate)
+                                <option value="{{ $candidate->id }}">{{ $candidate->rider?->fullName() ?? $candidate->name }} · {{ $candidate->rider?->station?->name ?? 'No station' }} · {{ $candidate->activeWorkload() }}/{{ \App\Models\Rider\Courier::ACTIVE_CAPACITY }} jobs</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="{{ $primaryButton }}">Assign selected</button>
+                        <p class="w-full font-sans text-[11.5px] text-[var(--text-muted)]">Each Rider can hold {{ \App\Models\Rider\Courier::ACTIVE_CAPACITY }} active jobs. Parcels over the limit are skipped and stay Unassigned.</p>
+                    </form>
+                @endif
                 <ul class="space-y-3">
                     @foreach ($grouped[$key] as $shipment)
                         @php
@@ -111,6 +128,9 @@
                         <li id="parcel-{{ $shipment->id }}" class="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm">
                             <div class="grid grid-cols-[minmax(0,1fr)_28px] items-center gap-x-4 gap-y-3 p-4 xl:grid-cols-[minmax(0,1fr)_140px_140px_minmax(190px,240px)_28px]">
                                 <div class="flex min-w-0 items-center gap-3">
+                                    @if ($key === 'rider' && $shipment->status === OrderStatus::Sorted && ! $shipment->delivery_courier_id)
+                                        <input type="checkbox" form="bulk-assign-form" name="seller_order_ids[]" value="{{ $shipment->id }}" aria-label="Select parcel #{{ $shipment->id }} for bulk assign" class="h-4 w-4 shrink-0 cursor-pointer accent-primary-700">
+                                    @endif
                                     <span class="{{ $look['tone'] }} ip-tinted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
                                         <i data-lucide="{{ $look['icon'] }}" class="h-5 w-5"></i>
                                     </span>
@@ -159,6 +179,9 @@
                                     @if ($canReassign && $shipment->needs_reassignment)
                                         <button type="button" data-ip-open class="{{ $primaryButton }}">Choose new rider</button>
                                     @endif
+                                    @if ($shipment->status === OrderStatus::Sorted && ! $shipment->delivery_courier_id)
+                                        @include('Logistics.DeliveryAssignments._assign-rider-dialog', ['buttonClass' => $primaryButton])
+                                    @endif
                                     @if ($shipment->status === OrderStatus::Sorted && $shipment->delivery_courier_id)
                                         <form method="POST" action="{{ route('logistics.parcel-sorting.assignDelivery', $shipment) }}">
                                             @csrf
@@ -168,6 +191,8 @@
                                         <p class="font-sans text-[12.5px] text-[var(--text-muted)]">Waiting for Rider to start</p>
                                     @elseif ($shipment->status === OrderStatus::OutForDelivery && ! $shipment->needs_reassignment)
                                         <p class="font-sans text-[12.5px] text-[var(--text-muted)]">Rider is completing the delivery</p>
+                                    @elseif ($shipment->status === OrderStatus::OutForDelivery)
+                                        <a href="{{ route('logistics.delivery-monitoring.show', $shipment) }}" class="{{ $quietButton }}">Report incident</a>
                                     @elseif ($shipment->status === OrderStatus::DeliveryFailed)
                                         @if ($canRetry)
                                             <button type="button" data-ip-open class="{{ $primaryButton }}">Schedule final attempt</button>
@@ -224,6 +249,13 @@
                                         @if ($shipment->delivery_failure_notes)
                                             <p class="text-[var(--text-muted)]">{{ $shipment->delivery_failure_notes }}</p>
                                         @endif
+                                        @if ($canRetry && ! $shipment->hasActiveReturn())
+                                            @if ($shipment->isBackAtStationAfterFailure())
+                                                <p class="text-[var(--text-muted)]">Back at the Station Hub since {{ $shipment->returned_to_station_at->timezone(StoreSale::TIMEZONE)->format('M j, g:i A') }}. The final attempt can go to any eligible Rider.</p>
+                                            @else
+                                                <p class="text-[var(--text-muted)]">Still with {{ $courier?->rider?->fullName() ?? 'the Rider' }}. Only they can take the final attempt until the parcel is <a href="{{ route('logistics.scan.index', array_filter(['tracking' => $shipment->tracking_number])) }}" class="font-semibold underline">scanned back in at the Station Hub</a>.</p>
+                                            @endif
+                                        @endif
                                         @if ((int) $shipment->delivery_attempts >= $maxAttempts)
                                             <p class="ip-tone-text font-semibold">Two attempts exhausted. Physical return required; verified Seller receipt is needed.</p>
                                         @elseif (! $canRetry && ! $shipment->hasActiveReturn())
@@ -275,19 +307,30 @@
                                             <select name="courier_id" aria-label="New rider for parcel #{{ $shipment->id }}" class="{{ $fieldClass }}">
                                                 <option value="">Auto-assign eligible Rider</option>
                                                 @foreach ($availableCouriers as $candidate)
-                                                    <option value="{{ $candidate->id }}">{{ $candidate->rider?->fullName() ?? $candidate->name }} · {{ $candidate->rider?->station?->name ?? 'No station' }} · carrying {{ number_format($candidate->activeWeightGrams()) }} of {{ number_format($candidate->max_weight_grams) }} g</option>
+                                                    <option value="{{ $candidate->id }}">{{ $candidate->rider?->fullName() ?? $candidate->name }} · {{ $candidate->rider?->station?->name ?? 'No station' }} · {{ $candidate->activeWorkload() }}/{{ \App\Models\Rider\Courier::ACTIVE_CAPACITY }} jobs · carrying {{ number_format($candidate->activeWeightGrams()) }} of {{ number_format($candidate->max_weight_grams) }} g</option>
                                                 @endforeach
                                             </select>
                                             <input name="reason" required maxlength="500" aria-label="Reason for changing the rider" placeholder="Why are you changing the rider?" class="{{ $fieldClass }}" value="{{ $isThisForm ? old('reason') : '' }}">
                                             <button type="submit" class="{{ $shipment->needs_reassignment ? $primaryButton : $quietButton }}">Save new rider</button>
                                         </form>
+                                    @elseif ($shipment->status === OrderStatus::OutForDelivery)
+                                        <div class="max-w-[420px] space-y-1 font-sans text-[12.5px]">
+                                            <p class="text-[13px] font-semibold text-[var(--text-ink)]">Changing the Rider</p>
+                                            <p class="text-[var(--text-muted)]">{{ \App\Http\Controllers\Logistics\DeliveryAssignmentsController::OUT_FOR_DELIVERY_REASSIGN_MESSAGE }}</p>
+                                        </div>
                                     @elseif ($shipment->status === OrderStatus::DeliveryFailed && $canRetry)
                                         <form method="POST" action="{{ route('logistics.delivery-assignments.reschedule', $shipment) }}" class="max-w-[420px] space-y-2">
                                             @csrf
                                             <p class="font-sans text-[13px] font-semibold text-[var(--text-ink)]">Final delivery attempt</p>
+                                            @php
+                                                // Custody-safe: the parcel stays with the attempting Rider until scanned back in.
+                                                $finalCandidates = $shipment->isBackAtStationAfterFailure()
+                                                    ? $availableCouriers
+                                                    : $availableCouriers->where('id', $shipment->delivery_courier_id);
+                                            @endphp
                                             <select name="courier_id" aria-label="Rider for the final attempt on parcel #{{ $shipment->id }}" class="{{ $fieldClass }}">
-                                                <option value="">Auto-assign eligible Rider</option>
-                                                @foreach ($availableCouriers as $candidate)
+                                                <option value="">{{ $shipment->isBackAtStationAfterFailure() ? 'Auto-assign eligible Rider' : 'Same Rider (parcel still with them)' }}</option>
+                                                @foreach ($finalCandidates as $candidate)
                                                     <option value="{{ $candidate->id }}">{{ $candidate->rider?->fullName() ?? $candidate->name }} · {{ $candidate->rider?->station?->name ?? 'No station' }} · carrying {{ number_format($candidate->activeWeightGrams()) }} of {{ number_format($candidate->max_weight_grams) }} g</option>
                                                 @endforeach
                                             </select>
@@ -308,3 +351,29 @@
 </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    document.addEventListener('click', function (event) {
+        var opener = event.target.closest('[data-assign-open]');
+        if (opener) {
+            var dialog = document.getElementById(opener.getAttribute('data-assign-open'));
+            if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+            return;
+        }
+
+        var closer = event.target.closest('[data-assign-close]');
+        if (closer) {
+            closer.closest('dialog')?.close();
+            return;
+        }
+
+        // A click on the dialog element itself (not its form content) is a backdrop click.
+        if (event.target instanceof HTMLDialogElement && event.target.open) {
+            event.target.close();
+        }
+    });
+})();
+</script>
+@endpush

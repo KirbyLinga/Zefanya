@@ -2,16 +2,10 @@
 
 @section('title', 'Dashboard')
 
-@push('scripts')
-    @vite('resources/js/logistics/notification-bell.js')
-@endpush
-
 @section('content')
     <x-logistics.dashboard-hero
         :name="$provider->business_name ?? $provider->fullName()"
         :date="now()->format('l, F j, Y')"
-        :notifications="$notifications"
-        :unread-count="$unreadCount"
     />
 
     <form method="GET" action="{{ route('logistics.dashboard') }}" class="mb-5 flex flex-wrap items-end gap-3">
@@ -45,7 +39,7 @@
         <button type="submit" class="h-10 rounded-sm bg-primary-800 px-4 font-sans text-xs font-semibold uppercase text-white hover:bg-primary-900">Apply filters</button>
     </form>
 
-    <p class="mb-4 text-xs text-[var(--text-muted)]">Dates include the full start and end days. Hub, transit and available-fleet results use the last updated date; deliveries use the delivery event date. Without dates, deliveries show today.</p>
+    <p class="mb-4 text-xs text-[var(--text-muted)]">Dates include the full start and end days. Hub, transit and available-rider results use the last updated date; deliveries use the delivery event date. Without dates, deliveries show today.</p>
     @if ($errors->any())<p role="alert" class="mb-4 text-sm text-red-800">{{ $errors->first() }}</p>@endif
     <section class="mb-6 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm" aria-labelledby="networkSetupTitle">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -56,23 +50,56 @@
                 <span class="rounded-full bg-amber-50 px-3 py-1 font-sans text-[11px] font-semibold text-amber-800">Assignments locked until setup is complete</span>
             @endif
         </div>
-        <ol class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            @foreach ($checklist['items'] as $item)
-                <li class="flex min-h-12 items-center gap-3 rounded-sm border border-[var(--border-strong)] px-3 py-2">
-                    <span class="flex size-7 shrink-0 items-center justify-center rounded-full {{ $item['complete'] ? 'bg-green-100 text-green-800' : 'bg-[var(--bg-page)] text-[var(--text-muted)]' }}">
-                        <i data-lucide="{{ $item['complete'] ? 'check' : 'circle' }}" width="15" height="15"></i>
-                    </span>
-                    @if ($item['key'] === 'province_hub' || $item['key'] === 'station_hub')
-                        <a href="{{ route('logistics.hubs.index') }}" class="min-w-0 flex-1 font-sans text-xs font-medium text-[var(--text-ink)] hover:text-primary-800">{{ $item['label'] }}</a>
-                    @elseif ($item['key'] === 'coverage')
-                        <a href="{{ route('logistics.areas.index') }}" class="min-w-0 flex-1 font-sans text-xs font-medium text-[var(--text-ink)] hover:text-primary-800">{{ $item['label'] }}</a>
-                    @else
-                        <span class="min-w-0 flex-1 font-sans text-xs font-medium text-[var(--text-ink)]">{{ $item['label'] }}</span>
-                    @endif
-                    <span class="font-sans text-xs text-[var(--text-muted)]">{{ $item['count'] }}</span>
-                </li>
-            @endforeach
-        </ol>
+        @php
+            // What each step means and where to do it. The Province Hub is provisioned by Admin.
+            $setupSteps = [
+                'province_hub' => ['help' => 'Admin creates and approves your Province Hub after verifying your province.', 'action' => null, 'waiting' => 'Waiting for Admin'],
+                'station_hub' => ['help' => 'Add the local Station Hubs your riders work from. Admin approves each one.', 'action' => ['Add Station Hub', route('logistics.hubs.index')]],
+                'coverage' => ['help' => 'Choose the barangays each Station Hub picks up from and delivers to.', 'action' => ['Add delivery areas', route('logistics.areas.index').'#coverage-form']],
+                'approved_rider' => ['help' => 'Approve a rider and link them to a Station Hub so parcels can be assigned.', 'action' => ['Review riders', route('logistics.riders.index')]],
+            ];
+            $nextStep = collect($checklist['items'])->firstWhere('complete', false)['key'] ?? null;
+        @endphp
+        <details @unless ($operationsReady) open @endunless class="group">
+            <summary class="mb-3 cursor-pointer list-none font-sans text-xs font-semibold text-primary-800 [&::-webkit-details-marker]:hidden">
+                <span class="group-open:hidden">Show setup steps</span>
+                <span class="hidden group-open:inline">{{ $operationsReady ? 'Hide setup steps' : 'Finish these steps in order to start receiving parcels.' }}</span>
+            </summary>
+            <ol class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                @foreach ($checklist['items'] as $item)
+                    @php
+                        $step = $setupSteps[$item['key']] ?? ['help' => null, 'action' => null];
+                        $isNext = $item['key'] === $nextStep;
+                    @endphp
+                    <li class="flex flex-col gap-2 rounded-md border p-3 {{ $isNext ? 'border-primary-300 bg-primary-50/40' : 'border-[var(--border-strong)]' }}">
+                        <div class="flex items-start gap-3">
+                            <span class="flex size-7 shrink-0 items-center justify-center rounded-full font-sans text-xs font-semibold {{ $item['complete'] ? 'bg-green-100 text-green-800' : 'bg-[var(--bg-page)] text-[var(--text-muted)]' }}">
+                                @if ($item['complete'])<i data-lucide="check" width="15" height="15"></i>@else{{ $loop->iteration }}@endif
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-sans text-xs font-semibold text-[var(--text-ink)]">{{ $item['label'] }}</p>
+                                @if ($step['help'])<p class="mt-0.5 font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">{{ $step['help'] }}</p>@endif
+                            </div>
+                            <span class="font-sans text-xs text-[var(--text-muted)]">{{ $item['count'] }}</span>
+                        </div>
+                        @if (! $item['complete'])
+                            @if ($step['action'])
+                                <a href="{{ $step['action'][1] }}" class="mt-auto inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md px-3 font-sans text-xs font-semibold {{ $isNext ? 'bg-primary-800 text-white hover:bg-primary-900' : 'border border-[var(--border-strong)] text-[var(--text-ink)] hover:bg-[var(--bg-page)]' }}">{{ $step['action'][0] }}<i data-lucide="arrow-right" class="size-3.5"></i></a>
+                            @else
+                                <span class="mt-auto inline-flex min-h-9 items-center justify-center rounded-md bg-amber-50 px-3 font-sans text-xs font-semibold text-amber-800">{{ $step['waiting'] ?? 'Pending' }}</span>
+                            @endif
+                        @endif
+                    </li>
+                @endforeach
+            </ol>
+            <p class="mt-3 font-sans text-[11px] text-[var(--text-muted)]">
+                Also set before going live:
+                <a href="{{ route('logistics.earnings.index', ['tab' => 'shipping-rates']) }}" class="font-semibold text-primary-800 hover:underline">shipping rates</a>,
+                <a href="{{ route('logistics.partnerships.index') }}" class="font-semibold text-primary-800 hover:underline">provider partnerships</a> and
+                <a href="{{ route('logistics.transport-connections.index') }}" class="font-semibold text-primary-800 hover:underline">transport connections</a>
+                for parcels that leave your province.
+            </p>
+        </details>
     </section>
 
     {{-- ========================== STAT CARDS =========================== --}}
@@ -108,7 +135,7 @@
             <div class="w-[36px] h-[36px] rounded-md flex items-center justify-center mb-4 bg-tertiary-500 text-[#fff8f7]">
                 <i data-lucide="users" class="w-[18px] h-[18px]"></i>
             </div>
-            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Available fleet riders</p>
+            <p class="font-sans text-[12.5px] text-[var(--text-muted)] mb-1">Available riders</p>
             <p class="font-sans text-[24px] font-extrabold text-[var(--text-ink)]">{{ number_format($activeRiders) }}</p>
             <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Available in this facility</p>
         </a>

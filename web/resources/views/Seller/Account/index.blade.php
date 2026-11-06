@@ -62,7 +62,7 @@
                     </div>
                     <div>
                         <label for="logo" class="{{ $label }}">Store logo</label>
-                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="{{ $input }}">
+                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="upload-input">
                         <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">JPG/PNG, up to 5 MB. Leave blank to keep your logo.</p>
                     </div>
                     <div>
@@ -71,7 +71,7 @@
                             <img src="{{ '/storage/'.ltrim($seller->store_banner_path, '/') }}" alt="Current store banner" class="mb-3 h-32 w-full rounded-lg object-cover">
                             <label class="mb-3 flex items-center gap-2 text-xs text-[var(--text-muted)]"><input type="checkbox" name="remove_banner" value="1" @checked(old('remove_banner'))>Remove current banner</label>
                         @endif
-                        <input id="banner" name="banner" type="file" accept="image/jpeg,image/png" class="{{ $input }}">
+                        <input id="banner" name="banner" type="file" accept="image/jpeg,image/png" class="upload-input">
                         <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">JPG/PNG, up to 5 MB. Leave blank to keep your banner.</p>
                     </div>
                 </div>

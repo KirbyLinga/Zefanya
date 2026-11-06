@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
 use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
@@ -27,6 +28,10 @@ use App\Services\Buyer\AutomaticBuyerReceiptService;
 use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelReturnService;
+use App\Services\Logistics\PickupPolicy;
+use App\Services\Logistics\PickupSessionService;
+use App\Services\Logistics\PickupWindowService;
+use App\Services\Rider\RiderEarningService;
 use App\Services\Shared\CommissionFinalizationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -48,7 +53,30 @@ class SellerOrderStatusService
 
     public function __construct(
         private readonly CommissionFinalizationService $commissions = new CommissionFinalizationService,
+        private readonly RiderEarningService $riderPay = new RiderEarningService,
     ) {}
+
+    private static function actorOwnsTarget(OrderActor $actor, OrderStatus $to): bool
+    {
+        foreach (OrderActor::allowedTransitions($actor) as [, $allowedTo]) {
+            if ($allowedTo === $to) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function staleMessage(int $id, OrderStatus $current, OrderStatus $to, OrderStatus $shown): string
+    {
+        return sprintf(
+            'Order #%d changed while you were working on it: it is now [%s], so it cannot go to [%s]%s. Refresh and try again.',
+            $id,
+            $current->value,
+            $to->value,
+            $shown !== $current ? sprintf(' (your page showed [%s])', $shown->value) : '',
+        );
+    }
 
     public static function canRetryDelivery(SellerOrder $parcel): bool
     {
@@ -188,12 +216,20 @@ class SellerOrderStatusService
 
             // Role gate — against the TRUE current status, not the caller's view.
             if ($actor !== null && ! $actor->canTransition($currentStatus, $to)) {
-                throw new \InvalidArgumentException(sprintf(
+                $roleMessage = sprintf(
                     'The %s role cannot move an order from [%s] to [%s].',
                     $actor->value,
                     $currentStatus->value,
                     $to->value,
-                ));
+                );
+
+                // The role owns a hop into $to, just not from where the row is now:
+                // another actor moved it first (e.g. Seller accepted before Buyer cancel).
+                if (self::actorOwnsTarget($actor, $to)) {
+                    throw new StaleStateException($roleMessage.' '.self::staleMessage($sellerOrder->id, $currentStatus, $to, $from));
+                }
+
+                throw new \InvalidArgumentException($roleMessage);
             }
 
             // Graph gate — forward-only, no skips. A caller whose view went
@@ -201,13 +237,7 @@ class SellerOrderStatusService
             $allowed = self::ALLOWED[$currentStatus->value] ?? [];
 
             if (! in_array($to, $allowed, true)) {
-                throw new \InvalidArgumentException(sprintf(
-                    'Order #%d changed while you were working on it: it is now [%s], so it cannot go to [%s]%s. Refresh and try again.',
-                    $sellerOrder->id,
-                    $currentStatus->value,
-                    $to->value,
-                    $from !== $currentStatus ? sprintf(' (your page showed [%s])', $from->value) : '',
-                ));
+                throw new StaleStateException(self::staleMessage($sellerOrder->id, $currentStatus, $to, $from));
             }
 
             if (in_array($to, [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::Delivered, OrderStatus::DeliveryFailed], true)
@@ -240,6 +270,19 @@ class SellerOrderStatusService
 
             // The audit log records the TRUE from-status, never the stale view.
             StatusHistory::record($current, $currentStatus, $to, $changedBy, $note, $actor, $actorId, $source);
+
+            // Marking ready books the pickup window that is open now (or the next one).
+            if ($to === OrderStatus::ReadyForPickup && PickupPolicy::sessionsAvailable()) {
+                app(PickupWindowService::class)->schedule($current);
+            }
+
+            // A cancelled parcel leaves its rider's pickup session.
+            if ($to === OrderStatus::Cancelled) {
+                app(PickupSessionService::class)->detach($current, 'parcel_cancelled');
+            }
+
+            // Rider pay commits (or rolls back) with the successful pickup or delivery.
+            $this->riderPay->creditFor($current, $to);
 
             // ── Parent rollup + COD settlement (INSIDE the transaction) ──────
             // These must be transactional: if the rollup or settlement throws,

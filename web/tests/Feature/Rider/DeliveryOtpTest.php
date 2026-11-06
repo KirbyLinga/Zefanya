@@ -35,7 +35,7 @@ class DeliveryOtpTest extends RiderTestCase
     private function complete(SellerOrder $parcel, ?string $code, array $extra = []): void
     {
         app(RiderOperationsService::class)->completeDelivery($this->rider, $parcel, array_merge([
-            'photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
             'delivery_otp' => $code,
         ], $extra));
     }
@@ -188,7 +188,7 @@ class DeliveryOtpTest extends RiderTestCase
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $token,
             'delivery_otp' => $code,
-            'proof_photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
         ])->assertRedirect(route('rider.deliveries.index'))->assertSessionHasNoErrors();
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
     }
@@ -202,7 +202,7 @@ class DeliveryOtpTest extends RiderTestCase
         ])->assertSessionHasErrors('proof_photo')->assertSessionMissing('_old_input.delivery_otp');
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $token, 'delivery_otp' => '123456',
-            'proof_photo' => UploadedFile::fake()->create('proof.jpg', 10, 'image/jpeg'),
+            'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
         ])->assertSessionHasErrors('delivery_otp')->assertSessionMissing('_old_input.delivery_otp');
     }
 
@@ -250,9 +250,12 @@ class DeliveryOtpTest extends RiderTestCase
         Notification::assertSentTo($this->buyer, DeliveryOtpCode::class, function (DeliveryOtpCode $notification, array $channels) use ($code, $parcel): bool {
             $data = $notification->toArray($this->buyer);
 
-            return $channels === ['database']
+            $mail = implode(' ', $notification->toMail($this->buyer)->introLines);
+
+            return $channels === ['database', 'mail']
                 && $data['seller_order_id'] === $parcel->id
-                && ! str_contains((string) json_encode($data), $code);
+                && ! str_contains((string) json_encode($data), $code)
+                && str_contains($mail, $code);
         });
         $this->assertNotSame($code, DeliveryOtp::query()->toBase()->value('code_encrypted'));
     }

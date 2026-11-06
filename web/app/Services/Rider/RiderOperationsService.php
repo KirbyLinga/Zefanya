@@ -5,10 +5,12 @@ namespace App\Services\Rider;
 use App\Enums\DeliveryFailureReason;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
+use App\Exceptions\StaleStateException;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\DeliveryProof;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
+use App\Models\Rider\RiderEarning;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\RiderParcelActivity;
@@ -17,6 +19,8 @@ use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Seller\SellerOrderStatusService;
+use App\Support\DeliveryProofImage;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -65,15 +69,19 @@ class RiderOperationsService
     /**
      * Resolve (and re-verify) the Courier that carries this rider's work.
      *
+     * $allowWindDown admits a suspended company's rider during an Admin-granted
+     * wind-down; only the steps that finish a parcel already out for delivery
+     * pass it.
+     *
      * @throws HttpException when the
      *                       rider is no longer operational or has no fleet record.
      */
-    public function operationalCourier(Rider $rider): Courier
+    public function operationalCourier(Rider $rider, bool $allowWindDown = false): Courier
     {
-        $rider->loadMissing(['station', 'courier']);
+        $rider->loadMissing(['station', 'courier', 'provider']);
 
         abort_unless(
-            $rider->isOperational(),
+            $rider->isOperational() || ($allowWindDown && $rider->isInWindDown()),
             403,
             'Your rider account is not allowed to perform this action.',
         );
@@ -84,6 +92,14 @@ class RiderOperationsService
         return $courier;
     }
 
+    /** True when the rider may only finish parcels already out for delivery. */
+    public function isWindingDown(Rider $rider): bool
+    {
+        $rider->loadMissing(['station', 'courier', 'provider']);
+
+        return $rider->isInWindDown();
+    }
+
     /**
      * Dashboard snapshot: real counts, never demo data.
      *
@@ -92,7 +108,10 @@ class RiderOperationsService
      *     active_deliveries: int,
      *     completed_deliveries: int,
      *     needs_attention: int,
-     *     attention_parcels: Collection<int, SellerOrder>
+     *     attention_parcels: Collection<int, SellerOrder>,
+     *     cash: array{holdingMinor: int, holdingCount: int, overdueCount: int, oldestAt: ?Carbon, handedOverMinor: int, handedOverMonthMinor: int},
+     *     earnings: array{monthMinor: int, pendingMinor: int, paidMinor: int, monthPickups: int, monthDeliveries: int},
+     *     recent_earnings: Collection<int, RiderEarning>
      * }
      */
     public function dashboard(Rider $rider): array
@@ -130,6 +149,9 @@ class RiderOperationsService
                 ->orderByDesc('reassignment_flagged_at')
                 ->limit(5)
                 ->get(),
+            'cash' => app(RiderCashService::class)->summaryFor($courier),
+            'earnings' => app(RiderEarningService::class)->summaryFor($courier),
+            'recent_earnings' => app(RiderEarningService::class)->recentFor($courier),
         ];
     }
 
@@ -146,9 +168,10 @@ class RiderOperationsService
     /** @return Collection<int, SellerOrder> */
     public function deliveryAssignments(Rider $rider): Collection
     {
-        $courier = $this->operationalCourier($rider);
+        $courier = $this->operationalCourier($rider, allowWindDown: true);
 
         return $this->deliveryQuery($courier)
+            ->when($this->isWindingDown($rider), fn (Builder $query) => $query->where('status', OrderStatus::OutForDelivery->value))
             ->orderBy('created_at')
             ->get();
     }
@@ -188,9 +211,7 @@ class RiderOperationsService
             }
 
             if ($order->status !== OrderStatus::ReadyForPickup) {
-                throw ValidationException::withMessages([
-                    'parcel' => 'This parcel is no longer available for pickup.',
-                ]);
+                throw StaleStateException::field('parcel', 'This parcel is no longer available for pickup.');
             }
 
             $this->assertOriginCovered($courier, $order);
@@ -243,9 +264,7 @@ class RiderOperationsService
             }
 
             if ($order->status !== OrderStatus::AssignedToRider) {
-                throw ValidationException::withMessages([
-                    'parcel' => 'This parcel is not ready to go out for delivery.',
-                ]);
+                throw StaleStateException::field('parcel', 'This parcel is not ready to go out for delivery.');
             }
 
             $this->assertAtDestinationStation($courier, $order);
@@ -279,7 +298,9 @@ class RiderOperationsService
      */
     public function completeDelivery(Rider $rider, SellerOrder $sellerOrder, array $data): SellerOrder
     {
-        $courier = $this->operationalCourier($rider);
+        // Wind-down riders may finish this; the transaction below still
+        // requires the parcel to be out for delivery.
+        $courier = $this->operationalCourier($rider, allowWindDown: true);
         $fresh = $sellerOrder->fresh() ?? $sellerOrder;
         $this->assertDeliveryOwnership($courier, $fresh);
         $verifiedOtp = in_array($fresh->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
@@ -301,9 +322,7 @@ class RiderOperationsService
                 }
 
                 if ($order->status !== OrderStatus::OutForDelivery) {
-                    throw ValidationException::withMessages([
-                        'parcel' => 'This parcel is not out for delivery.',
-                    ]);
+                    throw StaleStateException::field('parcel', 'This parcel is not out for delivery.');
                 }
 
                 app(DeliveryOtpService::class)->consume($order, $verifiedOtp);
@@ -322,7 +341,7 @@ class RiderOperationsService
                         'courier_id' => $courier->id,
                         'rider_id' => $rider->id,
                         'photo_path' => $storedPath,
-                        'photo_mime' => $photo->getClientMimeType(),
+                        'photo_mime' => DeliveryProofImage::storeMime($photo),
                         'photo_size' => $photo->getSize(),
                         'received_by' => $data['received_by'] ?? null,
                         'notes' => $data['notes'] ?? null,
@@ -354,7 +373,9 @@ class RiderOperationsService
                             'logistics_provider_id' => $courier->logistics_provider_id,
                             'amount_minor' => $collectedPayment->collected_amount_minor,
                             'status' => CodRemittance::PENDING_REMITTANCE,
-                        ])->save();
+                        ]);
+                        $remittance->snapshotAllocation();
+                        $remittance->save();
                     }
                 }
 
@@ -388,7 +409,7 @@ class RiderOperationsService
         ?string $notes = null,
         ?string $verificationMethod = null,
     ): SellerOrder {
-        $courier = $this->operationalCourier($rider);
+        $courier = $this->operationalCourier($rider, allowWindDown: true);
 
         [$order, $changed] = DB::transaction(function () use ($rider, $courier, $sellerOrder, $reason, $notes, $verificationMethod): array {
             $order = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
@@ -401,9 +422,7 @@ class RiderOperationsService
             }
 
             if ($order->status !== OrderStatus::OutForDelivery) {
-                throw ValidationException::withMessages([
-                    'parcel' => 'This parcel is not out for delivery.',
-                ]);
+                throw StaleStateException::field('parcel', 'This parcel is not out for delivery.');
             }
 
             $note = "Delivery failed: {$reason->label()}.";
@@ -492,7 +511,14 @@ class RiderOperationsService
      */
     public function assertDeliveryAssigned(Rider $rider, SellerOrder $order): void
     {
-        $this->assertDeliveryOwnership($this->operationalCourier($rider), $order);
+        $this->assertDeliveryOwnership($this->operationalCourier($rider, allowWindDown: true), $order);
+
+        // A wind-down rider may only finish a parcel already in hand, never start one.
+        abort_if(
+            $this->isWindingDown($rider) && ! in_array($order->status, [OrderStatus::OutForDelivery, OrderStatus::Delivered, OrderStatus::Completed], true),
+            403,
+            'Your logistics company is suspended. You can only finish deliveries that are already out for delivery.',
+        );
     }
 
     private function assertPickupOwnership(Courier $courier, SellerOrder $order): void

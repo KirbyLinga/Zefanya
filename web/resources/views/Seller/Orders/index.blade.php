@@ -5,16 +5,13 @@
 @use('App\Enums\OrderStatus')
 
 @push('scripts')
+@include('Seller.Orders._confirm-dialog')
 <script>
     function confirmAccept(btn) {
-        if (confirm('Accept this order? You can pack it in the next step.')) {
-            btn.closest('form').submit();
-        }
+        sellerConfirm('Accept this order? You can pack it in the next step.', () => btn.closest('form').submit());
     }
     function confirmMarkReady(btn) {
-        if (confirm('Mark this order as packed and ready for pickup? A courier will be assigned at pickup time.')) {
-            btn.closest('form').submit();
-        }
+        sellerConfirm('Mark this order as packed and ready for pickup? This schedules the current eligible or next pickup window. Logistics arranges the pickup rider.', () => btn.closest('form').submit());
     }
 </script>
 @endpush
@@ -22,9 +19,20 @@
 @section('content')
 <div class="mx-auto w-full max-w-[1440px]">
 <div class="mb-6">
-    <h1 class="font-serif text-2xl text-[var(--text-ink)]">Orders</h1>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="font-serif text-2xl text-[var(--text-ink)]">Orders</h1>
+        <a href="{{ route('seller.shipments.index') }}" class="inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-[var(--link)] hover:underline">Track pickups &amp; deliveries <i data-lucide="arrow-right" aria-hidden="true" class="size-3.5"></i></a>
+    </div>
+    <p class="mt-2 font-sans text-[13px] text-[var(--text-muted)]">Accept, pack and mark orders ready here. Review or cancel before pickup; use Shipments for tracking and waybills.</p>
     <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">First come, first served: oldest orders first, and orders you still need to prepare stay on top.</p>
 </div>
+
+<ol aria-label="Order preparation steps" class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-3 font-sans text-xs">
+    @foreach (['Accept', 'Pack', 'Mark ready'] as $step)
+        <li class="flex items-center gap-2"><span class="flex size-6 items-center justify-center rounded-full bg-[var(--pill-primary-bg)] text-[11px] font-semibold text-[var(--pill-primary-text)]">{{ $loop->iteration }}</span><span class="font-semibold text-[var(--text-ink)]">{{ $step }}</span></li>
+    @endforeach
+    <li class="text-[var(--text-muted)]">Then Logistics handles pickup and delivery.</li>
+</ol>
 
 {{-- ── Filter tabs ── --}}
 @php(

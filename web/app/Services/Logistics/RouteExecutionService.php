@@ -215,8 +215,11 @@ class RouteExecutionService
             OrderStatus::Completed => 'No further delivery steps. This order is complete.',
             OrderStatus::Cancelled => 'No further delivery steps. This shipment was cancelled.',
             OrderStatus::Returned => 'This shipment was returned to the seller.',
-            OrderStatus::DeliveryFailed => (int) $order->delivery_attempts >= SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS
-                ? 'Logistics will arrange return to the seller.' : 'Awaiting Logistics to arrange the final delivery attempt or a return.',
+            OrderStatus::DeliveryFailed => match (true) {
+                (int) $order->delivery_attempts >= SellerOrderStatusService::MAX_DELIVERY_ATTEMPTS => 'Logistics will arrange return to the seller.',
+                SellerOrderStatusService::canRetryDelivery($order) => 'Awaiting Logistics to arrange the final delivery attempt or a return.',
+                default => 'Logistics is reviewing the delivery attempt before deciding the next step.',
+            },
             OrderStatus::AssignedToRider => 'Awaiting the delivery rider to start the delivery.',
             default => $nextDestination !== null
                 ? ($inTransit ? 'Awaiting a verified receiving scan at ' : 'Awaiting dispatch to ').$nextDestination.'.'

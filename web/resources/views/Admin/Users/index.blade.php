@@ -154,6 +154,36 @@
                                            class="mb-2 w-full h-10 px-3 border border-neutral-300 rounded-lg text-sm" />
                                     <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-green-700 bg-green-50 rounded-lg hover:bg-green-100">Reactivate</button>
                                 </form>
+                                @if ($type === 'logistics')
+                                    @php
+                                        $inHand = $outForDelivery[$account->id] ?? 0;
+                                        $windDownUntil = $account->allowsRiderWindDown() ? $account->rider_wind_down_until : null;
+                                    @endphp
+                                    <div class="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-left text-xs text-neutral-700" data-rider-wind-down="{{ $account->id }}">
+                                        <p class="font-semibold">Riders are blocked.</p>
+                                        <p class="mt-0.5">{{ $inHand }} {{ Str::plural('parcel', $inHand) }} out for delivery with this company's riders.</p>
+                                        @if ($windDownUntil)
+                                            <p class="mt-0.5 text-amber-800">Riders may finish those until {{ $windDownUntil->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, g:i A') }}.</p>
+                                        @endif
+                                        <form method="POST" action="{{ route('admin.users.logistics.rider-wind-down', $account) }}" class="mt-2 flex flex-col gap-2"
+                                              onsubmit="return confirm('Change what this company\'s riders may do?');">
+                                            @csrf
+                                            <label for="wind-down-hours-{{ $account->id }}" class="font-semibold">Let riders finish parcels out for delivery</label>
+                                            <select id="wind-down-hours-{{ $account->id }}" name="hours" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
+                                                @foreach ([12, 24, 48, $maxWindDownHours] as $hours)
+                                                    <option value="{{ $hours }}">For {{ $hours }} hours</option>
+                                                @endforeach
+                                                @if ($windDownUntil)
+                                                    <option value="0">End now</option>
+                                                @endif
+                                            </select>
+                                            <label for="wind-down-reason-{{ $account->id }}" class="sr-only">Reason</label>
+                                            <input id="wind-down-reason-{{ $account->id }}" name="reason" required maxlength="1000" placeholder="Reason"
+                                                   class="h-9 px-2 border border-neutral-300 rounded-lg text-xs" />
+                                            <button type="submit" class="h-8 px-3 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100">Save</button>
+                                        </form>
+                                    </div>
+                                @endif
                             @endif
                         </td>
                     </tr>

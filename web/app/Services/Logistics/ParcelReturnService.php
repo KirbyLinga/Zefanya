@@ -5,7 +5,9 @@ namespace App\Services\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus as State;
+use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
+use App\Models\Admin\OperationsAuditLog;
 use App\Models\Buyer\Buyer;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductVariant;
@@ -33,6 +35,7 @@ use App\Services\Rider\RiderNotifier;
 use App\Services\Seller\SellerOrderStatusService;
 use App\Services\Seller\SellerSettlementService;
 use App\Services\Seller\StockService;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -86,7 +89,7 @@ class ParcelReturnService
             abort_unless((int) $parcel->order->buyer_id === (int) $buyer->id, 404);
             ParcelIncidentService::assertOperationsAllowed($parcel);
             $this->require(filled(trim($reason)) && mb_strlen($reason) <= 1000, 'reason', 'Provide a return reason of 1000 characters or fewer.');
-            $this->require($parcel->status === OrderStatus::Delivered, 'return', 'Only a delivered, uncompleted shipment can be returned.');
+            $this->conflict($parcel->status === OrderStatus::Delivered, 'return', 'Only a delivered, uncompleted shipment can be returned.');
             $existing = $parcel->parcelReturn;
             if ($existing !== null) {
                 return $existing;
@@ -124,7 +127,7 @@ class ParcelReturnService
     {
         DB::transaction(function () use ($record, $seller): void {
             $record = $this->lockedForDecision($record, $seller);
-            $record->forceFill(['seller_decision' => ParcelReturn::APPROVED, 'seller_decided_at' => now()])->save();
+            $record->forceFill(['seller_decision' => ParcelReturn::APPROVED, 'seller_decided_at' => now()] + $this->faultDefaults($record))->save();
             $this->event($record, 'seller_approved', 'seller', (int) $seller->id);
             app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
             $record->sellerOrder->order?->buyer?->notify(new ReturnRequestDecided($record));
@@ -158,7 +161,7 @@ class ParcelReturnService
         DB::transaction(function () use ($record, $buyer, $reason): void {
             $record = $this->locked($record);
             abort_unless((int) $record->sellerOrder->order->buyer_id === (int) $buyer->id, 404);
-            $this->require($record->canBuyerEscalate(), 'return', 'This rejection can no longer be escalated.');
+            $this->conflict($record->canBuyerEscalate(), 'return', 'This rejection can no longer be escalated.');
             $record->forceFill(['escalated_at' => now(), 'status' => State::InDispute])->save();
             $this->event($record, 'buyer_escalated', 'buyer', (int) $buyer->id, ['reason' => $reason]);
             $record->sellerOrder->seller?->notify(new ReturnDisputed($record));
@@ -175,13 +178,13 @@ class ParcelReturnService
 
         DB::transaction(function () use ($record, $admin, $outcome, $note): void {
             $record = $this->locked($record, investigation: true);
-            $this->require($record->inDispute(), 'return', 'Only a return that is in dispute can be resolved.');
+            $this->conflict($record->inDispute(), 'return', 'Only a return that is in dispute can be resolved.');
             $record->forceFill([
                 'status' => $outcome === ParcelReturn::DISPUTE_OVERTURNED ? State::Requested : State::Rejected,
                 'dispute_outcome' => $outcome,
                 'dispute_note' => $note,
                 'dispute_resolved_at' => now(),
-            ])->save();
+            ] + ($outcome === ParcelReturn::DISPUTE_OVERTURNED ? $this->faultDefaults($record) : []))->save();
             $this->event($record, 'dispute_'.$outcome, 'admin', (int) $admin->id, ['note' => $note]);
             if ($outcome === ParcelReturn::DISPUTE_OVERTURNED) {
                 app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
@@ -192,21 +195,118 @@ class ParcelReturnService
         }, 3);
     }
 
-    /** A recorded COD refund takes the same pending earnings and commission out. */
-    public function recordRefund(ParcelReturn $record, Admin $admin, string $reference): void
+    /**
+     * A recorded COD refund takes the same pending earnings and commission out.
+     * It keeps what was paid, to whom, when, and the proof, so the cash can be reconciled.
+     */
+    public function recordRefund(ParcelReturn $record, Admin $admin, string $reference, int $amountMinor, string $recipient, string $paidOn, ?string $proofPath = null, ?string $reason = null): void
     {
         $this->admin($admin);
         $reference = trim($reference);
+        $recipient = trim($recipient);
+        $reason = trim((string) $reason);
         $this->require($reference !== '' && mb_strlen($reference) <= 255, 'reference', 'A refund reference of at most 255 characters is required.');
+        $this->require($recipient !== '' && mb_strlen($recipient) <= 255, 'recipient', 'Say who received the refund, in at most 255 characters.');
+        $this->require($amountMinor > 0, 'amount', 'Enter the amount that was refunded.');
+        $this->require(! Carbon::parse($paidOn)->isFuture(), 'paid_on', 'The refund date cannot be in the future.');
 
-        DB::transaction(function () use ($record, $admin, $reference): void {
+        DB::transaction(function () use ($record, $admin, $reference, $amountMinor, $recipient, $paidOn, $proofPath, $reason): void {
             $record = $this->locked($record, investigation: true);
             $this->require($record->financial_review_required, 'refund', 'This return has no payment to refund.');
-            $this->require($record->refunded_at === null, 'refund', 'This return already has a recorded refund.');
-            $record->forceFill(['refunded_at' => now(), 'refund_reference' => $reference])->save();
-            $this->event($record, 'refund_recorded', 'admin', (int) $admin->id, ['reference' => $reference]);
+            $this->conflict($record->refunded_at === null, 'refund', 'This return already has a recorded refund.');
+            $this->require(! $record->needsAdminFaultDecision(), 'refund', 'The buyer gave "Other" as the reason. Decide who pays (Seller or Logistics) before recording the refund.');
+            $collected = (int) $record->sellerOrder->payment()->value('amount_minor');
+            $this->require($amountMinor <= $collected, 'amount', 'The refund cannot be more than the buyer paid (₱'.number_format($collected / 100, 2).').');
+            $this->require($amountMinor === $collected || (mb_strlen($reason) >= 10 && mb_strlen($reason) <= 1000), 'refund_reason',
+                'This refund is less than the buyer paid (₱'.number_format($collected / 100, 2).'). Explain why in 10 to 1000 characters.');
+            $record->forceFill($this->faultDefaults($record) + [
+                'refunded_at' => now(),
+                'refund_reference' => $reference,
+                'refund_amount_minor' => $amountMinor,
+                'refund_recipient' => $recipient,
+                'refund_paid_on' => $paidOn,
+                'refund_proof_path' => $proofPath,
+                'refund_reason' => $amountMinor === $collected ? null : $reason,
+            ])->save();
+            $this->event($record, $this->numberedKey($record, 'refund_recorded'), 'admin', (int) $admin->id, ['reference' => $reference, 'amount_minor' => $amountMinor, 'recipient' => $recipient, 'paid_on' => $paidOn, 'has_proof' => $proofPath !== null, 'reason' => $amountMinor === $collected ? null : $reason]);
             app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
+            app(ReturnChargeService::class)->sync($record);
         }, 3);
+    }
+
+    /**
+     * The recorded refund never reached the buyer (failed or bounced transfer). Voiding keeps
+     * the original in the return history and audit log, and reopens the refund so Admin can
+     * record a new one. The refund is still owed, so who pays stays as decided.
+     */
+    public function voidRefund(ParcelReturn $record, Admin $admin, string $reason): void
+    {
+        $this->admin($admin);
+        $reason = trim($reason);
+        $this->require(mb_strlen($reason) >= 10 && mb_strlen($reason) <= 1000, 'void_reason', 'Explain why the refund failed in 10 to 1000 characters.');
+
+        DB::transaction(function () use ($record, $admin, $reason): void {
+            $record = $this->locked($record, investigation: true);
+            $this->conflict($record->refunded_at !== null, 'void_reason', 'This return has no recorded refund to void.');
+            $voided = [
+                'reference' => $record->refund_reference, 'amount_minor' => $record->refund_amount_minor,
+                'recipient' => $record->refund_recipient, 'paid_on' => $record->refund_paid_on?->toDateString(),
+                'proof_path' => $record->refund_proof_path, 'refund_reason' => $record->refund_reason, 'void_reason' => $reason,
+            ];
+            $record->forceFill(['refunded_at' => null, 'refund_reference' => null, 'refund_amount_minor' => null, 'refund_recipient' => null,
+                'refund_paid_on' => null, 'refund_proof_path' => null, 'refund_reason' => null])->save();
+            $this->event($record, $this->numberedKey($record, 'refund_voided'), 'admin', (int) $admin->id, $voided);
+            OperationsAuditLog::record($admin, 'return_refund_voided', $record, 'Return #'.$record->id, $voided, ['refunded' => false], $reason);
+            app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
+            app(ReturnChargeService::class)->sync($record);
+        }, 3);
+    }
+
+    /** Refunds can be recorded and voided more than once; each event keeps its own history row. */
+    private function numberedKey(ParcelReturn $record, string $key): string
+    {
+        $count = $record->events()->where(fn ($query) => $query->where('event_key', $key)->orWhere('event_key', 'like', $key.'_%'))->count();
+
+        return $count === 0 ? $key : $key.'_'.($count + 1);
+    }
+
+    /**
+     * An admin decides who pays for the return: the Seller (the default once
+     * approved) or Logistics (damaged in transit). Logistics fault leaves the
+     * Seller's earnings whole. It can change until the refund is recorded.
+     */
+    public function setFault(ParcelReturn $record, Admin $admin, string $party, string $note): void
+    {
+        $this->admin($admin);
+        $note = trim($note);
+        $this->require(in_array($party, [ParcelReturn::FAULT_SELLER, ParcelReturn::FAULT_LOGISTICS], true), 'fault_party', 'Choose who pays: the Seller or Logistics.');
+        $this->require(mb_strlen($note) >= 10 && mb_strlen($note) <= 1000, 'fault_note', 'Explain the decision in 10 to 1000 characters.');
+
+        DB::transaction(function () use ($record, $admin, $party, $note): void {
+            $record = $this->locked($record, investigation: true);
+            $this->conflict($record->faultCanChange(), 'fault_party', 'Who pays can no longer change: the refund is recorded or the request was rejected.');
+            $from = $record->fault_party;
+            $record->forceFill(['fault_party' => $party, 'fault_note' => $note, 'fault_set_by_admin_id' => $admin->id, 'fault_set_at' => now()] + $this->faultDefaults($record))->save();
+            OperationsAuditLog::record($admin, 'return_fault_set', $record, 'Return #'.$record->id, ['fault_party' => $from], ['fault_party' => $party], $note);
+            app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
+            app(ReturnChargeService::class)->sync($record);
+        }, 3);
+    }
+
+    /**
+     * Once a return is approved, the Seller pays unless an admin decided otherwise. The
+     * return trip is frozen at the original delivery fee: same route, weight and carrier,
+     * at the checkout rate. Only a buyer's own request has a return trip to charge.
+     *
+     * @return array{fault_party: string, return_shipping_fee_minor: ?int}
+     */
+    private function faultDefaults(ParcelReturn $record): array
+    {
+        return [
+            'fault_party' => $record->fault_party ?? ParcelReturn::FAULT_SELLER,
+            'return_shipping_fee_minor' => $record->return_shipping_fee_minor
+                ?? ($record->isBuyerRequest() ? (int) $record->sellerOrder->shipping_fee_minor : null),
+        ];
     }
 
     /**
@@ -224,7 +324,7 @@ class ParcelReturnService
                 return false;
             }
 
-            $record->forceFill(['seller_decision' => ParcelReturn::AUTO_APPROVED, 'seller_decided_at' => now()])->save();
+            $record->forceFill(['seller_decision' => ParcelReturn::AUTO_APPROVED, 'seller_decided_at' => now()] + $this->faultDefaults($record))->save();
             $this->event($record, 'seller_approved', 'system', null);
             app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
             $record->sellerOrder->order?->buyer?->notify(new ReturnRequestDecided($record));
@@ -242,7 +342,7 @@ class ParcelReturnService
         $courier = DB::transaction(function () use ($record, $provider, $courierId): Courier {
             $record = $this->locked($record);
             $this->owner($record->sellerOrder, $provider);
-            $this->require($record->awaitingBuyerCollection(), 'return', 'This return is not waiting to be collected from a buyer.');
+            $this->conflict($record->awaitingBuyerCollection(), 'return', 'This return is not waiting to be collected from a buyer.');
             $courier = Courier::query()->whereKey($courierId)->where('logistics_provider_id', $provider->id)->with('rider')->first();
             $this->require($courier?->rider !== null && in_array($courier->rider->status, Rider::ASSIGNABLE_STATUSES, true), 'courier_id', 'Choose an active rider from your own fleet.');
             $record->forceFill(['collection_courier_id' => $courier->id, 'collection_assigned_at' => now()])->save();
@@ -264,7 +364,7 @@ class ParcelReturnService
             $record = $this->locked($record);
             $courier = $record->collectionCourier;
             abort_unless($courier !== null && (int) $courier->rider_id === (int) $rider->id && in_array($rider->status, Rider::ASSIGNABLE_STATUSES, true), 403);
-            $this->require($record->awaitingBuyerCollection(), 'return', 'This parcel has already been collected.');
+            $this->conflict($record->awaitingBuyerCollection(), 'return', 'This parcel has already been collected.');
             $this->require(filled($tracking) && hash_equals((string) $record->sellerOrder->tracking_number, trim($tracking)), 'tracking_number', 'Enter the tracking number on this parcel.');
             $this->require($rider->station_hub_id !== null, 'return', 'Your account has no station to bring this parcel to. Contact Logistics.');
             $record->forceFill(['collected_at' => now()])->save();
@@ -277,9 +377,9 @@ class ParcelReturnService
     {
         $record = $this->locked($record);
         abort_unless($seller->isApproved() && (int) $record->sellerOrder->seller_id === (int) $seller->id, 403);
-        $this->require(! $record->inDispute(), 'return', 'This return is in dispute. An admin has to resolve it.');
-        $this->require($record->awaitingSellerDecision(), 'return', 'This return request has already been decided.');
-        $this->require(! $record->sellerDecisionOverdue(), 'return', 'The 3-day deadline has passed, so this request is being approved automatically.');
+        $this->conflict(! $record->inDispute(), 'return', 'This return is in dispute. An admin has to resolve it.');
+        $this->conflict($record->awaitingSellerDecision(), 'return', 'This return request has already been decided.');
+        $this->conflict(! $record->sellerDecisionOverdue(), 'return', 'The 3-day deadline has passed, so this request is being approved automatically.');
 
         return $record;
     }
@@ -543,7 +643,7 @@ class ParcelReturnService
         DB::transaction(function () use ($record, $provider, $token): void {
             $record = $this->locked($record);
             $this->atOrigin($record, $provider);
-            $this->require(in_array($record->status, [State::Requested, State::InTransit], true), 'return', 'Origin receipt is already recorded.');
+            $this->conflict(in_array($record->status, [State::Requested, State::InTransit], true), 'return', 'Origin receipt is already recorded.');
             $this->verification->assertValidForLogistics($provider, $record->sellerOrder, ParcelHandoffVerification::ACTION_RETURN_ORIGIN, $token, $record->origin_hub_id);
             $record->sellerOrder->forceFill(['custody_provider_id' => $provider->id, 'custody_hub_id' => $record->origin_hub_id])->save();
             $this->arrived($record, $provider->id);
@@ -614,6 +714,8 @@ class ParcelReturnService
 
             app(SellerOrderStatusService::class)->transition($record->sellerOrder, OrderStatus::Returned,
                 note: 'Physical return received and inspected by the owning Seller.', actor: OrderActor::Seller, actorId: $seller->id, source: 'web');
+            // The trip back is done: settle who pays Logistics for it.
+            app(ReturnChargeService::class)->sync($record->fresh('sellerOrder'));
             $this->verification->consumeAfterSuccess(fn () => $this->verification->assertForSellerReturn($seller, $record, $condition, $token, true));
             $record->forceFill(['handover_code_hash' => null, 'handover_expires_at' => null])->save();
         }, 3);
@@ -697,6 +799,14 @@ class ParcelReturnService
     public function admin(Admin $admin): void
     {
         abort_unless(in_array($admin->role, ['super_admin', 'admin', 'moderator'], true), 403);
+    }
+
+    /** The record moved on since the page rendered: 409 for JSON, same errors for forms. */
+    private function conflict(bool $condition, string $field, string $message): void
+    {
+        if (! $condition) {
+            throw StaleStateException::field($field, $message);
+        }
     }
 
     private function require(bool $condition, string $field, string $message): void

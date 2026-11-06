@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
- * F3 — Buyer can cancel their own seller_order slice before Ready for Pickup:
+ * F3 — Buyer can cancel their own seller_order slice before the seller accepts:
  * restore stock once, void pending COD, notify the seller; siblings continue.
  */
 class BuyerOrderCancelTest extends TestCase
@@ -202,7 +202,7 @@ class BuyerOrderCancelTest extends TestCase
             ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), [
                 'reason' => 'Again',
             ])
-            ->assertStatus(422);
+            ->assertStatus(409);
 
         Notification::assertSentToTimes($sellerA, BuyerOrderCancelled::class, 1);
         $this->assertSame(1, InventoryTransaction::query()->where('reason', 'cancel')->count());
@@ -246,7 +246,7 @@ class BuyerOrderCancelTest extends TestCase
             ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), [
                 'reason' => 'Too late',
             ])
-            ->assertStatus(422);
+            ->assertStatus(409);
 
         $this->assertSame(OrderStatus::ReadyForPickup, $soA->fresh()->status);
         $this->assertSame(0, InventoryTransaction::query()->where('reason', 'cancel')->count());
@@ -306,7 +306,7 @@ class BuyerOrderCancelTest extends TestCase
         Notification::assertNotSentTo($sellerB, BuyerOrderCancelled::class);
     }
 
-    public function test_show_page_offers_cancel_for_new_and_accepted_shipments(): void
+    public function test_show_page_offers_cancel_only_before_the_seller_accepts(): void
     {
         [$buyer, , , , $soA, $soB, $order] = $this->multiSellerCheckout();
         $soB->forceFill(['status' => OrderStatus::Confirmed->value])->save();
@@ -315,6 +315,11 @@ class BuyerOrderCancelTest extends TestCase
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
             ->assertSee(route('buyer.orders.cancelSellerOrder', [$order, $soA]), false)
-            ->assertSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
+            ->assertDontSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
+
+        $this->actingAs($buyer, 'buyer')
+            ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soB]), ['reason' => 'Too late'])
+            ->assertStatus(409);
+        $this->assertSame(OrderStatus::Confirmed, $soB->fresh()->status);
     }
 }

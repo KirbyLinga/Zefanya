@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Rider\AccountController;
+use App\Http\Controllers\Rider\AvailabilityController;
 use App\Http\Controllers\Rider\DashboardController;
 use App\Http\Controllers\Rider\DeliveryAssignmentsController;
 use App\Http\Controllers\Rider\DeliveryHistoryController;
 use App\Http\Controllers\Rider\DeliveryProofController;
 use App\Http\Controllers\Rider\DigitalWaybillController;
+use App\Http\Controllers\Rider\MoneyController;
 use App\Http\Controllers\Rider\NotificationController;
 use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\ParcelScanController;
@@ -24,9 +26,12 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('rider.dashboard'))->name('home');
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::post('/availability', [AvailabilityController::class, 'update'])->name('availability.update');
 
         Route::get('/pickups', [PickupAssignmentsController::class, 'index'])->name('pickups.index');
         Route::post('/pickups/{sellerOrder}/confirm', [PickupAssignmentsController::class, 'confirm'])->name('pickups.confirm');
+
+        Route::post('/pickups/stops/{pickupSession}/finish', [PickupAssignmentsController::class, 'finishStop'])->name('pickups.stops.finish');
 
         Route::post('/pickups/{sellerOrder}/report-failure', [PickupAssignmentsController::class, 'reportFailure'])->name('pickups.reportFailure');
 
@@ -47,6 +52,7 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
         Route::post('/deliveries/{sellerOrder}/failed', [DeliveryAssignmentsController::class, 'failed'])->name('deliveries.failed');
 
         Route::get('/history', [DeliveryHistoryController::class, 'index'])->name('history.index');
+        Route::get('/money', [MoneyController::class, 'index'])->name('money.index');
         // Private evidence is streamed only to the rider who submitted it.
         Route::get('/proofs/{deliveryProof}', [DeliveryProofController::class, 'show'])->name('proofs.show');
         Route::get('/account', [AccountController::class, 'show'])->name('account.show');

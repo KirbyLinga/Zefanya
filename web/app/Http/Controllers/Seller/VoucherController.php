@@ -7,6 +7,7 @@ use App\Http\Requests\Seller\SellerVoucherRequest;
 use App\Models\Catalog\Product;
 use App\Models\Shared\Voucher;
 use App\Services\Seller\SellerVoucherService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,20 +16,42 @@ class VoucherController extends Controller
 {
     public function index(Request $request): View
     {
+        return $this->listing($request);
+    }
+
+    public function create(Request $request): View
+    {
+        return $this->listing($request, openCreateVoucher: true);
+    }
+
+    private function listing(Request $request, bool $openCreateVoucher = false): View
+    {
         $vouchers = Voucher::query()
             ->where('seller_id', $request->user('seller')->id)
             ->withCount('products')
             ->latest('id')
             ->paginate(20);
 
-        return view('Seller.Vouchers.index', compact('vouchers'));
+        return view($openCreateVoucher ? 'Seller.Vouchers.create' : 'Seller.Vouchers.index', [
+            'vouchers' => $vouchers,
+            'products' => $this->pickableProducts($request)->load('images:id,product_id,path,thumbnail_path,is_primary,sort_order'),
+            'openCreateVoucher' => $openCreateVoucher,
+        ]);
     }
 
-    public function create(Request $request): View
+    public function codeAvailability(Request $request): JsonResponse
     {
-        return view('Seller.Vouchers.create', [
-            'products' => $this->pickableProducts($request),
+        if (is_string($request->input('code'))) {
+            $request->merge(['code' => strtoupper(trim($request->input('code')))]);
+        }
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'regex:/^[A-Z0-9]{4,12}$/'],
         ]);
+
+        return response()->json([
+            'available' => ! Voucher::query()->where('code', $validated['code'])->exists(),
+        ])->header('Cache-Control', 'no-store');
     }
 
     public function store(SellerVoucherRequest $request, SellerVoucherService $vouchers): RedirectResponse

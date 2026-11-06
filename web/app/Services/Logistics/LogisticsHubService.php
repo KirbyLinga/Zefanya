@@ -506,7 +506,7 @@ class LogisticsHubService
         $items = [
             ['key' => 'province_hub', 'label' => 'Create Approved Province Hub', 'complete' => $provinceCount > 0, 'count' => $provinceCount],
             ['key' => 'station_hub', 'label' => 'Create Approved Station Hub', 'complete' => $stationCount > 0, 'count' => $stationCount],
-            ['key' => 'coverage', 'label' => 'Configure Barangay Coverage', 'complete' => $coverageCount > 0, 'count' => $coverageCount],
+            ['key' => 'coverage', 'label' => 'Set Up Delivery Areas', 'complete' => $coverageCount > 0, 'count' => $coverageCount],
             ['key' => 'approved_rider', 'label' => 'Approve First Rider', 'complete' => $approvedRiderCount > 0, 'count' => $approvedRiderCount],
         ];
 

@@ -28,7 +28,7 @@ class Rule04BuyerCancellationTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    private function parcel(OrderStatus $status = OrderStatus::Confirmed, ?Order $parent = null): SellerOrder
+    private function parcel(OrderStatus $status = OrderStatus::Placed, ?Order $parent = null): SellerOrder
     {
         $seller = Seller::factory()->create();
         $product = Product::factory()->create(['seller_id' => $seller->id, 'stock_quantity' => 18]);
@@ -49,7 +49,7 @@ class Rule04BuyerCancellationTest extends TestCase
         return $this->postJson(route('buyer.orders.cancelSellerOrder', [$parcel->order, $parcel]), ['reason' => $reason]);
     }
 
-    public function test_buy_can_001_accepted_cod_cancels_for_both_roles_restores_twenty_and_notifies_with_reason(): void
+    public function test_buy_can_001_unaccepted_cod_cancels_for_both_roles_restores_twenty_and_notifies_with_reason(): void
     {
         $parcel = $this->parcel();
         $variant = $parcel->orderItems->sole()->variant;
@@ -70,7 +70,7 @@ class Rule04BuyerCancellationTest extends TestCase
         $ledger = InventoryTransaction::where('seller_order_id', $parcel->id)->where('reason', 'cancel')->sole();
         $this->assertSame([18, 20, 2], [$ledger->quantity_before, $ledger->quantity_after, $ledger->delta]);
         $history = StatusHistory::where('seller_order_id', $parcel->id)->sole();
-        $this->assertSame(OrderStatus::Confirmed, $history->from_status);
+        $this->assertSame(OrderStatus::Placed, $history->from_status);
         $this->assertSame('buyer', $history->actor_type);
         $this->assertSame($parcel->order->buyer_id, $history->actor_id);
         $this->assertSame('Buyer cancelled: Changed my mind', $history->note);
@@ -83,11 +83,11 @@ class Rule04BuyerCancellationTest extends TestCase
 
     public static function buyerCancellationStates(): array
     {
-        return array_map(fn (OrderStatus $status): array => [$status, in_array($status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing], true)], OrderStatus::cases());
+        return array_map(fn (OrderStatus $status): array => [$status, $status === OrderStatus::Placed], OrderStatus::cases());
     }
 
     #[DataProvider('buyerCancellationStates')]
-    public function test_a6_buyer_cancel_visibility_and_direct_http_enforce_the_ready_for_pickup_boundary(OrderStatus $status, bool $allowed): void
+    public function test_a6_buyer_cancel_visibility_and_direct_http_enforce_the_seller_accept_boundary(OrderStatus $status, bool $allowed): void
     {
         Notification::fake();
         $parcel = $this->parcel($status);
@@ -103,7 +103,7 @@ class Rule04BuyerCancellationTest extends TestCase
             Notification::assertSentToTimes($parcel->seller, BuyerOrderCancelled::class, 1);
         } else {
             $page->assertDontSee('data-cancel-url="'.$url.'"', false);
-            $this->cancel($parcel)->assertUnprocessable();
+            $this->cancel($parcel)->assertStatus(409);
             $this->assertSame($status, $parcel->fresh()->status);
             $this->assertSame(PaymentStatus::Pending, $parcel->payment->fresh()->status);
             $this->assertSame(18, $parcel->orderItems->sole()->variant->fresh()->stock_quantity);
@@ -126,7 +126,7 @@ class Rule04BuyerCancellationTest extends TestCase
         $usageAfterCancellation = $voucher->fresh()->times_used;
         $historyBefore = StatusHistory::sole()->getRawOriginal();
 
-        $this->cancel($parcel, 'Duplicate click')->assertUnprocessable();
+        $this->cancel($parcel, 'Duplicate click')->assertStatus(409);
         app(SellerOrderStatusService::class)->transition($stale, OrderStatus::Cancelled,
             actor: OrderActor::Buyer, actorId: $parcel->order->buyer_id, note: 'Duplicate service call');
 
@@ -140,11 +140,11 @@ class Rule04BuyerCancellationTest extends TestCase
         Notification::assertSentToTimes($parcel->seller, BuyerOrderCancelled::class, 1);
     }
 
-    public function test_cancelling_one_accepted_slice_preserves_sibling_inventory_payment_vouchers_and_rollup(): void
+    public function test_cancelling_one_unaccepted_slice_preserves_sibling_inventory_payment_vouchers_and_rollup(): void
     {
         Notification::fake();
         $first = $this->parcel();
-        $second = $this->parcel(OrderStatus::Preparing, $first->order);
+        $second = $this->parcel(OrderStatus::Placed, $first->order);
         $voucher = Voucher::factory()->create(['times_used' => 1]);
         foreach ([$first, $second] as $slice) {
             $slice->forceFill(['voucher_id' => $voucher->id, 'platform_voucher_id' => $voucher->id, 'voucher_discount_minor' => 100])->save();
@@ -159,7 +159,7 @@ class Rule04BuyerCancellationTest extends TestCase
         $this->assertSame($siblingPaymentBefore, $second->payment->fresh()->getRawOriginal());
         $this->assertSame(18, $second->orderItems->sole()->variant->fresh()->stock_quantity);
         $this->assertSame(1, $voucher->fresh()->times_used);
-        $this->assertSame(OrderStatus::Preparing, $first->order->fresh()->status);
+        $this->assertSame(OrderStatus::Placed, $first->order->fresh()->status);
         Notification::assertNotSentTo($second->seller, BuyerOrderCancelled::class);
         $this->cancel($second)->assertOk();
         $this->assertSame(OrderStatus::Cancelled, $first->order->fresh()->status);
@@ -178,7 +178,7 @@ class Rule04BuyerCancellationTest extends TestCase
         $this->actingAs($parcel->order->buyer, 'buyer');
         $wrongParent = Order::factory()->create(['buyer_id' => $parcel->order->buyer_id]);
         $this->postJson(route('buyer.orders.cancelSellerOrder', [$wrongParent, $parcel]), ['reason' => 'Wrong order'])->assertNotFound();
-        $this->assertSame(OrderStatus::Confirmed, $parcel->fresh()->status);
+        $this->assertSame(OrderStatus::Placed, $parcel->fresh()->status);
         $this->assertSame(18, $parcel->orderItems->sole()->variant->fresh()->stock_quantity);
         $this->assertSame(PaymentStatus::Pending, $parcel->payment->fresh()->status);
         $this->assertSame(1, $voucher->fresh()->times_used);
@@ -192,7 +192,7 @@ class Rule04BuyerCancellationTest extends TestCase
         $parcel = $this->parcel();
         $this->actingAs($parcel->order->buyer, 'buyer');
         $this->cancel($parcel, '   ')->assertUnprocessable()->assertJsonValidationErrors('reason');
-        $this->assertSame(OrderStatus::Confirmed, $parcel->fresh()->status);
+        $this->assertSame(OrderStatus::Placed, $parcel->fresh()->status);
         $this->assertDatabaseCount('inventory_transactions', 0);
     }
 
@@ -210,7 +210,7 @@ class Rule04BuyerCancellationTest extends TestCase
         } finally {
             Event::forget('eloquent.saving: '.Payment::class);
         }
-        $this->assertSame(OrderStatus::Confirmed, $parcel->fresh()->status);
+        $this->assertSame(OrderStatus::Placed, $parcel->fresh()->status);
         $this->assertSame(18, $parcel->orderItems->sole()->variant->fresh()->stock_quantity);
         $this->assertSame(PaymentStatus::Pending, $parcel->payment->fresh()->status);
         $this->assertDatabaseCount('inventory_transactions', 0);

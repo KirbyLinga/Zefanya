@@ -3,7 +3,11 @@
 @section('content')
 <div class="space-y-6">
     <div>
-        <h1 class="font-serif text-3xl text-[var(--text-ink)]">Payout Requests</h1>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="font-serif text-3xl text-[var(--text-ink)]">Payout Requests</h1>
+            <a href="{{ route('seller.earnings.index') }}" class="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 text-xs font-semibold text-[var(--link)] hover:bg-[var(--bg-page)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">View order earnings <i data-lucide="arrow-right" aria-hidden="true" class="size-3.5"></i></a>
+        </div>
+        <p class="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">Withdraw available funds and track each request through approval and payment. Use Earnings for order-level amounts, commission and fund availability.</p>
         <p class="mt-2 text-sm text-[var(--text-muted)]">Request a withdrawal from your completed, reconciled earnings.</p>
     </div>
     @if(session('success'))
@@ -18,8 +22,11 @@
         <h2 class="text-sm text-[var(--text-muted)]">Available earnings</h2>
         <p class="mt-2 text-3xl font-semibold text-[var(--text-ink)]">₱{{ number_format($availableMinor / 100, 2) }}</p>
         <p class="mt-2 text-sm text-[var(--text-muted)]">Pending requests reserve earnings until cancelled. Minimum withdrawal: ₱100.00.</p>
+        @if($debtMinor > 0)
+            <p role="status" class="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">You owe ₱{{ number_format($debtMinor / 100, 2) }} from orders that were returned after you were paid. It is taken out of your next payout requests until it is repaid.</p>
+        @endif
         @if($pending)
-            <p role="status" class="mt-5 text-sm font-semibold text-[var(--text-ink)]">A payout request is already pending: ₱{{ number_format($pending->amount_minor / 100, 2) }}.</p>
+            <p role="status" class="mt-5 text-sm font-semibold text-[var(--text-ink)]">A payout request is already pending: ₱{{ number_format($pending->amount_minor / 100, 2) }}@if($pending->debt_deducted_minor > 0), of which ₱{{ number_format($pending->debt_deducted_minor / 100, 2) }} repays what you owe and ₱{{ number_format(($pending->amount_minor - $pending->debt_deducted_minor) / 100, 2) }} is sent to you @endif.</p>
         @else
             <form method="POST" action="{{ route('seller.payout-requests.store') }}" class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
                 @csrf
@@ -43,7 +50,7 @@
                     @forelse($payouts as $payout)
                         <tr class="border-b border-[var(--border-input)]">
                             <td class="p-3">#{{ $payout->id }}</td>
-                            <td class="p-3">₱{{ number_format($payout->amount_minor / 100, 2) }}</td>
+                            <td class="p-3">₱{{ number_format($payout->amount_minor / 100, 2) }}@if($payout->debt_deducted_minor > 0)<span class="block text-xs text-[var(--text-muted)]">₱{{ number_format($payout->debt_deducted_minor / 100, 2) }} repaid what you owe</span>@endif</td>
                             <td class="p-3">
                                 {{ ucfirst(strtolower($payout->status)) }}
                                 @if($payout->status === \App\Models\Seller\SellerPayoutRequest::PAID)

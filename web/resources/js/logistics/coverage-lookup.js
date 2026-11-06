@@ -35,6 +35,7 @@
                 input.checked = !claim && selected.has(String(item.code));
                 input.className = 'h-5 w-5 shrink-0 accent-primary-800';
                 const text = document.createElement('span');
+                text.className = claim ? 'text-neutral-600' : 'text-[var(--text-ink)]';
                 text.textContent = item.name + (claim ? ': claimed by ' + claim.station : '');
                 if (claim) label.classList.add('bg-neutral-100');
                 input.addEventListener('change', () => {
@@ -135,8 +136,9 @@
                 const station = rider.selectedOptions[0]?.dataset.station;
                 inputs.forEach(input => {
                     input.disabled = !station || input.dataset.station !== station;
-                    if (input.disabled) input.checked = false;
-                    input.closest('label').classList.toggle('bg-neutral-100', input.disabled);
+                    if (form.dataset.targetArea) input.checked = !input.disabled && input.value === form.dataset.targetArea;
+                    else if (input.disabled) input.checked = false;
+                    input.closest('label').classList.toggle('bg-[var(--bg-page)]', input.disabled);
                 });
             }
             rider.addEventListener('change', sync);

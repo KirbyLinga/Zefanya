@@ -15,7 +15,7 @@ class ReturnController extends Controller
     public function index(Request $request)
     {
         $returns = ParcelReturn::query()->whereHas('sellerOrder', fn ($q) => $q->where('seller_id', $request->user('seller')->id))
-            ->with(['sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'originHub', 'events'])->latest('id')->paginate(20)->withQueryString();
+            ->with(['sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'sellerOrder.payment', 'sellerOrder.sellerDebt', 'originHub', 'events'])->latest('id')->paginate(20)->withQueryString();
 
         return view('Seller.Returns.index', compact('returns'));
     }

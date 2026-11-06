@@ -7,6 +7,7 @@
 @use('App\Enums\OrderStatus')
 
 @section('content')
+@php($overallStatus = $order->computeRollupStatus())
     <div class="bg-[var(--bg-page)] py-8 sm:py-10">
         <div class="mx-auto w-full max-w-[1240px] break-words px-4 sm:px-6 lg:px-8">
             <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -23,7 +24,11 @@
             @if ($errors->any())
                 <p role="alert" class="mb-4 text-sm text-red-600">{{ $errors->first() }}</p>
             @endif
-            <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_360px]">
+            <section class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
+                <div data-order-status="{{ $overallStatus?->value }}" class="flex flex-wrap items-center gap-2"><h2 class="text-xs font-semibold text-[var(--text-muted)]">Overall order</h2>@if ($overallStatus)<x-shipment-status-badge :status="$overallStatus" buyer-facing />@endif</div>
+                @if ($order->sellerOrders->count() > 1)<p class="text-xs text-[var(--text-muted)]">Each shop sends a separate shipment. Follow its status and actions below.</p>@endif
+            </section>
+            <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 {{-- ── Left: items + timeline ────────────────────────────────── --}}
                 <div class="min-w-0 space-y-6">
                     {{-- Shipping address --}}
@@ -112,8 +117,14 @@
                                     @endif
                                 </div>
                             @endif
-                            <x-shipment-tracking :shipment="$sellerOrder" />
-                            <x-parcel-route-progress :details="$routeDetails[$sellerOrder->id] ?? null" />
+                            <x-shipment-tracking :shipment="$sellerOrder" buyer-facing />
+                            <details class="group mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
+                                <summary class="flex min-h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-1 text-xs font-semibold text-[var(--link)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--link)]">
+                                    <span class="text-[var(--link)]">Detailed delivery updates</span>
+                                    <i data-lucide="chevron-down" aria-hidden="true" class="size-4 shrink-0 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3"><x-parcel-route-progress :details="$routeDetails[$sellerOrder->id] ?? null" /></div>
+                            </details>
 
                             @php($hubMovements = $sellerOrder->manifestMovementEvents())
                             @if ($hubMovements !== [])
@@ -153,7 +164,7 @@
                             <div class="space-y-4">
                                 <div>
                                     <p class="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Status</p>
-                                    <p class="inline-flex rounded-full bg-secondary-100 px-3 py-1.5 font-sans text-sm font-semibold text-[var(--brand)]">{{ $sellerOrder->status->label() }}</p>
+                                    <p class="inline-flex rounded-full bg-secondary-100 px-3 py-1.5 font-sans text-sm font-semibold text-[var(--brand)]">{{ $sellerOrder->status->buyerLabel() }}</p>
                                 </div>
                                 @if ($sellerOrder->tracking_number)
                                     <div>
@@ -161,6 +172,7 @@
                                         <p class="font-mono text-sm text-[var(--text-ink)] break-all">{{ $sellerOrder->tracking_number }}</p>
                                     </div>
                                 @endif
+                                @include('Buyer.Orders._shipment-next-steps', ['shipment' => $sellerOrder])
                                 @if (in_array($sellerOrder->id, $returnableShipmentIds, true))
                                     <form method="POST" action="{{ route('buyer.orders.requestReturn', [$order, $sellerOrder]) }}" enctype="multipart/form-data" class="space-y-3">
                                         @csrf
@@ -174,56 +186,38 @@
                                         <label for="return-description-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">What happened? (10–500 characters)</label>
                                         <textarea id="return-description-{{ $sellerOrder->id }}" name="description" required minlength="10" maxlength="500" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">{{ old('description') }}</textarea>
                                         <label for="return-photos-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Photos (1–5 JPG or PNG, up to 5 MB each)</label>
-                                        <input id="return-photos-{{ $sellerOrder->id }}" type="file" name="photos[]" required multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="block w-full text-sm text-[var(--text-ink)]">
-                                        <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-primary-800 hover:bg-primary-50">Request return</button>
+                                        <input id="return-photos-{{ $sellerOrder->id }}" type="file" name="photos[]" required multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="upload-input">
+                                        <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Request return</button>
                                     </form>
-                                @elseif ($sellerOrder->parcelReturn?->inDispute())
-                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">In Dispute</p>
-                                    <p class="text-sm text-[var(--text-ink)]">An admin is reviewing the seller's rejection. The seller cannot change it until that review is finished.</p>
-                                    <p class="text-sm text-[var(--text-ink)]"><span class="font-semibold">Seller's reason:</span> {{ $sellerOrder->parcelReturn->seller_decision_reason }}</p>
-                                @elseif ($sellerOrder->parcelReturn?->status === \App\Enums\ParcelReturnStatus::Rejected)
-                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request rejected</p>
-                                    <p class="text-sm text-[var(--text-ink)]"><span class="font-semibold">Seller's reason:</span> {{ $sellerOrder->parcelReturn->seller_decision_reason }}</p>
-                                    @if ($sellerOrder->parcelReturn->canBuyerEscalate())
+                                @elseif ($sellerOrder->parcelReturn?->canBuyerEscalate())
                                         <form method="POST" action="{{ route('buyer.orders.escalateReturn', [$order, $sellerOrder]) }}" class="space-y-3">
                                             @csrf
                                             <label for="escalate-reason-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Ask an admin to review this rejection</label>
                                             <textarea id="escalate-reason-{{ $sellerOrder->id }}" name="reason" required minlength="10" maxlength="1000" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">{{ old('reason') }}</textarea>
-                                            <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-primary-800 hover:bg-primary-50">Escalate</button>
+                                            <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Escalate</button>
                                         </form>
-                                    @elseif ($sellerOrder->parcelReturn->dispute_outcome === \App\Models\Logistics\ParcelReturn::DISPUTE_UPHELD)
-                                        <p class="text-sm text-[var(--text-ink)]">An admin reviewed this and kept the rejection. {{ $sellerOrder->parcelReturn->dispute_note }}</p>
-                                    @endif
-                                @elseif ($sellerOrder->parcelReturn?->isActive() && $sellerOrder->parcelReturn->seller_decision !== null)
-                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request approved</p>
-                                    @if ($sellerOrder->parcelReturn->dispute_outcome === \App\Models\Logistics\ParcelReturn::DISPUTE_OVERTURNED)
-                                        <p class="text-sm text-[var(--text-ink)]">An admin overturned the seller's rejection. {{ $sellerOrder->parcelReturn->dispute_note }}</p>
-                                    @elseif ($sellerOrder->parcelReturn->seller_decision === \App\Models\Logistics\ParcelReturn::AUTO_APPROVED)
-                                        <p class="text-sm text-[var(--text-ink)]">The seller did not answer in time, so your request was approved automatically.</p>
-                                    @endif
-                                    @if ($sellerOrder->parcelReturn->collectedFromBuyer())
-                                        <p class="text-sm text-[var(--text-ink)]">Your parcel was collected and is on its way back to the seller.</p>
-                                    @elseif ($sellerOrder->parcelReturn->collection_courier_id)
-                                        <p class="text-sm text-[var(--text-ink)]">A rider has been assigned to collect the parcel from you.</p>
-                                    @else
-                                        <p class="text-sm text-[var(--text-ink)]">Please keep the parcel ready. A rider will be assigned to collect it.</p>
-                                    @endif
-                                @elseif ($sellerOrder->parcelReturn?->awaitingSellerDecision())
-                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request open</p>
-                                    <p class="text-sm text-[var(--text-ink)]">Waiting for the seller to decide by {{ $sellerOrder->parcelReturn->seller_response_due_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}.</p>
-                                @elseif ($sellerOrder->parcelReturn?->isActive())
-                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return in progress</p>
-                                    <p class="text-sm text-[var(--text-ink)]">This parcel is on its way back to the seller.</p>
-                                @elseif ($sellerOrder->parcelReturn?->status === \App\Enums\ParcelReturnStatus::Completed)
-                                    <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return completed</p>
-                                    <p class="text-sm text-[var(--text-ink)]">The seller has received the parcel.</p>
-                                    @if ($sellerOrder->parcelReturn->refunded_at)
-                                        <p class="text-sm text-[var(--text-ink)]">Refund recorded. Reference: {{ $sellerOrder->parcelReturn->refund_reference }}</p>
-                                    @elseif ($sellerOrder->parcelReturn->financial_review_required)
-                                        <p class="text-sm text-[var(--text-ink)]">Your refund is being reviewed.</p>
-                                    @endif
                                 @endif
-                                @if (in_array($sellerOrder->status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing], true))
+                                @if ($sellerOrder->status === OrderStatus::Delivered && ! $sellerOrder->hasActiveReturn())
+                                    <div class="rounded-xl border border-[var(--border)] p-4">
+                                        <h3 class="mb-1 text-sm font-semibold text-[var(--text-ink)]">Order Received</h3>
+                                        <p class="text-xs leading-relaxed text-[var(--text-muted)]">Confirm only after receiving and checking this parcel. Order completion is still pending. Eligible shipments complete automatically 7 days after delivery if no return or delivery issue remains open.</p>
+                                        <form method="POST" action="{{ route('buyer.orders.confirmReceived', $order) }}" class="mt-3">
+                                            @csrf
+                                            <input type="hidden" name="seller_order_id" value="{{ $sellerOrder->id }}">
+                                            <button type="submit" aria-label="Confirm Received from {{ $sellerOrder->seller?->business_name ?? 'Seller' }}, shipment {{ $sellerOrder->id }}" class="min-h-11 w-full rounded-xl bg-primary-800 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]">Confirm Received</button>
+                                        </form>
+                                    </div>
+                                @elseif ($sellerOrder->status === OrderStatus::Completed && ! $sellerOrder->hasActiveReturn())
+                                    <div class="border-t border-[var(--border)] pt-3">
+                                        <p class="text-xs leading-relaxed text-[var(--text-muted)]">Shipment received and completed. You can review eligible purchased products:</p>
+                                        @foreach ($sellerOrder->orderItems as $item)
+                                            @if ($item->product && $item->product->status === 'active')
+                                                <a class="mt-2 block text-sm font-semibold text-[var(--link)] underline" href="{{ route('buyer.products.show', $item->product_id) }}#reviews">Review {{ $item->product_name }}</a>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endif
+                                @if ($sellerOrder->status === OrderStatus::Placed)
                                     <div class="pt-2" data-cancel-action="{{ $sellerOrder->id }}">
                                         <button
                                             type="button"
@@ -239,28 +233,6 @@
                                 @endif
                             </div>
                         </section>
-                    @endforeach
-
-                    @foreach ($order->sellerOrders as $shipment)
-                        @if ($shipment->status === OrderStatus::Delivered && ! $shipment->hasActiveReturn())
-                            <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-6">
-                                <h2 class="text-sm font-semibold text-buyer-ink">{{ $shipment->seller?->business_name ?? 'Seller' }}</h2>
-                                <form method="POST" action="{{ route('buyer.orders.confirmReceived', $order) }}" class="mt-3">
-                                    @csrf
-                                    <input type="hidden" name="seller_order_id" value="{{ $shipment->id }}">
-                                    <button type="submit" class="w-full rounded-xl bg-primary-800 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]">Order Received</button>
-                                </form>
-                            </section>
-                        @elseif ($shipment->status === OrderStatus::Completed)
-                            <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-6">
-                                <p class="text-sm text-buyer-ink">Shipment received. Review your purchased products:</p>
-                                @foreach ($shipment->orderItems as $item)
-                                    @if ($item->product && $item->product->status === 'active')
-                                        <a class="mt-2 block text-sm text-primary-800 underline" href="{{ route('buyer.products.show', $item->product_id) }}#reviews">Review {{ $item->product_name }}</a>
-                                    @endif
-                                @endforeach
-                            </section>
-                        @endif
                     @endforeach
                 </div>
             </div>
@@ -359,6 +331,27 @@
                 confirmBtn.textContent = 'Confirm cancel';
             }
 
+            // Swap the shipment's Cancel button for the outcome, in place. The timeline
+            // catches up on the next visit; the link offers it now.
+            function retireCancelAction(sellerOrderId, data, cancelled) {
+                const block = document.querySelector(`[data-cancel-action="${sellerOrderId}"]`);
+                if (!block) {
+                    return;
+                }
+                block.querySelector('.buyer-cancel-order-btn')?.remove();
+                const feedback = block.querySelector('.buyer-cancel-feedback');
+                const message = data.message
+                    || (cancelled ? 'Shipment cancelled.' : 'This shipment can no longer be cancelled.');
+                feedback.textContent = data.status_label ? `${message} Current status: ${data.status_label}.` : message;
+                feedback.classList.remove('hidden');
+                feedback.classList.add(cancelled ? 'text-[var(--text-ink)]' : 'text-red-700');
+                const refresh = document.createElement('a');
+                refresh.href = window.location.href;
+                refresh.className = 'mt-1 inline-block font-sans text-sm font-semibold text-[var(--link)] underline';
+                refresh.textContent = 'See the updated timeline';
+                block.appendChild(refresh);
+            }
+
             document.querySelectorAll('.buyer-cancel-order-btn').forEach((btn) => {
                 btn.addEventListener('click', () => {
                     openModal(btn.dataset.cancelUrl, btn.dataset.sellerOrderId, btn.dataset.shopName || 'this seller');
@@ -401,6 +394,14 @@
 
                     const data = await response.json().catch(() => ({}));
 
+                    // 409: the seller acted first (or this was a repeat click). Either way the
+                    // Cancel button is stale, so retire it just like after a success.
+                    if (response.ok || response.status === 409) {
+                        retireCancelAction(activeSellerOrderId, data, response.ok);
+                        closeModal();
+                        return;
+                    }
+
                     if (!response.ok) {
                         const message = data.message
                             || data.errors?.reason?.[0]
@@ -411,10 +412,6 @@
                         confirmBtn.textContent = 'Confirm cancel';
                         return;
                     }
-
-                    // Refresh so timeline shows “Cancelled by Buyer” with reason/timestamp
-                    // and the Cancel Order action is gone for this slice.
-                    window.location.reload();
                 } catch (error) {
                     console.error('Cancel failed', error);
                     errorEl.textContent = 'Could not cancel this shipment. Please try again.';

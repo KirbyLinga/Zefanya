@@ -148,6 +148,7 @@ class RiderNotificationsTest extends RiderTestCase
             'delivery_courier_id' => $this->courier->id,
             'delivery_attempts' => 1, 'origin_station_hub_id' => $this->courier->rider->station_hub_id,
         ]);
+        $order->forceFill(['returned_to_station_at' => now()])->save(); // Station Hub scanned it back in.
 
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.delivery-assignments.reschedule', $order))

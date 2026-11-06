@@ -26,6 +26,12 @@
             ],
         ],
         [
+            'label' => 'Money',
+            'items' => [
+                ['route' => 'rider.money.index', 'icon' => 'wallet', 'label' => 'My Money', 'match' => ['rider.money.*']],
+            ],
+        ],
+        [
             'label' => 'Settings',
             'items' => [
                 ['route' => 'rider.account.show', 'icon' => 'user', 'label' => 'My Account', 'match' => ['rider.account.*']],

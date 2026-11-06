@@ -68,17 +68,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 const button = action(index === Number(q('[data-pf-cover-index]').value) && !q('[data-pf-cover-index]').disabled ? 'Cover image' : 'Use as cover', 'data-pf-set-cover');
                 button.dataset.pfSetCover = String(index);
                 button.classList.add('w-full');
-                figure.append(button);
+                const remove = action('Remove photo', 'data-pf-remove-gallery-photo');
+                remove.dataset.photoIndex = String(index);
+                remove.setAttribute('aria-label', 'Remove ' + file.name);
+                remove.classList.add('w-full');
+                figure.append(button, remove);
             }
             destination.append(figure);
         });
+    }
+    function setGalleryFiles(files, coverIndex, keepSavedCover) {
+        const transfer = new DataTransfer();
+        files.forEach(file => transfer.items.add(file));
+        q('[data-pf-gallery-files]').files = transfer.files;
+        state.galleryFiles = files;
+        const cover = q('[data-pf-cover-index]');
+        cover.value = String(coverIndex);
+        cover.disabled = !files.length || keepSavedCover;
+        preview(files, q('[data-pf-gallery]'), true);
+        const count = q('[data-pf-gallery-count]');
+        if (count) count.textContent = files.length
+            ? files.length + ' new photo' + (files.length === 1 ? '' : 's') + ' selected. ' + (keepSavedCover ? 'Your saved cover will be kept.' : 'One cover image; the other photos show additional angles.')
+            : '';
+    }
+    function addGalleryFiles(selected) {
+        const previous = state.galleryFiles;
+        const added = selected.filter(file => !previous.some(saved => saved.name === file.name && saved.size === file.size && saved.type === file.type && saved.lastModified === file.lastModified));
+        const files = [...previous, ...added];
+        const cover = q('[data-pf-cover-index]');
+        const coverIndex = previous.length ? Number(cover.value) : 0;
+        const keepSavedCover = previous.length ? cover.disabled : state.edit;
+        const savedCount = qa('[data-pf-existing-images] figure').length;
+        if (files.length + savedCount > 9 || files.some(file => !['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+            setGalleryFiles(previous, coverIndex, keepSavedCover);
+            error('Choose up to 9 JPG/PNG images in total, including saved photos, no larger than 5 MB each.');
+            return;
+        }
+        setGalleryFiles(files, coverIndex, keepSavedCover);
+        error('');
+    }
+    function removeGalleryFile(index) {
+        const files = state.galleryFiles.filter((_, position) => position !== index);
+        const cover = q('[data-pf-cover-index]');
+        const selected = Number(cover.value);
+        const coverIndex = selected === index ? 0 : selected > index ? selected - 1 : selected;
+        setGalleryFiles(files, coverIndex, cover.disabled);
+        error('');
     }
     function initialize() {
         dispose();
         const root = q('[data-pf-root]');
         if (!root) { submit.disabled = true; next.disabled = true; return; }
         const initial = JSON.parse(q('[data-pf-initial]').textContent);
-        state = { colorFirst: root.dataset.pfColorFirst === '1', groups: [], step: 1, furthestStep: 1, edit: root.dataset.pfEdit === '1', urls: new Set(), rows: new Map(), colors: new Map(), initialColors: initial.colorImages || {}, imageIds: initial.colorImageIds || {}, axes: (initial.options || []).slice(0, 2).map(axis => ({ name: axis.name || '', values: asValues(axis.values) })) };
+        state = { galleryFiles: [], colorFirst: root.dataset.pfColorFirst === '1', groups: [], step: 1, furthestStep: 1, edit: root.dataset.pfEdit === '1', urls: new Set(), rows: new Map(), colors: new Map(), initialColors: initial.colorImages || {}, imageIds: initial.colorImageIds || {}, axes: (initial.options || []).slice(0, 2).map(axis => ({ name: axis.name || '', values: asValues(axis.values) })) };
         initial.variants.forEach(row => state.rows.set(key(asValues(row.values)), { ...row, values: asValues(row.values) }));
         if (state.colorFirst) {
             const colors = state.axes[0]?.values || [];
@@ -274,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 card.append(existing);
                 card.append(input('hidden', null, value, 'data-pf-color-value'));
-                const uploadLabel = node('label', undefined, 'flex cursor-pointer flex-col items-center gap-1 rounded-sm border border-dashed border-[var(--border-input)] bg-[var(--bg-soft)] p-3 text-center hover:border-[var(--brand)]');
+                const uploadLabel = node('label', undefined, 'upload-zone flex flex-col items-center gap-1 text-center');
                 uploadLabel.append(node('span', '+ Add photos of this color', 'font-semibold text-[var(--text-ink)]'));
                 uploadLabel.append(node('span', 'Up to 9. Buyers see these when they pick this color.', 'text-xs text-[var(--text-muted)]'));
                 const files = input('file', null, '', 'data-pf-color-files');
@@ -527,7 +569,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!commitPendingValues()) return;
             saveRows(); state.axes[Number(row.dataset.index)].values.splice(Number(button.dataset.valueIndex), 1); renderOptions(); generate();
         }
-        if (button.matches('[data-pf-set-cover]')) { q('[data-pf-cover-index]').disabled = false; q('[data-pf-cover-index]').value = button.dataset.pfSetCover; preview([...q('[data-pf-gallery-files]').files], q('[data-pf-gallery]'), true); }
+        if (button.matches('[data-pf-remove-gallery-photo]')) removeGalleryFile(Number(button.dataset.photoIndex));
+        if (button.matches('[data-pf-set-cover]')) setGalleryFiles(state.galleryFiles, Number(button.dataset.pfSetCover), false);
         if (button.matches('[data-pf-apply-bulk]')) {
             const price = q('[data-pf-bulk-price]'), stock = q('[data-pf-bulk-stock]'), weight = q('[data-pf-bulk-weight]'), unit = q('[data-pf-bulk-weight-unit]');
             if (![price, stock, weight].every(field => field.checkValidity())) { error('Enter a valid price, whole-number stock and weight.'); return; }
@@ -628,14 +671,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.matches('[data-pf-store-categories] input[type="checkbox"]')) updateStoreCategoryChoices(body);
         if (target.matches('[data-pf-enabled]')) target.closest('tr').querySelector('[data-pf-available]').value = target.checked ? '1' : '0';
         if (target.matches('#status')) review();
-        if (target.matches('[data-pf-gallery-files], [data-pf-color-files]')) {
+        if (target.matches('[data-pf-gallery-files]')) addGalleryFiles([...target.files]);
+        if (target.matches('[data-pf-color-files]')) {
             const files = [...target.files];
             const invalid = files.length > 9 || files.some(file => !['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024);
             if (invalid) { target.value = ''; error('Choose up to 9 JPG/PNG images, no larger than 5 MB each.'); }
             else error('');
-            const isGallery = target.matches('[data-pf-gallery-files]');
-            if (isGallery) { q('[data-pf-cover-index]').value = '0'; q('[data-pf-cover-index]').disabled = state.edit; }
-            preview([...target.files], isGallery ? q('[data-pf-gallery]') : target.closest('[data-pf-color-card]').querySelector('[data-pf-color-previews]'), isGallery);
+            preview([...target.files], target.closest('[data-pf-color-card]').querySelector('[data-pf-color-previews]'));
         }
         review();
     });
