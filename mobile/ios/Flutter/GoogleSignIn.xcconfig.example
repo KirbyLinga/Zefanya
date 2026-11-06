@@ -1,0 +1,28 @@
+// Copy this file to ios/Flutter/GoogleSignIn.xcconfig and fill in the values
+// from your own Google Cloud project. The real file is git-ignored: these IDs
+// belong to one project and one app signing identity, not to the repository.
+//
+// Do not quote the values and do not add spaces around `=`; Xcode reads this
+// as build settings, and Info.plist substitutes them into GIDClientID,
+// GIDServerClientID and the Google URL scheme.
+//
+// GOOGLE_IOS_CLIENT_ID
+//   iOS OAuth client ID, e.g.
+//   1234567890-abcdefghijklmnop.apps.googleusercontent.com
+//   Must be the iOS client whose bundle ID is com.zefanya.app (or your
+//   PRODUCT_BUNDLE_IDENTIFIER).
+//
+// GOOGLE_SERVER_CLIENT_ID
+//   The *web* OAuth client ID. Google puts it in the ID token's audience so
+//   the Laravel backend can verify the token. Android also uses this value
+//   via --dart-define=zefanya.googleServerClientId.
+//
+// GOOGLE_REVERSED_CLIENT_ID
+//   The iOS client ID reversed, e.g.
+//   com.googleusercontent.apps.1234567890-abcdefghijklmnop
+//   Google Sign-In uses it as the callback URL scheme. It must match
+//   GOOGLE_IOS_CLIENT_ID exactly after reversing the host part.
+
+GOOGLE_IOS_CLIENT_ID=
+GOOGLE_SERVER_CLIENT_ID=
+GOOGLE_REVERSED_CLIENT_ID=

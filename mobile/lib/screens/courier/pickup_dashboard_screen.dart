@@ -5,8 +5,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
+import '../../utils/timed_snackbar.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
 import '../../widgets/app_page_route.dart';
@@ -14,7 +17,7 @@ import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/shimmer_box.dart';
 import '../../widgets/editorial_shapes.dart';
-import '../../widgets/staggered_reveal.dart';
+import '../../widgets/motion/ease_in_frame.dart';
 
 class PickupDashboardScreen extends StatefulWidget {
   const PickupDashboardScreen({super.key});
@@ -34,14 +37,18 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
 
   Future<void> _refresh() async {
     setState(() => _isLoading = true);
-    // TODO: replace with a real assignment feed fetch (websocket/polling).
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      await context.read<CourierState>().refreshJobs();
+    } on ApiException {
+      // loadFailure is set by refreshJobs; _buildEmptyState reads it.
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final jobs = context.watch<CourierState>().jobsForPickup;
 
     return Scaffold(
@@ -59,6 +66,7 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
                         const EditorialHeader(
                           eyebrow: 'FOR PICKUP',
                           title: 'Assigned to You',
+                          trailing: _AvailabilityToggle(),
                           padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
                         ),
                         const SizedBox(height: 40),
@@ -70,15 +78,19 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
                       itemCount: jobs.length + 1,
                       itemBuilder: (context, i) {
                         if (i == 0) {
-                          return const EditorialHeader(
-                            eyebrow: 'FOR PICKUP',
-                            title: 'Assigned to You',
-                            padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+                          return const EaseInFrame(
+                            index: 0,
+                            child: EditorialHeader(
+                              eyebrow: 'FOR PICKUP',
+                              title: 'Assigned to You',
+                              trailing: _AvailabilityToggle(),
+                              padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+                            ),
                           );
                         }
                         final job = jobs[i - 1];
-                        return StaggeredReveal(
-                          index: i - 1,
+                        return EaseInFrame(
+                          index: (i - 1).clamp(0, 5),
                           child: DeliveryJobCard(
                             assignedJob: job,
                             index: i - 1,
@@ -104,18 +116,110 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
           // Matches the real card's asymmetric corners, same reasoning as
           // the buyer grid's skeletons: shape shouldn't visibly change
           // when content replaces it.
-          decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: editorialRadius(i, big: 28, small: 8)),
+          decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: editorialRadius(i, ShapeTier.card)),
         ),
       ),
     );
   }
 
+  /// The empty state says which *kind* of empty this is — see the note on
+  /// [CourierState.loadFailure]. "Pull down to refresh" is only honest when
+  /// nothing actually failed.
   Widget _buildEmptyState(BuildContext context) {
-    return const EmptyState(
+    final courier = context.watch<CourierState>();
+    final failure = courier.loadFailure;
+
+    if (failure != null) {
+      return EmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'We couldn\'t load your pickups',
+        subtitle: Microcopy.calmError(failure.message),
+        action: failure.isRetryable
+            ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
+            : null,
+        tint: AppColors.tertiary,
+      );
+    }
+
+    return EmptyState(
       icon: Icons.inbox_outlined,
-      title: 'No pickups assigned right now',
-      subtitle: 'Pull down to refresh',
+      title: Microcopy.pickupsEmptyTitle,
+      subtitle: Microcopy.pickupsEmptySubtitle,
       tint: AppColors.tertiary,
+    );
+  }
+
+  /// Re-reads the dispatcher's jobs. The failure is not handled here on purpose:
+  /// the state keeps it and this screen rebuilds from `loadFailure`, so catching
+  /// it again would swallow the same error twice.
+  Future<void> _retry(CourierState courier) async {
+    try {
+      await courier.refreshJobs();
+    } on ApiException {
+      // Rendered above, from the state.
+    }
+  }
+}
+
+/// The Online/Offline control the rider uses to start and stop receiving work.
+///
+/// Going offline is never blocked — a job already picked up stays with the
+/// rider — while going online is refused for a suspended account with the
+/// reason shown inline. The switch mirrors [CourierState] rather than holding
+/// its own bool, so the dashboard and the profile cannot disagree.
+class _AvailabilityToggle extends StatelessWidget {
+  const _AvailabilityToggle();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final courier = context.watch<CourierState>();
+    final suspended = courier.isSuspended;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              courier.isOnline ? 'ONLINE' : 'OFFLINE',
+              style: AppType.eyebrow.copyWith(
+                color: courier.isOnline
+                    ? AppColors.tertiary
+                    : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Switch(
+              key: const ValueKey('availability-switch'),
+              value: courier.isOnline,
+              onChanged: suspended
+                  ? null
+                  : (value) {
+                      if (value) {
+                        final problem = courier.goOnline();
+                        if (problem != null && context.mounted) {
+                          showTimedSnackBar(
+                            context,
+                            SnackBar(content: Text(problem)),
+                          );
+                        }
+                      } else {
+                        courier.goOffline();
+                      }
+                    },
+            ),
+          ],
+        ),
+        if (suspended)
+          Text(
+            courier.suspensionReason ?? 'Account suspended',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.danger,
+            ),
+          ),
+      ],
     );
   }
 }

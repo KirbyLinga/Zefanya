@@ -1,1 +1,5 @@
+// Optional, git-ignored: real Google client IDs for this machine/build.
+// See ios/Flutter/GoogleSignIn.xcconfig.example and
+// mobile/docs/google_sign_in_contract.md.
+#include? "GoogleSignIn.xcconfig"
 #include "Generated.xcconfig"

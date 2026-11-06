@@ -26,6 +26,8 @@ migrate_working_dir/
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
+# Real Google client IDs for iOS. Copy GoogleSignIn.xcconfig.example.
+**/ios/Flutter/GoogleSignIn.xcconfig
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
@@ -43,3 +45,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Build-time configuration — contains client IDs; never commit real values.
+# Copy env.example.json to env.json and fill in your own values.
+/env.json
