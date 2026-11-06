@@ -84,6 +84,7 @@
                         <img src="{{ $thumbnail }}"
                              alt="{{ $product->name }}"
                              loading="lazy" decoding="async"
+                             onerror="this.hidden = true"
                              class="h-full w-full object-cover object-top transition-transform duration-300 hover:scale-105">
                     @endif
                 </a>

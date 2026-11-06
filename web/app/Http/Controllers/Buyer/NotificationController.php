@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Shared\SellerOrder;
+use App\Support\BuyerNotificationTitle;
 use Illuminate\Http\JsonResponse;
 
 class NotificationController extends Controller
@@ -99,18 +100,6 @@ class NotificationController extends Controller
      */
     private function getNotificationTitle($notification): string
     {
-        $type = $notification->data['type'] ?? 'notification';
-
-        return match ($type) {
-            'courier_assigned' => 'Courier Assigned',
-            'out_for_delivery', 'order_out_for_delivery' => 'Order Out for Delivery',
-            'delivery_code' => 'Delivery Code Ready',
-            'delivered', 'order_delivered' => 'Order Delivered',
-            'delivery_failed' => 'Delivery Attempt Failed',
-            'seller_order_cancelled' => 'Shipment Cancelled',
-            'return_request_decided' => 'Return Request Updated',
-            'return_dispute_resolved' => 'Return Dispute Resolved',
-            default => 'Notification',
-        };
+        return BuyerNotificationTitle::for((array) $notification->data);
     }
 }

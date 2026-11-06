@@ -4,13 +4,17 @@
 // on Product Details — previously tapping the seller name only opened
 // Chat, with no way to see what else they sell.
 //
-// All data comes from mockProducts filtered by sellerName. When real
-// seller profiles exist (avatar, bio, location), slot them in here —
-// the structure is already waiting.
+// The products come from `CatalogState`, so a live build lists what the server
+// holds for that shop rather than a filtered mock list. When real seller profiles
+// exist (avatar, bio, location), slot them in here — the structure is already
+// waiting.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../state/catalog_state.dart';
+import '../../state/wishlist_state.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -27,9 +31,9 @@ class SellerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts
-        .where((p) => p.sellerName == sellerName)
-        .toList();
+    AppColors.watch(context);
+    final products = context.watch<CatalogState>().bySeller(sellerName);
+    final wishlist = context.watch<WishlistState>();
 
     // Average rating across all of this seller's products.
     final avgRating = products.isEmpty
@@ -50,14 +54,18 @@ class SellerScreen extends StatelessWidget {
                 productCount: products.length,
                 avgRating: avgRating,
                 totalSold: totalSold,
-                onChat: () => Navigator.of(context).push(
-                  AppPageRoute(
-                    builder: (_) => ChatScreen(
-                      contactName: sellerName,
-                      contactRole: 'Seller',
-                    ),
-                  ),
-                ),
+                isFollowing: wishlist.isFollowing(sellerName),
+                onFollow: () => wishlist.toggleFollow(sellerName),
+                onChat: FeatureFlags.chatLive
+                    ? () => Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) => ChatScreen(
+                            contactName: sellerName,
+                            contactRole: 'Seller',
+                          ),
+                        ),
+                      )
+                    : null,
               ),
             ),
 
@@ -148,24 +156,32 @@ class _SellerHero extends StatelessWidget {
     required this.productCount,
     required this.avgRating,
     required this.totalSold,
-    required this.onChat,
+    required this.isFollowing,
+    required this.onFollow,
+    this.onChat,
   });
 
   final String sellerName;
   final int productCount;
   final double avgRating;
   final int totalSold;
-  final VoidCallback onChat;
+  final bool isFollowing;
+  final VoidCallback onFollow;
+
+  /// Null in live mode, where the server has no chat. The Follow button then
+  /// takes the full width instead of leaving a dead half-row.
+  final VoidCallback? onChat;
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Stack(
       children: [
         // Gradient hero banner
         ClipRRect(
-          borderRadius: editorialRadius(0, tier: EditorialTier.hero),
+          borderRadius: editorialRadius(0, ShapeTier.hero),
           child: Container(
             margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
@@ -184,7 +200,8 @@ class _SellerHero extends StatelessWidget {
               children: [
                 // Back button
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: AppColors.textOnDark),
+                  tooltip: 'Go back',
+                  icon: Icon(Icons.arrow_back, color: AppColors.textOnDark),
                   onPressed: () => Navigator.of(context).maybePop(),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -219,17 +236,37 @@ class _SellerHero extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
-                OutlinedButton.icon(
-                  onPressed: onChat,
-                  icon: const Icon(Icons.chat_bubble_outline, size: 16,
-                      color: AppColors.textOnDark),
-                  label: const Text('Chat with Seller',
-                      style: TextStyle(color: AppColors.textOnDark)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: AppColors.textOnDark.withValues(alpha: 0.45),
+                Row(
+                  children: [
+                    if (onChat != null) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onChat,
+                          icon: Icon(Icons.chat_bubble_outline, size: 16,
+                              color: AppColors.textOnDark),
+                          label: Text('Chat',
+                              style: TextStyle(color: AppColors.textOnDark)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: AppColors.textOnDark.withValues(alpha: 0.45),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const ValueKey('follow-seller'),
+                        onPressed: onFollow,
+                        icon: Icon(
+                          isFollowing ? Icons.check : Icons.add,
+                          size: 16,
+                        ),
+                        label: Text(isFollowing ? 'Following' : 'Follow'),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -255,7 +292,7 @@ class _SellerHero extends StatelessWidget {
               label,
               style: AppType.eyebrow.copyWith(
                 color: AppColors.textOnDark.withValues(alpha: 0.65),
-                letterSpacing: 1.8,
+                letterSpacing: 1.2,
               ),
             ),
           ],

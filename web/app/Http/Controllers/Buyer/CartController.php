@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Buyer;
 
+use App\Exceptions\CartItemUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\CartItem;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Voucher;
+use App\Services\Buyer\CartService;
 use App\Services\Buyer\CartSummary;
 use App\Services\Buyer\CartVariantResolver;
 use App\Services\Buyer\VoucherApplication;
@@ -17,7 +19,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class CartController extends Controller
@@ -30,15 +31,7 @@ class CartController extends Controller
     /** Load the buyer's cart items with all relations needed by the views. */
     private function loadItems(): Collection
     {
-        return auth('buyer')->user()
-            ->cartItems()
-            ->with([
-                'product' => fn ($q) => $q->withTrashed()->with(['images', 'seller', 'category']),
-                'variant.optionValues',
-            ])
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get();
+        return app(CartService::class)->items(auth('buyer')->user());
     }
 
     /**
@@ -160,73 +153,17 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        // `status = active` + the SoftDeletes default scope already excludes
-        // drafts and deleted products.
-        $product = Product::where('status', 'active')->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
-            ->find($validated['product_id']);
-
-        if (! $product || ! $product->isListedForSale()) {
-            return response()->json(['error' => 'This product is not available.'], 422);
-        }
-
-        $variant = app(CartVariantResolver::class)->resolve(
-            $product, isset($validated['variant_id']) ? (int) $validated['variant_id'] : null,
-        );
-        $variantId = $variant->id;
-
         $buyer = auth('buyer')->user();
 
-        // Read-merge-write inside a transaction with a row lock. This protects
-        // the unique(buyer_id, product_id, variant_id) constraint from
-        // concurrent adds.
-        // NOTE: this never touches variant/product stock — a cart is not a
-        // stock reservation, so no inventory_transactions row is written here.
         try {
-            // Missing-row gap locks can deadlock on concurrent first inserts.
-            // Retry the entire read/merge/write transaction, never just INSERT.
-            $quantityResult = DB::transaction(function () use ($buyer, $product, $variantId, $validated): array {
-                $currentProduct = Product::query()->find($product->id);
-                if ($currentProduct === null) {
-                    throw ValidationException::withMessages(['product_id' => 'This product is not available.']);
-                }
-                $currentProduct->setRelation('seller', Seller::query()
-                    ->whereKey($currentProduct->seller_id)->sharedLock()->first());
-                $currentVariant = app(CartVariantResolver::class)->resolve($currentProduct, $variantId);
-                $cap = $currentVariant->stock_quantity;
-
-                $locked = CartItem::query()
-                    ->where('buyer_id', $buyer->id)
-                    ->where('product_id', $product->id)
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get();
-                $existing = $locked->firstWhere('variant_id', $variantId);
-
-                if ($cap < 1) {
-                    throw ValidationException::withMessages(['quantity' => 'Sorry, this item is out of stock.']);
-                }
-
-                $requested = (int) $validated['quantity'];
-                $wanted = ($existing?->quantity ?? 0) + $requested;
-                $newQty = min($wanted, $cap);
-
-                if ($existing !== null) {
-                    $existing->update(['quantity' => $newQty]);
-                } else {
-                    CartItem::create([
-                        'buyer_id' => $buyer->id,
-                        'product_id' => $product->id,
-                        'variant_id' => $variantId,
-                        'quantity' => $newQty,
-                    ]);
-                }
-
-                return [
-                    'quantity' => $newQty,
-                    'quantity_limit' => $cap,
-                    'quantity_warning' => $wanted > $cap ? "Only {$cap} available." : null,
-                ];
-            }, attempts: 3);
+            $added = app(CartService::class)->add(
+                $buyer,
+                (int) $validated['product_id'],
+                isset($validated['variant_id']) ? (int) $validated['variant_id'] : null,
+                (int) $validated['quantity'],
+            );
+        } catch (CartItemUnavailableException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 422);
         } catch (QueryException $exception) {
             if (! in_array((int) ($exception->errorInfo[1] ?? 0), [1213, 1205], true)) {
                 throw $exception;
@@ -238,6 +175,7 @@ class CartController extends Controller
         // Count after commit rather than using an earlier retry snapshot.
         $cartCount = (int) CartItem::where('buyer_id', $buyer->id)->count();
 
+        ['product' => $product, 'variant' => $variant] = $added;
         $formattedPrice = app(PriceResolver::class)->forVariant($product, $variant)->formatted();
 
         return response()->json([
@@ -245,7 +183,9 @@ class CartController extends Controller
             'cart_count' => $cartCount,
             'product_name' => $product->name,
             'product_price' => $formattedPrice,
-            ...$quantityResult,
+            'quantity' => $added['quantity'],
+            'quantity_limit' => $added['quantity_limit'],
+            'quantity_warning' => $added['quantity_warning'],
         ]);
     }
 
@@ -253,7 +193,8 @@ class CartController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $item = CartItem::where('id', $id)
+        // Ownership (404) is checked before validation, as before.
+        CartItem::where('id', $id)
             ->where('buyer_id', auth('buyer')->id())
             ->firstOrFail();
 
@@ -261,48 +202,19 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        // The product may have been soft-deleted since it was added, in which
-        // case $item->product is null and we must not touch the quantity.
-        $product = Product::withTrashed()->find($item->product_id);
-
-        if ($product === null) {
-            return response()->json(['error' => 'This product no longer exists.'], 422);
+        try {
+            $updated = app(CartService::class)->updateQuantity(auth('buyer')->user(), $id, (int) $validated['quantity']);
+        } catch (CartItemUnavailableException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 422);
         }
 
-        if (! $item->isAvailable()) {
-            return response()->json(['error' => 'This item is no longer available.'], 422);
-        }
-
-        $quantityResult = DB::transaction(function () use ($item, $validated): array {
-            $locked = CartItem::query()
-                ->where('buyer_id', $item->buyer_id)
-                ->where('product_id', $item->product_id)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-            $current = $locked->firstWhere('id', $item->id) ?? $item;
-            $cap = $item->availableQuantity();
-
-            if ($cap < 1) {
-                throw ValidationException::withMessages(['quantity' => 'Sorry, this item is out of stock.']);
-            }
-
-            $current->update([
-                'quantity' => min((int) $validated['quantity'], $cap),
-            ]);
-
-            return [
-                'quantity_limit' => $cap,
-                'quantity_warning' => (int) $validated['quantity'] > $cap ? "Only {$cap} available." : null,
-            ];
-        });
-
-        $item->refresh();
+        $item = $updated['item'];
 
         return $this->summaryResponse($this->loadItems(), $this->selectedIdsFrom($request), [
             'item_id' => $item->id,
             'quantity' => $item->quantity,
-            ...$quantityResult,
+            'quantity_limit' => $updated['quantity_limit'],
+            'quantity_warning' => $updated['quantity_warning'],
             'line_total' => $item->formattedLineTotal(),
             'line_total_raw' => $item->lineTotalCentavos(),
         ]);
@@ -312,11 +224,7 @@ class CartController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $item = CartItem::where('id', $id)
-            ->where('buyer_id', auth('buyer')->id())
-            ->firstOrFail();
-
-        $item->delete();
+        $item = app(CartService::class)->remove(auth('buyer')->user(), $id);
 
         return $this->summaryResponse($this->loadItems(), $this->selectedIdsFrom($request), [
             'removed_id' => $item->id,
@@ -332,18 +240,7 @@ class CartController extends Controller
             'ids.*' => ['integer'],
         ]);
 
-        $buyerId = (int) auth('buyer')->id();
-        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
-
-        // Every requested id must belong to this buyer, otherwise the whole
-        // request is rejected — never silently delete only a subset.
-        $ownedCount = CartItem::whereIn('id', $ids)->where('buyer_id', $buyerId)->count();
-
-        if ($ownedCount !== count($ids)) {
-            abort(403, 'One or more cart items do not belong to you.');
-        }
-
-        CartItem::whereIn('id', $ids)->where('buyer_id', $buyerId)->delete();
+        $ids = app(CartService::class)->removeMany(auth('buyer')->user(), $validated['ids']);
 
         return $this->summaryResponse($this->loadItems(), $this->selectedIdsFrom($request), [
             'removed_ids' => $ids,
@@ -400,30 +297,17 @@ class CartController extends Controller
             'seller_id' => ['nullable', 'integer'],
         ]);
 
-        $code = strtoupper(trim($validated['code']));
-        $voucher = Voucher::where('code', $code)->first();
-
-        if ($voucher === null) {
-            return response()->json(['error' => 'Voucher code not found.'], 422);
-        }
-
         $items = $this->loadItems();
         $selectedIds = $this->selectedIdsFrom($request);
         $base = new CartSummary($items, null, $selectedIds);
 
-        $requestedSlot = $this->requestedSlot($validated);
-
         $service = app(VoucherSessionService::class);
-        $notice = null;
 
-        if (! $service->apply($voucher, $base->sellerGroups, $base->subtotalCentavos, $notice, $requestedSlot)) {
-            return response()->json(['error' => $notice], 422);
-        }
-
-        // Using a listed voucher puts it in the buyer's wallet, so the rule lock
-        // and the wallet both see every buyer holding it.
-        if ($voucher->is_claimable) {
-            $voucher->claims()->firstOrCreate(['buyer_id' => (int) auth('buyer')->id()]);
+        $refusal = app(CartService::class)->applyVoucher(
+            auth('buyer')->user(), $service, $items, $validated['code'], $this->requestedSlot($validated), $selectedIds,
+        );
+        if ($refusal !== null) {
+            return response()->json(['error' => $refusal], 422);
         }
 
         $resolveNotice = null;

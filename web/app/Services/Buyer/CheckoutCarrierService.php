@@ -415,6 +415,39 @@ class CheckoutCarrierService
         ];
     }
 
+    /**
+     * Fees for the initial checkout total: the buyer's chosen carrier per
+     * seller when it is offered, otherwise the first offered carrier. Display
+     * only — the order re-validates the real selection (moved from
+     * CheckoutController::defaultShippingFees).
+     *
+     * @param  list<array<string, mixed>>  $carrierOptions
+     * @param  array<int|string, mixed>  $chosen  seller id => provider id
+     * @return array<int, int>
+     */
+    public function defaultFees(array $carrierOptions, array $chosen = []): array
+    {
+        $fees = [];
+
+        foreach ($carrierOptions as $row) {
+            if (! ($row['available'] ?? false)) {
+                continue;
+            }
+
+            $sellerId = (int) $row['seller_id'];
+            $raw = $chosen[$sellerId] ?? $chosen[(string) $sellerId] ?? null;
+            $choice = is_int($raw) || (is_string($raw) && ctype_digit($raw)) ? (int) $raw : 0;
+            $match = collect($row['carriers'])->firstWhere('id', $choice)
+                ?? ($row['carriers'][0] ?? null);
+
+            if ($match !== null) {
+                $fees[$sellerId] = (int) $match['fee_minor'];
+            }
+        }
+
+        return $fees;
+    }
+
     public function allRoutesAvailable(array $options): bool
     {
         foreach ($options as $row) {
