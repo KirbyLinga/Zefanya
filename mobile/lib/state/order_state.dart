@@ -199,10 +199,6 @@ class OrderState extends ChangeNotifier {
     try {
       _orders = await _repository.orders();
       _loadFailure = null;
-    } finally {
-      _loading = false;
-      notifyListeners();
-    }
     } on ApiNotConfiguredException {
       // A live build with no base URL is a *build* mistake rather than a runtime
       // condition: no screen can do anything sensible with it, and the person who
@@ -212,6 +208,9 @@ class OrderState extends ChangeNotifier {
     } on ApiException catch (error) {
       _orders = const [];
       _loadFailure = error;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
   }
 

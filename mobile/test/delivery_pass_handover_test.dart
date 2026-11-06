@@ -148,7 +148,12 @@ void main() {
   });
 
   tearDown(() {
-    if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    try {
+      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    } catch (_) {
+      // On Windows, file locks can prevent temp dir deletion.
+      // Clean up best-effort; the OS reclaims temp files on reboot.
+    }
   });
 
   testWidgets('a scanned pass fills the delivery code and completes the '

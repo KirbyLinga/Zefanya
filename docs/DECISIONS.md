@@ -164,3 +164,8 @@ All rate limits are named buckets in `AppServiceProvider::configureRateLimiting(
 1. **Base check deviation:** `integration/hardened` was at `69dc883` (13 commits after `6dfa162`; H1-H6 and WO-0) when S0-lite started. `6dfa162` was verified as an ancestor. Continued instead of stopping because those later commits are the hardening work S0.1 audits and the architect asked to resume at the first unfinished stage. Recorded in `docs/STATE.md`.
 2. **Mutation restore:** restored only the mutated file (`git restore web/app/Http/Controllers/Admin/RegistrationController.php`) instead of `git restore .`, because the working tree held pre-existing uncommitted S2.1 media-picker work that must not be discarded.
 3. **Flutter analyze:** the 4 reported issues are all in the pre-existing uncommitted `mobile/lib/services/media_picker.dart`; S0-lite changed no mobile file. S2.1 owns that cleanup.
+
+## S4.4 / S5-lite (feature/s1-lite, 2026-11-05)
+
+1. **`order_state.dart` syntax repair:** HEAD contained `try { ... } finally { ... } on ...`, which is invalid Dart and prevented the app compiling. Moved `finally` after the `on` clauses. No behaviour change: `_loading` still clears and notifies on every path.
+2. **`delivery_pass_handover_test.dart` teardown:** temp-directory deletion is now best-effort (`try/catch` around `deleteSync`). On Windows a still-open file handle made the old teardown fail a passing test. No assertion was changed, weakened, or removed.
