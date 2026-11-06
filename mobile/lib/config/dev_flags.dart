@@ -68,6 +68,20 @@ const bool kUseLiveApi = bool.fromEnvironment(
   defaultValue: false,
 );
 
+/// Capabilities that exist on one side of the mock/live boundary.
+///
+/// Chat is the first: the live API has no conversation endpoints yet, so every
+/// chat entry point is hidden there rather than opening a thread that cannot
+/// send. Kept as a named capability instead of sprinkling `!kUseLiveApi`
+/// through screens, so the day the server grows chat this is the one line that
+/// changes.
+class FeatureFlags {
+  FeatureFlags._();
+
+  /// Whether chat is available in this build. Mock only for now.
+  static const bool chatLive = !kUseLiveApi;
+}
+
 /// Base URL of the Laravel API, including the `/api` prefix.
 ///
 /// Empty when unset. [ApiClient] treats an empty base URL as a configuration

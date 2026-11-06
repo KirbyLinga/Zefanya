@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../data/mock_data.dart' show DeliveryJob;
@@ -683,16 +684,17 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
             semanticLabel: 'Call $title',
           ),
           const SizedBox(width: 8),
-          _circleAction(
-            Icons.chat_bubble_outline,
-            () => Navigator.of(context).push(
-              AppPageRoute(
-                builder: (_) =>
-                    ChatScreen(contactName: title, contactRole: roleLabel),
+          if (FeatureFlags.chatLive)
+            _circleAction(
+              Icons.chat_bubble_outline,
+              () => Navigator.of(context).push(
+                AppPageRoute(
+                  builder: (_) =>
+                      ChatScreen(contactName: title, contactRole: roleLabel),
+                ),
               ),
+              semanticLabel: 'Message $title',
             ),
-            semanticLabel: 'Message $title',
-          ),
           // Open in Maps: hands the address to the device's maps app.
           // Address only — no buyer phone is shown or passed anywhere
           // here (see OPEN QUESTIONS: call-buyer privacy).

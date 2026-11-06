@@ -91,7 +91,9 @@ class _ChatScreenState extends State<ChatScreen> {
     // Seed an opening line the first time this contact's thread is
     // opened — no-op if there's already history (incl. from a
     // previous session, since ChatState is persisted).
-    context.read<ChatState>().seedIfEmpty(
+    final chat = context.read<ChatState>();
+    chat.registerContact(widget.contactName, widget.contactRole);
+    chat.seedIfEmpty(
       widget.contactName,
       const ChatMessage(
         text: 'Hi! Thanks for reaching out — how can I help?',
@@ -235,7 +237,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final messages = context.watch<ChatState>().messagesFor(widget.contactName);
+    final chat = context.watch<ChatState>();
+    final messages = chat.messagesFor(widget.contactName);
+    // A thread on screen is read. The greeting is seeded asynchronously after
+    // initState, and a simulated reply arrives while the thread is open, so
+    // this checks every build rather than only on open.
+    if (chat.unreadFor(widget.contactName) > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<ChatState>().markRead(widget.contactName);
+      });
+    }
     final avatarColor = _avatarColorFor(widget.contactName);
 
     return Scaffold(

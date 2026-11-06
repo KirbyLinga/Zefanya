@@ -52,6 +52,24 @@ class ChatMessage {
   }
 }
 
+/// One row of the inbox: a contact, their history, and how much of the other
+/// side's most recent talk has not been read.
+class ChatConversation {
+  const ChatConversation({
+    required this.contactName,
+    required this.contactRole,
+    required this.messages,
+    required this.unreadCount,
+  });
+
+  final String contactName;
+  final String contactRole;
+  final List<ChatMessage> messages;
+  final int unreadCount;
+
+  ChatMessage? get lastMessage => messages.isEmpty ? null : messages.last;
+}
+
 class ChatState extends ChangeNotifier {
   /// [repository] defaults to the mock implementation so existing call sites
   /// (and tests) are unaffected; `main.dart` passes the resolved bundle's.
@@ -74,8 +92,69 @@ class ChatState extends ChangeNotifier {
   /// A cache because [messagesFor] is synchronous and called from `build()`.
   final Map<String, List<ChatMessage>> _threads = {};
 
+  /// Which role each contact speaks as, so reopening a thread from the inbox
+  /// keeps "COURIER" or "SELLER" above the name. Session-only: it is a display
+  /// label, and the thread itself survives restarts.
+  final Map<String, String> _roles = {};
+
+  /// How many messages had been seen when each thread was last read. A count
+  /// rather than a message id because [ChatMessage] has only a display time
+  /// ("Now", "10:02 AM"), which cannot be compared safely.
+  final Map<String, int> _readCounts = {};
+
+  /// Most recently active first. The repository stores history, not ordering,
+  /// and a map alone would list threads by when they were first created.
+  final List<String> _recent = [];
+
   List<ChatMessage> messagesFor(String contactName) =>
       List.unmodifiable(_threads[contactName] ?? const []);
+
+  /// The inbox, newest activity first, with only threads that have something
+  /// in them. A thread seeded but never messaged has nothing to preview.
+  List<ChatConversation> get conversations {
+    final keys = <String>[
+      ..._recent.where(_threads.containsKey),
+      ..._threads.keys.where((key) => !_recent.contains(key)),
+    ];
+    return [
+      for (final key in keys)
+        if ((_threads[key] ?? const []).isNotEmpty)
+          ChatConversation(
+            contactName: key,
+            contactRole: _roles[key] ?? 'Seller',
+            messages: messagesFor(key),
+            unreadCount: unreadFor(key),
+          ),
+    ];
+  }
+
+  /// Incoming messages added after this thread was last read. Messages the
+  /// buyer sent are never unread, even if they are the newest line.
+  int unreadFor(String contactName) {
+    final messages = _threads[contactName] ?? const <ChatMessage>[];
+    final read = _readCounts[contactName] ?? messages.length;
+    return messages.skip(read).where((message) => !message.isMe).length;
+  }
+
+  int get totalUnread =>
+      _threads.keys.fold(0, (sum, contact) => sum + unreadFor(contact));
+
+  /// Remembers how a contact should be labelled when the inbox reopens their
+  /// thread. Deliberately does not notify: this is called from ChatScreen's
+  /// `initState`, while the route beneath is still building.
+  void registerContact(String contactName, String contactRole) {
+    _roles[contactName] = contactRole;
+  }
+
+  /// Marks everything currently in [contactName]'s thread as seen.
+  void markRead(String contactName) {
+    final messages = _threads[contactName];
+    if (messages == null) return;
+    final read = _readCounts[contactName] ?? 0;
+    if (read >= messages.length) return;
+    _readCounts[contactName] = messages.length;
+    notifyListeners();
+  }
 
   /// Call once before runApp (see main.dart).
   Future<void> load() async {
@@ -86,6 +165,18 @@ class ChatState extends ChangeNotifier {
     _threads
       ..clear()
       ..addAll(await _repository.threads());
+    // History from a previous session is not new mail. Starting every thread
+    // at "all read" is the only honest baseline: there is no stored read
+    // marker to recover, and re-badging a week-old conversation would nag
+    // about messages the person almost certainly saw.
+    _readCounts
+      ..clear()
+      ..addEntries(
+        _threads.entries.map((entry) => MapEntry(entry.key, entry.value.length)),
+      );
+    _recent
+      ..clear()
+      ..addAll(_threads.keys);
   }
 
   /// Seeds a thread with an opening message the first time it's opened — no-op
@@ -105,7 +196,16 @@ class ChatState extends ChangeNotifier {
   }
 
   Future<void> _refreshThread(String contactName) async {
-    _threads[contactName] = await _repository.messagesFor(contactName);
+    // Capture what had been seen before this refresh. On a brand-new thread
+    // the baseline is zero, so an incoming first message is unread; on an
+    // existing thread it is the count from the previous render.
+    final previousLength = _threads[contactName]?.length ?? 0;
+    final messages = await _repository.messagesFor(contactName);
+    _threads[contactName] = messages;
+    _readCounts.putIfAbsent(contactName, () => previousLength);
+    _recent
+      ..remove(contactName)
+      ..insert(0, contactName);
     notifyListeners();
   }
 }

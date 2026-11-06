@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
@@ -634,6 +635,7 @@ class _OrderCard extends StatelessWidget {
   /// Opens the same seller thread Product Details opens, keyed by shop
   /// name, so a conversation started there continues here.
   void _contactSeller(BuildContext context) {
+    if (!FeatureFlags.chatLive) return;
     Navigator.of(context).push(
       AppPageRoute(builder: (_) => ChatScreen(contactName: order.shopName, contactRole: 'Seller')),
     );
@@ -788,11 +790,12 @@ class _OrderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.s8),
-          OutlinedButton.icon(
-            onPressed: () => _contactSeller(context),
-            icon: const Icon(Icons.chat_bubble_outline, size: 16),
-            label: const Text('Contact Seller'),
-          ),
+          if (FeatureFlags.chatLive)
+            OutlinedButton.icon(
+              onPressed: () => _contactSeller(context),
+              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+              label: const Text('Contact Seller'),
+            ),
         ],
       );
     }
@@ -808,14 +811,16 @@ class _OrderCard extends StatelessWidget {
       case OrderStatus.toShip:
         return Row(
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _contactSeller(context),
-                icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                label: const Text('Contact Seller'),
+            if (FeatureFlags.chatLive) ...[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _contactSeller(context),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('Contact Seller'),
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.s8),
+              const SizedBox(width: AppSpacing.s8),
+            ],
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _cancelOrder(context),
@@ -833,14 +838,16 @@ class _OrderCard extends StatelessWidget {
       case OrderStatus.outForDelivery:
         return Row(
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _contactSeller(context),
-                icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                label: const Text('Contact Seller'),
+            if (FeatureFlags.chatLive) ...[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _contactSeller(context),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('Contact Seller'),
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.s8),
+              const SizedBox(width: AppSpacing.s8),
+            ],
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).push(

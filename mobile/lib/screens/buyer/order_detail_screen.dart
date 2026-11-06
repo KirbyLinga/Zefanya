@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
@@ -468,29 +469,38 @@ class _ActionCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(AppPageRoute(
-              builder: (_) => ChatScreen(
-                  contactName: order.shopName, contactRole: 'Seller'),
-            )),
-            icon: const Icon(Icons.chat_bubble_outline, size: 16),
-            label: const Text('Contact Seller'),
-          ),
-          const SizedBox(height: 8),
-          // Copies the reference number AND opens the seller thread in
-          // one tap: the thing a buyer pastes first when asking about
-          // an order is its ID, so hand it over with the chat.
-          OutlinedButton.icon(
-            onPressed: () {
-              copyId(context, order.id);
-              Navigator.of(context).push(AppPageRoute(
+          if (FeatureFlags.chatLive) ...[
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(AppPageRoute(
                 builder: (_) => ChatScreen(
                     contactName: order.shopName, contactRole: 'Seller'),
-              ));
-            },
-            icon: const Icon(Icons.copy_outlined, size: 16),
-            label: const Text('Copy ID & Chat with Seller'),
-          ),
+              )),
+              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+              label: const Text('Contact Seller'),
+            ),
+            const SizedBox(height: 8),
+            // Copies the reference number AND opens the seller thread in
+            // one tap: the thing a buyer pastes first when asking about
+            // an order is its ID, so hand it over with the chat.
+            OutlinedButton.icon(
+              onPressed: () {
+                copyId(context, order.id);
+                Navigator.of(context).push(AppPageRoute(
+                  builder: (_) => ChatScreen(
+                      contactName: order.shopName, contactRole: 'Seller'),
+                ));
+              },
+              icon: const Icon(Icons.copy_outlined, size: 16),
+              label: const Text('Copy ID & Chat with Seller'),
+            ),
+          ] else
+            // No chat on the live server; the reference number is still
+            // useful on its own when contacting the shop another way.
+            OutlinedButton.icon(
+              onPressed: () => copyId(context, order.id),
+              icon: const Icon(Icons.copy_outlined, size: 16),
+              label: const Text('Copy order ID'),
+            ),
           if (order.status == OrderStatus.toRate && !returnOpen) ...[
             const SizedBox(height: 10),
             ReviewButton(order: order),

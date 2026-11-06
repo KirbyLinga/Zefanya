@@ -5,7 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../config/dev_flags.dart' show kUseLiveApi;
+import '../../config/dev_flags.dart' show FeatureFlags, kUseLiveApi;
 import '../../data/mock_data.dart';
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
@@ -17,6 +17,7 @@ import '../../utils/microcopy.dart';
 import '../../utils/money_format.dart';
 import '../../utils/scroll_to_top.dart';
 import '../../widgets/cart_button.dart';
+import '../../widgets/chat_inbox_button.dart';
 import '../../widgets/notification_bell.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/ease_in_frame.dart';
@@ -424,6 +425,10 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                       // build would promise notifications the server cannot
                       // send. It returns with S6.9.
                       if (!kUseLiveApi) const NotificationBell(),
+                      if (FeatureFlags.chatLive) ...[
+                        const SizedBox(width: AppSpacing.s4),
+                        const ChatInboxButton(),
+                      ],
                       const SizedBox(width: AppSpacing.s4),
                       const CartButton(),
                     ],

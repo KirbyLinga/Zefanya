@@ -28,6 +28,7 @@ import '../../data/api/api_exception.dart';
 import '../../data/dto/remote_status.dart';
 import '../../data/mock_data.dart';
 import '../../data/repositories/repositories.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/copy_id.dart';
@@ -736,9 +737,10 @@ class _CourierCard extends StatelessWidget {
               ],
             ),
           ),
-          if (assigned)
+          if (assigned && FeatureFlags.chatLive)
             // Contact, kept to an icon button so it doesn't compete with the
-            // order's own actions elsewhere on this screen.
+            // order's own actions elsewhere on this screen. Hidden in live
+            // mode, where the server has no conversation endpoints.
             IconButton(
               tooltip: 'Message $name',
               onPressed: () => Navigator.of(context).push(

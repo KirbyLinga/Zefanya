@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 
 import '../../state/catalog_state.dart';
 import '../../state/wishlist_state.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../theme/app_theme.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -55,14 +56,16 @@ class SellerScreen extends StatelessWidget {
                 totalSold: totalSold,
                 isFollowing: wishlist.isFollowing(sellerName),
                 onFollow: () => wishlist.toggleFollow(sellerName),
-                onChat: () => Navigator.of(context).push(
-                  AppPageRoute(
-                    builder: (_) => ChatScreen(
-                      contactName: sellerName,
-                      contactRole: 'Seller',
-                    ),
-                  ),
-                ),
+                onChat: FeatureFlags.chatLive
+                    ? () => Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) => ChatScreen(
+                            contactName: sellerName,
+                            contactRole: 'Seller',
+                          ),
+                        ),
+                      )
+                    : null,
               ),
             ),
 
@@ -155,7 +158,7 @@ class _SellerHero extends StatelessWidget {
     required this.totalSold,
     required this.isFollowing,
     required this.onFollow,
-    required this.onChat,
+    this.onChat,
   });
 
   final String sellerName;
@@ -164,7 +167,10 @@ class _SellerHero extends StatelessWidget {
   final int totalSold;
   final bool isFollowing;
   final VoidCallback onFollow;
-  final VoidCallback onChat;
+
+  /// Null in live mode, where the server has no chat. The Follow button then
+  /// takes the full width instead of leaving a dead half-row.
+  final VoidCallback? onChat;
 
   @override
   Widget build(BuildContext context) {
@@ -232,21 +238,23 @@ class _SellerHero extends StatelessWidget {
                 const SizedBox(height: 18),
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onChat,
-                        icon: Icon(Icons.chat_bubble_outline, size: 16,
-                            color: AppColors.textOnDark),
-                        label: Text('Chat',
-                            style: TextStyle(color: AppColors.textOnDark)),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: AppColors.textOnDark.withValues(alpha: 0.45),
+                    if (onChat != null) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onChat,
+                          icon: Icon(Icons.chat_bubble_outline, size: 16,
+                              color: AppColors.textOnDark),
+                          label: Text('Chat',
+                              style: TextStyle(color: AppColors.textOnDark)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: AppColors.textOnDark.withValues(alpha: 0.45),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: FilledButton.icon(
                         key: const ValueKey('follow-seller'),

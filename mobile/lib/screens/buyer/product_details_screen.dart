@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../config/pricing.dart';
 import '../../data/mock_data.dart';
 import '../../state/cart_state.dart';
@@ -990,7 +991,9 @@ _buildShippingAndVoucher(theme),
                 Text(
                   _product.sellerOnVacation
                       ? 'On vacation · not accepting orders'
-                      : 'Usually replies within an hour',
+                      : FeatureFlags.chatLive
+                      ? 'Usually replies within an hour'
+                      : 'Browse the rest of their collection',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: _product.sellerOnVacation
                         ? AppColors.danger
@@ -1003,21 +1006,9 @@ _buildShippingAndVoucher(theme),
               ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              AppPageRoute(
-                builder: (_) => ChatScreen(
-                  contactName: _product.sellerName,
-                  contactRole: 'Seller',
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.chat_bubble_outline, size: 16),
-            label: const Text('Chat'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s8),
-            ),
-          ),
+          // Chat lives in the bottom action bar. A second Chat button here
+          // was the same action twice on one screen, which made the seller
+          // row look like the primary way to message them.
         ],
       ),
     );
@@ -1649,19 +1640,21 @@ _buildShippingAndVoucher(theme),
               ),
             Row(
               children: [
-                _circleIconButton(
-                  Icons.chat_bubble_outline,
-                  () => Navigator.of(context).push(
-                    AppPageRoute(
-                      builder: (_) => ChatScreen(
-                        contactName: _product.sellerName,
-                        contactRole: 'Seller',
+                if (FeatureFlags.chatLive) ...[
+                  _circleIconButton(
+                    Icons.chat_bubble_outline,
+                    () => Navigator.of(context).push(
+                      AppPageRoute(
+                        builder: (_) => ChatScreen(
+                          contactName: _product.sellerName,
+                          contactRole: 'Seller',
+                        ),
                       ),
                     ),
+                    tooltip: 'Chat with seller',
                   ),
-                  tooltip: 'Chat with seller',
-                ),
-                const SizedBox(width: AppSpacing.s8),
+                  const SizedBox(width: AppSpacing.s8),
+                ],
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: actionsDisabled
