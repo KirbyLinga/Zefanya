@@ -9,7 +9,6 @@
 // state/courier_state.dart), so both dashboard tabs just show
 // whatever's currently assigned to this courier.
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/fade_through.dart';
@@ -18,7 +17,6 @@ import '../shared/profile_screen.dart';
 import 'courier_profit_screen.dart';
 import 'delivery_dashboard_screen.dart';
 import 'pickup_dashboard_screen.dart';
-import 'dev_qr_generator_screen.dart';
 
 class CourierShell extends StatefulWidget {
   const CourierShell({super.key});
@@ -54,16 +52,8 @@ class _CourierShellState extends State<CourierShell> {
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),
       ),
-      // Dev-only QR generator entry — hidden in release builds via kDebugMode.
-      floatingActionButton: kDebugMode
-          ? FloatingActionButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DevQrGeneratorScreen()),
-              ),
-              tooltip: 'Dev QR Generator',
-              child: const Icon(Icons.qr_code),
-            )
-          : null,
+      // Dev tooling lives behind Settings > About (seven taps). Nothing
+      // developer-only floats over the app by default in any build.
     );
   }
 }

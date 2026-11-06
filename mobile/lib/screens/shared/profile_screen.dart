@@ -43,14 +43,12 @@ import '../../widgets/avatar_picker.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
 import '../buyer/widgets/product_card.dart' show ProductImage;
-import 'account_security_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
-import '../../widgets/motion/cloud_transition.dart';
 import '../../widgets/motion/ease_in_frame.dart';
-import '../../widgets/theme_toggle.dart';
 import '../buyer/address_book_screen.dart';
 import '../courier/rider_profile_section.dart';
+import 'settings_screen.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
 /// name/email/phone/address from the shared AuthState and edits them
@@ -136,36 +134,6 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (!isCourier) ...[
-                    const SizedBox(height: AppSpacing.s12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey('manage-addresses'),
-                        onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(
-                            builder: (_) => const AddressBookScreen(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.location_city_outlined, size: 18),
-                        label: const Text('Manage Addresses'),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey('account-security'),
-                        onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(
-                            builder: (_) => const AccountSecurityScreen(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.shield_outlined, size: 18),
-                        label: const Text('Account & Security'),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -173,30 +141,6 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.s24),
               const EaseInFrame(index: 3, child: RiderProfileSection()),
             ],
-            const SizedBox(height: AppSpacing.s24),
-            EaseInFrame(
-              index: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('APPEARANCE', style: AppType.eyebrow),
-                  const SizedBox(height: AppSpacing.s12),
-                  const ThemeToggle(),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s24),
-            EaseInFrame(
-              index: 4,
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _logout(context),
-                  icon: const Icon(Icons.logout, size: 18),
-                  label: const Text('Log Out'),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -289,12 +233,35 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).push(
-                        AppPageRoute(builder: (_) => const EditProfileScreen()),
-                      ),
-                      icon: Icon(Icons.edit_outlined, color: AppColors.textOnDark),
-                      tooltip: 'Edit Profile',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: const ValueKey('open-settings'),
+                          onPressed: () => Navigator.of(context).push(
+                            AppPageRoute(
+                              builder: (_) => const SettingsScreen(),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.settings_outlined,
+                            color: AppColors.textOnDark,
+                          ),
+                          tooltip: 'Settings',
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).push(
+                            AppPageRoute(
+                              builder: (_) => const EditProfileScreen(),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: AppColors.textOnDark,
+                          ),
+                          tooltip: 'Edit Profile',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -310,75 +277,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _logout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        AppColors.watch(dialogContext);
-        final dialogTheme = Theme.of(dialogContext);
-        return Dialog(
-          shape: editorialShape(0, ShapeTier.card),
-          backgroundColor: AppColors.surface,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.s16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('LOG OUT?', style: AppType.eyebrow),
-                const SizedBox(height: AppSpacing.s8),
-                Text('Log out of Zefanya?', style: dialogTheme.textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.s8),
-                Text(
-                  'You will need to sign back in to shop and track orders.',
-                  style: dialogTheme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(false),
-                        child: const Text('Stay'),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.s12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.danger,
-                          foregroundColor: AppColors.textOnDark,
-                        ),
-                        child: const Text('Log out'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    if (confirmed != true || !context.mounted) return;
-    await CloudTransition.run(
-      context,
-      swap: () {
-        // A rider signing out is no longer available for work, even though the
-        // job already picked up stays with them when they sign back in.
-        if (context.read<AuthState>().role == UserRole.courier) {
-          context.read<CourierState>().goOffline();
-        }
-        context.read<AuthState>().logout();
-        // AuthGate (in main.dart) rebuilds to LoginScreen once the state
-        // changes — this just unwinds back to that root route.
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      },
-    );
-  }
 }
 
 // ---------------------------------------------------------------------

@@ -42,6 +42,11 @@ class ThemeToggle extends StatelessWidget {
             icon: Icon(Icons.dark_mode_outlined, size: 17),
             label: Text('Dark'),
           ),
+          ButtonSegment(
+            value: ThemeMode.system,
+            icon: Icon(Icons.brightness_auto_outlined, size: 17),
+            label: Text('System'),
+          ),
         ],
         selected: {themeState.mode},
         showSelectedIcon: false,

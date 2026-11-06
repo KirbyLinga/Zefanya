@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/dev_flags.dart' show kUseLiveApi;
 import '../../data/mock_data.dart';
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
@@ -419,7 +420,10 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           ],
                         ),
                       ),
-                      const NotificationBell(),
+                      // The bell has no backend yet; showing it in a live
+                      // build would promise notifications the server cannot
+                      // send. It returns with S6.9.
+                      if (!kUseLiveApi) const NotificationBell(),
                       const SizedBox(width: AppSpacing.s4),
                       const CartButton(),
                     ],

@@ -38,7 +38,15 @@ class ThemeState extends ChangeNotifier {
 
   bool get isDark => _mode == ThemeMode.dark;
 
-  Brightness get brightness => isDark ? Brightness.dark : Brightness.light;
+  /// The palette brightness this mode resolves to right now. System follows
+  /// the phone's current setting; the app's custom palette needs this because
+  /// it is applied above `MaterialApp`, where `themeMode` cannot help it.
+  Brightness get brightness => switch (_mode) {
+        ThemeMode.dark => Brightness.dark,
+        ThemeMode.light => Brightness.light,
+        ThemeMode.system =>
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      };
 
   /// Call once before runApp (see main.dart) to restore the saved choice.
   Future<void> load() async {
@@ -46,7 +54,11 @@ class ThemeState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_storageKey);
       if (raw == null) return;
-      _mode = raw == 'dark' ? ThemeMode.dark : ThemeMode.light;
+      _mode = switch (raw) {
+        'dark' => ThemeMode.dark,
+        'system' => ThemeMode.system,
+        _ => ThemeMode.light,
+      };
       notifyListeners();
     } catch (_) {
       // Unreadable or unrecognised value — stay on the default rather
@@ -57,7 +69,7 @@ class ThemeState extends ChangeNotifier {
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, isDark ? 'dark' : 'light');
+    await prefs.setString(_storageKey, _mode.name);
   }
 
   void setMode(ThemeMode mode) {

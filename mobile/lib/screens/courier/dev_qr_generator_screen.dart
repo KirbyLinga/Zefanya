@@ -1,15 +1,16 @@
 // lib/screens/courier/dev_qr_generator_screen.dart
 //
 // Dev-only QR generator screen. Renders a QR code for any tracking number
-// typed by the user. Hidden from release builds via kDebugMode gating.
+// typed by the user. Reached only through Settings > About (seven taps);
+// nothing in the normal UI advertises it.
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 /// Dev-only QR code generator screen.
 ///
-/// Renders a QR code for any tracking number typed by the user. Gated by
-/// [kDebugMode] so it is hidden in release builds.
+/// Renders a QR code for any tracking number typed by the user. Reached only
+/// from Developer options, which Settings reveals after seven taps on About.
 class DevQrGeneratorScreen extends StatelessWidget {
   const DevQrGeneratorScreen({super.key});
 
