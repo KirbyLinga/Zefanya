@@ -80,6 +80,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   /// quantity a second time (and, for Buy Now, pushed Checkout twice).
   bool _addCooldown = false;
 
+  /// Seller descriptions can run long. Three lines is enough to judge the
+  /// thing; the rest is a deliberate choice rather than something that pushes
+  /// the price and actions off the screen.
+  bool _descriptionExpanded = false;
+
   Product get _product => widget.product;
 
   List<VariationType> get _groups => _product.optionGroups;
@@ -1291,16 +1296,61 @@ _buildShippingAndVoucher(theme),
   }
 
   Widget _buildDescription(ThemeData theme) {
+    final description = _product.description.isEmpty
+        ? 'No description provided yet.'
+        : _product.description;
+    final style = theme.textTheme.bodyMedium?.copyWith(height: 1.5);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Description', style: theme.textTheme.titleSmall),
         const SizedBox(height: AppSpacing.s8),
-        Text(
-          _product.description.isEmpty
-              ? 'No description provided yet.'
-              : _product.description,
-          style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Only offer the toggle when the copy actually runs past three
+            // lines at this width and text scale. A two-line description with
+            // a "Read more" that reveals nothing is worse than no control.
+            final painter = TextPainter(
+              text: TextSpan(text: description, style: style),
+              maxLines: 3,
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+              locale: Localizations.maybeLocaleOf(context),
+            )..layout(maxWidth: constraints.maxWidth);
+            final hasMore = painter.didExceedMaxLines;
+            painter.dispose();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  key: const ValueKey('product-description'),
+                  style: style,
+                  maxLines: _descriptionExpanded ? null : 3,
+                  overflow: _descriptionExpanded
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
+                ),
+                if (hasMore)
+                  TextButton(
+                    key: const ValueKey('description-toggle'),
+                    onPressed: () => setState(
+                      () => _descriptionExpanded = !_descriptionExpanded,
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(48, 40),
+                      alignment: Alignment.centerLeft,
+                    ),
+                    child: Text(
+                      _descriptionExpanded ? 'Show less' : 'Read more',
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ],
     );
