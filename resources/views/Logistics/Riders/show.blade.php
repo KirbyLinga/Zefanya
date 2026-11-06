@@ -35,6 +35,7 @@
             <div class="col-span-2 max-sm:col-span-1"><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Residential Address</p><p class="mt-0.5 text-neutral-900">{{ $addressParts !== '' ? $addressParts : 'Not provided' }}</p></div>
             <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Station Hub</p><p class="mt-0.5 text-neutral-900">{{ $rider->station?->name ?? 'Unassigned' }}</p></div>
             <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Coverage</p><p class="mt-0.5 text-neutral-900">{{ $rider->courier?->area?->name ?? 'No coverage linked' }}</p></div>
+            <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Availability</p><div class="mt-0.5">@include('Logistics.Riders.partials.availability', ['rider' => $rider])</div></div>
             @if ($rider->status_reason)
                 <div class="col-span-2 max-sm:col-span-1"><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Status Reason</p><p class="mt-0.5 text-neutral-900">{{ $rider->status_reason }}</p></div>
             @endif
@@ -73,8 +74,8 @@
                       onsubmit="return confirm('Reject this rider application?');">
                     @csrf
                     <div class="flex-1 min-w-[220px]">
-                        <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="riderRejectReason">Rejection reason *</label>
-                        <input type="text" name="reason" id="riderRejectReason" value="{{ old('reason') }}" maxlength="1000" required
+                        <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="riderRejectReason">Rejection reason (10–300 characters) *</label>
+                        <input type="text" name="reason" id="riderRejectReason" value="{{ old('reason') }}" minlength="10" maxlength="300" required
                                class="h-11 w-full rounded-sm border border-neutral-300 bg-white px-3 font-sans text-[13px] text-neutral-900 outline-none focus:border-[#9c5c68]">
                         @error('reason')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
                     </div>
@@ -131,7 +132,8 @@
                 <p class="mb-3 font-sans text-[11.5px] text-[var(--text-muted)]">Parcels already assigned are flagged for reassignment; their status is not changed.</p>
                 <form method="POST" action="{{ route('logistics.riders.suspend', $rider) }}" class="flex flex-col gap-3">
                     @csrf
-                    <input type="text" name="reason" value="{{ old('reason') }}" maxlength="1000" placeholder="Reason (optional)"
+                    <label for="riderSuspendReason" class="text-xs font-semibold text-[var(--text-ink)]">Suspension reason (required)</label>
+                    <input type="text" name="reason" value="{{ old('reason') }}" id="riderSuspendReason" required minlength="10" maxlength="300" placeholder="Reason (10–300 characters)"
                            class="h-10 w-full rounded-sm border border-[var(--border-strong)] bg-white px-3 font-sans text-[12.5px] text-[var(--text-ink)]">
                     @error('reason')<span class="font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
                     <button type="submit" class="inline-flex h-10 items-center justify-center rounded-sm border border-amber-300 font-sans text-[12px] font-semibold uppercase tracking-[1px] text-amber-700 transition-colors hover:bg-amber-50">

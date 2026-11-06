@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Incidents;
-use App\Services\ParcelIncidentService;
+use App\Models\Logistics\ParcelRouteRereoute;
+use App\Models\Shared\Incidents;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\ParcelLegService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,9 +23,12 @@ class IncidentController extends Controller
         $this->authorizeForUser($request->user('admin'), 'viewAny', Incidents::class);
 
         $incidents = Incidents::query()
-            ->where('status', ParcelIncidentStatus::Open->value)
-            ->whereIn('type', ['lost', 'damaged', 'LOST', 'DAMAGED'])
-            ->with(['sellerOrder.seller', 'sellerOrder.order.buyer', 'events'])
+            ->whereIn('status', [
+                ParcelIncidentStatus::Open->value,
+                ParcelIncidentStatus::UnderReview->value,
+            ])
+            ->whereIn('type', ParcelIncidentService::ACTIVE_TYPES)
+            ->with(['sellerOrder.seller', 'sellerOrder.order.buyer', 'events', 'sellerOrder.parcelRoute.destinationHub'])
             ->latest('id')
             ->paginate(30)
             ->withQueryString();
@@ -35,9 +40,22 @@ class IncidentController extends Controller
     {
         $this->authorizeForUser($request->user('admin'), 'view', $incident);
 
+        $incident = $incident->loadMissing([
+            'sellerOrder.seller',
+            'sellerOrder.order.buyer',
+            'events',
+            'sellerOrder.parcelRoute.destinationHub',
+            'sellerOrder.parcelRoute.originHub',
+        ]);
+
         return view('Admin.Incidents.detail', [
-            'incident' => $incident->loadMissing(['sellerOrder.seller', 'sellerOrder.order.buyer', 'events']),
+            'incident' => $incident,
             'eventCounts' => $incident->eventCounts(),
+            'lastVerifiedHub' => app(ParcelLegService::class)
+                ->verifiedLocation($incident->sellerOrder),
+            'rereoutes' => ParcelRouteRereoute::query()
+                ->where('seller_order_id', $incident->incident_seller_order_id)
+                ->latest('id')->get(),
         ]);
     }
 
@@ -48,6 +66,7 @@ class IncidentController extends Controller
         $this->incident->resolve($incident, $request->user('admin'), [
             'event' => $request->input('resolution'),
             'reason' => $request->input('resolution_note'),
+            'context' => is_array($request->input('resolution_context')) ? $request->input('resolution_context') : [],
         ]);
 
         return back()->with('success', 'Incident resolution recorded.');

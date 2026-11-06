@@ -6,10 +6,26 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Notifications\DatabaseNotification;
 
 class NotificationController extends Controller
 {
+    public function index(Request $request): Response
+    {
+        $data = $request->validate(['filter' => ['nullable', 'in:all,unread']]);
+        $filter = $data['filter'] ?? 'all';
+        $provider = $request->user('logistics');
+
+        return response()->view('Logistics.Notifications.index', [
+            'notifications' => $provider->notifications()
+                ->when($filter === 'unread', fn ($query) => $query->whereNull('read_at'))
+                ->latest()->orderByDesc('id')->paginate(20)->withQueryString(),
+            'filter' => $filter,
+            'unreadCount' => $provider->unreadNotifications()->count(),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
     public function recent(Request $request): JsonResponse
     {
         $provider = $request->user('logistics');

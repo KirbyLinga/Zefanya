@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Shared\Category;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -17,8 +17,7 @@ class LandingPageController extends Controller
         }
 
         $products = Product::query()->withBuyerCardData()
-            ->activeInStock()
-            ->whereHas('seller', fn ($query) => $query->where('status', 'approved'))
+            ->discoverable()
             ->with(['images', 'seller', 'variants.optionValues'])
             ->latest('id')
             ->limit(4)

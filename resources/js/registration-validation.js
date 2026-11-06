@@ -125,6 +125,21 @@ function getPasswordStrength(password) {
     };
 }
 
+// Names every failing rule; same wording as App\Support\PasswordRule::error().
+function joinList(items) {
+    return items.length === 1 ? items[0] : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+}
+
+function passwordError(password) {
+    const missing = getPasswordStrength(password).missing.filter((m) => m !== '8+ characters');
+    const short = [...password].length < 8;
+    if (!short && missing.length === 0) return null;
+
+    const include = missing.length ? 'include ' + joinList(missing) : '';
+    if (!short) return 'Password must ' + include + '.';
+    return 'Password must be at least 8 characters' + (include ? ' and ' + include : '') + '.';
+}
+
 function updatePasswordMeterDisplay(field) {
     const meter = document.querySelector('[data-password-meter="' + esc(field.id) + '"]');
     if (!meter) return;
@@ -202,7 +217,8 @@ const MOBILE_LENGTH_MSG_INTL = 'Enter +63 followed by 10 digits, like +639171234
 
 // Returns { error } or { normalized } where normalized is always the 09XXXXXXXXX form.
 function normalizeMobile(value) {
-    const v = String(value ?? '').trim();
+    // Spaces are ignored ("+63 917 123 4567"); any other separator is invalid.
+    const v = String(value ?? '').replace(/\s+/g, '');
     if (!v) return { error: REQUIRED };
     if (!/^\+?\d+$/.test(v)) return { error: MOBILE_FORMAT_MSG };
 
@@ -220,7 +236,7 @@ function normalizeMobile(value) {
 }
 
 function checkContactNoLive(value) {
-    const v = String(value ?? '').trim();
+    const v = String(value ?? '').replace(/\s+/g, '');
     if (!v) return null;
 
     if (!/^\+?\d+$/.test(v)) {
@@ -375,10 +391,7 @@ const validators = {
     },
     password(value) {
         if (!value) return REQUIRED;
-        const s = getPasswordStrength(value);
-        if (value.length < 8) return 'Password must be at least 8 characters.';
-        if (!s.valid) return 'Password must include an uppercase letter, a lowercase letter, a number and a special character.';
-        return null;
+        return passwordError(value);
     },
     'password-confirm'(value, field) {
         if (!value) return 'Please confirm your password.';

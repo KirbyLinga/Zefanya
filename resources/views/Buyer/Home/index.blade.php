@@ -21,8 +21,8 @@
   {{-- ═══════════════════════════════════════════════════════════════════════
        CATEGORY CAROUSEL  (mirrors landing page, buyer tokens)
        ═══════════════════════════════════════════════════════════════════════ --}}
-  <section id="categories" class="py-10 sm:py-12">
-    <div class="mb-6 flex items-center justify-between">
+  <section id="categories" class="py-6 sm:py-8">
+    <div class="mb-4 flex items-center justify-between">
       <h2 class="font-serif text-2xl text-buyer-ink sm:text-[28px]">Explore Categories</h2>
       <a href="{{ route('buyer.categories.index') }}"
          class="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-primary-800 transition-colors hover:text-primary-900">
@@ -31,49 +31,36 @@
       </a>
     </div>
 
-    {{-- Carousel track — --cat-per-view drives card widths via CSS calc() --}}
-    <div class="[--cat-per-view:5] relative w-full overflow-hidden max-lg:[--cat-per-view:4] max-sm:[--cat-per-view:2]"
-         id="catCarousel">
-      <div class="flex items-stretch gap-4 transition-transform duration-[450ms] will-change-transform" id="catTrack">
-        @foreach([
-          ['icon' => 'book-open',    'label' => 'Books and Media'],
-          ['icon' => 'heart-pulse',  'label' => 'Health and Beauty'],
-          ['icon' => 'mountain',     'label' => 'Sports and Outdoors'],
-          ['icon' => 'flower-2',     'label' => 'Home and Garden'],
-          ['icon' => 'baby',         'label' => 'Kids and Baby'],
-          ['icon' => 'shirt',        'label' => "Men's Apparel"],
-          ['icon' => 'sparkles',     'label' => "Women's Apparel"],
-          ['icon' => 'smartphone',   'label' => 'Electronics and Gadgets'],
-          ['icon' => 'paw-print',    'label' => 'Pet Supplies'],
-          ['icon' => 'utensils',     'label' => 'Food and Gourmet'],
-          ['icon' => 'car',          'label' => 'Automotive & Motorcycle'],
-          ['icon' => 'sofa',         'label' => 'Furniture and Office'],
-          ['icon' => 'gem',          'label' => 'Jewelry and Watches'],
-          ['icon' => 'pencil-ruler', 'label' => 'Office and School'],
-        ] as $cat)
-          <a href="{{ route('buyer.categories.index') }}"
-             class="group basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view))] relative flex min-h-[120px] min-w-[110px] shrink-0 flex-col items-center justify-center rounded-2xl border border-buyer-line bg-white px-4 py-6 text-center transition-[flex,padding,margin,box-shadow,border-color] duration-300 hover:-mx-1 hover:grow-[0.3] hover:border-primary-700 hover:px-5 hover:py-8 hover:shadow-[0_12px_28px_-8px_rgba(58,37,41,0.20)]">
-            <div class="mb-2 inline-flex h-14 w-14 items-center justify-center rounded-full bg-secondary-100 transition-transform duration-300 group-hover:scale-110">
-              <i data-lucide="{{ $cat['icon'] }}" width="24" height="24" class="text-primary-800"></i>
-            </div>
-            <span class="mt-2 w-full text-center text-[11px] font-semibold uppercase leading-[1.4] tracking-[1.1px] text-buyer-ink transition-[font-size] duration-300 group-hover:mt-3 group-hover:text-[12px]">
-              {{ $cat['label'] }}
-            </span>
-          </a>
-        @endforeach
-      </div>
+    {{-- A native scroller, so swipe, trackpad and keyboard all work and the browser does the animating.
+         --cat-per-view drives card widths via CSS calc(); the padding leaves room for the hover lift and shadow. --}}
+    <div class="[--cat-per-view:5] -mx-1 -mb-4 -mt-1 flex snap-x snap-mandatory scroll-px-1 items-stretch gap-4 overflow-x-auto px-1 pb-4 pt-1 [scrollbar-width:none] max-lg:[--cat-per-view:4] max-sm:[--cat-per-view:2] [&::-webkit-scrollbar]:hidden"
+         id="catCarousel" tabindex="0" role="region" aria-label="Categories">
+      @foreach ($categories as $cat)
+        <a href="{{ route('buyer.categories.show', $cat->id) }}"
+           class="group relative isolate flex aspect-[4/5] min-w-[110px] shrink-0 basis-[calc((100%_-_((var(--cat-per-view)_-_1)_*_16px))_/_var(--cat-per-view))] snap-start flex-col justify-end overflow-hidden rounded-2xl bg-primary-800 p-4 no-underline transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_12px_24px_-10px_rgba(58,37,41,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-5">
+          {{-- The label names the card, so the photo is decorative. The solid background keeps the label readable if it fails to load. --}}
+          {{-- Not lazy: the arrows should reveal cards already loaded, so only the priority differs. --}}
+          <img src="{{ $cat->image_url }}" srcset="{{ $cat->image_srcset }}" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 250px"
+               alt="" width="640" height="800" fetchpriority="{{ $loop->index < 5 ? 'high' : 'low' }}" decoding="async"
+               class="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+          <span class="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(58,37,41,0)_45%,rgba(58,37,41,0.2)_62%,rgba(58,37,41,0.68)_78%,rgba(58,37,41,0.9)_100%)]" aria-hidden="true"></span>
+          <span class="font-serif text-[17px] leading-[1.25] text-white [text-wrap:balance] sm:text-[19px]">
+            {{ $cat->label }}
+          </span>
+        </a>
+      @endforeach
     </div>
 
     {{-- Prev / dots / Next --}}
-    <div class="mt-6 flex w-full items-center justify-center gap-4">
+    <div class="mt-3 flex w-full items-center justify-center gap-3" id="catControls">
       <button type="button"
-              class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-buyer-line bg-white shadow-[0_2px_8px_rgba(58,37,41,0.08)] transition-colors hover:bg-secondary-100"
+              class="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-buyer-line bg-white shadow-[0_2px_8px_rgba(58,37,41,0.08)] transition-[background-color,opacity] duration-150 hover:bg-secondary-100 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-white"
               id="catPrev" aria-label="Previous categories">
         <i data-lucide="chevron-left" width="18" height="18" class="text-primary-800"></i>
       </button>
-      <div class="flex items-center gap-2.5" id="catDots" role="tablist" aria-label="Category pages"></div>
+      <div class="flex items-center" id="catDots" role="group" aria-label="Category pages"></div>
       <button type="button"
-              class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-buyer-line bg-white shadow-[0_2px_8px_rgba(58,37,41,0.08)] transition-colors hover:bg-secondary-100"
+              class="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-buyer-line bg-white shadow-[0_2px_8px_rgba(58,37,41,0.08)] transition-[background-color,opacity] duration-150 hover:bg-secondary-100 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-white"
               id="catNext" aria-label="Next categories">
         <i data-lucide="chevron-right" width="18" height="18" class="text-primary-800"></i>
       </button>
@@ -83,6 +70,7 @@
   {{-- ═══════════════════════════════════════════════════════════════════════
        FLASH SALE
        ═══════════════════════════════════════════════════════════════════════ --}}
+  @if ($flashProducts->isNotEmpty())
   <section id="flash-sale" class="py-6 sm:py-10">
     {{-- Section header with animated sale badge --}}
     <div class="mb-5 flex items-center gap-3">
@@ -91,94 +79,88 @@
         <span class="rounded bg-buyer-ink px-2.5 py-0.5 text-[10px] font-bold tracking-[0.08em] text-white uppercase">On</span>
         <span class="rounded bg-primary-200 px-2.5 py-0.5 text-[10px] font-bold tracking-[0.08em] text-primary-800 uppercase">Sale</span>
       </div>
-      {{-- Close / dismiss icon (decorative, matches mockup's ✕ in top-right) --}}
-      <button type="button" class="ml-auto rounded-full p-1 text-neutral-400 transition-colors hover:text-buyer-ink" aria-label="Dismiss flash sale">
-        <i data-lucide="x" width="16" height="16"></i>
-      </button>
+      @php
+          $flashEndsAt = $flashProducts->map(fn ($product) => $product->ongoingSale?->ends_at)->filter()->sort()->first();
+      @endphp
+      @if ($flashEndsAt)
+        <p id="flash-countdown" class="text-sm font-semibold text-primary-800" data-ends="{{ $flashEndsAt->toIso8601String() }}">Ends in <span data-flash-remaining>--:--:--</span></p>
+      @endif
     </div>
+    @if ($flashEndsAt ?? null)
+      <script>
+        (function () {
+          const root = document.getElementById('flash-countdown');
+          const node = root?.querySelector('[data-flash-remaining]');
+          if (!root || !node) return;
+          const end = new Date(root.dataset.ends).getTime();
+          const tick = () => {
+            const left = Math.max(0, end - Date.now());
+            const hours = Math.floor(left / 3600000);
+            const minutes = Math.floor((left % 3600000) / 60000);
+            const seconds = Math.floor((left % 60000) / 1000);
+            const pad = (value) => String(value).padStart(2, '0');
+            node.textContent = pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+          };
+          tick();
+          setInterval(tick, 1000);
+        })();
+      </script>
+    @endif
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {{-- 4 product cards --}}
-      <div class="grid grid-cols-2 gap-4 sm:col-span-2 lg:col-span-4 lg:grid-cols-4">
-        @php $discountBadges = ['40%', '28%', '35%', '20%']; @endphp
-        @forelse ($flashProducts as $i => $product)
-          @include('Components.buyer.product-card', [
-              'product'       => $product,
-              'discountBadge' => $discountBadges[$i] ?? null,
-              'url'           => route('buyer.products.show', $product->id),
-          ])
-        @empty
-          @foreach (range(0, 3) as $i)
-            @include('Components.buyer.product-card', [
-                'discountBadge' => $discountBadges[$i] ?? null,
-            ])
-          @endforeach
-        @endforelse
-      </div>
-
-      {{-- Promo aside — matches "PREMIUM BRAND / The Zefanya Mall Privilege" card --}}
-      <aside class="flex min-h-[280px] flex-col justify-between overflow-hidden rounded-2xl bg-linear-[160deg] from-primary-200 via-secondary-100 to-cream p-5 lg:min-h-full">
-        <div>
-          <span class="mb-2 inline-block rounded bg-buyer-ink px-2 py-0.5 text-[9px] font-bold tracking-[0.1em] text-white uppercase">Premium Brand</span>
-          <p class="mt-1 font-serif text-[20px] leading-snug text-buyer-ink">The Zefanya Mall Privilege</p>
-          <p class="mt-2 text-[12px] leading-relaxed text-buyer-ink-soft">
-            100% guaranteed authentic sourcing from global premium brands.
-          </p>
-        </div>
-        <div>
-          <div class="mb-3 rounded-xl bg-white/70 px-3 py-2.5">
-            <p class="text-[10px] font-bold tracking-[0.06em] text-buyer-ink-soft uppercase">Cashback 15%</p>
-            <p class="text-[10px] text-buyer-ink-soft">on your first premium order</p>
-          </div>
-          <a href="#for-you" class="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-buyer-ink hover:underline">
-            Explore Mall
-            <i data-lucide="arrow-right" width="13" height="13"></i>
-          </a>
-        </div>
-      </aside>
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      @foreach ($flashProducts as $product)
+        @include('Components.buyer.product-card', [
+            'product'       => $product,
+            'url'           => route('buyer.products.show', $product->id),
+        ])
+      @endforeach
     </div>
   </section>
+  @endif
+
+  @include('Buyer.Home._product-section', [
+      'sectionId' => 'on-sale',
+      'title' => 'On Sale',
+      'products' => $onSaleProducts,
+      'viewAllUrl' => route('buyer.products.index', ['on_sale' => 1]),
+  ])
+
+  @include('Buyer.Home._product-section', [
+      'sectionId' => 'new-arrivals',
+      'title' => 'New Arrivals',
+      'products' => $newArrivals,
+      'viewAllUrl' => route('buyer.products.index', ['sort' => 'newest']),
+  ])
+
+  @include('Buyer.Home._product-section', [
+      'sectionId' => 'trending',
+      'title' => 'Trending Products',
+      'products' => $trendingProducts,
+  ])
 
   {{-- ═══════════════════════════════════════════════════════════════════════
        TODAY'S FOR YOU + BEST SELLING STORES
        ═══════════════════════════════════════════════════════════════════════ --}}
   <section id="for-you" class="py-8 sm:py-12">
-    {{-- Header row: title + tabs + View All --}}
+    {{-- Header row: title + View All --}}
     <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
       <h2 class="font-serif text-2xl text-buyer-ink sm:text-[28px]">Todays For You!</h2>
-      <div class="flex flex-wrap items-center gap-x-5 gap-y-2" role="tablist" aria-label="Product filters">
-        <button type="button"
-          class="js-home-tab active text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="true">Best Seller</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Keep It Off</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Special Discount</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Official Store</button>
-        <button type="button"
-          class="js-home-tab text-[12.5px] font-semibold text-neutral-400 transition-colors [&.active]:text-buyer-ink [&.active]:underline [&.active]:decoration-buyer-ink [&.active]:underline-offset-8"
-          aria-selected="false">Greatest Product</button>
-        <a href="{{ route('buyer.products.index') }}"
-           class="text-[12.5px] font-semibold text-neutral-400 transition-colors hover:text-buyer-ink">
-          View All
-        </a>
-      </div>
+      <a href="{{ route('buyer.products.index') }}"
+         class="text-[12.5px] font-semibold text-neutral-400 transition-colors hover:text-buyer-ink">
+        View All
+      </a>
     </div>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       {{-- Product grid --}}
-      <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+      <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         @forelse ($forYouProducts as $product)
           @include('Components.buyer.product-card', [
               'product' => $product,
               'url'     => route('buyer.products.show', $product->id),
           ])
         @empty
-          @foreach (range(1, 6) as $slot)
+          @foreach (range(1, 8) as $slot)
             @include('Components.buyer.product-card')
           @endforeach
         @endforelse
@@ -190,10 +172,10 @@
           <h3 class="font-serif text-[18px] text-buyer-ink">Best Selling Store</h3>
         </div>
         @forelse ($stores as $store)
-          @include('Components.buyer.store-card', ['store' => $store])
+          @include('Components.buyer.store-card', ['store' => $store, 'following' => in_array($store->id, $followedStoreIds, true)])
         @empty
           <div class="rounded-2xl border border-dashed border-buyer-line bg-white p-5 text-[13px] text-neutral-500">
-            Approved stores with live products will appear here.
+            Stores will appear here once they have delivered orders.
           </div>
         @endforelse
       </aside>
@@ -209,86 +191,65 @@
   </section>
 
   {{-- ═══════════════════════════════════════════════════════════════════════
+       EXPLORE STORES
+       ═══════════════════════════════════════════════════════════════════════ --}}
+  @if ($exploreStores->isNotEmpty())
+  <section id="explore-stores" class="py-6 sm:py-10">
+    <h2 class="mb-5 font-serif text-2xl text-buyer-ink sm:text-[28px]">Explore Stores</h2>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      @foreach ($exploreStores as $store)
+        @include('Components.buyer.store-card', ['store' => $store, 'following' => in_array($store->id, $followedStoreIds, true)])
+      @endforeach
+    </div>
+  </section>
+  @endif
+
+  {{-- ═══════════════════════════════════════════════════════════════════════
        TRUST BADGES — why shop with us
        ═══════════════════════════════════════════════════════════════════════ --}}
+  <section class="py-8 sm:py-12">
+    <h2 class="mb-8 text-center font-serif text-2xl text-buyer-ink sm:text-[28px]">Why Shop with Zefanya?</h2>
+    
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-8">
+      {{-- Cash on Delivery: the only payment method --}}
+      <div class="flex flex-col items-center text-center">
+        <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+          <i data-lucide="banknote" width="28" height="28" class="text-primary-800"></i>
+        </div>
+        <h3 class="mb-2 font-serif text-[18px] font-semibold text-buyer-ink">Cash on Delivery</h3>
+        <p class="text-[13px] leading-relaxed text-buyer-ink-soft">
+          Pay in cash when your order arrives. No card or online payment details needed.
+        </p>
+      </div>
 
+      {{-- Delivery Tracking --}}
+      <div class="flex flex-col items-center text-center">
+        <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+          <i data-lucide="truck" width="28" height="28" class="text-primary-800"></i>
+        </div>
+        <h3 class="mb-2 font-serif text-[18px] font-semibold text-buyer-ink">Order Tracking</h3>
+        <p class="text-[13px] leading-relaxed text-buyer-ink-soft">
+          Follow your order's status and tracking number from placement to delivery.
+        </p>
+      </div>
+
+      {{-- Verified Sellers --}}
+      <div class="flex flex-col items-center text-center">
+        <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+          <i data-lucide="store" width="28" height="28" class="text-primary-800"></i>
+        </div>
+        <h3 class="mb-2 font-serif text-[18px] font-semibold text-buyer-ink">Verified Sellers</h3>
+        <p class="text-[13px] leading-relaxed text-buyer-ink-soft">
+          Every seller submits an ID and business permit for approval by our team. Something wrong with an order? You can request a return.
+        </p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
 @endsection
 
 @push('scripts')
     @vite(['resources/js/buyer/home.js'])
-    <script>
-    (function () {
-        var carousel = document.getElementById('catCarousel');
-        var track    = document.getElementById('catTrack');
-        var dotsWrap = document.getElementById('catDots');
-        if (!carousel || !track || !dotsWrap) return;
-
-        var page = 0;
-
-        function perView() {
-            var v = getComputedStyle(carousel).getPropertyValue('--cat-per-view');
-            var n = parseInt(v, 10);
-            return n > 0 ? n : 5;
-        }
-
-        function pageCount() {
-            return Math.ceil(track.children.length / perView());
-        }
-
-        function go(idx) {
-            var pages = pageCount();
-            page = Math.max(0, Math.min(idx, pages - 1));
-
-            var card  = track.children[0];
-            if (!card) return;
-            var cardW = card.getBoundingClientRect().width;
-            var gap   = parseFloat(getComputedStyle(track).gap) || 0;
-            var step  = (cardW + gap) * perView();
-            var max   = Math.max(0, track.scrollWidth - carousel.clientWidth);
-            var shift = Math.min(page * step, max);
-
-            track.style.transform = 'translateX(-' + shift + 'px)';
-
-            Array.prototype.forEach.call(dotsWrap.children, function (d, i) {
-                d.classList.toggle('w-[22px]',      i === page);
-                d.classList.toggle('bg-primary-800', i === page);
-                d.classList.toggle('bg-buyer-line',  i !== page);
-            });
-        }
-
-        function setup() {
-            var pages = pageCount();
-            if (page >= pages) page = pages - 1;
-
-            dotsWrap.innerHTML = '';
-            for (var i = 0; i < pages; i++) {
-                (function (idx) {
-                    var b = document.createElement('button');
-                    b.type = 'button';
-                    b.className = 'h-2 w-2 cursor-pointer rounded-full border-0 p-0 transition-[background-color,width] duration-300 bg-buyer-line'
-                        + (idx === page ? ' !w-[22px] !bg-primary-800' : '');
-                    b.setAttribute('aria-label', 'Category page ' + (idx + 1));
-                    b.addEventListener('click', function () { go(idx); });
-                    dotsWrap.appendChild(b);
-                })(i);
-            }
-            go(page);
-        }
-
-        document.getElementById('catPrev').addEventListener('click', function () {
-            go(page === 0 ? pageCount() - 1 : page - 1);
-        });
-        document.getElementById('catNext').addEventListener('click', function () {
-            go(page === pageCount() - 1 ? 0 : page + 1);
-        });
-
-        var t;
-        window.addEventListener('resize', function () {
-            clearTimeout(t);
-            t = setTimeout(setup, 150);
-        });
-
-        setup();
-    })();
-    </script>
 @endpush

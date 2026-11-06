@@ -4,7 +4,7 @@ namespace App\Policies;
 
 use App\Enums\AdminRole;
 use App\Models\Admin\Admin;
-use App\Models\Incidents;
+use App\Models\Shared\Incidents;
 
 class IncidentsPolicy
 {
@@ -19,13 +19,12 @@ class IncidentsPolicy
 
     public function view(Admin $admin, Incidents $incident): bool
     {
-        return $this->viewAny($admin)
-            && in_array(strtolower($incident->type), ['lost', 'damaged'], true);
+        return $this->viewAny($admin);
     }
 
     public function resolve(Admin $admin, Incidents $incident): bool
     {
-        return $this->view($admin, $incident) && $incident->isOpen();
+        return $this->view($admin, $incident) && $incident->isActive();
     }
 
     public function reject(Admin $admin, Incidents $incident): bool

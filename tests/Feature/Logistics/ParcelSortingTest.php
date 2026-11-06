@@ -3,15 +3,15 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\ParcelHandoffVerification;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\Support\IssuesLogisticsHandoff;
@@ -292,7 +292,7 @@ class ParcelSortingTest extends TestCase
             ->assertViewHas('assignedCount', 1);
     }
 
-    public function test_assign_rider_action_opens_a_modal_listing_available_riders(): void
+    public function test_sorted_parcels_are_assigned_from_assign_deliveries_not_sorting(): void
     {
         $pickupCourier = Courier::factory()->create([
             'logistics_provider_id' => $this->provider->id,
@@ -308,11 +308,16 @@ class ParcelSortingTest extends TestCase
         $this->actingAs($this->provider, 'logistics')
             ->get(route('logistics.parcel-sorting.index', ['tab' => 'sorting']))
             ->assertOk()
+            ->assertSee('Assign in Assign deliveries')
+            ->assertSee(route('logistics.delivery-assignments.index').'#stage-rider', false)
+            ->assertDontSee('data-assign-open="assign-rider-'.$sorted->id.'"', false);
+
+        $this->get(route('logistics.delivery-assignments.index'))
+            ->assertOk()
             ->assertSee('data-assign-open="assign-rider-'.$sorted->id.'"', false)
             ->assertSee('id="assign-rider-'.$sorted->id.'"', false)
             ->assertSee('Auto-assign by area')
-            ->assertSee($deliveryCourier->name)
-            ->assertDontSee('Reason for a manual Rider choice');
+            ->assertSee($deliveryCourier->rider?->fullName() ?? $deliveryCourier->name);
     }
 
     public function test_sorting_tab_filters_out_assigned_parcels_server_side(): void
@@ -336,6 +341,86 @@ class ParcelSortingTest extends TestCase
             ->assertDontSee('#'.$assigned->id);
     }
 
+    /** A Sorted parcel at the delivery courier's station, ready for delivery assignment. */
+    private function sortedParcelAt(Courier $deliveryCourier): SellerOrder
+    {
+        $pickupCourier = Courier::factory()->create(['logistics_provider_id' => $this->provider->id, 'is_available' => false]);
+        $so = $this->order(OrderStatus::Sorted, $pickupCourier);
+        $so->order->update(['shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001']]);
+        $so->forceFill(['custody_provider_id' => $this->provider->id, 'custody_hub_id' => $deliveryCourier->rider->station_hub_id])->save();
+
+        return $so->fresh();
+    }
+
+    // LOG-DISP-003
+    public function test_offline_and_suspended_riders_are_not_listed_and_direct_requests_are_rejected(): void
+    {
+        $offline = $this->assignableCourier($this->provider, ['service_area' => ['Quezon City'], 'max_weight_grams' => 100000]);
+        $offline->rider->forceFill(['is_online' => false])->save();
+        $suspended = $this->assignableCourier($this->provider, ['service_area' => ['Quezon City'], 'max_weight_grams' => 100000]);
+        $suspended->rider->forceFill(['status' => Rider::STATUS_SUSPENDED])->save();
+        $so = $this->sortedParcelAt($offline);
+
+        $listed = $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.delivery-assignments.index'))->assertOk()
+            ->viewData('availableCouriers')->pluck('id');
+        $this->assertNotContains($offline->id, $listed);
+        $this->assertNotContains($suspended->id, $listed);
+
+        $this->post(route('logistics.parcel-sorting.assignDelivery', $so), ['courier_id' => $offline->id])
+            ->assertRedirect()->assertSessionHas('error', fn (string $m): bool => str_contains($m, 'is offline'));
+        $this->post(route('logistics.parcel-sorting.assignDelivery', $so), ['courier_id' => $suspended->id])
+            ->assertRedirect()->assertSessionHas('error', fn (string $m): bool => str_contains($m, 'cannot take new jobs'));
+        $this->post(route('logistics.parcel-sorting.bulkAssignDelivery'), ['courier_id' => $offline->id, 'seller_order_ids' => [$so->id]])
+            ->assertRedirect()->assertSessionHas('error', fn (string $m): bool => str_contains($m, 'is offline'));
+
+        // Automatic selection skips them too: no online Rider covers the parcel.
+        $this->post(route('logistics.parcel-sorting.assignDelivery', $so))->assertRedirect()->assertSessionHas('error');
+
+        $so->refresh();
+        $this->assertSame(OrderStatus::Sorted, $so->status);
+        $this->assertNull($so->delivery_courier_id);
+    }
+
+    // LOG-DISP-004
+    public function test_manual_assign_to_rider_at_job_limit_is_blocked_with_limit_message(): void
+    {
+        $rider = $this->assignableCourier($this->provider, ['service_area' => ['Quezon City'], 'max_weight_grams' => 100000]);
+        for ($i = 0; $i < Courier::ACTIVE_CAPACITY; $i++) {
+            $this->order(OrderStatus::AssignedToRider, null, $rider);
+        }
+        $so = $this->sortedParcelAt($rider);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.parcel-sorting.assignDelivery', $so), ['courier_id' => $rider->id])
+            ->assertRedirect()
+            ->assertSessionHas('error', fn (string $message): bool => str_contains($message, Courier::ACTIVE_CAPACITY.' active jobs, the limit per Rider'));
+
+        $so->refresh();
+        $this->assertSame(OrderStatus::Sorted, $so->status);
+        $this->assertNull($so->delivery_courier_id);
+    }
+
+    // LOG-DISP-007
+    public function test_bulk_assign_over_the_job_limit_assigns_three_and_skips_the_rest(): void
+    {
+        $rider = $this->assignableCourier($this->provider, ['service_area' => ['Quezon City'], 'max_weight_grams' => 100000]);
+        $parcels = collect(range(1, 5))->map(fn () => $this->sortedParcelAt($rider));
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.parcel-sorting.bulkAssignDelivery'), [
+                'courier_id' => $rider->id,
+                'seller_order_ids' => $parcels->pluck('id')->all(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', fn (string $message): bool => str_contains($message, '3 parcels assigned')
+                && str_contains($message, '2 parcels skipped because the Rider reached the 3-job limit'));
+
+        $fresh = $parcels->map->fresh();
+        $this->assertSame(3, $fresh->where('status', OrderStatus::AssignedToRider)->where('delivery_courier_id', $rider->id)->count());
+        $this->assertSame(2, $fresh->where('status', OrderStatus::Sorted)->whereNull('delivery_courier_id')->count());
+    }
+
     public function test_assign_delivery_rejected_when_not_sorted(): void
     {
         $courier = Courier::factory()->create([
@@ -352,5 +437,37 @@ class ParcelSortingTest extends TestCase
         $so->refresh();
         $this->assertSame(OrderStatus::AtSortingCenter, $so->status);
         $this->assertNull($so->delivery_courier_id);
+    }
+
+    public function test_parcels_are_sorted_by_destination_region_across_pages_with_unknown_regions_last(): void
+    {
+        $courier = Courier::factory()->create(['logistics_provider_id' => $this->provider->id]);
+        $expected = [];
+        foreach (['sorting' => OrderStatus::AtSortingCenter, 'assigned' => OrderStatus::AssignedToRider] as $tab => $status) {
+            $groups = [];
+            foreach (['13', '03'] as $region) {
+                for ($i = 0; $i < 13; $i++) {
+                    $parcel = $this->order($status, $courier);
+                    $parcel->order->update(['shipping_address' => ['province_code' => $region.'0540000']]);
+                    $parcel->forceFill(['created_at' => '2026-10-20 08:00:00'])->save();
+                    $groups[$region][] = $parcel->id;
+                }
+            }
+            $unknown = $this->order($status, $courier);
+            $unknown->order->update(['shipping_address' => []]);
+            $expected[$tab] = [...$groups['03'], ...$groups['13'], $unknown->id];
+            $foreign = $this->order($status, $courier);
+            $foreign->forceFill(['custody_provider_id' => LogisticsProvider::factory()->create()->id])->save();
+        }
+        foreach ($expected as $tab => $ids) {
+            $first = $this->actingAs($this->provider, 'logistics')
+                ->get(route('logistics.parcel-sorting.index', ['tab' => $tab]))
+                ->assertOk()->assertSee('Destination region 03')->assertSee('Destination region 13');
+            $this->assertSame(27, $first->viewData('shipments')->total());
+            $this->assertSame(array_slice($ids, 0, 25), $first->viewData('shipments')->pluck('id')->all());
+            $second = $this->get(route('logistics.parcel-sorting.index', ['tab' => $tab, 'page' => 2]))
+                ->assertOk()->assertSee('Region unavailable');
+            $this->assertSame(array_slice($ids, 25), $second->viewData('shipments')->pluck('id')->all());
+        }
     }
 }

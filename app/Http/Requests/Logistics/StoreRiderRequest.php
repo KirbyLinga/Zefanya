@@ -2,12 +2,13 @@
 
 namespace App\Http\Requests\Logistics;
 
-use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsHub;
-use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
-use App\Models\Seller\Seller;
+use App\Models\Rider\Rider;
+use App\Support\BirthDate;
+use App\Support\DocumentUpload;
 use App\Support\EmailRegistry;
+use App\Support\PersonName;
+use App\Support\PhilippineMobile;
 use App\Support\RiderValidation;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -46,11 +47,11 @@ class StoreRiderRequest extends FormRequest
         $providerId = Auth::guard('logistics')->id();
 
         return array_merge([
-            'first_name' => ['required', 'string', 'min:2', 'max:50', 'regex:'.RiderValidation::NAME_REGEX],
-            'last_name' => ['required', 'string', 'min:2', 'max:50', 'regex:'.RiderValidation::NAME_REGEX],
-            'birthday' => ['required', 'date'],
-            'email' => ['required', 'string', 'email', 'max:255', 'regex:/^[^\s@]+@[^\s@]+\.[^\s@]+$/'],
-            'contact_no' => ['required', 'regex:/^09\d{9}$/'],
+            'first_name' => PersonName::rules(),
+            'last_name' => PersonName::rules(),
+            'birthday' => BirthDate::rules(),
+            'email' => EmailRegistry::formatRules(),
+            'contact_no' => PhilippineMobile::rules(),
             'license_no' => ['required', 'string', 'regex:'.RiderValidation::LICENSE_REGEX],
             // A licence expiry may be any future date; only an expired date is
             // invalid. Parsed in Asia/Manila so "today" matches the application
@@ -67,8 +68,8 @@ class StoreRiderRequest extends FormRequest
             ],
             'vehicle_type' => ['required', Rule::in(RiderValidation::VEHICLES)],
             'plate_number' => ['required', 'string', 'max:20'],
-            'drivers_license' => ['required', 'file', 'max:5120'],
-            'or_cr' => ['required', 'file', 'max:5120'],
+            'drivers_license' => DocumentUpload::rules(),
+            'or_cr' => DocumentUpload::rules(),
             // Legacy Logistics-created riders must be attached to one of the
             // company's approved, active Station Hubs before they can activate.
             'station_hub_id' => [
@@ -117,9 +118,6 @@ class StoreRiderRequest extends FormRequest
             if ($v->errors()->any()) {
                 return;
             }
-            if (! $v->errors()->has('birthday') && $this->filled('birthday') && ! RiderValidation::isAdult((string) $this->input('birthday'))) {
-                $v->errors()->add('birthday', 'The rider must be at least 18 years old.');
-            }
             $email = strtolower((string) $this->input('email', ''));
             if ($email !== '' && ! $v->errors()->has('email')) {
                 $taken = EmailRegistry::rolesFor($email) !== [];
@@ -129,12 +127,8 @@ class StoreRiderRequest extends FormRequest
             }
             $mobile = (string) $this->input('contact_no', '');
             if ($mobile !== '' && ! $v->errors()->has('contact_no')) {
-                $taken = Rider::where('contact_no', $mobile)->exists()
-                    || Buyer::where('contact_no', $mobile)->exists()
-                    || Seller::where('contact_no', $mobile)->exists()
-                    || LogisticsProvider::where('contact_no', $mobile)->exists();
-                if ($taken) {
-                    $v->errors()->add('contact_no', 'This mobile number is already in use.');
+                if (PhilippineMobile::isTaken($mobile, 'rider')) {
+                    $v->errors()->add('contact_no', PhilippineMobile::TAKEN_MESSAGE);
                 }
             }
             $lic = (string) $this->input('license_no', '');
@@ -155,14 +149,14 @@ class StoreRiderRequest extends FormRequest
                 }
                 $ext = strtolower((string) $file->getClientOriginalExtension());
                 if (! in_array($ext, self::UPLOAD_EXTENSIONS, true)) {
-                    $v->errors()->add($field, $field === 'drivers_license' ? 'Driver license must be a JPG, PNG, or PDF.' : 'Vehicle OR/CR must be a JPG, PNG, or PDF.');
+                    $v->errors()->add($field, DocumentUpload::message($field === 'drivers_license' ? 'Driver\'s license' : 'Vehicle OR/CR'));
 
                     continue;
                 }
                 $head = (string) file_get_contents($file->getRealPath(), false, null, 0, 12);
                 $ok = str_starts_with($head, "\xFF\xD8\xFF") || str_starts_with($head, "\x89PNG\r\n\x1A\n") || str_starts_with($head, '%PDF');
                 if (! $ok) {
-                    $v->errors()->add($field, $field === 'drivers_license' ? 'Driver license content must be a real JPG, PNG, or PDF.' : 'OR/CR content must be a real JPG, PNG, or PDF.');
+                    $v->errors()->add($field, DocumentUpload::message($field === 'drivers_license' ? 'Driver\'s license' : 'Vehicle OR/CR'));
                 }
             }
         });
@@ -181,20 +175,16 @@ class StoreRiderRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'first_name.regex' => 'First name may contain only letters, spaces, hyphen, apostrophe, and period.',
-            'first_name.min' => 'First name must be at least 2 characters.',
-            'first_name.max' => 'First name must not exceed 50 characters.',
-            'last_name.regex' => 'Last name may contain only letters, spaces, hyphen, apostrophe, and period.',
-            'last_name.min' => 'Last name must be at least 2 characters.',
-            'last_name.max' => 'Last name must not exceed 50 characters.',
+            ...BirthDate::messages(),
+            ...PersonName::messages('first_name', 'First name'),
+            ...PersonName::messages('last_name', 'Last name'),
             'email.email' => 'Enter a valid email address.',
-            'email.regex' => 'Enter a valid email address with a domain.',
-            'contact_no.regex' => 'Enter a valid mobile number (09XXXXXXXXX or +639XXXXXXXXX).',
+            'email.regex' => EmailRegistry::FORMAT_MESSAGE,
             'license_no.regex' => 'License number must follow the format A00-00-000000.',
             'license_expiry.date' => 'Enter a valid license expiry date.',
             'vehicle_type.in' => 'Vehicle type must be Motorcycle, Car, or Van.',
-            'drivers_license.max' => 'Driver license must not exceed 5 MB.',
-            'or_cr.max' => 'Vehicle OR/CR must not exceed 5 MB.',
+            ...DocumentUpload::messages('drivers_license', 'Driver\'s license'),
+            ...DocumentUpload::messages('or_cr', 'Vehicle OR/CR'),
             'station_hub_id.required' => 'Select an active Station Hub for this rider.',
             'station_hub_id.exists' => 'Select an approved, active Station Hub owned by your company.',
             'province.required' => 'Select a province.',

@@ -3,6 +3,7 @@
 // Mirrors resources/js/buyer/buyer-register-modal.js.
 
 import '../registration-validation.js';
+import { registrationAddress } from '../registration-address.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     var overlay = document.getElementById('sellerModalOverlay');
@@ -60,7 +61,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var businessPermitName = document.getElementById('sellerBusinessPermitName');
     var businessPermitWrapper = businessPermitInput ? businessPermitInput.previousElementSibling : null;
 
-    var provincesLoaded = false;
+    var startAddress = registrationAddress({
+        region: document.getElementById('sellerRegion'), province: provinceSelect,
+        city: municipalitySelect, barangay: barangaySelect,
+        names: [null, provinceNameField, municipalityNameField, barangayNameField], base: PSGC_BASE
+    });
 
     var requiredElements = {
         closeBtn: closeBtn, form: form, headerIcon: headerIcon,
@@ -159,9 +164,7 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
-        if (!provincesLoaded) {
-            fetchProvinces();
-        }
+        fetchProvinces();
     };
 
     function closeModal() {
@@ -245,90 +248,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ===== PH address cascading dropdowns (PSGC API) =====
 
-    function populateSelect(select, items, placeholder) {
-        select.innerHTML = '';
-        var ph = document.createElement('option');
-        ph.value = '';
-        ph.disabled = true;
-        ph.selected = true;
-        ph.textContent = placeholder;
-        select.appendChild(ph);
-        items.forEach(function (item) {
-            var opt = document.createElement('option');
-            opt.value = item.code;
-            opt.textContent = item.name;
-            select.appendChild(opt);
-        });
-    }
-
-    function fetchProvinces() {
-        provinceSelect.innerHTML = '<option value="" disabled selected>Loading provinces...</option>';
-        fetch(PSGC_BASE + '/provinces/')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                data.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                populateSelect(provinceSelect, data, 'Select province');
-                provincesLoaded = true;
-            })
-            .catch(function () {
-                provinceSelect.innerHTML = '<option value="" disabled selected>Could not load provinces</option>';
-            });
-    }
-
-    function resetMunicipalityBarangayForNewProvince() {
-        municipalityNameField.value = '';
-        barangayNameField.value = '';
-        municipalitySelect.disabled = true;
-        barangaySelect.disabled = true;
-        municipalitySelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        barangaySelect.innerHTML = '<option value="" disabled selected>Select municipality first</option>';
-    }
-
-    function fetchMunicipalities(provinceCode) {
-        fetch(PSGC_BASE + '/provinces/' + provinceCode + '/cities-municipalities/')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                data.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                populateSelect(municipalitySelect, data, 'Select municipality/city');
-                municipalitySelect.disabled = false;
-            })
-            .catch(function () {
-                municipalitySelect.innerHTML = '<option value="" disabled selected>Could not load</option>';
-            });
-    }
-
-    function fetchBarangays(municipalityCode) {
-        fetch(PSGC_BASE + '/cities-municipalities/' + municipalityCode + '/barangays/')
-            .then(function (res) { return res.json(); })
-            .then(function (data) {
-                data.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                populateSelect(barangaySelect, data, 'Select barangay');
-                barangaySelect.disabled = false;
-            })
-            .catch(function () {
-                barangaySelect.innerHTML = '<option value="" disabled selected>Could not load</option>';
-            });
-    }
-
-    provinceSelect.addEventListener('change', function () {
-        provinceNameField.value = provinceSelect.selectedOptions[0] ? provinceSelect.selectedOptions[0].textContent : '';
-        resetMunicipalityBarangayForNewProvince();
-        fetchMunicipalities(provinceSelect.value);
-    });
-
-    municipalitySelect.addEventListener('change', function () {
-        municipalityNameField.value = municipalitySelect.selectedOptions[0] ? municipalitySelect.selectedOptions[0].textContent : '';
-        barangayNameField.value = '';
-        barangaySelect.disabled = true;
-        barangaySelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        fetchBarangays(municipalitySelect.value);
-    });
-
-    barangaySelect.addEventListener('change', function () {
-        barangayNameField.value = barangaySelect.selectedOptions[0] ? barangaySelect.selectedOptions[0].textContent : '';
-    });
+    function fetchProvinces() { startAddress(); }
 
     addressModeField.value = 'api';
+
+    var sellerType = document.getElementById('sellerType');
+    var secCertificate = document.getElementById('sellerSecCertificate');
+    function updateSellerDocuments() {
+        var corporation = sellerType.value === 'corporation';
+        document.getElementById('sellerSecCertificateFields').classList.toggle('hidden', !corporation);
+        secCertificate.required = corporation;
+        secCertificate.disabled = !corporation;
+        if (!corporation) secCertificate.value = '';
+    }
+    sellerType.addEventListener('change', updateSellerDocuments);
+    form.addEventListener('reset', function () { setTimeout(updateSellerDocuments, 0); });
+    updateSellerDocuments();
 
     // ===== Validation helpers =====
     function findFieldError(field) {
@@ -336,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (sib && sib.classList && sib.classList.contains('field-error')) return sib;
         var parentSib = field.parentElement && field.parentElement.nextElementSibling;
         if (parentSib && parentSib.classList && parentSib.classList.contains('field-error')) return parentSib;
-        return null;
+        return field.parentElement && field.parentElement.querySelector('.field-error');
     }
 
     function showFieldError(field, message) {
@@ -356,6 +291,12 @@ document.addEventListener('DOMContentLoaded', function () {
         panel.querySelectorAll('input, select, textarea').forEach(function (el) { el.classList.remove('border-[#a5333d]'); });
     }
 
+    function checkDocument(file) {
+        if (!/\.(jpe?g|png|pdf)$/i.test(file.name || '')) return 'Only JPG, PNG or PDF files are accepted.';
+        if (file.size > 5 * 1024 * 1024) return 'File is too large. The maximum size is 5 MB.';
+        return null;
+    }
+
     function validatePanel(n) {
         var panel = panels.filter(function (p) { return parseInt(p.dataset.panel, 10) === n; })[0];
         if (!panel) return true;
@@ -368,6 +309,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 // For file inputs, check if any file is selected
                 if (!field.files || field.files.length === 0) {
                     showFieldError(field, 'Please upload a file.');
+                    valid = false;
+                } else {
+                    // Same check and messages as checkDocFile() in registration-validation.js.
+                    var docError = checkDocument(field.files[0]);
+                    if (docError) {
+                        showFieldError(field, docError);
+                        valid = false;
+                    }
+                }
+            } else if (field.type === 'checkbox') {
+                // A checkbox always has a value; only the checked state counts.
+                if (!field.checked) {
+                    showFieldError(field, 'You must accept the Terms and Privacy Policy.');
                     valid = false;
                 }
             } else if (!field.value) {
@@ -427,9 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
     nextStep1.addEventListener('click', function () {
         if (validatePanel(1)) {
             showPanel(2);
-            if (!provincesLoaded) {
-                fetchProvinces();
-            }
+            fetchProvinces();
         }
     });
 
@@ -521,12 +473,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (field) showFieldError(field, res.body.errors[name][0]);
                     });
                     var step1Fields = ['first_name', 'last_name', 'middle_initial', 'sex', 'email', 'password', 'contact_no', 'birthday'];
-                    var step2Fields = ['province', 'municipality', 'barangay', 'street'];
-                    var step3Fields = ['business_name', 'line_of_business_id', 'upload_id', 'business_permit'];
+                    var step2Fields = ['region_code', 'postal_code', 'province', 'municipality', 'barangay', 'street'];
+                    var step3Fields = ['business_name', 'tin', 'seller_type', 'sec_certificate', 'line_of_business_id', 'upload_id', 'business_permit', 'terms'];
                     var errKeys = Object.keys(res.body.errors);
                     if (errKeys.some(function (k) { return step1Fields.indexOf(k) !== -1; })) showPanel(1);
                     else if (errKeys.some(function (k) { return step2Fields.indexOf(k) !== -1; })) showPanel(2);
-                    else if (errKeys.some(function (k) { return step3Fields.indexOf(k) !== -1; })) showPanel(3);
+                    else if (errKeys.some(function (k) { return step3Fields.indexOf(k.split('.')[0]) !== -1; })) showPanel(3);
                 } else {
                     console.error('[seller-register-modal] Unexpected response:', res.body);
                     alert(res.body && res.body.message ? res.body.message : 'Registration failed. Please try again.');

@@ -3,8 +3,8 @@
 namespace Tests\Feature\Http\Controllers\Buyer;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -25,7 +25,7 @@ class BuyNowTest extends TestCase
         $buyer = Buyer::factory()->create();
         $product = Product::factory()->create(['seller_id' => $seller->id, 'stock_quantity' => 5]);
 
-        $otherItem = CartItem::factory()->create([
+        CartItem::factory()->create([
             'buyer_id' => $buyer->id,
             'product_id' => $product->id,
             'variant_id' => null,

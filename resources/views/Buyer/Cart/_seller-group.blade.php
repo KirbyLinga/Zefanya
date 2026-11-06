@@ -26,6 +26,12 @@
     <span class="truncate text-[13.5px] font-semibold text-buyer-ink">{{ $seller->business_name }}</span>
   </div>
 
+  @include('Buyer.Vouchers._shop-offers', [
+      'offers' => ($shopVouchers ?? collect())->get($seller->id, collect()),
+      'applyInCart' => true,
+      'wrapperClass' => 'border-b border-buyer-line px-5 py-3.5',
+  ])
+
   {{-- Item rows --}}
   @foreach ($items as $item)
     @include('Buyer.Cart._item', ['item' => $item, 'unavailable' => false])

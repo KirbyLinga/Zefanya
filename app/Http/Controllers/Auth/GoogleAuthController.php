@@ -10,6 +10,7 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Support\EmailRegistry;
 use App\Support\SignedOtpLink;
+use App\Support\SignedRegistrationResubmission;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -105,10 +106,27 @@ class GoogleAuthController extends Controller
             return $this->failed('Google sign-in expired. Please try again.');
         }
 
+        // Never trust an unverified address: linking or signing in on an
+        // unconfirmed email would let an attacker claim someone else's account.
+        if (! $this->hasVerifiedEmail($googleUser)) {
+            return $this->failed('Google has not verified this email address. Please verify it with Google and try again.');
+        }
+
         $email = $googleUser->getEmail();
 
-        if (! is_string($email) || $email === '') {
+        if (! is_string($email) || trim($email) === '') {
             return $this->failed('Google did not share an email address. Please sign in with your password.');
+        }
+
+        // Google is case-insensitive; Zefanya stores the address as registered.
+        // Compare in lowercase so casing can never create a second identity.
+        $email = strtolower(trim($email));
+
+        // Google's stable account id (the `sub` claim) — never request data.
+        $googleId = trim((string) $googleUser->getId());
+
+        if ($googleId === '') {
+            return $this->failed('Google did not share an account id. Please try again.');
         }
 
         // Ignore admins here: the same email may exist in `admins` for
@@ -121,26 +139,28 @@ class GoogleAuthController extends Controller
             );
         }
 
-        $role ??= $this->resolveRole($email);
+        // Email is the first-time link key. Once linked, the stable Google id is
+        // authoritative even if the address changed at Google.
+        $role ??= $this->resolveRole($email) ?? $this->resolveRoleByGoogleId($googleId);
 
         if ($role === null || ! isset(self::ROLE_MAP[$role])) {
             return $this->failed(self::NO_ACCOUNT_MESSAGE);
         }
 
-        $account = self::ROLE_MAP[$role]['model']::query()->where('email', $email)->first();
+        $account = $this->findAccount($role, $email, $googleId);
 
         if (! $account instanceof Model) {
             return $this->failed(self::NO_ACCOUNT_MESSAGE);
         }
 
-        return $this->linkAndLogin($request, $role, $account, (string) $googleUser->getId());
+        return $this->linkAndLogin($role, $account, $googleId);
     }
 
     /**
      * Link on first sign-in, then enforce the approval gate password sign-in
      * also enforces, then open the session.
      */
-    private function linkAndLogin(Request $request, string $role, Model $account, string $googleId): RedirectResponse
+    private function linkAndLogin(string $role, Model $account, string $googleId): RedirectResponse
     {
         $googleId = trim($googleId);
 
@@ -164,6 +184,10 @@ class GoogleAuthController extends Controller
             };
 
             $extra = [];
+            if ($status === 'rejected' && in_array($role, ['seller', 'logistics'], true) && $account->email_verified_at !== null) {
+                $extra['auth.resume_url'] = SignedRegistrationResubmission::url($account);
+                $extra['auth.resume_label'] = 'Edit and resubmit application';
+            }
 
             if ($status === 'unverified') {
                 $extra['auth.resume_url'] = SignedOtpLink::showUrl($role, $account);
@@ -192,6 +216,14 @@ class GoogleAuthController extends Controller
     private function linkGoogleAccount(Model $account, string $googleId): ?string
     {
         if ($account->google_id === null) {
+            // Ownership gate: Google's verified claim proves the address, and
+            // the local row must also have completed its own email verification
+            // before an identity is attached automatically. An unverified local
+            // registration can therefore never be claimed by a Google sign-in.
+            if ($account->email_verified_at === null) {
+                return 'Please verify your email address before linking Google Sign-In.';
+            }
+
             if ($account->newQuery()->where('google_id', $googleId)->exists()) {
                 return 'That Google account is already linked to another Zefanya account.';
             }
@@ -201,8 +233,71 @@ class GoogleAuthController extends Controller
             return null;
         }
 
-        if ((string) $account->google_id !== $googleId) {
+        if (! hash_equals((string) $account->google_id, $googleId)) {
             return 'This email is linked to a different Google account. Please sign in with your password.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Google asserts whether it has verified the address. Socialite exposes the
+     * claim as `verified_email` in the raw payload; Google's own userinfo/JWT
+     * payload calls it `email_verified`. Both are accepted, and anything other
+     * than an explicit boolean-true is treated as unverified.
+     */
+    private function hasVerifiedEmail(object $googleUser): bool
+    {
+        $raw = method_exists($googleUser, 'getRaw') ? $googleUser->getRaw() : [];
+        $raw = is_array($raw) ? $raw : [];
+
+        $claim = $raw['verified_email'] ?? $raw['email_verified'] ?? null;
+
+        if ($claim === null && isset($googleUser->attributes) && is_array($googleUser->attributes)) {
+            $claim = $googleUser->attributes['verified_email']
+                ?? $googleUser->attributes['email_verified']
+                ?? null;
+        }
+
+        return filter_var($claim, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true;
+    }
+
+    /**
+     * Locate the row for this callback. Email is the first-time key; after the
+     * first link the stable Google id is authoritative so a Google-side email
+     * change does not lock the owner out.
+     */
+    private function findAccount(string $role, string $email, string $googleId): ?Model
+    {
+        $model = self::ROLE_MAP[$role]['model'];
+
+        $account = $model::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+
+        if ($account instanceof Model) {
+            return $account;
+        }
+
+        $account = $model::query()->where('google_id', $googleId)->first();
+
+        return $account instanceof Model ? $account : null;
+    }
+
+    /**
+     * Which role table owns this Google account id, most privileged role first.
+     * Used only when the (possibly changed) email no longer resolves a role.
+     */
+    private function resolveRoleByGoogleId(string $googleId): ?string
+    {
+        if ($googleId === '') {
+            return null;
+        }
+
+        foreach (AuthRole::publicOrder() as $authRole) {
+            $role = $authRole->value;
+
+            if (self::ROLE_MAP[$role]['model']::query()->where('google_id', $googleId)->exists()) {
+                return $role;
+            }
         }
 
         return null;
@@ -217,7 +312,7 @@ class GoogleAuthController extends Controller
             $role = $authRole->value;
             $model = self::ROLE_MAP[$role]['model'];
 
-            if ($model::query()->where('email', $email)->exists()) {
+            if ($model::query()->whereRaw('LOWER(email) = ?', [$email])->exists()) {
                 return $role;
             }
         }
@@ -237,17 +332,17 @@ class GoogleAuthController extends Controller
             default => '',
         };
 
-        if ($status === 'approved') {
+        if ($status === 'approved' || (in_array($role, ['seller', 'logistics'], true) && $status === 'pending' && $account->email_verified_at !== null)) {
             return null;
         }
 
         return match ([$role, $status]) {
             ['seller', 'unverified'] => 'Your email has not been verified yet. Please check your email for the verification code.',
             ['seller', 'pending'] => 'Your seller account is still pending administrator approval.',
-            ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.',
+            ['seller', 'rejected'] => 'Your seller registration was not approved. Please contact support or submit a new registration.'.(filled($account->rejection_reason) ? ' Reason: '.$account->rejection_reason : ''),
             ['logistics', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
             ['logistics', 'pending'] => 'Your logistics provider registration is still awaiting administrator approval.',
-            ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.',
+            ['logistics', 'rejected'] => 'Your logistics provider registration was not approved.'.(filled($account->rejection_reason) ? ' Reason: '.$account->rejection_reason : ''),
             ['buyer', 'unverified'] => 'Please verify your email before logging in. Check your inbox for the code.',
             ['buyer', 'pending'] => 'Your buyer registration is still awaiting administrator approval.',
             ['buyer', 'rejected'] => 'Your buyer registration was not approved.',
@@ -271,18 +366,5 @@ class GoogleAuthController extends Controller
         }
 
         return $redirect;
-    }
-
-    /**
-     * Log out from every guard and redirect to the home page.
-     */
-    public function logout(Request $request): RedirectResponse
-    {
-        $this->clearAllGuards();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('home');
     }
 }

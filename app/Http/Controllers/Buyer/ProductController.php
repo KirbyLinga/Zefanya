@@ -3,54 +3,100 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Shared\Category;
-use App\Services\ProductReviewService;
+use App\Models\Shared\Voucher;
+use App\Services\Buyer\BuyerAddressBook;
+use App\Services\Buyer\CatalogSearch;
+use App\Services\Buyer\CheckoutCarrierService;
+use App\Services\Buyer\ProductReviewService;
+use App\Services\Shared\PriceResolver;
+use App\Services\Shared\ResolvedPrice;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 
 class ProductController extends Controller
 {
+    /** Divides evenly into the 2, 4 and 5 column shop grid, so loaded rows stay full. */
+    private const PER_PAGE = 20;
+
     public function index(): View
     {
-        $query = Product::query()->withBuyerCardData()
-            ->activeInStock()
-            ->with(['images', 'seller', 'category'])
-            ->whereHas('seller', fn ($q) => $q->where('status', 'approved'));
+        // Base visibility + authorization filters: no expensive card aggregates yet.
+        $base = Product::query()
+            ->discoverable();
 
         if (request()->filled('seller')) {
-            $query->where('seller_id', request()->integer('seller'));
+            $base->where('seller_id', request()->integer('seller'));
         }
 
         // Filter by category if provided
         $categoryId = request('category');
         if ($categoryId) {
-            $query->where('category_id', (int) $categoryId);
+            $base->where('category_id', (int) $categoryId);
         }
 
-        // Search by product name or description
-        $search = request('q');
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($search).'%'])
-                    ->orWhereRaw('LOWER(description) LIKE ?', ['%'.strtolower($search).'%']);
-            });
+        // The navbar's Sale link: only products a buyer can really buy for less.
+        $onSaleOnly = request()->boolean('on_sale');
+        if ($onSaleOnly) {
+            $base->withRealSaleDiscount();
         }
 
-        $query->withBuyerPriceFilters(request()->only(['min_price', 'max_price', 'sort']));
+        // Search by product name or description (the navbar searches here).
+        $searchTerm = CatalogSearch::term(request()->query('q'));
+        if ($searchTerm !== '') {
+            CatalogSearch::apply($base, $searchTerm);
+        }
 
-        // Paginate with query string preservation
-        $products = $query->paginate(12)->withQueryString();
+        ['filters' => $priceFilters, 'error' => $priceError] = CatalogSearch::priceFilters(request()->only(['min_price', 'max_price']));
+
+        $perPage = self::PER_PAGE;
+        $page = max(1, (int) request()->integer('page', 1));
+
+        // Phase 1: select the page of product IDs *before* the expensive
+        // rating/sales/stock aggregates. The sort (including price sort) is
+        // applied here so the final ordering stays correct.
+        $idQuery = clone $base;
+        $idQuery->withBuyerPriceFilters($priceFilters + request()->only(['sort']));
+        $total = (int) $idQuery->count();
+        $ids = $idQuery->forPage($page, $perPage)->pluck('id')->all();
+
+        // Phase 2: load card aggregates + eager loads only for this page.
+        // Ordered in PHP to stay portable (SQLite has no FIELD() function).
+        $products = Product::query()->withBuyerCardData()
+            ->with(['images', 'seller', 'category'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy(fn (Product $product) => array_search($product->id, $ids, true))
+            ->values();
+
+        $products = new LengthAwarePaginator(
+            $products, $total, $perPage, $page,
+            ['path' => request()->url()]
+        );
+        $products->appends(request()->except(array_merge(['page'], $priceError !== null ? ['min_price', 'max_price'] : [])));
 
         // Load all categories for filters
         $categories = Category::orderBy('label')->get();
 
+        $suggestion = $products->isEmpty() && $searchTerm !== '' && $priceFilters === []
+            && ! request()->filled('category') && ! request()->filled('seller') && ! $onSaleOnly
+            ? CatalogSearch::suggest($searchTerm)
+            : null;
+
         return view('Buyer.Products.index', compact(
             'products',
             'categories',
+            'searchTerm',
+            'priceFilters',
+            'priceError',
+            'suggestion',
+            'onSaleOnly',
         ));
     }
 
-    public function show(Product $id): View
+    public function show(Product $id, BuyerAddressBook $addressBook, CheckoutCarrierService $carriers): View
     {
         $product = $id;
 
@@ -58,13 +104,18 @@ class ProductController extends Controller
             abort(404);
         }
 
-        $product->load(['images', 'seller', 'category', 'variants.optionValues.option']);
+        $product->load(['images', 'seller', 'category', 'variants.optionValues.option', 'options.values', 'storeCategories.parent']);
 
         $product->loadAvg('reviews', 'rating')->loadCount('reviews');
-        $reviews = $product->reviews()->latest('id')->paginate(10, ['rating', 'body', 'created_at'], 'reviews_page');
+        $ratingCounts = $product->reviews()->selectRaw('rating, COUNT(*) as total')->groupBy('rating')->pluck('total', 'rating');
+        $reviews = $product->reviews()->with(['photos', 'orderItem', 'buyer:id,first_name,middle_initial,last_name'])->latest('id')->paginate(10, ['id', 'buyer_id', 'order_item_id', 'rating', 'body', 'seller_reply', 'seller_replied_at', 'seller_reply_edited_at', 'created_at'], 'reviews_page');
         $reviewBuyer = auth('buyer')->user();
-        $canReview = $reviewBuyer && app(ProductReviewService::class)->eligibleItem($product, $reviewBuyer);
-        $myReview = $reviewBuyer ? $product->reviews()->where('buyer_id', $reviewBuyer->id)->first() : null;
+        $reviewService = app(ProductReviewService::class);
+        $reviewableItems = $reviewBuyer ? $reviewService->reviewableItems($product, $reviewBuyer) : collect();
+        $canReview = $reviewableItems->isNotEmpty();
+        $myReviews = $reviewBuyer
+            ? $product->reviews()->where('buyer_id', $reviewBuyer->id)->with(['photos', 'orderItem'])->latest('id')->get()
+            : collect();
 
         $breadcrumb = [
             ['label' => 'Home', 'url' => route('buyer.home')],
@@ -85,7 +136,9 @@ class ProductController extends Controller
             $galleryImages = array_values(array_unique([$coverImage, ...$galleryImages]));
         }
 
-        $price = $product->formattedPriceRange();
+        $pricing = $product->buyerPrice();
+        $price = $pricing?->formatted() ?? 'Unavailable';
+        $resolver = app(PriceResolver::class);
 
         $variantAxes = null;
         $variantData = null;
@@ -106,7 +159,7 @@ class ProductController extends Controller
                 ->filter->hasOptions()
                 ->map(fn ($variant) => [
                     'id' => $variant->id,
-                    'price' => (float) $variant->price,
+                    ...$this->variantPricing($resolver->forVariant($product, $variant)),
                     'stock' => (int) $variant->stock_quantity,
                     'available' => $variant->is_available,
                     'images' => ($variantImage = $product->catalogImageUrl(
@@ -125,7 +178,7 @@ class ProductController extends Controller
         if ($variantAxes === null && $product->variants->count() > 1) {
             $variantAxes = [['name' => 'Option', 'values' => $product->variants->map(fn ($variant) => 'Option '.$variant->id)->all()]];
             $variantData = $product->variants->map(fn ($variant) => [
-                'id' => $variant->id, 'price' => (float) $variant->price,
+                'id' => $variant->id, ...$this->variantPricing($resolver->forVariant($product, $variant)),
                 'stock' => $variant->stock_quantity, 'available' => $variant->is_available,
                 'values' => ['Option '.$variant->id],
             ])->all();
@@ -135,18 +188,30 @@ class ProductController extends Controller
             ?? 'No description has been added for this product yet.';
 
         $seller = $product->seller;
+        $shippingAvailability = null;
+        $deliveryAddress = null;
+        $deliveryAddressComplete = false;
+        if ($reviewBuyer !== null && $seller !== null) {
+            $deliverTo = $addressBook->deliveringTo($reviewBuyer, $addressBook->chosen($reviewBuyer, null));
+            $deliveryAddressComplete = filled($deliverTo->province_code) && filled($deliverTo->barangay_code);
+            $deliveryAddress = collect([$deliverTo->barangay_name, $deliverTo->municipality_name, $deliverTo->province_name])
+                ->filter()->implode(', ');
+            $shippingAvailability = $carriers->optionsForSellerGroup($deliverTo, $seller, 0, (int) $product->weight_grams);
+        }
+        $shopVouchers = $seller === null ? collect() : Voucher::offeredBy([(int) $seller->id], auth('buyer')->id())
+            ->filter(fn (Voucher $voucher): bool => $voucher->appliesToProduct($product->id))
+            ->values();
         $sellerData = [
             'name' => $seller?->business_name ?? 'Zefanya Marketplace',
             'initials' => $seller?->storeInitials() ?? 'ZM',
         ];
 
         $related = Product::query()->withBuyerCardData()
-            ->activeInStock()
+            ->discoverable()
             ->when(
                 $product->category_id,
                 fn ($q) => $q->where('category_id', $product->category_id),
             )
-            ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
             ->where('id', '!=', $product->id)
             ->with(['images', 'seller'])
             ->latest('id')
@@ -157,15 +222,96 @@ class ProductController extends Controller
             'product',
             'reviews',
             'canReview',
-            'myReview',
+            'reviewableItems',
+            'ratingCounts',
+            'myReviews',
             'breadcrumb',
             'galleryImages',
             'price',
+            'pricing',
+            'shopVouchers',
             'description',
             'sellerData',
+            'shippingAvailability',
+            'deliveryAddress',
+            'deliveryAddressComplete',
             'related',
             'variantAxes',
             'variantData',
         ));
+    }
+
+    /**
+     * Load more products via AJAX for infinite scroll / load-more button.
+     * Returns the next page of products as HTML fragments (partial product cards).
+     */
+    public function loadMore(): JsonResponse
+    {
+        $base = Product::query()
+            ->discoverable();
+
+        if (request()->filled('seller')) {
+            $base->where('seller_id', request()->integer('seller'));
+        }
+
+        $categoryId = request('category');
+        if ($categoryId) {
+            $base->where('category_id', (int) $categoryId);
+        }
+
+        $onSaleOnly = request()->boolean('on_sale');
+        if ($onSaleOnly) {
+            $base->withRealSaleDiscount();
+        }
+
+        $searchTerm = CatalogSearch::term(request()->query('q'));
+        if ($searchTerm !== '') {
+            CatalogSearch::apply($base, $searchTerm);
+        }
+
+        ['filters' => $priceFilters, 'error' => $priceError] = CatalogSearch::priceFilters(
+            request()->only(['min_price', 'max_price'])
+        );
+
+        $perPage = self::PER_PAGE;
+        $page = max(1, (int) request()->integer('page', 2));
+
+        // Same two-phase loading as index()
+        $idQuery = clone $base;
+        $idQuery->withBuyerPriceFilters($priceFilters + request()->only(['sort']));
+        $total = (int) $idQuery->count();
+        $ids = $idQuery->forPage($page, $perPage)->pluck('id')->all();
+
+        $products = Product::query()->withBuyerCardData()
+            ->with(['images', 'seller', 'category'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy(fn (Product $product) => array_search($product->id, $ids, true))
+            ->values();
+
+        $hasMore = ($page * $perPage) < $total;
+        $showing = min($page * $perPage, $total);
+
+        return response()->json([
+            'html' => view('Buyer.Products._load-more-items', ['products' => $products])->render(),
+            'total' => $total,
+            'showing' => $showing,
+            'has_more' => $hasMore,
+            'next_page' => $page + 1,
+        ]);
+    }
+
+    /**
+     * The picker's price text comes from the server, never from browser math.
+     *
+     * @return array{price: string, regular_price: string|null, badge: string|null}
+     */
+    private function variantPricing(ResolvedPrice $price): array
+    {
+        return [
+            'price' => $price->formatted(),
+            'regular_price' => $price->formattedRegular(),
+            'badge' => $price->badge(),
+        ];
     }
 }

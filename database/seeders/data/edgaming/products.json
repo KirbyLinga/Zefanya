@@ -1,0 +1,1214 @@
+[
+    {
+        "name": "PlayStation 5 Console with DualSense",
+        "brand": "Sony",
+        "condition": "New",
+        "price": 28990,
+        "stock": 12,
+        "weight_grams": 4500,
+        "dimensions": {
+            "length": 45,
+            "width": 30,
+            "height": 15
+        },
+        "description": "Next-generation PlayStation console with an ultra-fast SSD, ray tracing support and one DualSense wireless controller in the box.",
+        "images": [
+            {
+                "file": "ps5-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:PlayStation_5_and_DualSense.jpg",
+                "author": "Osh33m",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "PlayStation 4 Slim Console",
+        "brand": "Sony",
+        "condition": "New",
+        "price": 16990,
+        "stock": 10,
+        "weight_grams": 2200,
+        "dimensions": {
+            "length": 35,
+            "width": 30,
+            "height": 10
+        },
+        "description": "Slim and quiet PS4 console with access to a huge library of games, streaming apps and HDR support.",
+        "images": [
+            {
+                "file": "ps4-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:PlayStation_4_Slim_video_game_console.jpg",
+                "author": "Mtsan43558918",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "PlayStation 3 Slim Console (Pre-owned)",
+        "brand": "Sony",
+        "condition": "Used",
+        "price": 6490,
+        "stock": 4,
+        "weight_grams": 2800,
+        "dimensions": {
+            "length": 35,
+            "width": 30,
+            "height": 12
+        },
+        "description": "Tested and cleaned pre-owned PS3 Slim with one wireless controller, ideal for Blu-ray playback and classic titles.",
+        "images": [
+            {
+                "file": "ps5-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Sony-PlayStation-3-2001A-wController-L.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "PlayStation 2 Slim Console (Pre-owned)",
+        "brand": "Sony",
+        "condition": "Used",
+        "price": 3990,
+        "stock": 5,
+        "weight_grams": 1200,
+        "dimensions": {
+            "length": 28,
+            "width": 20,
+            "height": 8
+        },
+        "description": "Tested and cleaned pre-owned PS2 Slim for playing the classics. A compact console for any retro collection.",
+        "images": [
+            {
+                "file": "ps5-5.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Sony-PlayStation-2-70001-Console-BR.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Xbox Series X Console",
+        "brand": "Microsoft",
+        "condition": "New",
+        "price": 29990,
+        "stock": 8,
+        "weight_grams": 5000,
+        "dimensions": {
+            "length": 40,
+            "width": 25,
+            "height": 20
+        },
+        "description": "The most powerful Xbox, with true 4K gaming, fast load times and backward compatibility across generations.",
+        "images": [
+            {
+                "file": "xsx-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Xbox_Series_X_2.jpg",
+                "author": "Der. Bellemer",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Xbox Series S Console",
+        "brand": "Microsoft",
+        "condition": "New",
+        "price": 17990,
+        "stock": 14,
+        "weight_grams": 2200,
+        "dimensions": {
+            "length": 35,
+            "width": 25,
+            "height": 12
+        },
+        "description": "Compact all-digital Xbox with next-generation speed and performance, plus one wireless controller.",
+        "images": [
+            {
+                "file": "xss-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Xbox_Series_S_with_controller.jpg",
+                "author": "AsmodeanUnderscore",
+                "license": "CC BY-SA 4.0"
+            },
+            {
+                "file": "xss-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Xbox_Series_S_with_controller_and_box.jpg",
+                "author": "AsmodeanUnderscore",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Nintendo Switch Console with Joy-Con",
+        "brand": "Nintendo",
+        "condition": "New",
+        "price": 17490,
+        "stock": 15,
+        "weight_grams": 1500,
+        "dimensions": {
+            "length": 30,
+            "width": 20,
+            "height": 12
+        },
+        "description": "Play at home on the TV or on the go. Includes the dock and neon red and blue Joy-Con controllers.",
+        "images": [
+            {
+                "file": "switch-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo-Switch-Console-Docked-wJoyConRB.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Nintendo Switch 2 Console",
+        "brand": "Nintendo",
+        "condition": "New",
+        "price": 29490,
+        "stock": 6,
+        "weight_grams": 1700,
+        "dimensions": {
+            "length": 35,
+            "width": 22,
+            "height": 12
+        },
+        "description": "The successor to the Switch, with a larger display, magnetic Joy-Con 2 controllers and the redesigned dock.",
+        "images": [
+            {
+                "file": "switch-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo_Switch_2_in_Docking_Console.jpg",
+                "author": "Crisco 1492",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Nintendo Switch Lite (Grey)",
+        "brand": "Nintendo",
+        "condition": "New",
+        "price": 11490,
+        "stock": 12,
+        "weight_grams": 600,
+        "dimensions": {
+            "length": 25,
+            "width": 14,
+            "height": 8
+        },
+        "description": "Compact and lightweight handheld-only Switch with built-in controls, in a clean grey finish.",
+        "images": [
+            {
+                "file": "switchlite-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo_Switch_Lite_Grey_-_01.jpg",
+                "author": "DYVER",
+                "license": "CC BY-SA 4.0"
+            },
+            {
+                "file": "switchlite-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo_Switch_Lite_Grey_-_02.jpg",
+                "author": "DYVER",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Nintendo Switch Lite (Turquoise)",
+        "brand": "Nintendo",
+        "condition": "New",
+        "price": 11490,
+        "stock": 9,
+        "weight_grams": 600,
+        "dimensions": {
+            "length": 25,
+            "width": 14,
+            "height": 8
+        },
+        "description": "Compact and lightweight handheld-only Switch with built-in controls, in a bright turquoise finish.",
+        "images": [
+            {
+                "file": "switchlite-5.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo_switch_lite_blue.jpg",
+                "author": "GerdeeX",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Game Boy Advance (Purple, Pre-owned)",
+        "brand": "Nintendo",
+        "condition": "Used",
+        "price": 4490,
+        "stock": 3,
+        "weight_grams": 350,
+        "dimensions": {
+            "length": 18,
+            "width": 12,
+            "height": 6
+        },
+        "description": "Tested pre-owned Game Boy Advance in the classic purple, ready for your favorite cartridges.",
+        "images": [
+            {
+                "file": "gameboy-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo-Game-Boy-Advance-Purple-FL.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Lenovo Legion Go Handheld",
+        "brand": "Lenovo",
+        "condition": "New",
+        "price": 39990,
+        "stock": 4,
+        "weight_grams": 1400,
+        "dimensions": {
+            "length": 35,
+            "width": 20,
+            "height": 12
+        },
+        "description": "Windows gaming handheld with a large high-refresh display and detachable controllers for PC games anywhere.",
+        "images": [
+            {
+                "file": "legion-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Lenovo_Legion_Go.jpg",
+                "author": "TaurusEmerald",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "DualSense Wireless Controller (White)",
+        "brand": "Sony",
+        "condition": "New",
+        "price": 3990,
+        "stock": 30,
+        "weight_grams": 500,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "PS5 controller with haptic feedback, adaptive triggers and a built-in microphone in the original white.",
+        "images": [
+            {
+                "file": "dualsense-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Playstation_DualSense_Controller.png",
+                "author": "Alex Cochrane",
+                "license": "CC BY-SA 4.0"
+            },
+            {
+                "file": "dualsense-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Playstation_Dualsense_controller.jpg",
+                "author": "Sergey Galyonkin",
+                "license": "CC BY-SA 2.0"
+            }
+        ]
+    },
+    {
+        "name": "DualSense Wireless Controller (Midnight Black)",
+        "brand": "Sony",
+        "condition": "New",
+        "price": 3990,
+        "stock": 25,
+        "weight_grams": 500,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "PS5 controller with haptic feedback and adaptive triggers in a sleek Midnight Black finish.",
+        "images": [
+            {
+                "file": "dualsense-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Playstation_5_DualSense_controller_in_Midnight_Black,_2026-02-07_(front).jpg",
+                "author": "Chris Woodrich",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "DualSense Wireless Controller (Chroma Pearl)",
+        "brand": "Sony",
+        "condition": "New",
+        "price": 4490,
+        "stock": 10,
+        "weight_grams": 500,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Special Chroma Pearl edition of the PS5 controller with a pearlescent finish, haptics and adaptive triggers.",
+        "images": [
+            {
+                "file": "dualsense-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:DualSense_Controller_Chroma_Pearl.jpg",
+                "author": "Sonson2",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Xbox Wireless Controller (Light Blue)",
+        "brand": "Microsoft",
+        "condition": "New",
+        "price": 3490,
+        "stock": 20,
+        "weight_grams": 450,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Modern Xbox controller with textured grips and a share button. Works with Xbox consoles and Windows PCs.",
+        "images": [
+            {
+                "file": "xss-5.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Xbox_series_s_controller.jpg",
+                "author": "Microsoft",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Xbox One Wireless Controller (Black)",
+        "brand": "Microsoft",
+        "condition": "New",
+        "price": 2990,
+        "stock": 18,
+        "weight_grams": 450,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Comfortable and reliable wireless gamepad for Xbox and Windows PC, in classic black.",
+        "images": [
+            {
+                "file": "xboxpad-5.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Microsoft-Xbox-One-controller.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Xbox 360 Wireless Controller (White, Pre-owned)",
+        "brand": "Microsoft",
+        "condition": "Used",
+        "price": 1190,
+        "stock": 8,
+        "weight_grams": 400,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Tested pre-owned Xbox 360 wireless controller, a comfortable classic for retro sessions.",
+        "images": [
+            {
+                "file": "xboxpad-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Xbox-360-Wireless-Controller-White.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Nintendo Switch Pro Controller",
+        "brand": "Nintendo",
+        "condition": "New",
+        "price": 3990,
+        "stock": 16,
+        "weight_grams": 450,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Traditional full-size controller for the Switch with motion controls, rumble and long battery life.",
+        "images": [
+            {
+                "file": "switchpro-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo-Switch-Pro-Controller-FL.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            },
+            {
+                "file": "switchpro-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Nintendo-Switch-Pro-Controller-BR.jpg",
+                "author": "Evan-Amos",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Afterglow Wireless Controller for Switch",
+        "brand": "PDP",
+        "condition": "New",
+        "price": 2290,
+        "stock": 10,
+        "weight_grams": 450,
+        "dimensions": {
+            "length": 22,
+            "width": 18,
+            "height": 8
+        },
+        "description": "Transparent wireless Switch controller with bright LED lighting effects. Sold sealed in retail packaging.",
+        "images": [
+            {
+                "file": "switchpro-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Afterglow_Switch_Pro_Controller.jpg",
+                "author": "WrestlingGeek5196",
+                "license": "CC0"
+            }
+        ]
+    },
+    {
+        "name": "Joy-Con 2 Charging Grip",
+        "brand": "Nintendo",
+        "condition": "New",
+        "price": 2490,
+        "stock": 12,
+        "weight_grams": 300,
+        "dimensions": {
+            "length": 18,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Comfortable grip for playing with your Joy-Con 2 controllers like a traditional gamepad.",
+        "images": [
+            {
+                "file": "joycon-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Joy-Con_Grip_2_mit_Joy-Con_2_20250605_HOF4474-HDR_RAW-Export.png",
+                "author": "PantheraLeo1359531",
+                "license": "CC BY 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech G502 X Plus Wireless Mouse",
+        "brand": "Logitech G",
+        "condition": "New",
+        "price": 8490,
+        "stock": 12,
+        "weight_grams": 250,
+        "dimensions": {
+            "length": 18,
+            "width": 12,
+            "height": 6
+        },
+        "description": "Wireless gaming mouse with hybrid optical-mechanical switches, RGB lighting and a white and teal design.",
+        "images": [
+            {
+                "file": "g502-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:2026_G502_X_PLUS_(side_view).jpg",
+                "author": "Stan Lee",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech G502 Hero Gaming Mouse",
+        "brand": "Logitech G",
+        "condition": "New",
+        "price": 2790,
+        "stock": 25,
+        "weight_grams": 250,
+        "dimensions": {
+            "length": 18,
+            "width": 12,
+            "height": 6
+        },
+        "description": "Popular wired gaming mouse with the HERO sensor, programmable buttons and adjustable weights.",
+        "images": [
+            {
+                "file": "g502-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech_G502_Hero.jpg",
+                "author": "Panthermail",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech G903 Lightspeed Wireless Mouse",
+        "brand": "Logitech G",
+        "condition": "New",
+        "price": 6490,
+        "stock": 8,
+        "weight_grams": 250,
+        "dimensions": {
+            "length": 18,
+            "width": 12,
+            "height": 6
+        },
+        "description": "Ambidextrous wireless gaming mouse with Lightspeed connectivity. USB receiver included.",
+        "images": [
+            {
+                "file": "g903-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:2023_Mysz_komputerowa_Logitech_G903_Lightspeed.jpg",
+                "author": "Jacek Halicki",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Razer DeathAdder Elite Gaming Mouse",
+        "brand": "Razer",
+        "condition": "New",
+        "price": 2490,
+        "stock": 18,
+        "weight_grams": 250,
+        "dimensions": {
+            "length": 18,
+            "width": 12,
+            "height": 6
+        },
+        "description": "Ergonomic wired gaming mouse with an accurate optical sensor and a comfortable right-handed shape.",
+        "images": [
+            {
+                "file": "deathadder-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Razer_DeathAdder_Elite-top_PNr%C2%B00466.jpg",
+                "author": "D-Kuru",
+                "license": "CC BY-SA 3.0 at"
+            },
+            {
+                "file": "deathadder-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Razer_DeathAdder_Elite-front_oblique-ar_16to10-fs_PNr%C2%B00465.jpg",
+                "author": "D-Kuru",
+                "license": "CC BY-SA 3.0 at"
+            },
+            {
+                "file": "deathadder-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Razer_DeathAdder_Elite-bottom_PNr%C2%B00467.jpg",
+                "author": "D-Kuru",
+                "license": "CC BY-SA 3.0 at"
+            }
+        ]
+    },
+    {
+        "name": "Keychron K8 Wireless Mechanical Keyboard",
+        "brand": "Keychron",
+        "condition": "New",
+        "price": 4990,
+        "stock": 12,
+        "weight_grams": 1100,
+        "dimensions": {
+            "length": 40,
+            "width": 18,
+            "height": 6
+        },
+        "description": "Tenkeyless wireless mechanical keyboard with a retro look. Connects to Mac and Windows over Bluetooth or USB-C.",
+        "images": [
+            {
+                "file": "keychron-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Keychron_K8_Non-Backlight_Wireless_Mechanical_Keyboard_-_52772912798.jpg",
+                "author": "Triple-green",
+                "license": "CC BY 2.0"
+            },
+            {
+                "file": "keychron-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Keychron_K8_Non-Backlight_Wireless_Mechanical_Keyboard_(closeup).jpg",
+                "author": "Triple-green",
+                "license": "CC BY 2.0"
+            },
+            {
+                "file": "keychron-5.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Keychron_K8_Non-Backlight_Wireless_Mechanical_Keyboard_-_52771896827.jpg",
+                "author": "Triple-green",
+                "license": "CC BY 2.0"
+            }
+        ]
+    },
+    {
+        "name": "Keychron K4 Mechanical Keyboard",
+        "brand": "Keychron",
+        "condition": "New",
+        "price": 5290,
+        "stock": 8,
+        "weight_grams": 1000,
+        "dimensions": {
+            "length": 40,
+            "width": 18,
+            "height": 6
+        },
+        "description": "Compact 96 percent layout wireless mechanical keyboard that keeps the number pad while saving desk space.",
+        "images": [
+            {
+                "file": "keychron-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Keychron_K4_mechanical_keyboard.jpg",
+                "author": "iMoD Official YouTube channel",
+                "license": "CC BY 3.0"
+            }
+        ]
+    },
+    {
+        "name": "Razer BlackWidow Mechanical Keyboard",
+        "brand": "Razer",
+        "condition": "New",
+        "price": 5490,
+        "stock": 10,
+        "weight_grams": 1500,
+        "dimensions": {
+            "length": 50,
+            "width": 20,
+            "height": 6
+        },
+        "description": "Full-size mechanical gaming keyboard with green backlighting and dedicated macro keys.",
+        "images": [
+            {
+                "file": "blackwidow-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Razer_BlackWidow_Ultimate_2014_Elite_Mechanical_Gaming_Keyboard.jpg",
+                "author": "osman.gucel",
+                "license": "CC BY 2.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech G910 Orion Mechanical Keyboard",
+        "brand": "Logitech G",
+        "condition": "New",
+        "price": 7490,
+        "stock": 6,
+        "weight_grams": 1600,
+        "dimensions": {
+            "length": 55,
+            "width": 25,
+            "height": 6
+        },
+        "description": "Full-size RGB mechanical gaming keyboard with Romer-G switches, macro keys and a palm rest.",
+        "images": [
+            {
+                "file": "mechkb-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech-g910_(16475940137).jpg",
+                "author": "Sinchen.Lin",
+                "license": "CC BY 2.0"
+            },
+            {
+                "file": "mechkb-5.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech-g910_(16093947623).jpg",
+                "author": "Sinchen.Lin",
+                "license": "CC BY 2.0"
+            }
+        ]
+    },
+    {
+        "name": "Corsair K65 RGB Mechanical Keyboard",
+        "brand": "Corsair",
+        "condition": "New",
+        "price": 5990,
+        "stock": 9,
+        "weight_grams": 1100,
+        "dimensions": {
+            "length": 42,
+            "width": 18,
+            "height": 6
+        },
+        "description": "Compact tenkeyless mechanical keyboard with per-key RGB lighting and an aluminum frame.",
+        "images": [
+            {
+                "file": "corsairkb-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Corsair_K65_1_2017-01-01.jpg",
+                "author": "FASTILY",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Mars Gaming MK6 Mechanical Keyboard",
+        "brand": "Mars Gaming",
+        "condition": "New",
+        "price": 2490,
+        "stock": 14,
+        "weight_grams": 900,
+        "dimensions": {
+            "length": 45,
+            "width": 18,
+            "height": 6
+        },
+        "description": "Affordable mechanical gaming keyboard with colorful RGB backlighting for everyday play.",
+        "images": [
+            {
+                "file": "mechkb-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Mars_Gaming_MK6_gaming_keyboard_(49426451032).jpg",
+                "author": "Jorge Franganillo",
+                "license": "CC BY 2.0"
+            }
+        ]
+    },
+    {
+        "name": "Oculus Quest 2 VR Headset",
+        "brand": "Meta",
+        "condition": "New",
+        "price": 17990,
+        "stock": 7,
+        "weight_grams": 900,
+        "dimensions": {
+            "length": 28,
+            "width": 20,
+            "height": 12
+        },
+        "description": "Standalone virtual reality headset with two Touch controllers. No PC or cables required.",
+        "images": [
+            {
+                "file": "quest2-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Oculus_Quest_II_(50844634326).jpg",
+                "author": "Maximilian Prandstätter",
+                "license": "CC BY 2.0"
+            }
+        ]
+    },
+    {
+        "name": "Meta Quest 3 VR Headset",
+        "brand": "Meta",
+        "condition": "New",
+        "price": 29990,
+        "stock": 6,
+        "weight_grams": 1000,
+        "dimensions": {
+            "length": 28,
+            "width": 20,
+            "height": 12
+        },
+        "description": "Mixed reality headset with full-color passthrough, sharper lenses and redesigned Touch Plus controllers.",
+        "images": [
+            {
+                "file": "quest3-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Meta_Quest_3_front_View.jpg",
+                "author": "Roy.wonder.cohen",
+                "license": "CC BY-SA 4.0"
+            },
+            {
+                "file": "quest3-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Meta_Quest_3_-_3.jpg",
+                "author": "Kyu3a",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "PlayStation VR2 Headset",
+        "brand": "Sony",
+        "condition": "New",
+        "price": 32990,
+        "stock": 5,
+        "weight_grams": 1200,
+        "dimensions": {
+            "length": 30,
+            "width": 25,
+            "height": 15
+        },
+        "description": "PS5 virtual reality headset with OLED displays, eye tracking and two Sense controllers.",
+        "images": [
+            {
+                "file": "psvr2-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:PlayStation_VR2.jpg",
+                "author": "ArlindoPereira",
+                "license": "CC BY 4.0"
+            },
+            {
+                "file": "psvr2-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:PlayStation_VR2_Sense_Controllers.jpg",
+                "author": "GeorgeM2011",
+                "license": "Public domain"
+            }
+        ]
+    },
+    {
+        "name": "Gigabyte GeForce RTX 3090 Eagle OC 24GB",
+        "brand": "Gigabyte",
+        "condition": "New",
+        "price": 64990,
+        "stock": 3,
+        "weight_grams": 1800,
+        "dimensions": {
+            "length": 38,
+            "width": 18,
+            "height": 10
+        },
+        "description": "High-end graphics card with 24GB of GDDR6X memory and a triple-fan cooler for 4K gaming and creative work.",
+        "images": [
+            {
+                "file": "rtx3080-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Gigabyte_GeForce_RTX_3090_Eagle_OC_24G,_24576_MiB_GDDR6X_Front_20201114_DSC5880.jpg",
+                "author": "PantheraLeo1359531",
+                "license": "CC BY 4.0"
+            }
+        ]
+    },
+    {
+        "name": "MSI GeForce RTX 3070 Ventus 3X OC",
+        "brand": "MSI",
+        "condition": "New",
+        "price": 24990,
+        "stock": 6,
+        "weight_grams": 1400,
+        "dimensions": {
+            "length": 35,
+            "width": 16,
+            "height": 8
+        },
+        "description": "Capable 1440p graphics card with ray tracing, DLSS and a quiet triple-fan cooler.",
+        "images": [
+            {
+                "file": "rtx3080-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:MSI_GeForce_RTX_3070_VENTUS_3X_OC.jpg",
+                "author": "TheStriker",
+                "license": "CC BY 4.0"
+            }
+        ]
+    },
+    {
+        "name": "NVIDIA GeForce RTX 4090 Founders Edition",
+        "brand": "NVIDIA",
+        "condition": "New",
+        "price": 119990,
+        "stock": 2,
+        "weight_grams": 3000,
+        "dimensions": {
+            "length": 40,
+            "width": 20,
+            "height": 12
+        },
+        "description": "Flagship graphics card with 24GB of GDDR6X memory for uncompromising 4K gaming and AI workloads.",
+        "images": [
+            {
+                "file": "rtx4090-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_(ZMASLO).png",
+                "author": "ZMASLO",
+                "license": "CC BY 3.0"
+            }
+        ]
+    },
+    {
+        "name": "AMD Ryzen 9 9950X Processor",
+        "brand": "AMD",
+        "condition": "New",
+        "price": 38990,
+        "stock": 6,
+        "weight_grams": 200,
+        "dimensions": {
+            "length": 15,
+            "width": 12,
+            "height": 8
+        },
+        "description": "16-core, 32-thread desktop processor for the AM5 platform, built for gaming and heavy multitasking.",
+        "images": [
+            {
+                "file": "ryzen-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:AMD_Ryzen_9_9950X.jpg",
+                "author": "4300streetcar",
+                "license": "CC BY 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Intel Core i9-14900KF Processor",
+        "brand": "Intel",
+        "condition": "New",
+        "price": 33990,
+        "stock": 5,
+        "weight_grams": 200,
+        "dimensions": {
+            "length": 15,
+            "width": 12,
+            "height": 8
+        },
+        "description": "24-core unlocked desktop processor for LGA1700 boards. Requires a dedicated graphics card.",
+        "images": [
+            {
+                "file": "corei9-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Intel_i9-14900KF_CPU.jpg",
+                "author": "Pstrahl",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "G.Skill Ripjaws V DDR4 Desktop Memory",
+        "brand": "G.Skill",
+        "condition": "New",
+        "price": 2790,
+        "stock": 20,
+        "weight_grams": 100,
+        "dimensions": {
+            "length": 15,
+            "width": 8,
+            "height": 3
+        },
+        "description": "Reliable DDR4 desktop memory with a low-profile red heat spreader for gaming builds.",
+        "images": [
+            {
+                "file": "vengeance-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:RAM_Module_(SDRAM-DDR4).jpg",
+                "author": "ElooKoN",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Corsair Vengeance LPX 16GB DDR4 Kit (2x8GB)",
+        "brand": "Corsair",
+        "condition": "New",
+        "price": 2990,
+        "stock": 18,
+        "weight_grams": 120,
+        "dimensions": {
+            "length": 15,
+            "width": 8,
+            "height": 3
+        },
+        "description": "Two 8GB DDR4 modules with low-profile black heat spreaders for dual-channel performance.",
+        "images": [
+            {
+                "file": "vengeance-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:2*8Go_DDR4_Corsair_-_2018-05-08.jpg",
+                "author": "Bretwa",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Samsung 980 PRO 1TB NVMe SSD",
+        "brand": "Samsung",
+        "condition": "New",
+        "price": 6490,
+        "stock": 15,
+        "weight_grams": 50,
+        "dimensions": {
+            "length": 12,
+            "width": 8,
+            "height": 2
+        },
+        "description": "PCIe 4.0 M.2 solid state drive with very fast read speeds for quick boots and game loads.",
+        "images": [
+            {
+                "file": "nvme-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Samsung_980_PRO_PCIe_4.0_NVMe_SSD_1TB-top_PNr%C2%B00915.jpg",
+                "author": "D-Kuru",
+                "license": "CC BY-SA 4.0"
+            },
+            {
+                "file": "nvme-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Samsung_980_PRO_PCIe_4.0_NVMe_SSD_1TB-bottom_PNr%C2%B00916.jpg",
+                "author": "D-Kuru",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Corsair H115i 280mm Liquid CPU Cooler",
+        "brand": "Corsair",
+        "condition": "New",
+        "price": 7990,
+        "stock": 6,
+        "weight_grams": 1500,
+        "dimensions": {
+            "length": 35,
+            "width": 18,
+            "height": 12
+        },
+        "description": "All-in-one liquid CPU cooler with a 280mm radiator that keeps high-end processors cool and quiet.",
+        "images": [
+            {
+                "file": "aio-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:H115i_liquid_cooler.jpg",
+                "author": "BrandonXLF",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Aorus Gaming Chair",
+        "brand": "Gigabyte",
+        "condition": "New",
+        "price": 15990,
+        "stock": 4,
+        "weight_grams": 20000,
+        "dimensions": {
+            "length": 80,
+            "width": 65,
+            "height": 35
+        },
+        "description": "Racing-style gaming chair with lumbar and neck support, adjustable armrests and a sturdy five-star base.",
+        "images": [
+            {
+                "file": "chair-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Aorus_gaming_chair_on_the_stage_20230205.jpg",
+                "author": "Solomon203",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech G923 Racing Wheel (PlayStation)",
+        "brand": "Logitech G",
+        "condition": "New",
+        "price": 19990,
+        "stock": 5,
+        "weight_grams": 5500,
+        "dimensions": {
+            "length": 35,
+            "width": 30,
+            "height": 30
+        },
+        "description": "Force feedback racing wheel with TRUEFORCE for PlayStation and PC. Built for serious sim racing.",
+        "images": [
+            {
+                "file": "g29-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech_G923_(PlayStation_variant)_wheel,_front.jpg",
+                "author": "FreeMediaKid!",
+                "license": "CC BY 4.0"
+            },
+            {
+                "file": "g29-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech_G923_(PlayStation_variant)_wheel,_rear.jpg",
+                "author": "FreeMediaKid!",
+                "license": "CC BY 4.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech G920 Racing Wheel (Xbox)",
+        "brand": "Logitech G",
+        "condition": "New",
+        "price": 14990,
+        "stock": 5,
+        "weight_grams": 5500,
+        "dimensions": {
+            "length": 35,
+            "width": 30,
+            "height": 30
+        },
+        "description": "Dual-motor force feedback racing wheel for Xbox and PC with a leather-wrapped rim.",
+        "images": [
+            {
+                "file": "g29-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech_G920_Wheel.jpg",
+                "author": "Wikiediter2029",
+                "license": "CC0"
+            }
+        ]
+    },
+    {
+        "name": "Elgato Stream Deck +",
+        "brand": "Elgato",
+        "condition": "New",
+        "price": 12490,
+        "stock": 7,
+        "weight_grams": 500,
+        "dimensions": {
+            "length": 20,
+            "width": 16,
+            "height": 10
+        },
+        "description": "Stream controller with LCD keys, dials and a touch strip for controlling your audio, scenes and apps.",
+        "images": [
+            {
+                "file": "streamdeck-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Elgato_Stream_Deck_%2B.jpg",
+                "author": "TaurusEmerald",
+                "license": "CC BY-SA 4.0"
+            }
+        ]
+    },
+    {
+        "name": "8BitDo N30 Arcade Stick",
+        "brand": "8BitDo",
+        "condition": "New",
+        "price": 5490,
+        "stock": 6,
+        "weight_grams": 1500,
+        "dimensions": {
+            "length": 28,
+            "width": 22,
+            "height": 12
+        },
+        "description": "Wireless arcade stick with a retro look and full-size buttons, made for fighting games.",
+        "images": [
+            {
+                "file": "arcadestick-2.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:N30_Arcade_Stick_(43025247905).jpg",
+                "author": "unmatched value",
+                "license": "CC BY 2.0"
+            },
+            {
+                "file": "arcadestick-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:N30_Arcade_Stick_(43882102622).jpg",
+                "author": "unmatched value",
+                "license": "CC BY 2.0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech C922 Pro Stream Webcam",
+        "brand": "Logitech",
+        "condition": "New",
+        "price": 4990,
+        "stock": 12,
+        "weight_grams": 250,
+        "dimensions": {
+            "length": 15,
+            "width": 12,
+            "height": 8
+        },
+        "description": "Full HD streaming webcam with autofocus and a stereo microphone for calls and live streams.",
+        "images": [
+            {
+                "file": "c920-4.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Webcam_(Logitech_c922).jpg",
+                "author": "Zsinytwiki",
+                "license": "CC0"
+            }
+        ]
+    },
+    {
+        "name": "Logitech Brio 301 Full HD Webcam",
+        "brand": "Logitech",
+        "condition": "New",
+        "price": 3490,
+        "stock": 12,
+        "weight_grams": 250,
+        "dimensions": {
+            "length": 15,
+            "width": 12,
+            "height": 8
+        },
+        "description": "Full HD webcam with a built-in privacy shutter and a noise-reducing microphone for work and play.",
+        "images": [
+            {
+                "file": "c920-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech_Brio_301_webcam_HS3.jpg",
+                "author": "Hayden Schiff",
+                "license": "CC BY 4.0"
+            },
+            {
+                "file": "c920-1.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Logitech_Brio_301_webcam_HS1.jpg",
+                "author": "Hayden Schiff",
+                "license": "CC BY 4.0"
+            }
+        ]
+    },
+    {
+        "name": "ASUS ROG Strix Z390-F Gaming Motherboard",
+        "brand": "ASUS",
+        "condition": "New",
+        "price": 11990,
+        "stock": 4,
+        "weight_grams": 1200,
+        "dimensions": {
+            "length": 35,
+            "width": 28,
+            "height": 8
+        },
+        "description": "ATX gaming motherboard for LGA1151 processors with robust power delivery and dual M.2 slots.",
+        "images": [
+            {
+                "file": "pccase-3.jpg",
+                "source": "https://commons.wikimedia.org/wiki/File:Asus-ROG-Strix-Z390-F-Gaming-Motherboard_20201120_DSC6025.jpg",
+                "author": "PantheraLeo1359531",
+                "license": "CC BY 4.0"
+            }
+        ]
+    }
+]

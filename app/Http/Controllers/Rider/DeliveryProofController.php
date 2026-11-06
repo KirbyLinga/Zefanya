@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
-use App\Models\DeliveryProof;
+use App\Models\Logistics\DeliveryProof;
+use App\Support\DeliveryProofImage;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -28,11 +28,6 @@ class DeliveryProofController extends Controller
             'This proof of delivery does not belong to you.',
         );
 
-        abort_unless(Storage::disk('local')->exists($deliveryProof->photo_path), 404);
-
-        return Storage::disk('local')->response($deliveryProof->photo_path, null, [
-            'Content-Type' => $deliveryProof->photo_mime ?? 'application/octet-stream',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return DeliveryProofImage::response($deliveryProof->photo_path);
     }
 }

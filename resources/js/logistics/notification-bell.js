@@ -84,18 +84,16 @@
         } catch { /* Keep server-rendered notifications on a failed refresh. */ }
     }
 
-    // Provider desktops are expected to idle-timeout during a business day.
-    // The logistics bell keeps polling while the tab is hidden, so an open
-    // logistics tab keeps the session alive forever like the rider bell used to.
-    // Add a hidden-tab check so the session can expire when the desktop is
-    // not being used, consistent with the rider bell now that it also pauses
-    // on hidden tabs.
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { return; } refresh(); });
-    let logisticsPollTimer = setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+    // One poll while the tab is visible; it stops on hidden tabs so an idle
+    // provider desktop can still reach its session timeout.
+    let pollTimer = 0;
+    function startPolling() {
+        clearInterval(pollTimer);
+        pollTimer = setInterval(refresh, 30000);
+    }
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) { clearInterval(logisticsPollTimer); logisticsPollTimer = 0; return; }
-        clearInterval(logisticsPollTimer);
-        logisticsPollTimer = setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+        if (document.hidden) { clearInterval(pollTimer); pollTimer = 0; return; }
+        startPolling();
         refresh();
     });
 
@@ -153,7 +151,6 @@
         } finally { updating = false; submit.disabled = false; }
     });
 
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
     refresh();
-    window.setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+    if (!document.hidden) startPolling();
 })();

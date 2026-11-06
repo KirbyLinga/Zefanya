@@ -110,7 +110,7 @@ function addToCart(productId, quantity = 1, variantId = null, sourceButton = nul
       const el = document.getElementById('cartCount');
       if (el) el.textContent = cartCount;
     }
-    showToast(data.product_name, data.product_price);
+    showToast(data.product_name, data.product_price, data.quantity_warning || 'Added to cart');
     return data;
   })
   .catch(err => {

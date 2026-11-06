@@ -651,6 +651,70 @@ class BuyerRegistrationTest extends TestCase
 
     // ── TC-BUY-022: Double registration / rapid clicking ─────────────────────
 
+    public function test_buy_007_turning_18_today_is_accepted_early_in_the_manila_morning(): void
+    {
+        // 01:00 on 2026-10-08 in Manila is still 2026-10-07 in UTC.
+        Carbon::setTestNow(Carbon::parse('2026-10-08 01:00:00', 'Asia/Manila'));
+
+        $this->registerBuyer(['birthday' => '2008-10-08'])->assertStatus(200)->assertJsonPath('ok', true);
+    }
+
+    public function test_buy_007_008_birthday_messages(): void
+    {
+        $this->registerBuyer(['birthday' => '2008-10-09'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['birthday' => 'You must be at least 18 years old.']);
+
+        $this->registerBuyer(['birthday' => '2026-10-09'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['birthday' => 'Please enter a valid date of birth. It cannot be in the future.']);
+    }
+
+    public function test_buy_022_repeat_submission_returns_the_first_registration_without_an_error(): void
+    {
+        Notification::fake();
+        $payload = $this->basePayload();
+
+        $first = $this->postJson(route('register.buyer.store'), $payload)->assertOk();
+        $second = $this->postJson(route('register.buyer.store'), $payload)->assertOk();
+
+        $this->assertSame($first->json('buyer_id'), $second->json('buyer_id'));
+        $this->assertSame(1, Buyer::where('email', $payload['email'])->count());
+        $this->assertSame(1, Notification::sent(Buyer::where('email', $payload['email'])->first(), BuyerVerifyOtp::class)->count());
+    }
+
+    public function test_buy_010_identical_resubmission_after_the_double_submit_window_is_blocked(): void
+    {
+        Notification::fake();
+        $payload = $this->basePayload();
+
+        $this->postJson(route('register.buyer.store'), $payload)->assertOk();
+
+        Carbon::setTestNow(now()->addSeconds(11));
+
+        $this->postJson(route('register.buyer.store'), array_merge($payload, [
+            'upload_id' => UploadedFile::fake()->create('id2.pdf', 100, 'application/pdf'),
+        ]))->assertStatus(422)->assertJsonValidationErrorFor('email');
+
+        $this->assertSame(1, Buyer::where('email', $payload['email'])->count());
+    }
+
+    public function test_buy_022_same_email_with_a_different_password_is_not_a_duplicate(): void
+    {
+        Notification::fake();
+        $payload = $this->basePayload();
+
+        $this->postJson(route('register.buyer.store'), $payload)->assertOk();
+
+        $this->postJson(route('register.buyer.store'), array_merge($payload, [
+            'upload_id' => UploadedFile::fake()->create('id2.pdf', 100, 'application/pdf'),
+            'password' => 'Different@2026',
+            'password_confirmation' => 'Different@2026',
+        ]))->assertStatus(422)->assertJsonValidationErrorFor('email');
+
+        $this->assertSame(1, Buyer::where('email', $payload['email'])->count());
+    }
+
     public function test_buy_022_multiple_rapid_submissions_single_account(): void
     {
         Notification::fake();
@@ -748,19 +812,44 @@ class BuyerRegistrationTest extends TestCase
         [$buyer, $otp] = $this->registerAndCaptureOtp();
         $this->assertSame('unverified', $buyer->status);
 
-        // The OTP expires at now()->addMinutes(10), so we need to move time
-        // past the 10-minute expiry. Move to 12:10:01 (10 minutes + 1 second).
-        Carbon::setTestNow('2026-10-08 12:10:01');
+        // The OTP lives 5 minutes; the workbook enters it at 5:01.
+        Carbon::setTestNow('2026-10-08 12:05:01');
 
         $buyer->refresh();
         $this->assertTrue($buyer->isVerificationLinkExpired());
 
         $response = $this->verifyOtp($buyer, $otp);
-        $response->assertStatus(422)->assertJsonPath('ok', false);
+        $response->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('expired', true)
+            ->assertJsonPath('message', 'This code has expired. Tap "Resend code" for a new one.');
 
         $buyer->refresh();
         $this->assertSame('unverified', $buyer->status);
         $this->assertNull($buyer->email_verified_at);
+    }
+
+    public function test_buy_023_otp_is_still_valid_at_4_minutes_59_seconds(): void
+    {
+        Carbon::setTestNow('2026-10-08 12:00:00');
+        [$buyer, $otp] = $this->registerAndCaptureOtp();
+
+        Carbon::setTestNow('2026-10-08 12:04:59');
+
+        $this->verifyOtp($buyer, $otp)->assertOk()->assertJsonPath('ok', true);
+    }
+
+    public function test_buy_025_wrong_format_otp_gets_the_six_digit_message(): void
+    {
+        [$buyer] = $this->registerAndCaptureOtp();
+
+        foreach (['48291', '4829137', '48A91B', ''] as $otp) {
+            $this->verifyOtp($buyer, $otp)
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['otp' => 'Enter the 6-digit code from your email.']);
+        }
+
+        $this->assertSame('unverified', $buyer->fresh()->status);
     }
 
     // ── TC-BUY-027: Resend OTP ──────────────────────────────────────────────

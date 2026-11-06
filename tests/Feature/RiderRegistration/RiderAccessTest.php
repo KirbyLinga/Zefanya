@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\RiderRegistration;
 
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -55,8 +55,9 @@ class RiderAccessTest extends RiderTestBase
     public function test_tc_rid_031_pending_logistics_denied_even_direct_post(): void
     {
         $pending = $this->logisticsB('pending');
-        $this->actingAs($pending, 'logistics')->get(route('logistics.riders.create'))->assertRedirect();
-        $this->actingAs($pending, 'logistics')->post(route('logistics.riders.store'), $this->validPayload())->assertRedirect();
+        $this->actingAs($pending, 'logistics')->get(route('logistics.riders.create'))->assertForbidden()->assertSee('Your account is under review');
+        $this->actingAs($pending, 'logistics')->post(route('logistics.riders.store'), $this->validPayload())->assertForbidden();
+        $this->assertAuthenticatedAs($pending, 'logistics');
         $this->assertDatabaseMissing('riders', ['email' => 'pedrojose.garcia@example.com']);
     }
 

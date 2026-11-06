@@ -129,6 +129,29 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.from(selected);
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function voucherChip(voucher) {
+    const label = voucher.scope === 'shipping'
+      ? `${voucher.code} (shipping)`
+      : voucher.label;
+
+    return `<div class="js-cartpage-voucher-chip flex items-center gap-2 rounded-lg border border-tertiary-200 bg-tertiary-50 px-2.5 py-2" data-slot="${escapeHtml(voucher.slot)}">
+      <i data-lucide="tag" width="13" height="13" class="shrink-0 text-tertiary-700"></i>
+      <span class="js-cartpage-voucher-chip-label min-w-0 flex-1 truncate text-[11.5px] font-semibold text-tertiary-700">${escapeHtml(label)}</span>
+      <button type="button" class="js-cartpage-voucher-remove shrink-0 text-tertiary-700 transition-opacity hover:opacity-70" data-slot="${escapeHtml(voucher.slot)}" aria-label="Remove ${escapeHtml(voucher.code)}">
+        <i data-lucide="x" width="14" height="14"></i>
+      </button>
+    </div>`;
+  }
+
   function request(url, options = {}) {
     const method = options.method || 'GET';
     const body = options.body === undefined ? null : options.body;
@@ -174,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setText('#cartpage-select-all-count', `(${lineCount} ${lineCount === 1 ? 'item' : 'items'})`);
 
-    // Voucher discount row + applied-code chip
+    // Voucher discount row + applied-voucher chips
     const discountRow = $('#cartpage-discount-row');
 
     if (discountRow) {
@@ -183,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (payload.has_voucher) {
       setText('#cartpage-discount', payload.discount);
-      setText('#cartpage-voucher-chip-label', payload.voucher_label);
 
       const input = $('#cartpage-voucher-input');
 
@@ -192,10 +214,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const chip = $('#cartpage-voucher-chip');
+    const chips = $('#cartpage-voucher-chips');
 
-    if (chip) {
-      chip.classList.toggle('hidden', !payload.has_voucher);
+    if (chips) {
+      if (payload.has_voucher && Array.isArray(payload.vouchers)) {
+        chips.innerHTML = payload.vouchers.map(voucherChip).join('');
+        chips.classList.remove('hidden');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } else {
+        chips.innerHTML = '';
+        chips.classList.add('hidden');
+      }
     }
 
     // A previously applied voucher can be dropped when the selection changes
@@ -289,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateStepperBounds(row, quantity, stock) {
     const down = $('.js-cartpage-qty-down', row);
     const up = $('.js-cartpage-qty-up', row);
+    const input = $('.js-cartpage-qty-input', row);
 
     if (down) {
       down.disabled = quantity <= 1;
@@ -297,18 +329,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (up) {
       up.disabled = quantity >= stock;
     }
+
+    if (input) {
+      input.max = String(stock);
+    }
   }
 
   function stepQuantity(id, delta) {
     const row = rowFor(id);
-    const display = row && $('.js-cartpage-qty-display', row);
+    const input = row && $('.js-cartpage-qty-input', row);
 
-    if (!row || !display || row.dataset.available !== '1') {
+    if (!row || !input || row.dataset.available !== '1') {
       return;
     }
 
     const stock = Number.parseInt(row.dataset.stock, 10) || 0;
-    const current = Number.parseInt(display.textContent, 10) || 1;
+    const current = Number.parseInt(input.value, 10) || 1;
 
     if (row.dataset.confirmedQuantity === undefined) {
       row.dataset.confirmedQuantity = String(current);
@@ -320,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    display.textContent = String(next);
+    input.value = String(next);
     updateStepperBounds(row, next, stock);
 
     // Debounce so holding the stepper down sends one request, not many.
@@ -340,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const confirmed = Number.parseInt(row.dataset.confirmedQuantity, 10) || 1;
     const stock = Number.parseInt(row.dataset.stock, 10) || 0;
-    const display = $('.js-cartpage-qty-display', row);
+    const input = $('.js-cartpage-qty-input', row);
 
     request(itemUrl(data.updateUrl, id), {
       method: 'PATCH',
@@ -348,21 +384,24 @@ document.addEventListener('DOMContentLoaded', () => {
     })
       .then((payload) => {
         const applied = Number(payload.quantity) || quantity;
+        const currentStock = Number.isInteger(payload.quantity_limit) ? payload.quantity_limit : stock;
 
         row.dataset.confirmedQuantity = String(applied);
+        row.dataset.stock = String(currentStock);
 
         // The server may have capped the quantity at the available stock.
-        if (display && applied !== quantity) {
-          display.textContent = String(applied);
-          updateStepperBounds(row, applied, stock);
+        if (input && applied !== quantity) {
+          input.value = String(applied);
         }
+        updateStepperBounds(row, applied, currentStock);
+        if (payload.quantity_warning) toast(payload.quantity_warning);
 
         applySummary(payload);
       })
       .catch((error) => {
         // Revert to the last server-confirmed quantity.
-        if (display) {
-          display.textContent = String(confirmed);
+        if (input) {
+          input.value = String(confirmed);
         }
 
         updateStepperBounds(row, confirmed, stock);
@@ -523,13 +562,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  function removeVoucher() {
+  function removeVoucher(slot) {
     clearVoucherError();
 
-    request(withQuery(data.voucherRemoveUrl, selectionParams()), { method: 'DELETE' })
+    const params = selectionParams(slot ? { slot } : {});
+
+    request(withQuery(data.voucherRemoveUrl, params), { method: 'DELETE' })
       .then((payload) => {
         applySummary(payload);
-        toast('Voucher removed');
+        toast(slot ? 'Voucher removed' : 'Vouchers removed');
       })
       .catch((error) => toast(error.message));
   }
@@ -622,14 +663,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const shopVoucher = event.target.closest('.js-cartpage-shop-voucher-apply');
+    if (shopVoucher) {
+      const input = document.getElementById('cartpage-voucher-input');
+      if (input) input.value = shopVoucher.dataset.code;
+      applyVoucher();
+      return;
+    }
+
     if (event.target.closest('#cartpage-voucher-apply')) {
       applyVoucher();
 
       return;
     }
 
-    if (event.target.closest('#cartpage-voucher-remove')) {
-      removeVoucher();
+    const voucherRemove = event.target.closest('.js-cartpage-voucher-remove, #cartpage-voucher-remove');
+
+    if (voucherRemove) {
+      removeVoucher(voucherRemove.dataset.slot);
 
       return;
     }
@@ -653,11 +704,47 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Initial state ────────────────────────────────────────────────────
 
   $$('.js-cartpage-item-row').forEach((row) => {
-    const display = $('.js-cartpage-qty-display', row);
+    const input = $('.js-cartpage-qty-input', row);
 
-    if (display) {
-      row.dataset.confirmedQuantity = display.textContent.trim();
+    if (input) {
+      row.dataset.confirmedQuantity = input.value.trim();
     }
+  });
+
+  // ── Input direct typing handler ─────────────────────────────────────
+  document.addEventListener('input', (event) => {
+    const input = event.target.closest('.js-cartpage-qty-input');
+
+    if (!input) {
+      return;
+    }
+
+    const id = input.dataset.itemId;
+    const row = rowFor(id);
+
+    if (!row || row.dataset.available !== '1') {
+      return;
+    }
+
+    const stock = Number.parseInt(row.dataset.stock, 10) || 0;
+    let value = Number.parseInt(input.value, 10);
+
+    // Validate: must be between 1 and stock
+    if (Number.isNaN(value) || value < 1) {
+      value = 1;
+    } else if (value > stock) {
+      value = stock;
+    }
+
+    input.value = String(value);
+    updateStepperBounds(row, value, stock);
+
+    // Debounce the commit when typing
+    clearTimeout(quantityTimers.get(id));
+
+    quantityTimers.set(id, setTimeout(() => {
+      commitQuantity(id, value);
+    }, 600));
   });
 
   syncSelectionUi();

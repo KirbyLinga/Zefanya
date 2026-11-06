@@ -159,8 +159,8 @@
                 <div class="mb-5 grid grid-cols-1 gap-5">
                     @foreach(['drivers_license' => 'Driver license document', 'or_cr' => 'Vehicle OR/CR document'] as $name => $label)
                         <div class="buyer-modal__field">
-                            <label class="buyer-modal__label-plain">{{ $label }} *</label>
-                            <div class="buyer-modal__file-wrap">
+                            <label for="rider-{{ $name }}" class="buyer-modal__label-plain">{{ $label }} *</label>
+                            <div class="buyer-modal__file-wrap upload-zone flex-wrap">
                                 <label for="rider-{{ $name }}" class="buyer-modal__file-btn"><i data-lucide="upload" width="16" height="16"></i>Choose file</label>
                                 <span class="buyer-modal__file-name" id="rider-{{ $name }}Name">No file selected</span>
                             </div>

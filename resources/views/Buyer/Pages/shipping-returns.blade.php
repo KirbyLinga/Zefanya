@@ -10,7 +10,7 @@
                 <section class="bg-white rounded-2xl border border-buyer-line p-6">
                     <h2 class="font-serif text-[22px] text-buyer-ink mb-3">Shipping Information</h2>
                     <div class="space-y-4 text-[14px] text-buyer-ink-soft leading-relaxed">
-                        <p><strong class="text-buyer-ink">Free Shipping:</strong> Orders over ₱1,500 ship free. Standard shipping otherwise.</p>
+                        <p><strong class="text-buyer-ink">Shipping Fees:</strong> Calculated automatically at checkout from the route and parcel weight.</p>
                         <p><strong class="text-buyer-ink">Delivery Time:</strong> 3-5 business days for Metro Manila, 5-7 days for provincial areas.</p>
                         <p><strong class="text-buyer-ink">Tracking:</strong> You'll receive a tracking number via email once your order ships.</p>
                     </div>

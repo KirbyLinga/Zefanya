@@ -3,11 +3,11 @@
 namespace Database\Seeders;
 
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Services\CourierAssignmentService;
+use App\Services\Logistics\CourierAssignmentService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 

@@ -5,16 +5,19 @@ namespace App\Http\Controllers\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
+use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelHandoffVerification;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelLegService;
+use App\Services\Logistics\PickupPolicy;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -35,6 +38,9 @@ class IncomingParcelsController extends Controller
         OrderStatus::ReadyForPickup,
         OrderStatus::PickedUp,
     ];
+
+    public const COLLECTED_REASSIGN_MESSAGE = 'This parcel was already collected by the pickup Rider, so the pickup can no longer be reassigned. '
+        .'It continues once the origin Station Hub confirms receipt.';
 
     public function __construct(
         private readonly SellerOrderStatusService $status = new SellerOrderStatusService,
@@ -75,6 +81,7 @@ class IncomingParcelsController extends Controller
                 'deliveryAssignments.courier',
                 'originStation',
                 'deliveryCourier.rider.station',
+                ...(PickupPolicy::sessionsAvailable() ? ['pickupSession' => fn ($query) => $query->withCount('parcels')] : []),
                 'courier.provider',
                 'courier.rider.station',
                 'deliveryCourier',
@@ -158,6 +165,12 @@ class IncomingParcelsController extends Controller
 
         $reassign = $request->boolean('reassign');
 
+        // Once the Rider recorded collection the parcel is physically theirs;
+        // say so instead of a generic "no eligible rider" message.
+        if ($reassign && $sellerOrder->courier_id !== null && $sellerOrder->handover_at !== null) {
+            return back()->with('error', self::COLLECTED_REASSIGN_MESSAGE);
+        }
+
         if ($sellerOrder->status !== OrderStatus::ReadyForPickup && ! ($reassign && $sellerOrder->status === OrderStatus::PickedUp)) {
             return back()->with('error', 'This parcel is no longer available for pickup assignment.');
         }
@@ -174,6 +187,10 @@ class IncomingParcelsController extends Controller
             'courier_id.required' => 'Select an eligible Rider for this pickup.',
         ]);
 
+        if (($limit = $this->assignment->manualRiderBlockReason($request->integer('courier_id') ?: null, $provider->id)) !== null) {
+            return back()->with('error', $limit);
+        }
+
         $courier = $this->assignment->reservePickup(
             $sellerOrder,
             $provider,
@@ -185,7 +202,19 @@ class IncomingParcelsController extends Controller
         );
 
         if ($courier === null) {
-            return back()->with('error', 'No eligible rider in your fleet serves this pickup area.');
+            // The service returns null for a lost race too; say which one happened.
+            $current = $sellerOrder->fresh();
+            $lostRace = $reassign
+                ? (int) $current->courier_id !== (int) $data['expected_courier_id']
+                : $current->courier_id !== null;
+            if ($reassign && ! $lostRace && $current->handover_at !== null) {
+                // Collected between page load and submit.
+                return back()->with('error', self::COLLECTED_REASSIGN_MESSAGE);
+            }
+
+            return back()->with('error', $lostRace
+                ? 'This pickup was already assigned by someone else. The page now shows the current Rider.'
+                : 'No eligible rider in your fleet serves this pickup area.');
         }
 
         $action = $reassign ? 'reassigned' : 'assigned';
@@ -246,7 +275,7 @@ class IncomingParcelsController extends Controller
         $token = $request->input('verification_token');
 
         if (! $alreadyAtHub && $fresh->status !== OrderStatus::PickedUp) {
-            return back()->with('error', 'This parcel is not in the pickup phase.');
+            return back()->with('error', 'Scan blocked: this parcel must be picked up before it can be received at the hub.');
         }
 
         try {
@@ -264,15 +293,18 @@ class IncomingParcelsController extends Controller
                 );
                 $method = $payload['method'] ?? null;
 
-                $this->status->transition(
-                    $fresh,
-                    OrderStatus::AtSortingCenter,
-                    note: 'Parcel handed to sorting center.'.ParcelHandoffVerification::noteSuffix($method),
-                    changedBy: $provider->fullName(),
-                    actor: OrderActor::Logistics,
-                    actorId: $provider->id,
-                    source: 'web',
-                );
+                DB::transaction(function () use ($fresh, $provider, $method, $stationHubId): void {
+                    $this->status->transition(
+                        $fresh,
+                        OrderStatus::AtSortingCenter,
+                        note: 'Parcel handed to sorting center.'.ParcelHandoffVerification::noteSuffix($method),
+                        changedBy: $provider->fullName(),
+                        actor: OrderActor::Logistics,
+                        actorId: $provider->id,
+                        source: 'web',
+                    );
+                    app(ParcelLegService::class)->receiveAtOrigin($fresh, (int) $provider->id, $stationHubId);
+                });
 
                 $handoffVerify->consumeAfterSuccess(fn () => $handoffVerify->consumeForLogistics(
                     $provider,
@@ -293,6 +325,8 @@ class IncomingParcelsController extends Controller
             $this->assignment->release($pickupCourier);
         }
 
-        return back()->with('success', 'Parcel delivered to sorting center. Pickup courier released.');
+        return back()->with('success', $alreadyAtHub
+            ? 'Parcel already received at the hub. No status change was made.'
+            : 'Parcel received at the hub. Pickup rider released.');
     }
 }

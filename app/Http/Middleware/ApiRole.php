@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Controllers\Api\Traits\ValidatesRoleAbilities;
+use App\Models\Buyer\Buyer;
+use App\Models\Rider\Rider;
 use Closure;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Factory as Auth;
@@ -16,6 +19,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ApiRole
 {
+    use ValidatesRoleAbilities;
+
     /** @var array<int, string> */
     private const ALLOWED_ROLES = ['buyer', 'rider'];
 
@@ -48,12 +53,23 @@ class ApiRole
             throw new AuthenticationException('Unauthenticated. The token has expired.', ['sanctum']);
         }
 
-        if (! $user->tokenCan($role)) {
+        $correctModel = $role === 'buyer' ? $user instanceof Buyer : $user instanceof Rider;
+
+        if (! $correctModel || ! $user->tokenCan($role)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This token is not allowed to access this endpoint.',
                 'data' => null,
-                'errors' => ['token' => ["The token is missing the [{$role}] ability."]],
+                'errors' => ['token' => ["The token must belong to a [{$role}] account and include the [{$role}] ability."]],
+            ], 403);
+        }
+
+        if (! $this->accountIsLoginable($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is not eligible for API access.',
+                'data' => null,
+                'errors' => ['account' => ['An approved or active, verified and eligible account is required.']],
             ], 403);
         }
 

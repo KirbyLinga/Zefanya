@@ -4,13 +4,12 @@ namespace Tests\Feature\Seller;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -74,7 +73,8 @@ class MarkReadyDoubleSubmitTest extends TestCase
 
     public function test_a_second_mark_ready_does_not_create_a_duplicate_history_row(): void
     {
-        // First click: packs the order to ReadyForPickup (no courier assignment).
+        // The order has already been accepted and packed.
+        $this->sellerOrder->forceFill(['status' => OrderStatus::Preparing])->save();
         $this->actingSeller()->post(route('seller.orders.markReady', $this->sellerOrder));
         $this->sellerOrder->refresh();
         $this->assertSame(OrderStatus::ReadyForPickup, $this->sellerOrder->status);
@@ -95,6 +95,8 @@ class MarkReadyDoubleSubmitTest extends TestCase
 
     public function test_double_click_before_assignment_marks_ready_only_once(): void
     {
+        $this->sellerOrder->forceFill(['status' => OrderStatus::Preparing])->save();
+
         // No couriers exist — markReady transitions to ReadyForPickup without
         // any auto-assignment. Double click must be a clean no-op.
         $this->actingSeller()->post(route('seller.orders.markReady', $this->sellerOrder));
@@ -118,7 +120,7 @@ class MarkReadyDoubleSubmitTest extends TestCase
         $this->actingSeller()
             ->post(route('seller.orders.markReady', $this->sellerOrder))
             ->assertRedirect()
-            ->assertSessionHas('warning');
+            ->assertSessionHas('error');
 
         $this->assertSame(OrderStatus::PickedUp, $this->sellerOrder->refresh()->status, 'status unchanged');
     }
@@ -134,22 +136,22 @@ class MarkReadyDoubleSubmitTest extends TestCase
         $this->assertSame(OrderStatus::Placed, $this->sellerOrder->refresh()->status);
     }
 
-    public function test_accept_order_drives_placed_to_confirming_to_preparing(): void
+    public function test_accept_order_advances_only_to_confirmed(): void
     {
-        // Accept Order: Placed → Confirmed → Preparing.
+        // Accept performs only Placed to Confirmed.
         $this->actingSeller()
             ->post(route('seller.orders.accept', $this->sellerOrder))
             ->assertRedirect()
             ->assertSessionHas('accepted');
 
         $this->sellerOrder->refresh();
-        $this->assertSame(OrderStatus::Preparing, $this->sellerOrder->status);
+        $this->assertSame(OrderStatus::Confirmed, $this->sellerOrder->status);
 
-        // Two history rows: Placed → Confirmed → Preparing.
-        $this->assertSame(2, StatusHistory::where('seller_order_id', $this->sellerOrder->id)->count());
+        // One acceptance history row.
+        $this->assertSame(1, StatusHistory::where('seller_order_id', $this->sellerOrder->id)->count());
     }
 
-    public function test_accept_order_is_rejected_on_non_placed_status(): void
+    public function test_repeated_accept_order_does_not_write_history(): void
     {
         // Move the order past Placed manually.
         $this->sellerOrder->forceFill(['status' => OrderStatus::Confirmed->value])->save();
@@ -157,8 +159,9 @@ class MarkReadyDoubleSubmitTest extends TestCase
         $this->actingSeller()
             ->post(route('seller.orders.accept', $this->sellerOrder))
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHas('accepted');
 
         $this->assertSame(OrderStatus::Confirmed, $this->sellerOrder->refresh()->status);
+        $this->assertDatabaseCount('status_histories', 0);
     }
 }

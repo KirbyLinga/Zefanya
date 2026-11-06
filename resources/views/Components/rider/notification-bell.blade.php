@@ -14,7 +14,7 @@
 <div
     id="rider-notification-bell"
     class="relative"
-    data-recent-url="{{ json_encode(route('rider.notifications.recent')) }}"
+    data-recent-url="{{ route('rider.notifications.recent') }}"
 >
     <button
         type="button"

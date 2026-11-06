@@ -3,8 +3,8 @@
 namespace App\Policies;
 
 use App\Models\Buyer\Buyer;
-use App\Models\Conversation;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Conversation;
 
 class ConversationPolicy
 {

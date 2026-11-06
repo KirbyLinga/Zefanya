@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests\Seller;
 
-use App\Models\ProductVariant;
-use App\Services\VariantSyncService;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
@@ -66,11 +67,22 @@ class StoreProductRequest extends FormRequest
             'options' => $options,
             'variants' => $variants,
         ]);
+        if ($this->boolean('store_categories_present')) {
+            $this->merge(['store_category_ids' => $this->input('store_category_ids', [])]);
+        }
+
+        // The main category is the store's line of business. Anything submitted
+        // is ignored; only a store with none on file still chooses one.
+        $locked = $this->route('product')?->category_id ?? $this->user('seller')?->line_of_business_id;
+        if ($locked !== null) {
+            $this->merge(['category_id' => $locked]);
+        }
     }
 
     public function authorize(): bool
     {
-        return true; // seller-guard middleware already gates access to this route
+        return $this->user('seller') !== null && ($this->route('product') === null
+            || $this->route('product')->seller_id === $this->user('seller')->id);
     }
 
     private function grams(mixed $weight, mixed $unit): mixed
@@ -130,6 +142,10 @@ class StoreProductRequest extends FormRequest
         // OTHER products of the same seller (soft-deleted ones drop out of the
         // whereHas through Product's global scope, freeing their SKUs).
         $editingProductId = $this->route('product')?->id;
+        if ($editingProductId === null && is_string($this->input('creation_key'))) {
+            $editingProductId = Product::query()->where('seller_id', $sellerId)
+                ->where('creation_key', $this->input('creation_key'))->value('id');
+        }
 
         $usedElsewhere = ProductVariant::query()
             ->whereHas('product', fn (Builder $query): Builder => $query->where('seller_id', $sellerId))
@@ -262,32 +278,45 @@ class StoreProductRequest extends FormRequest
     public function rules(): array
     {
         $isUpdate = $this->isMethod('put') || $this->isMethod('patch');
+        $draft = $this->input('status') === 'draft';
+        $required = $draft ? 'nullable' : 'required';
 
         return [
             'color_first' => ['nullable', 'boolean'],
             'variants.*.id' => ['nullable', 'integer', 'min:1'],
             'inventory_revision' => [$this->isMethod('PUT') || $this->isMethod('PATCH') ? 'required' : 'nullable', 'string', 'size:64'],
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'price' => ['required', 'numeric', 'min:0', 'max:9999999.99'],
-            'weight' => ['exclude_if:variants_exist,1', 'required', 'numeric'],
-            'weight_unit' => ['exclude_if:variants_exist,1', 'required', Rule::in(['g', 'kg'])],
-            'weight_grams' => ['exclude_if:variants_exist,1', 'required', 'integer', 'min:1', 'max:100000'],
-            'stock_quantity' => ['required', 'integer', 'min:0'],
+            'creation_key' => [$isUpdate ? 'nullable' : 'required', 'uuid'],
+            'name' => ['required', 'string', 'min:5', 'max:120'],
+            'description' => [$required, 'string', 'min:20', 'max:3000'],
+            'category_id' => [$required, 'integer', 'exists:categories,id'],
+            'store_category_ids' => ['sometimes', 'array', 'max:3'],
+            'store_category_ids.*' => ['required', 'integer', 'distinct'],
+            'new_store_category' => ['nullable', 'string', 'max:50'],
+            'brand' => ['nullable', 'string', 'max:100'],
+            'condition' => ['nullable', 'string', 'max:100'],
+            'dimensions' => [$required, 'array:length,width,height'],
+            'dimensions.length' => [$required, 'numeric', 'gt:0'],
+            'dimensions.width' => [$required, 'numeric', 'gt:0'],
+            'dimensions.height' => [$required, 'numeric', 'gt:0'],
+            'price' => [$required, 'numeric', 'decimal:0,2', $draft ? 'min:0' : 'min:1', 'max:1000000'],
+            'weight' => ['exclude_if:variants_exist,1', $required, 'numeric'],
+            'weight_unit' => ['exclude_if:variants_exist,1', $required, Rule::in(['g', 'kg'])],
+            'weight_grams' => ['exclude_if:variants_exist,1', $required, 'integer', $draft ? 'min:0' : 'min:1', 'max:100000'],
+            'stock_quantity' => [$required, 'integer', 'min:0', Rule::when(! $this->boolean('variants_exist'), ['max:99999'])],
             'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', Rule::in(['draft', 'active', 'inactive'])],
-            'images' => [$isUpdate ? 'nullable' : 'required', 'array', 'max:6'],
-            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
+            'images' => [$isUpdate || $draft ? 'nullable' : 'required', 'array', 'max:9'],
+            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
             'cover_index' => ['nullable', 'integer', 'min:0'],
             'color_images' => ['nullable', 'array', 'max:50'],
             'color_images.*.value' => ['required_with:color_images', 'string', 'max:100'],
             'color_images.*.remove_ids' => ['nullable', 'array', 'max:100'],
             'color_images.*.remove_ids.*' => ['integer', 'min:1', 'distinct'],
-            'color_images.*.files' => ['nullable', 'array', 'max:6'],
-            'color_images.*.files.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
+            'color_images.*.files' => ['nullable', 'array', 'max:9'],
+            'color_images.*.files.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
             'variant_images' => ['nullable', 'array', 'max:50'],
-            'variant_images.*' => ['array', 'max:6'],
-            'variant_images.*.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
+            'variant_images.*' => ['array', 'max:9'],
+            'variant_images.*.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
 
             // ── Variant Options (optional) ──────────────────────────────
             // variants_exist=0 → legacy single-SKU product (no options UI shown).
@@ -296,16 +325,16 @@ class StoreProductRequest extends FormRequest
 
             'options' => ['required_if:variants_exist,1', 'nullable', 'array', 'max:2'],
             'options.*.name' => ['required_with:options', 'string', 'max:50'],
-            'options.*.values' => ['required_with:options', 'array', 'min:1', 'max:50'],
+            'options.*.values' => ['required_with:options', 'array', 'min:1', 'max:20'],
             'options.*.values.*' => ['string', 'max:100'],
 
-            'variants' => ['required_if:variants_exist,1', 'nullable', 'array', 'max:50'],
+            'variants' => ['required_if:variants_exist,1', 'nullable', 'array', 'max:400'],
             'variants.*.sku' => ['nullable', 'string', 'max:64'],
-            'variants.*.price' => ['required_with:variants', 'numeric', 'min:0', 'max:9999999.99'],
+            'variants.*.price' => ['required_with:variants', 'numeric', 'decimal:0,2', $draft ? 'min:0' : 'min:1', 'max:1000000'],
             'variants.*.weight' => ['required', 'numeric'],
             'variants.*.weight_unit' => ['required', Rule::in(['g', 'kg'])],
             'variants.*.weight_grams' => ['required', 'integer', 'min:1', 'max:100000'],
-            'variants.*.stock_quantity' => ['required_with:variants', 'integer', 'min:0'],
+            'variants.*.stock_quantity' => ['required_with:variants', 'integer', 'min:0', 'max:99999'],
             'variants.*.is_available' => ['nullable', 'boolean'],
             'variants.*.values' => ['required_with:variants', 'array'],
             'variants.*.values.*' => ['string', 'max:100'],
@@ -315,12 +344,14 @@ class StoreProductRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'new_store_category.max' => 'Keep a sub-category name within 50 characters.',
             'weight_grams.*' => 'Enter a weight from 1 g to 100 kg, in whole grams.',
             'variants.*.weight_grams.*' => 'Enter a weight from 1 g to 100 kg for each variant, in whole grams.',
             'images.required' => 'Upload at least one product photo.',
-            'images.*.image' => 'Each file must be an image (JPG, PNG, or WEBP).',
-            'images.*.max' => 'Each image must be smaller than 3MB.',
-            'price.min' => 'Price cannot be negative.',
+            'images.*.image' => 'Each image must be JPG/PNG and at most 5 MB.',
+            'images.*.mimes' => 'Each image must be JPG/PNG and at most 5 MB.',
+            'images.*.max' => 'Each image must be JPG/PNG and at most 5 MB.',
+            'price.min' => 'The publishing price must be at least ₱1.00.',
             'options.max' => 'A product can have at most two option axes (e.g. Color, Size).',
             'options.*.values.min' => 'Each option needs at least one value.',
         ];

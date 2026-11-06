@@ -12,7 +12,7 @@
                 <div class="relative">
                     @php
                         $sortOptions = ['relevance' => 'Relevance', 'price_asc' => 'Price: Low to High', 'price_desc' => 'Price: High to Low', 'newest' => 'Newest', 'oldest' => 'Oldest'];
-                        $currentSort = request('sort', 'relevance');
+                        $currentSort = is_string(request('sort')) ? request('sort') : 'relevance';
                         $currentLabel = $sortOptions[$currentSort] ?? 'Relevance';
                     @endphp
                     <button type="button"
@@ -55,6 +55,8 @@
                 <span class="text-buyer-ink font-medium">{{ $products->total() }}</span> @if ($products->total() === 1) result @else results @endif
             </div>
         </div>
+
+        @include('Buyer.Search._price-filter', ['action' => route('buyer.products.index')])
 
         {{-- Category pills (horizontal scroll) --}}
         <div class="mb-8 relative group/category-row">
@@ -105,20 +107,22 @@
                  class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-neutral-50 via-neutral-50/60 to-transparent pointer-events-none"></div>
         </div>
 
+<p id="product-load-status" role="status" aria-live="polite" class="mb-4 text-sm text-buyer-ink-soft" hidden></p>
+
         {{-- Active filters chips --}}
-        @if (request('q') || request('category') || request('sort') !== 'relevance')
+        @if ($searchTerm || $onSaleOnly || request('category') || request()->filled('sort') && request('sort') !== 'relevance')
             <div class="mb-8">
-                @if (request('q'))
+                @if ($searchTerm)
                     <div class="mb-4 flex items-center justify-between">
-                        <h2 class="text-[16px] font-semibold text-buyer-ink">Results for "<span class="text-primary-800">{{ request('q') }}</span>"</h2>
+                        <h2 class="text-[16px] font-semibold text-buyer-ink">Results for "<span class="text-primary-800">{{ $searchTerm }}</span>"</h2>
                         <a href="{{ route('buyer.products.index') }}" class="text-[13px] font-medium text-primary-800 hover:text-primary-900">Clear</a>
                     </div>
                 @endif
                 
                 <div class="flex flex-wrap gap-2">
-                    @if (request('q'))
+                    @if ($searchTerm)
                         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
-                            Search: "{{ request('q') }}"
+                            Search: "{{ $searchTerm }}"
                             <a href="{{ request()->fullUrlWithQuery(['q' => null, 'page' => 1]) }}"
                                aria-label="Remove search filter"
                                class="hover:text-primary-900">
@@ -126,6 +130,17 @@
                             </a>
                         </div>
                     @endif
+
+                @if ($onSaleOnly)
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
+                        On sale
+                        <a href="{{ request()->fullUrlWithQuery(['on_sale' => null, 'page' => 1]) }}"
+                           aria-label="Remove on sale filter"
+                           class="hover:text-primary-900">
+                            <i data-lucide="x" width="14" height="14"></i>
+                        </a>
+                    </div>
+                @endif
 
                 @if (request('category'))
                     @php
@@ -143,9 +158,9 @@
                     @endif
                 @endif
 
-                @if (request('sort') !== 'relevance')
+                @if (request()->filled('sort') && request('sort') !== 'relevance')
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-100 text-primary-800 text-[12px] font-medium">
-                        Sort: {{ $sortOptions[request('sort')] ?? 'Relevance' }}
+                        Sort: {{ $currentLabel }}
                         <a href="{{ request()->fullUrlWithQuery(['sort' => 'relevance', 'page' => 1]) }}"
                            aria-label="Remove sort filter"
                            class="hover:text-primary-900">
@@ -165,7 +180,7 @@
 
         {{-- Products grid or empty state --}}
         @if ($products->isNotEmpty())
-            <div data-products-grid data-layout="grid" class="group/products grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-12">
+            <div data-products-grid data-layout="grid" class="group/products grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 mb-12">
                 @foreach ($products as $product)
                     @include('Components.buyer.product-card', [
                         'product' => $product,
@@ -174,16 +189,31 @@
                 @endforeach
             </div>
 
-            {{-- Pagination --}}
-            <div class="flex justify-center mt-16">
-                {{ $products->links() }}
+            {{-- Results counter and Load More button --}}
+            <div class="flex flex-col items-center gap-4 mt-16">
+                <p class="text-[13px] text-buyer-ink-soft">
+                    <span id="js-products-showing">{{ $products->count() }}</span> of <span id="js-products-total">{{ $products->total() }}</span> products
+                </p>
+
+                @if ($products->hasMorePages())
+                    <button type="button"
+                            id="js-load-more-btn"
+                            data-load-more
+                            data-next-page="{{ $products->currentPage() + 1 }}"
+                            class="px-8 py-3 bg-primary-800 text-white rounded-lg font-semibold text-[13px] hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Load More Products
+                    </button>
+                @endif
             </div>
         @else
             {{-- Empty state --}}
             <div class="rounded-2xl border-2 border-dashed border-buyer-line bg-primary-50/50 p-12 text-center">
                 <i data-lucide="shopping-bag" width="48" height="48" class="mx-auto mb-4 text-buyer-ink-soft"></i>
                 <p class="font-serif text-[20px] text-buyer-ink mb-2">No products found</p>
-                <p class="text-[14px] text-buyer-ink-soft mb-6">Try adjusting your filters or search terms</p>
+                @include('Buyer.Search._empty-hint', [
+                    'term' => $searchTerm,
+                    'suggestionUrl' => $suggestion ? route('buyer.products.index', ['q' => $suggestion]) : null,
+                ])
                 <a href="{{ route('buyer.products.index') }}"
                    class="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-primary-800 text-white hover:bg-primary-700 transition-colors font-semibold text-[13px]">
                     <i data-lucide="rotate-ccw" width="16" height="16"></i>
@@ -201,7 +231,7 @@
 </style>
 
 @push('scripts')
-    @vite(['resources/js/buyer/category-scroll.js'])
+    @vite(['resources/js/buyer/category-scroll.js', 'resources/js/buyer/products-load-more.js'])
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             // Sort dropdown toggle

@@ -21,7 +21,30 @@
     @if ($return->exception_reason)<p class="mt-4 text-xs text-amber-800">Exception: {{ $return->exception_reason }}</p>@endif
     <ol class="mt-5 space-y-2 text-xs text-[var(--text-muted)]">@foreach ($return->events as $event)<li>{{ $event->occurred_at->format('M j, Y g:i A') }} | {{ str_replace('_', ' ', $event->event_key) }} | {{ $event->actor_type }} #{{ $event->actor_id }}</li>@endforeach</ol>
 </section>
-@if ($canOperate)
+@if ($canOperate && $return->awaitingBuyerCollection())
+<section class="space-y-3 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
+    <h2 class="text-sm font-semibold text-[var(--text-ink)]">Collect from the buyer</h2>
+    <p class="text-xs text-[var(--text-muted)]">This parcel is still with the buyer at {{ $return->sellerOrder->order?->shipping_address['full'] ?? 'an address that requires review' }}. Reverse transport opens once the rider confirms collection.</p>
+    @if ($return->collectionCourier)
+        <p class="text-xs font-semibold text-[var(--text-ink)]">Assigned to {{ $return->collectionCourier->rider?->fullName() ?? 'a rider' }}. You can reassign until it is collected.</p>
+    @endif
+    <form method="POST" action="{{ route('logistics.returns.assign-collection', $return) }}" class="space-y-3">@csrf
+        <label class="block text-xs">Rider
+            <select name="courier_id" required class="mt-2 block w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2">
+                <option value="">Choose a rider</option>
+                @foreach ($collectionCouriers as $courier)
+                    <option value="{{ $courier->id }}" @selected((int) $return->collection_courier_id === (int) $courier->id)>{{ $courier->rider?->fullName() }}</option>
+                @endforeach
+            </select>
+        </label>
+        <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Assign rider</button>
+    </form>
+</section>
+@elseif ($canOperate && $return->awaitingSellerDecision())
+<section class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
+    <p class="text-xs text-[var(--text-muted)]">{{ $return->movementBlockedReason() }}</p>
+</section>
+@elseif ($canOperate)
 <section class="space-y-5">
     @if (in_array($return->status->value, ['RETURN_REQUESTED','RETURN_IN_TRANSIT']))
         <form method="POST" action="{{ route('logistics.returns.manifest', $return) }}" class="rounded-lg border border-[var(--border-strong)] p-4">@csrf

@@ -2,8 +2,8 @@
 
 namespace App\Models\Concerns;
 
-use App\Models\Product;
-use App\Models\ProductVariant;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
 
 /**
  * Guarantees the "every product has ≥1 variant" invariant for products created

@@ -5,7 +5,7 @@ namespace App\Models\Admin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** An audit snapshot of an Admin account suspension or reactivation. */
+/** An audit snapshot of an Admin account status action or Seller registration decision. */
 class AccountActionHistory extends Model
 {
     public const UPDATED_AT = null;

@@ -41,7 +41,7 @@ There is also a legacy `web` guard bound to `App\Models\Shared\User` / the `user
 - [x] Checkout: confirm saved address, choose payment method, place order (single transaction, no double-submit).
 - [x] Track order status; confirm receipt (order → Completed).
 - [ ] Rate / review a seller or product — **missing**.
-- [ ] Buyer-initiated return request — **missing** (returns only happen when delivery fails, see below).
+- [x] Buyer-initiated return request: seller decision, admin dispute, rider collection and reverse transport back to the seller (scope awaiting panel confirmation, see open decision 8).
 
 ### Seller
 - [x] Register → OTP → admin decision → login only if `approved`.
@@ -110,13 +110,15 @@ From `composer.json` and `package.json` (verified):
 **Run it**
 ```sh
 composer install
-copy .env.example .env        # Windows; then set DB_*, APP_KEY, ADMIN_SEED_PASSWORD
+copy .env.example .env        # Windows; then set DB_*, APP_KEY, ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
 php artisan key:generate
 php artisan migrate
-php artisan db:seed           # requires ADMIN_SEED_PASSWORD (seeder refuses otherwise)
+php artisan db:seed           # requires ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD (seeder refuses otherwise)
 npm install && npm run build
 php artisan serve             # or: composer run dev
 ```
+- Production cron, every minute: `php artisan schedule:run` (auto-receipt, return approval, pickup windows, token and failed-job pruning). Failures are logged and emailed to admins.
+- When `QUEUE_CONNECTION=database`, also run `php artisan queue:work --tries=3`. `sync` runs queued work inside the request and needs no worker.
 - `composer run setup` runs the whole setup (`composer.json` scripts). `composer run dev` runs `php artisan dev`.
 - If a frontend change does not appear, run `npm run dev`, `npm run build`, or `composer run dev`.
 
@@ -158,14 +160,14 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Feature | Status | Evidence |
 |---|---|---|
 | Home, categories, search, product detail, variants | Implemented | `Buyer/HomeController.php`, `CategoryController.php`, `ProductController.php` |
-| Cart (add/merge/update/remove/voucher) | Implemented | `Buyer/CartController.php`, `Services/CartSummary.php` |
+| Cart (add/merge/update/remove/voucher) | Implemented | `Buyer/CartController.php`, `Services/Buyer/CartSummary.php` |
 | Wishlist (UI + toggle) | Implemented | `Buyer/WishlistController.php`; `wishlist-cards.js` |
 | Checkout (address confirm + payment + place order) | Implemented | `Buyer/CheckoutController.php` |
 | Orders list / timeline / tracking / confirm receipt | Implemented | `Buyer/OrderController.php` |
 | Account (profile/address/password), settings | Implemented | `Buyer/AccountController.php`, `SettingsController.php` |
 | Notifications centre | Implemented | `Buyer/NotificationController.php` |
 | Messages (buyer↔seller) | Implemented | `Buyer/MessageController.php`, `Components/.../Messages` views |
-| **Chat** page | **Placeholder** | `Buyer/ChatController.php:20-32` redirects "Chat is coming soon"; `Buyer/Chat/index.blade.php` (144 B) is a comment |
+| **Chat** links | Implemented | `Buyer/ChatController.php` redirects to Messages |
 | **Category grid** page | **Placeholder** | `Buyer/Categories/index.blade.php` (134 B) body is a comment |
 | Account landing (`/account`) | **Placeholder** | `Buyer/Account/index.blade.php` (422 B) renders an empty `<main>` |
 | Rate / review seller | **Missing** | no rating code anywhere |
@@ -173,8 +175,8 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 ### Seller
 | Feature | Status | Evidence |
 |---|---|---|
-| Products + variants (1–2 axes), images, status | Implemented | `Seller/ProductController.php`, `Services/VariantSyncService.php` |
-| Stock ledger (every change) | Implemented | `Services/StockService.php`, `inventory_transactions` |
+| Products + variants (1–2 axes), images, status | Implemented | `Seller/ProductController.php`, `Services/Seller/VariantSyncService.php` |
+| Stock ledger (every change) | Implemented | `Services/Seller/StockService.php`, `inventory_transactions` |
 | Orders: accept → preparing, mark ready | Implemented | `Seller/OrderController.php:79-172` |
 | Shipments list + printable waybill | Implemented | `Seller/ShipmentController.php`, `Seller/Shipments/{index,label}.blade.php` |
 | Messages | Implemented | `Seller/MessageController.php` |
@@ -187,7 +189,7 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Dashboard | Partial | `Logistics/DashboardController.php`; view renders no notifications despite passing them |
 | Incoming parcels: pickup, to sorting center | Implemented | `Logistics/IncomingParcelsController.php` |
 | Sorting: receive → sort (determines destination area) | Implemented | `Logistics/ParcelSortingController.php:102-138` |
-| Assign delivery rider by area (+ override) | Implemented | `ParcelSortingController.php:146`; `Services/CourierAssignmentService.php` |
+| Assign delivery rider by area (+ override) | Implemented | `ParcelSortingController.php:146`; `Services/Logistics/CourierAssignmentService.php` |
 | Delivery: start, delivered, failed, reschedule, return | Implemented | `Logistics/DeliveryAssignmentsController.php` |
 | Delivery monitoring | Implemented | `Logistics/DeliveryMonitoringController.php` |
 | Delivery areas CRUD + link riders | Implemented | `Logistics/AreaController.php`, `Logistics/Areas/index.blade.php` |
@@ -200,9 +202,9 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 | Dashboard (company, station, real counters, attention items) | Implemented | `Rider/DashboardController.php`, `Services/RiderOperationsService::dashboard()` |
 | Pickup assignments + confirm collection | Implemented | `Rider/PickupAssignmentsController.php`, `RiderOperationsService::confirmPickup()` |
 | Delivery assignments, start, failed attempts | Implemented | `Rider/DeliveryAssignmentsController.php`, `RiderOperationsService::{startDelivery,failDelivery}()` |
-| Proof of delivery + COD collection | Implemented | `Rider/DeliveryProofController.php`, `Logistics/DeliveryProofController.php`, `Models/DeliveryProof.php`, `Payment::recordCodCollection()` |
+| Proof of delivery + COD collection | Implemented | `Rider/DeliveryProofController.php`, `Logistics/DeliveryProofController.php`, `Models/Logistics/DeliveryProof.php`, `Payment::recordCodCollection()` |
 | Delivery history + account | Implemented | `Rider/DeliveryHistoryController.php`, `Rider/AccountController.php` |
-| Notifications centre (assignments, reassignment, station, account) | Implemented | `Rider/NotificationController.php`, `Services/RiderNotifier.php`, `Notifications/Rider/*` |
+| Notifications centre (assignments, reassignment, station, account) | Implemented | `Rider/NotificationController.php`, `Services/Rider/RiderNotifier.php`, `Notifications/Rider/*` |
 
 ### Admin
 | Feature | Status | Evidence |
@@ -217,13 +219,14 @@ Legend: **Implemented** = works end-to-end; **Partial** = works but incomplete; 
 ### Order & delivery engine
 | Feature | Status | Evidence |
 |---|---|---|
-| Status pipeline PLACED…COMPLETED | Implemented | `Services/SellerOrderStatusService.php:41-55` |
+| Status pipeline PLACED…COMPLETED | Implemented | `Services/Seller/SellerOrderStatusService.php:41-55` |
 | DELIVERY_FAILED → retry (≤2) / RETURNED | Implemented | `DeliveryAssignmentsController.php:201-250` |
 | COD settlement on delivery | Implemented | `SellerOrderStatusService.php:336-346` |
 | Stock restore on return | Implemented | `SellerOrderStatusService.php:258-287` |
 | Status history (audit) | Implemented | `status_histories` table, written in `transition()` |
-| **Commission (10%) on COMPLETED** | **Missing** | no commission code anywhere in `app/` |
-| **Shipping fee** | **Missing** | no column/service/logic |
+| Commission (5%) on COMPLETED | Implemented | `Services/Shared/CommissionFinalizationService.php` (`COMMISSION_BPS = 500`, on item subtotal after seller-funded discounts, shipping excluded) |
+| Shipping fee | Implemented | `seller_orders.shipping_fee_minor`; per-company zone rates `Services/Logistics/ShippingRateService.php`, fallback `config/buyer.php` |
+| COD remittance → seller payout | Implemented | Rider → Logistics `CodRemittanceService`; Logistics → Zefanya `LogisticsRemittanceService`; Zefanya → Seller `SellerSettlementService`, `SellerPayoutRequestService` |
 
 ---
 
@@ -233,8 +236,6 @@ Each item was checked in the current code. "Verified" means the file/line was re
 
 | # | Problem | File | Verified | Severity |
 |---|---|---|---|---|
-| C1 | `App\Models\Seller\ProductImage` is a **0-byte dead file**; live code uses `App\Models\ProductImage` | `app/Models/Seller/ProductImage.php` | yes (empty) | High (dead code) |
-| C2 | `App\Models\Seller\Product.php` declares `namespace App\Models` (same FQCN as `app/Models/Product.php`) → **unreachable** | `app/Models/Seller/Product.php` | yes (0 refs) | Medium |
 | C7 | `RETURNED` can → `COMPLETED` in the graph but **no actor owns it**; a returned slice is a dead end and blocks buyer confirmation of the whole order | `SellerOrderStatusService.php:53`, `Enums/OrderActor.php:61-63`, `Order.php:118-123` | yes | High (logic) |
 | C8 | Idempotent-replay path can **re-fire notifications** (the post-transaction `status === $to` guard is true on a racing replay) | `SellerOrderStatusService.php:119-121,186` | yes | Medium |
 | C9 | `Buyer/CourierAssigned` notification on `ASSIGNED_TO_RIDER` reads `courier?->name` (**pickup** courier), not `delivery_courier_id` | `Notifications/Buyer/CourierAssigned.php:25` | yes | Low |
@@ -245,14 +246,12 @@ Each item was checked in the current code. "Verified" means the file/line was re
 | C14 | Logistics dashboard passes `$notifications`/`$unreadCount` but the view renders neither | `Logistics/DashboardController.php:38-54` | yes | Low |
 | C15 | Buyer order list runs a **second full query** to compute pill counts | `Buyer/OrderController.php:55-97,120-123` | yes | Low |
 | C16 | Cart voucher is not cleared on the checkout **failure** path (only on success) | `Buyer/CheckoutController.php` | yes | Low |
-| C17 | `LoginChoiceController` is **dead** (no route references it; `/login` is a closure) | `Auth/LoginChoiceController.php` | yes | Low |
-| C18 | `Admin\SellerRegistrationController` is **unrouted** (dead legacy controller) | `app/Http/Controllers/Admin/SellerRegistrationController.php` | yes | Low |
 | C20 | ~~`buyers.contact_no` has no unique constraint~~ **Fixed** — unique nullable `contact_no` on buyers/sellers/logistics_providers (`2026_10_17_000001`); archive nulls the phone | migration + FormRequests | yes | — |
 | C21 | `ConversationPolicy` exists but is **not registered** in `AppServiceProvider` | `Providers/AppServiceProvider.php` | yes | Low |
 | C22 | ~~Admin registrations "View details" unwired~~ **Fixed** — detail modal with address + document links | `Admin/Registrations/index.blade.php` | yes | — |
 | C23 | `SESSION_ENCRYPT=false` and `SESSION_SECURE_COOKIE=false` in `.env` (dev; must be reviewed for prod) | `.env:32,35` | yes | Medium (prod) |
 
-**Notable structural gaps:** no `deliveries` table (delivery carried by `seller_orders` columns + `status_histories`); no commission; no shipping fee; no Rider mobile app/bearer tokens (web guard only; `routes/api.php` is registration/OTP + Logistics review).
+**Notable structural gaps:** no `deliveries` table (delivery carried by `seller_orders` columns + `status_histories`); no Rider mobile app/bearer tokens (web guard only; `routes/api.php` is registration/OTP + Logistics review).
 **Documented-but-absent classes:** `CourierApplicationPolicy`, `DeliveryPolicy` — grep finds them **only in old docs**; they do not exist. `CourierApplication` model does **not** exist either.
 
 **Things old docs claimed that are now FALSE (do not re-report):** `buyer.home` duplicate route name (fixed — `/home` is now unnamed); `Seller/Products/show.blade.php` being byte-identical to `_form.blade.php` (they differ); wishlist being unwired (it works); `CheckoutController` clearing voucher on the wrong path (no). `EnsureLogisticsApproved` enum bug, `/messages/unread-count` shadowing, `seller->name`, and voucher `times_used` are **fixed**.
@@ -268,6 +267,13 @@ Each item was checked in the current code. "Verified" means the file/line was re
 ### Decisions (dated)
 | Date | Decision |
 |---|---|
+| 2026-10-31 | **Hub-to-hub Courier belongs to the sending Logistics provider** and is assigned to a transfer trip that carries parcels between hubs. Custody stays with the sender until the receiving hub's verified scan. Not built yet. |
+| 2026-11-03 | **Cross-provider shipping fee split 40/60:** the origin carrier (`carrier_provider_id`: pickup, sorting, dispatch) gets 40%; the delivering destination company (receiving, sorting, final delivery) keeps 60% from the COD cash and sends the origin's 40% to Zefanya with the rest. Zefanya owes that 40% to the origin (`CodRemittance::originShareMinor()`, `LogisticsRemittanceService::originShares()`). Replaces the 2026-10-31 "pending allocation" rule. |
+| 2026-11-04 | **Pickup windows, sessions and tiered pickup pay:** a ready parcel is booked into the pickup window open now (default 8-12 and 1-5, Philippine time, Admin-editable); parcels one rider collects from one seller in a window form a pickup session. Pickup pay is per session: ₱30 for the first parcel collected, ₱5 for each additional, ₱0 for failed or cancelled; delivery stays ₱50. Rates are Platform Settings, copied onto each session and saved on each earning; recorded earnings are never recalculated. A missed window reschedules the parcel and is not a failed pickup. Open limits: a quick second pass by the same rider within 30 minutes counts as the same visit; the 30-minute lead and revisit gap are config, not settings; the per-parcel `PickupAssigned` notification is unchanged. |
+| 2026-11-03 | **Rider pay:** ₱30 per successful pickup (`PickedUp`, pickup Courier) and ₱50 per successful delivery (`Delivered`, delivery Courier); failed attempts earn ₱0. Recorded in `rider_earnings` inside `SellerOrderStatusService::transition()` by `RiderEarningService`, one row per parcel per job. The Logistics company pays its riders off-platform; the Rider dashboard and Logistics Earnings show the amounts. |
+| 2026-11-03 | **Payouts and split snapshot:** each `cod_remittances` row freezes its split at delivery (`kept_shipping_minor`, `origin_share_minor`; `CodRemittance::snapshotAllocation()`); the backfill gave unsent parcels the 40/60 split and kept every sent payment on the rule it was sent under. Admin pays an origin carrier its 40% only for parcels whose cash Zefanya confirmed (`LogisticsRemittanceService::payOriginShare()`, `origin_share_payouts`). A Logistics company marks a rider's unpaid earnings paid in one batch (`RiderEarningService::payCourier()`, `rider_payouts`). Each payout records reference, date paid, amount and status; a parcel or earning can be in one payout only. |
+| 2026-11-03 | **Returns after payout, refunds, reconciliation:** a return approved or refunded after the Seller was paid creates a `seller_debts` row for what they received; each later payout request deducts it (`debt_deducted_minor`) and Admin sends only the net. A recorded refund keeps amount, recipient, date and an optional private proof. Admin can confirm only some parcels of a short payment (the rest become due again), flag payments overdue after 3 days, split or keep the old unallocated fees, and see platform voucher cost against commission. The JSON settlement payout is super-admin only, needs a reason and is audit-logged. |
+| 2026-11-06 | **Return and refund money rules (DTI-aligned). Rule (5) is built: `SellerSettlementService::keptAfterReturn()` takes a recorded refund off the item amount first; the Seller keeps the rest less 5% commission, and a paid Seller's debt is lowered to what they received beyond that, never below what they already repaid. Who pays (part of rule 3) is built: `parcel_returns.fault_party` is set to `seller` on approval, auto-approval, an overturned dispute or the refund. Admin can set `logistics` with a note (audit-logged) until the refund is recorded, and a Logistics fault leaves the Seller paid in full. A buyer reason of "Other" blocks the refund until an Admin decides. The money panel `<x-return-money>` appears on the Admin and Seller return pages. Return shipping (rule 3) is built: on approval, `parcel_returns.return_shipping_fee_minor` is frozen at the original `shipping_fee_minor` (same route, weight and carrier, checkout rate). For a Seller fault, `SellerSettlementService::returnBreakdown()` charges the refunded original shipping and the return trip against what the Seller keeps, and any shortfall becomes a `return_charges` seller debt. Before the refund only the return trip is charged. A Logistics fault charges the Seller nothing. Also built: partial-refund reasons, refund voids, `logistics_return_charges` (transit-damage repayment, return-trip pay, failed-delivery pay) settled by Admin with a reference, and the failed-delivery Seller debt. All six rules are built; see docs/4-Flow.md "Return money". Deviation from rule (3): the Logistics charge is settled by Admin, not deducted from the COD remittance automatically.** (1) There are **no change-of-mind returns**. A buyer may return only for a fault: damaged, wrong, defective, missing parts or not as described (`ParcelReturnService::BUYER_REASONS`). (2) An approved return gets a **full refund of the item plus the original shipping fee**, and the buyer never pays return shipping. (3) **The party at fault pays.** A Seller fault charges the refund and the return shipping to the Seller, as a seller debt or a settlement reduction. In-transit damage is a **Logistics** fault: Admin marks it, and the cost is deducted from that company's remittance; the Seller is not charged. (4) A **failed delivery returned to the Seller** (unreachable, refused, wrong address) is not a buyer return: the **Seller absorbs** the delivery and return shipping cost as a debt, and Logistics is still paid. (5) Admin may record a **partial refund with a required reason**. The Seller is charged only what was refunded, plus return shipping, never the full settlement. (6) A refund whose transfer failed is **voided with a reason**: the void is audit-logged and the original is kept. Admin then records a new refund, and the charges stay because the refund is still owed. Replaces open decisions 2 and 10. |
 | 2026-10-16 | **One account per browser** — signing in on one guard clears the other three; logout clears all (`ClearsOtherGuards`). |
 | 2026-10-16 | Only `PaymentMethod::Cod` is **integrated**; GCash / Bank transfer / Card are selectable, stored `pending`, and labelled so checkout never blocks. |
 | 2026-10-23 | **Delivery policy clarified:** two total attempts (initial delivery + one retry). The second failure requires Logistics return; not two reschedules or a third failure. Counting/enforcement are centralized in `SellerOrderStatusService`. |
@@ -287,15 +293,18 @@ Each item was checked in the current code. "Verified" means the file/line was re
 | standing | **Logistics owns the courier lifecycle** — there is deliberately no buyer/seller rider-registration UI. |
 
 ### Open decisions / questions for the owner
-1. **Shipping fee** — none exists. Is delivery intentionally free for the MVP?
-2. **Gateway refund** — returns restore stock but never reverse payment. What is the refund mechanism?
+1. **Shipping fee** — resolved: buyer pays a per-company zone/weight fee, which the delivering company keeps (cross-provider: split 40% origin / 60% destination, see 11).
+2. **Gateway refund**: resolved 2026-11-06. Refunds stay manual: Admin records them, and a failed refund can be voided and recorded again. See the decision table.
 3. **`deliveries` table** — build it, or formally accept the `seller_orders` + `status_histories` deviation?
 4. **Session hardening for production** — `SESSION_ENCRYPT` / `SESSION_SECURE_COOKIE` / `secure` cookies.
 5. **Rider API** — Sanctum, or a hand-rolled hashed token table? (Batch D)
-6. **Commission model** — where 10% is recorded and how seller earnings are surfaced.
-7. **Dead code** — delete `Seller/ProductImage.php`, `Seller/Product.php`, `Seller/Products/show.blade.php`, `Admin\SellerRegistrationController`, `Auth/LoginChoiceController`? (They are listed in `3-Folder-Structure.md`.)
+6. **Commission model** — resolved in code as 5% (`CommissionFinalizationService::COMMISSION_BPS`), recorded on `seller_orders` and `seller_settlements`, shown on Seller Earnings. Confirm 5% (older notes said 10%).
+7. **Dead code** — removed 2026-10-31 (unrouted controllers, duplicate `Seller` product models, orphan views, the `RiderHandoffVerification` wrapper).
+8. **Reverse pickup scope (audit F-03, P1-07)** — built and tested, but the panel has not confirmed it. If it is ruled out, hide the buyer Return button so no return stops at approved.
 8. **Registration test failures** — fix the 403-vs-302 + `postal_code` assertions, or accept?
 9. **Test baseline** — establish the true pass/fail count.
+10. **Money on returned parcels**: resolved 2026-11-06. The party at fault pays: the Seller, or Logistics for in-transit damage. A failed delivery returned to the Seller is charged to the Seller. See the decision table.
+11. **Cross-provider shipping payout** — built (2026-11-03). Parcels sent to Zefanya under the old "full fee" rule keep a 0/0 split: their fee stays with Zefanya, unallocated. Decide whether to pay those out by hand.
 
 ---
 

@@ -3,20 +3,25 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ParcelIncident\StoreIncidentRequest;
-use App\Models\Courier;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelIncidentService;
-use App\Services\ParcelReturnService;
-use App\Services\RiderNotifier;
-use App\Services\SellerOrderStatusService;
+use App\Models\Admin\OperationsAuditLog;
+use App\Models\Rider\Courier;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\LogisticsStatusOverrideService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\ParcelReturnService;
+use App\Services\Logistics\RouteExecutionService;
+use App\Services\Rider\RiderNotifier;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -41,6 +46,14 @@ class DeliveryAssignmentsController extends Controller
         OrderStatus::Delivered,
         OrderStatus::Completed,
     ];
+
+    public const OUT_FOR_DELIVERY_REASSIGN_MESSAGE = 'This parcel is out for delivery and physically with the Rider, so it cannot be moved to another Rider directly. '
+        .'The Rider records the delivery attempt to bring it back under Station custody, then schedule the final attempt with a new Rider. '
+        .'If the Rider cannot return the parcel, report an incident.';
+
+    public const STILL_WITH_RIDER_MESSAGE = 'This parcel is still with the Rider who made the failed attempt. '
+        .'Scan it on the Scan page to receive it back at the Station Hub before giving the final attempt to another Rider. '
+        .'The same Rider can take the final attempt without a scan.';
 
     public function __construct(
         private readonly SellerOrderStatusService $status = new SellerOrderStatusService,
@@ -105,12 +118,14 @@ class DeliveryAssignmentsController extends Controller
             'order.buyer', 'seller', 'payment', 'orderItems.product', 'orderItems.variant',
         ]);
 
-        $openIncident = $this->incident->hasOpenIncident($parcel);
+        $openIncident = ParcelIncidentService::movementBlockers($parcel)->exists();
 
         return view('Logistics.DeliveryMonitoring.show', [
             'sellerOrder' => $parcel,
+            'routeDetails' => app(RouteExecutionService::class)->trackingSummary($parcel),
+            'overrideOptions' => app(LogisticsStatusOverrideService::class)->options($parcel),
             'openIncident' => $openIncident,
-            'incident' => $openIncident ? $parcel->incidentSet()->where('status', ParcelIncidentStatus::Open->value)->latest('id')->first() : null,
+            'incident' => $openIncident ? ParcelIncidentService::movementBlockers($parcel)->latest('id')->first() : null,
         ]);
     }
 
@@ -129,24 +144,34 @@ class DeliveryAssignmentsController extends Controller
         if (($reason = $hubs->assignmentBlockReason($provider->id)) !== null) {
             return back()->with('error', $reason);
         }
-        if (! in_array($sellerOrder->status, [OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery], true)) {
+        if ($sellerOrder->status === OrderStatus::OutForDelivery) {
+            return back()->with('error', self::OUT_FOR_DELIVERY_REASSIGN_MESSAGE);
+        }
+        if (! in_array($sellerOrder->status, [OrderStatus::Sorted, OrderStatus::AssignedToRider], true)) {
             return back()->with('error', 'This delivery leg cannot be reassigned.');
         }
         $data = $request->validate([
-            'reason' => [$request->filled('courier_id') ? 'required' : 'nullable', 'string', 'max:500'],
             'courier_id' => ['nullable', 'integer'],
             'reason' => ['required', 'string', 'max:500'],
             'expected_courier_id' => ['required', 'integer'],
         ]);
+        if (($limit = $this->assignment->manualRiderBlockReason(filled($data['courier_id'] ?? null) ? (int) $data['courier_id'] : null, $provider->id)) !== null) {
+            return back()->withInput()->with('error', $limit);
+        }
         $courier = $this->assignment->reassign(
             $sellerOrder, $provider, 'delivery',
             filled($data['courier_id'] ?? null) ? (int) $data['courier_id'] : null,
             $data['reason'], (int) $data['expected_courier_id'],
         );
 
-        return $courier === null
-            ? back()->with('error', 'No eligible replacement Rider is available for this delivery leg.')
-            : back()->with('success', "Delivery reassigned to {$courier->name}.");
+        if ($courier === null) {
+            // The service returns null for a lost race too; say which one happened.
+            return back()->with('error', (int) $sellerOrder->fresh()->delivery_courier_id !== (int) $data['expected_courier_id']
+                ? 'This delivery was already reassigned by someone else. The page now shows the current Rider.'
+                : 'No eligible replacement Rider is available for this delivery leg.');
+        }
+
+        return back()->with('success', "Delivery reassigned to {$courier->name}.");
     }
 
     /**
@@ -183,21 +208,71 @@ class DeliveryAssignmentsController extends Controller
                 'integer',
                 Rule::exists('couriers', 'id')->where('logistics_provider_id', $provider->id),
             ],
+            'reason' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $preferred = filled($data['courier_id'] ?? null) ? (int) $data['courier_id'] : null;
+        $withRider = ! $sellerOrder->isBackAtStationAfterFailure();
+        if ($withRider && $preferred !== null && $preferred !== (int) $sellerOrder->delivery_courier_id) {
+            return back()->with('error', self::STILL_WITH_RIDER_MESSAGE);
+        }
 
         $courier = $this->assignment->assignDelivery(
             $sellerOrder,
             $provider,
-            preferredCourierId: filled($data['courier_id'] ?? null) ? (int) $data['courier_id'] : null,
+            preferredCourierId: $preferred,
             rescheduled: true,
             reason: $data['reason'] ?? null,
         );
 
         if ($courier === null) {
-            return back()->with('error', 'No available courier in your fleet serves this destination. Return the parcel to the seller instead.');
+            return back()->with('error', $withRider
+                ? 'The Rider who made the failed attempt cannot take the final attempt and the parcel is still with them. '.self::STILL_WITH_RIDER_MESSAGE
+                : 'No available courier in your fleet serves this destination. Return the parcel to the seller instead.');
         }
 
         return back()->with('success', "Re-delivery scheduled with {$courier->name}.");
+    }
+
+    /**
+     * Station Hub receives a parcel back after a failed delivery attempt. The
+     * tracking number must be verified on the Scan page first (camera or
+     * manual), the same proof used for pickup station receipt. No status
+     * changes: it records custody so the final attempt may go to any Rider.
+     */
+    public function receiveBack(Request $request, SellerOrder $sellerOrder, ParcelHandoffVerification $verify): RedirectResponse
+    {
+        $provider = $request->user('logistics');
+        $this->authorizeForUser($provider, 'advance-shipment', [$sellerOrder]);
+
+        if ($sellerOrder->status !== OrderStatus::DeliveryFailed || $sellerOrder->hasActiveReturn()) {
+            return back()->with('error', 'Only a parcel with a failed delivery attempt can be received back here.');
+        }
+        if ($sellerOrder->isBackAtStationAfterFailure()) {
+            return back()->with('success', 'This parcel is already back at the Station Hub. No change was made.');
+        }
+        $hubId = $this->assignment->failedReturnStationId($sellerOrder);
+        $token = $request->input('verification_token');
+
+        try {
+            $verify->assertValidForLogistics($provider, $sellerOrder, ParcelHandoffVerification::ACTION_FAILED_RETURN_RECEIPT, $token, $hubId);
+            DB::transaction(function () use ($sellerOrder, $provider, $hubId): void {
+                $parcel = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
+                ParcelIncidentService::assertOperationsAllowed($parcel);
+                if ($parcel->status !== OrderStatus::DeliveryFailed) {
+                    throw ValidationException::withMessages(['parcel' => 'The parcel status changed. Refresh the page.']);
+                }
+                $parcel->forceFill(['returned_to_station_at' => now(), 'custody_provider_id' => $provider->id, 'custody_hub_id' => $hubId])->save();
+                OperationsAuditLog::record($provider, 'failed_parcel_received_back', $parcel, 'Parcel #'.$parcel->id,
+                    ['custody' => 'Rider after failed attempt'], ['custody' => 'Station Hub #'.$hubId], null);
+            });
+            $verify->consumeAfterSuccess(fn () => $verify->consumeForLogistics($provider, $sellerOrder, ParcelHandoffVerification::ACTION_FAILED_RETURN_RECEIPT, $token, $hubId));
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return redirect()->route('logistics.delivery-assignments.index')
+            ->with('success', 'Parcel received back at the Station Hub. The final attempt can now go to any eligible Rider.');
     }
 
     /**

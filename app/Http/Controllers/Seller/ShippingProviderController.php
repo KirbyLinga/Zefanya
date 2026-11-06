@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsProvider;
-use App\Services\SellerShippingProviderService;
+use App\Services\Seller\SellerShippingProviderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;

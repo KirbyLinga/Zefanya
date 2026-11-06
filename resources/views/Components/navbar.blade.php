@@ -179,8 +179,10 @@
         @if ($variant === 'buyer')
             <div class="zf-nav-main flex items-center gap-8">
                 <a href="{{ route('buyer.home') }}" class="zf-nav-link text-buyer-ink {{ request()->routeIs('buyer.home') ? 'active' : '' }}" title="Home">Home</a>
-                <a href="{{ route('buyer.products.index') }}" class="zf-nav-link text-buyer-ink {{ request()->routeIs('buyer.products.index') ? 'active' : '' }}" title="Shop">Shop</a>
-                <a href="#" class="zf-nav-link text-buyer-ink" title="Sale">Sale</a>
+                <a href="{{ route('buyer.products.index') }}" class="zf-nav-link text-buyer-ink {{ request()->routeIs('buyer.products.index') && ! request()->boolean('on_sale') ? 'active' : '' }}" title="Shop">Shop</a>
+                @if ($hasRealSaleDiscounts ?? false)
+                    <a href="{{ route('buyer.products.index', ['on_sale' => 1]) }}" class="zf-nav-link text-buyer-ink {{ request()->routeIs('buyer.products.index') && request()->boolean('on_sale') ? 'active' : '' }}" title="Sale">Sale</a>
+                @endif
             </div>
         @endif
 
@@ -230,9 +232,7 @@
                                 aria-label="Notifications"
                                 aria-haspopup="true" aria-expanded="false">
                             <i data-lucide="bell" width="22" height="22"></i>
-                            @if ($unreadNotificationCount > 0)
-                                <span class="absolute top-0 right-0 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-primary-800 px-1 font-sans text-[10px] font-bold leading-none text-white">{{ min($unreadNotificationCount, 9) }}</span>
-                            @endif
+                            <span data-notification-count class="absolute top-0 right-0 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-primary-800 px-1 font-sans text-[10px] font-bold leading-none text-white" @if ($unreadNotificationCount <= 0) style="display: none;" @endif>{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
                         </button>
 
                         {{-- Notifications dropdown --}}

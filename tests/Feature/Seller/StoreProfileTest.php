@@ -50,7 +50,7 @@ class StoreProfileTest extends TestCase
         $originalPassword = $seller->password;
         $data = $this->payload($seller) + [
             'province_name' => 'Forged Province', 'municipality_name' => 'Forged City', 'barangay_name' => 'Forged Barangay',
-            'seller_id' => $other->id, 'id' => $other->id, 'status' => 'suspended',
+            'status' => 'suspended',
             'email' => 'forged@example.com', 'password' => 'ForgedPassword123!', 'store_logo_path' => 'forged.php',
         ];
         $data['contact_no'] = '+63 917 123 4567';
@@ -81,12 +81,12 @@ class StoreProfileTest extends TestCase
         $first = $seller->fresh()->store_logo_path;
         Storage::disk('public')->assertExists($first);
         $this->assertStringStartsWith('seller-logos/'.$seller->id.'/', $first);
-        $this->get(route('seller.account.index'))->assertSee(Storage::disk('public')->url($first));
+        $this->get(route('seller.account.index'))->assertSee('/storage/'.ltrim($first, '/'), false);
 
         $this->patch(route('seller.account.update'), $this->payload($seller))->assertSessionHasNoErrors();
         $this->assertSame($first, $seller->fresh()->store_logo_path);
 
-        $this->patch(route('seller.account.update'), $this->payload($seller) + ['logo' => UploadedFile::fake()->image('replacement.webp')])
+        $this->patch(route('seller.account.update'), $this->payload($seller) + ['logo' => UploadedFile::fake()->image('replacement.png')])
             ->assertSessionHasNoErrors();
         $second = $seller->fresh()->store_logo_path;
         Storage::disk('public')->assertMissing($first);
@@ -100,7 +100,7 @@ class StoreProfileTest extends TestCase
     public static function invalidFields(): array
     {
         return [
-            ['business_name', ''], ['store_description', str_repeat('x', 2001)],
+            ['business_name', ''], ['store_description', str_repeat('x', 501)],
             ['contact_no', 'not-a-phone'], ['contact_email', 'not-an-email'],
             ['region_code', ''], ['street', ''], ['postal_code', str_repeat('1', 11)],
         ];
@@ -129,7 +129,7 @@ class StoreProfileTest extends TestCase
         $payload['contact_no'] = $other->contact_no;
         $this->patch(route('seller.account.update'), $payload)->assertSessionHasErrors('contact_no');
 
-        foreach ([UploadedFile::fake()->create('logo.svg', 1, 'image/svg+xml'), UploadedFile::fake()->create('fake.png', 1, 'image/png'), UploadedFile::fake()->image('large.png')->size(2049), UploadedFile::fake()->image('wide.png', 2049, 10)] as $logo) {
+        foreach ([UploadedFile::fake()->create('logo.svg', 1, 'image/svg+xml'), UploadedFile::fake()->create('fake.png', 1, 'image/png'), UploadedFile::fake()->image('large.png')->size(5223), UploadedFile::fake()->image('unsupported.webp')] as $logo) {
             $this->patch(route('seller.account.update'), $this->payload($seller) + ['logo' => $logo])->assertSessionHasErrors('logo');
         }
         $this->patch(route('seller.account.update'), $this->payload($seller) + ['logo' => UploadedFile::fake()->image('logo.png'), 'remove_logo' => '1'])

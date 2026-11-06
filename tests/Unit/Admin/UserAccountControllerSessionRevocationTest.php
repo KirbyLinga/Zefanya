@@ -8,6 +8,7 @@ use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -239,6 +240,17 @@ class UserAccountControllerSessionRevocationTest extends TestCase
     private function seedSessionFor($account, string $sessionId): void
     {
         $this->seedSessionRow($account->getAuthIdentifier(), $sessionId);
+        $guard = match (true) {
+            $account instanceof Buyer => 'buyer',
+            $account instanceof Seller => 'seller',
+            $account instanceof LogisticsProvider => 'logistics',
+        };
+        $attributes = [Auth::guard($guard)->getName() => $account->getAuthIdentifier()];
+        $serialized = config('session.serialization') === 'json' ? json_encode($attributes, JSON_THROW_ON_ERROR) : serialize($attributes);
+        if (config('session.encrypt')) {
+            $serialized = app('encrypter')->encrypt($serialized);
+        }
+        DB::table('sessions')->where('id', $sessionId)->update(['payload' => base64_encode($serialized)]);
     }
 
     private function seedSessionRow(int|string $userId, string $sessionId): void

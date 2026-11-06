@@ -5,7 +5,8 @@ namespace Tests\Feature\Rider;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
-use App\Models\Payment;
+use App\Models\Shared\Payment;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class DigitalWaybillTest extends RiderTestCase
 {
@@ -32,9 +33,22 @@ class DigitalWaybillTest extends RiderTestCase
         $this->assertStringNotContainsString($this->buyer->contact_no, $response->getContent());
     }
 
-    public function test_delivery_rider_sees_buyer_contact_and_call_link(): void
+    public static function buyerNames(): array
+    {
+        return [
+            'ordinary name' => ['Maria', 'Santos'],
+            'apostrophe' => ['Maria', "O'Kon"],
+            'ampersand and quotes' => ['Maria & "Mae"', 'Santos'],
+            'HTML characters' => ['Maria <b>Mae</b>', 'Santos'],
+        ];
+    }
+
+    #[DataProvider('buyerNames')]
+    public function test_delivery_rider_sees_buyer_contact_and_call_link(string $firstName, string $lastName): void
     {
         $this->withoutVite();
+
+        $this->buyer->forceFill(['first_name' => $firstName, 'last_name' => $lastName])->save();
 
         $parcel = $this->parcel(OrderStatus::OutForDelivery, [], [
             'delivery_courier_id' => $this->courier->id,
@@ -51,7 +65,7 @@ class DigitalWaybillTest extends RiderTestCase
         $this->actingAsRider()
             ->get(route('rider.waybills.show', $parcel))
             ->assertOk()
-            ->assertSee($this->buyer->fullName(), false)
+            ->assertSeeText($this->buyer->fullName())
             ->assertSee('123 Mabini Street', false)
             ->assertSee('Call buyer', false)
             ->assertSee('tel:', false)
@@ -59,7 +73,7 @@ class DigitalWaybillTest extends RiderTestCase
             ->assertSee('Collect', false);
     }
 
-    public function test_gcash_label_reflects_supported_method_without_account_ids(): void
+    public function test_collected_cod_is_not_requested_again(): void
     {
         $this->withoutVite();
 
@@ -69,15 +83,15 @@ class DigitalWaybillTest extends RiderTestCase
 
         Payment::factory()->create([
             'seller_order_id' => $parcel->id,
-            'method' => PaymentMethod::Gcash,
-            'status' => PaymentStatus::Pending,
+            'method' => PaymentMethod::Cod,
+            'status' => PaymentStatus::Paid,
             'amount_minor' => 9900,
         ]);
 
         $this->actingAsRider()
             ->get(route('rider.waybills.show', $parcel))
             ->assertOk()
-            ->assertSee('GCash', false)
+            ->assertSee('COD already collected', false)
             ->assertDontSee('gcash account', false)
             ->assertDontSee('Collect ₱', false);
     }

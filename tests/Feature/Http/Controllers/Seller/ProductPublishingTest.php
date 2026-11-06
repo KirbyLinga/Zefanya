@@ -3,21 +3,24 @@
 namespace Tests\Feature\Http\Controllers\Seller;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
-use App\Models\ProductImage;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductImage;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
+use App\Models\Shared\Category;
+use App\Services\Seller\ProductPublishingService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class ProductPublishingTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private function image(string $name = 'shirt.png'): UploadedFile
     {
@@ -35,6 +38,7 @@ class ProductPublishingTest extends TestCase
         }
 
         return [
+            ...$this->publicationDefaults(),
             'name' => 'Premium Oversized Cotton Shirt', 'description' => 'Premium cotton oversized shirt, available in multiple colors and sizes.',
             'price' => 999, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 0, 'status' => 'active', 'variants_exist' => '1',
             'images' => [$this->image('detail.png'), $this->image('cover.png')], 'cover_index' => '1',
@@ -48,6 +52,40 @@ class ProductPublishingTest extends TestCase
         ];
     }
 
+    #[DataProvider('anglePhotoCounts')]
+    public function test_product_keeps_one_selected_cover_and_all_additional_angles(int $additional): void
+    {
+        Storage::fake('public');
+        $seller = Seller::factory()->create();
+        $data = $this->payload();
+        $data['images'] = array_map(fn ($index) => $this->image('angle-'.$index.'.png'), range(0, $additional));
+        $data['cover_index'] = $additional;
+        $this->actingAs($seller, 'seller')->post(route('seller.products.store'), $data)
+            ->assertSessionHasNoErrors()->assertRedirect(route('seller.products.index'));
+        $product = Product::query()->sole();
+        $general = $product->images()->whereNull('variant_id')->orderBy('sort_order')->get();
+        $this->assertCount($additional + 1, $general);
+        $this->assertCount(1, $general->where('is_primary', true));
+        $this->assertTrue($general[$additional]->is_primary);
+        foreach ($general as $image) {
+            Storage::disk('public')->assertExists($image->path);
+        }
+        $this->get(route('buyer.products.show', $product))->assertOk()
+            ->assertViewHas('galleryImages', function ($images) use ($general, $additional): bool {
+                $this->assertSame(Storage::disk('public')->url($general[$additional]->path), $images[0]);
+                foreach ($general as $image) {
+                    $this->assertContains(Storage::disk('public')->url($image->path), $images);
+                }
+
+                return true;
+            });
+    }
+
+    public static function anglePhotoCounts(): array
+    {
+        return ['one extra angle' => [1], 'three extra angles' => [3]];
+    }
+
     public function test_publishing_saves_one_listing_twelve_combinations_and_shared_color_images(): void
     {
         Storage::fake('public');
@@ -57,14 +95,14 @@ class ProductPublishingTest extends TestCase
             ->assertSessionHasNoErrors()->assertRedirect(route('seller.products.index'));
 
         $product = Product::query()->sole();
-        $this->assertSame($seller->line_of_business_id, $product->category_id);
+        $this->assertSame($seller->line_of_business_id ?? Category::query()->where('label', 'Home & Living')->value('id'), $product->category_id);
         $this->assertSame(12, $product->variants()->count());
         $this->assertSame(94, $product->stock_quantity);
         $this->assertSame('350.00', $product->price);
         $this->assertSame(1, $product->images()->where('is_primary', true)->count());
         $this->assertSame(2, $product->images()->whereNull('variant_id')->count());
         $this->assertSame(12, $product->images()->whereNotNull('variant_id')->count());
-        $this->assertCount(5, Storage::disk('public')->allFiles());
+        $this->assertCount(5, Storage::disk('public')->allFiles('products'));
         $this->assertDatabaseCount('inventory_transactions', 12);
         foreach (['Black', 'White', 'Beige'] as $color) {
             $paths = $product->variants()->whereHas('optionValues', fn ($query) => $query->where('value', $color))
@@ -98,7 +136,7 @@ class ProductPublishingTest extends TestCase
             'fractional stock' => ['fractional', 'variants.0.stock_quantity'],
             'unknown color upload' => ['color', 'color_images.0.value'],
             'cover outside upload list' => ['cover', 'cover_index'],
-            'more than fifty combinations' => ['limit', 'variants'],
+            'more than twenty options in one axis' => ['limit', 'options.0.values'],
         ];
     }
 
@@ -128,8 +166,8 @@ class ProductPublishingTest extends TestCase
             case 'cover': $data['cover_index'] = 8;
                 break;
             case 'limit':
-                $data['options'] = [['name' => 'Color', 'values' => range(1, 51)]];
-                $data['variants'] = array_map(fn ($i) => ['values' => [(string) $i], 'price' => 50, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 1], range(1, 51));
+                $data['options'] = [['name' => 'Color', 'values' => range(1, 21)]];
+                $data['variants'] = array_map(fn ($i) => ['values' => [(string) $i], 'price' => 50, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 1], range(1, 21));
                 unset($data['color_images']);
                 break;
         }
@@ -183,7 +221,7 @@ class ProductPublishingTest extends TestCase
         $seller = Seller::factory()->create();
         $product = Product::factory()->create(['seller_id' => $seller->id]);
         $foreign = Product::factory()->create()->variants()->firstOrFail();
-        $data = ['name' => $product->name, 'price' => 100, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 2, 'status' => 'active', 'variant_images' => [$foreign->id => [$this->image()]]];
+        $data = [...$this->publicationDefaults(), 'name' => $product->name, 'price' => 100, 'weight' => 250, 'weight_unit' => 'g', 'weight_grams' => 250, 'stock_quantity' => 2, 'status' => 'active', 'variant_images' => [$foreign->id => [$this->image()]]];
 
         $this->actingAs($seller, 'seller')->put(route('seller.products.update', $product), $data + ['inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'))])->assertSessionHasErrors('variant_images');
 
@@ -250,7 +288,7 @@ class ProductPublishingTest extends TestCase
             $this->assertCount(1, $variant->images);
             Storage::disk('public')->assertExists($variant->images->first()->path);
         }
-        $this->assertCount(5, Storage::disk('public')->allFiles());
+        $this->assertCount(5, Storage::disk('public')->allFiles('products'));
         $this->assertSame(100, $product->fresh()->stock_quantity);
     }
 }

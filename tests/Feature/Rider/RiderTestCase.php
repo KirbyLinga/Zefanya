@@ -4,17 +4,17 @@ namespace Tests\Feature\Rider;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\RiderHandoffVerification;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -31,7 +31,7 @@ use Tests\TestCase;
  */
 abstract class RiderTestCase extends TestCase
 {
-    use CreatesAssignableFleet, LazilyRefreshDatabase;
+    use CreatesAssignableFleet, LazilyRefreshDatabase, \Tests\Support\ProvidesDeliveryOtp;
 
     protected LogisticsProvider $provider;
 
@@ -136,7 +136,7 @@ abstract class RiderTestCase extends TestCase
     /** Issue a short-lived handoff verification token for the fixture rider. */
     protected function handoffToken(SellerOrder $parcel, string $action, ?Rider $rider = null): string
     {
-        return app(RiderHandoffVerification::class)->issue(
+        return app(ParcelHandoffVerification::class)->issueForRider(
             $rider ?? $this->rider,
             $parcel,
             $action,
@@ -149,6 +149,10 @@ abstract class RiderTestCase extends TestCase
      */
     protected function withHandoff(SellerOrder $parcel, string $action, array $payload = [], ?Rider $rider = null): array
     {
+        if ($action === ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY && ! array_key_exists('delivery_otp', $payload)) {
+            $payload['delivery_otp'] = $this->deliveryOtp($parcel);
+        }
+
         return array_merge($payload, [
             'verification_token' => $this->handoffToken($parcel, $action, $rider),
         ]);

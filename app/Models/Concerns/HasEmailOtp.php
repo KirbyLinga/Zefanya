@@ -25,6 +25,9 @@ trait HasEmailOtp
      * with commitOtp() only once delivery has succeeded, so a failed send can
      * never invalidate the code the user already received.
      */
+    /** OTP lifetime (workbook A9: a code entered at 5:01 is expired). */
+    public const OTP_TTL_MINUTES = 5;
+
     public function generateOtp(): string
     {
         return (string) random_int(100000, 999999);
@@ -41,7 +44,7 @@ trait HasEmailOtp
     {
         $this->forceFill([
             'email_verification_code' => static::hashOtp($otp),
-            'email_verification_expires_at' => now()->addMinutes(10),
+            'email_verification_expires_at' => now()->addMinutes(self::OTP_TTL_MINUTES),
         ])->save();
     }
 

@@ -3,10 +3,10 @@
 namespace Tests\Feature\Buyer;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -49,6 +49,32 @@ class CartVariantDisplayTest extends TestCase
         return $document->saveHTML($nodes->item(0));
     }
 
+    public static function unavailableVariations(): array
+    {
+        return [['disabled'], ['missing selection']];
+    }
+
+    #[DataProvider('unavailableVariations')]
+    public function test_unavailable_variation_stays_in_cart_with_a_label_and_cannot_be_selected(string $state): void
+    {
+        Storage::fake('public');
+        $product = $this->product(['Color' => ['Black']]);
+        $variant = $product->variants()->sole();
+        $buyer = Buyer::factory()->create();
+        $line = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $state === 'disabled' ? $variant->id : null]);
+        if ($state === 'disabled') {
+            $variant->forceFill(['is_available' => false])->save();
+        }
+        $html = $this->actingAs($buyer, 'buyer')->get(route('buyer.cart.index'))->assertOk()->getContent();
+        $row = $this->row($html, $line->id);
+        $this->assertStringContainsString('Variation unavailable', $row);
+        $this->assertStringContainsString('data-available="0"', $row);
+        $this->assertStringContainsString('disabled', $row);
+        $this->getJson(route('buyer.cart.mini'))->assertOk()->assertJsonPath('subtotal_centavos', 0)->assertJsonPath('items.0.is_available', false);
+        $this->assertModelExists($line);
+        $this->assertSame(20, $variant->fresh()->stock_quantity);
+    }
+
     public static function optionTypes(): array
     {
         return [
@@ -80,7 +106,7 @@ class CartVariantDisplayTest extends TestCase
         $this->assertStringContainsString('data-unit-centavos="12025"', $row);
         $this->assertStringContainsString('data-line-total-centavos="24050"', $row);
         $this->assertStringContainsString('240.50', $row);
-        $this->assertStringContainsString('>2</span>', $row);
+        $this->assertMatchesRegularExpression('/<input[^>]*js-cartpage-qty-input[^>]*value="2"[^>]*aria-label="Quantity of Cart Display Shirt"/s', $row);
         if ($label !== null) {
             $this->assertStringContainsString($label, $row);
         } else {

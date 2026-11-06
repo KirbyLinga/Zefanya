@@ -45,7 +45,9 @@ return [
             'root' => storage_path('app/public'),
             // Serve public uploads even when the web server has no storage symlink.
             'serve' => true,
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // Same-origin path so images load from whichever host the visitor used;
+            // APP_URL (often localhost) only resolves on the machine running the app.
+            'url' => '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

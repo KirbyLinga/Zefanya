@@ -2,6 +2,7 @@
 
 use App\Enums\AuthRole;
 use App\Http\Middleware\Admin\EnsureAdminRole;
+use App\Http\Middleware\Admin\EnsureAdminTwoFactor;
 use App\Http\Middleware\ApiRole;
 use App\Http\Middleware\AuthenticateRoleSession;
 use App\Http\Middleware\Buyer\EnsureBuyerActive;
@@ -9,9 +10,10 @@ use App\Http\Middleware\EnforceSingleBrowserAccount;
 use App\Http\Middleware\Logistics\EnsureLogisticsApproved;
 use App\Http\Middleware\RedirectIfAuthenticatedRole;
 use App\Http\Middleware\Rider\EnsureRiderActive;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\Seller\EnsureSellerApproved;
 use Illuminate\Auth\AuthenticationException;
-use Illuminate\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -35,13 +37,19 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Behind a reverse proxy / Cloudflare / load balancer, trust every proxy's
-        // X-Forwarded-* headers so Laravel generates https:// URLs and marks the
-        // session cookie secure in production. Kept separate from the aliases below.
-        $middleware->trustProxies(at: '*');
+        // Trusted reverse proxies are configured in config/trustedproxy.php via
+        // the TRUSTED_PROXIES environment variable. Laravel's TrustProxies
+        // middleware reads that config at request time, so no wildcard is set
+        // here: by default NO proxy is trusted and X-Forwarded-* headers from
+        // direct clients are ignored (client IPs cannot be spoofed).
+        //
+        // TODO (deployment): set TRUSTED_PROXIES to the exact address/CIDR of the
+        // Cloudflare Tunnel connector (or load balancer) that forwards requests
+        // to this app. That value cannot be guessed from this repository.
 
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
+            'admin.2fa' => EnsureAdminTwoFactor::class,
             'guest.role' => RedirectIfAuthenticatedRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
             'rider.active' => EnsureRiderActive::class,
@@ -55,6 +63,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             EnforceSingleBrowserAccount::class,
             AuthenticateRoleSession::class,
+            SecurityHeaders::class,
+        ]);
+
+        $middleware->api(append: [
+            SecurityHeaders::class,
         ]);
 
         // Revoke stale credentials before route authentication can authorize a request.

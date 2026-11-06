@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Api\Rider;
 
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Traits\ValidatesRoleAbilities;
-use App\Models\Rider;
+use App\Http\Controllers\Controller;
+use App\Models\Rider\Rider;
 use Illuminate\Auth\AuthenticationException;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 /** Rider API login.
  *
@@ -53,14 +52,8 @@ class LoginController extends Controller
 
         // Check status: approved or active + verified + operational.
         if (! $this->accountIsLoginable($account)) {
-            return $this->accountNotActiveResponse($account, $role);
+            return $this->accountNotActiveResponse($account);
         }
-
-        if (! Auth::guard('rider')->attempt(['email' => $email, 'password' => $password], $request->boolean('remember'))) {
-            throw new AuthenticationException();
-        }
-
-        $request->session()->regenerate();
 
         $token = $account->createToken('api-token', ['rider'], now()->addMinutes(config('sanctum.expiration', 60)));
 
@@ -70,22 +63,12 @@ class LoginController extends Controller
             'data' => [
                 'token' => (string) $token->plainTextToken,
                 'token_type' => 'Bearer',
-                'expires_in' => $token->accessToken->expires_at ? $token->accessToken->expires_at->getTimestamp() - time() : null,
+                'expires_in' => $token->accessToken->expires_at ? $token->accessToken->expires_at->getTimestamp() - now()->getTimestamp() : null,
                 'expires_at' => $token->accessToken->expires_at ? $token->accessToken->expires_at->toIso8601String() : null,
                 'role' => $role,
             ],
             'errors' => null,
         ], 200);
-    }
-
-    /** Rider accounts have an extra operational gate: assigned station + linked Courier. */
-    protected function accountIsOperational(object $account): bool
-    {
-        if (! $account instanceof Rider) {
-            return true;
-        }
-
-        return $account->isOperational();
     }
 
     /** Resolve the rider account. */
@@ -95,21 +78,22 @@ class LoginController extends Controller
 
         if ($account instanceof Rider && $account->password) {
             $this->validatePassword($account, $password);
+
             return $account;
         }
 
-        throw new AuthenticationException();
+        throw new AuthenticationException;
     }
 
     private function validatePassword(object $account, string $password): void
     {
         if (! Hash::check($password, $account->password)) {
-            throw new AuthenticationException();
+            throw new AuthenticationException;
         }
     }
 
     /** Address cases where the account exists but is not loginable. */
-    private function accountNotActiveResponse(object $account, string $role): JsonResponse
+    private function accountNotActiveResponse(object $account): JsonResponse
     {
         $message = match (true) {
             $account->isEmailVerified() === false => 'Please verify your email before logging in. Check your inbox for the code.',

@@ -366,6 +366,10 @@ html[data-theme="dark"] .zf-theme-toggle .zf-icon-moon { display: none; }
     width: fit-content;
 }
 
+.sp-hero__date-chip span {
+    color: inherit;
+}
+
 .sp-hero__toolbar {
     display: flex;
     align-items: center;
@@ -438,6 +442,10 @@ html[data-theme="dark"] .sp-icon-btn.zf-theme-toggle .zf-icon-moon { display: no
     z-index: 50;
     display: flex;
     flex-direction: column;
+}
+
+.sp-notif-dropdown[hidden] {
+    display: none;
 }
 
 .sp-notif-dropdown__header {

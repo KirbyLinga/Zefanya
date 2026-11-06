@@ -31,7 +31,7 @@
                 <span class="mt-0.5 block font-serif text-[18px] font-semibold text-[var(--text-ink)]">{{ $counts['all'] ?? 0 }}</span>
             </div>
             <div class="rounded-xl bg-secondary-100 p-3 text-left">
-                <span class="block font-sans text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">In Transit</span>
+                <span class="block font-sans text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">To Receive</span>
                 <span class="mt-0.5 block font-serif text-[18px] font-semibold text-[var(--text-ink)]">{{ $counts['to_receive'] ?? 0 }}</span>
             </div>
         </div>

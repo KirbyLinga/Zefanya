@@ -2,10 +2,11 @@
 
 namespace App\Notifications\Rider;
 
-use App\Models\Rider;
+use App\Models\Rider\Rider;
+use Illuminate\Notifications\Messages\MailMessage;
 
 /**
- * Logistics suspended, deactivated or reactivated this rider.
+ * Logistics rejected, suspended, deactivated or reactivated this rider.
  *
  * Stored even when the rider is suspended: the `rider.active` middleware
  * blocks every operational page (and therefore every notification link)
@@ -13,12 +14,28 @@ use App\Models\Rider;
  */
 class AccountStatusChanged extends RiderNotification
 {
-    /** @param  'suspended'|'deactivated'|'active'  $status */
+    /** @param  'rejected'|'suspended'|'deactivated'|'active'  $status */
     public function __construct(
         public Rider $rider,
         public string $status,
         public ?string $reason = null,
     ) {}
+
+    public function via(object $notifiable): array
+    {
+        return in_array($this->status, [Rider::STATUS_REJECTED, Rider::STATUS_SUSPENDED], true)
+            ? ['database', 'mail']
+            : parent::via($notifiable);
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $payload = $this->payload();
+
+        return (new MailMessage)
+            ->subject($payload['title'])
+            ->line($payload['message']);
+    }
 
     public function dedupeKey(): string
     {
@@ -30,6 +47,7 @@ class AccountStatusChanged extends RiderNotification
     protected function payload(): array
     {
         $message = match ($this->status) {
+            Rider::STATUS_REJECTED => 'Your rider application was rejected by your Logistics company.',
             Rider::STATUS_SUSPENDED => 'Your rider account was suspended by your Logistics company. You cannot open operational pages until it is reactivated.',
             Rider::STATUS_DEACTIVATED => 'Your rider account was deactivated by your Logistics company.',
             Rider::STATUS_ACTIVE => 'Your rider account was reactivated. You can open your assignments again.',
@@ -43,12 +61,14 @@ class AccountStatusChanged extends RiderNotification
         return [
             'type' => 'rider_account_status_changed',
             'title' => match ($this->status) {
+                Rider::STATUS_REJECTED => 'Application rejected',
                 Rider::STATUS_SUSPENDED => 'Account suspended',
                 Rider::STATUS_DEACTIVATED => 'Account deactivated',
                 Rider::STATUS_ACTIVE => 'Account reactivated',
                 default => 'Account status updated',
             },
             'message' => $message,
+            'reason' => $this->reason,
             'url' => route('rider.account.show'),
         ];
     }

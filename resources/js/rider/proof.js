@@ -79,12 +79,6 @@
         return base.indexOf('//') === 0 ? window.location.origin + '/rider/notifications/recent' : base;
     }
 
-    function warnIfSessionExpired() {
-        if (sessionHealthy === false) {
-            showSessionWarn(true);
-        }
-    }
-
     function showSessionWarn(visible) {
         sessionWarnVisible = visible;
         if (!sessionWarnEl) { return; }

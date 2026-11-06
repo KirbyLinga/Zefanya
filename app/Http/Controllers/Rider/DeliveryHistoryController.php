@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
-use App\Services\RiderOperationsService;
+use App\Services\Rider\RiderOperationsService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 

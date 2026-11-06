@@ -1,13 +1,13 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Cross-Provider Handoffs')
+@section('title', 'Provider Handoffs')
 
 @section('content')
 <div data-handoffs-page>
     <header class="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-strong)] pb-6">
         <div>
             <p class="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-700">Logistics network</p>
-            <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Cross-Provider Handoffs</h1>
+            <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Provider Handoffs</h1>
             <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">{{ $provider->business_name }} <span aria-hidden="true">/</span> {{ $provider->province_name ?: 'Service province' }}</p>
         </div>
         <a href="{{ route('logistics.partnerships.index') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm border border-[var(--border-strong)] px-3 font-sans text-[11px] font-semibold text-[var(--text-ink)] transition hover:bg-[var(--bg-surface)]">

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Http\Controllers\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -49,5 +49,93 @@ class ProductControllerTest extends TestCase
             ->assertOk()
             ->assertSee('In Stock Widget', false)
             ->assertDontSee('Out Of Stock Widget', false);
+    }
+
+    public function test_load_more_endpoint_returns_next_page_products(): void
+    {
+        $seller = Seller::factory()->create(['status' => 'approved']);
+
+        // Create 45 products (initial page loads 20, load-more should load next 20)
+        for ($i = 1; $i <= 45; $i++) {
+            Product::factory()->create([
+                'seller_id' => $seller->id,
+                'status' => 'active',
+                'stock_quantity' => 5,
+                'name' => "Product {$i}",
+            ]);
+        }
+
+        // The button only works if the shop page loads its script
+        $this->get(route('buyer.products.index'))->assertSee('products-load-more', false);
+
+        // Request page 2
+        $response = $this->get(route('buyer.products.load-more', ['page' => 2]));
+
+        $response->assertOk()
+            ->assertJson([
+                'total' => 45,
+                'showing' => 40, // 2 pages * 20 products
+                'has_more' => true,
+                'next_page' => 3,
+            ]);
+
+        // Verify HTML contains product cards
+        $data = $response->json();
+        $this->assertNotEmpty($data['html']);
+        $this->assertStringContainsString('buyer-product-card', $data['html']);
+    }
+
+    public function test_load_more_endpoint_hides_has_more_on_last_page(): void
+    {
+        $seller = Seller::factory()->create(['status' => 'approved']);
+
+        // Create 13 products (page 1: 12, page 2: 1)
+        for ($i = 1; $i <= 13; $i++) {
+            Product::factory()->create([
+                'seller_id' => $seller->id,
+                'status' => 'active',
+                'stock_quantity' => 5,
+            ]);
+        }
+
+        // Request page 2 (last page)
+        $response = $this->get(route('buyer.products.load-more', ['page' => 2]));
+
+        $response->assertJson([
+            'total' => 13,
+            'showing' => 13,
+            'has_more' => false,
+            'next_page' => 3,
+        ]);
+    }
+
+    public function test_load_more_endpoint_filters_by_search_term(): void
+    {
+        $seller = Seller::factory()->create(['status' => 'approved']);
+
+        // Create products with different names
+        Product::factory()->create([
+            'seller_id' => $seller->id,
+            'status' => 'active',
+            'stock_quantity' => 5,
+            'name' => 'Widget Pro',
+        ]);
+
+        Product::factory()->create([
+            'seller_id' => $seller->id,
+            'status' => 'active',
+            'stock_quantity' => 5,
+            'name' => 'Gadget Max',
+        ]);
+
+        // Request with search term
+        $response = $this->get(route('buyer.products.load-more', [
+            'page' => 1,
+            'q' => 'Widget',
+        ]));
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertLessThanOrEqual(1, $data['total']);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Rider;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 
 /**
  * Logistics assigned a delivery (or a re-delivery after a failed attempt) to

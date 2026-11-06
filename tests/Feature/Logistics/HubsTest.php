@@ -3,14 +3,14 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\LogisticsHubService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\LogisticsHubService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -173,7 +173,7 @@ class HubsTest extends TestCase
         ]);
         Courier::factory()->create(['logistics_provider_id' => $this->provider->id, 'area_id' => $station->areas()->value('id')]);
         $this->actingAs($this->provider, 'logistics')->get(route('logistics.hubs.index'))
-            ->assertOk()->assertSee('San Fernando')->assertSee('Pending Approval')->assertSee('1 barangays')->assertSee('1 fleet riders');
+            ->assertOk()->assertSee('San Fernando')->assertSee('Pending Approval')->assertSee('1 barangays')->assertSee('1 rider');
     }
 
     public function test_province_hubs_can_no_longer_be_self_service_created(): void

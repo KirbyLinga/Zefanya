@@ -7,6 +7,7 @@ enum ManifestStatus: string
     case Draft = 'DRAFT';
     case Dispatched = 'DISPATCHED';
     case Received = 'RECEIVED';
+    case ReceivedWithExceptions = 'RECEIVED_WITH_EXCEPTIONS';
     case Cancelled = 'CANCELLED';
 
     public function label(): string
@@ -15,6 +16,7 @@ enum ManifestStatus: string
             self::Draft => 'Draft',
             self::Dispatched => 'Dispatched',
             self::Received => 'Received',
+            self::ReceivedWithExceptions => 'Received with Issues',
             self::Cancelled => 'Cancelled',
         };
     }

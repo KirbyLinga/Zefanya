@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Buyer;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
-use App\Models\Order;
+use App\Models\Shared\Order;
+use App\Services\Buyer\BuyerAccountDeletionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
@@ -17,7 +17,7 @@ class SettingsController extends Controller
     /**
      * GET /buyer/settings — Display settings page
      */
-    public function index(Request $request): View
+    public function index(Request $request, BuyerAccountDeletionService $deletion): View
     {
         $buyer = $request->user('buyer');
 
@@ -40,6 +40,7 @@ class SettingsController extends Controller
             'buyer' => $buyer,
             'counts' => $this->getOrderCounts($buyer),
             'settings' => $settings,
+            'deletionBlockedBy' => $deletion->blockingReason($buyer),
         ]);
     }
 
@@ -94,34 +95,32 @@ class SettingsController extends Controller
     }
 
     /**
-     * POST /buyer/settings/delete-account — Delete buyer account (requires password confirmation)
+     * POST /buyer/settings/delete-account — Anonymize the buyer account (requires confirmation)
      */
-    public function deleteAccount(Request $request): RedirectResponse
+    public function deleteAccount(Request $request, BuyerAccountDeletionService $deletion): RedirectResponse
     {
         $buyer = $request->user('buyer');
 
+        // Accounts created with Google have no password to confirm, so they retype their email.
+        $hasPassword = $buyer->password !== null;
         $data = $request->validate([
-            'password' => ['required', 'string'],
+            'password' => [$hasPassword ? 'required' : 'nullable', 'string'],
+            'confirm_email' => [$hasPassword ? 'nullable' : 'required', 'string'],
+            'confirm' => ['accepted'],
         ], [
             'password.required' => 'Enter your password to confirm account deletion.',
+            'confirm_email.required' => 'Enter your email to confirm account deletion.',
+            'confirm.accepted' => 'Confirm that you understand this action is permanent.',
         ]);
 
-        // Verify password
-        if (! Hash::check($data['password'], $buyer->password)) {
-            return back()
-                ->withInput()
-                ->withErrors(['password' => 'That password doesn\'t match your account.']);
+        if ($hasPassword && ! Hash::check($data['password'], $buyer->password)) {
+            return back()->withErrors(['password' => 'That password doesn\'t match your account.']);
+        }
+        if (! $hasPassword && strcasecmp(trim($data['confirm_email']), $buyer->email) !== 0) {
+            return back()->withErrors(['confirm_email' => 'That email doesn\'t match your account.']);
         }
 
-        // Delete account in a transaction
-        DB::transaction(function () use ($buyer) {
-            // Delete related data
-            $buyer->cartItems()->delete();
-            $buyer->wishlist()->delete();
-
-            // Delete the buyer account
-            $buyer->delete();
-        });
+        $deletion->delete($buyer);
 
         // Log out and redirect to home
         auth('buyer')->logout();
@@ -130,7 +129,7 @@ class SettingsController extends Controller
 
         return redirect()
             ->route('home')
-            ->with('success', 'Your account has been permanently deleted.');
+            ->with('success', 'Your account has been deleted.');
     }
 
     /**

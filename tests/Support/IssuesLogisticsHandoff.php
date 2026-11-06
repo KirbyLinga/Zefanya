@@ -3,9 +3,9 @@
 namespace Tests\Support;
 
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelHandoffVerification;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\ParcelHandoffVerification;
 
 trait IssuesLogisticsHandoff
 {

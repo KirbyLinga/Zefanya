@@ -5,18 +5,18 @@ namespace Tests\Feature\Rider;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
 use App\Models\Logistics\LogisticsHub;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Notifications\Rider\AccountStatusChanged;
 use App\Notifications\Rider\AssignmentReassigned;
 use App\Notifications\Rider\DeliveryAssigned;
 use App\Notifications\Rider\DeliveryReturned;
 use App\Notifications\Rider\PickupAssigned;
 use App\Notifications\Rider\StationChanged;
-use App\Services\CourierAssignmentService;
-use App\Services\RiderNotifier;
-use App\Services\RiderOperationsService;
-use App\Services\RiderRegistrationService;
-use App\Services\SellerOrderStatusService;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Rider\RiderNotifier;
+use App\Services\Rider\RiderOperationsService;
+use App\Services\Rider\RiderRegistrationService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -148,6 +148,7 @@ class RiderNotificationsTest extends RiderTestCase
             'delivery_courier_id' => $this->courier->id,
             'delivery_attempts' => 1, 'origin_station_hub_id' => $this->courier->rider->station_hub_id,
         ]);
+        $order->forceFill(['returned_to_station_at' => now()])->save(); // Station Hub scanned it back in.
 
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.delivery-assignments.reschedule', $order))

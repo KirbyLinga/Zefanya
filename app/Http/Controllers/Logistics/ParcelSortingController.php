@@ -5,18 +5,22 @@ namespace App\Http\Controllers\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Courier;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
-use App\Services\CourierAssignmentService;
-use App\Services\LogisticsHubService;
-use App\Services\ParcelHandoffVerification;
-use App\Services\ParcelIncidentService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Rider\Courier;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\RouteExecutionService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -63,7 +67,17 @@ class ParcelSortingController extends Controller
             ? [OrderStatus::AssignedToRider]
             : [OrderStatus::AtSortingCenter, OrderStatus::Sorted];
 
+        // The immutable destination snapshot is authoritative; never use the buyer's live address.
+        $grammar = DB::connection()->getQueryGrammar();
+        $regionParts = collect(['region_code', 'province_code', 'municipality_code', 'barangay_code'])
+            ->map(fn (string $key) => 'NULLIF(SUBSTRING(TRIM('.$grammar->wrap('orders.shipping_address->'.$key)."), 1, 2), '')")
+            ->implode(', ');
+        $destinationRegion = Order::query()
+            ->selectRaw("COALESCE({$regionParts}, 'zz')")
+            ->whereColumn('orders.id', 'seller_orders.order_id');
         $shipments = (clone $baseQuery)
+            ->select('seller_orders.*')
+            ->selectSub($destinationRegion, 'destination_region_sort')
             ->whereIn('status', $statuses)
             ->with([
                 'deliveryCourier' => fn ($q) => $q->withWorkload(),
@@ -76,11 +90,14 @@ class ParcelSortingController extends Controller
                 'seller',
                 'orderItems.product',
             ])
-            ->orderBy('created_at')->orderBy('id')
+            ->orderBy('destination_region_sort')->orderBy('created_at')->orderBy('id')
             ->paginate(25)->withQueryString();
 
         return view('Logistics.ParcelSorting.index', [
             'shipments' => $shipments,
+            'sortingBlocked' => $shipments->getCollection()
+                ->filter(fn (SellerOrder $parcel): bool => $parcel->status === OrderStatus::AtSortingCenter)
+                ->mapWithKeys(fn (SellerOrder $parcel): array => [$parcel->id => app(RouteExecutionService::class)->sortingBlockedReason($parcel)]),
             'tab' => $tab,
             'sortingCount' => $sortingCount,
             'assignedCount' => $assignedCount,
@@ -147,6 +164,10 @@ class ParcelSortingController extends Controller
             return back()->with('error', 'This parcel has already been sorted.');
         }
 
+        if (! $alreadySorted && ($blocked = app(RouteExecutionService::class)->sortingBlockedReason($fresh)) !== null) {
+            return back()->with('error', $blocked);
+        }
+
         $area = $this->destinationAreaFor($provider, $fresh);
 
         try {
@@ -173,6 +194,10 @@ class ParcelSortingController extends Controller
                 ParcelIncidentService::assertOperationsAllowed($fresh);
                 if ($alreadySorted) {
                     return;
+                }
+
+                if (($blocked = app(RouteExecutionService::class)->sortingBlockedReason($fresh)) !== null) {
+                    throw new \InvalidArgumentException($blocked);
                 }
 
                 if ($area !== null && $fresh->destination_area_id !== $area->id) {
@@ -236,6 +261,10 @@ class ParcelSortingController extends Controller
         $preferredCourierId = $request->integer('courier_id') ?: null;
         $request->validate(['courier_id' => ['nullable', 'integer']]);
 
+        if (($limit = $this->assignment->manualRiderBlockReason($preferredCourierId, $provider->id)) !== null) {
+            return back()->with('error', $limit);
+        }
+
         try {
             $courier = $this->assignment->assignDelivery(
                 $sellerOrder,
@@ -252,6 +281,81 @@ class ParcelSortingController extends Controller
         }
 
         return back()->with('success', "Delivery courier {$courier->name} assigned.");
+    }
+
+    /**
+     * Assign several sorted, unassigned parcels to one Rider. Each parcel goes
+     * through the same locked assignDelivery() path as a single assignment;
+     * parcels past the Rider's job limit, or no longer assignable, are skipped
+     * and stay Unassigned.
+     */
+    public function bulkAssignDelivery(Request $request, LogisticsHubService $hubs): RedirectResponse
+    {
+        $provider = $request->user('logistics');
+
+        if (($reason = $hubs->assignmentBlockReason($provider->id)) !== null) {
+            return back()->with('error', $reason);
+        }
+
+        $data = $request->validate([
+            'courier_id' => ['required', 'integer'],
+            'seller_order_ids' => ['required', 'array', 'min:1', 'max:25'],
+            'seller_order_ids.*' => ['integer', 'distinct'],
+        ], [
+            'courier_id.required' => 'Select a Rider for the selected parcels.',
+            'seller_order_ids.required' => 'Select at least one parcel to assign.',
+        ]);
+
+        $courierId = (int) $data['courier_id'];
+        $courier = Courier::query()->where('logistics_provider_id', $provider->id)->find($courierId);
+        if ($courier === null) {
+            return back()->with('error', 'Select a Rider from your own fleet.');
+        }
+        // An offline or non-assignable Rider blocks the whole batch; only the
+        // job limit is reported per parcel.
+        $courier->loadMissing('rider');
+        if (! $courier->isEligibleForAssignment() || ! $courier->rider->isOnline()) {
+            return back()->with('error', $this->assignment->manualRiderBlockReason($courierId, $provider->id));
+        }
+
+        $parcels = SellerOrder::query()->whereKey($data['seller_order_ids'])->orderBy('id')->get();
+        $assigned = 0;
+        $skippedLimit = 0;
+        $skippedOther = 0;
+
+        foreach ($parcels as $parcel) {
+            if (! Gate::forUser($provider)->allows('advance-shipment', $parcel)
+                || $parcel->status !== OrderStatus::Sorted || $parcel->delivery_courier_id !== null) {
+                $skippedOther++;
+
+                continue;
+            }
+            if (Courier::query()->withWorkload()->findOrFail($courierId)->isAtJobLimit()) {
+                $skippedLimit++;
+
+                continue;
+            }
+            try {
+                $result = $this->assignment->assignDelivery($parcel, $provider, $courierId, $parcel->destination_area_id);
+            } catch (\InvalidArgumentException|ValidationException) {
+                $result = null;
+            }
+            $result !== null ? $assigned++ : $skippedOther++;
+        }
+        $skippedOther += count($data['seller_order_ids']) - $parcels->count();
+
+        $name = $courier->rider?->fullName() ?? $courier->name;
+        $count = fn (int $n): string => $n.' '.Str::plural('parcel', $n);
+        $parts = [$count($assigned).' assigned to '.$name.'.'];
+        if ($skippedLimit > 0) {
+            $parts[] = $count($skippedLimit).' skipped because the Rider reached the '
+                .Courier::ACTIVE_CAPACITY.'-job limit; they stay Unassigned.';
+        }
+        if ($skippedOther > 0) {
+            $parts[] = $count($skippedOther).' skipped because they are not ready for this Rider; they stay Unassigned.';
+        }
+
+        return back()->with($assigned > 0 ? 'success' : 'error', implode(' ', $parts));
     }
 
     /**

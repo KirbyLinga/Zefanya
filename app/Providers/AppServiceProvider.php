@@ -2,22 +2,27 @@
 
 namespace App\Providers;
 
-use App\Models\CartItem;
-use App\Models\Incidents;
-use App\Models\Order;
-use App\Models\SellerOrder;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\Wishlist;
+use App\Models\Catalog\Product;
+use App\Models\Rider\Rider;
 use App\Models\Shared\Category;
-use App\Models\Wishlist;
+use App\Models\Shared\Incidents;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
 use App\Policies\BuyerOrderPolicy;
 use App\Policies\IncidentsPolicy;
 use App\Policies\SellerOrderFleetPolicy;
 use App\Policies\SellerOrderPolicy;
+use App\Services\Shared\OfferPricing;
 use App\View\Composers\RiderNotificationComposer;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -34,7 +39,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(OfferPricing::class);
     }
 
     /**
@@ -42,6 +47,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Rider notifications and API tokens saved before the model moved to
+        // App\Models\Rider\Rider store this class name. Keep reading and
+        // writing it so those rows stay attached without changing any data.
+        Relation::morphMap(['App\Models\Rider' => Rider::class]);
+
         // ── Login / auth throttling ─────────────────────────────────────────
         // Throttle logins per e-mail+IP (5/min) with a looser per-IP ceiling
         // (25/min), so one shared office/NAT IP cannot lock every user out.
@@ -53,6 +63,23 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(5)->by('login-email:'.$email.'|'.$request->ip()),
                 Limit::perMinute(25)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
+        // Bearer login has the same limits, with the API response envelope.
+        // Keep the existing web login limiter and its responses unchanged.
+        RateLimiter::for('api-login', function (Request $request) {
+            $email = Str::lower((string) $request->input('email'));
+            $response = fn (Request $request, array $headers) => response()->json([
+                'success' => false,
+                'message' => 'Too many login attempts. Please try again later.',
+                'data' => null,
+                'errors' => ['email' => ['Too many login attempts. Please try again later.']],
+            ], 429, $headers);
+
+            return [
+                Limit::perMinute(5)->by('api-login-email:'.$email.'|'.$request->ip())->response($response),
+                Limit::perMinute(25)->by('api-login-ip:'.$request->ip())->response($response),
             ];
         });
 
@@ -90,6 +117,15 @@ class AppServiceProvider extends ServiceProvider
             ->by('password-update:'.$request->ip()));
         RateLimiter::for('google-auth', fn (Request $request) => Limit::perMinute(10)
             ->by('google-auth:'.$request->ip()));
+
+        // Admin second factor: 5 attempts/minute per pending admin + IP. The
+        // challenge route has no authenticated user yet, so the session marker
+        // set by AuthController::login() is the per-account key.
+        RateLimiter::for('admin-2fa', function (Request $request) {
+            $pending = (string) $request->session()->get('admin.2fa.id', 'guest');
+
+            return Limit::perMinute(5)->by('admin-2fa:'.$pending.'|'.$request->ip());
+        });
 
         // ── Policies for the order flow (Slice 1) ───────────────────────────
         // BuyerOrderPolicy / SellerOrderFleetPolicy don't match Laravel's
@@ -146,6 +182,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with('wishlistCount', $this->buyerWishlistCount());
             $view->with('unreadNotificationCount', $this->buyerUnreadNotificationCount());
             $view->with('categories', $this->getCategories());
+            $view->with('hasRealSaleDiscounts', $this->hasRealSaleDiscounts());
         });
 
         // Rider panel: the bell lives in Layouts/rider so it is present on
@@ -224,5 +261,18 @@ class AppServiceProvider extends ServiceProvider
         return Category::query()
             ->orderBy('id')
             ->get(['id', 'label', 'icon']);
+    }
+
+    /**
+     * Whether the navbar's Sale link has anything to show. The navbar renders on
+     * every buyer page, so the answer is cached briefly: the link can lag a sale
+     * starting or ending by up to a minute, and the filtered page is still correct.
+     */
+    private function hasRealSaleDiscounts(): bool
+    {
+        return Cache::remember('buyer:has-real-sale-discounts', now()->addMinute(), fn (): bool => Product::query()
+            ->discoverable()
+            ->withRealSaleDiscount()
+            ->exists());
     }
 }

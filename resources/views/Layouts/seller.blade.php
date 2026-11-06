@@ -22,6 +22,8 @@
         })();
     </script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
 
     @vite([
@@ -38,8 +40,17 @@
         <x-seller.sidebar />
 
         {{-- ============================ MAIN ============================= --}}
-        <div class="flex-1 min-w-0 p-8 bg-[var(--bg-page)]">
-            @yield('content')
+        <div class="flex-1 min-w-0 bg-[var(--bg-page)]">
+            <div class="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] px-4 py-3 lg:hidden">
+                <button type="button" id="sellerSidebarOpen" aria-label="Open menu" aria-controls="sellerSidebar" aria-expanded="false"
+                    class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)]">
+                    <i data-lucide="menu" class="block h-5 w-5"></i>
+                </button>
+                <span class="font-sans text-[14px] font-semibold text-[var(--sidebar-text)]">Seller Panel</span>
+            </div>
+            <div class="relative p-4 max-lg:overflow-x-auto lg:p-8">
+                @yield('content')
+            </div>
         </div>
     </div>
 
@@ -52,6 +63,7 @@
          sidebar toggle works on every seller page. --}}
     @vite('resources/js/seller/theme-toggle.js')
     @vite('resources/js/seller/sidebar-tooltips.js')
+    @vite('resources/js/submit-guard.js')
 
     @stack('scripts')
 </body>

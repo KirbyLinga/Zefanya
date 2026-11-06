@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
-use App\Models\Rider;
-use App\Services\RiderRegistrationService;
+use App\Models\Rider\Rider;
+use App\Services\Rider\RiderRegistrationService;
+use App\Support\PasswordRule;
 use App\Support\RiderValidation;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -24,12 +25,7 @@ class ActivationController extends Controller
     public function store(Request $request, string $token, RiderRegistrationService $service): RedirectResponse
     {
         $row = $this->findToken($token);
-        $data = $request->validate([
-            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).+$/'],
-        ], [
-            'password.regex' => 'Password must include uppercase, lowercase, number, and special character.',
-            'password.confirmed' => 'Passwords do not match.',
-        ]);
+        $data = $request->validate(['password' => PasswordRule::rules()], PasswordRule::messages());
 
         DB::transaction(function () use ($row, $data, $service): void {
             $rider = Rider::whereKey($row->rider_id)->lockForUpdate()->firstOrFail();

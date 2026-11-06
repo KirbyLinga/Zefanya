@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Rider;
 
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 
 /**
  * The rider's second failed pickup attempt cancelled the order.

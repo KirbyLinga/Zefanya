@@ -4,10 +4,11 @@ namespace Tests\Feature\Logistics;
 
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\SellerOrder;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\LogisticsHubDecisionNotification;
 use App\Notifications\Logistics\RiderAssignmentsNeedReassignment;
 use App\Notifications\Logistics\RiderParcelActivity;
+use App\Support\AccountUnderReview;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
@@ -163,11 +164,28 @@ class LogisticsNotificationsTest extends TestCase
         $provider = LogisticsProvider::factory()->create(['status' => 'pending']);
         $row = $this->notification($provider);
         $this->actingAs($provider, 'logistics')->getJson(route('logistics.notifications.recent'))
-            ->assertRedirect(route('home', ['login' => 1]));
+            ->assertForbidden()->assertExactJson(['message' => AccountUnderReview::MESSAGE]);
         $this->actingAs($provider, 'logistics')->postJson(route('logistics.notifications.read', $row->id))
-            ->assertRedirect(route('home', ['login' => 1]));
+            ->assertForbidden()->assertExactJson(['message' => AccountUnderReview::MESSAGE]);
         $this->actingAs($provider, 'logistics')->postJson(route('logistics.notifications.readAll'))
-            ->assertRedirect(route('home', ['login' => 1]));
+            ->assertForbidden()->assertExactJson(['message' => AccountUnderReview::MESSAGE]);
+        $this->assertAuthenticatedAs($provider, 'logistics');
         $this->assertNull($row->fresh()->read_at);
+    }
+
+    public function test_notifications_page_lists_own_alerts_filters_unread_and_bell_shows_on_other_pages(): void
+    {
+        $provider = $this->provider();
+        $this->notification($provider, ['title' => 'Unread hub alert']);
+        $this->notification($provider, ['title' => 'Old hub alert'], true);
+        $this->notification($this->provider(), ['title' => 'Foreign alert']);
+
+        $this->actingAs($provider, 'logistics')->get(route('logistics.notifications.index'))->assertOk()
+            ->assertSee('Unread hub alert')->assertSee('Old hub alert')->assertDontSee('Foreign alert')
+            ->assertSee('1 unread.');
+        $this->get(route('logistics.notifications.index', ['filter' => 'unread']))->assertOk()
+            ->assertViewHas('notifications', fn ($page) => $page->pluck('data.title')->all() === ['Unread hub alert']);
+        $this->get(route('logistics.scan.index'))->assertOk()
+            ->assertSee('id="lg-notification-bell"', false)->assertSee('Notifications, 1 unread');
     }
 }

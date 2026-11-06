@@ -6,10 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
-use App\Notifications\Buyer\BuyerRegistrationDecision;
-use App\Notifications\Logistics\LogisticsRegistrationDecision;
-use App\Notifications\Seller\SellerRegistrationDecision;
-use App\Services\ProviderProvinceService;
+use App\Services\Admin\BuyerRegistrationDecisionService;
+use App\Services\Admin\LogisticsRegistrationDecisionService;
+use App\Services\Admin\SellerRegistrationDecisionService;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -21,6 +20,12 @@ use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends Controller
 {
+    public function __construct(
+        private SellerRegistrationDecisionService $sellerDecisions,
+        private BuyerRegistrationDecisionService $buyerDecisions,
+        private LogisticsRegistrationDecisionService $logisticsDecisions,
+    ) {}
+
     /**
      * Registration management table view with filtering, search, and pagination.
      *
@@ -299,128 +304,58 @@ class RegistrationController extends Controller
 
     public function approveBuyer(Buyer $buyer)
     {
-        if ($buyer->status !== 'pending') {
+        if (! $this->buyerDecisions->decide($buyer, Auth::guard('admin')->user(), 'approved')) {
             return back()->with('error', 'Only pending registrations can be approved.');
         }
-
-        $buyer->forceFill([
-            'status' => 'approved',
-            'approved_by' => Auth::guard('admin')->id(),
-            'approved_at' => now(),
-            'rejection_reason' => null,
-        ])->save();
-
-        $buyer->notify(new BuyerRegistrationDecision('approved'));
 
         return back()->with('success', "{$buyer->fullName()}'s buyer registration was approved.");
     }
 
     public function rejectBuyer(Buyer $buyer, Request $request)
     {
-        if ($buyer->status !== 'pending') {
+        if (! $this->buyerDecisions->decide($buyer, Auth::guard('admin')->user(), 'rejected', $request->input('rejection_reason'))) {
             return back()->with('error', 'Only pending registrations can be rejected.');
         }
-
-        $request->validate([
-            'rejection_reason' => ['required', 'string', 'max:500'],
-        ]);
-
-        $buyer->forceFill([
-            'status' => 'rejected',
-            'approved_by' => Auth::guard('admin')->id(),
-            'approved_at' => now(),
-            'rejection_reason' => $request->rejection_reason,
-        ])->save();
-
-        $buyer->notify(new BuyerRegistrationDecision('rejected', $request->rejection_reason));
 
         return back()->with('success', "{$buyer->fullName()}'s buyer registration was rejected.");
     }
 
     public function approveSeller(Seller $seller)
     {
-        if ($seller->status !== 'pending') {
+        if (! $this->sellerDecisions->decide($seller, Auth::guard('admin')->user(), 'approved')) {
             return back()->with('error', 'Only pending registrations can be approved.');
         }
-
-        $seller->forceFill([
-            'status' => 'approved',
-            'approved_by' => Auth::guard('admin')->id(),
-            'approved_at' => now(),
-            'rejection_reason' => null,
-        ])->save();
-
-        $seller->notify(new SellerRegistrationDecision('approved'));
 
         return back()->with('success', "{$seller->fullName()}'s seller registration was approved.");
     }
 
     public function rejectSeller(Seller $seller, Request $request)
     {
-        if ($seller->status !== 'pending') {
+        if (! $this->sellerDecisions->decide($seller, Auth::guard('admin')->user(), 'rejected', $request->input('rejection_reason'))) {
             return back()->with('error', 'Only pending registrations can be rejected.');
         }
-
-        $request->validate([
-            'rejection_reason' => ['required', 'string', 'max:500'],
-        ]);
-
-        $seller->forceFill([
-            'status' => 'rejected',
-            'approved_by' => Auth::guard('admin')->id(),
-            'approved_at' => now(),
-            'rejection_reason' => $request->rejection_reason,
-        ])->save();
-
-        $seller->notify(new SellerRegistrationDecision('rejected', $request->rejection_reason));
 
         return back()->with('success', "{$seller->fullName()}'s seller registration was rejected.");
     }
 
-    public function approveLogistics(LogisticsProvider $logisticsProvider, ProviderProvinceService $provinces)
+    public function approveLogistics(LogisticsProvider $logisticsProvider)
     {
-        if ($logisticsProvider->status->value !== 'pending') {
-            return back()->with('error', 'Only pending registrations can be approved.');
-        }
-
-        $admin = Auth::guard('admin')->user();
-
         try {
-            $provinces->verifyProvinceOnApproval($logisticsProvider, $admin);
+            if (! $this->logisticsDecisions->decide($logisticsProvider, Auth::guard('admin')->user(), 'approved')) {
+                return back()->with('error', 'Only pending registrations can be approved.');
+            }
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         }
-
-        $logisticsProvider->update([
-            'status' => 'approved',
-            'approved_by' => $admin?->id,
-            'approved_at' => now(),
-            'rejection_reason' => null,
-        ]);
-
-        $logisticsProvider->notify(new LogisticsRegistrationDecision('approved'));
 
         return back()->with('success', "{$logisticsProvider->fullName()}'s logistics registration was approved. Province {$logisticsProvider->province_name} is now verified.");
     }
 
     public function rejectLogistics(LogisticsProvider $logisticsProvider, Request $request)
     {
-        if ($logisticsProvider->status->value !== 'pending') {
+        if (! $this->logisticsDecisions->decide($logisticsProvider, Auth::guard('admin')->user(), 'rejected', $request->input('rejection_reason'))) {
             return back()->with('error', 'Only pending registrations can be rejected.');
         }
-
-        $request->validate([
-            'rejection_reason' => ['required', 'string', 'max:500'],
-        ]);
-
-        $logisticsProvider->update([
-            'status' => 'rejected',
-            'approved_by' => Auth::guard('admin')->id(),
-            'approved_at' => now(),
-            'rejection_reason' => $request->rejection_reason,
-        ]);
-
-        $logisticsProvider->notify(new LogisticsRegistrationDecision('rejected', $request->rejection_reason));
 
         return back()->with('success', "{$logisticsProvider->fullName()}'s logistics registration was rejected.");
     }

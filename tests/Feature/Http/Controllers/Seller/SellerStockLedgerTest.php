@@ -2,18 +2,20 @@
 
 namespace Tests\Feature\Http\Controllers\Seller;
 
-use App\Models\InventoryTransaction;
-use App\Models\Product;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Services\ProductPublishingService;
+use App\Services\Seller\ProductPublishingService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\ValidProductPublication;
 use Tests\TestCase;
 
 class SellerStockLedgerTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use ValidProductPublication;
 
     private Seller $seller;
 
@@ -27,10 +29,13 @@ class SellerStockLedgerTest extends TestCase
     private function updatePayload(Product $product, array $overrides = []): array
     {
         return array_merge([
+            ...$this->publicationDefaults(),
             'inventory_revision' => app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants')),
             'name' => $product->name,
             'price' => (string) $product->price,
             'stock_quantity' => $product->stock_quantity,
+            'weight' => $product->weight_grams,
+            'weight_unit' => 'g',
             'status' => 'active',
         ], $overrides);
     }
@@ -41,9 +46,12 @@ class SellerStockLedgerTest extends TestCase
 
         $this->actingAs($this->seller, 'seller')
             ->post(route('seller.products.store'), [
+                ...$this->publicationDefaults(),
                 'name' => 'Ledger Lamp',
                 'price' => '250.00',
                 'stock_quantity' => 12,
+                'weight' => 500,
+                'weight_unit' => 'g',
                 'status' => 'active',
                 'images' => [UploadedFile::fake()->image('lamp.jpg')],
             ])
@@ -108,8 +116,8 @@ class SellerStockLedgerTest extends TestCase
                 'variants_exist' => 1,
                 'options' => [['name' => 'Size', 'values' => 'S, M']],
                 'variants' => [
-                    ['values' => 'S', 'price' => '100.00', 'stock_quantity' => 5, 'is_available' => 1],
-                    ['values' => 'M', 'price' => '100.00', 'stock_quantity' => 7, 'is_available' => 1],
+                    ['values' => 'S', 'price' => '100.00', 'stock_quantity' => 5, 'weight' => 500, 'weight_unit' => 'g', 'is_available' => 1],
+                    ['values' => 'M', 'price' => '100.00', 'stock_quantity' => 7, 'weight' => 750, 'weight_unit' => 'g', 'is_available' => 1],
                 ],
             ]))
             ->assertSessionHasNoErrors()

@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Buyer;
 
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -123,11 +123,12 @@ class SearchPaginationTest extends TestCase
         $this->assertSame(13, $second->viewData('products')->total());
 
         // T11 submits to the catalog with these same supported filters.
-        foreach ([1, 2] as $page) {
-            $catalog = $this->get(route('buyer.products.index', $filters + ['page' => $page]))->assertOk();
-            $search = $this->get(route('buyer.search.index', $filters + ['page' => $page]))->assertOk();
-            $this->assertSame($catalog->viewData('products')->modelKeys(), $search->viewData('products')->modelKeys());
-        }
+        // Page sizes differ (catalog 20, search 12), so compare the whole ordered result.
+        $catalog = $this->get(route('buyer.products.index', $filters))->assertOk()->viewData('products');
+        $this->assertSame(13, $catalog->total());
+        $this->assertSame(20, $catalog->perPage());
+        $this->assertSame($ids, $catalog->modelKeys());
+        $this->assertSame($ids, array_merge($first->viewData('products')->modelKeys(), $second->viewData('products')->modelKeys()));
     }
 
     public static function emptySearches(): array

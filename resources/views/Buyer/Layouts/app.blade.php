@@ -6,8 +6,8 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Zefanya — @yield('title', 'Buyer')</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   {{-- Buyer phase: `design-system.css` DELIBERATELY REMOVED from this array.
       It was compiled UNLAYERED (no @layer in the built asset) and therefore
       BEAT every Tailwind utility on `h1-h6`, `p`, `span`, `label`, `button`,
@@ -23,7 +23,10 @@
       .search-bar/.progress/.nav-pill/.action-btn).
       Same state the landing layout is already in. See
       docs/css-migration-notes.md → "CROSS-CUTTING HAZARD". --}}
-  @vite(['resources/css/app.css', 'resources/css/login-modal.css', 'resources/css/buyer/buyer-register-modal.css'])
+  @vite(['resources/css/app.css', 'resources/css/login-modal.css'])
+  @guest('buyer')
+    @vite(['resources/css/buyer/buyer-register-modal.css'])
+  @endguest
   @stack('styles')
   <script>
     {{-- Theme init MUST run before the stylesheet paints: reads the buyer
@@ -67,9 +70,12 @@
     @yield('content')
   </main>
 
+  {{-- Stays for signed-in buyers too: an expired session reopens it (see buyer.js). --}}
   @include('Components.login-modal')
 
-  @include('Components.buyer-register-modal')
+  @guest('buyer')
+    @include('Components.buyer-register-modal')
+  @endguest
 
   @include('Buyer.Layouts.footer')
 
@@ -97,14 +103,17 @@
 
   @vite(['resources/js/buyer/buyer.js', 'resources/js/buyer/navbar.js', 'resources/js/buyer/search.js', 'resources/js/buyer/wishlist-cards.js', 'resources/js/buyer/add-to-cart-animation.js', 'resources/js/buyer/messages.js'])
 
-  {{-- Shared PSGC address module for the buyer register modal included above
-       (line 67). It must load before buyer-register-modal.js, which reads
+  {{-- Shared PSGC address module for the buyer register modal included above.
+       It must load before buyer-register-modal.js, which reads
        window.zfAddressLookup at init. --}}
-  @vite(['resources/js/buyer/address-lookup.js'])
-  @vite(['resources/js/buyer/buyer-register-modal.js'])
+  @guest('buyer')
+    @vite(['resources/js/buyer/address-lookup.js'])
+    @vite(['resources/js/buyer/buyer-register-modal.js'])
+  @endguest
 
   {{-- Light/dark toggle behaviour --}}
   @vite('resources/js/seller/theme-toggle.js')
+  @vite('resources/js/submit-guard.js')
 
   @include('Components.buyer.wishlist-config')
 @stack('scripts')

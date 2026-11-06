@@ -21,7 +21,7 @@ class RiderRegistrationOtp extends Notification
             ->greeting("Hi {$notifiable->fullName()},")
             ->line('Enter this code on the registration screen to verify your email:')
             ->line($this->otp)
-            ->line('This code expires in 10 minutes.')
+            ->line('This code expires in 5 minutes.')
             ->line('After verification, your application requires Logistics approval.')
             ->line('If you did not request this, you can ignore this email.');
     }

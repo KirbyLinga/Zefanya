@@ -7,10 +7,10 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Logistics\MarkDeliveryFailedRequest;
 use App\Http\Requests\Rider\CompleteDeliveryRequest;
-use App\Models\SellerOrder;
-use App\Services\ParcelHandoffVerification;
-use App\Services\RiderHandoffVerification;
-use App\Services\RiderOperationsService;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\DeliveryOtpService;
+use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Rider\RiderOperationsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +32,7 @@ class DeliveryAssignmentsController extends Controller
         return view('Rider.Deliveries.index', [
             'rider' => $rider,
             'shipments' => $operations->deliveryAssignments($rider),
+            'windingDown' => $operations->isWindingDown($rider),
         ]);
     }
 
@@ -39,7 +40,7 @@ class DeliveryAssignmentsController extends Controller
         Request $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
-        RiderHandoffVerification $handoffVerify,
+        ParcelHandoffVerification $handoffVerify,
     ): RedirectResponse {
         $rider = $request->user('rider');
 
@@ -49,10 +50,10 @@ class DeliveryAssignmentsController extends Controller
         try {
             $method = null;
             if ($sellerOrder->fresh()?->status !== OrderStatus::OutForDelivery) {
-                $payload = $handoffVerify->assertValid(
+                $payload = $handoffVerify->assertValidForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_START_DELIVERY,
+                    ParcelHandoffVerification::ACTION_START_DELIVERY,
                     $request->input('verification_token'),
                 );
                 $method = $payload['method'] ?? null;
@@ -61,10 +62,10 @@ class DeliveryAssignmentsController extends Controller
             $operations->startDelivery($rider, $sellerOrder, $method);
 
             if ($method !== null) {
-                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consume(
+                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consumeForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_START_DELIVERY,
+                    ParcelHandoffVerification::ACTION_START_DELIVERY,
                     $request->input('verification_token'),
                 ));
             }
@@ -81,10 +82,10 @@ class DeliveryAssignmentsController extends Controller
         Request $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
-        RiderHandoffVerification $handoffVerify,
+        ParcelHandoffVerification $handoffVerify,
     ): View|RedirectResponse {
         $rider = $request->user('rider');
-        $courier = $operations->operationalCourier($rider);
+        $courier = $operations->operationalCourier($rider, allowWindDown: true);
 
         abort_if(
             (int) $sellerOrder->delivery_courier_id !== (int) $courier->id,
@@ -105,10 +106,10 @@ class DeliveryAssignmentsController extends Controller
         $token = $request->query('verification_token') ?? $request->input('verification_token');
 
         try {
-            $handoffVerify->assertValid(
+            $handoffVerify->assertValidForRider(
                 $rider,
                 $sellerOrder,
-                RiderHandoffVerification::ACTION_COMPLETE_DELIVERY,
+                ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY,
                 is_string($token) ? $token : null,
             );
         } catch (ValidationException $e) {
@@ -125,11 +126,34 @@ class DeliveryAssignmentsController extends Controller
         ]);
     }
 
+    public function sendDeliveryOtp(
+        Request $request,
+        SellerOrder $sellerOrder,
+        RiderOperationsService $operations,
+        ParcelHandoffVerification $handoffVerify,
+        DeliveryOtpService $otp,
+    ): RedirectResponse {
+        $rider = $request->user('rider');
+        $operations->assertDeliveryAssigned($rider, $sellerOrder);
+        try {
+            $handoffVerify->assertValidForRider($rider, $sellerOrder, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $request->input('verification_token'));
+            $otp->send($rider, $sellerOrder);
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
+        } catch (\Exception $exception) {
+            report($exception);
+
+            return back()->with('error', 'The delivery code could not be sent. Try again.');
+        }
+
+        return back()->with('success', 'Delivery code sent to the buyer\'s order page. It expires in 10 minutes.');
+    }
+
     public function deliver(
         CompleteDeliveryRequest $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
-        RiderHandoffVerification $handoffVerify,
+        ParcelHandoffVerification $handoffVerify,
     ): RedirectResponse {
         $rider = $request->user('rider');
 
@@ -143,10 +167,10 @@ class DeliveryAssignmentsController extends Controller
             $method = null;
             if (! $alreadyDone) {
                 // Assert only — do not consume before POD/COD validation succeeds.
-                $payload = $handoffVerify->assertValid(
+                $payload = $handoffVerify->assertValidForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_COMPLETE_DELIVERY,
+                    ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY,
                     $token,
                 );
                 $method = $payload['method'] ?? null;
@@ -158,20 +182,21 @@ class DeliveryAssignmentsController extends Controller
                 'notes' => $request->input('delivery_notes'),
                 'cod_amount_minor' => $request->codAmountMinor(),
                 'verification_method' => $method,
+                'delivery_otp' => $request->input('delivery_otp'),
             ]);
 
             if (! $alreadyDone) {
-                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consume(
+                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consumeForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_COMPLETE_DELIVERY,
+                    ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY,
                     $token,
                 ));
             }
         } catch (ValidationException $e) {
-            return back()->withInput()->withErrors($e->errors());
+            return back()->withInput($request->except('delivery_otp'))->withErrors($e->errors());
         } catch (\InvalidArgumentException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            return back()->withInput($request->except('delivery_otp'))->with('error', $e->getMessage());
         }
 
         return redirect()->route('rider.deliveries.index')
@@ -182,10 +207,10 @@ class DeliveryAssignmentsController extends Controller
         Request $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
-        RiderHandoffVerification $handoffVerify,
+        ParcelHandoffVerification $handoffVerify,
     ): View|RedirectResponse {
         $rider = $request->user('rider');
-        $courier = $operations->operationalCourier($rider);
+        $courier = $operations->operationalCourier($rider, allowWindDown: true);
 
         abort_if(
             (int) $sellerOrder->delivery_courier_id !== (int) $courier->id,
@@ -206,10 +231,10 @@ class DeliveryAssignmentsController extends Controller
         $token = $request->query('verification_token') ?? $request->input('verification_token');
 
         try {
-            $handoffVerify->assertValid(
+            $handoffVerify->assertValidForRider(
                 $rider,
                 $sellerOrder,
-                RiderHandoffVerification::ACTION_FAIL_DELIVERY,
+                ParcelHandoffVerification::ACTION_FAIL_DELIVERY,
                 is_string($token) ? $token : null,
             );
         } catch (ValidationException $e) {
@@ -229,7 +254,7 @@ class DeliveryAssignmentsController extends Controller
         MarkDeliveryFailedRequest $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
-        RiderHandoffVerification $handoffVerify,
+        ParcelHandoffVerification $handoffVerify,
     ): RedirectResponse {
         $rider = $request->user('rider');
 
@@ -242,10 +267,10 @@ class DeliveryAssignmentsController extends Controller
         try {
             $method = null;
             if (! $alreadyFailed) {
-                $payload = $handoffVerify->assertValid(
+                $payload = $handoffVerify->assertValidForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_FAIL_DELIVERY,
+                    ParcelHandoffVerification::ACTION_FAIL_DELIVERY,
                     $token,
                 );
                 $method = $payload['method'] ?? null;
@@ -260,17 +285,17 @@ class DeliveryAssignmentsController extends Controller
             );
 
             if (! $alreadyFailed) {
-                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consume(
+                app(ParcelHandoffVerification::class)->consumeAfterSuccess(fn () => $handoffVerify->consumeForRider(
                     $rider,
                     $sellerOrder,
-                    RiderHandoffVerification::ACTION_FAIL_DELIVERY,
+                    ParcelHandoffVerification::ACTION_FAIL_DELIVERY,
                     $token,
                 ));
             }
         } catch (ValidationException $e) {
-            return back()->withInput()->withErrors($e->errors());
+            return back()->withInput($request->except('delivery_otp'))->withErrors($e->errors());
         } catch (\InvalidArgumentException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            return back()->withInput($request->except('delivery_otp'))->with('error', $e->getMessage());
         }
 
         return redirect()->route('rider.deliveries.index')

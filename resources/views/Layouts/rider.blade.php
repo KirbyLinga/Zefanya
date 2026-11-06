@@ -33,7 +33,7 @@
         <x-rider.sidebar />
 
         {{-- ============================ MAIN ============================= --}}
-        <div class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 bg-[var(--bg-page)]">
+        <div class="flex-1 min-w-0 max-sm:ml-[72px] p-4 sm:p-6 lg:p-8 bg-[var(--bg-page)]">
             <div class="mb-4 flex items-center justify-end gap-2">
                 <button
                     type="button"
@@ -63,6 +63,7 @@
 
     @vite('resources/js/seller/theme-toggle.js')
     @vite('resources/js/rider/sidebar-tooltips.js')
+    @vite('resources/js/submit-guard.js')
     @vite('resources/js/rider/notification-bell.js')
 
     @stack('scripts')

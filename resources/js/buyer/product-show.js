@@ -12,16 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedColorImage = null;
 
   thumbBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (event) => {
       const src = btn.dataset.src || '';
 
       // Swap main image
       if (mainImg) {
-        mainImg.style.opacity = '0';
-        setTimeout(() => {
-          mainImg.src = src;
-          mainImg.style.opacity = src ? '1' : '0';
-        }, 120);
+        mainImg.src = src;
+        mainImg.style.opacity = src ? '1' : '0';
       }
 
       // Update active ring
@@ -33,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.classList.add('border-buyer-ink');
       btn.classList.remove('border-transparent');
       btn.setAttribute('aria-pressed', 'true');
+      openImageModal(event);
     });
   });
 
@@ -47,7 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let   selectedValues = [];
   let   selectedVariant = null;
   const basePriceText = document.getElementById('pdp-price')?.textContent || '';
-  let   baseStock      = Math.max(0, parseInt(addCartBtn?.dataset.stock || '0', 10) || 0);
+  const regularPriceEl = document.getElementById('pdp-price-regular');
+  const priceBadgeEl = document.getElementById('pdp-price-badge');
+  const baseRegularText = regularPriceEl?.textContent || '';
+  const baseBadgeText = priceBadgeEl?.textContent || '';
+  let   baseStock     = Math.max(0, parseInt(addCartBtn?.dataset.stock || '0', 10) || 0);
 
   if (variantMode) {
     try { variantsData = JSON.parse(variantsScript.textContent || '[]'); } catch { variantsData = []; }
@@ -61,6 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
       v.values.length === selection.length
       && v.values.every((value, i) => selection[i] === value)
     ) || null;
+  }
+
+  // Sale text is resolved by the server (PriceResolver); only ever displayed here.
+  function showSaleText(element, text) {
+    if (!element) return;
+    element.textContent = text || '';
+    element.hidden = !text;
   }
 
   function updateVariantUi() {
@@ -89,22 +98,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Price + stock follow the selected variant.
     const priceEl = document.getElementById('pdp-price');
     if (selectedVariant && priceEl) {
-      priceEl.textContent = '₱' + selectedVariant.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      const hidden = document.getElementById('pdp-variant-id');
-      if (hidden) hidden.value = selectedVariant.available && selectedVariant.stock > 0 ? String(selectedVariant.id) : '';
+      priceEl.textContent = selectedVariant.price;
+      showSaleText(regularPriceEl, selectedVariant.regular_price);
+      showSaleText(priceBadgeEl, selectedVariant.badge);
     }
 
     if (!selectedVariant) {
       if (priceEl) priceEl.textContent = basePriceText;
-      const hidden = document.getElementById('pdp-variant-id');
-      if (hidden) hidden.value = '';
+      showSaleText(regularPriceEl, baseRegularText);
+      showSaleText(priceBadgeEl, baseBadgeText);
     }
+
+    const hidden = document.getElementById('pdp-variant-id');
+    if (hidden) hidden.value = selectedVariant?.available && selectedVariant.stock > 0 ? String(selectedVariant.id) : '';
 
     const availability = document.getElementById('pdp-availability');
     if (availability) {
       availability.textContent = selectedVariant
         ? (selectedVariant.available && selectedVariant.stock > 0 ? selectedVariant.stock + ' unit(s) available' : 'Out of Stock')
-        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Out of Stock' : variantsScript.dataset.selectionMessage || 'Select color and size to see availability.');
+        : (selectedValues.length && selectedValues.every(value => value !== null) ? 'Out of Stock' : (variantsScript.dataset.selectionMessage || 'Please select a variation'));
     }
 
     // Sold-out styling: a value is sold out when every variant carrying it
@@ -119,8 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
         && v.values[axis] === value
       );
       btn.classList.toggle('soldout', !hasStock);
-      btn.disabled = !hasStock;
-      btn.setAttribute('aria-disabled', String(!hasStock));
+      btn.disabled = !hasStock || btn.dataset.vacation === '1';
+      btn.setAttribute('aria-disabled', String(btn.disabled));
       btn.classList.toggle('selected', selectedValues[axis] === value);
       btn.setAttribute('aria-pressed', String(selectedValues[axis] === value));
     });
@@ -158,32 +170,43 @@ document.addEventListener('DOMContentLoaded', () => {
   let   pdpQty     = 1;
   if (variantMode) updateVariantUi();
 
+  function requiresSelection() {
+    return variantMode && !selectedVariant;
+  }
+
   function currentStock() {
     return variantMode ? (selectedVariant?.available ? Math.max(0, selectedVariant.stock) : 0) : baseStock;
   }
 
+  // Quantity to send now: the stock. A cart is not a reservation; the server caps the cart line.
+  function currentLimit() {
+    return currentStock();
+  }
+
   function updateQtyDisplay() {
-    const stock = currentStock();
-    pdpQty = stock > 0 ? Math.max(1, Math.min(pdpQty, stock)) : 0;
+    const limit = requiresSelection() ? 0 : currentLimit();
+    pdpQty = limit > 0 ? Math.max(1, Math.min(pdpQty, limit)) : (requiresSelection() ? Math.max(1, pdpQty || 1) : 0);
     if (qtyDisplay) {
-      qtyDisplay.value = String(pdpQty);
-      qtyDisplay.max = String(stock);
-      qtyDisplay.disabled = stock <= 0;
+      qtyDisplay.value = String(requiresSelection() ? 1 : pdpQty);
+      qtyDisplay.max = String(Math.max(limit, requiresSelection() ? 1 : 0));
+      qtyDisplay.disabled = requiresSelection() || limit <= 0;
     }
-    if (qtyDown) qtyDown.disabled = stock <= 0 || pdpQty <= 1;
-    if (qtyUp) qtyUp.disabled = stock <= 0 || pdpQty >= stock;
+    if (qtyDown) qtyDown.disabled = requiresSelection() || limit <= 0 || pdpQty <= 1;
+    if (qtyUp) qtyUp.disabled = requiresSelection() || limit <= 0 || pdpQty >= limit;
     [addCartBtn, document.getElementById('pdp-buy-now')].forEach(button => {
-      if (button) button.disabled = stock <= 0 || button.dataset.busy === '1';
+      if (!button) return;
+      button.disabled = button.dataset.vacation === '1' || button.dataset.busy === '1'
+        || requiresSelection() || limit <= 0;
     });
     // Dim the down button at min, up button at max
     if (qtyDown) qtyDown.style.opacity = pdpQty <= 1 ? '0.35' : '1';
-    if (qtyUp)   qtyUp.style.opacity   = pdpQty >= currentStock() ? '0.35' : '1';
+    if (qtyUp)   qtyUp.style.opacity   = !requiresSelection() && pdpQty >= limit ? '0.35' : '1';
   }
 
   function readTypedQuantity() {
-    const stock = currentStock();
+    const limit = currentLimit();
     const typed = Number(qtyDisplay.value);
-    pdpQty = stock > 0 ? Math.max(1, Math.min(Number.isFinite(typed) ? Math.trunc(typed) : 1, stock)) : 0;
+    pdpQty = limit > 0 ? Math.max(1, Math.min(Number.isFinite(typed) ? Math.trunc(typed) : 1, limit)) : 0;
     // Leave an empty field editable until blur so replacing a number is easy.
     if (qtyDisplay.value !== '') updateQtyDisplay();
   }
@@ -192,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
   qtyDisplay?.addEventListener('blur', () => { readTypedQuantity(); updateQtyDisplay(); });
 
   qtyUp?.addEventListener('click', () => {
-    if (pdpQty < currentStock()) { pdpQty++; updateQtyDisplay(); }
+    if (pdpQty < currentLimit()) { pdpQty++; updateQtyDisplay(); }
   });
   qtyDown?.addEventListener('click', () => {
     if (pdpQty > 1) { pdpQty--; updateQtyDisplay(); }
@@ -202,6 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 5. Add to Cart ───────────────────────────────────────────────────────
   addCartBtn?.addEventListener('click', () => {
+    if (addCartBtn.dataset.vacation === '1' || addCartBtn.dataset.busy === '1') return;
+    readTypedQuantity();
     const productId = parseInt(addCartBtn.dataset.productId, 10);
 
     if (variantMode) {
@@ -209,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!selectedVariant) {
         if (variantError) {
-          variantError.textContent = 'Please choose one option per axis before adding to cart.';
+          variantError.textContent = variantError.dataset.selectionMessage || 'Please select a variation';
           variantError.classList.remove('hidden');
           variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -274,6 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const buyNowBtn = document.getElementById('pdp-buy-now');
 
   buyNowBtn?.addEventListener('click', () => {
+    if (buyNowBtn.dataset.vacation === '1' || buyNowBtn.dataset.busy === '1') return;
+    readTypedQuantity();
     const productId = parseInt(buyNowBtn.dataset.productId, 10);
     const variantError = document.getElementById('pdp-variant-error');
     let variantId = null;
@@ -283,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (variantError) {
           variantError.textContent = selectedVariant
             ? 'This combination is sold out — pick another.'
-            : 'Please choose one option per axis first.';
+            : (variantError.dataset.selectionMessage || 'Please select a variation');
           variantError.classList.remove('hidden');
           variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -352,10 +379,94 @@ document.addEventListener('DOMContentLoaded', () => {
     slideTo(0);
   }
 
-  // ── 8. Maximize button (simple new-tab open, no lightbox dependency) ─────
-  document.getElementById('pdp-maximize')?.addEventListener('click', () => {
-    const src = mainImg?.src;
-    if (src) window.open(src, '_blank', 'noopener');
+  // Product photos stay on the current page in a native modal dialog.
+  const imageDialog = document.getElementById('pdp-image-modal');
+  const modalImage = document.getElementById('pdp-modal-img');
+  const imageCounter = document.getElementById('pdp-image-counter');
+  const imageError = document.getElementById('pdp-image-error');
+  const previousPhoto = document.getElementById('pdp-image-prev');
+  const nextPhoto = document.getElementById('pdp-image-next');
+  let modalPhotos = [];
+  let modalIndex = 0;
+  let imageOpener = null;
+  let previousBodyOverflow = '';
+
+  function displayModalPhoto(index) {
+    modalIndex = (index + modalPhotos.length) % modalPhotos.length;
+    const src = modalPhotos[modalIndex];
+    modalImage.alt = (mainImg?.alt || 'Product') + ' - photo ' + (modalIndex + 1) + ' of ' + modalPhotos.length;
+    if (imageError) imageError.hidden = true;
+    modalImage.src = src;
+    if (imageCounter) imageCounter.textContent = 'Photo ' + (modalIndex + 1) + ' of ' + modalPhotos.length;
+    if (previousPhoto) previousPhoto.hidden = modalPhotos.length < 2;
+    if (nextPhoto) nextPhoto.hidden = modalPhotos.length < 2;
+    if (mainImg) { mainImg.src = src; mainImg.style.opacity = '1'; }
+    thumbBtns.forEach(button => {
+      const selected = button.dataset.src === src;
+      button.setAttribute('aria-pressed', String(selected));
+      button.classList.toggle('border-buyer-ink', selected);
+      button.classList.toggle('border-transparent', !selected);
+    });
+  }
+
+  function openImageModal(event) {
+    const current = mainImg?.getAttribute('src');
+    if (!current || !imageDialog || !modalImage || imageDialog.open) return;
+    modalPhotos = [...new Set([
+      generalImage,
+      ...Array.from(thumbBtns, button => button.dataset.src),
+      ...variantsData.flatMap(variant => variant.images || []),
+      current,
+    ].filter(Boolean))];
+    imageOpener = event?.currentTarget || document.activeElement;
+    previousBodyOverflow = document.body.style.overflow;
+    displayModalPhoto(Math.max(0, modalPhotos.indexOf(current)));
+    imageDialog.showModal();
+    document.body.style.overflow = 'hidden';
+  }
+
+  document.getElementById('pdp-image-open')?.addEventListener('click', openImageModal);
+  document.getElementById('pdp-maximize')?.addEventListener('click', openImageModal);
+  document.getElementById('pdp-image-close')?.addEventListener('click', () => imageDialog?.close());
+  previousPhoto?.addEventListener('click', () => displayModalPhoto(modalIndex - 1));
+  nextPhoto?.addEventListener('click', () => displayModalPhoto(modalIndex + 1));
+  if (imageDialog) {
+    imageDialog.addEventListener('keydown', event => {
+      if (event.key === 'Tab') {
+        const controls = [document.getElementById('pdp-image-close'), previousPhoto, nextPhoto]
+          .filter(button => button && !button.hidden && !button.disabled);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (first && event.shiftKey && document.activeElement === first) {
+          event.preventDefault(); last.focus();
+        } else if (last && !event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        displayModalPhoto(modalIndex + (event.key === 'ArrowLeft' ? -1 : 1));
+      }
+    });
+    imageDialog.addEventListener('click', event => {
+      if (event.target !== imageDialog) return;
+      const bounds = imageDialog.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) imageDialog.close();
+    });
+    imageDialog.addEventListener('close', () => {
+      document.body.style.overflow = previousBodyOverflow;
+      imageOpener?.focus();
+    });
+    modalImage?.addEventListener('error', () => { if (imageError && imageDialog.open) imageError.hidden = false; });
+    modalImage?.addEventListener('load', () => { if (imageError) imageError.hidden = true; });
+  }
+
+  // Jump bar above the specifications: the links scroll natively, this marks the current one.
+  const detailTabs = [...document.querySelectorAll('[data-pdp-tabs] a')];
+  detailTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      detailTabs.forEach((other) => other.setAttribute('aria-current', String(other === tab)));
+    });
   });
 
   // ── 9. Chat with Seller ─────────────────────────────────────────────────
@@ -366,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const productId = chatBtn.dataset.productId;
 
       try {
-        const response = await fetch('{{ route("buyer.messages.get-or-create") }}', {
+        const response = await fetch(chatBtn.dataset.url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -378,6 +489,11 @@ document.addEventListener('DOMContentLoaded', () => {
             product_id: productId,
           }),
         });
+
+        if (response.status === 401) {
+          window.openLoginModal?.();
+          return;
+        }
 
         if (response.ok) {
           const data = await response.json();

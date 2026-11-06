@@ -4,13 +4,13 @@ namespace Tests\Feature\Rider;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Models\DeliveryProof;
+use App\Models\Logistics\DeliveryProof;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Payment;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use App\Notifications\Logistics\RiderParcelActivity;
-use App\Services\RiderHandoffVerification;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +19,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
 {
     private function photo(string $name = 'proof.jpg'): UploadedFile
     {
-        return UploadedFile::fake()->create($name, 120, 'image/jpeg');
+        return UploadedFile::fake()->image($name);
     }
 
     public function test_proof_photo_is_required(): void
@@ -27,7 +27,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $parcel = $this->outForDelivery();
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, []))
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, []))
             ->assertSessionHasErrors('proof_photo');
 
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
@@ -39,7 +39,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $parcel = $this->outForDelivery();
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => UploadedFile::fake()->create('proof.pdf', 20, 'application/pdf'),
             ]))
             ->assertSessionHasErrors('proof_photo');
@@ -52,7 +52,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $parcel = $this->outForDelivery();
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => $this->photo(),
                 'received_by' => 'Maria Buyer',
                 'delivery_notes' => 'Handed to the recipient at the gate.',
@@ -99,8 +99,8 @@ class RiderProofOfDeliveryTest extends RiderTestCase
             'received_by' => 'Maria Buyer',
         ];
 
-        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, $payload))->assertRedirect();
-        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, $payload))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $payload))->assertRedirect();
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $payload))->assertRedirect();
 
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
         $this->assertSame(1, DeliveryProof::query()->where('seller_order_id', $parcel->id)->count());
@@ -118,7 +118,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $parcel = $this->outForDelivery(['amount_minor' => 150000]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => $this->photo(),
                 'cod_amount' => '1500.00',
             ]))
@@ -138,7 +138,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
     public function test_a_mismatched_cod_amount_rolls_back_the_whole_delivery(): void
     {
         $parcel = $this->outForDelivery(['amount_minor' => 150000]);
-        $payload = $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+        $payload = $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
             'proof_photo' => $this->photo(),
             'cod_amount' => '1400.00',
         ]);
@@ -159,6 +159,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $this->actingAsRider()
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
+                'delivery_otp' => $this->deliveryOtp($parcel),
                 'proof_photo' => $this->photo(),
                 'cod_amount' => '1500.00',
             ])
@@ -173,7 +174,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $parcel = $this->outForDelivery(['amount_minor' => 99900]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => $this->photo(),
             ]))
             ->assertSessionHasErrors('cod_amount_minor');
@@ -181,17 +182,17 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
     }
 
-    public function test_a_prepaid_order_does_not_require_collection(): void
+    public function test_already_collected_cod_does_not_require_collection_again(): void
     {
         $parcel = $this->outForDelivery([
             'amount_minor' => 150000,
-            'method' => 'gcash',
+            'method' => 'cod',
             'status' => PaymentStatus::Paid->value,
             'paid_at' => now(),
         ]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => $this->photo(),
             ]))
             ->assertRedirect()
@@ -207,7 +208,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         ]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => $this->photo(),
             ]))
             ->assertSessionHasErrors('parcel');
@@ -225,7 +226,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         ]);
 
         $this->actingAsRider()
-            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            ->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
                 'proof_photo' => $this->photo(),
             ]))
             ->assertForbidden();
@@ -237,7 +238,7 @@ class RiderProofOfDeliveryTest extends RiderTestCase
     {
         $parcel = $this->outForDelivery();
 
-        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
             'proof_photo' => $this->photo(),
         ]))->assertRedirect();
 
@@ -268,11 +269,36 @@ class RiderProofOfDeliveryTest extends RiderTestCase
             ->assertNotFound();
     }
 
+    public function test_a_client_supplied_mime_type_is_not_served(): void
+    {
+        $parcel = $this->outForDelivery();
+
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            'proof_photo' => $this->photo(),
+        ]))->assertRedirect();
+
+        $proof = DeliveryProof::query()->where('seller_order_id', $parcel->id)->firstOrFail();
+        $this->assertSame('image/jpeg', $proof->photo_mime);
+        $proof->forceFill(['photo_mime' => 'text/html'])->save();
+
+        $this->actingAsRider()
+            ->get(route('rider.proofs.show', $proof))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
+            ->assertHeader('content-security-policy', "default-src 'none'; sandbox");
+
+        Storage::disk('local')->put($proof->photo_path, '<html><script>alert(1)</script></html>');
+
+        $this->actingAsRider()
+            ->get(route('rider.proofs.show', $proof))
+            ->assertStatus(415);
+    }
+
     public function test_delivery_rolls_the_parent_order_status_up(): void
     {
         $parcel = $this->outForDelivery();
 
-        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, RiderHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
             'proof_photo' => $this->photo(),
         ]))->assertRedirect();
 

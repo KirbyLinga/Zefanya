@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('to_status', 20);
             $table->text('reason');
             $table->timestamp('created_at');
-            $table->index(['account_type', 'account_id', 'created_at']);
+            $table->index(['account_type', 'account_id', 'created_at'], 'account_action_history_lookup_idx');
         });
     }
 

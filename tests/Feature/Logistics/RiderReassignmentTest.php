@@ -3,16 +3,19 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
+use App\Http\Controllers\Logistics\DeliveryAssignmentsController;
+use App\Http\Controllers\Logistics\IncomingParcelsController;
+use App\Models\Logistics\DeliveryAssignment;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use App\Notifications\Rider\AssignmentReassigned;
 use App\Notifications\Rider\DeliveryAssigned;
 use App\Notifications\Rider\PickupAssigned;
-use App\Services\CourierAssignmentService;
-use App\Services\RiderRegistrationService;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Rider\RiderRegistrationService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -26,7 +29,7 @@ class RiderReassignmentTest extends TestCase
     public static function activeLegs(): array
     {
         $cases = [];
-        foreach (['pickup' => [OrderStatus::ReadyForPickup, OrderStatus::PickedUp], 'delivery' => [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery]] as $role => $statuses) {
+        foreach (['pickup' => [OrderStatus::ReadyForPickup, OrderStatus::PickedUp], 'delivery' => [OrderStatus::AssignedToRider]] as $role => $statuses) {
             foreach ($statuses as $status) {
                 foreach (['suspended', 'deactivated'] as $condition) {
                     $cases[$role.' '.$status->value.' '.$condition] = [$role, $status, $condition];
@@ -69,7 +72,7 @@ class RiderReassignmentTest extends TestCase
     {
         Notification::fake();
         [$provider, $old, $replacement, $parcel] = $this->fixture($role, $status);
-        app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider);
+        app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider, 'Safety review required.');
         $before = $parcel->fresh();
         $this->actingAs($provider, 'logistics')->post($this->url($role, $parcel), ['courier_id' => $replacement->id, 'reassign' => 1, 'reason' => 'Rider unavailable; replace within this station.', 'expected_courier_id' => $old->id])
             ->assertRedirect()->assertSessionHas('success');
@@ -161,16 +164,16 @@ class RiderReassignmentTest extends TestCase
     {
         Notification::fake();
         [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::OutForDelivery);
-        app(RiderRegistrationService::class)->suspend($parcel->courier->rider, $provider);
+        app(RiderRegistrationService::class)->suspend($parcel->courier->rider, $provider, 'Safety review required.');
         $this->assertFalse($parcel->fresh()->needs_reassignment);
-        app(RiderRegistrationService::class)->suspend($old->rider, $provider);
+        app(RiderRegistrationService::class)->suspend($old->rider, $provider, 'Safety review required.');
         $this->assertTrue($parcel->fresh()->needs_reassignment);
     }
 
     public function test_stale_reassignment_cannot_overwrite_new_assignment(): void
     {
         Notification::fake();
-        [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::OutForDelivery);
+        [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::AssignedToRider);
         $service = app(CourierAssignmentService::class);
         $this->assertNotNull($service->reassign($parcel, $provider, 'delivery', $replacement->id, 'Rider unavailable'));
         $this->assertNull($service->reassign($parcel, $provider, 'delivery', $old->id, 'Rider unavailable'));
@@ -227,14 +230,84 @@ class RiderReassignmentTest extends TestCase
         foreach (['suspended', 'deactivated', 'unavailable'] as $condition) {
             [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::DeliveryFailed);
             if ($condition !== 'unavailable') {
-                app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider);
+                app(RiderRegistrationService::class)->{$condition === 'suspended' ? 'suspend' : 'deactivate'}($old->rider, $provider, 'Safety review required.');
             }
+            $parcel->forceFill(['returned_to_station_at' => now()])->save(); // Station Hub scanned it back in.
             $this->actingAs($provider, 'logistics')->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id, 'reason' => 'Replacement Rider selected for the final attempt.'])
                 ->assertSessionHas('success');
             $this->assertSame(OrderStatus::AssignedToRider, $parcel->fresh()->status);
             $this->assertSame($replacement->id, (int) $parcel->fresh()->delivery_courier_id);
             $this->assertSame(1, $parcel->fresh()->delivery_attempts);
         }
+    }
+
+    // Custody-safe handling: an out-for-delivery parcel is with the Rider.
+    public function test_out_for_delivery_parcel_cannot_be_reassigned_directly(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture('delivery', OrderStatus::OutForDelivery);
+        app(RiderRegistrationService::class)->suspend($old->rider, $provider, 'Safety review required.');
+
+        $this->actingAs($provider, 'logistics')->post($this->url('delivery', $parcel), ['courier_id' => $replacement->id, 'reason' => 'Rider unavailable; replace within this station.', 'expected_courier_id' => $old->id])
+            ->assertRedirect()->assertSessionHas('error', DeliveryAssignmentsController::OUT_FOR_DELIVERY_REASSIGN_MESSAGE);
+        $this->assertNull(app(CourierAssignmentService::class)->reassign($parcel, $provider, 'delivery', $replacement->id, 'Rider unavailable'));
+
+        $parcel->refresh();
+        $this->assertSame($old->id, (int) $parcel->delivery_courier_id);
+        $this->assertSame(OrderStatus::OutForDelivery, $parcel->status);
+        $this->assertDatabaseMissing('delivery_assignments', ['seller_order_id' => $parcel->id, 'courier_id' => $replacement->id]);
+        Notification::assertNotSentTo($replacement->rider, DeliveryAssigned::class);
+
+        // The flagged parcel offers the custody-safe paths instead of a rider picker.
+        $this->get(route('logistics.delivery-assignments.index'))->assertOk()
+            ->assertDontSee('Save new rider')->assertSee('Report incident')
+            ->assertSee('records the delivery attempt to bring it back under Station custody');
+    }
+
+    // LOG-DISP-006
+    public function test_collected_pickup_reassignment_explains_the_parcel_was_already_collected(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture('pickup', OrderStatus::PickedUp);
+        $parcel->forceFill(['handover_at' => now()])->save();
+
+        $this->actingAs($provider, 'logistics')->post($this->url('pickup', $parcel), ['courier_id' => $replacement->id, 'reassign' => 1, 'reason' => 'Rider unavailable; replace within this station.', 'expected_courier_id' => $old->id])
+            ->assertRedirect()->assertSessionHas('error', IncomingParcelsController::COLLECTED_REASSIGN_MESSAGE);
+        $this->assertSame($old->id, (int) $parcel->fresh()->courier_id);
+        Notification::assertNothingSent();
+    }
+
+    // LOG-DISP-005
+    public function test_buyer_timeline_shows_assignment_and_reassignment_without_rider_identity(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture('pickup', OrderStatus::ReadyForPickup);
+        DeliveryAssignment::query()->create(['seller_order_id' => $parcel->id, 'courier_id' => $old->id, 'role' => 'pickup', 'assigned_by_type' => 'system']);
+
+        $this->actingAs($provider, 'logistics')->post($this->url('pickup', $parcel), ['courier_id' => $replacement->id, 'reassign' => 1, 'reason' => 'Rider unavailable; replace within this station.', 'expected_courier_id' => $old->id])
+            ->assertSessionHas('success');
+
+        // Rider 1 loses the job immediately; Rider 2 holds it.
+        $parcel->refresh();
+        $this->assertSame($replacement->id, (int) $parcel->courier_id);
+        $this->assertSame(0, $old->fresh()->activePickups()->count());
+        $this->assertSame(1, $replacement->fresh()->activePickups()->count());
+        $this->assertSame([$old->id, $replacement->id], $parcel->deliveryAssignments()->where('role', 'pickup')->reorder('id')->pluck('courier_id')->map(fn ($id) => (int) $id)->all());
+        Notification::assertSentTo($old->rider, AssignmentReassigned::class);
+        $this->actingAs($old->rider, 'rider')->get(route('rider.pickups.index'))->assertOk()->assertDontSee('#'.$parcel->id);
+
+        $events = collect($parcel->trackingEvents(buyerFacing: true));
+        $titles = $events->pluck('title');
+        $this->assertContains('Pickup rider assigned', $titles);
+        $this->assertContains('Pickup rider changed', $titles);
+        $this->assertLessThan($titles->search('Pickup rider changed'), $titles->search('Pickup rider assigned'));
+        $text = $events->map(fn (array $e): string => $e['title'].' '.($e['detail'] ?? ''))->implode(' ');
+        foreach ([$old, $replacement] as $courier) {
+            $this->assertStringNotContainsString($courier->rider->fullName(), $text);
+            $this->assertStringNotContainsString($courier->name, $text);
+        }
+        // Still no fake status change for a reassignment.
+        $this->assertSame(0, StatusHistory::query()->where('seller_order_id', $parcel->id)->count());
     }
 
     public function test_stale_unassigned_pickup_cannot_overwrite_an_existing_assignment(): void

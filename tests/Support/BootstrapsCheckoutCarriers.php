@@ -7,7 +7,7 @@ use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerShippingProvider;
-use App\Services\LogisticsHubService;
+use App\Services\Logistics\LogisticsHubService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -30,6 +30,14 @@ trait BootstrapsCheckoutCarriers
     protected function bootstrapCheckoutCarriers(Buyer $buyer, iterable $sellers, string $barangay = '0305401001'): LogisticsProvider
     {
         Http::preventStrayRequests();
+
+        // Factory weights are random, so tests about money keep a fixed fee here.
+        // CheckoutShippingTest covers pricing by weight and sets its own rates.
+        config([
+            'buyer.shipping_rates.same_municipality.additional_kg_minor' => 0,
+            'buyer.shipping_rates.same_province.additional_kg_minor' => 0,
+        ]);
+
         Cache::put('psgc:cities:030540000:030000000', [
             ['code' => '030540100', 'name' => 'San Fernando'],
             ['code' => '030540200', 'name' => 'Angeles'],

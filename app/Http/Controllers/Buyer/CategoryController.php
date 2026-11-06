@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Models\Catalog\Product;
 use App\Models\Shared\Category;
+use App\Models\Shared\OrderItem;
 use Illuminate\View\View;
 
 class CategoryController extends Controller
@@ -44,10 +44,9 @@ class CategoryController extends Controller
         $preservedFilters = request()->only(['min_price', 'max_price']);
 
         $query = Product::query()->withBuyerCardData()
-            ->activeInStock()
+            ->discoverable()
             ->where('category_id', $category->id)
             ->with(['images', 'seller', 'category'])
-            ->whereHas('seller', fn ($q) => $q->where('status', 'approved'))
             ->withBuyerPriceFilters($preservedFilters + ['sort' => $sort]);
 
         if ($sort === 'popular') {

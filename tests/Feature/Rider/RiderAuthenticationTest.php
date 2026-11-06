@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Rider;
 
-use App\Models\Courier;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 
 class RiderAuthenticationTest extends RiderTestCase
 {
@@ -22,10 +22,9 @@ class RiderAuthenticationTest extends RiderTestCase
         $this->get(route('rider.dashboard'))->assertOk()->assertSee('Rider Dashboard');
     }
 
-    public function test_pending_rejected_suspended_and_deactivated_riders_cannot_log_in(): void
+    public function test_rejected_suspended_and_deactivated_riders_cannot_log_in(): void
     {
         foreach ([
-            Rider::STATUS_PENDING,
             Rider::STATUS_PENDING_ACTIVATION,
             Rider::STATUS_REJECTED,
             Rider::STATUS_SUSPENDED,

@@ -17,18 +17,20 @@
   - **Services** hold the invariants: `SellerOrderStatusService` (the only writer of status), `CourierAssignmentService`, `StockService`, `VariantSyncService`, `CartSummary`.
   - **Models** hold relations, casts, small domain helpers (OTP, tracking-number generation, rollup computation).
   - **Middlewares** gate panel access by approval status and admin role.
-- **Background work:** none meaningful. `QUEUE_CONNECTION=sync`; notifications run inline. There is one artisan command, `orders:resync` (`app/Console/Commands/OrdersResyncCommand.php`).
-- **One scheduler?** `routes/console.php` registers only `inspire`. No scheduled tasks.
+- **Background work:** `config/queue.php` defaults to `database` and commits jobs after the surrounding transaction. Local `.env` may still set `QUEUE_CONNECTION=sync`, which runs work inline. A `database` connection needs `php artisan queue:work --tries=3`. Notifications stay synchronous unless a class implements `ShouldQueue`.
+- **Scheduler:** `routes/console.php` runs buyer auto-receipt, overdue return approval, and missed pickup-window rolling every five minutes, and daily pruning of expired Sanctum tokens and failed jobs. Each task records a cache heartbeat and emails admins on failure. Production cron is `* * * * * php artisan schedule:run`.
 
 ### 1.1 The service layer
 
 | Service | File | Responsibility |
 |---|---|---|
-| `SellerOrderStatusService` | `app/Services/SellerOrderStatusService.php` | **The only writer of `seller_orders.status`.** Compare-and-swap under `lockForUpdate`, forward-only graph + role gate, writes `status_histories`, rolls up the parent order, settles COD, restores stock on `Returned`. |
-| `CourierAssignmentService` | `app/Services/CourierAssignmentService.php` | Pickup/delivery rider selection (explicit → area → municipality); sets the courier column, flips `couriers.is_available`, writes a `delivery_assignments` row. |
-| `StockService` | `app/Services/StockService.php` | Seller-initiated variant stock changes; absolute quantity + `inventory_transactions` ledger row; refreshes rollups. |
-| `VariantSyncService` | `app/Services/VariantSyncService.php` | Rebuilds option axes (max 2) + variant combinations from a seller submission. |
-| `CartSummary` | `app/Services/CartSummary.php` | Cart math in integer centavos: subtotal, voucher discount, total, seller grouping, JSON payload. |
+| `SellerOrderStatusService` | `app/Services/Seller/SellerOrderStatusService.php` | **The only writer of `seller_orders.status`.** Compare-and-swap under `lockForUpdate`, forward-only graph + role gate, writes `status_histories`, rolls up the parent order, settles COD, restores stock on `Returned`. |
+| `CourierAssignmentService` | `app/Services/Logistics/CourierAssignmentService.php` | Pickup/delivery rider selection (explicit → area → municipality); sets the courier column, flips `couriers.is_available`, writes a `delivery_assignments` row. |
+| `StockService` | `app/Services/Seller/StockService.php` | Seller-initiated variant stock changes; absolute quantity + `inventory_transactions` ledger row; refreshes rollups. |
+| `VariantSyncService` | `app/Services/Seller/VariantSyncService.php` | Rebuilds option axes (max 2) + variant combinations from a seller submission. |
+| `CartSummary` | `app/Services/Buyer/CartSummary.php` | Cart math in integer centavos: subtotal, voucher discount, total, seller grouping, JSON payload. |
+| `PriceResolver` | `app/Services/Shared/PriceResolver.php` | The one source of what a buyer pays, returned as `ResolvedPrice`: product page, cards, search, cart, checkout and order snapshot. `Product::buyerStartingPriceQuery()` repeats its math in SQL for price sort/filter; change both together. |
+| `StoreSaleService` | `app/Services/Seller/StoreSaleService.php` | Every store sale write: one sale at a time per product (locks the product row), running-sale edit limits, End Now, delete. |
 
 `SellerOrderStatusService::transition()` is the single choke-point: **never** write `status` anywhere else. Callers pass an `OrderActor` (`Seller`, `Logistics`, `Rider`, `Buyer`); passing `actor: null` **bypasses** the role gate (`SellerOrderStatusService.php:124`) and must be avoided.
 
@@ -103,7 +105,7 @@ COMPLETED         -> (terminal)
 ### 2.3 Order-level vs seller-order-level status
 
 `orders.status` is a **derived rollup** of its slices:
-- `Order::computeRollupStatus()` (`app/Models/Order.php:65-83`): all slices `Completed` → `Completed`; otherwise the **minimum-rank** status among non-`Completed` slices (rank = declaration order above).
+- `Order::computeRollupStatus()` (`app/Models/Shared/Order.php:65-83`): all slices `Completed` → `Completed`; otherwise the **minimum-rank** status among non-`Completed` slices (rank = declaration order above).
 - Persisted by `Order::rollUpStatus()` and re-run inside the transition transaction by `SellerOrderStatusService::rollUpParentOrder()` (`:306-323`, locks the parent row).
 - `Order::canBeConfirmed()`: true when at least one shipment is Delivered. Delivered shipments can be confirmed independently of in-transit, Completed or Returned siblings; BuyerShipmentConfirmation validates and locks the selected shipment(s).
 
@@ -139,9 +141,9 @@ All tables below are derived from `database/migrations/`. Notation: `NN` = NOT N
 **`product_options`** — id, product_id FK cascade, name(50), sort_order — index `(product_id, sort_order)`.
 **`product_option_values`** — id, product_option_id FK cascade, value(100), sort_order — index `(product_option_id, sort_order)`.
 **`product_variant_option_values`** — pivot (variant_id, option_value_id), both FK cascade, **unique `(product_variant_id, product_option_value_id)`** (named explicitly — the auto name exceeds MySQL's 64-char limit).
-**`product_images`** — id, product_id FK cascade, `variant_id` FK **nullOnDelete** (product-level when null), path, is_primary, sort_order.
+**`product_images`** — id, product_id FK cascade, `variant_id` FK **nullOnDelete** (product-level when null), path, `thumbnail_path` nullable (card-sized WebP; cards fall back to `path`; backfill with `products:generate-thumbnails`), is_primary, sort_order.
 
-> **Money split:** catalog money is `decimal(10,2)` pesos. **Every order/ledger money column is integer centavos.** Converting `products.price` ⇄ `order_items.price_minor` requires ×100. `CartItem::unitPriceCentavos()` uses `bcmul(price,'100',0)` (`app/Models/CartItem.php:58`).
+> **Money split:** catalog money is `decimal(10,2)` pesos. **Every order/ledger money column is integer centavos.** Converting `products.price` ⇄ `order_items.price_minor` requires ×100. `CartItem::unitPriceCentavos()` uses `bcmul(price,'100',0)` (`app/Models/Buyer/CartItem.php:58`).
 
 ### 3.4 Cart / checkout / wishlist / newsletter
 
@@ -149,7 +151,9 @@ All tables below are derived from `database/migrations/`. Notation: `NN` = NOT N
 **`checkout_tokens`** — id, `token` *(unique)*, buyer_id FK cascade, used bool, expires_at; guards double-submit. Indexes `(buyer_id, used)`, `(expires_at)`.
 **`wishlists`** — id, buyer_id FK cascade, product_id FK cascade, **unique `(buyer_id, product_id)`**.
 **`newsletter_subscribers`** — id, `email` *(unique)*, is_active — **no route/subscribe UI (missing)**.
-**`vouchers`** — id, `code` *(unique)*, `type` varchar (`fixed`|`percent`), `value` bigintU (**centavos** when fixed; 0–100 when percent), `min_spend` bigintU (**centavos**), is_active, expires_at, usage_limit, `times_used` intU default 0. **No FK to orders.**
+**`vouchers`** — id, `code` *(unique)*, `type` varchar (`fixed`|`percent`), `value` bigintU (**centavos** when fixed; 0–100 when percent), `min_spend` bigintU (**centavos**), is_active, expires_at, usage_limit, `times_used` intU default 0, `max_discount` bigintU (**centavos**, percent cap), `starts_at` datetime (null = started), `per_buyer_limit` intU, `is_claimable` bool (true = listed on the store page, product page and cart by `Voucher::offeredBy()`; false = code only, never listed), `applies_to_all_products` bool (false = only `voucher_product` rows count toward discount and minimum spend). `ended_at` datetime (set by the Seller's End action; final). Sellers manage shop vouchers through `SellerVoucherService`, always `funding_source = seller`. **`voucher_claims`** (voucher_id, buyer_id, unique pair) is the buyer's wallet. Once a voucher has a claim or an order, `Voucher::rulesLocked()` allows only a later end date or a higher limit. Ending removes claims from buyers with no order using it. **No FK to orders.**
+
+**`store_sales`** — id, seller_id **FK (cascade)**, product_id **FK (cascade)**, variant_id **FK→product_variants.id (cascade)**; null = whole product, `type` varchar (`percent`|`fixed_price`), `value` bigintU (1–99 when percent; sale price in **centavos** when fixed_price), `starts_at`, `ends_at` datetime (UTC; sellers enter Asia/Manila). **No status column:** `StoreSale::status()` derives Upcoming/Ongoing/Ended from the times. `order_items` also snapshots `regular_price_minor` and `store_sale_id` (nullOnDelete), both null on rows placed before they existed.
 
 ### 3.5 Orders / fulfilment / money
 
@@ -172,6 +176,24 @@ All tables below are derived from `database/migrations/`. Notation: `NN` = NOT N
 **`couriers`** — id, logistics_provider_id **FK (restrict)**, `area_id` **FK→areas.id (nullOnDelete)**, name, phone(11), `service_area` **json** (legacy free-form list), `is_available` bool default true, `vehicle_type` varchar(20) default `motorcycle`, `max_weight_grams` intU default 5000. Indexes `(is_available, vehicle_type)` and `(logistics_provider_id)`.
 
 **`areas`** — id, logistics_provider_id **FK (cascade)**, name, `municipality`, `is_active` bool default true. **Unique `(logistics_provider_id, municipality)`**.
+
+**`operations_audit_logs`** — append-only record written in the same transaction as the action: `actor_type`, `actor_id`, `actor_name`, `logistics_provider_id`, `action`, `entity_type`, `entity_id`, `entity_label`, `old_values` json, `new_values` json, `reason`, `created_at`. No foreign keys, so rows outlive what they describe. `OperationsAuditLog` refuses updates and deletes, including bulk queries; the only routes are `GET logistics/audit-logs` (own company) and `GET admin/audit-logs` (all, Admin only). Covers rider decisions and status changes, manually chosen or replaced riders, manual address verification, shipping rate changes and COD remittance confirmation.
+
+**`logistics_remittances`** — one payment from a Logistics company to Zefanya: logistics_provider_id **FK (restrict)**, `parcel_count`, `cod_total_minor`, `shipping_total_minor`, `amount_minor` (cash minus the shipping it keeps), `reference`, `status` (`SUBMITTED`, `CONFIRMED`, `REJECTED`), `received_amount_minor`, `decided_by_admin_id` **FK (restrict)**, `confirmed_at`, `rejected_at`, `rejection_reason`. `cod_remittances` gains `logistics_remittance_id` and `zefanya_received_at`; seller payouts require `zefanya_received_at`. Companies record payments at `logistics/earnings`; Admin confirms the exact amount or rejects at `admin/logistics-remittances`.
+
+**`rider_earnings`** — pay a Courier earned for one successful job: seller_order_id **FK**, courier_id **FK**, logistics_provider_id **FK** (all restrict), `job` (`pickup` | `delivery`), `amount_minor` (the rate in force when earned: pickup ₱30 first / ₱5 additional per session, delivery ₱50, all from Platform Settings), `earned_at`; **unique (seller_order_id, job)**. `pickup_session_id` FK nullable and `session_first` (1 only on a session's first-parcel payment), **unique (pickup_session_id, session_first)**. Failed attempts write no row. `rider_payout_id` FK nullable, set once when paid.
+
+**`pickup_sessions`** — one rider's visit to one seller in one pickup window: logistics_provider_id, seller_id, courier_id (**FK**, restrict), `pickup_address_hash`, `pickup_address`, `pickup_barangay_code`, `window_key`, `window_starts_at`, `window_ends_at`, `status` (`OPEN` | `IN_PROGRESS` | `COMPLETED` | `MISSED` | `CANCELLED`), rate snapshot `first_minor` / `additional_minor`, `first_payable`, `continuation_of_id`, `started_at`, `closed_at`, `close_reason`, and `open_key` (unique, set only while OPEN, so one open session per seller + address + provider + window + rider). `seller_orders` gains `pickup_session_id` (FK, null on delete), `pickup_window_key`, `pickup_window_starts_at`, `pickup_window_ends_at`, `pickup_missed_windows`. Platform Settings gain `pickup_window_morning`, `pickup_window_afternoon`, `rider_pickup_first_rate`, `rider_pickup_additional_rate`, `rider_delivery_rate`.
+
+**`rider_payouts`** — one payment from a Logistics company to a Courier for a batch of earnings: logistics_provider_id, courier_id **FK**, `earning_count`, `amount_minor`, `reference`, `paid_on` date, `status` (`PAID`).
+
+**`seller_debts`** — money a Seller was already paid for an order that was then returned or refunded: seller_id, `seller_order_id` *(unique)*, seller_settlement_id **FKs**, `amount_minor`, `settled_minor`, `reason`. `seller_payout_requests.debt_deducted_minor` is the part of a request that repays it; the debt is settled when Admin records the payout, not when the seller requests it.
+
+`parcel_returns` also keeps the refund: `refund_amount_minor`, `refund_recipient`, `refund_paid_on`, and `refund_proof_path` (private, shown only to Admin). `logistics_remittances.short_minor` and `left_out_count` record a partly confirmed payment. `cod_remittances.reconciliation` (`allocated` or `kept`), `reconciled_at`, `destination_share_minor` and `destination_paid_*` record the one-time decision on a parcel sent under the old full-fee rule.
+
+**`origin_share_payouts`** — one payment from Zefanya to an origin carrier for its 40% of cross-provider fees: logistics_provider_id **FK**, `parcel_count`, `amount_minor`, `reference` *(unique per provider)*, `paid_on` date, `status` (`PAID`), paid_by_admin_id **FK**. `cod_remittances` gained `kept_shipping_minor` and `origin_share_minor` (split frozen at delivery) and `origin_share_payout_id` (set once).
+
+**`logistics_shipping_rates`** — id, logistics_provider_id **FK (cascade)**, `zone` (`same_municipality`, `same_province`, `cross_province`), `first_kg_minor` intU nullable, `additional_kg_minor` intU nullable. **Unique `(logistics_provider_id, zone)`**. Null means the company uses the marketplace rate from `config/buyer.php`. Shown on Earnings → Shipping Rates (`/logistics/earnings?tab=shipping-rates`); `/logistics/shipping-rates` redirects there. Placed orders keep `seller_orders.shipping_fee_minor`.
 
 > Two parallel coverage models exist: the legacy `couriers.service_area` JSON and the newer `areas` table. The `areas` table supersedes it but `service_area` is still NOT NULL.
 
@@ -250,6 +272,7 @@ All three verify controllers `use VerifiesEmailOtp`; all three models `use HasEm
 | `otp-verify`: **10 / min per IP** | all three OTP **verify** POSTs (signed) |
 | 5 / 1 min (route) | unified login; seller login; admin login; forgot-password; reset-password; unified logout |
 | 10 / 1 min (route) | the whole `/auth/google/*` group |
+| `admin-2fa`: **5 / min per pending admin+IP** | admin TOTP challenge, enable and disable |
 
 **OTP ownership:** every OTP GET/verify/resend URL is a Laravel **temporary signed URL** (60 min, `App\Support\SignedOtpLink`). Changing the numeric id invalidates the signature → **403**. Strangers cannot open another applicant's page, lock their 5-attempt window, or trigger resend mail.
 
@@ -264,7 +287,14 @@ All three verify controllers `use VerifiesEmailOtp`; all three models `use HasEm
 - Paths: buyer `ids/`; seller `seller-ids/` + `business-permits/`; logistics `logistics-ids/` + `logistics-permits/`.
 - Validation (all three): `file`, `mimes:jpg,jpeg,png,pdf`, `max:5120` (5 MB).
 - Old files are deleted when a rejected/unverified applicant re-registers.
-- **Streaming:** `Admin\DocumentController@stream` — `{type}` limited to `seller|logistics|buyer`, `{document}` whitelisted to `id|business_permit|dti_permit` (route `where` + controller `match` on known path columns). Private-disk download with `X-Content-Type-Options: nosniff`; gated by `auth:admin` + `admin.role`.
+- **Streaming:** `Admin\DocumentController@stream` — `{type}` limited to `seller|logistics|buyer`, `{document}` whitelisted to `id|business_permit|dti_permit` (route `where` + controller `match` on known path columns). Private-disk download with `X-Content-Type-Options: nosniff`; gated by `auth:admin` + `admin.role:admin` (**moderators are excluded** — they may decide applications but cannot stream raw IDs). Every successful view is appended to `admin_document_access_logs` with the admin id, document reference (`type` + row id + whitelisted key), action, IP and timestamp. Document bytes, storage paths and tokens are never logged.
+
+### 4.6.1 Admin two-factor authentication (admin only)
+- Migration `add_two_factor_columns_to_admins_table`: `two_factor_secret` (encrypted), `two_factor_recovery_codes` (encrypted array of bcrypt hashes), `two_factor_confirmed_at`.
+- `App\Services\Admin\TwoFactorAuthenticator`: RFC 6238 TOTP (SHA-1, 30 s, 6 digits, ±1 period) plus QR provisioning URI; no external dependency.
+- Password login (`Admin\AuthController`) logs the guard out again for enrolled admins and stores a pending id in the session. `Admin\TwoFactorController@verify` requires a TOTP or unused recovery code before `Auth::login()`; the challenge is throttled (`admin-2fa`). Recovery codes are single-use.
+- `admin.2fa` middleware (`EnsureAdminTwoFactor`) enforces enrolment when `ADMIN_REQUIRE_2FA=true` (recommended in production). Buyer, seller, logistics and rider authentication are untouched.
+- The seeded super-admin reads **both** `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD` from the environment; the password must be ≥ 12 characters and there is no default address or password. **Deployment TODO:** existing installations that seeded the former hardcoded address must delete/rotate that account; `firstOrCreate` will not rename it.
 
 ### 4.7 Session rules — one account per browser
 `app/Http/Controllers/Concerns/ClearsOtherGuards.php`. Participating guards: `['admin','seller','logistics','buyer']` (the `web` guard is **not** included).
@@ -275,6 +305,7 @@ All three verify controllers `use VerifiesEmailOtp`; all three models `use HasEm
 
 ### 4.8 Known weak points
 - `SESSION_ENCRYPT=false`, `SESSION_SECURE_COOKIE=false` in `.env` (must be reviewed for production).
+- **Trusted proxies:** `bootstrap/app.php` no longer trusts `*`. `config/trustedproxy.php` reads `TRUSTED_PROXIES` and defaults to **none**, so direct clients cannot spoof `X-Forwarded-For` and IP throttles use the real peer. **Deployment TODO:** set `TRUSTED_PROXIES` to the exact Cloudflare Tunnel connector address/CIDR (never `*`) so client IPs and HTTPS detection are correct behind the tunnel. This value cannot be derived from the repository.
 - `EnsureAdminRole` + `Admin` model validate roles against `AdminRole` enum (`super_admin` bypasses; unknown roles throw on save).
 - OTP codes are stored with a **keyed HMAC** (sha256 + `APP_KEY`), not a bare sha256. See §4.4.
 - **Production log/mail config:** use `LOG_LEVEL=warning` (never `debug`/`info`) and `MAIL_MAILER=smtp` — **never `log`**, which writes full email bodies (OTP included) to `storage/logs`.

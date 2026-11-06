@@ -47,9 +47,13 @@
 
             <button type="submit"
                 class="inline-flex h-10 items-center justify-center rounded-sm bg-rose-700 px-4 font-sans text-[11.5px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-rose-800"
-                onclick="return confirm('Record this delivery attempt as failed?');">
+                onclick="return appConfirmSubmit(this, 'Record this delivery attempt as failed?');">
                 Record Failed Attempt
             </button>
         </form>
     </section>
 @endsection
+
+@push('scripts')
+    @include('Components.confirm-dialog')
+@endpush

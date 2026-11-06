@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Buyer;
 
-use App\Models\Buyer\Buyer;
+use App\Support\BirthDate;
 use App\Support\EmailRegistry;
+use App\Support\PasswordRule;
+use App\Support\PersonName;
+use App\Support\PhilippineMobile;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -21,14 +23,13 @@ class StoreBuyerRegistrationRequest extends FormRequest
         // Trim and lowercase email
         $email = $this->input('email');
         if ($email) {
-            $this->merge(['email' => trim(strtolower($email))]);
+            $this->merge(['email' => EmailRegistry::normalize($email)]);
         }
 
-        // Normalize mobile: convert +63 to 09
+        // Normalize mobile: +639XXXXXXXXX → 09XXXXXXXXX before the unique check.
         $contactNo = $this->input('contact_no');
-        if ($contactNo) {
-            $normalized = $this->normalizePhoneNumber($contactNo);
-            $this->merge(['contact_no' => $normalized]);
+        if (is_string($contactNo)) {
+            $this->merge(['contact_no' => PhilippineMobile::normalize($contactNo)]);
         }
     }
 
@@ -41,85 +42,31 @@ class StoreBuyerRegistrationRequest extends FormRequest
             }
 
             $email = $this->input('email');
-            if ($email) {
-                // Block only a live registration. A REJECTED applicant (or an
-                // abandoned unverified one) must be able to retry with the same
-                // email — otherwise a rejection is a permanent dead end.
-                $exists = DB::table('buyers')
-                    ->whereRaw('LOWER(email) = ?', [strtolower($email)])
-                    ->whereNotIn('status', ['unverified', 'rejected'])
-                    ->exists();
-
-                if ($exists) {
-                    $validator->errors()->add('email', 'The email has already been registered.');
-                } elseif ($foreign = EmailRegistry::otherRolesFor($email, 'buyer')) {
-                    // One email = one role across every account table.
-                    $validator->errors()->add(
-                        'email',
-                        'This email is already registered as a '.EmailRegistry::labelList($foreign).'. Use a different email.'
-                    );
-                } else {
-                    // Never let a newcomer replace a registration that is still
-                    // inside its 10-minute verification window.
-                    $stale = Buyer::whereRaw('LOWER(email) = ?', [strtolower($email)])
-                        ->where('status', 'unverified')
-                        ->first();
-
-                    if ($stale && ! $stale->isAbandonedRegistration()) {
-                        $validator->errors()->add(
-                            'email',
-                            'This email is currently awaiting verification. Please finish verifying it, then try again later.'
-                        );
-                    }
-                }
+            if ($email && ($error = EmailRegistry::registrationError($email, 'buyer', submission: $this->only(['password', 'first_name', 'last_name', 'contact_no'])))) {
+                $validator->errors()->add('email', $error);
             }
 
-            // Live contact numbers must be unique. Skip the same-email
-            // unverified/rejected row — store() archives it and nulls contact_no.
+            // Live contact numbers are unique across every role.
             $contactNo = $this->input('contact_no');
-            if ($contactNo) {
-                $exists = DB::table('buyers')
-                    ->where('contact_no', $contactNo)
-                    ->whereNull('archived_at')
-                    ->where(function ($query) use ($email) {
-                        $query->whereRaw('LOWER(email) != ?', [strtolower((string) $email)])
-                            ->orWhereNotIn('status', ['unverified', 'rejected']);
-                    })
-                    ->exists();
-
-                if ($exists) {
-                    $validator->errors()->add('contact_no', 'This mobile number is already in use.');
-                }
+            if (is_string($contactNo) && PhilippineMobile::isTaken($contactNo, 'buyer', (string) $email)) {
+                $validator->errors()->add('contact_no', PhilippineMobile::TAKEN_MESSAGE);
             }
         });
-    }
-
-    private function normalizePhoneNumber(string $phone): string
-    {
-        // Remove spaces, hyphens, parentheses
-        $phone = preg_replace('/[\s\-()]/u', '', $phone);
-
-        // Convert +63 to 09
-        if (str_starts_with($phone, '+63')) {
-            $phone = '0'.substr($phone, 3);
-        }
-
-        return $phone;
     }
 
     public function rules(): array
     {
         return [
-            'last_name' => ['required', 'string', 'regex:/^[\p{L}\s\-\']+$/u', 'min:2', 'max:50'],
-            'first_name' => ['required', 'string', 'regex:/^[\p{L}\s\-\']+$/u', 'min:2', 'max:50'],
+            'last_name' => PersonName::rules(),
+            'first_name' => PersonName::rules(),
             'middle_initial' => ['nullable', 'string', 'max:2'],
             'sex' => ['required', Rule::in(['male', 'female'])],
 
-            'email' => ['required', 'string', 'email', 'max:255', 'regex:/^[^\s@]+@[^\s@]+\.[^\s@]+$/'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*\p{Lu})(?=.*\p{Ll})(?=.*\p{N})(?=.*[\p{Z}\p{S}\p{P}]).+$/u'],
+            'email' => EmailRegistry::formatRules(),
+            'password' => PasswordRule::rules(),
 
-            'contact_no' => ['required', 'regex:/^09\d{9}$/'],
-            'birthday' => ['required', 'date', 'before:today', 'before_or_equal:-18 years'],
+            'contact_no' => PhilippineMobile::rules(),
+            'birthday' => BirthDate::rules(),
 
             // Registration: province / municipality / barangay from dropdowns only.
             'address_mode' => ['required', Rule::in(['api'])],
@@ -148,17 +95,12 @@ class StoreBuyerRegistrationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'first_name.regex' => 'First name can only contain letters, spaces, hyphens and apostrophes.',
-            'last_name.regex' => 'Last name can only contain letters, spaces, hyphens and apostrophes.',
-            'first_name.min' => 'First name must be at least 2 characters.',
-            'first_name.max' => 'First name must not exceed 50 characters.',
-            'last_name.min' => 'Last name must be at least 2 characters.',
-            'last_name.max' => 'Last name must not exceed 50 characters.',
-            'email.regex' => 'Enter a valid email address with a domain.',
-            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.',
-            'contact_no.regex' => 'Enter a valid PH mobile number (09XXXXXXXXX).',
-            'contact_no.unique' => 'This mobile number is already in use.',
-            'birthday.before_or_equal' => 'You must be at least 18 years old.',
+            ...PersonName::messages('first_name', 'First name'),
+            ...PersonName::messages('last_name', 'Last name'),
+            'email.email' => 'Enter a valid email address.',
+            'email.regex' => EmailRegistry::FORMAT_MESSAGE,
+            ...PasswordRule::messages(),
+            ...BirthDate::messages(),
             'upload_id.uploaded' => 'Upload ID failed to upload. Use a JPG, PNG, or PDF under 5MB.',
             'upload_id.mimes' => 'Upload ID must be a JPG, PNG, or PDF.',
             'upload_id.max' => 'Upload ID must be smaller than 5MB.',

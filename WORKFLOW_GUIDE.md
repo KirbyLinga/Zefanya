@@ -147,7 +147,7 @@ The following account criteria are derived from the **LogisticsFlowTestSeeder** 
 
 | Role | Email | Password | Notes |
 |------|-------|----------|-------|
-| Admin | SuperZefanya@admin.com | Zefanya@6967 | Super administrator |
+| Admin | `ADMIN_SEED_EMAIL` from `.env` | `ADMIN_SEED_PASSWORD` from `.env` | Super administrator (never commit real credentials) |
 | Logistics A | demo.provider.a@example.com | password123 | Santa Cruz, Pagsanjan, Los Baños |
 | Logistics B | demo.provider.b@example.com | password123 | Coverage not fully verified |
 | Logistics Test | penguinskipper9@gmail.com | password123 | Bulacan province |
@@ -288,8 +288,9 @@ The following account switching sequence should be followed during manual testin
    - Riders are associated with logistics providers through the Courier model
    - Rider login typically via provider context, not direct login
    
-5. **Admin** (optional) - `http://localhost:8000/admin/login` → Log in with super-admin
-   - SuperZefanya@admin.com / `Zefanya@6967`
+5. **Admin** (optional) - `http://localhost:8000/admin/login` → Log in with the seeded super-admin
+   - Email/password come from `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` in `.env`
+   - If 2FA is enrolled, enter the authenticator (or recovery) code on the next screen
 
 **Switching pattern:** Log out as current role, log in as next role. Use Incognito/Private browser windows for each role to avoid session conflicts.
 

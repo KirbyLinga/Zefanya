@@ -4,8 +4,9 @@ namespace App\Http\Controllers\Seller;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\SellerOrder;
-use App\Services\WaybillQrCode;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\WaybillQrCode;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -27,13 +28,19 @@ class ShipmentController extends Controller
      * Parcels in the outbound pipeline (anything from a fresh order through to
      * delivered). The list is shop-scoped and read-only apart from the label.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         $seller = Auth::guard('seller')->user();
+        $statuses = collect(OrderStatus::cases())
+            ->reject(fn (OrderStatus $status) => in_array($status, [OrderStatus::Returned, OrderStatus::Cancelled], true));
+        $selectedStatus = $statuses->first(
+            fn (OrderStatus $status) => $status->value === $request->query('status')
+        );
 
         $shipments = SellerOrder::query()
             ->where('seller_id', $seller->id)
             ->whereNotIn('status', [OrderStatus::Returned, OrderStatus::Cancelled])
+            ->when($selectedStatus, fn ($query) => $query->where('status', $selectedStatus))
             ->with([
                 'order' => fn ($q) => $q->with('buyer'),
                 'orderItems',
@@ -41,10 +48,13 @@ class ShipmentController extends Controller
                 'deliveryCourier',
             ])
             ->latest('id')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         return view('Seller.Shipments.index', [
             'shipments' => $shipments,
+            'statuses' => $statuses,
+            'selectedStatus' => $selectedStatus,
         ]);
     }
 

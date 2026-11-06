@@ -1,4 +1,4 @@
-@extends('layouts.buyer')
+@extends('Buyer.Layouts.app')
 
 @section('title', 'Messages')
 
@@ -20,7 +20,7 @@
                             <div class="flex justify-between items-start mb-2">
                                 <div>
                                     <h3 class="font-semibold text-gray-900">
-                                        {{ $conversation->seller->name ?? 'Seller' }}
+                                        {{ $conversation->seller->business_name ?? 'Seller' }}
                                     </h3>
                                     @if($conversation->product)
                                         <p class="text-sm text-gray-500">
@@ -37,7 +37,7 @@
                                 </span>
                             </div>
                             <p class="text-sm text-gray-600 line-clamp-2">
-                                {{ $conversation->messages->last()?->body ?? 'No messages' }}
+                                {{ $conversation->messages->last()?->preview() ?? 'No messages' }}
                             </p>
                             @if($unreadCounts[$conversation->id] ?? 0)
                                 <div class="mt-2">
@@ -53,48 +53,4 @@
         @endif
     </div>
 </div>
-
-<script>
-    // Poll for new messages every 5 seconds
-    let pollInterval;
-
-    function startPolling() {
-        if (pollInterval) return;
-        
-        pollInterval = setInterval(async () => {
-            try {
-                const response = await fetch('{{ route("buyer.messages.index") }}');
-                if (response.ok) {
-                    const html = await response.text();
-                    // Simple polling - refresh full page periodically
-                    // In production, this could be replaced with a more sophisticated update mechanism
-                }
-            } catch (error) {
-                console.error('Polling error:', error);
-            }
-        }, 5000);
-    }
-
-    function stopPolling() {
-        if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-        }
-    }
-
-    // Pause polling when tab is hidden, resume when visible
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            stopPolling();
-        } else {
-            startPolling();
-        }
-    });
-
-    // Start polling on page load
-    startPolling();
-
-    // Clean up on page unload
-    window.addEventListener('beforeunload', stopPolling);
-</script>
 @endsection

@@ -12,7 +12,7 @@
     @endphp
 
     @if ($collapsible)
-        <details class="group" data-nav-group @if ($active) open @endif>
+        <details class="group mt-4" data-nav-group @if ($active) open @endif>
             <summary
                 class="flex min-h-10 cursor-pointer list-none items-center gap-3 rounded-md px-3 py-2 font-sans text-[13px] font-medium text-[var(--sidebar-text)] transition-colors hover:bg-[var(--sidebar-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sidebar-active-border)] [&::-webkit-details-marker]:hidden [.is-collapsed_&]:justify-center [.is-collapsed_&]:gap-0 [.is-collapsed_&]:px-0 {{ $active ? 'bg-[var(--sidebar-hover)]' : '' }}"
                 aria-label="{{ $section['label'] }}"
@@ -26,7 +26,7 @@
             </summary>
             <div id="{{ $groupId }}" class="mt-1 flex flex-col gap-1 border-l border-[var(--sidebar-border)] pl-2 ml-5 [.is-collapsed_&]:hidden">
                 @foreach ($section['items'] as $item)
-                    <x-logistics.sidebar-nav-item :route="$item['route'] ?? null" :icon="$item['icon'] ?? null" :label="$item['label'] ?? ''" />
+                    <x-logistics.sidebar-nav-item :route="$item['route'] ?? null" :icon="$item['icon'] ?? null" :label="$item['label'] ?? ''" :badge="$item['badge'] ?? 0" />
                 @endforeach
             </div>
         </details>
@@ -36,7 +36,7 @@
                 <p class="px-3 pb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-muted)] [.is-collapsed_&]:hidden">{{ $section['label'] }}</p>
             @endif
             @foreach ($section['items'] as $item)
-                <x-logistics.sidebar-nav-item :route="$item['route'] ?? null" :icon="$item['icon'] ?? null" :label="$item['label'] ?? ''" />
+                <x-logistics.sidebar-nav-item :route="$item['route'] ?? null" :icon="$item['icon'] ?? null" :label="$item['label'] ?? ''" :badge="$item['badge'] ?? 0" />
             @endforeach
         </div>
     @endif

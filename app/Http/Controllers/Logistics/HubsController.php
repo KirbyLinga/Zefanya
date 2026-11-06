@@ -2,14 +2,24 @@
 
 namespace App\Http\Controllers\Logistics;
 
+use App\Enums\ManifestStatus;
+use App\Enums\OrderStatus;
+use App\Enums\ParcelHandoffStatus;
+use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsHubLocationChange;
-use App\Services\LogisticsHubService;
-use App\Services\PhilippineLocationService;
-use App\Services\ProviderProvinceService;
+use App\Models\Logistics\ManifestItem;
+use App\Models\Logistics\ParcelHandoff;
+use App\Models\Shared\Incidents;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\ProviderProvinceService;
+use App\Services\Shared\PhilippineLocationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -38,6 +48,7 @@ class HubsController extends Controller
         return view('Logistics.Hubs.index', [
             'provider' => $provider,
             'provinceHubs' => $provinceHubs,
+            'stationInventory' => $this->stationInventory($provider->id, $provinceHubs->flatMap->stations->pluck('id')),
             'liveProvinceHub' => $provinces->activeProvinceHub($provider),
             'provinceLocked' => $provinces->isProvinceLocked($provider),
         ]);
@@ -324,6 +335,73 @@ class HubsController extends Controller
         }
 
         return back()->with('success', $active ? 'Hub activated.' : 'Hub deactivated.');
+    }
+
+    /**
+     * Per-station parcel counts: parcels held at the station (and how many still
+     * need sorting), active exceptions on those parcels, and parcels dispatched
+     * towards the station that have not been received yet.
+     *
+     * @return array<int, array{inside: int, to_sort: int, exceptions: int, inbound: int, total: int}>
+     */
+    private function stationInventory(int $providerId, Collection $stationIds): array
+    {
+        if ($stationIds->isEmpty()) {
+            return [];
+        }
+
+        $held = SellerOrder::query()
+            ->where('custody_provider_id', $providerId)
+            ->whereIn('custody_hub_id', $stationIds)
+            ->whereIn('status', [
+                OrderStatus::AtSortingCenter->value,
+                OrderStatus::Sorted->value,
+                OrderStatus::AssignedToRider->value,
+                OrderStatus::DeliveryFailed->value,
+            ])
+            ->get(['id', 'custody_hub_id', 'status']);
+
+        $exceptions = Incidents::query()
+            ->whereIn('type', ParcelIncidentService::ACTIVE_TYPES)
+            ->whereIn('incident_seller_order_id', $held->pluck('id'))
+            ->where(fn ($active) => $active
+                ->whereIn('status', [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value])
+                ->orWhere('resolution', ParcelIncidentService::HOLD))
+            ->distinct()
+            ->pluck('incident_seller_order_id')
+            ->countBy(fn ($orderId) => $held->firstWhere('id', $orderId)?->custody_hub_id);
+
+        $manifestTransit = ManifestItem::query()
+            ->whereNull('received_at')
+            ->whereNull('released_at')
+            ->whereHas('manifest', fn ($manifest) => $manifest
+                ->where('status', ManifestStatus::Dispatched->value)
+                ->whereIn('destination_hub_id', $stationIds))
+            ->with('manifest:id,destination_hub_id')
+            ->get(['id', 'manifest_id'])
+            ->countBy(fn (ManifestItem $item) => $item->manifest->destination_hub_id);
+
+        $handoffTransit = ParcelHandoff::query()
+            ->where('status', ParcelHandoffStatus::InTransit->value)
+            ->whereIn('receiving_hub_id', $stationIds)
+            ->pluck('receiving_hub_id')
+            ->countBy();
+
+        $heldByHub = $held->groupBy('custody_hub_id');
+
+        return $stationIds->mapWithKeys(function (int $stationId) use ($heldByHub, $exceptions, $manifestTransit, $handoffTransit): array {
+            $parcels = $heldByHub->get($stationId, collect());
+            $inside = $parcels->count();
+            $inbound = $manifestTransit->get($stationId, 0) + $handoffTransit->get($stationId, 0);
+
+            return [$stationId => [
+                'inside' => $inside,
+                'to_sort' => $parcels->filter(fn (SellerOrder $parcel) => $parcel->status === OrderStatus::AtSortingCenter)->count(),
+                'exceptions' => $exceptions->get($stationId, 0),
+                'inbound' => $inbound,
+                'total' => $inside + $inbound,
+            ]];
+        })->all();
     }
 
     private function ownedHub(int $providerId, int $hubId): LogisticsHub

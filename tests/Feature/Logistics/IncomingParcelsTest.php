@@ -4,15 +4,15 @@ namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Courier;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\ParcelHandoffVerification;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\Support\IssuesLogisticsHandoff;
@@ -81,6 +81,19 @@ class IncomingParcelsTest extends TestCase
             ->assertDontSee('#'.$sorting->id);
     }
 
+    public function test_index_renders_a_single_notification_bell_beside_the_page_title(): void
+    {
+        $html = $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.incoming-parcels.index'))
+            ->assertOk()
+            ->assertSee('Incoming Parcels', false)
+            ->assertSee('Scan parcel', false)
+            ->assertSee('id="lg-notification-bell"', false)
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, 'id="lg-notification-bell"'));
+    }
+
     public function test_legacy_pickup_route_is_removed_and_pickup_requires_rider_confirmation(): void
     {
         $ready = $this->order(OrderStatus::ReadyForPickup);
@@ -121,7 +134,7 @@ class IncomingParcelsTest extends TestCase
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.incoming-parcels.assignPickupRider', $ready), ['courier_id' => $courier->id])
             ->assertRedirect()
-            ->assertSessionHas('error', 'No eligible rider in your fleet serves this pickup area.');
+            ->assertSessionHas('error', $courier->rider->fullName().' cannot take new jobs: the Rider account is suspended, inactive or not yet approved.');
 
         $ready->refresh();
         $this->assertSame(OrderStatus::ReadyForPickup, $ready->status);
@@ -370,7 +383,54 @@ class IncomingParcelsTest extends TestCase
             $html,
             'claimed parcel keeps showing the buyer name'
         );
-        $this->assertStringContainsString('Claim to reveal buyer details', $html);
+        $this->assertStringContainsString("Buyer's name shows once your rider is assigned", $html);
+    }
+
+    public function test_parcels_are_grouped_by_the_next_step(): void
+    {
+        $courier = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
+        $notifiedCourier = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
+
+        $unassigned = $this->order(OrderStatus::ReadyForPickup);
+        $reserved = $this->order(OrderStatus::ReadyForPickup);
+        $notified = $this->order(OrderStatus::ReadyForPickup);
+        $arriving = $this->order(OrderStatus::PickedUp, Courier::factory()->create([
+            'logistics_provider_id' => $this->provider->id,
+            'is_available' => false,
+        ]));
+        $arriving->forceFill(['handover_at' => now()])->save();
+
+        $this->actingAs($this->provider, 'logistics');
+        foreach ([[$reserved, $courier], [$notified, $notifiedCourier]] as [$parcel, $rider]) {
+            $parcel->order->update(['shipping_address' => ['municipality' => 'Quezon City', 'barangay_code' => '1374040001']]);
+            $this->post(route('logistics.incoming-parcels.assignPickupRider', $parcel), ['courier_id' => $rider->id])
+                ->assertSessionHas('success');
+        }
+        $this->post(route('logistics.incoming-parcels.confirmPickupDispatch', $notified))->assertSessionHas('success');
+
+        $this->get(route('logistics.incoming-parcels.index'))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'id="stage-rider"', 'id="parcel-'.$unassigned->id.'"',
+                'id="stage-dispatch"', 'id="parcel-'.$reserved->id.'"',
+                'id="stage-waiting"', 'id="parcel-'.$notified->id.'"',
+                'id="stage-arriving"', 'id="parcel-'.$arriving->id.'"',
+            ], false)
+            ->assertSee(route('logistics.incoming-parcels.confirmPickupDispatch', $reserved), false)
+            ->assertDontSee(route('logistics.incoming-parcels.confirmPickupDispatch', $notified), false)
+            ->assertSee('data-ip-tab="rider" aria-selected="true"', false)
+            ->assertSee('data-ip-stage="dispatch"  hidden', false)
+            ->assertSee('data-ip-details  hidden', false);
+    }
+
+    public function test_highlighted_parcel_offers_a_way_back_to_the_full_list(): void
+    {
+        $parcel = $this->order(OrderStatus::ReadyForPickup);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.incoming-parcels.index', ['highlight' => $parcel->id]))
+            ->assertOk()
+            ->assertSee('Show all parcels');
     }
 
     public function test_unclaimed_parcel_shows_parcel_size(): void
@@ -407,7 +467,7 @@ class IncomingParcelsTest extends TestCase
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.incoming-parcels.toSortingCenter', $ready))
             ->assertRedirect()
-            ->assertSessionHas('error', 'This parcel is not in the pickup phase.');
+            ->assertSessionHas('error', 'Scan blocked: this parcel must be picked up before it can be received at the hub.');
 
         $this->assertSame(OrderStatus::ReadyForPickup, $ready->refresh()->status);
     }
@@ -617,9 +677,9 @@ class IncomingParcelsTest extends TestCase
             'is_available' => false,
         ]);
 
-        $unassigned = $this->order(OrderStatus::ReadyForPickup);
-        $assigned = $this->order(OrderStatus::ReadyForPickup, $courier);
-        $pickedUp = $this->order(OrderStatus::PickedUp, Courier::factory()->create([
+        $this->order(OrderStatus::ReadyForPickup);
+        $this->order(OrderStatus::ReadyForPickup, $courier);
+        $this->order(OrderStatus::PickedUp, Courier::factory()->create([
             'logistics_provider_id' => $this->provider->id,
             'is_available' => false,
         ]));

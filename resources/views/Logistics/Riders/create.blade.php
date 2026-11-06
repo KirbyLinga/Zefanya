@@ -120,12 +120,12 @@
         <div class="mt-4 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
                 <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_drivers_license">Driver's License (JPG, PNG, PDF · max 5 MB) *</label>
-                <input type="file" name="drivers_license" id="rider_drivers_license" accept=".jpg,.jpeg,.png,.pdf" class="w-full rounded-sm border border-neutral-300 bg-white px-3 py-2.5 font-sans text-[12.5px] text-neutral-700 outline-none">
+                <input type="file" name="drivers_license" id="rider_drivers_license" accept=".jpg,.jpeg,.png,.pdf" class="upload-input">
                 @error('drivers_license')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
             </div>
             <div>
                 <label class="mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="rider_or_cr">Vehicle OR/CR (JPG, PNG, PDF · max 5 MB) *</label>
-                <input type="file" name="or_cr" id="rider_or_cr" accept=".jpg,.jpeg,.png,.pdf" class="w-full rounded-sm border border-neutral-300 bg-white px-3 py-2.5 font-sans text-[12.5px] text-neutral-700 outline-none">
+                <input type="file" name="or_cr" id="rider_or_cr" accept=".jpg,.jpeg,.png,.pdf" class="upload-input">
                 @error('or_cr')<span class="mt-1 block font-sans text-[11.5px] text-[#a5333d]">{{ $message }}</span>@enderror
             </div>
         </div>

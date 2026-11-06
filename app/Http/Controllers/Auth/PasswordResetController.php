@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Support\PasswordRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -22,9 +23,9 @@ use Illuminate\View\View;
  *
  * The request response never reveals whether an email exists
  * (account-enumeration safe): a miss returns the same "link sent" message as a
- * hit. A successful reset rotates the account's remember_token, and
- * AuthenticateRoleSession ends every OTHER session still holding the old
- * password.
+ * hit. A successful reset rotates the account's remember_token, deletes that
+ * account's API tokens, and AuthenticateRoleSession ends every OTHER session
+ * still holding the old password.
  */
 class PasswordResetController extends Controller
 {
@@ -34,7 +35,7 @@ class PasswordResetController extends Controller
      *
      * @var list<string>
      */
-    private const BROKERS = ['admins', 'sellers', 'logistics', 'buyers'];
+    private const BROKERS = ['admins', 'sellers', 'logistics', 'buyers', 'riders'];
 
     /**
      * GET /forgot-password — the request form.
@@ -82,8 +83,8 @@ class PasswordResetController extends Controller
         $request->validate([
             'token' => ['required', 'string'],
             'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
+            'password' => PasswordRule::rules(),
+        ], PasswordRule::messages());
 
         $credentials = $request->only('email', 'password', 'password_confirmation', 'token');
 
@@ -97,6 +98,10 @@ class PasswordResetController extends Controller
                         'password' => $password,
                         'remember_token' => Str::random(60),
                     ])->save();
+
+                    if (method_exists($user, 'tokens')) {
+                        $user->tokens()->delete();
+                    }
                 },
             );
 

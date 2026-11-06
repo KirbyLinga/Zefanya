@@ -24,14 +24,14 @@
         || ($openCreateModal ?? request()->boolean('create'));
     $autoOpen = $createAutoOpen || $editMode;
     $productModalProduct = $editProduct
-        ?? ($newProduct ?? new \App\Models\Product(['status' => 'draft', 'low_stock_threshold' => 5]));
+        ?? ($newProduct ?? new \App\Models\Catalog\Product(['status' => 'draft', 'low_stock_threshold' => 5]));
 @endphp
 <div id="productModalOverlay"
      class="buyer-modal-overlay fixed inset-0 z-[999] hidden items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-[2px] [&.is-open]:flex"
      data-auto-open="{{ $autoOpen ? '1' : '0' }}"
      data-auto-edit-id="{{ request()->input('edit') }}"
-     data-edit-template="{{ route('seller.products.edit', ['product' => '__ID__']) }}"
-     data-update-template="{{ route('seller.products.update', ['product' => '__ID__']) }}"
+     data-edit-template="{{ route('seller.products.edit', ['product' => '__ID__'], absolute: false) }}"
+     data-update-template="{{ route('seller.products.update', ['product' => '__ID__'], absolute: false) }}"
      aria-hidden="true">
     <div role="dialog" aria-modal="true" aria-labelledby="productModalTitle"
          class="flex max-h-[90vh] w-full max-w-[1000px] flex-col overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[0_24px_60px_rgba(15,23,42,0.25)] max-sm:max-h-[94vh]">
@@ -51,7 +51,7 @@
         </header>
 
         <form id="productModalForm" method="POST" novalidate enctype="multipart/form-data"
-              action="{{ $editMode ? route('seller.products.update', $productModalProduct) : route('seller.products.store') }}"
+              action="{{ $editMode ? route('seller.products.update', $productModalProduct, absolute: false) : route('seller.products.store', absolute: false) }}"
               class="flex min-h-0 flex-1 flex-col">
             <input type="hidden" name="_modal" id="productModalFlag" value="{{ $editMode ? 'product-edit' : 'product-create' }}">
             <input type="hidden" name="_product_id" id="productModalProductId" value="{{ $editMode ? $productModalProduct->id : '' }}">
@@ -69,7 +69,7 @@
                     class="inline-flex h-10 items-center justify-center rounded-sm border border-[var(--border-cancel)] bg-[var(--bg-surface)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-cancel-text)] transition-colors hover:bg-[var(--bg-raised)]">
                 Cancel
             </button>
-            <div class="ml-auto flex items-center gap-3"><button type="button" data-pf-back class="rounded-sm border border-[var(--border-input)] px-4 py-2.5 text-xs font-semibold text-[var(--text-ink)] hover:bg-[var(--bg-soft)]">Back</button><button type="button" data-pf-next class="rounded-sm bg-[var(--btn-primary-bg)] px-5 py-2.5 text-xs font-semibold text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-bg-hover-soft)]">Continue →</button><button id="productModalSubmit" type="submit" form="productModalForm" hidden disabled
+            <div class="ml-auto flex items-center gap-3"><button type="submit" form="productModalForm" data-pf-save-draft formnovalidate class="rounded-sm border border-[var(--border-input)] px-4 py-2.5 text-xs font-semibold text-[var(--text-ink)]">Save as Draft</button><button type="button" data-pf-back hidden class="rounded-sm border border-[var(--border-input)] px-4 py-2.5 text-xs font-semibold text-[var(--text-ink)] hover:bg-[var(--bg-soft)]">Back</button><button type="button" data-pf-next hidden class="rounded-sm bg-[var(--btn-primary-bg)] px-5 py-2.5 text-xs font-semibold text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-bg-hover-soft)]">Continue →</button><button id="productModalSubmit" type="submit" form="productModalForm" hidden disabled
                     class="inline-flex h-10 items-center justify-center gap-2 rounded-sm border-none bg-[var(--btn-primary-bg)] px-5 font-sans text-[12px] font-semibold uppercase tracking-[0.8px] text-[var(--btn-primary-text)] cursor-pointer transition-colors hover:bg-[var(--btn-primary-bg-hover-soft)]">
                 <span id="productModalSubmitLabel" class="text-[var(--btn-primary-text)]">{{ $editMode ? 'Save Changes' : 'Publish Product' }}</span>
             </button>

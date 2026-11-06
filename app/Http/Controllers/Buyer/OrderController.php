@@ -4,15 +4,20 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
+use App\Exceptions\StaleStateException;
 use App\Http\Controllers\Controller;
-use App\Models\Order;
-use App\Models\SellerOrder;
-use App\Services\BuyerShipmentConfirmation;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Buyer\BuyerShipmentConfirmation;
+use App\Services\Logistics\DeliveryOtpService;
+use App\Services\Logistics\ParcelReturnService;
+use App\Services\Logistics\RouteExecutionService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class OrderController extends Controller
@@ -38,8 +43,6 @@ class OrderController extends Controller
     ];
 
     private const CANCELLED_STATUSES = [
-        OrderStatus::DeliveryFailed,
-        OrderStatus::Returned,
         OrderStatus::Cancelled,
     ];
 
@@ -54,13 +57,16 @@ class OrderController extends Controller
     {
         $buyer = $request->user('buyer');
         $tab = $request->query('tab', 'all');
+        if (! in_array($tab, ['all', 'to_ship', 'to_receive', 'completed', 'cancelled', 'delivery_failed', 'returned'], true)) {
+            $tab = 'all';
+        }
         $search = trim((string) $request->query('search', ''));
 
         $baseQuery = Order::query()
             ->where('buyer_id', $buyer->id)
             ->with([
                 'sellerOrders' => fn ($q) => $q
-                    ->with('courier', 'seller', 'orderItems.product.images')
+                    ->with('courier', 'seller', 'orderItems.product.images', 'parcelReturn')
                     ->orderBy('created_at'),
             ]);
 
@@ -85,18 +91,29 @@ class OrderController extends Controller
             'to_receive' => 0,
             'completed' => 0,
             'cancelled' => 0,
+            'delivery_failed' => 0,
+            'returned' => 0,
         ];
 
         foreach ($allOrdersForCounts as $o) {
             $statuses = $o->sellerOrders->pluck('status');
             if ($o->computeRollupStatus() === OrderStatus::Completed) {
                 $counts['completed']++;
-            } elseif ($statuses->contains(fn ($s) => in_array($s, self::TO_RECEIVE_STATUSES, true))) {
+            }
+            if ($statuses->contains(fn ($s) => in_array($s, self::TO_RECEIVE_STATUSES, true))) {
                 $counts['to_receive']++;
-            } elseif ($statuses->contains(fn ($s) => in_array($s, self::TO_SHIP_STATUSES, true))) {
+            }
+            if ($statuses->contains(fn ($s) => in_array($s, self::TO_SHIP_STATUSES, true))) {
                 $counts['to_ship']++;
-            } elseif ($statuses->contains(fn ($s) => in_array($s, self::CANCELLED_STATUSES, true))) {
+            }
+            if ($statuses->contains(fn ($s) => in_array($s, self::CANCELLED_STATUSES, true))) {
                 $counts['cancelled']++;
+            }
+            if ($statuses->contains(OrderStatus::DeliveryFailed)) {
+                $counts['delivery_failed']++;
+            }
+            if ($statuses->contains(OrderStatus::Returned)) {
+                $counts['returned']++;
             }
         }
 
@@ -113,6 +130,8 @@ class OrderController extends Controller
             'completed' => $baseQuery
                 ->whereHas('sellerOrders', fn ($q) => $q->where('status', OrderStatus::Completed))
                 ->whereDoesntHave('sellerOrders', fn ($q) => $q->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled])),
+            'delivery_failed' => $baseQuery->whereHas('sellerOrders', fn ($q) => $q->where('status', OrderStatus::DeliveryFailed)),
+            'returned' => $baseQuery->whereHas('sellerOrders', fn ($q) => $q->where('status', OrderStatus::Returned)),
             'cancelled' => $baseQuery->whereHas(
                 'sellerOrders',
                 fn ($q) => $q->whereIn('status', self::CANCELLED_STATUSES)
@@ -137,7 +156,7 @@ class OrderController extends Controller
     /**
      * Show a single order with all its seller-order fulfilment timelines.
      */
-    public function show(Order $order, Request $request): View
+    public function show(Order $order, Request $request, ParcelReturnService $returns): View
     {
         $buyer = $request->user('buyer');
 
@@ -163,7 +182,61 @@ class OrderController extends Controller
         return view('Buyer.Orders.show', [
             'order' => $order,
             'canConfirm' => $order->canBeConfirmed(),
+            'routeDetails' => $order->sellerOrders->mapWithKeys(fn (SellerOrder $parcel): array => [
+                $parcel->id => app(RouteExecutionService::class)->trackingSummary($parcel),
+            ]),
+            'deliveryCodes' => $order->sellerOrders->mapWithKeys(fn (SellerOrder $parcel): array => [
+                $parcel->id => app(DeliveryOtpService::class)->activeCodeFor($parcel),
+            ]),
+            'returnableShipmentIds' => $order->sellerOrders->filter(fn (SellerOrder $parcel) => $returns->canBuyerRequest($parcel))->modelKeys(),
         ]);
+    }
+
+    public function requestReturn(Order $order, SellerOrder $sellerOrder, Request $request, ParcelReturnService $returns): RedirectResponse|JsonResponse
+    {
+        $buyer = $request->user('buyer');
+        $this->authorizeForUser($buyer, 'view', $order);
+        abort_unless((int) $sellerOrder->order_id === (int) $order->id, 404);
+        $data = $request->validate([
+            'reason' => ['required', 'string', Rule::in(ParcelReturnService::BUYER_REASONS)],
+            'description' => ['required', 'string', 'min:10', 'max:500'],
+            'photos' => ['required', 'array', 'min:1', 'max:5'],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ], [
+            'description.required' => 'Describe what happened in 10 to 500 characters.',
+            'description.min' => 'Describe what happened in 10 to 500 characters.',
+            'description.max' => 'Describe what happened in 10 to 500 characters.',
+            'photos.required' => 'Add 1 to 5 JPG or PNG photos, up to 5 MB each.',
+            'photos.min' => 'Add 1 to 5 JPG or PNG photos, up to 5 MB each.',
+            'photos.max' => 'Add up to 5 photos.',
+            'photos.*.image' => 'Photos must be JPG or PNG files.',
+            'photos.*.mimes' => 'Photos must be JPG or PNG files.',
+            'photos.*.max' => 'Each photo may not be larger than 5 MB.',
+        ]);
+        $record = $returns->requestByBuyer($sellerOrder, $buyer, $data['reason'], $data['description'] ?? null, $request->file('photos', []));
+
+        return $request->expectsJson()
+            ? response()->json(['id' => $record->id, 'status' => $record->status->value, 'reason' => $record->reason], $record->wasRecentlyCreated ? 201 : 200)
+            : back()->with('success', 'Return request recorded. The Seller has been notified.');
+    }
+
+    /** Ask an admin to review a seller's rejection. Allowed once; the seller is locked out until then. */
+    public function escalateReturn(Order $order, SellerOrder $sellerOrder, Request $request, ParcelReturnService $returns): RedirectResponse
+    {
+        $buyer = $request->user('buyer');
+        $this->authorizeForUser($buyer, 'view', $order);
+        abort_unless((int) $sellerOrder->order_id === (int) $order->id, 404);
+        abort_unless($sellerOrder->parcelReturn !== null, 404);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'reason.required' => 'Tell the admin why this rejection should be reviewed.',
+            'reason.min' => 'Tell the admin why this rejection should be reviewed, in 10 to 1000 characters.',
+            'reason.max' => 'Tell the admin why this rejection should be reviewed, in 10 to 1000 characters.',
+        ]);
+        $returns->escalateByBuyer($sellerOrder->parcelReturn, $buyer, $data['reason']);
+
+        return back()->with('success', 'An admin will review this rejection. The seller cannot change it until then.');
     }
 
     /** Confirm a selected delivered shipment, or all delivered shipments. */
@@ -176,12 +249,12 @@ class OrderController extends Controller
             $order, $buyer, isset($data['seller_order_id']) ? (int) $data['seller_order_id'] : null,
         );
 
-        return back()->with('success', 'Delivered shipment confirmed. Thank you!');
+        return back()->with('success', 'Order received.');
     }
 
     /**
-     * Buyer cancels one seller_order slice while it is still PLACED (before
-     * the seller accepts). Stock/payment side effects run through the shared
+     * Buyer cancels one seller_order slice before the seller accepts it.
+     * Stock/payment side effects run through the shared
      * status service (same path as F1 seller decline).
      */
     public function cancelSellerOrder(
@@ -198,12 +271,16 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
+        ], [
+            'reason.required' => 'Please provide a cancellation reason.',
         ]);
 
         $service = new SellerOrderStatusService;
 
         try {
-            DB::transaction(function () use ($sellerOrder, $service, $validated, $buyer): void {
+            DB::transaction(function () use ($sellerOrder, $service, $validated, $buyer, $order): void {
+                // Serialize sibling cancellations before taking the shipment lock.
+                Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
                 $current = SellerOrder::query()
                     ->whereKey($sellerOrder->id)
                     ->lockForUpdate()
@@ -214,9 +291,9 @@ class OrderController extends Controller
                 }
 
                 if ($current->status !== OrderStatus::Placed) {
-                    throw new \InvalidArgumentException(
-                        'This shipment can no longer be cancelled — the seller has already started preparing it.'
-                    );
+                    throw new StaleStateException($current->status === OrderStatus::Cancelled
+                        ? 'This shipment is already cancelled.'
+                        : 'This order can no longer be cancelled because the seller has already accepted it.');
                 }
 
                 $service->transition(
@@ -227,12 +304,23 @@ class OrderController extends Controller
                     actor: OrderActor::Buyer,
                     actorId: (int) $buyer->id,
                     source: 'web',
-                    expectedFrom: OrderStatus::Placed,
+                    expectedFrom: $current->status,
                 );
-            });
+            }, 3);
         } catch (\InvalidArgumentException $e) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => $e->getMessage()], 422);
+                if (! $e instanceof StaleStateException) {
+                    return response()->json(['message' => $e->getMessage()], 422);
+                }
+
+                // Let the page swap the stale Cancel button for the real status.
+                $status = $sellerOrder->fresh()->status;
+
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'status' => $status->value,
+                    'status_label' => $status->label(),
+                ], 409);
             }
 
             return back()->withErrors(['reason' => $e->getMessage()]);

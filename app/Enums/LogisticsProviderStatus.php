@@ -34,9 +34,4 @@ enum LogisticsProviderStatus: string
             self::Suspended => 'Suspended',
         };
     }
-
-    public function isDecided(): bool
-    {
-        return $this === self::Approved || $this === self::Rejected || $this === self::Suspended;
-    }
 }

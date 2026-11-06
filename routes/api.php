@@ -1,11 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\Buyer\LoginController;
-use App\Http\Controllers\Api\Buyer\ProfileController;
 use App\Http\Controllers\Api\Buyer\LogoutController;
+use App\Http\Controllers\Api\Buyer\ProfileController;
 use App\Http\Controllers\Api\Rider\LoginController as RiderLoginController;
-use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
 use App\Http\Controllers\Api\Rider\LogoutController as RiderLogoutController;
+use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
 use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Route;
 
 // Guests authenticate with these routes; NO token required.
 Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
-    Route::post('/login', [LoginController::class, 'login'])->name('login');
+    Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:api-login')->name('login');
 });
 
 // Token-bearing routes.
@@ -42,7 +42,7 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
 
 // Guests authenticate with these routes; NO token required.
 Route::prefix('rider')->name('api.rider.')->group(function (): void {
-    Route::post('/login', [RiderLoginController::class, 'login'])->name('login');
+    Route::post('/login', [RiderLoginController::class, 'login'])->middleware('throttle:api-login')->name('login');
 });
 
 // Token-bearing routes.
@@ -52,10 +52,6 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
         Route::post('/logout', [RiderLogoutController::class, 'store'])->name('logout');
     });
 });
-
-
-
-
 
 Route::prefix('rider')->name('api.rider.')->group(function (): void {
     Route::post('/register', [RegistrationController::class, 'store'])->middleware('throttle:register')->name('register');

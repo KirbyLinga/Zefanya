@@ -16,7 +16,9 @@ class RiderValidationTest extends TestCase
     public function test_normalize_mobile_plus63_and_separators(): void
     {
         $this->assertSame('09171234567', RiderValidation::normalizeMobile('+639171234567'));
-        $this->assertSame('09171234567', RiderValidation::normalizeMobile('0917-123-4567'));
+        $this->assertSame('09171234567', RiderValidation::normalizeMobile('+63 917 123 4567'));
+        // Only spaces are ignored; hyphens are kept so validation rejects them (TC-RID-009).
+        $this->assertSame('0917-123-4567', RiderValidation::normalizeMobile('0917-123-4567'));
     }
 
     public function test_normalize_plate_and_license_uppercase(): void

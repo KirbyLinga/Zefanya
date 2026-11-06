@@ -8,9 +8,9 @@ use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\Manifest;
 use App\Models\Logistics\ManifestItem;
-use App\Models\SellerOrder;
-use App\Services\ManifestService;
-use App\Services\ParcelHandoffVerification;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ManifestService;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -33,35 +33,76 @@ class ManifestController extends Controller
     public function index(Request $request): View
     {
         $provider = $this->provider($request);
+        $tab = (string) $request->query('tab', 'outgoing');  // 'outgoing' or 'incoming'
         $status = ManifestStatus::tryFrom((string) $request->query('status'));
 
-        $manifests = Manifest::query()
-            ->where('logistics_provider_id', $provider->id)
-            ->with(['originHub:id,name,hub_type', 'destinationHub:id,name,hub_type'])
-            ->withCount([
-                'items as total_items_count' => fn ($q) => $q->where(function ($inner): void {
-                    $inner->whereNull('released_at')->orWhereNotNull('received_at');
-                }),
-                'items as received_items_count' => fn ($q) => $q->whereNotNull('received_at'),
-            ])
-            ->when($status !== null, fn ($q) => $q->where('status', $status->value))
-            ->latest('id')
-            ->paginate(15)
-            ->withQueryString();
+        if ($tab === 'incoming') {
+            // Incoming: manifests this provider is receiving at (destination_hub_id)
+            $manifests = Manifest::query()
+                ->where('destination_hub_id', function ($query) use ($provider): void {
+                    $query->select('id')
+                        ->from('logistics_hubs')
+                        ->where('logistics_provider_id', $provider->id)
+                        ->limit(1);
+                })
+                ->where('status', ManifestStatus::Dispatched->value)  // Only show dispatched for incoming
+                ->with(['originHub:id,name,hub_type', 'destinationHub:id,name,hub_type', 'provider:id,business_name'])
+                ->withCount([
+                    'items as total_items_count' => fn ($q) => $q->where(function ($inner): void {
+                        $inner->whereNull('released_at')->orWhereNotNull('received_at');
+                    }),
+                    'items as received_items_count' => fn ($q) => $q->whereNotNull('received_at'),
+                ])
+                ->latest('id')
+                ->paginate(15)
+                ->withQueryString();
+        } else {
+            // Outgoing: manifests this provider is sending from (origin_hub_id)
+            $manifests = Manifest::query()
+                ->where('origin_hub_id', function ($query) use ($provider): void {
+                    $query->select('id')
+                        ->from('logistics_hubs')
+                        ->where('logistics_provider_id', $provider->id)
+                        ->limit(1);
+                })
+                ->with(['originHub:id,name,hub_type', 'destinationHub:id,name,hub_type'])
+                ->withCount([
+                    'items as total_items_count' => fn ($q) => $q->where(function ($inner): void {
+                        $inner->whereNull('released_at')->orWhereNotNull('received_at');
+                    }),
+                    'items as received_items_count' => fn ($q) => $q->whereNotNull('received_at'),
+                ])
+                ->when($status !== null, fn ($q) => $q->where('status', $status->value))
+                ->latest('id')
+                ->paginate(15)
+                ->withQueryString();
+        }
 
         return view('Logistics.Manifests.index', [
             'provider' => $provider,
             'manifests' => $manifests,
             'status' => $status,
+            'tab' => $tab,
             'statuses' => ManifestStatus::cases(),
         ]);
     }
 
     public function create(Request $request): View
     {
+        $provider = $this->provider($request);
+        $hubs = $this->hubs($request);
+
+        // If an origin hub is being retained (from form validation error or query param),
+        // suggest recent destinations for that origin.
+        $originHubId = (int) $request->query('origin_hub_id', $request->old('origin_hub_id', 0));
+        $recentDestinations = $originHubId > 0
+            ? $this->recentDestinations($provider, $originHubId)
+            : collect();
+
         return view('Logistics.Manifests.create', [
-            'provider' => $this->provider($request),
-            'hubs' => $this->hubs($request),
+            'provider' => $provider,
+            'hubs' => $hubs,
+            'recentDestinations' => $recentDestinations,
         ]);
     }
 
@@ -147,7 +188,7 @@ class ManifestController extends Controller
             'tokens.*' => ['nullable', 'string', 'max:128'],
         ]);
 
-        $this->manifests->dispatch($manifest, $provider, $data['tokens'] ?? []);
+        $this->manifests->dispatch($manifest, $provider, $data['tokens'] ?? [], $request);
 
         return redirect()
             ->route('logistics.manifests.show', $manifest)
@@ -211,13 +252,47 @@ class ManifestController extends Controller
 
         $data = $request->validate([
             'verification_token' => ['required', 'string', 'max:128'],
+            'issue_type' => ['nullable', 'string', 'in:missing,damaged'],
+            'issue_note' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $issueType = $data['issue_type'] ?? null;
+
+        if ($issueType !== null) {
+            // Report issue first
+            $this->manifests->reportIssue(
+                $manifest,
+                $item,
+                (string) $issueType,
+                (string) ($data['issue_note'] ?? ''),
+                'logistics',
+                (int) $provider->id,
+                (string) $data['verification_token'],
+            );
+
+            $issueMessage = $issueType === 'missing'
+                ? 'parcel marked as missing'
+                : 'parcel marked as damaged and received';
+
+            return redirect()
+                ->route('logistics.manifests.receive.index', $manifest)
+                ->with('success', 'Issue reported: '.$issueMessage)
+                ->with('nextStep', 'The issue has been recorded for investigation. Parcel status updated accordingly.');
+        }
+
+        // Normal receive
         $result = $this->manifests->receive(
             $manifest,
             $provider,
             $item,
             (string) $data['verification_token'],
+            $request,
+        );
+
+        $nextStepMessage = $this->manifests->nextStepMessage(
+            $result['manifest'],
+            $result['item'],
+            $result['completed'],
         );
 
         return redirect()
@@ -227,7 +302,36 @@ class ManifestController extends Controller
                 $result['completed']
                     ? 'All parcels received. Manifest closed.'
                     : 'Parcel received. The manifest stays open for the remaining parcels.',
-            );
+            )
+            ->with('nextStep', $nextStepMessage);
+    }
+
+    public function destroy(Request $request, Manifest $manifest): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+
+        $this->manifests->deleteManifest($manifest, $provider, $request);
+
+        return redirect()
+            ->route('logistics.manifests.index')
+            ->with('success', 'Draft manifest deleted. All parcels have been released.');
+    }
+
+    public function cancel(Request $request, Manifest $manifest): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+
+        $data = $request->validate([
+            'cancellation_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $this->manifests->cancelManifest($manifest, $provider, (string) $data['cancellation_reason'], $request);
+
+        return redirect()
+            ->route('logistics.manifests.show', $manifest)
+            ->with('success', 'Manifest cancelled. All parcels have been released and custody remains at the origin hub.');
     }
 
     private function provider(Request $request): LogisticsProvider
@@ -271,5 +375,71 @@ class ManifestController extends Controller
             ->orderByRaw('case when hub_type = ? then 0 else 1 end', [LogisticsHub::PROVINCE])
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Fetch recent destination hubs for the given origin, sorted by most recent usage.
+     * Used by AJAX to populate suggestions as user changes origin hub.
+     *
+     * @return Collection<int, LogisticsHub>
+     */
+    public function suggestDestinations(Request $request): JsonResponse
+    {
+        $provider = $this->provider($request);
+
+        $originHubId = (int) $request->query('origin_hub_id');
+        if ($originHubId <= 0) {
+            return response()->json([]);
+        }
+
+        // Validate the origin hub belongs to this provider and is operational
+        $originHub = LogisticsHub::query()
+            ->where('id', $originHubId)
+            ->where('logistics_provider_id', $provider->id)
+            ->operational()
+            ->first();
+
+        if (! $originHub) {
+            return response()->json([]);
+        }
+
+        $recentDestinations = $this->recentDestinations($provider, $originHubId);
+
+        return response()->json([
+            'suggestions' => $recentDestinations->map(fn (LogisticsHub $hub) => [
+                'id' => $hub->id,
+                'name' => $hub->name,
+                'hub_type' => $hub->hub_type,
+                'type_label' => $hub->hub_type === LogisticsHub::PROVINCE ? 'Province Hub' : 'Station Hub',
+            ]),
+        ]);
+    }
+
+    /**
+     * Fetch recent destination hubs for the given origin, sorted by most recent usage.
+     *
+     * @return Collection<int, LogisticsHub>
+     */
+    private function recentDestinations(LogisticsProvider $provider, int $originHubId, int $limit = 5)
+    {
+        $destinationHubIds = Manifest::query()
+            ->where('origin_hub_id', $originHubId)
+            ->where('logistics_provider_id', $provider->id)
+            ->where('status', '!=', ManifestStatus::Cancelled->value)
+            ->select('destination_hub_id')
+            ->distinct()
+            ->orderByRaw('MAX(created_at) DESC')
+            ->groupBy('destination_hub_id')
+            ->limit($limit)
+            ->pluck('destination_hub_id');
+
+        return LogisticsHub::query()
+            ->whereIn('id', $destinationHubIds)
+            ->where('logistics_provider_id', $provider->id)
+            ->operational()
+            ->get()
+            ->sortByDesc(function (LogisticsHub $hub) use ($destinationHubIds): int {
+                return $destinationHubIds->search((int) $hub->id);
+            });
     }
 }

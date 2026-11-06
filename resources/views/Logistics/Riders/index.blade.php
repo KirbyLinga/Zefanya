@@ -1,20 +1,15 @@
 @extends('Layouts.logistics')
 
-@section('title', 'Rider Management')
+@section('title', 'Riders')
 
 @section('content')
 <div class="flex items-center justify-between mb-6">
     <div>
-        <h1 class="font-serif text-2xl text-[var(--text-ink)]">Rider Management</h1>
+        <h1 class="font-serif text-2xl text-[var(--text-ink)]">Riders</h1>
         <p class="font-sans text-[12.5px] text-[var(--text-muted)] mt-1">
             Approve applications into one of your Station Hubs and manage the riders in your fleet.
         </p>
     </div>
-    <a href="{{ route('logistics.riders.create') }}"
-       class="inline-flex items-center gap-2 h-10 px-4 rounded-sm font-sans font-semibold text-[12.5px] tracking-[1.4px] uppercase text-white bg-neutral-900 hover:bg-[#9c5c68] transition-colors">
-        <i data-lucide="plus" class="w-[16px] h-[16px]"></i>
-        Add Rider
-    </a>
 </div>
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
@@ -77,7 +72,7 @@
         </div>
         <p class="font-sans text-[13px] font-semibold text-[var(--text-ink)] mb-1">No riders yet</p>
         <p class="font-sans text-[11.5px] text-[var(--text-muted)] max-w-[360px]">
-            Approved applications and riders you add will appear here with their Station Hub and status.
+            Approved rider applications will appear here with their Station Hub and status.
         </p>
     </section>
 @else
@@ -90,6 +85,7 @@
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Station Hub</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Vehicle</th>
                     <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Status</th>
+                    <th class="font-sans text-[10.5px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] px-4 py-2.5">Availability</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-[var(--border-strong)]">
@@ -114,6 +110,9 @@
                         </td>
                         <td class="px-4 py-2.5">
                             @include('Logistics.Riders.partials.status', ['status' => $r->status])
+                        </td>
+                        <td class="px-4 py-2.5">
+                            @include('Logistics.Riders.partials.availability', ['rider' => $r])
                         </td>
                     </tr>
                 @endforeach

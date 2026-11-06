@@ -3,18 +3,20 @@
 namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
-use App\Models\Courier;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\RiderAssignmentsNeedReassignment;
-use App\Services\CourierAssignmentService;
-use App\Services\RiderRegistrationService;
+use App\Notifications\Rider\AccountStatusChanged;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Rider\RiderRegistrationService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
 
@@ -151,7 +153,7 @@ class RiderManagementTest extends TestCase
         $station = $rider->station;
         $assignment = new CourierAssignmentService;
 
-        $assigned = $assignment->assignPickup($this->readyOrder($provider, ['municipality' => 'Quezon City']), $provider);
+        $assigned = $assignment->assignPickup($this->readyOrder(['municipality' => 'Quezon City']), $provider);
         $this->assertNotNull($assigned);
         $this->assertSame($courier->id, $assigned->id);
 
@@ -259,12 +261,12 @@ class RiderManagementTest extends TestCase
         $rider = $courier->rider;
         $service = app(RiderRegistrationService::class);
 
-        $byCode = (new CourierAssignmentService)->assignPickup($this->readyOrder($provider, ['municipality' => 'Quezon City', 'municipality_code' => '137404000']), $provider);
+        $byCode = (new CourierAssignmentService)->assignPickup($this->readyOrder(['municipality' => 'Quezon City', 'municipality_code' => '137404000']), $provider);
         $this->assertNotNull($byCode);
         $this->assertSame($courier->id, $byCode->id);
 
-        $service->suspend($rider, $provider);
-        $this->assertNull((new CourierAssignmentService)->assignPickup($this->readyOrder($provider, ['municipality' => 'Quezon City', 'municipality_code' => '137404000']), $provider));
+        $service->suspend($rider, $provider, 'Suspended for safety review.');
+        $this->assertNull((new CourierAssignmentService)->assignPickup($this->readyOrder(['municipality' => 'Quezon City', 'municipality_code' => '137404000']), $provider));
 
         $unassigned = Rider::factory()->create([
             'logistics_provider_id' => $provider->id,
@@ -280,7 +282,7 @@ class RiderManagementTest extends TestCase
             'max_weight_grams' => 10000,
         ]);
 
-        $this->assertNull((new CourierAssignmentService)->assignPickup($this->readyOrder($provider, ['municipality' => 'Quezon City', 'municipality_code' => '137404000']), $provider));
+        $this->assertNull((new CourierAssignmentService)->assignPickup($this->readyOrder(['municipality' => 'Quezon City', 'municipality_code' => '137404000']), $provider));
     }
 
     public function test_logistics_rider_screens_render_applications_station_actions_and_status_controls(): void
@@ -322,7 +324,7 @@ class RiderManagementTest extends TestCase
     /**
      * @param  array<string, mixed>  $shippingAddress
      */
-    private function readyOrder(LogisticsProvider $provider, array $shippingAddress = ['municipality' => 'San Fernando']): SellerOrder
+    private function readyOrder(array $shippingAddress = ['municipality' => 'San Fernando']): SellerOrder
     {
         $order = Order::factory()->create(['shipping_address' => $shippingAddress + ['barangay_code' => $this->fixtureBarangay($shippingAddress['municipality'])]]);
         $sellerOrder = SellerOrder::factory()->create([
@@ -332,5 +334,73 @@ class RiderManagementTest extends TestCase
         ]);
 
         return $sellerOrder->fresh();
+    }
+
+    public function test_reject_and_suspend_require_a_reason_between_ten_and_three_hundred_characters(): void
+    {
+        Notification::fake();
+        $provider = $this->provider();
+        foreach (['reject', 'suspend'] as $action) {
+            $rider = $action === 'reject' ? $this->pendingRider($provider) : $this->assignableCourier($provider)->rider;
+            $originalStatus = $rider->status;
+            foreach ([null, str_repeat('a', 9), str_repeat('a', 301)] as $reason) {
+                $this->actingAs($provider, 'logistics')
+                    ->post(route('logistics.riders.'.$action, $rider), ['reason' => $reason])
+                    ->assertSessionHasErrors('reason');
+                $this->assertSame($originalStatus, $rider->fresh()->status);
+            }
+        }
+        Notification::assertNothingSent();
+    }
+
+    public function test_reject_and_suspend_notify_the_rider_with_the_exact_reason_at_both_length_limits(): void
+    {
+        Notification::fake();
+        $provider = $this->provider();
+        foreach (['reject', 'suspend'] as $action) {
+            foreach ([10, 300] as $length) {
+                $rider = $action === 'reject' ? $this->pendingRider($provider) : $this->assignableCourier($provider)->rider;
+                $reason = str_repeat('x', $length - 3).'!?Z';
+                $this->actingAs($provider, 'logistics')
+                    ->post(route('logistics.riders.'.$action, $rider), ['reason' => $reason])
+                    ->assertSessionHasNoErrors()->assertRedirect();
+                $this->assertSame($reason, $rider->fresh()->status_reason);
+                Notification::assertSentTo($rider, AccountStatusChanged::class, function ($notification, $channels) use ($rider, $reason): bool {
+                    $payload = $notification->toArray($rider);
+                    $mail = $notification->toMail($rider);
+
+                    return $payload['reason'] === $reason
+                        && str_ends_with($payload['message'], 'Reason: '.$reason)
+                        && in_array('database', $channels, true)
+                        && in_array('mail', $channels, true)
+                        && in_array($payload['message'], $mail->introLines, true);
+                });
+            }
+        }
+    }
+
+    public function test_service_rejects_missing_or_invalid_reasons_without_changing_rider_status(): void
+    {
+        Notification::fake();
+        $provider = $this->provider();
+        $service = app(RiderRegistrationService::class);
+        foreach (['reject', 'suspend'] as $action) {
+            $rider = $action === 'reject' ? $this->pendingRider($provider) : $this->assignableCourier($provider)->rider;
+            $originalStatus = $rider->status;
+            foreach ([null, str_repeat('a', 9), str_repeat('a', 301)] as $reason) {
+                try {
+                    if ($action === 'reject') {
+                        $service->decide($rider, $provider, Rider::STATUS_REJECTED, $reason);
+                    } else {
+                        $service->suspend($rider, $provider, $reason);
+                    }
+                    $this->fail('Invalid reason should be rejected by the service.');
+                } catch (ValidationException $exception) {
+                    $this->assertArrayHasKey('reason', $exception->errors());
+                }
+                $this->assertSame($originalStatus, $rider->fresh()->status);
+            }
+        }
+        Notification::assertNothingSent();
     }
 }

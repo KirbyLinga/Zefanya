@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\ParcelIncident;
 
-use App\Services\ParcelIncidentService;
+use App\Services\Logistics\ParcelIncidentService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreIncidentRequest extends FormRequest
@@ -22,5 +22,10 @@ class StoreIncidentRequest extends FormRequest
     public function rules(): array
     {
         return ParcelIncidentService::reportRules();
+    }
+
+    public function messages(): array
+    {
+        return ['photo.required_if' => 'Attach a photo when reporting a damaged parcel.'];
     }
 }

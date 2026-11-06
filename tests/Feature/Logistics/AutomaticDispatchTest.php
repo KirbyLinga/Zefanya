@@ -5,21 +5,23 @@ namespace Tests\Feature\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Models\Admin\Admin;
-use App\Models\Courier;
+use App\Models\Catalog\Product;
+use App\Models\Logistics\Area;
+use App\Models\Logistics\DeliveryAssignment;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\Rider;
+use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Rider\DeliveryAssigned;
 use App\Notifications\Rider\PickupAssigned;
-use App\Services\CourierAssignmentService;
-use App\Services\ManifestService;
-use App\Services\ParcelHandoffService;
-use App\Services\RiderRegistrationService;
-use App\Services\SellerOrderStatusService;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Logistics\ManifestService;
+use App\Services\Logistics\ParcelHandoffService;
+use App\Services\Rider\RiderRegistrationService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -96,6 +98,43 @@ class AutomaticDispatchTest extends TestCase
         $this->assignableCourier($other, [], 'San Fernando', '030540100');
         $f['second']->forceFill(['max_weight_grams' => 100000])->save();
         $this->assertSame($f['first']->id, app(CourierAssignmentService::class)->dispatch($f['parcel'], 'pickup')['courier']->id);
+    }
+
+    // LOG-DISP-001: "nearest" is coverage closeness (PSGC codes), ahead of workload and rider id.
+    public function test_auto_assign_offers_the_nearest_rider_by_coverage_first(): void
+    {
+        $f = $this->fixture();
+        $exactArea = $f['first']->area;
+        // The two fixture Riders become station-wide (no barangay links).
+        foreach (['first', 'second'] as $key) {
+            $f[$key]->forceFill(['area_id' => null])->save();
+            $f[$key]->areas()->detach();
+        }
+        $cityWide = Area::query()->create([
+            'logistics_provider_id' => $f['provider']->id, 'station_hub_id' => $exactArea->station_hub_id,
+            'name' => 'San Fernando city-wide', 'municipality' => 'San Fernando (city-wide)',
+            'city_municipality_code' => $exactArea->city_municipality_code,
+            'is_active' => true, 'coverage_validated_at' => now(),
+        ]);
+        $municipal = $this->assignableCourier($f['provider'], ['max_weight_grams' => 20000], 'San Fernando', '030540100');
+        $municipal->forceFill(['area_id' => $cityWide->id])->save();
+        $nearest = $this->assignableCourier($f['provider'], ['max_weight_grams' => 20000], 'San Fernando', '030540100');
+        // Proximity outranks workload: the nearest Rider already holds a job.
+        SellerOrder::factory()->create(['seller_id' => $f['seller']->id, 'status' => OrderStatus::PickedUp->value, 'courier_id' => $nearest->id]);
+
+        $service = app(CourierAssignmentService::class);
+        $this->assertSame($nearest->id, $service->dispatch($f['parcel'], 'pickup')['courier']->id);
+
+        // Without an exact-barangay Rider, the municipality-wide Rider beats station-wide ones.
+        $nearest->forceFill(['area_id' => null])->save();
+        $nearest->areas()->detach();
+        // A different seller, so the open pickup session from the first parcel is not reused.
+        $next = SellerOrder::factory()->create([
+            'seller_id' => Seller::factory()->create(['barangay_code' => '0305401001'])->id, 'status' => OrderStatus::ReadyForPickup->value,
+            'carrier_provider_id' => $f['provider']->id, 'origin_station_hub_id' => $exactArea->station_hub_id,
+            'order_id' => Order::factory()->create(['shipping_address' => ['barangay_code' => '0305401001', 'municipality' => 'San Fernando']])->id,
+        ]);
+        $this->assertSame($municipal->id, $service->reservePickup($next, $f['provider'])->id);
     }
 
     public function test_suspended_inactive_and_pending_riders_are_excluded(): void
@@ -215,6 +254,7 @@ class AutomaticDispatchTest extends TestCase
     public function test_delivery_reservation_cannot_run_during_an_active_manifest(): void
     {
         $f = $this->fixture(OrderStatus::Sorted);
+        $f['parcel']->forceFill(['handover_at' => now()])->save();
         $manifestService = app(ManifestService::class);
         $manifest = $manifestService->create($f['provider'], $f['first']->rider->station_hub_id, $f['first']->rider->station->parent_hub_id);
         $manifestService->addParcel($manifest, $f['parcel']);
@@ -227,12 +267,14 @@ class AutomaticDispatchTest extends TestCase
         $f = $this->fixture();
         $service = app(CourierAssignmentService::class);
         $service->dispatch($f['parcel'], 'pickup');
+        // The reassignment always lands in a later second than the reservation.
+        $this->travel(2)->seconds();
         $url = route('logistics.incoming-parcels.assignPickupRider', $f['parcel']);
         $payload = ['reassign' => 1, 'courier_id' => $f['second']->id, 'expected_courier_id' => $f['first']->id];
         $this->actingAs($f['provider'], 'logistics')->post($url, $payload)->assertSessionHasErrors('reason');
         $payload['reason'] = 'Original Rider cannot collect today.';
         $this->post($url, $payload)->assertRedirect()->assertSessionHas('success');
-        $assignment = $f['parcel']->deliveryAssignments()->latest('id')->firstOrFail();
+        $assignment = $f['parcel']->deliveryAssignments()->where('role', 'pickup')->where('courier_id', $f['second']->id)->reorder('id', 'desc')->firstOrFail();
         $audit = json_decode($assignment->notes, true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame($f['first']->rider_id, $audit['previous_rider_id']);
         $this->assertSame($f['second']->rider_id, $audit['rider_id']);
@@ -241,6 +283,28 @@ class AutomaticDispatchTest extends TestCase
         $this->assertNotNull($assignment->created_at);
         $this->post($url, $payload)->assertRedirect();
         $this->assertSame(2, $f['parcel']->deliveryAssignments()->count());
+    }
+
+    public function test_dispatch_labels_its_new_assignment_and_leaves_an_older_audit_row_untouched(): void
+    {
+        $f = $this->fixture();
+        $notes = json_encode(['reason' => 'Earlier manual reassignment.', 'rider_id' => $f['first']->rider_id], JSON_THROW_ON_ERROR);
+        $older = DeliveryAssignment::query()->create([
+            'seller_order_id' => $f['parcel']->id, 'courier_id' => $f['first']->id, 'role' => 'pickup',
+            'assigned_by_type' => 'logistics', 'assigned_by_id' => $f['provider']->id,
+        ]);
+        $older->forceFill(['notes' => $notes, 'created_at' => now()->subHour()])->save();
+
+        app(CourierAssignmentService::class)->dispatch($f['parcel'], 'pickup');
+
+        $older->refresh();
+        $this->assertSame($notes, $older->notes);
+        $this->assertSame('logistics', $older->assigned_by_type);
+        $this->assertSame($f['provider']->id, (int) $older->assigned_by_id);
+        $newest = DeliveryAssignment::query()->where('seller_order_id', $f['parcel']->id)->orderByDesc('id')->firstOrFail();
+        $this->assertNotSame($older->id, $newest->id);
+        $this->assertSame('system', $newest->assigned_by_type);
+        $this->assertStringContainsString('Reserved at pickup', $newest->notes);
     }
 
     public function test_foreign_provider_cannot_retry_or_reassign_dispatch(): void
@@ -292,7 +356,7 @@ class AutomaticDispatchTest extends TestCase
     {
         $f = $this->fixture(OrderStatus::Sorted);
         $station = $f['first']->rider->station;
-        $f['parcel']->forceFill(['custody_provider_id' => $f['provider']->id, 'custody_hub_id' => $station->parent_hub_id])->save();
+        $f['parcel']->forceFill(['handover_at' => now(), 'custody_provider_id' => $f['provider']->id, 'custody_hub_id' => $station->parent_hub_id])->save();
         $service = app(ManifestService::class);
         $manifest = $service->create($f['provider'], $station->parent_hub_id, $station->id);
         $item = $service->addParcel($manifest, $f['parcel']->fresh());
@@ -324,7 +388,7 @@ class AutomaticDispatchTest extends TestCase
         $f = $this->fixture();
         $service = app(CourierAssignmentService::class);
         $service->dispatch($f['parcel'], 'pickup');
-        app(RiderRegistrationService::class)->suspend($f['first']->rider, $f['provider']);
+        app(RiderRegistrationService::class)->suspend($f['first']->rider, $f['provider'], 'Safety review required.');
         $originalReason = $f['parcel']->fresh()->reassignment_reason;
         $this->assertSame('unavailable', $service->dispatch($f['parcel']->fresh(), 'pickup')['status']);
         $this->assertTrue($f['parcel']->fresh()->needs_reassignment);

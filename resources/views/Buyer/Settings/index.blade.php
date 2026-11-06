@@ -185,7 +185,7 @@
                             </div>
                         </form>
 
-                        @if ($errors->any())
+                        @if ($errors->any() && ! $errors->hasAny(['password', 'confirm_email', 'confirm', 'account']))
                             <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
                                 @foreach ($errors->all() as $error)
                                     <p class="font-sans text-[12px] text-red-700">{{ $error }}</p>
@@ -201,19 +201,21 @@
                                 Danger Zone
                             </h2>
                             <p class="mt-1 font-sans text-[13px] text-red-600">
-                                Permanently delete your account and all associated data
+                                Permanently remove your personal details from Zefanya
                             </p>
                         </div>
 
                         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <p class="font-sans text-[13px] text-red-700">
-                                This action cannot be undone. Your account will be deleted permanently.
+                                {{ $errors->first('account') ?: ($deletionBlockedBy ?? 'This action cannot be undone. You won\'t be able to sign in or see your orders again.') }}
                             </p>
-                            <button type="button"
-                                    onclick="document.getElementById('deleteAccountModal').showModal()"
-                                    class="inline-flex shrink-0 items-center justify-center rounded-xl border border-red-300 bg-white px-5 py-2.5 font-sans text-[12.5px] font-semibold text-red-700 transition-colors hover:bg-red-100">
-                                Delete Account
-                            </button>
+                            @if (! $deletionBlockedBy)
+                                <button type="button"
+                                        onclick="document.getElementById('deleteAccountModal').showModal()"
+                                        class="inline-flex shrink-0 items-center justify-center rounded-xl border border-red-300 bg-white px-5 py-2.5 font-sans text-[12.5px] font-semibold text-red-700 transition-colors hover:bg-red-100">
+                                    Delete Account
+                                </button>
+                            @endif
                         </div>
                     </section>
 
@@ -224,35 +226,47 @@
 </div>
 
 {{-- ═══ DELETE ACCOUNT CONFIRMATION MODAL ═══ --}}
-<dialog id="deleteAccountModal" class="backdrop:bg-black/50 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-lg max-w-[420px]">
+<dialog id="deleteAccountModal" class="backdrop:bg-black/50 m-auto w-[calc(100%-2rem)] max-w-[420px] rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-lg">
     <div class="mb-4">
         <h2 class="font-serif text-[20px] font-medium text-red-700">
             Delete Account?
         </h2>
         <p class="mt-2 font-sans text-[13px] text-[var(--text-muted)]">
-            This will permanently delete your account and all associated data including orders, addresses, and wishlists. This action cannot be undone.
+            We'll erase your name, contact details, ID document, saved addresses, cart, wishlist and notifications. Order, payment and delivery records are kept without your name, phone or street address, and your messages and reviews stay with your name removed. This action cannot be undone.
         </p>
     </div>
 
     <form action="{{ route('buyer.settings.deleteAccount') }}" method="POST">
         @csrf
 
-        {{-- Password Confirmation --}}
+        {{-- Password Confirmation (accounts created with Google retype their email instead) --}}
         <div class="mb-5">
-            <label for="password" class="block font-sans text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">
-                Confirm your password
-            </label>
-            <input type="password"
-                   name="password"
-                   id="password"
-                   placeholder="Enter your password"
-                   required
-                   class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-2.5 font-sans text-[13px] text-[var(--text-ink)] outline-none transition-colors placeholder:text-[var(--text-placeholder)] focus:border-red-400 focus:ring-2 focus:ring-red-200">
-            @if ($errors->has('password'))
-                <p class="mt-1.5 font-sans text-[11.5px] text-red-600">
-                    {{ $errors->first('password') }}
-                </p>
+            @if ($buyer->password !== null)
+                <label for="password" class="block font-sans text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                    Confirm your password
+                </label>
+                <input type="password"
+                       name="password"
+                       id="password"
+                       placeholder="Enter your password"
+                       required
+                       class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-2.5 font-sans text-[13px] text-[var(--text-ink)] outline-none transition-colors placeholder:text-[var(--text-placeholder)] focus:border-red-400 focus:ring-2 focus:ring-red-200">
+            @else
+                <label for="confirm_email" class="block font-sans text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                    Type your email to confirm
+                </label>
+                <input type="email"
+                       name="confirm_email"
+                       id="confirm_email"
+                       placeholder="{{ $buyer->email }}"
+                       required
+                       class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-2.5 font-sans text-[13px] text-[var(--text-ink)] outline-none transition-colors placeholder:text-[var(--text-placeholder)] focus:border-red-400 focus:ring-2 focus:ring-red-200">
             @endif
+            @foreach (['password', 'confirm_email', 'confirm'] as $field)
+                @error($field)
+                    <p class="mt-1.5 font-sans text-[11.5px] text-red-600">{{ $message }}</p>
+                @enderror
+            @endforeach
         </div>
 
         {{-- Confirmation Checkbox --}}
@@ -281,5 +295,10 @@
         </div>
     </form>
 </dialog>
+
+{{-- A rejected confirmation comes back to the page, so reopen the dialog that shows why. --}}
+@if ($errors->hasAny(['password', 'confirm_email', 'confirm']))
+    <script>document.getElementById('deleteAccountModal').showModal();</script>
+@endif
 
 @endsection

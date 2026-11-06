@@ -3,7 +3,7 @@
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Rider;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\User;
 

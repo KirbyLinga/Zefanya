@@ -20,8 +20,15 @@
             'items' => [
                 ['route' => 'rider.scan.index', 'icon' => 'scan-line', 'label' => 'Scan Parcel', 'match' => ['rider.scan.*']],
                 ['route' => 'rider.pickups.index', 'icon' => 'package-search', 'label' => 'Pickup Assignments', 'match' => ['rider.pickups.*']],
+                ['route' => 'rider.return-pickups.index', 'icon' => 'package-open', 'label' => 'Return Pickups', 'match' => ['rider.return-pickups.*']],
                 ['route' => 'rider.deliveries.index', 'icon' => 'truck', 'label' => 'Delivery Assignments', 'match' => ['rider.deliveries.*']],
                 ['route' => 'rider.history.index', 'icon' => 'history', 'label' => 'Delivery History', 'match' => ['rider.history.*']],
+            ],
+        ],
+        [
+            'label' => 'Money',
+            'items' => [
+                ['route' => 'rider.money.index', 'icon' => 'wallet', 'label' => 'My Money', 'match' => ['rider.money.*']],
             ],
         ],
         [
@@ -33,7 +40,7 @@
     ];
 @endphp
 
-<aside class="w-[240px] [&.is-collapsed]:w-[72px] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] flex flex-col flex-shrink-0 sticky top-0 h-[100dvh] overflow-hidden shadow-[2px_0_12px_rgba(192,122,133,0.06)] border-r border-[var(--sidebar-border)] transition-[width] duration-200 ease-out" id="riderSidebar">
+<aside class="w-[240px] [&.is-collapsed]:w-[72px] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] flex flex-col flex-shrink-0 sticky top-0 max-sm:fixed max-sm:left-0 max-sm:z-40 h-[100dvh] overflow-hidden shadow-[2px_0_12px_rgba(192,122,133,0.06)] border-r border-[var(--sidebar-border)] transition-[width] duration-200 ease-out" id="riderSidebar">
     <x-rider.sidebar-brand />
 
     <nav class="flex flex-col gap-5 px-3 py-3 flex-1 overflow-y-auto" id="riderNav">
@@ -64,7 +71,7 @@
 
         var saved = null;
         try { saved = localStorage.getItem(KEY); } catch (e) { /* storage unavailable */ }
-        apply(saved === '1');
+        apply(saved === '1' || window.matchMedia('(max-width: 639px)').matches);
 
         toggle.addEventListener('click', function () {
             var collapsed = !sidebar.classList.contains('is-collapsed');

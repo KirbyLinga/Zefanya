@@ -4,7 +4,10 @@
 
 @section('content')
 @php
-    $value = fn (string $field) => old($field, $seller->{$field});
+    $value = function (string $field) use ($seller) {
+        $value = old($field, $seller->{$field});
+        return is_scalar($value) || $value === null ? $value : '';
+    };
     $input = 'w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg-page)] px-3 py-2.5 font-sans text-sm text-[var(--text-ink)] focus-visible:outline-2 focus-visible:outline-primary-700';
     $label = 'mb-2 block font-sans text-xs font-semibold text-[var(--text-ink)]';
     $section = 'rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-6';
@@ -24,6 +27,16 @@
             <ul class="mt-2 list-disc pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
     @endif
+    <section class="{{ $section }} mb-5" aria-labelledby="vacationTitle">
+        <h2 id="vacationTitle" class="mb-3 font-serif text-xl text-[var(--text-ink)]">Vacation mode</h2>
+        <p class="mb-4 text-sm text-[var(--text-muted)]">Published products stay visible. Buyers cannot add them to their cart or check out while your store is on vacation.</p>
+        <form method="POST" action="{{ route('seller.account.vacation') }}" class="flex flex-wrap items-center gap-4">
+            @csrf @method('PATCH')
+            <input type="hidden" name="is_on_vacation" value="0">
+            <label class="flex items-center gap-3 text-sm text-[var(--text-ink)]"><input type="checkbox" name="is_on_vacation" value="1" @checked(old('is_on_vacation', $seller->is_on_vacation))>On vacation</label>
+            <button class="rounded-md bg-primary-800 px-4 py-2 text-sm font-semibold text-white">Save vacation mode</button>
+        </form>
+    </section>
     <form method="POST" action="{{ route('seller.account.update') }}" enctype="multipart/form-data" class="flex flex-col gap-5">
         @csrf
         @method('PATCH')
@@ -32,25 +45,34 @@
             <div class="grid gap-6 sm:grid-cols-[160px_1fr]">
                 <div>
                     @if ($seller->store_logo_path)
-                        <img src="{{ Storage::disk('public')->url($seller->store_logo_path) }}" alt="Current store logo" class="mb-3 size-28 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-page)] object-contain p-2">
+                        <img src="{{ '/storage/'.ltrim($seller->store_logo_path, '/') }}" alt="Current store logo" class="mb-3 size-28 shrink-0 rounded-full border-4 border-[var(--bg-surface)] bg-[var(--bg-page)] object-cover shadow-sm">
                         <label class="flex items-center gap-2 font-sans text-xs text-[var(--text-muted)]"><input type="checkbox" name="remove_logo" value="1" @checked(old('remove_logo'))>Remove current logo</label>
                     @else
-                        <div class="mb-3 flex size-28 items-center justify-center rounded-lg bg-primary-50 font-serif text-3xl text-primary-800" aria-label="Store initials">{{ $seller->storeInitials() }}</div>
+                        <div class="mb-3 flex size-28 shrink-0 items-center justify-center rounded-full border-4 border-[var(--bg-surface)] bg-primary-50 font-serif text-3xl text-primary-800 shadow-sm" aria-label="Store initials">{{ $seller->storeInitials() }}</div>
                     @endif
                 </div>
                 <div class="flex flex-col gap-4">
                     <div>
                         <label for="business_name" class="{{ $label }}">Store name *</label>
-                        <input id="business_name" name="business_name" required maxlength="255" value="{{ $value('business_name') }}" class="{{ $input }}">
+                        <input id="business_name" name="business_name" required minlength="3" maxlength="30" value="{{ $value('business_name') }}" class="{{ $input }}">
                     </div>
                     <div>
                         <label for="store_description" class="{{ $label }}">Description</label>
-                        <textarea id="store_description" name="store_description" rows="4" maxlength="2000" class="{{ $input }}">{{ $value('store_description') }}</textarea>
+                        <textarea id="store_description" name="store_description" rows="4" maxlength="500" class="{{ $input }}">{{ $value('store_description') }}</textarea>
                     </div>
                     <div>
                         <label for="logo" class="{{ $label }}">Store logo</label>
-                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png,image/webp" class="{{ $input }}">
-                        <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">JPG, PNG, or WebP. Up to 2 MB and 2048 x 2048 pixels. Leave blank to keep your logo.</p>
+                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="upload-input">
+                        <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">JPG/PNG, up to 5 MB. Leave blank to keep your logo.</p>
+                    </div>
+                    <div>
+                        <label for="banner" class="{{ $label }}">Store banner</label>
+                        @if($seller->store_banner_path)
+                            <img src="{{ '/storage/'.ltrim($seller->store_banner_path, '/') }}" alt="Current store banner" class="mb-3 h-32 w-full rounded-lg object-cover">
+                            <label class="mb-3 flex items-center gap-2 text-xs text-[var(--text-muted)]"><input type="checkbox" name="remove_banner" value="1" @checked(old('remove_banner'))>Remove current banner</label>
+                        @endif
+                        <input id="banner" name="banner" type="file" accept="image/jpeg,image/png" class="upload-input">
+                        <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">JPG/PNG, up to 5 MB. Leave blank to keep your banner.</p>
                     </div>
                 </div>
             </div>

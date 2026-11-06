@@ -5,12 +5,14 @@ namespace Tests\Feature\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
+use App\Http\Controllers\Logistics\DeliveryAssignmentsController;
+use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Order;
-use App\Models\SellerOrder;
-use App\Models\StatusHistory;
-use App\Services\CourierAssignmentService;
-use App\Services\SellerOrderStatusService;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\CourierAssignmentService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -50,6 +52,7 @@ class DeliveryAttemptPolicyTest extends TestCase
 
         $this->actingAs($provider, 'logistics')->get(route('logistics.delivery-assignments.index'))
             ->assertOk()->assertSee('Schedule final attempt');
+        $parcel->forceFill(['returned_to_station_at' => now()])->save(); // Station Hub scanned it back in.
         $this->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id, 'reason' => 'Replacement Rider selected for the final attempt.'])->assertSessionHas('success');
         $this->assertSame(1, $parcel->fresh()->delivery_attempts);
         $parcel = $service->transition($parcel->fresh(), OrderStatus::OutForDelivery, actor: OrderActor::Rider);
@@ -65,6 +68,97 @@ class DeliveryAttemptPolicyTest extends TestCase
         $this->assertSame(OrderStatus::DeliveryFailed, $parcel->fresh()->status);
         $this->assertSame(ParcelReturnStatus::Requested, $parcel->fresh()->parcelReturn->status);
         $this->assertSame(2, $parcel->fresh()->delivery_attempts);
+    }
+
+    // Custody-safe: after a failed attempt the parcel is still with that Rider.
+    public function test_final_attempt_goes_to_another_rider_only_after_scan_verified_station_receipt(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture();
+        $parcel->forceFill(['tracking_number' => 'TRK-FAILED-RETURN-1'])->save();
+        $parcel = app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::DeliveryFailed, actor: OrderActor::Rider);
+        $this->actingAs($provider, 'logistics');
+
+        // Blocked for another Rider, directly and through the service.
+        $this->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id])
+            ->assertSessionHas('error', DeliveryAssignmentsController::STILL_WITH_RIDER_MESSAGE);
+        $this->assertNull(app(CourierAssignmentService::class)->assignDelivery($parcel->fresh(), $provider, $replacement->id, rescheduled: true));
+        $this->assertSame($old->id, (int) $parcel->fresh()->delivery_courier_id);
+        $this->get(route('logistics.delivery-assignments.index'))->assertOk()->assertSee('scanned back in at the Station Hub');
+
+        // A receipt without the scan token is refused.
+        $this->post(route('logistics.delivery-assignments.receive-back', $parcel))->assertSessionHasErrors();
+        $this->assertNull($parcel->fresh()->returned_to_station_at);
+
+        // Scan at the Station Hub, then receive it back with the issued token.
+        $scan = $this->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()->assertJsonPath('context', 'failed_return_receipt')->json();
+        $action = collect($scan['actions'])->firstWhere('key', 'receive_failed_return');
+        $this->post($action['url'], ['verification_token' => $action['verification_token']])
+            ->assertRedirect()->assertSessionHas('success');
+        $parcel->refresh();
+        $this->assertNotNull($parcel->returned_to_station_at);
+        $this->assertTrue($parcel->isBackAtStationAfterFailure());
+        $this->assertSame(OrderStatus::DeliveryFailed, $parcel->status);
+        $this->assertTrue(OperationsAuditLog::query()->where('action', 'failed_parcel_received_back')->exists());
+
+        // Now the final attempt may go to another Rider.
+        $this->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id])
+            ->assertSessionHas('success');
+        $this->assertSame($replacement->id, (int) $parcel->fresh()->delivery_courier_id);
+        $this->assertSame(OrderStatus::AssignedToRider, $parcel->fresh()->status);
+    }
+
+    public function test_the_same_rider_can_take_the_final_attempt_without_a_station_scan(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture();
+        $parcel = app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::DeliveryFailed, actor: OrderActor::Rider);
+
+        // Auto-assign keeps the Rider who still holds the parcel.
+        $this->actingAs($provider, 'logistics')->post(route('logistics.delivery-assignments.reschedule', $parcel))
+            ->assertSessionHas('success');
+        $this->assertSame($old->id, (int) $parcel->fresh()->delivery_courier_id);
+        $this->assertSame(OrderStatus::AssignedToRider, $parcel->fresh()->status);
+    }
+
+    public function test_the_reason_for_a_final_attempt_is_saved_and_logged(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture();
+        $parcel = app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::DeliveryFailed, actor: OrderActor::Rider);
+        $parcel->forceFill(['returned_to_station_at' => now()])->save(); // Station Hub scanned it back in.
+        $url = route('logistics.delivery-assignments.reschedule', $parcel);
+
+        $this->actingAs($provider, 'logistics')
+            ->post($url, ['courier_id' => $replacement->id, 'reason' => str_repeat('a', 501)])
+            ->assertSessionHasErrors('reason');
+        $this->assertSame($old->id, (int) $parcel->fresh()->delivery_courier_id);
+
+        $this->post($url, ['courier_id' => $replacement->id, 'reason' => 'Buyer asked for an afternoon rider.'])
+            ->assertSessionHas('success');
+
+        $log = OperationsAuditLog::query()->where('action', 'rider_chosen_manually')->sole();
+        $this->assertSame('Buyer asked for an afternoon rider.', $log->reason);
+        $this->assertSame($replacement->rider->fullName(), $log->new_values['delivery_rider']);
+
+        $notes = json_decode($parcel->deliveryAssignments()->where('role', 'delivery')->latest('id')->first()->notes, true);
+        $this->assertSame('Buyer asked for an afternoon rider.', $notes['reason']);
+        $this->get(route('logistics.delivery-assignments.index'))->assertOk()->assertSee('Buyer asked for an afternoon rider.');
+    }
+
+    public function test_a_final_attempt_with_no_reason_still_works(): void
+    {
+        Notification::fake();
+        [$provider, $old, $replacement, $parcel] = $this->fixture();
+        $parcel = app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::DeliveryFailed, actor: OrderActor::Rider);
+        $parcel->forceFill(['returned_to_station_at' => now()])->save(); // Station Hub scanned it back in.
+
+        $this->actingAs($provider, 'logistics')
+            ->post(route('logistics.delivery-assignments.reschedule', $parcel), ['courier_id' => $replacement->id])
+            ->assertSessionHas('success');
+
+        $this->assertNull(OperationsAuditLog::query()->where('action', 'rider_chosen_manually')->sole()->reason);
     }
 
     public static function invalidRetryCounts(): array

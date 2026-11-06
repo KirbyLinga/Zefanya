@@ -22,7 +22,7 @@
             </p>
         </section>
     @else
-        <section class="overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm">
+        <section class="overflow-x-auto rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm">
             <table class="w-full text-left font-sans">
                 <thead class="border-b border-[var(--border-strong)] bg-[var(--bg-page)]">
                     <tr>

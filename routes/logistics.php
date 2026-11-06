@@ -6,11 +6,14 @@ use App\Http\Controllers\Logistics\DashboardController;
 use App\Http\Controllers\Logistics\DeliveryAssignmentsController;
 use App\Http\Controllers\Logistics\DeliveryMonitoringController;
 use App\Http\Controllers\Logistics\DeliveryProofController;
+use App\Http\Controllers\Logistics\EarningsController;
+use App\Http\Controllers\Logistics\ExceptionsController;
 use App\Http\Controllers\Logistics\HandoffController;
 use App\Http\Controllers\Logistics\HubsController;
 use App\Http\Controllers\Logistics\IncomingParcelsController;
 use App\Http\Controllers\Logistics\ManifestController;
 use App\Http\Controllers\Logistics\NotificationController;
+use App\Http\Controllers\Logistics\OperationsAuditLogController;
 use App\Http\Controllers\Logistics\ParcelScanController;
 use App\Http\Controllers\Logistics\ParcelSortingController;
 use App\Http\Controllers\Logistics\PartnershipController;
@@ -18,6 +21,8 @@ use App\Http\Controllers\Logistics\PsgcController;
 use App\Http\Controllers\Logistics\ReturnController;
 use App\Http\Controllers\Logistics\RiderApplicationController;
 use App\Http\Controllers\Logistics\RiderController;
+use App\Http\Controllers\Logistics\ShippingRateController;
+use App\Http\Controllers\Logistics\TransportConnectionController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -31,6 +36,21 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
 
         Route::get('/cod-remittances', [CodRemittanceController::class, 'index'])->name('cod-remittances.index');
         Route::post('/cod-remittances/{remittance}/confirm', [CodRemittanceController::class, 'confirm'])->name('cod-remittances.confirm');
+
+        Route::get('/earnings', [EarningsController::class, 'index'])->name('earnings.index');
+        Route::post('/earnings/remit', [EarningsController::class, 'remit'])->name('earnings.remit');
+        Route::post('/earnings/riders/{courier}/pay', [EarningsController::class, 'payRider'])->name('earnings.pay-rider');
+        Route::post('/earnings/rider-payments/{payout}/reverse', [EarningsController::class, 'reverseRiderPayment'])->name('earnings.reverse-rider-payment');
+
+        // Read-only on purpose: the audit log has no edit or delete routes.
+        Route::get('/audit-logs', [OperationsAuditLogController::class, 'index'])->name('audit-logs.index');
+
+        Route::get('/shipping-rates', [ShippingRateController::class, 'index'])->name('shipping-rates.index');
+        Route::put('/shipping-rates', [ShippingRateController::class, 'update'])->name('shipping-rates.update');
+
+        Route::get('/transport-connections', [TransportConnectionController::class, 'index'])->name('transport-connections.index');
+        Route::post('/transport-connections', [TransportConnectionController::class, 'store'])->name('transport-connections.store');
+        Route::patch('/transport-connections/{connection}/status', [TransportConnectionController::class, 'updateStatus'])->name('transport-connections.status');
 
         Route::get('/hubs', [HubsController::class, 'index'])->name('hubs.index');
         Route::post('/hubs/{hub}/stations', [HubsController::class, 'storeStation'])->name('hubs.stations.store');
@@ -46,6 +66,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         // ── Cross-provider parcel handoffs (Phase 5.3–5.4) ──────────────────
         Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
         Route::get('/returns/{return}', [ReturnController::class, 'show'])->name('returns.show');
+        Route::post('/returns/{return}/assign-collection', [ReturnController::class, 'assignCollection'])->name('returns.assign-collection');
         Route::post('/returns/{return}/scan', [ReturnController::class, 'scan'])->name('returns.scan');
         Route::post('/returns/{return}/origin', [ReturnController::class, 'origin'])->name('returns.origin');
         Route::post('/returns/{return}/handover', [ReturnController::class, 'handover'])->name('returns.handover');
@@ -61,6 +82,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/handoffs/{handoff}/dispatch', [HandoffController::class, 'dispatch'])->name('handoffs.dispatch');
         Route::post('/handoffs/{handoff}/receive', [HandoffController::class, 'receive'])->name('handoffs.receive');
 
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
@@ -72,10 +94,13 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         // ── Internal hub-to-hub manifests (same provider only) ──────────────
         Route::get('/manifests', [ManifestController::class, 'index'])->name('manifests.index');
         Route::get('/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
+        Route::get('/manifests/suggest-destinations', [ManifestController::class, 'suggestDestinations'])->name('manifests.suggest-destinations');
         Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
         Route::get('/manifests/{manifest}', [ManifestController::class, 'show'])->name('manifests.show');
         Route::post('/manifests/{manifest}/items', [ManifestController::class, 'addItem'])->name('manifests.items.store');
         Route::delete('/manifests/{manifest}/items/{item}', [ManifestController::class, 'removeItem'])->name('manifests.items.destroy');
+        Route::delete('/manifests/{manifest}', [ManifestController::class, 'destroy'])->name('manifests.destroy');
+        Route::post('/manifests/{manifest}/cancel', [ManifestController::class, 'cancel'])->name('manifests.cancel');
         Route::post('/manifests/{manifest}/dispatch', [ManifestController::class, 'dispatch'])->name('manifests.dispatch');
         Route::post('/manifests/{manifest}/scan/verify', [ManifestController::class, 'verifyScan'])->name('manifests.scan.verify');
         Route::get('/manifests/{manifest}/receive', [ManifestController::class, 'receiveIndex'])->name('manifests.receive.index');
@@ -94,14 +119,25 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/parcel-sorting/{seller_order}/verify-address', [ParcelSortingController::class, 'verifyAddress'])->name('parcel-sorting.address.verify');
         Route::post('/parcel-sorting/{seller_order}/sort', [ParcelSortingController::class, 'sort'])->name('parcel-sorting.sort');
         Route::post('/parcel-sorting/{seller_order}/assign-delivery', [ParcelSortingController::class, 'assignDelivery'])->name('parcel-sorting.assignDelivery');
+        Route::post('/parcel-sorting/bulk-assign-delivery', [ParcelSortingController::class, 'bulkAssignDelivery'])->name('parcel-sorting.bulkAssignDelivery');
 
         // ── Rider delivery: delivery assignments ─────────────────────────────
         Route::get('/delivery-assignments', [DeliveryAssignmentsController::class, 'index'])->name('delivery-assignments.index');
         Route::post('/delivery-assignments/{seller_order}/reassign', [DeliveryAssignmentsController::class, 'reassign'])->name('delivery-assignments.reassign');
         Route::post('/delivery-assignments/{seller_order}/reschedule', [DeliveryAssignmentsController::class, 'reschedule'])->name('delivery-assignments.reschedule');
+        Route::post('/delivery-assignments/{seller_order}/receive-back', [DeliveryAssignmentsController::class, 'receiveBack'])->name('delivery-assignments.receive-back');
         Route::post('/delivery-assignments/{seller_order}/return', [DeliveryAssignmentsController::class, 'returnToSeller'])->name('delivery-assignments.return');
 
+        // ── Parcel exceptions + authorized rerouting (Phase 5) ─────────────
+        Route::get('/exceptions', [ExceptionsController::class, 'index'])->name('exceptions.index');
+        Route::post('/exceptions/parcels/{seller_order}', [ExceptionsController::class, 'store'])->name('exceptions.store');
+        Route::get('/exceptions/{incident}', [ExceptionsController::class, 'show'])->name('exceptions.show');
+        Route::post('/exceptions/{incident}/review', [ExceptionsController::class, 'review'])->name('exceptions.review');
+        Route::post('/exceptions/{incident}/preview', [ExceptionsController::class, 'preview'])->name('exceptions.preview');
+        Route::post('/exceptions/{incident}/resolve', [ExceptionsController::class, 'resolve'])->name('exceptions.resolve');
+
         // ── Read-only overview of claimed parcels + failure reasons ─────────
+        Route::post('/delivery-monitoring/{sellerOrder}/status-override', [DeliveryMonitoringController::class, 'overrideStatus'])->name('delivery-monitoring.override');
         Route::get('/delivery-monitoring', [DeliveryMonitoringController::class, 'index'])->name('delivery-monitoring.index');
 
         Route::post('/delivery-monitoring/{seller_order}/incidents', [DeliveryAssignmentsController::class, 'reportIncident'])

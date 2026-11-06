@@ -15,7 +15,7 @@ config(['session.driver' => 'array', 'app.url' => 'http://127.0.0.1']);
 Illuminate\Support\Facades\URL::forceRootUrl('http://127.0.0.1');
 $errors = new Illuminate\Support\ViewErrorBag;
 $modal = view('Components.seller.product-create-modal', [
-    'newProduct' => new App\Models\Product(['status' => 'draft', 'low_stock_threshold' => 5]),
+    'newProduct' => new App\Models\Catalog\Product(['status' => 'draft', 'low_stock_threshold' => 5]),
     'lockedCategory' => new App\Models\Shared\Category(['label' => "Women's Apparel"]),
     'openCreateModal' => true,
     'errors' => $errors,

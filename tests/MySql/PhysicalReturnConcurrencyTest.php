@@ -4,11 +4,11 @@ namespace Tests\MySql;
 
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
-use App\Models\InventoryTransaction;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
 use App\Models\Logistics\ParcelReturn;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Services\ParcelReturnService;
+use App\Models\Shared\OrderItem;
+use App\Services\Logistics\ParcelReturnService;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
 use Tests\TestCase;
 

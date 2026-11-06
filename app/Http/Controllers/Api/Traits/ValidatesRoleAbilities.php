@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\Traits;
 
-/** Trait used by API login controllers to centralise the account-status gate.
+use App\Models\Rider\Rider;
+
+/** Shared account-status gate for API login and protected bearer requests.
  *
  * The role-ability check (tokenCan) is performed by the api.role middleware;
- * this trait only knows the account-level status rules shared by the buyer
+ * this trait knows the account-level status rules shared by the buyer
  * and rider logins: approved, email-verified, and not in a terminal
  * rejected/suspended/deactivated state.
  */
@@ -16,7 +18,7 @@ trait ValidatesRoleAbilities
      * The base gate is "approved or active status, email verified, and not in
      * a terminal rejected/suspended/deactivated state". Roles with an extra
      * operational requirement (riders need an assigned, operational station
-     * hub and a linked Courier) override this via accountIsOperational().
+     * hub and a linked Courier) are checked by accountIsOperational().
      */
     public function accountIsLoginable(object $account): bool
     {
@@ -45,6 +47,6 @@ trait ValidatesRoleAbilities
      */
     protected function accountIsOperational(object $account): bool
     {
-        return true;
+        return ! $account instanceof Rider || $account->isOperational();
     }
 }

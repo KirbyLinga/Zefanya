@@ -182,7 +182,7 @@
             if (trackingInput) {
                 trackingInput.value = value;
             }
-            setStatus(`Verified ${data.parcel?.tracking_number || value}`);
+            setStatus(data.message || `Verified ${data.parcel?.tracking_number || value}`);
             renderResult(data);
         } catch (e) {
             lastSubmitted = null;
@@ -207,9 +207,10 @@
         const parcel = data.parcel;
         const actions = Array.isArray(data.actions) ? data.actions : [];
 
-        const actionHtml = actions.length === 0
-            ? '<p class="font-sans text-[12px] text-[var(--text-muted)]">No handoff action is available for this status. Verification only — status was not changed.</p>'
-            : actions.map((action) => {
+        const noChangeNote = actions.some((action) => action.method !== 'GET')
+            ? ''
+            : '<p class="w-full font-sans text-[12px] text-[var(--text-muted)]">No handoff action is available for this status. Verification only — status was not changed.</p>';
+        const actionHtml = noChangeNote + actions.map((action) => {
                 if (action.method === 'GET') {
                     return `<a href="${escapeAttr(action.url)}" class="inline-flex h-9 items-center justify-center rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 font-sans text-[11.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-ink)] hover:bg-[var(--bg-page)]">${escapeHtml(action.label)}</a>`;
                 }
@@ -252,11 +253,40 @@
         resultEl.querySelectorAll('form[data-confirm]').forEach((form) => {
             form.addEventListener('submit', (event) => {
                 const message = form.getAttribute('data-confirm');
-                if (message && !window.confirm(message)) {
+                if (message) {
                     event.preventDefault();
+                    confirmInPage(message, () => form.submit());
                 }
             });
         });
+    }
+
+    // In-page replacement for window.confirm(): never blocks the browser, so it works with screen readers and browser automation.
+    function confirmInPage(message, onConfirm) {
+        let dialog = document.getElementById('scanner-confirm-dialog');
+        if (!dialog) {
+            dialog = document.createElement('dialog');
+            dialog.id = 'scanner-confirm-dialog';
+            dialog.style.cssText = 'margin:auto;max-width:26rem;width:calc(100% - 2rem);padding:1.25rem;border:1px solid var(--border-strong);border-radius:0.5rem;background:var(--bg-surface);color:var(--text-ink);font-family:inherit';
+            dialog.innerHTML = '<p data-message style="margin:0 0 1rem;font-size:0.875rem;line-height:1.5"></p>'
+                + '<div style="display:flex;justify-content:flex-end;gap:0.5rem">'
+                + '<button type="button" data-cancel style="min-height:2.25rem;padding:0 1rem;border:1px solid var(--border-strong);border-radius:0.25rem;background:transparent;color:inherit;font-weight:600;cursor:pointer">Cancel</button>'
+                + '<button type="button" data-ok style="min-height:2.25rem;padding:0 1rem;border:0;border-radius:0.25rem;background:var(--brand);color:#fff;font-weight:600;cursor:pointer">Confirm</button>'
+                + '</div>';
+            document.body.appendChild(dialog);
+        }
+
+        dialog.querySelector('[data-message]').textContent = message;
+        // Replace the buttons so a previous parcel's handler can never fire for this one.
+        const ok = dialog.querySelector('[data-ok]').cloneNode(true);
+        const cancel = dialog.querySelector('[data-cancel]').cloneNode(true);
+        dialog.querySelector('[data-ok]').replaceWith(ok);
+        dialog.querySelector('[data-cancel]').replaceWith(cancel);
+        ok.addEventListener('click', () => { dialog.close(); onConfirm(); });
+        cancel.addEventListener('click', () => dialog.close());
+
+        dialog.showModal();
+        cancel.focus();
     }
 
     function escapeHtml(value) {
@@ -313,5 +343,10 @@
     if (!supportsCameraScan()) {
         setStatus('Camera QR scanning is unavailable here. Use manual tracking entry.');
         startBtn?.classList.add('hidden');
+    }
+
+    // Opened from a parcel's "Scan to confirm" link: verify that tracking number straight away.
+    if (root.hasAttribute('data-auto-verify') && trackingInput?.value.trim()) {
+        submitTracking(trackingInput.value, 'manual');
     }
 })();

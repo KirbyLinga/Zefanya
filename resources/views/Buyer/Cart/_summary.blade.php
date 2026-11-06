@@ -1,7 +1,7 @@
 {{--
     Order Summary card (right column; sticky on lg+).
 
-    Expects: $summary (App\Services\CartSummary), $voucher (?App\Models\Voucher),
+    Expects: $summary (App\Services\Buyer\CartSummary), $voucher (?App\Models\Shared\Voucher),
              $voucherNotice (?string)
 
     DOM contract for cart.js:
@@ -13,20 +13,21 @@
       #cartpage-total              total value
       #cartpage-mobile-total       total shown in the mobile bottom bar
       #cartpage-voucher-input / #cartpage-voucher-apply / #cartpage-voucher-error
-      #cartpage-voucher-chip / #cartpage-voucher-chip-label / #cartpage-voucher-remove
+      #cartpage-voucher-chips / .js-cartpage-voucher-chip / .js-cartpage-voucher-remove
       .js-cartpage-checkout-btn    both checkout buttons
 --}}
 @php
     $selectedLines = $summary->selectedLineCount();
-    $hasVoucher  = $voucher !== null;
+    $hasVoucher  = $summary->hasVoucher();
     $canCheckout = $summary->subtotalCentavos > 0;
+    $appliedVouchers = $summary->voucherApplication->toArray();
 @endphp
 
 <aside class="lg:sticky lg:top-6 lg:h-fit" id="cartpage-summary">
   <div class="rounded-2xl border border-buyer-line bg-white p-5">
 
     {{-- Header --}}
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex items-center justify-between gap-3 mb-4 pb-4 border-b border-buyer-line/50">
       <h2 class="font-serif text-[20px] font-semibold text-buyer-ink">Order Summary</h2>
       <span id="cartpage-summary-count"
             class="rounded-full bg-secondary-100 px-3 py-1 text-[11px] font-semibold text-buyer-ink"
@@ -36,31 +37,47 @@
       </span>
     </div>
 
-    {{-- Totals --}}
-    <div class="mt-4 flex flex-col gap-2.5" aria-live="polite">
-      <div class="flex items-center justify-between text-[12.5px]">
-        <span class="text-neutral-400">Subtotal</span>
-        <span id="cartpage-subtotal" class="font-serif text-[14px] font-semibold text-buyer-ink">
+    {{-- Totals breakdown --}}
+    <div class="flex flex-col gap-3" aria-live="polite">
+      {{-- Subtotal --}}
+      <div class="flex items-center justify-between">
+        <span class="text-[13px] text-neutral-500">Subtotal</span>
+        <span id="cartpage-subtotal" class="font-serif text-[15px] font-semibold text-buyer-ink">
           {{ $summary->formattedSubtotal() }}
         </span>
       </div>
 
-      <div class="flex items-center justify-between text-[12.5px]">
-        <span class="text-neutral-400">Shipping</span>
-        <span class="text-neutral-400">Calculated at checkout</span>
+      {{-- Shipping placeholder --}}
+      <div class="flex items-center justify-between">
+        <span class="text-[13px] text-neutral-500">Shipping</span>
+        <span class="text-[13px] text-neutral-400 font-medium">Calculated at checkout</span>
       </div>
 
+      {{-- Voucher Discount --}}
       <div id="cartpage-discount-row"
-           class="flex items-center justify-between text-[12.5px] {{ $hasVoucher ? '' : 'hidden' }}">
-        <span class="text-neutral-400">Voucher Discount</span>
-        <span id="cartpage-discount" class="font-semibold text-tertiary-700">
-          {{ $summary->formattedDiscount() }}
+           class="flex items-center justify-between {{ $hasVoucher ? '' : 'hidden' }}">
+        <span class="text-[13px] text-neutral-500">Voucher Discount</span>
+        <span id="cartpage-discount" class="font-semibold text-[15px] text-tertiary-700">
+          -{{ $summary->formattedDiscount() }}
         </span>
       </div>
+
+      {{-- Divider --}}
+      <div class="my-1 border-t border-buyer-line/50"></div>
+
+      {{-- Subtotal before shipping --}}
+      <div class="flex items-end justify-between">
+        <span class="text-[14px] font-bold text-buyer-ink">Subtotal before shipping</span>
+        <span id="cartpage-total" class="font-serif text-[26px] font-semibold text-buyer-ink"
+              aria-live="polite">{{ $summary->formattedTotal() }}</span>
+      </div>
+
+      {{-- Note about final amount --}}
+      <p class="text-[11px] text-neutral-400 italic">Final payable amount will be shown at checkout</p>
     </div>
 
-    {{-- Voucher --}}
-    <div class="mt-4">
+    {{-- Voucher section --}}
+    <div class="mt-5 pt-5 border-t border-buyer-line/50">
       <div class="flex items-center gap-1 rounded-xl border border-buyer-line bg-blush p-1">
         <label for="cartpage-voucher-input" class="sr-only">Voucher code</label>
         <input
@@ -84,21 +101,26 @@
       {{-- Inline error --}}
       <p id="cartpage-voucher-error" class="mt-1.5 hidden text-[11.5px] font-medium text-primary-700" role="alert"></p>
 
-      {{-- Applied voucher chip --}}
-      <div id="cartpage-voucher-chip"
-           class="mt-2 flex items-center gap-2 rounded-lg border border-tertiary-200 bg-tertiary-50 px-2.5 py-2 {{ $hasVoucher ? '' : 'hidden' }}">
-        <i data-lucide="tag" width="13" height="13" class="shrink-0 text-tertiary-700"></i>
-        <span id="cartpage-voucher-chip-label" class="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-tertiary-700">
-          {{ $hasVoucher ? $summary->voucherChipLabel() : '' }}
-        </span>
-        <button
-          type="button"
-          id="cartpage-voucher-remove"
-          class="shrink-0 text-tertiary-700 transition-opacity hover:opacity-70"
-          aria-label="Remove the applied voucher"
-        >
-          <i data-lucide="x" width="14" height="14"></i>
-        </button>
+      {{-- Applied vouchers (one platform, one shipping, one per shop) --}}
+      <div id="cartpage-voucher-chips"
+           class="mt-2 flex flex-col gap-2 {{ $hasVoucher ? '' : 'hidden' }}">
+        @foreach ($appliedVouchers as $applied)
+          <div class="js-cartpage-voucher-chip flex items-center gap-2 rounded-lg border border-tertiary-200 bg-tertiary-50 px-2.5 py-2"
+               data-slot="{{ $applied['slot'] }}">
+            <i data-lucide="tag" width="13" height="13" class="shrink-0 text-tertiary-700"></i>
+            <span class="js-cartpage-voucher-chip-label min-w-0 flex-1 truncate text-[11.5px] font-semibold text-tertiary-700">
+              {{ $applied['scope'] === 'shipping' ? $applied['code'].' (shipping)' : $applied['label'] }}
+            </span>
+            <button
+              type="button"
+              class="js-cartpage-voucher-remove shrink-0 text-tertiary-700 transition-opacity hover:opacity-70"
+              data-slot="{{ $applied['slot'] }}"
+              aria-label="Remove {{ $applied['code'] }}"
+            >
+              <i data-lucide="x" width="14" height="14"></i>
+            </button>
+          </div>
+        @endforeach
       </div>
 
       {{-- Shown when a previously applied voucher was dropped on recalculation --}}
@@ -107,27 +129,16 @@
       @endif
     </div>
 
-    {{-- Total --}}
-    <div class="mt-4 border-t border-buyer-line pt-4">
-      <div class="flex items-end justify-between">
-        <span class="text-[13px] font-semibold text-buyer-ink">Total</span>
-        <span id="cartpage-total" class="font-serif text-[26px] font-semibold text-buyer-ink"
-              aria-live="polite">{{ $summary->formattedTotal() }}</span>
-      </div>
-
+    {{-- Checkout button --}}
+    <div class="mt-5 pt-5 border-t border-buyer-line/50">
       <button
         type="button"
-        class="js-cartpage-checkout-btn mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-5 py-3.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
+        class="js-cartpage-checkout-btn flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-5 py-3.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
         @disabled(! $canCheckout)
       >
         Proceed to Checkout
         <i data-lucide="arrow-right" width="15" height="15"></i>
       </button>
-
-      <p class="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
-        <i data-lucide="lock" width="12" height="12"></i>
-        Secure 256-bit SSL encrypted checkout
-      </p>
     </div>
   </div>
 </aside>

@@ -3,11 +3,11 @@
 namespace Tests\Feature\Buyer;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
-use App\Models\ProductVariant;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
+use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
-use App\Services\VariantSyncService;
+use App\Services\Seller\VariantSyncService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -260,7 +260,7 @@ class CheckoutItemDisplayTest extends TestCase
     {
         $buyer = Buyer::factory()->create();
         $product = $this->product(['Color' => '<script>red</script>'], '<script>shirt</script>');
-        $line = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $product->variants()->sole()->id]);
+        CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'variant_id' => $product->variants()->sole()->id]);
 
         $this->actingAs($buyer, 'buyer')->get(route('buyer.checkout.index'))->assertOk()
             ->assertSee('<script>shirt</script>')->assertSee('Color: <script>red</script>')

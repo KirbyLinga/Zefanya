@@ -3,10 +3,10 @@
 namespace Tests\Feature\Http\Controllers\Buyer;
 
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\Product;
+use App\Models\Buyer\CartItem;
+use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
-use App\Models\Voucher;
+use App\Models\Shared\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -432,7 +432,7 @@ class CartControllerTest extends TestCase
         // ₱3,499.00 + 2 × ₱649.00 = ₱4,797.00 — the sold-out line is excluded.
         $response->assertSee('4,797.00');
         $response->assertSee('Select all');
-        $response->assertSee('Secure 256-bit SSL encrypted checkout');
+        $response->assertDontSee('Secure checkout');
     }
 
     public function test_the_cart_page_shows_the_empty_state_when_there_are_no_items(): void
@@ -446,22 +446,26 @@ class CartControllerTest extends TestCase
             ->assertDontSee('Select all');
     }
 
-    public function test_the_navbar_badge_shows_the_real_cart_quantity(): void
+    public function test_the_navbar_badge_shows_the_real_cart_line_count(): void
     {
         $buyer = Buyer::factory()->create();
         $product = Product::factory()->create(['stock_quantity' => 10]);
 
-        CartItem::factory()->create([
+        $line = CartItem::factory()->create([
             'buyer_id' => $buyer->id,
             'product_id' => $product->id,
             'quantity' => 3,
         ]);
 
+        // docs/4-Flow.md "Cart count contract": lines, not summed quantities.
         $response = $this->actingAs($buyer, 'buyer')->get(route('buyer.cart.index'));
 
         $response->assertOk();
-        $response->assertSee('id="cartCount"', false);
-        $response->assertSee('>3</span>', false);
+        $response->assertSee('id="cartCount">1</span>', false);
+        $this->assertSame(3, $line->fresh()->quantity);
+
+        $this->deleteJson(route('buyer.cart.destroy', $line))->assertOk()->assertJsonPath('cart_count', 0);
+        $this->get(route('buyer.cart.index'))->assertOk()->assertSee('id="cartCount">0</span>', false);
     }
 
     // ── Checkout hand-off ───────────────────────────────────────────────────

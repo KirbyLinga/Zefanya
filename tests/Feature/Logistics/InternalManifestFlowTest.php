@@ -9,11 +9,11 @@ use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\Manifest;
 use App\Models\Logistics\ManifestItem;
-use App\Models\Order;
 use App\Models\Seller\Seller;
-use App\Models\SellerOrder;
-use App\Services\ManifestService;
-use App\Services\ParcelHandoffVerification;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\ManifestService;
+use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
@@ -85,6 +85,10 @@ class InternalManifestFlowTest extends TestCase
         $this->parcel->forceFill([
             'status' => OrderStatus::AtSortingCenter->value,
             'origin_station_hub_id' => $this->calamba->id,
+            'custody_hub_id' => $this->calamba->id,
+            'carrier_provider_id' => $this->provider->id,
+            'custody_provider_id' => null,
+            'handover_at' => now(),  // Pickup confirmed
         ])->save();
 
         $this->parcel->refresh();
@@ -98,11 +102,11 @@ class InternalManifestFlowTest extends TestCase
 
         $this->get(route('logistics.manifests.index'))
             ->assertOk()
-            ->assertSee('Manifests');
+            ->assertSee('Transfer Batches');
 
         $this->get(route('logistics.manifests.create'))
             ->assertOk()
-            ->assertSee('Create Manifest');
+            ->assertSee('Create Transfer Batch');
 
         $this->post(route('logistics.manifests.store'), [
             'origin_hub_id' => $this->calamba->id,
@@ -349,8 +353,8 @@ class InternalManifestFlowTest extends TestCase
 
         $this->get(route('logistics.manifests.show', $manifest))
             ->assertOk()
-            ->assertSee('Add parcels')
-            ->assertSee('Dispatch this manifest')
+            ->assertSee('Add Parcels')
+            ->assertSee('Dispatch this batch')
             ->assertSee($this->parcel->tracking_number);
 
         $this->dispatchManifest($manifest, [
@@ -373,7 +377,7 @@ class InternalManifestFlowTest extends TestCase
 
         $this->get(route('logistics.manifests.receive.index', $manifest))
             ->assertOk()
-            ->assertSee('Manifest fully received');
+            ->assertSee('Batch fully received');
     }
 
     public function test_cross_provider_carrier_parcels_are_rejected(): void
@@ -498,6 +502,10 @@ class InternalManifestFlowTest extends TestCase
         $parcel->forceFill([
             'status' => OrderStatus::AtSortingCenter->value,
             'origin_station_hub_id' => $origin->id,
+            'custody_hub_id' => $origin->id,
+            'carrier_provider_id' => $this->provider->id,
+            'custody_provider_id' => null,
+            'handover_at' => now(),  // Pickup confirmed
         ])->save();
 
         return $parcel->fresh();
@@ -540,5 +548,105 @@ class InternalManifestFlowTest extends TestCase
             'is_active' => true,
             'approval_status' => LogisticsHub::APPROVAL_APPROVED,
         ]);
+    }
+
+    public function test_delete_draft_manifest_releases_items_and_deletes_manifest(): void
+    {
+        $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
+        $item = $this->manifests->addParcel($manifest, $this->parcel);
+
+        $this->actingAs($this->provider, 'logistics');
+
+        $this->delete(route('logistics.manifests.destroy', $manifest))
+            ->assertRedirect(route('logistics.manifests.index'))
+            ->assertSessionHas('success');
+
+        $this->assertNull(Manifest::query()->find($manifest->id));
+        $this->assertNull(ManifestItem::query()->find($item->id));
+    }
+
+    public function test_cannot_delete_non_draft_manifest(): void
+    {
+        $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
+        $item = $this->manifests->addParcel($manifest, $this->parcel);
+
+        $this->actingAs($this->provider, 'logistics');
+
+        $this->dispatchManifest($manifest, [
+            $item->id => $this->scanForToken($manifest, $this->parcel, 'dispatch'),
+        ]);
+
+        $this->delete(route('logistics.manifests.destroy', $manifest))
+            ->assertSessionHasErrors();
+
+        $this->assertNotNull(Manifest::query()->find($manifest->id));
+    }
+
+    public function test_cancel_dispatched_manifest_with_reason(): void
+    {
+        $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
+        $item = $this->manifests->addParcel($manifest, $this->parcel);
+
+        $this->actingAs($this->provider, 'logistics');
+
+        $this->dispatchManifest($manifest, [
+            $item->id => $this->scanForToken($manifest, $this->parcel, 'dispatch'),
+        ]);
+
+        $this->assertSame(ManifestStatus::Dispatched, $manifest->fresh()->status);
+
+        $this->post(route('logistics.manifests.cancel', $manifest), [
+            'cancellation_reason' => 'Weather emergency — delaying all shipments',
+        ])->assertRedirect(route('logistics.manifests.show', $manifest))
+            ->assertSessionHas('success');
+
+        $manifest->refresh();
+        $this->assertSame(ManifestStatus::Cancelled, $manifest->status);
+        $this->assertNotNull($manifest->cancelled_at);
+        $this->assertSame('logistics', $manifest->cancelled_by_type);
+        $this->assertSame($this->provider->id, (int) $manifest->cancelled_by_id);
+        $this->assertStringContainsString('Weather emergency', $manifest->cancellation_reason);
+        $this->assertNotNull($item->fresh()->released_at);
+    }
+
+    public function test_cannot_cancel_manifest_with_empty_reason(): void
+    {
+        $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
+        $item = $this->manifests->addParcel($manifest, $this->parcel);
+
+        $this->actingAs($this->provider, 'logistics');
+
+        $this->dispatchManifest($manifest, [
+            $item->id => $this->scanForToken($manifest, $this->parcel, 'dispatch'),
+        ]);
+
+        $this->post(route('logistics.manifests.cancel', $manifest), [
+            'cancellation_reason' => '',
+        ])->assertSessionHasErrors('cancellation_reason');
+
+        $this->assertSame(ManifestStatus::Dispatched, $manifest->fresh()->status);
+    }
+
+    public function test_cannot_cancel_manifest_with_received_items(): void
+    {
+        $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
+        $item = $this->manifests->addParcel($manifest, $this->parcel);
+
+        $this->actingAs($this->provider, 'logistics');
+
+        $this->dispatchManifest($manifest, [
+            $item->id => $this->scanForToken($manifest, $this->parcel, 'dispatch'),
+        ]);
+
+        // Receive the item
+        $this->post(route('logistics.manifests.receive.store', [$manifest, $item]), [
+            'verification_token' => $this->scanForToken($manifest, $this->parcel, 'receive'),
+        ]);
+
+        $this->post(route('logistics.manifests.cancel', $manifest), [
+            'cancellation_reason' => 'Too late — item already received',
+        ])->assertSessionHasErrors('manifest');
+
+        $this->assertSame(ManifestStatus::Received, $manifest->fresh()->status);
     }
 }

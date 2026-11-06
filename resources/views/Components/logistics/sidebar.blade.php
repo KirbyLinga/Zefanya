@@ -2,30 +2,38 @@
 
 @php
     $provider = $provider ?? auth('logistics')->user();
+    $unreadNotifications = $provider && \Illuminate\Support\Facades\Schema::hasTable('notifications')
+        ? $provider->unreadNotifications()->count() : 0;
     $sections ??= [
         ['label' => null, 'items' => [
             ['route' => 'logistics.dashboard', 'icon' => 'layout-dashboard', 'label' => 'Dashboard'],
+            ['route' => 'logistics.notifications.index', 'icon' => 'bell', 'label' => 'Notifications', 'badge' => $unreadNotifications],
             ['route' => 'logistics.scan.index', 'icon' => 'scan-line', 'label' => 'Scan parcel'],
         ]],
-        ['label' => 'Daily operations', 'items' => [
+        ['label' => 'Parcel flow', 'items' => [
             ['route' => 'logistics.incoming-parcels.index', 'icon' => 'inbox', 'label' => 'Incoming parcels'],
             ['route' => 'logistics.parcel-sorting.index', 'icon' => 'archive', 'label' => 'Parcel sorting'],
             ['route' => 'logistics.delivery-assignments.index', 'icon' => 'map-pin', 'label' => 'Assign deliveries'],
             ['route' => 'logistics.delivery-monitoring.index', 'icon' => 'activity', 'label' => 'Delivery tracking'],
+            ['route' => 'logistics.exceptions.index', 'icon' => 'alert-triangle', 'label' => 'Parcel exceptions'],
         ]],
-        ['label' => 'More tools', 'items' => [
-            ['route' => 'logistics.cod-remittances.index', 'icon' => 'banknote', 'label' => 'COD remittances'],
-        ]],
-        ['label' => 'Transfers & returns', 'icon' => 'repeat-2', 'collapsible' => true, 'items' => [
+        ['label' => 'Transfers & returns', 'items' => [
             ['route' => 'logistics.handoffs.index', 'icon' => 'repeat-2', 'label' => 'Provider handoffs'],
-            ['route' => 'logistics.manifests.index', 'icon' => 'truck', 'label' => 'Manifests'],
+            ['route' => 'logistics.manifests.index', 'icon' => 'truck', 'label' => 'Transfer Batches'],
             ['route' => 'logistics.returns.index', 'icon' => 'undo-2', 'label' => 'Physical returns'],
         ]],
-        ['label' => 'Team & network', 'icon' => 'network', 'collapsible' => true, 'items' => [
+        ['label' => 'Money', 'items' => [
+            ['route' => 'logistics.earnings.index', 'icon' => 'wallet', 'label' => 'Earnings'],
+            ['route' => 'logistics.cod-remittances.index', 'icon' => 'banknote', 'label' => 'COD remittances'],
+        ]],
+        // Set-up pages are rarely visited, so they stay folded to keep the list short.
+        ['label' => 'Team & setup', 'icon' => 'settings-2', 'collapsible' => true, 'items' => [
             ['route' => 'logistics.riders.index', 'icon' => 'users', 'label' => 'Riders'],
             ['route' => 'logistics.hubs.index', 'icon' => 'network', 'label' => 'Hubs & stations'],
+            ['route' => 'logistics.transport-connections.index', 'icon' => 'route', 'label' => 'Transport connections'],
             ['route' => 'logistics.partnerships.index', 'icon' => 'handshake', 'label' => 'Provider partnerships'],
             ['route' => 'logistics.areas.index', 'icon' => 'map', 'label' => 'Delivery areas'],
+            ['route' => 'logistics.audit-logs.index', 'icon' => 'scroll-text', 'label' => 'Activity log'],
         ]],
     ];
 @endphp

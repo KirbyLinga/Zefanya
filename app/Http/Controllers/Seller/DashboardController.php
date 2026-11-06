@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Seller;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Product;
-use App\Models\SellerOrder;
-use Illuminate\Support\Carbon;
+use App\Models\Catalog\Product;
+use App\Models\Logistics\ParcelReturn;
+use App\Models\Shared\SellerOrder;
+use App\Services\Seller\SellerSalesTrend;
+use App\Services\Seller\SellerShippingProviderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
@@ -97,18 +99,20 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
-        $salesTrend = collect(range(6, 0))->map(function (int $daysAgo) use ($baseQuery): array {
-            $day = Carbon::now()->subDays($daysAgo)->startOfDay();
-            $value = (clone $baseQuery)
-                ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
-                ->whereDate('seller_orders.updated_at', $day->toDateString())
-                ->sum('subtotal_minor');
+        $shippingReady = app(SellerShippingProviderService::class)->canOfferShipping($seller);
 
-            return [
-                'label' => Carbon::now()->subDays($daysAgo)->format('D'),
-                'value' => $value,
-            ];
-        })->values();
+        $returnDecisions = ParcelReturn::query()
+            ->whereHas('sellerOrder', fn ($query) => $query->where('seller_id', $sellerId))
+            ->whereNull('seller_decision')
+            ->whereNotNull('seller_response_due_at');
+        $pendingReturnDecisionCount = (clone $returnDecisions)->count();
+        $pendingReturnDecisions = $returnDecisions
+            ->orderBy('seller_response_due_at')
+            ->orderBy('id')
+            ->limit(3)
+            ->get(['id', 'seller_order_id', 'seller_response_due_at']);
+
+        $salesSummary = app(SellerSalesTrend::class)->forSeller($sellerId);
 
         // ── Notifications: only query if the table exists (Notifiable trait
         //     is present on Seller, but the Laravel notifications table may not
@@ -123,6 +127,9 @@ class DashboardController extends Controller
 
         return view('Seller.Dashboard.index', [
             'seller' => $seller,
+            'shippingReady' => $shippingReady,
+            'pendingReturnDecisionCount' => $pendingReturnDecisionCount,
+            'pendingReturnDecisions' => $pendingReturnDecisions,
             'totalSales' => $totalSales,
             'totalOrders' => $totalOrders,
             'pendingOrders' => $pendingOrders,
@@ -135,7 +142,8 @@ class DashboardController extends Controller
             'lowStockCount' => $lowStockCount,
             'lowStockProducts' => $lowStockProducts,
             'recentOrders' => $recentOrders,
-            'salesTrend' => $salesTrend,
+            'salesTrend' => $salesSummary['days'],
+            'salesSummary' => $salesSummary,
             'ordersModuleReady' => true,
             'notifications' => $notifications,
             'unreadCount' => $unreadCount,

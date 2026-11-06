@@ -3,6 +3,15 @@
 @section('title', 'Registration Management')
 
 @section('content')
+@php
+    $registrationFilters = request()->only(['search', 'status', 'date_range', 'per_page']);
+    $canViewIdentityDocuments = in_array(auth('admin')->user()?->role, ['super_admin', 'admin'], true);
+@endphp
+<x-admin.tabs :tabs="[
+    ['label' => 'Buyers', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'buyer'], 'active' => request('type') === 'buyer'],
+    ['label' => 'Sellers', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'seller'], 'active' => request('type') === 'seller'],
+    ['label' => 'Logistics', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'logistics'], 'active' => request('type') === 'logistics'],
+]" />
 
 @php
     // Status colors and labels (updated for new status values)
@@ -286,8 +295,10 @@
                                         data-detail-contact="{{ e($model->contact_no ?? '') }}"
                                         data-detail-business="{{ e($model->business_name ?? '') }}"
                                         data-detail-address="{{ e(trim(collect([$model->street, $model->house_number, $model->barangay_name, $model->municipality_name, $model->province_name, $model->postal_code])->filter()->implode(', '))) }}"
-                                        data-detail-id-url="{{ $model->upload_id_path ? route('admin.documents.stream', ['type' => $type, 'id' => $model->id, 'document' => 'id']) : '' }}"
-                                        data-detail-permit-url="{{ $type === 'seller' && $model->business_permit_path ? route('admin.documents.stream', ['type' => 'seller', 'id' => $model->id, 'document' => 'business_permit']) : ($type === 'logistics' && ($model->dti_permit_path ?? null) ? route('admin.documents.stream', ['type' => 'logistics', 'id' => $model->id, 'document' => 'dti_permit']) : '') }}"
+                                        data-detail-id-url="{{ $canViewIdentityDocuments && $model->upload_id_path ? route('admin.documents.stream', ['type' => $type, 'id' => $model->id, 'document' => 'id']) : '' }}"
+                                        data-detail-permit-url="{{ $canViewIdentityDocuments && $type === 'seller' && $model->business_permit_path ? route('admin.documents.stream', ['type' => 'seller', 'id' => $model->id, 'document' => 'business_permit']) : ($canViewIdentityDocuments && $type === 'logistics' && ($model->dti_permit_path ?? null) ? route('admin.documents.stream', ['type' => 'logistics', 'id' => $model->id, 'document' => 'dti_permit']) : '') }}"
+                                        data-detail-sec-url="{{ $canViewIdentityDocuments && $type === 'seller' && $model->sec_certificate_path ? route('admin.documents.stream', ['type' => 'seller', 'id' => $model->id, 'document' => 'sec_certificate']) : '' }}"
+                                        data-detail-documents-locked="{{ ! $canViewIdentityDocuments && ($model->upload_id_path || ($type === 'seller' && ($model->business_permit_path || $model->sec_certificate_path)) || ($type === 'logistics' && ($model->dti_permit_path ?? null))) ? '1' : '' }}"
                                         data-detail-permit-label="{{ $type === 'seller' ? 'Business permit' : ($type === 'logistics' ? 'DTI permit' : '') }}"
                                         onclick="openDetailModal(this)">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
@@ -360,9 +371,11 @@
             <div><dt class="text-neutral-500">Type / Status</dt><dd class="text-neutral-800"><span id="detailType"></span> · <span id="detailStatus"></span></dd></div>
             <div id="detailBusinessWrap" class="hidden"><dt class="text-neutral-500">Business</dt><dd id="detailBusiness" class="text-neutral-800"></dd></div>
             <div><dt class="text-neutral-500">Address</dt><dd id="detailAddress" class="text-neutral-800"></dd></div>
+            <p id="detailDocumentNote" class="hidden text-sm text-neutral-600">Identity documents can only be opened by an administrator. This view is recorded when an administrator opens them.</p>
             <div class="flex flex-wrap gap-2 pt-2">
                 <a id="detailIdLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200">View ID</a>
                 <a id="detailPermitLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200"></a>
+                <a id="detailSecLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-2 bg-neutral-100 rounded-lg text-neutral-800 font-medium hover:bg-neutral-200">View SEC certificate</a>
             </div>
         </dl>
     </div>
@@ -422,6 +435,12 @@
         } else {
             idLink.classList.add('hidden');
         }
+
+        const secLink = document.getElementById('detailSecLink');
+        secLink.classList.toggle('hidden', !btn.dataset.detailSecUrl);
+        secLink.href = btn.dataset.detailSecUrl || '#';
+
+        document.getElementById('detailDocumentNote').classList.toggle('hidden', btn.dataset.detailDocumentsLocked !== '1');
 
         const permitLink = document.getElementById('detailPermitLink');
         if (btn.dataset.detailPermitUrl) {

@@ -4,14 +4,6 @@
 
 @section('content')
 @php
-    // old() wins after a validation error so the user doesn't retype. The
-    // backend never resurfaced old() for password fields, so a failed
-    // confirm() would wipe them — restore current/new from the request
-    // before showing the form.
-    $cp = old('current_password', '');
-    $np = old('new_password', '');
-    $nf = old('new_password_confirmation', '');
-
     // Shared with profile/address (Components/buyer-register-modal).
     $labelCls = 'mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-[var(--text-label)]';
     $inputCls = 'h-11 w-full rounded-md border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--hover-rose)]';
@@ -46,23 +38,37 @@
                 @endif
 
                 <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
+                    @if ($buyer->pending_password)
+                    <h2 class="font-serif text-[20px] font-normal leading-tight text-[var(--text-ink)]">Enter the code from your email</h2>
+                    <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">We sent a 6-digit code to <strong>{{ $buyer->email }}</strong>. Your new password starts working once you enter it. Your current password works until then.</p>
+
+                    <form method="POST" action="{{ route('buyer.account.password.verify') }}" class="mt-5">
+                        @csrf
+                        <label class="{{ $labelCls }}" for="passwordChangeOtp">6-digit code *</label>
+                        <input type="text" name="otp" id="passwordChangeOtp" required autofocus inputmode="numeric" pattern="\d{6}" maxlength="6" autocomplete="one-time-code"
+                               class="{{ $inputCls }} sm:max-w-[220px]">
+                        @error('otp', 'passwordChange')<span class="{{ $errorCls }}" role="alert">{{ $message }}</span>@enderror
+                        <button type="submit"
+                                class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[var(--btn-primary-bg)] px-8 py-2.5 font-sans text-[13px] font-semibold text-[var(--btn-primary-text)] transition-opacity hover:opacity-90 sm:w-auto">
+                            Confirm new password
+                        </button>
+                    </form>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                        <form method="POST" action="{{ route('buyer.account.password.resend') }}">
+                            @csrf
+                            <button type="submit" class="font-sans text-[13px] font-medium text-[var(--link)]">Resend code</button>
+                        </form>
+                        <form method="POST" action="{{ route('buyer.account.password.cancel') }}">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="font-sans text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--link)]">Cancel change</button>
+                        </form>
+                    </div>
+                    @else
                     <form method="POST" action="{{ route('buyer.account.password.update') }}">
                         @csrf
                         @method('PATCH')
-
-                        @if (session('error'))
-                            <div class="mb-4 flex items-center gap-2.5 rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-danger)]" role="alert">
-                                <i data-lucide="alert-circle" width="15" height="15" class="shrink-0"></i>
-                                <span class="text-[var(--status-danger)]">{{ session('error') }}</span>
-                            </div>
-                        @endif
-
-                        @error('current_password')
-                            <div class="mb-4 flex items-center gap-2.5 rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-danger)]" role="alert">
-                                <i data-lucide="alert-circle" width="15" height="15" class="shrink-0"></i>
-                                <span class="text-[var(--status-danger)]">{{ $message }}</span>
-                            </div>
-                        @enderror
 
                         {{-- Current password --}}
                         <div class="mb-4">
@@ -116,6 +122,7 @@
                             </button>
                         </div>
                     </form>
+                    @endif
                 </section>
             </main>
         </div>

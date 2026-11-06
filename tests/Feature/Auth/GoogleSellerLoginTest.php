@@ -46,7 +46,7 @@ class GoogleSellerLoginTest extends TestCase
         $this->assertDatabaseCount('sellers', 0);
     }
 
-    public function test_seller_awaiting_approval_cannot_sign_in_with_google(): void
+    public function test_seller_awaiting_approval_can_sign_in_only_to_the_review_notice(): void
     {
         $seller = Seller::factory()->pending()->create([
             'email' => 'pending-seller@gmail.com',
@@ -57,18 +57,29 @@ class GoogleSellerLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.role.callback', ['role' => 'seller']));
 
-        $response->assertRedirect(route('home', ['login' => 1]));
-        $response->assertSessionHas(
-            'auth.status_message',
-            'Your seller account is still pending administrator approval.',
-        );
-        $this->assertGuest('seller');
+        $response->assertRedirect(route('seller.dashboard'));
+        $this->assertAuthenticated('seller');
+        $this->get(route('seller.dashboard'))->assertForbidden()->assertSee('Your account is under review');
         $this->assertSame('google-seller-2', $seller->fresh()->google_id);
+    }
+
+    public function test_rejected_seller_google_login_shows_the_saved_reason(): void
+    {
+        $account = Seller::factory()->create(['status' => 'rejected', 'rejection_reason' => 'Business permit is unreadable.', 'email' => 'rejected-seller@gmail.com', 'google_id' => null]);
+        $this->fakeGoogleUser($account->email, 'rejected-seller-id');
+        $this->get(route('auth.google.role.callback', ['role' => 'seller']))->assertRedirect(route('home', ['login' => 1]))
+            ->assertSessionHas('auth.status_message', fn ($message) => str_contains($message, 'Reason: Business permit is unreadable.'));
+        $this->assertGuest('seller');
+        $this->get(route('home', ['login' => 1]))->assertOk()->assertSeeText('Reason: Business permit is unreadable.');
     }
 
     private function fakeGoogleUser(string $email, string $id): void
     {
-        $googleUser = (new GoogleUser)->map([
+        $googleUser = (new GoogleUser)->setRaw([
+            'sub' => $id,
+            'email' => $email,
+            'email_verified' => true,
+        ])->map([
             'id' => $id,
             'email' => $email,
             'name' => 'Google Seller',

@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Enums\AuthRole;
+use App\Services\Shared\AccountSessionService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 /**
  * "One account per browser": opening a session on one role's guard must end
@@ -92,7 +93,6 @@ trait ClearsOtherGuards
     protected function rememberSessionOnLogin(string $guard): void
     {
         $realSession = app('session.store');
-        $table = config('session.table');
         $driver = config('session.driver');
         $suppressedId = $realSession->get('session.suppressed_session_id');
 
@@ -118,18 +118,16 @@ trait ClearsOtherGuards
 
         $currentId = (string) $realSession->getId();
 
-        DB::table($table)
-            ->where('user_id', $userId)
-            ->where('ip_address', $ip)
-            ->where('user_agent', $userAgent)
-            ->when($currentId !== '', fn ($query) => $query->where('id', '!=', $currentId))
-            ->delete();
+        app(AccountSessionService::class)->revoke($guard, $userId, function (Builder $query) use ($ip, $userAgent, $currentId): void {
+            $query->where('ip_address', $ip)
+                ->where('user_agent', $userAgent)
+                ->when($currentId !== '', fn ($query) => $query->where('id', '!=', $currentId));
+        });
 
         if ($suppressedId !== null) {
-            DB::table($table)
-                ->where('id', $suppressedId)
-                ->where('user_id', $userId)
-                ->delete();
+            app(AccountSessionService::class)->revoke($guard, $userId, function (Builder $query) use ($suppressedId): void {
+                $query->where('id', $suppressedId);
+            });
         }
     }
 }

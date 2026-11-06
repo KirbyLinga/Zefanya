@@ -48,7 +48,7 @@ class GoogleLogisticsLoginTest extends TestCase
         $this->assertDatabaseCount('logistics_providers', 0);
     }
 
-    public function test_provider_awaiting_approval_cannot_sign_in_with_google(): void
+    public function test_provider_awaiting_approval_can_sign_in_only_to_the_review_notice(): void
     {
         $provider = LogisticsProvider::factory()->pending()->create([
             'email' => 'pending-logistics@gmail.com',
@@ -59,12 +59,9 @@ class GoogleLogisticsLoginTest extends TestCase
 
         $response = $this->get(route('auth.google.callback'));
 
-        $response->assertRedirect(route('home', ['login' => 1]));
-        $response->assertSessionHas(
-            'auth.status_message',
-            'Your logistics provider registration is still awaiting administrator approval.',
-        );
-        $this->assertGuest('logistics');
+        $response->assertRedirect(route('logistics.dashboard'));
+        $this->assertAuthenticated('logistics');
+        $this->get(route('logistics.dashboard'))->assertForbidden()->assertSee('Your account is under review');
         $this->assertSame('google-logistics-2', $provider->fresh()->google_id);
     }
 
@@ -87,9 +84,23 @@ class GoogleLogisticsLoginTest extends TestCase
         $this->assertGuest('buyer');
     }
 
+    public function test_rejected_logistics_google_login_shows_the_saved_reason(): void
+    {
+        $account = LogisticsProvider::factory()->create(['status' => 'rejected', 'rejection_reason' => 'Business permit is unreadable.', 'email' => 'rejected-logistics@gmail.com', 'google_id' => null]);
+        $this->fakeGoogleUser($account->email, 'rejected-logistics-id');
+        $this->get(route('auth.google.callback'))->assertRedirect(route('home', ['login' => 1]))
+            ->assertSessionHas('auth.status_message', fn ($message) => str_contains($message, 'Reason: Business permit is unreadable.'));
+        $this->assertGuest('logistics');
+        $this->get(route('home', ['login' => 1]))->assertOk()->assertSeeText('Reason: Business permit is unreadable.');
+    }
+
     private function fakeGoogleUser(string $email, string $id): void
     {
-        $googleUser = (new GoogleUser)->map([
+        $googleUser = (new GoogleUser)->setRaw([
+            'sub' => $id,
+            'email' => $email,
+            'email_verified' => true,
+        ])->map([
             'id' => $id,
             'email' => $email,
             'name' => 'Google Provider',

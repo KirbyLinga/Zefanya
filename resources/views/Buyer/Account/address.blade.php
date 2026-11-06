@@ -5,8 +5,9 @@
 @section('content')
 @php
     // old() wins after a validation error so the user doesn't retype everything.
-    $val = fn (string $field, $default = '') => old($field, $buyer->$field ?? $default);
-    $isManualOld = old('address_mode', $buyer->address_mode ?? 'api') === 'manual';
+    $record = $editing ?? null;
+    $val = fn (string $field, $default = '') => old($field, $record?->$field ?? $default);
+    $atLimit = $addresses->count() >= \App\Services\Buyer\BuyerAddressBook::MAX && $record === null;
 
     // Shared with the buyer registration modal (Components/buyer-register-modal).
     $labelCls = 'mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-[var(--text-label)]';
@@ -41,12 +42,52 @@
                     </div>
                 @endif
 
-                <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
-                    <form method="POST" action="{{ route('buyer.account.address.update') }}">
-                        @csrf
-                        @method('PATCH')
+                <section class="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
+                    <h2 class="font-serif text-[18px] font-normal text-[var(--text-ink)]">Saved addresses</h2>
+                    <p class="mt-1 font-sans text-[12px] text-[var(--text-muted)]">{{ $addresses->count() }} of {{ \App\Services\Buyer\BuyerAddressBook::MAX }}. One address is the default.</p>
+                    @if ($addresses->isEmpty())
+                        <p class="mt-4 font-sans text-[13px] text-[var(--text-muted)]">No saved addresses yet.</p>
+                    @else
+                        <ul class="mt-4 space-y-3">
+                            @foreach ($addresses as $address)
+                                <li class="rounded-xl border border-[var(--border-faint)] px-4 py-3">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <p class="font-sans text-[13px] text-[var(--text-ink)]">{{ $address->summary() }}</p>
+                                        @if ($address->is_default)
+                                            <span class="rounded-full bg-[var(--pill-success-bg)] px-2.5 py-1 font-sans text-[11px] font-semibold text-[var(--status-success)]">Default</span>
+                                        @endif
+                                    </div>
+                                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                                        <a href="{{ route('buyer.account.address', ['edit' => $address->id]) }}" class="font-sans text-[12px] font-semibold text-[var(--text-ink)] underline">Edit</a>
+                                        @unless ($address->is_default)
+                                            <form method="POST" action="{{ route('buyer.account.addresses.default', $address) }}">
+                                                @csrf
+                                                <button type="submit" class="font-sans text-[12px] font-semibold text-[var(--text-ink)] underline">Set as default</button>
+                                            </form>
+                                            <form method="POST" action="{{ route('buyer.account.addresses.destroy', $address) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="font-sans text-[12px] font-semibold text-[var(--status-danger)] underline">Delete</button>
+                                            </form>
+                                        @else
+                                            <p class="font-sans text-[12px] text-[var(--text-muted)]">Choose another default address before deleting this one.</p>
+                                        @endunless
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </section>
 
-                        <input type="hidden" name="address_mode" id="addressMode" value="{{ old('address_mode', $buyer->address_mode ?? 'api') }}">
+                @unless ($atLimit)
+                <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
+                    <form method="POST" action="{{ $record ? route('buyer.account.addresses.update', $record) : route('buyer.account.addresses.store') }}" data-account-address>
+                        @csrf
+                        @if ($record)
+                            @method('PATCH')
+                        @endif
+
+                        <input type="hidden" name="address_mode" id="addressMode" value="api">
                         <input type="hidden" name="province_name" id="provinceNameField" value="{{ $val('province_name') }}">
                         <input type="hidden" name="municipality_name" id="municipalityNameField" value="{{ $val('municipality_name') }}">
                         <input type="hidden" name="barangay_name" id="barangayNameField" value="{{ $val('barangay_name') }}">
@@ -59,31 +100,33 @@
                         @endif
 
                         <div class="mb-6">
-                            <div class="mb-4 flex justify-between items-start">
-                                <div>
-                                    <h2 class="font-serif text-[18px] font-normal leading-tight text-[var(--text-ink)]">Delivery Address</h2>
-                                    <p class="mt-1 font-sans text-[12px] text-[var(--text-muted)]">Update where we'll send your orders.</p>
-                                </div>
-                                <button type="button"
-                                        class="font-sans text-xs font-semibold text-[var(--brand)] hover:text-[var(--link)]"
-                                        id="toggleManualAddress">{{ $isManualOld ? 'Use address lookup' : 'Enter address manually' }}</button>
+                            <div class="mb-4">
+                                <h2 class="font-serif text-[18px] font-normal leading-tight text-[var(--text-ink)]">{{ $record ? 'Edit address' : 'Add an address' }}</h2>
+                                <p class="mt-1 font-sans text-[12px] text-[var(--text-muted)]">{{ $addresses->isEmpty() ? 'The first address you save becomes the default.' : 'Update where we\'ll send your orders.' }}</p>
                             </div>
 
-                            {{-- API mode: PSGC cascading dropdowns (same DOM contract as the registration modal) --}}
-                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 {{ $isManualOld ? 'hidden' : '' }}" id="apiAddressFields">
+                            {{-- PSGC cascading dropdowns (same DOM contract as the registration modal) --}}
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" id="apiAddressFields">
+                                <div>
+                                    <label class="{{ $labelCls }}" for="region">Region *</label>
+                                    <select name="region" id="region" required data-saved-code="{{ old('region') }}" class="{{ $inputCls }}">
+                                        <option value="">Loading regions...</option>
+                                    </select>
+                                    @error('region')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                </div>
                                 <div>
                                     <label class="{{ $labelCls }}" for="province">Province *</label>
-                                    <select name="province" id="province" {{ $isManualOld ? '' : 'required' }}
-                                            data-saved-code="{{ old('province', $buyer->province_code) }}"
+                                    <select name="province" id="province" required
+                                            data-saved-code="{{ old('province', $record?->province_code) }}"
                                             class="{{ $inputCls }}">
-                                        <option value="" disabled selected>{{ $isManualOld ? 'Select province' : 'Loading provinces...' }}</option>
+                                        <option value="" disabled selected>Select region first</option>
                                     </select>
                                     @error('province')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                                 <div>
                                     <label class="{{ $labelCls }}" for="municipality">Municipality / city *</label>
-                                    <select name="municipality" id="municipality" disabled {{ $isManualOld ? '' : 'required' }}
-                                            data-saved-code="{{ old('municipality', $buyer->municipality_code) }}"
+                                    <select name="municipality" id="municipality" disabled required
+                                            data-saved-code="{{ old('municipality', $record?->municipality_code) }}"
                                             class="{{ $inputCls }} disabled:bg-neutral-100 disabled:text-neutral-400">
                                         <option value="" disabled selected>Select province first</option>
                                     </select>
@@ -91,33 +134,12 @@
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="{{ $labelCls }}" for="barangay">Barangay *</label>
-                                    <select name="barangay" id="barangay" disabled {{ $isManualOld ? '' : 'required' }}
-                                            data-saved-code="{{ old('barangay', $buyer->barangay_code) }}"
+                                    <select name="barangay" id="barangay" disabled required
+                                            data-saved-code="{{ old('barangay', $record?->barangay_code) }}"
                                             class="{{ $inputCls }} disabled:bg-neutral-100 disabled:text-neutral-400">
                                         <option value="" disabled selected>Select municipality first</option>
                                     </select>
                                     @error('barangay')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
-                                </div>
-                            </div>
-
-                            {{-- Manual fallback: free-text province/municipality/barangay --}}
-                            <div class="mt-4 grid grid-cols-1 gap-4 {{ $isManualOld ? '' : 'hidden' }}" id="manualAddressFields">
-                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="manualProvince">Province</label>
-                                        <input type="text" id="manualProvince" name="province_name_manual" placeholder="Province name" value="{{ $val('province_name') }}"
-                                               class="{{ $inputCls }}">
-                                    </div>
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="manualMunicipality">Municipality / City</label>
-                                        <input type="text" id="manualMunicipality" name="municipality_name_manual" placeholder="Municipality or city" value="{{ $val('municipality_name') }}"
-                                               class="{{ $inputCls }}">
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="{{ $labelCls }}" for="manualBarangay">Barangay</label>
-                                    <input type="text" id="manualBarangay" name="barangay_name_manual" placeholder="Barangay name" value="{{ $val('barangay_name') }}"
-                                           class="{{ $inputCls }}">
                                 </div>
                             </div>
 
@@ -150,6 +172,13 @@
                             </div>
                         </div>
 
+                        @if ($addresses->isNotEmpty() && ! $record?->is_default)
+                            <label class="mt-4 flex items-center gap-2 font-sans text-[13px] text-[var(--text-ink)]">
+                                <input type="checkbox" name="is_default" value="1" @checked(old('is_default'))>
+                                Set as default
+                            </label>
+                        @endif
+
                         <div class="flex flex-col gap-3 border-t border-[var(--border-faint)] pt-5 sm:flex-row sm:items-center sm:gap-x-5">
                             <button type="submit"
                                     class="inline-flex w-full items-center justify-center rounded-full bg-[var(--btn-primary-bg)] px-8 py-2.5 font-sans text-[13px] font-semibold text-[var(--btn-primary-text)] transition-colors hover:bg-[var(--btn-primary-bg-hover)] sm:w-auto">
@@ -158,6 +187,9 @@
                         </div>
                     </form>
                 </section>
+                @else
+                    <p class="font-sans text-[13px] text-[var(--text-muted)]">{{ \App\Services\Buyer\BuyerAddressBook::LIMIT_MESSAGE }}</p>
+                @endunless
             </main>
         </div>
     </div>
@@ -165,37 +197,4 @@
 
 {{-- Shared PSGC lookup: same module the registration modal uses (no duplicated API code). --}}
 @vite('resources/js/buyer/address-lookup.js')
-<script>
-    // Account-page bootstrapping: scope the shared lookup to THIS form (the
-    // layout also embeds the registration modal whose duplicate IDs would
-    // otherwise win a document-wide getElementById), then restore the saved
-    // record's mode and preselect its PSGC codes.
-    (function boot() {
-        var root = document.querySelector('form[action*="account/address"]');
-        if (!root || !window.zfAddressLookup) {
-            // Module is a deferred Vite entry — retry until it lands.
-            return setTimeout(boot, 25);
-        }
-
-        var api = window.zfAddressLookup.init(root);
-        if (!api) return;
-
-        var saved = {
-            province: root.querySelector('#province').dataset.savedCode || '',
-            municipality: root.querySelector('#municipality').dataset.savedCode || '',
-            barangay: root.querySelector('#barangay').dataset.savedCode || '',
-        };
-
-        if (root.querySelector('#addressMode').value === 'manual') {
-            // Saved record used manual entry — start there. setManualMode also
-            // attaches the mirror listeners that keep the hidden *_name fields
-            // in sync with what the user types.
-            api.setManualMode(true);
-        } else if (saved.province) {
-            api.preselect(saved);
-        } else {
-            api.ensureLoaded();
-        }
-    })();
-</script>
 @endsection

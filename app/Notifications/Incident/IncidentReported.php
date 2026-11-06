@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Incident;
 
-use App\Models\Incidents;
+use App\Models\Shared\Incidents;
 use Illuminate\Notifications\Notification;
 
 class IncidentReported extends Notification

@@ -7,16 +7,26 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
-use App\Models\CartItem;
-use App\Models\CheckoutToken;
-use App\Models\InventoryTransaction;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Payment;
-use App\Models\Product;
+use App\Models\Buyer\BuyerAddress;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
+use App\Models\Logistics\LogisticsHub;
+use App\Models\Logistics\ParcelRoute;
+use App\Models\Logistics\TransportConnection;
 use App\Models\Seller\Seller;
-use App\Models\Voucher;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\Voucher;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\RoutePlannerService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
+use Mockery;
 use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
@@ -111,8 +121,16 @@ class CheckoutControllerTest extends TestCase
                 ...$this->checkoutCarrierPayload([$this->sellerA, $this->sellerB]),
             ]);
 
+        // DEBUG: Check response status and location
+        $location = $response->headers->get('Location');
+        if (! str_contains($location ?? '', 'checkout/success')) {
+            $this->fail("Expected success redirect, got: $location. Session errors: ".json_encode(session('errors')?->all() ?? []).'. Session flash: '.json_encode(session()->all()));
+        }
+
         // subtotal = 2×10000 + 1×2550 = 22550; discount 5000; shipping 9800; total 27350.
-        $order = Order::query()->sole();
+        $this->assertGreaterThan(0, Order::count(), 'No orders created after checkout');
+        $order = Order::query()->first();
+        $this->assertNotNull($order, 'Expected at least one order');
         $this->assertSame(22550, $order->subtotal_minor);
         $this->assertSame(5000, $order->discount_minor);
         $this->assertSame(27350, $order->total_minor);
@@ -368,7 +386,7 @@ class CheckoutControllerTest extends TestCase
         $this->assertSame(0, Order::query()->count());
     }
 
-    public function test_an_invalid_parked_voucher_is_dropped_and_the_order_still_places(): void
+    public function test_an_invalid_parked_voucher_stops_the_order_until_the_buyer_confirms_the_new_total(): void
     {
         $cart = CartItem::factory()->create([
             'buyer_id' => $this->buyer->id,
@@ -378,18 +396,23 @@ class CheckoutControllerTest extends TestCase
         Voucher::factory()->fixed(5000)->expired()->create(['code' => 'OLDCODE']);
         $this->parkSelection([$cart->id], 'OLDCODE');
 
-        $response = $this->actingAs($this->buyer, 'buyer')
-            ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
-                ...$this->checkoutCarrierPayload([$this->sellerA]),
-            ]);
+        $token = CheckoutToken::issue($this->buyer->id)->token;
+        $payload = ['checkout_token' => $token, ...$this->checkoutCarrierPayload([$this->sellerA])];
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), $payload)
+            ->assertRedirect(route('buyer.checkout.index', ['items' => [$cart->id]]))
+            ->assertSessionHas('error', fn (string $message) => str_contains($message, 'expired'));
+        $this->assertSame(0, Order::query()->count());
+
+        // Confirming again places it at the total the page now shows.
+        $this->post(route('buyer.checkout.store'), $payload)->assertRedirect();
 
         $order = Order::query()->sole();
         $this->assertSame(10000, $order->subtotal_minor);
         $this->assertSame(0, $order->discount_minor);
         $this->assertSame(14900, $order->total_minor);
         $this->assertSame(14900, (int) Payment::query()->value('amount_minor'));
-        $response->assertSessionHas('voucher_notice');
     }
 
     // ── Checkout index: invalid / stale selections ───────────────────────
@@ -451,5 +474,192 @@ class CheckoutControllerTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.success', $order))
             ->assertOk();
+    }
+
+    // ── Phase 4: Route validation and transaction safety ──────────────────────
+
+    public function test_checkout_transaction_rolls_back_when_route_validation_fails(): void
+    {
+        // Route planning runs last in the transaction, so every earlier write
+        // must roll back. We use mocking to force route planning to fail.
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+
+        $initialStock = $this->productA->stock_quantity;
+        $this->parkSelection([$cartA->id]);
+
+        // Mock RoutePlannerService to throw ValidationException for this test
+        $mockRoutePlanner = Mockery::mock(RoutePlannerService::class);
+        $mockRoutePlanner->shouldReceive('planRoute')->andThrow(
+            ValidationException::withMessages([
+                'route' => 'No connected route exists from origin to destination.',
+            ])
+        );
+        app()->instance(RoutePlannerService::class, $mockRoutePlanner);
+
+        $token = CheckoutToken::issue($this->buyer->id)->token;
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => $token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        $this->assertCheckoutRolledBack($response, $cartA, $initialStock, route('buyer.cart.index'), 'No shipping route available');
+
+        // The rolled-back claim leaves the token usable for a retry.
+        $this->assertFalse((bool) CheckoutToken::query()->where('token', $token)->value('used'));
+    }
+
+    public function test_an_unconnected_destination_is_refused_before_any_write(): void
+    {
+        $this->coverSecondBarangayFromAnotherStation();
+        $this->buyer->forceFill(['barangay_code' => '0305401002', 'barangay_name' => 'Second'])->save();
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        // The real planner, reached through carrier validation, stops this ahead of the transaction.
+        $this->assertCheckoutRolledBack($response, $cartA, 5, route('buyer.checkout.index', ['items' => [$cartA->id]]), 'Shipping is not available');
+    }
+
+    public function test_a_connected_route_lets_checkout_succeed_and_persists_the_route(): void
+    {
+        $destination = $this->coverSecondBarangayFromAnotherStation();
+        $origin = LogisticsHub::query()->where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('hub_type', LogisticsHub::STATION)->whereKeyNot($destination->id)->first();
+        TransportConnection::create([
+            'origin_hub_id' => $origin->id,
+            'destination_hub_id' => $destination->id,
+            'transport_mode' => TransportConnection::ROAD,
+            'is_active' => true,
+        ]);
+        $this->buyer->forceFill(['barangay_code' => '0305401002', 'barangay_name' => 'Second'])->save();
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        $order = Order::query()->sole();
+        $response->assertRedirect(route('buyer.checkout.success', $order));
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionMissing('error');
+
+        $sellerOrder = $order->sellerOrders()->sole();
+        $this->assertSame(1, Payment::query()->where('seller_order_id', $sellerOrder->id)->count());
+        $this->assertSame(3, $this->productA->fresh()->stock_quantity);
+        $this->assertFalse(CartItem::query()->whereKey($cartA->id)->exists());
+
+        $route = ParcelRoute::query()->where('seller_order_id', $sellerOrder->id)->sole();
+        $this->assertSame((int) $destination->id, (int) $route->destination_hub_id);
+        $this->assertSame([(int) $destination->id], array_column($route->legs, 'hub_id'));
+    }
+
+    public function test_the_route_follows_the_address_chosen_for_the_order(): void
+    {
+        // Profile barangay is unroutable from here; the chosen address shares the seller's hub.
+        $this->coverSecondBarangayFromAnotherStation();
+        $this->buyer->forceFill(['barangay_code' => '0305401002', 'barangay_name' => 'Second'])->save();
+        $chosen = BuyerAddress::query()->forceCreate([
+            'buyer_id' => $this->buyer->id,
+            'address_mode' => 'api',
+            'street' => 'Maple Street',
+            'province_code' => '030540000',
+            'province_name' => 'Pampanga',
+            'municipality_code' => '030540100',
+            'municipality_name' => 'San Fernando',
+            'barangay_code' => '0305401001',
+            'barangay_name' => 'First',
+        ]);
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 1,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'address_id' => $chosen->id,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        $order = Order::query()->sole();
+        $response->assertRedirect(route('buyer.checkout.success', $order));
+        $this->assertSame('0305401001', $order->shipping_address['barangay_code']);
+
+        $route = ParcelRoute::query()->where('seller_order_id', $order->sellerOrders()->sole()->id)->sole();
+        $this->assertSame((int) $route->origin_hub_id, (int) $route->destination_hub_id);
+    }
+
+    private function assertCheckoutRolledBack(TestResponse $response, CartItem $cart, int $expectedStock, string $redirect, string $error): void
+    {
+        $response->assertRedirect($redirect);
+        $response->assertSessionHas('error', fn (string $flash): bool => str_contains($flash, $error));
+
+        $this->assertSame(0, Order::query()->count());
+        $this->assertSame(0, SellerOrder::query()->count());
+        $this->assertSame(0, Payment::query()->count());
+        $this->assertSame(0, OrderItem::query()->count());
+        $this->assertSame(0, ParcelRoute::query()->count());
+        $this->assertSame(0, InventoryTransaction::query()->where('reason', 'checkout')->count());
+        $this->assertSame($expectedStock, $this->productA->fresh()->stock_quantity);
+        $this->assertTrue(CartItem::query()->whereKey($cart->id)->exists());
+    }
+
+    /** A second Station Hub as the validated coverage for barangay 0305401002. */
+    private function coverSecondBarangayFromAnotherStation(): LogisticsHub
+    {
+        $origin = LogisticsHub::query()->where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('hub_type', LogisticsHub::STATION)->firstOrFail();
+
+        $station = LogisticsHub::query()->create([
+            'logistics_provider_id' => $this->checkoutCarrier->id,
+            'parent_hub_id' => $origin->parent_hub_id,
+            'name' => 'Second Station',
+            'hub_type' => LogisticsHub::STATION,
+            'region_code' => $origin->region_code,
+            'province_code' => $origin->province_code,
+            'province_name' => $origin->province_name,
+            'city_municipality_code' => '030540100',
+            'municipality' => 'San Fernando',
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        (new LogisticsHubService)->saveCoverage($this->checkoutCarrier->id, [
+            'name' => 'Coverage 0305401002',
+            'station_hub_id' => $station->id,
+            'city_municipality_code' => '030540100',
+            'barangay_code' => '0305401002',
+            'is_active' => true,
+        ]);
+
+        return $station;
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Policies;
 
 use App\Models\Buyer\Buyer;
-use App\Models\Order;
+use App\Models\Shared\Order;
 use Illuminate\Auth\Access\Response;
 
 /**
@@ -24,7 +24,7 @@ class BuyerOrderPolicy
         return $this->view($buyer, $order);
     }
 
-    /** Cancel an unaccepted seller_order slice on the buyer's own order. */
+    /** Authorize ownership; the status service enforces cancellation eligibility. */
     public function cancelSellerOrder(Buyer $buyer, Order $order): Response
     {
         return $this->view($buyer, $order);
