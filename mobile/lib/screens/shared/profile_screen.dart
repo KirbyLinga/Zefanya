@@ -30,7 +30,6 @@
 //   3. Buyers get a strip of what they've actually been looking at, so
 //      the screen reads as this person rather than as a settings form.
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/auth_state.dart';
@@ -39,8 +38,8 @@ import '../../state/order_state.dart';
 import '../../state/recently_viewed_state.dart';
 import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/image_picker_helper.dart';
 import '../../utils/money_format.dart';
+import '../../widgets/avatar_picker.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
 import '../buyer/widgets/product_card.dart' show ProductImage;
@@ -251,7 +250,13 @@ class ProfileScreen extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildAvatar(context, auth),
+                    AvatarDisplay(
+                      onTap: () => Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: AppSpacing.s16),
                     Expanded(
                       child: Padding(
@@ -300,80 +305,6 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvatar(BuildContext context, AuthState auth) {
-    final hasRealPhoto = auth.avatarPath != null && File(auth.avatarPath!).existsSync();
-
-    return Semantics(
-      button: true,
-      label: 'Change profile photo',
-      child: InkWell(
-        onTap: () async {
-          final picked = await pickAndSaveImage(context, filenamePrefix: 'avatar');
-          if (picked != null) {
-            // ignore: use_build_context_synchronously
-            context.read<AuthState>().updateProfile(avatarPath: picked.path);
-          }
-        },
-        customBorder: const CircleBorder(),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Arch, not ClipOval. This is the app's "important photo"
-          // silhouette and the avatar is the most important photo on
-          // the screen — a plain circle here was the one place the
-          // shape language didn't reach.
-          Arch(
-            footRadius: 10,
-            child: SizedBox(
-              width: 68,
-              height: 84,
-              child: hasRealPhoto
-                  ? Image.file(File(auth.avatarPath!), fit: BoxFit.cover)
-                  : _placeholderAvatar(auth),
-            ),
-          ),
-          Positioned(
-            right: -4,
-            bottom: -4,
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.s4),
-              decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-              child: Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  Widget _placeholderAvatar(AuthState auth) {
-    // A monogram, not a stranger's face. The old Picsum portrait put an
-    // unrelated stock photograph on the most personal surface in the app;
-    // the initial is honest, on-brand, and cannot fail to load.
-    final source = (auth.name ?? auth.email ?? '').trim();
-    final initial = source.isEmpty
-        ? 'Z'
-        : String.fromCharCode(source.runes.first).toUpperCase();
-    return Semantics(
-      image: true,
-      label: 'Profile photo placeholder',
-      excludeSemantics: true,
-      child: Container(
-        color: AppColors.secondary,
-        alignment: Alignment.center,
-        child: Text(
-          initial,
-          style: AppType.masthead.copyWith(
-            fontSize: 34,
-            height: 1,
-            color: AppColors.textPrimary,
-          ),
         ),
       ),
     );

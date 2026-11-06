@@ -104,6 +104,10 @@ class MediaPicker {
   /// [MediaResult] or null. [cameraOnly] skips the sheet and opens the
   /// camera directly.
   ///
+  /// Pass [source] when the caller has already asked the person where the
+  /// photo should come from (the avatar sheet does). It skips the built-in
+  /// sheet while keeping every permission, validation and storage rule.
+  ///
   /// Camera requests the runtime permission before launching. Gallery needs
   /// no storage permission on Android 13+ (photo picker). On denial, a
   /// friendly message with an Open Settings button is shown.
@@ -112,17 +116,17 @@ class MediaPicker {
     required String filenamePrefix,
     bool cameraOnly = false,
     bool allowPdf = false,
+    ImageSource? source,
   }) async {
     final pickerContext = context;
-    final source = cameraOnly
-        ? ImageSource.camera
-        : await _chooseSource(context);
+    final chosenSource = source ??
+        (cameraOnly ? ImageSource.camera : await _chooseSource(context));
 
-    if (source == null) return null;
+    if (chosenSource == null) return null;
 
     try {
       final picked = await ImagePicker().pickImage(
-        source: source,
+        source: chosenSource,
         maxWidth: kMediaMaxDimension.toDouble(),
         imageQuality: kMediaJpegQuality,
       );
@@ -130,7 +134,7 @@ class MediaPicker {
 
       return _validateAndSave(picked, filenamePrefix, allowPdf: allowPdf);
     } on Exception {
-      if (source == ImageSource.camera) {
+      if (chosenSource == ImageSource.camera) {
         // ignore: use_build_context_synchronously
         _showPermissionDenied(pickerContext);
         return null;

@@ -824,6 +824,11 @@ class AuthState extends ChangeNotifier {
   /// Called from RegistrationScreen and EditProfileScreen — updates
   /// whichever fields are passed and leaves the rest untouched. Also
   /// recomposes the display `name` whenever any name part changes.
+  ///
+  /// [removeAvatar] exists because "no avatar" is a real choice, and a
+  /// nullable `avatarPath` cannot express it: null already means "leave it
+  /// alone" for every other caller. Set it (rather than passing null) to
+  /// return to the initials fallback.
   void updateProfile({
     String? lastName,
     String? firstName,
@@ -837,6 +842,7 @@ class AuthState extends ChangeNotifier {
     String? street,
     String? postalCode,
     String? avatarPath,
+    bool removeAvatar = false,
   }) {
     if (lastName != null) this.lastName = lastName;
     if (firstName != null) this.firstName = firstName;
@@ -852,10 +858,20 @@ class AuthState extends ChangeNotifier {
     if (barangay != null) this.barangay = barangay;
     if (street != null) this.street = street;
     if (postalCode != null) this.postalCode = postalCode;
-    if (avatarPath != null) this.avatarPath = avatarPath;
+    if (removeAvatar) {
+      this.avatarPath = null;
+    } else if (avatarPath != null) {
+      this.avatarPath = avatarPath;
+    }
     notifyListeners();
     _save();
   }
+
+  /// Persists the current profile snapshot and completes when the write is
+  /// done. [updateProfile] notifies immediately and saves in the background;
+  /// AvatarPicker awaits this so it can roll back a change that could not be
+  /// stored instead of leaving the photo visible until the next launch.
+  Future<void> persistProfile() => _save();
 
   /// Records the rider half of a courier registration.
   ///

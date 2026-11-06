@@ -16,6 +16,7 @@ import '../../data/ph_address_catalog.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/validators.dart';
+import '../../widgets/avatar_picker.dart';
 import '../../widgets/dirty_guard.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/ph_address_fields.dart';
@@ -200,6 +201,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 title: 'Edit Profile',
                 padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
               ),
+              Center(
+                child: Column(
+                  children: [
+                    AvatarPicker(
+                      key: const ValueKey('edit-profile-avatar'),
+                      width: 88,
+                      height: 110,
+                      onChanged: _markDirty,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Tap the photo to change it',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
