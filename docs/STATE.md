@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-08
 Stage: limited combined Courier implemented/tested; LOCAL SETUP/DEVICE GATES OPEN, not LIVE-READY.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified starting HEAD: 09d27aa; implementation hash recorded by follow-up state commit.
+Verified implementation HEAD: 8e8d7d5; follow-up records its hash and local-setup continuation only.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep UserRole.courier as legacy Rider; new linehaul role/model/ability and live-only Courier login/portal.
 Logistics assigns one active forward manifest to an eligible same-company Courier; driver/manifest locks and ownership policy.
