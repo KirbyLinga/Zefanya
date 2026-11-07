@@ -41,8 +41,10 @@ class _FakeServer {
   final List<Map<String, String>> queries = [];
   final List<Map<String, String>> headers = [];
 
-  late final http.Client client =
-      MockClient.streaming((request, bodyStream) async {
+  late final http.Client client = MockClient.streaming((
+    request,
+    bodyStream,
+  ) async {
     methods.add(request.method);
     paths.add(request.url.path);
     queries.add(request.url.queryParameters);
@@ -63,13 +65,19 @@ class _FakeServer {
 }
 
 http.Response _json(Map<String, Object?> body, [int status = 200]) =>
-    http.Response(jsonEncode(body), status);
+    http.Response(
+      jsonEncode(body),
+      status,
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
 
 /// WebZefanya's envelope: `{success, data}`; product lists nest `{data, meta}`.
 http.Response _ok(Object? data) => _json({'success': true, 'data': data});
 
-http.Response _page(List<Object?> rows) =>
-    _ok({'data': rows, 'meta': {'page': 1, 'per_page': 20, 'total': rows.length, 'has_more': false}});
+http.Response _page(List<Object?> rows) => _ok({
+  'data': rows,
+  'meta': {'page': 1, 'per_page': 20, 'total': rows.length, 'has_more': false},
+});
 
 Map<String, Object?> _productJson({
   Object? id = 7,
@@ -82,30 +90,29 @@ Map<String, Object?> _productJson({
   int reviewCount = 0,
   double? rating,
   int stock = 12,
-}) =>
-    {
-      'id': id,
-      'name': name,
-      'category': {'id': 2, 'label': category},
-      'seller': {'id': 3, 'name': sellerName},
-      'image_url': imageUrl,
-      'price': {
-        'min_minor': priceMinor,
-        'max_minor': priceMinor,
-        'regular_min_minor': regularMinor ?? priceMinor,
-        'regular_max_minor': regularMinor ?? priceMinor,
-      },
-      'rating': rating,
-      'review_count': reviewCount,
-      'sold': 0,
-      'in_stock': stock > 0,
-      'stock': stock,
-    };
+}) => {
+  'id': id,
+  'name': name,
+  'category': {'id': 2, 'label': category},
+  'seller': {'id': 3, 'name': sellerName},
+  'image_url': imageUrl,
+  'price': {
+    'min_minor': priceMinor,
+    'max_minor': priceMinor,
+    'regular_min_minor': regularMinor ?? priceMinor,
+    'regular_max_minor': regularMinor ?? priceMinor,
+  },
+  'rating': rating,
+  'review_count': reviewCount,
+  'sold': 0,
+  'in_stock': stock > 0,
+  'stock': stock,
+};
 
 class _Live {
   _Live(List<http.Response> script)
-      : server = _FakeServer(script),
-        tokens = InMemoryTokenStore() {
+    : server = _FakeServer(script),
+      tokens = InMemoryTokenStore() {
     client = ApiClient(
       baseUrl: 'https://api.zefanya.test',
       tokenStore: tokens,
@@ -125,15 +132,18 @@ class _Live {
 void main() {
   // ── What goes over the wire ──────────────────────────────────────────────
 
-  test('the catalogue is fetched without a token, even when one is held', () async {
-    final live = _Live([_page([])]);
-    await live.tokens.write('1|buyer');
+  test(
+    'the catalogue is fetched without a token, even when one is held',
+    () async {
+      final live = _Live([_page([])]);
+      await live.tokens.write('1|buyer');
 
-    await live.catalog.products();
+      await live.catalog.products();
 
-    expect(live.server.paths.single, '/buyer/products');
-    expect(live.server.headers.single.containsKey('authorization'), isFalse);
-  });
+      expect(live.server.paths.single, '/buyer/products');
+      expect(live.server.headers.single.containsKey('authorization'), isFalse);
+    },
+  );
 
   test('the category chip is sent as the server id behind its label', () async {
     final live = _Live([
@@ -143,18 +153,28 @@ void main() {
       _page([]),
     ]);
 
-    await live.catalog.products(query: const CatalogQuery(category: 'Home and Garden'));
+    await live.catalog.products(
+      query: const CatalogQuery(category: 'Home and Garden'),
+    );
 
     expect(live.server.paths, ['/buyer/categories', '/buyer/products']);
     expect(live.server.queries.last['category'], '2');
   });
 
-  test('an unknown category answers empty without asking for products', () async {
-    final live = _Live([_ok(<Object?>[])]);
+  test(
+    'an unknown category answers empty without asking for products',
+    () async {
+      final live = _Live([_ok(<Object?>[])]);
 
-    expect(await live.catalog.products(query: const CatalogQuery(category: 'Nope')), isEmpty);
-    expect(live.server.paths, ['/buyer/categories']);
-  });
+      expect(
+        await live.catalog.products(
+          query: const CatalogQuery(category: 'Nope'),
+        ),
+        isEmpty,
+      );
+      expect(live.server.paths, ['/buyer/categories']);
+    },
+  );
 
   test('the app\'s "All" chip is not sent as a category', () async {
     final live = _Live([_page([])]);
@@ -164,15 +184,23 @@ void main() {
     expect(live.server.queries.single, isEmpty);
   });
 
-  test('search becomes q; a shop filter uses the seller id the server sent', () async {
-    final live = _Live([_page([_productJson()]), _page([])]);
+  test(
+    'search becomes q; a shop filter uses the seller id the server sent',
+    () async {
+      final live = _Live([
+        _page([_productJson()]),
+        _page([]),
+      ]);
 
-    await live.catalog.products();
-    await live.catalog.products(query: const CatalogQuery(search: 'rattan', seller: 'Loom & Larder'));
+      await live.catalog.products();
+      await live.catalog.products(
+        query: const CatalogQuery(search: 'rattan', seller: 'Loom & Larder'),
+      );
 
-    expect(live.server.queries.last['q'], 'rattan');
-    expect(live.server.queries.last['seller'], '3');
-  });
+      expect(live.server.queries.last['q'], 'rattan');
+      expect(live.server.queries.last['seller'], '3');
+    },
+  );
 
   test('a blank filter is left off rather than sent as empty text', () async {
     final live = _Live([_page([])]);
@@ -194,27 +222,37 @@ void main() {
   // ── What the answer becomes ──────────────────────────────────────────────
 
   test('a price in centavos becomes the pesos the app renders', () async {
-    final live = _Live([_page([_productJson(priceMinor: 125075)])]);
+    final live = _Live([
+      _page([_productJson(priceMinor: 125075)]),
+    ]);
 
     expect((await live.catalog.products()).single.price, 1250.75);
   });
 
-  test('the detail cover photo is the first one, as the server ordered it', () async {
-    final live = _Live([
-      _ok({
-        ..._productJson(),
-        'images': ['https://zefanya.test/b.jpg', 'https://zefanya.test/a.jpg'],
-      }),
-    ]);
+  test(
+    'the detail cover photo is the first one, as the server ordered it',
+    () async {
+      final live = _Live([
+        _ok({
+          ..._productJson(),
+          'images': [
+            'https://zefanya.test/b.jpg',
+            'https://zefanya.test/a.jpg',
+          ],
+        }),
+      ]);
 
-    final product = (await live.catalog.productById('7'))!;
+      final product = (await live.catalog.productById('7'))!;
 
-    expect(product.images.first, endsWith('b.jpg'));
-    expect(product.hasGallery, isTrue);
-  });
+      expect(product.images.first, endsWith('b.jpg'));
+      expect(product.hasGallery, isTrue);
+    },
+  );
 
   test('a product with no photo keeps an empty list', () async {
-    final live = _Live([_page([_productJson(imageUrl: null)])]);
+    final live = _Live([
+      _page([_productJson(imageUrl: null)]),
+    ]);
 
     final product = (await live.catalog.products()).single;
 
@@ -222,22 +260,27 @@ void main() {
     expect(product.hasGallery, isFalse);
   });
 
-  test('a sale price is shown only when the server\'s regular price is higher', () async {
-    final live = _Live([
-      _page([
-        _productJson(id: 1),
-        _productJson(id: 2, priceMinor: 80000, regularMinor: 100000),
-      ]),
-    ]);
+  test(
+    'a sale price is shown only when the server\'s regular price is higher',
+    () async {
+      final live = _Live([
+        _page([
+          _productJson(id: 1),
+          _productJson(id: 2, priceMinor: 80000, regularMinor: 100000),
+        ]),
+      ]);
 
-    final products = await live.catalog.products();
+      final products = await live.catalog.products();
 
-    expect(products.first.compareAtPrice, isNull);
-    expect(products.last.compareAtPrice, 1000);
-  });
+      expect(products.first.compareAtPrice, isNull);
+      expect(products.last.compareAtPrice, 1000);
+    },
+  );
 
   test('a live product with reviews carries the real aggregate', () async {
-    final live = _Live([_page([_productJson(rating: 4.3, reviewCount: 47)])]);
+    final live = _Live([
+      _page([_productJson(rating: 4.3, reviewCount: 47)]),
+    ]);
 
     final product = (await live.catalog.products()).single;
 
@@ -250,11 +293,26 @@ void main() {
       _ok({
         ..._productJson(),
         'options': [
-          {'name': 'Color', 'values': ['Black', 'Tan']},
+          {
+            'name': 'Color',
+            'values': ['Black', 'Tan'],
+          },
         ],
         'variants': [
-          {'id': 91, 'price': {'min_minor': 130000}, 'stock': 3, 'available': true, 'values': ['Black']},
-          {'id': 92, 'price': {'min_minor': 125075}, 'stock': 0, 'available': true, 'values': ['Tan']},
+          {
+            'id': 91,
+            'price': {'min_minor': 130000},
+            'stock': 3,
+            'available': true,
+            'values': ['Black'],
+          },
+          {
+            'id': 92,
+            'price': {'min_minor': 125075},
+            'stock': 0,
+            'available': true,
+            'values': ['Tan'],
+          },
         ],
       }),
     ]);
@@ -273,11 +331,16 @@ void main() {
     expect(await live.catalog.products(), isEmpty);
   });
 
-  test('a product that is gone reads as null rather than as an error', () async {
-    final live = _Live([_json({'message': 'Not found.'}, 404)]);
+  test(
+    'a product that is gone reads as null rather than as an error',
+    () async {
+      final live = _Live([
+        _json({'message': 'Not found.'}, 404),
+      ]);
 
-    expect(await live.catalog.productById('7'), isNull);
-  });
+      expect(await live.catalog.productById('7'), isNull);
+    },
+  );
 
   // ── Categories ───────────────────────────────────────────────────────────
 
@@ -289,7 +352,11 @@ void main() {
       ]),
     ]);
 
-    expect(await live.catalog.categories(), ['All', 'Books and Media', 'Home and Garden']);
+    expect(await live.catalog.categories(), [
+      'All',
+      'Books and Media',
+      'Home and Garden',
+    ]);
     expect(live.server.paths.single, '/buyer/categories');
   });
 
@@ -309,8 +376,24 @@ void main() {
   test('claimable vouchers come from /buyer/vouchers with the token', () async {
     final live = _Live([
       _ok([
-        {'code': 'WELCOME10', 'scope': 'shop', 'type': 'percent', 'value': 10, 'min_spend_minor': 50000, 'expires_at': null, 'summary': '10% off · Min. spend ₱500.00'},
-        {'code': 'FLAT50', 'scope': 'shop', 'type': 'fixed', 'value': 5000, 'min_spend_minor': null, 'expires_at': null, 'summary': '₱50.00 off'},
+        {
+          'code': 'WELCOME10',
+          'scope': 'shop',
+          'type': 'percent',
+          'value': 10,
+          'min_spend_minor': 50000,
+          'expires_at': null,
+          'summary': '10% off · Min. spend ₱500.00',
+        },
+        {
+          'code': 'FLAT50',
+          'scope': 'shop',
+          'type': 'fixed',
+          'value': 5000,
+          'min_spend_minor': null,
+          'expires_at': null,
+          'summary': '₱50.00 off',
+        },
       ]),
     ]);
     await live.tokens.write('1|buyer');
@@ -326,23 +409,29 @@ void main() {
     expect(vouchers.first.expiryLabel, 'No expiry');
   });
 
-  test('a voucher whose value cannot be read is refused rather than guessed', () async {
-    final live = _Live([
-      _ok([
-        {'code': 'ODD', 'type': 'percent', 'value': 'lots'},
-      ]),
-    ]);
+  test(
+    'a voucher whose value cannot be read is refused rather than guessed',
+    () async {
+      final live = _Live([
+        _ok([
+          {'code': 'ODD', 'type': 'percent', 'value': 'lots'},
+        ]),
+      ]);
 
-    expect(await live.cart.vouchers(), isEmpty);
-  });
+      expect(await live.cart.vouchers(), isEmpty);
+    },
+  );
 
   // ── What WebZefanya does not have ────────────────────────────────────────
 
-  test('no maker note or promo slide is invented, and nothing is requested', () async {
-    final live = _Live([_ok(null)]);
+  test(
+    'no maker note or promo slide is invented, and nothing is requested',
+    () async {
+      final live = _Live([_ok(null)]);
 
-    expect(await live.catalog.makerNote('Loom & Larder'), isNull);
-    expect(await live.catalog.promoSlides(), isEmpty);
-    expect(live.server.paths, isEmpty);
-  });
+      expect(await live.catalog.makerNote('Loom & Larder'), isNull);
+      expect(await live.catalog.promoSlides(), isEmpty);
+      expect(live.server.paths, isEmpty);
+    },
+  );
 }
