@@ -417,6 +417,8 @@ class CourierState extends ChangeNotifier {
     } finally {
       notifyListeners();
     }
+    await refreshCash();
+    await refreshPayouts();
   }
 
   /// Reports a lost or damaged parcel (live mode). The server blocks the
@@ -494,6 +496,208 @@ class CourierState extends ChangeNotifier {
       _pickupFailureReasons = List.unmodifiable(meta.failureReasons);
     }
     _maxPickupAttempts = meta.maxPickupAttempts;
+    _windingDown = meta.windingDown;
+    _windingDownMessage = meta.windingDownMessage;
+    if (_windingDown) _online = false;
+  }
+
+  // ── Wind-down (live mode) ────────────────────────────────────────────────
+
+  bool _windingDown = false;
+  String? _windingDownMessage;
+
+  /// The rider's company is suspended inside an Admin-granted wind-down. Only
+  /// parcels already out for delivery may be finished; pickups, returns and
+  /// going online are closed. The server enforces this; the app only hides
+  /// what it would refuse.
+  bool get isWindingDown => _windingDown;
+
+  /// The server's notice for the wind-down.
+  String get windingDownMessage =>
+      _windingDownMessage ??
+      'Your logistics company is suspended. You can only finish deliveries that are already out for delivery.';
+
+  // ── COD cash (live mode) ─────────────────────────────────────────────────
+
+  RiderCashSnapshot? _serverCash;
+  ApiException? _cashFailure;
+
+  /// The server's COD cash: collected, held, handed over and each record's
+  /// status. Null in mock mode or before the first read.
+  RiderCashSnapshot? get serverCash => _serverCash;
+
+  /// Why the last COD read failed (live mode), or null.
+  ApiException? get cashFailure => _cashFailure;
+
+  /// Re-reads the server's COD cash (live mode); a no-op in mock mode.
+  Future<void> refreshCash() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      _serverCash = await server.cash();
+      _cashFailure = null;
+    } on ApiException catch (error) {
+      _cashFailure = error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  // ── History, payouts, waybill, proof, coverage (live mode) ──────────────
+
+  List<RiderHistoryEntry>? _history;
+  ApiException? _historyFailure;
+  RiderPayoutsSnapshot? _serverPayouts;
+  ApiException? _payoutsFailure;
+  RiderCoverage? _coverage;
+
+  /// My finished deliveries from the server, or null before the first read
+  /// (and always in mock mode, where [completedJobs] is the history).
+  List<RiderHistoryEntry>? get history => _history == null ? null : List.unmodifiable(_history!);
+  ApiException? get historyFailure => _historyFailure;
+
+  /// What Logistics paid me (server data), or null.
+  RiderPayoutsSnapshot? get serverPayouts => _serverPayouts;
+  ApiException? get payoutsFailure => _payoutsFailure;
+
+  /// My station and coverage area (server data), or null.
+  RiderCoverage? get coverage => _coverage;
+
+  /// True when a server can answer history, waybill and proof requests.
+  bool get hasServerRecords => _server != null;
+
+  /// Re-reads my delivery history. Live mode only; closed during a
+  /// wind-down, as on the web.
+  Future<void> refreshHistory() async {
+    final server = _server;
+    if (server == null || _windingDown) return;
+    try {
+      _history = List.unmodifiable(await server.history());
+      _historyFailure = null;
+    } on ApiException catch (error) {
+      _historyFailure = error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  /// Re-reads what Logistics paid me (live mode).
+  Future<void> refreshPayouts() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      _serverPayouts = await server.payouts();
+      _payoutsFailure = null;
+    } on ApiException catch (error) {
+      _payoutsFailure = error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  bool _coverageRequested = false;
+
+  /// Reads the coverage at most once per session (the profile section calls
+  /// this on every build until it arrives).
+  Future<void> refreshCoverageOnce() async {
+    if (_coverageRequested) return;
+    _coverageRequested = true;
+    await refreshCoverage();
+  }
+
+  /// Reads my station and coverage once it is needed (live mode).
+  Future<void> refreshCoverage() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      _coverage = await server.coverage();
+      notifyListeners();
+    } on ApiException {
+      // The profile still shows the rest; coverage appears on the next read.
+    }
+  }
+
+  /// The private waybill for one of my jobs (live mode). Throws the server's
+  /// refusal (403 when it is not mine or no longer active).
+  Future<RiderWaybill> waybillFor(String jobId) {
+    final server = _server;
+    if (server == null) {
+      throw const ApiNotImplementedException('GET /api/rider/waybills/{id}');
+    }
+    return server.waybill(jobId);
+  }
+
+  /// My proof-of-delivery photo (live mode).
+  Future<Uint8List> proofPhoto(String proofId) {
+    final server = _server;
+    if (server == null) {
+      throw const ApiNotImplementedException('GET /api/rider/proofs/{id}');
+    }
+    return server.proofPhoto(proofId);
+  }
+
+  // ── Return pickups (live mode) ───────────────────────────────────────────
+
+  List<RiderReturnPickup> _returnPickups = const [];
+  ApiException? _returnsFailure;
+
+  /// Approved buyer returns assigned to this rider (server data).
+  List<RiderReturnPickup> get returnPickups => List.unmodifiable(_returnPickups);
+
+  /// Why the last returns read failed, or null.
+  ApiException? get returnsFailure => _returnsFailure;
+
+  bool isReturnCollectBusy(String returnId) =>
+      _pickupActionsInFlight.contains('return:$returnId');
+
+  /// Re-reads the assigned return pickups. Live mode only, and not during a
+  /// wind-down (the server closes return pickups then).
+  Future<void> refreshReturns() async {
+    final server = _server;
+    if (server == null || _windingDown) {
+      if (_returnPickups.isNotEmpty) {
+        _returnPickups = const [];
+        notifyListeners();
+      }
+      return;
+    }
+    try {
+      _returnPickups = List.unmodifiable(await server.returnPickups());
+      _returnsFailure = null;
+    } on ApiException catch (error) {
+      _returnsFailure = error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  /// Confirms collecting a return from the buyer. The server verifies the
+  /// tracking number, refuses a second collection and moves custody. Returns
+  /// false when a collection for this return is already in flight.
+  Future<bool> collectReturn(String returnId, {required String trackingNumber}) async {
+    final server = _server;
+    if (server == null) {
+      throw const ApiNotImplementedException('POST /api/rider/return-pickups/{id}/collect');
+    }
+    final key = 'return:$returnId';
+    if (!_pickupActionsInFlight.add(key)) return false;
+    notifyListeners();
+    try {
+      try {
+        await server.collectReturn(returnId, trackingNumber: trackingNumber);
+      } on ApiException catch (error) {
+        final stale = (error is RequestRejectedException && error.isConflict) ||
+            error is NotFoundException ||
+            error is ForbiddenException;
+        if (stale) await refreshReturns();
+        rethrow;
+      }
+      await refreshReturns();
+      return true;
+    } finally {
+      _pickupActionsInFlight.remove(key);
+      notifyListeners();
+    }
   }
 
   /// Reports a failed pickup attempt (live mode).
@@ -680,6 +884,7 @@ class CourierState extends ChangeNotifier {
     // server), so a successful job read also re-reads them. Live mode only;
     // a failure is kept in [earningsFailure], never thrown at the job list.
     await refreshEarnings();
+    await refreshReturns();
   }
 
   /// How many of this courier's deliveries have been rated.
@@ -775,6 +980,7 @@ class CourierState extends ChangeNotifier {
       return null;
     }
     if (_availabilityBusy) return null;
+    if (online && _windingDown) return windingDownMessage;
     if (online && isSuspended) return goOnline();
     if (online == _online) return null;
 
@@ -935,6 +1141,11 @@ class CourierState extends ChangeNotifier {
   /// hand over less than the full balance, and the remainder stays outstanding
   /// after Logistics confirms (RID-EARN-005).
   String? requestRemittance(double amount) {
+    // Live mode: one record per COD delivery is created by the server and only
+    // Logistics confirms the handover, so nothing is recorded on the phone.
+    if (_server != null) {
+      return 'Hand the cash to your Logistics company. They record and confirm it.';
+    }
     final cents = (amount * 100).round();
     if (cents <= 0) return 'Enter an amount to remit.';
     if (cents > (codOutstanding * 100).round()) {

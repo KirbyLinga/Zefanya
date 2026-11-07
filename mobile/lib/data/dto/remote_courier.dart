@@ -190,7 +190,16 @@ class RiderJobsMeta {
     required this.stops,
     required this.failureReasons,
     required this.maxPickupAttempts,
+    this.windingDown = false,
+    this.windingDownMessage,
   });
+
+  /// The rider's company is suspended inside an Admin-granted wind-down: only
+  /// parcels already out for delivery may be finished (server policy).
+  final bool windingDown;
+
+  /// The server's own wording for that notice.
+  final String? windingDownMessage;
 
   /// The rider's availability as the server has it, or null when absent.
   final bool? online;
@@ -218,8 +227,143 @@ RiderJobsMeta riderJobsMetaFromJson(Map<String, Object?> data) {
           ),
     ],
     maxPickupAttempts: _int(failure['max_attempts']) ?? 2,
+    windingDown: data['winding_down'] == true,
+    windingDownMessage: data['winding_down_message']?.toString(),
   );
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/cod
+// ---------------------------------------------------------------------------
+
+/// One COD record (WebZefanya `CodRemittance`): created by the server when a
+/// COD parcel is delivered, confirmed only by Logistics.
+class RiderCodRecord {
+  const RiderCodRecord({
+    required this.id,
+    required this.status,
+    required this.amount,
+    this.trackingNumber,
+    this.receivedAmount,
+    this.collectedAt,
+    this.confirmedAt,
+    this.overdue = false,
+  });
+
+  final String id;
+
+  /// `PENDING_REMITTANCE` (cash still with the rider) or
+  /// `REMITTED_TO_LOGISTICS` (Logistics confirmed receiving it).
+  final String status;
+  final double amount;
+  final String? trackingNumber;
+
+  /// What Logistics confirmed receiving; may be less than [amount].
+  final double? receivedAmount;
+  final DateTime? collectedAt;
+  final DateTime? confirmedAt;
+  final bool overdue;
+
+  bool get isHeld => status == 'PENDING_REMITTANCE';
+}
+
+/// The server's COD answer. Nothing here is computed on the device.
+class RiderCashSnapshot {
+  const RiderCashSnapshot({
+    required this.collected,
+    required this.holding,
+    required this.holdingCount,
+    required this.overdueCount,
+    required this.overdueAfterDays,
+    required this.remitted,
+    required this.remittedThisMonth,
+    required this.held,
+    required this.remittedRecords,
+  });
+
+  final double collected;
+  final double holding;
+  final int holdingCount;
+  final int overdueCount;
+  final int overdueAfterDays;
+  final double remitted;
+  final double remittedThisMonth;
+  final List<RiderCodRecord> held;
+  final List<RiderCodRecord> remittedRecords;
+}
+
+RiderCashSnapshot riderCashFromJson(Map<String, Object?> data) {
+  final summary = (data['summary'] as Map?)?.cast<String, Object?>() ?? const {};
+  double pesos(Object? minor) => (_int(minor) ?? 0) / 100;
+  List<RiderCodRecord> rows(Object? list) => [
+        for (final row in (list as List?) ?? const [])
+          if (row is Map && row['id'] != null)
+            RiderCodRecord(
+              id: '${row['id']}',
+              status: '${row['status'] ?? ''}',
+              amount: pesos(row['amount_minor']),
+              trackingNumber: row['tracking_number']?.toString(),
+              receivedAmount: row['received_amount_minor'] == null ? null : pesos(row['received_amount_minor']),
+              collectedAt: DateTime.tryParse('${row['collected_at']}')?.toLocal(),
+              confirmedAt: DateTime.tryParse('${row['confirmed_at']}')?.toLocal(),
+              overdue: row['overdue'] == true,
+            ),
+      ];
+
+  return RiderCashSnapshot(
+    collected: pesos(summary['collected_minor']),
+    holding: pesos(summary['holding_minor']),
+    holdingCount: _int(summary['holding_count']) ?? 0,
+    overdueCount: _int(summary['overdue_count']) ?? 0,
+    overdueAfterDays: _int(summary['overdue_after_days']) ?? 0,
+    remitted: pesos(summary['remitted_minor']),
+    remittedThisMonth: pesos(summary['remitted_month_minor']),
+    held: rows(data['holding']),
+    remittedRecords: rows(data['remitted']),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/return-pickups
+// ---------------------------------------------------------------------------
+
+/// An approved buyer return this rider is assigned to collect.
+class RiderReturnPickup {
+  const RiderReturnPickup({
+    required this.id,
+    required this.trackingNumber,
+    this.buyerName,
+    this.buyerPhone,
+    this.pickupAddress,
+    this.reason,
+    this.itemCount = 0,
+    this.assignedAt,
+  });
+
+  final String id;
+  final String trackingNumber;
+  final String? buyerName;
+  final String? buyerPhone;
+  final String? pickupAddress;
+  final String? reason;
+  final int itemCount;
+  final DateTime? assignedAt;
+}
+
+List<RiderReturnPickup> riderReturnPickupsFromJson(Map<String, Object?> data) => [
+      for (final row in (data['returns'] as List?) ?? const [])
+        if (row is Map && row['id'] != null && '${row['tracking_number'] ?? ''}'.isNotEmpty)
+          RiderReturnPickup(
+            id: '${row['id']}',
+            trackingNumber: '${row['tracking_number']}',
+            buyerName: row['buyer_name']?.toString(),
+            buyerPhone: row['buyer_phone']?.toString(),
+            pickupAddress: row['pickup_address']?.toString(),
+            reason: row['reason']?.toString(),
+            itemCount: _int(row['item_count']) ?? 0,
+            assignedAt: DateTime.tryParse('${row['assigned_at']}')?.toLocal(),
+          ),
+    ];
 
 /// The server's answer to a failed-pickup report.
 class PickupFailureResult {
@@ -345,3 +489,220 @@ List<RiderProviderOption> riderProvidersFromJson(Map<String, Object?> data) => [
           if (_int(row['id']) case final id?)
             RiderProviderOption(id: id, name: '${row['name'] ?? ''}'),
     ];
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/history
+// ---------------------------------------------------------------------------
+
+/// A finished delivery (delivered, completed, failed or returned).
+class RiderHistoryEntry {
+  const RiderHistoryEntry({
+    required this.sellerOrderId,
+    required this.status,
+    required this.statusLabel,
+    this.trackingNumber,
+    this.sellerName,
+    this.deliveryArea,
+    this.returned = false,
+    this.earning,
+    this.deliveredAt,
+    this.proofId,
+  });
+
+  final String sellerOrderId;
+  final String status;
+  final String statusLabel;
+  final String? trackingNumber;
+  final String? sellerName;
+  final String? deliveryArea;
+  final bool returned;
+
+  /// The server's credited delivery pay for this parcel, when there is one.
+  final double? earning;
+  final DateTime? deliveredAt;
+
+  /// `GET /api/rider/proofs/{proofId}` streams the photo to this rider only.
+  final String? proofId;
+}
+
+List<RiderHistoryEntry> riderHistoryFromJson(Map<String, Object?> data) => [
+      for (final row in (data['history'] as List?) ?? const [])
+        if (row is Map && row['id'] != null)
+          RiderHistoryEntry(
+            sellerOrderId: '${row['id']}',
+            status: '${row['status'] ?? ''}',
+            statusLabel: '${row['status_label'] ?? row['status'] ?? ''}',
+            trackingNumber: row['tracking_number']?.toString(),
+            sellerName: row['seller_name']?.toString(),
+            deliveryArea: row['delivery_area']?.toString(),
+            returned: row['returned'] == true,
+            earning: row['earning_minor'] == null ? null : (_int(row['earning_minor']) ?? 0) / 100,
+            deliveredAt: DateTime.tryParse('${row['delivered_at']}')?.toLocal(),
+            proofId: row['proof_id']?.toString(),
+          ),
+    ];
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/payouts
+// ---------------------------------------------------------------------------
+
+/// A payment Logistics recorded for the rider.
+class RiderPayoutRecord {
+  const RiderPayoutRecord({
+    required this.id,
+    required this.reference,
+    required this.amount,
+    required this.jobCount,
+    this.paidOn,
+    this.reversed = false,
+  });
+
+  final String id;
+  final String reference;
+  final double amount;
+  final int jobCount;
+  final DateTime? paidOn;
+
+  /// Logistics reversed this payment for correction; its jobs are unpaid again.
+  final bool reversed;
+}
+
+class RiderPayoutsSnapshot {
+  const RiderPayoutsSnapshot({
+    required this.earnedThisMonth,
+    required this.paid,
+    required this.pending,
+    required this.payouts,
+  });
+
+  final double earnedThisMonth;
+  final double paid;
+  final double pending;
+  final List<RiderPayoutRecord> payouts;
+}
+
+RiderPayoutsSnapshot riderPayoutsFromJson(Map<String, Object?> data) {
+  final summary = (data['summary'] as Map?)?.cast<String, Object?>() ?? const {};
+  double pesos(Object? minor) => (_int(minor) ?? 0) / 100;
+
+  return RiderPayoutsSnapshot(
+    earnedThisMonth: pesos(summary['earned_month_minor']),
+    paid: pesos(summary['paid_minor']),
+    pending: pesos(summary['pending_minor']),
+    payouts: [
+      for (final row in (data['payouts'] as List?) ?? const [])
+        if (row is Map && row['id'] != null)
+          RiderPayoutRecord(
+            id: '${row['id']}',
+            reference: '${row['reference'] ?? ''}',
+            amount: pesos(row['amount_minor']),
+            jobCount: _int(row['earning_count']) ?? 0,
+            paidOn: DateTime.tryParse('${row['paid_on']}'),
+            reversed: row['reversed'] == true,
+          ),
+    ],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/waybills/{id}
+// ---------------------------------------------------------------------------
+
+class WaybillParty {
+  const WaybillParty({required this.name, this.address, this.phone});
+
+  final String name;
+  final String? address;
+  final String? phone;
+}
+
+/// The private digital waybill. The server sends the seller's contact on a
+/// pickup and the buyer's on a delivery, never both.
+class RiderWaybill {
+  const RiderWaybill({
+    required this.context,
+    required this.sellerOrderId,
+    required this.statusLabel,
+    this.trackingNumber,
+    this.weight,
+    this.itemCount = 0,
+    this.seller,
+    this.buyer,
+    this.destinationArea,
+    this.paymentLabel,
+    this.collectCod = 0,
+  });
+
+  /// `pickup` or `delivery`.
+  final String context;
+  final String sellerOrderId;
+  final String statusLabel;
+  final String? trackingNumber;
+  final String? weight;
+  final int itemCount;
+  final WaybillParty? seller;
+  final WaybillParty? buyer;
+  final String? destinationArea;
+  final String? paymentLabel;
+
+  /// Cash to collect at the door (the server's amount); 0 when none.
+  final double collectCod;
+}
+
+WaybillParty? _party(Object? json) {
+  if (json is! Map) return null;
+  return WaybillParty(
+    name: '${json['name'] ?? ''}',
+    address: json['address']?.toString(),
+    phone: json['phone']?.toString(),
+  );
+}
+
+RiderWaybill riderWaybillFromJson(Map<String, Object?> data) => RiderWaybill(
+      context: '${data['context'] ?? ''}',
+      sellerOrderId: '${data['seller_order_id'] ?? ''}',
+      statusLabel: '${data['status_label'] ?? ''}',
+      trackingNumber: data['tracking_number']?.toString(),
+      weight: data['weight']?.toString(),
+      itemCount: _int(data['item_count']) ?? 0,
+      seller: _party(data['seller']),
+      buyer: _party(data['buyer']),
+      destinationArea: data['destination_area']?.toString(),
+      paymentLabel: data['payment_label']?.toString(),
+      collectCod: (_int(data['collect_cod_minor']) ?? 0) / 100,
+    );
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/profile: station and coverage
+// ---------------------------------------------------------------------------
+
+class RiderCoverage {
+  const RiderCoverage({this.stationName, this.stationMunicipality, this.areaName, this.areaMunicipality, this.areaBarangay});
+
+  final String? stationName;
+  final String? stationMunicipality;
+  final String? areaName;
+  final String? areaMunicipality;
+  final String? areaBarangay;
+
+  String? get stationLabel => _joinNonEmpty([stationName, stationMunicipality]);
+  String? get areaLabel => _joinNonEmpty([areaBarangay, areaMunicipality]) ?? areaName;
+}
+
+String? _joinNonEmpty(List<String?> parts) {
+  final kept = [for (final p in parts) if (p != null && p.trim().isNotEmpty) p.trim()];
+  return kept.isEmpty ? null : kept.join(', ');
+}
+
+RiderCoverage riderCoverageFromJson(Map<String, Object?> data) {
+  final station = (data['station'] as Map?)?.cast<String, Object?>();
+  final area = (data['coverage_area'] as Map?)?.cast<String, Object?>();
+  return RiderCoverage(
+    stationName: station?['name']?.toString(),
+    stationMunicipality: station?['municipality']?.toString(),
+    areaName: area?['name']?.toString(),
+    areaMunicipality: area?['municipality']?.toString(),
+    areaBarangay: area?['barangay']?.toString(),
+  );
+}
+

@@ -11,7 +11,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/dto/remote_courier.dart';
 import '../../state/courier_state.dart';
+import '../../utils/microcopy.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
@@ -76,6 +78,10 @@ class CourierProfitScreen extends StatelessWidget {
                 _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
                 const SizedBox(height: 16),
                 _buildCodCard(context, theme, courier),
+                if (courier.isServerAuthoritative) ...[
+                  const SizedBox(height: 16),
+                  _buildPayoutsCard(theme, courier),
+                ],
                 const SizedBox(height: 20),
                 _WeeklyChart(completed: completed),
               ],
@@ -268,6 +274,8 @@ class CourierProfitScreen extends StatelessWidget {
     ThemeData theme,
     CourierState courier,
   ) {
+    // Live mode: the server's records only. No remit button, no local ledger.
+    if (courier.isServerAuthoritative) return _buildServerCodCard(theme, courier);
     final collected = courier.codCollections;
     return Container(
       key: const ValueKey('cod-balance-card'),
@@ -343,6 +351,194 @@ class CourierProfitScreen extends StatelessWidget {
                 onPressed: () => _openRemittance(context, courier),
                 child: const Text('Remit COD'),
               ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// What Logistics actually paid (`GET /api/rider/payouts`), read-only.
+  Widget _buildPayoutsCard(ThemeData theme, CourierState courier) {
+    final pay = courier.serverPayouts;
+    final failure = courier.payoutsFailure;
+
+    return Container(
+      key: const ValueKey('rider-payouts-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: editorialRadius(1, ShapeTier.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('PAYMENTS FROM LOGISTICS', style: AppType.eyebrow),
+          const SizedBox(height: 8),
+          if (pay == null)
+            Text(
+              failure == null ? 'Loading your payments…' : Microcopy.calmError(failure.message),
+              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(child: _payFigure(theme, 'Paid to you', pay.paid, 'payouts-paid')),
+                Expanded(child: _payFigure(theme, 'Pending pay', pay.pending, 'payouts-pending')),
+                Expanded(child: _payFigure(theme, 'Earned this month', pay.earnedThisMonth, 'payouts-month')),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (pay.payouts.isEmpty)
+              Text(
+                'No payments recorded yet.',
+                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              )
+            else
+              for (final payout in pay.payouts.take(5))
+                Padding(
+                  key: ValueKey('rider-payout-${payout.id}'),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${payout.paidOn == null ? '' : '${payout.paidOn!.year}-${payout.paidOn!.month.toString().padLeft(2, '0')}-${payout.paidOn!.day.toString().padLeft(2, '0')} · '}'
+                          '${payout.jobCount} job${payout.jobCount == 1 ? '' : 's'} · Ref ${payout.reference}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      if (payout.reversed)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Text(
+                            'Reversed',
+                            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.danger),
+                          ),
+                        ),
+                      Text(
+                        formatPeso(payout.amount, showDecimals: true),
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _payFigure(ThemeData theme, String label, double amount, String key) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
+          Text(formatPeso(amount, showDecimals: true), key: ValueKey(key), style: theme.textTheme.titleSmall),
+        ],
+      );
+
+  /// COD cash from WebZefanya (`GET /api/rider/cod`). Each COD delivery
+  /// creates one record on the server; Logistics confirms the handover. The
+  /// rider can only read this.
+  Widget _buildServerCodCard(ThemeData theme, CourierState courier) {
+    final cash = courier.serverCash;
+    final failure = courier.cashFailure;
+
+    Widget figure(String label, double amount, String key) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
+              Text(formatPeso(amount, showDecimals: true), key: ValueKey(key), style: theme.textTheme.titleSmall),
+            ],
+          ),
+        );
+
+    Widget record(RiderCodRecord row) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  row.trackingNumber ?? 'Parcel',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              Text(
+                row.isHeld
+                    ? (row.overdue ? 'Overdue' : 'With you')
+                    : 'Confirmed ${formatPeso(row.receivedAmount ?? row.amount, showDecimals: true)}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: row.isHeld && row.overdue ? AppColors.danger : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formatPeso(row.amount, showDecimals: true),
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        );
+
+    return Container(
+      key: const ValueKey('cod-balance-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: editorialRadius(0, ShapeTier.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('COD CASH WITH YOU', style: AppType.eyebrow)),
+              Text(
+                formatPeso(cash?.holding ?? 0, showDecimals: true),
+                key: const ValueKey('cod-outstanding'),
+                style: AppType.priceNumeral(24),
+              ),
+            ],
+          ),
+          if (cash == null) ...[
+            const SizedBox(height: 6),
+            Text(
+              failure == null ? 'Loading your COD records…' : Microcopy.calmError(failure.message),
+              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                figure('Collected', cash.collected, 'cod-collected'),
+                figure('Remitted', cash.remitted, 'cod-remitted'),
+                figure('This month', cash.remittedThisMonth, 'cod-remitted-month'),
+              ],
+            ),
+            if (cash.overdueCount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${cash.overdueCount} collection${cash.overdueCount == 1 ? '' : 's'} held longer than ${cash.overdueAfterDays} days. Hand the cash to your Logistics company.',
+                key: const ValueKey('cod-overdue'),
+                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+              ),
+            ],
+            if (cash.held.isEmpty && cash.remittedRecords.isEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Cash you collect at the door appears here until Logistics confirms receiving it.',
+                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+            ] else ...[
+              const SizedBox(height: 10),
+              for (final row in cash.held.take(4)) record(row),
+              for (final row in cash.remittedRecords.take(4)) record(row),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              'Logistics records and confirms every cash handover.',
+              style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],

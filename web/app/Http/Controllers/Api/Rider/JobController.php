@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Rider;
 use App\Enums\DeliveryFailureReason;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Http\Resources\Mobile\RiderParcelResource;
 use App\Http\Resources\Mobile\RiderPickupStopResource;
@@ -53,6 +54,7 @@ class JobController extends Controller
         return $this->success('Assigned jobs retrieved.', [
             'online' => (bool) $rider->fresh()->is_online,
             'winding_down' => $windingDown,
+            'winding_down_message' => $windingDown ? EnsureRiderActive::WIND_DOWN_MESSAGE : null,
             'pickups' => $pickups->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('pickup')->resolve($request))->values(),
             // One entry per seller stop the pickups belong to (collected / remaining
             // counts and earnings come from PickupSessionService::summary).
@@ -102,6 +104,8 @@ class JobController extends Controller
                 'returned' => $parcel->status === OrderStatus::Returned || $parcel->parcelReturn !== null,
                 'earning_minor' => $credited->has($parcel->id) ? (int) $credited->get($parcel->id) : null,
                 'delivered_at' => $parcel->deliveryProof?->created_at?->toIso8601String(),
+                // GET /api/rider/proofs/{proof_id} streams the photo to this rider only.
+                'proof_id' => $parcel->deliveryProof?->id,
             ])->values(),
         ]);
     }

@@ -18,6 +18,8 @@
 //   * The app's own milestone machine and payout ledger remain the mock-mode
 //     simulation; in live mode they are display state that a refresh replaces.
 
+import 'dart:typed_data';
+
 import '../api/api_exception.dart';
 import '../api/api_client.dart';
 import '../dto/remote_courier.dart';
@@ -117,6 +119,33 @@ abstract class RiderServerData {
   /// `POST /api/rider/pickups/stops/{id}/finish`: ends the seller stop. Parcels
   /// not collected stay assigned for the next visit (server rule).
   Future<PickupStop?> finishPickupStop(String stopId);
+
+  /// `GET /api/rider/cod`: COD cash held and handed over, read-only. Logistics
+  /// confirms handovers; the app never creates or confirms one.
+  Future<RiderCashSnapshot> cash({int limit = 20});
+
+  /// `GET /api/rider/return-pickups`: approved buyer returns assigned to me.
+  Future<List<RiderReturnPickup>> returnPickups();
+
+  /// `POST /api/rider/return-pickups/{id}/collect`: the server verifies
+  /// [trackingNumber] against the parcel, refuses a second collection (409)
+  /// and moves custody to the rider's station.
+  Future<void> collectReturn(String returnId, {required String trackingNumber});
+
+  /// `GET /api/rider/history`: my finished deliveries, newest first.
+  Future<List<RiderHistoryEntry>> history();
+
+  /// `GET /api/rider/payouts`: what Logistics paid me, read-only.
+  Future<RiderPayoutsSnapshot> payouts({int limit = 20});
+
+  /// `GET /api/rider/waybills/{id}`: the private waybill for my own job.
+  Future<RiderWaybill> waybill(String jobId);
+
+  /// `GET /api/rider/proofs/{id}`: my proof-of-delivery photo bytes.
+  Future<Uint8List> proofPhoto(String proofId);
+
+  /// `GET /api/rider/profile`: my station and coverage area.
+  Future<RiderCoverage> coverage();
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +270,63 @@ class LiveCourierRepository extends LiveRepository
       ),
     );
     return pickupFailureResultFromJson(data);
+  }
+
+  @override
+  Future<RiderCashSnapshot> cash({int limit = 20}) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return riderCashFromJson(
+      unwrapMap(await client.getJson('/rider/cod', query: {'limit': '$limit'})),
+    );
+  }
+
+  @override
+  Future<List<RiderReturnPickup>> returnPickups() async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return riderReturnPickupsFromJson(
+      unwrapMap(await client.getJson('/rider/return-pickups')),
+    );
+  }
+
+  @override
+  Future<void> collectReturn(String returnId, {required String trackingNumber}) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    await client.postJson(
+      '/rider/return-pickups/$returnId/collect',
+      body: {'tracking_number': trackingNumber.trim()},
+    );
+  }
+
+  @override
+  Future<List<RiderHistoryEntry>> history() async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return riderHistoryFromJson(unwrapMap(await client.getJson('/rider/history')));
+  }
+
+  @override
+  Future<RiderPayoutsSnapshot> payouts({int limit = 20}) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return riderPayoutsFromJson(
+      unwrapMap(await client.getJson('/rider/payouts', query: {'limit': '$limit'})),
+    );
+  }
+
+  @override
+  Future<RiderWaybill> waybill(String jobId) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return riderWaybillFromJson(unwrapMap(await client.getJson('/rider/waybills/$jobId')));
+  }
+
+  @override
+  Future<Uint8List> proofPhoto(String proofId) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return client.getBytes('/rider/proofs/$proofId');
+  }
+
+  @override
+  Future<RiderCoverage> coverage() async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return riderCoverageFromJson(unwrapMap(await client.getJson('/rider/profile')));
   }
 
   @override

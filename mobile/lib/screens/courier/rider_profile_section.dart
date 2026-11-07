@@ -38,6 +38,11 @@ class RiderProfileSection extends StatelessWidget {
     final courier = context.watch<CourierState>();
     final status = courier.isSuspended ? 'Suspended' : 'Active';
 
+    if (courier.hasServerRecords && courier.coverage == null) {
+      // Read once, after this frame; the rows appear when it answers.
+      WidgetsBinding.instance.addPostFrameCallback((_) => courier.refreshCoverageOnce());
+    }
+
     return Column(
       key: const ValueKey('rider-profile-section'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,6 +70,16 @@ class RiderProfileSection extends StatelessWidget {
                 value: auth.riderCompany,
                 emptyPrompt: 'Add company',
               ),
+              // Live mode: the station and coverage area from WebZefanya
+              // (GET /api/rider/profile). Read-only; Logistics assigns them.
+              if (courier.coverage?.stationLabel != null) ...[
+                Divider(height: 1, thickness: 1, color: AppColors.divider),
+                _row(context, label: 'Station', value: courier.coverage!.stationLabel),
+              ],
+              if (courier.coverage?.areaLabel != null) ...[
+                Divider(height: 1, thickness: 1, color: AppColors.divider),
+                _row(context, label: 'Coverage', value: courier.coverage!.areaLabel),
+              ],
               Divider(height: 1, thickness: 1, color: AppColors.divider),
               _row(
                 context,

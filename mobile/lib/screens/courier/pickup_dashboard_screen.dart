@@ -15,6 +15,9 @@ import '../../utils/microcopy.dart';
 import '../../utils/timed_snackbar.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
+import 'widgets/wind_down_banner.dart';
+import 'courier_qr_scanner.dart';
+import 'rider_waybill_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
@@ -72,6 +75,8 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
                           trailing: _AvailabilityToggle(),
                           padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
                         ),
+                        const RiderWindDownBanner(margin: EdgeInsets.fromLTRB(20, 0, 20, 12)),
+                        const _ReturnPickupsSection(padding: EdgeInsets.symmetric(horizontal: 20)),
                         const SizedBox(height: 40),
                         _buildEmptyState(context),
                       ],
@@ -99,6 +104,7 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
           padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
         ),
       ),
+      const RiderWindDownBanner(margin: EdgeInsets.only(bottom: 12)),
     ];
     var index = 0;
 
@@ -116,7 +122,23 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
           ),
         ),
       );
+      if (courier.hasServerRecords && job.job.serverStatus != null) {
+        children.add(
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: ValueKey('waybill-${job.job.id}'),
+              onPressed: () => Navigator.of(context).push(
+                AppPageRoute(builder: (_) => RiderWaybillScreen(jobId: job.job.id)),
+              ),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: const Text('Waybill'),
+            ),
+          ),
+        );
+      }
       if (courier.canReportPickupFailure &&
+          !courier.isWindingDown &&
           job.job.serverStatus == 'READY_FOR_PICKUP') {
         children.add(_PickupFailureButton(job: job.job));
       }
@@ -140,6 +162,7 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
       members.forEach(addCard);
     }
     loose.forEach(addCard);
+    children.add(const _ReturnPickupsSection());
     return children;
   }
 
@@ -212,6 +235,13 @@ class _AvailabilityToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
+    if (courier.isWindingDown) {
+      return Text(
+        'OFFLINE',
+        key: const ValueKey('availability-wind-down'),
+        style: AppType.eyebrow.copyWith(color: AppColors.textSecondary),
+      );
+    }
     final suspended = courier.isSuspended;
     final busy = courier.availabilityBusy;
 
@@ -301,7 +331,7 @@ class _StopHeader extends StatelessWidget {
             'Earned ${formatPeso(stop.earned)} so far',
             style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
-          if (stop.canFinish) ...[
+          if (stop.canFinish && !courier.isWindingDown) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
@@ -546,3 +576,110 @@ class _PickupFailureSheetState extends State<_PickupFailureSheet> {
     }
   }
 }
+
+/// "Returns to collect": approved buyer returns assigned to this rider (live
+/// mode, never during a wind-down). Collection is confirmed by scanning or
+/// typing the parcel's tracking number; the server verifies it.
+class _ReturnPickupsSection extends StatelessWidget {
+  const _ReturnPickupsSection({this.padding = EdgeInsets.zero});
+
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final courier = context.watch<CourierState>();
+    final returns = courier.returnPickups;
+    if (!courier.isServerAuthoritative || courier.isWindingDown || returns.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: padding,
+      child: Column(
+        key: const ValueKey('return-pickups-section'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Text('RETURNS TO COLLECT', style: AppType.eyebrow),
+          const SizedBox(height: 8),
+          for (final item in returns) _ReturnPickupCard(item: item, theme: theme),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReturnPickupCard extends StatelessWidget {
+  const _ReturnPickupCard({required this.item, required this.theme});
+
+  final RiderReturnPickup item;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final courier = context.watch<CourierState>();
+    final busy = courier.isReturnCollectBusy(item.id);
+
+    return Container(
+      key: ValueKey('return-pickup-${item.id}'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.trackingNumber, style: theme.textTheme.titleSmall),
+          if ((item.buyerName ?? '').isNotEmpty) Text(item.buyerName!, style: theme.textTheme.bodyMedium),
+          if ((item.pickupAddress ?? '').isNotEmpty) Text(item.pickupAddress!, style: theme.textTheme.bodySmall),
+          if ((item.buyerPhone ?? '').isNotEmpty) Text(item.buyerPhone!, style: theme.textTheme.bodySmall),
+          Text(
+            '${item.itemCount} item${item.itemCount == 1 ? '' : 's'}${(item.reason ?? '').isEmpty ? '' : ' · ${item.reason}'}',
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: ValueKey('collect-return-${item.id}'),
+              onPressed: busy ? null : () => _collect(context, courier),
+              child: Text(busy ? 'Confirming…' : 'Confirm Collection'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _collect(BuildContext context, CourierState courier) async {
+    final scanned = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => CourierQrScanner(
+          key: ValueKey('return-scanner-${item.id}'),
+          expectedTrackingNumber: item.trackingNumber,
+        ),
+      ),
+    );
+    final tracking = scanned?.trim() ?? '';
+    if (tracking.isEmpty || !context.mounted) return;
+
+    try {
+      final sent = await courier.collectReturn(item.id, trackingNumber: tracking);
+      if (!sent || !context.mounted) return;
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Parcel collected. Bring it to your Station Hub.')),
+      );
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      showTimedSnackBar(
+        context,
+        SnackBar(content: Text(Microcopy.calmError(error.message))),
+      );
+    }
+  }
+}
+

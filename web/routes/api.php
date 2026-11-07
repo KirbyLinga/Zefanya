@@ -14,16 +14,21 @@ use App\Http\Controllers\Api\Buyer\OrderController;
 use App\Http\Controllers\Api\Buyer\ProfileController;
 use App\Http\Controllers\Api\Buyer\ReviewController;
 use App\Http\Controllers\Api\Buyer\WishlistController;
+use App\Http\Controllers\Api\Rider\CashController as RiderCashController;
 use App\Http\Controllers\Api\Rider\IncidentController as RiderIncidentController;
 use App\Http\Controllers\Api\Rider\JobController as RiderJobController;
 use App\Http\Controllers\Api\Rider\LoginController as RiderLoginController;
 use App\Http\Controllers\Api\Rider\LogoutController as RiderLogoutController;
 use App\Http\Controllers\Api\Rider\NotificationController as RiderNotificationController;
 use App\Http\Controllers\Api\Rider\ParcelActionController as RiderParcelActionController;
+use App\Http\Controllers\Api\Rider\PayoutController as RiderPayoutController;
 use App\Http\Controllers\Api\Rider\PickupController as RiderPickupController;
 use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
+use App\Http\Controllers\Api\Rider\ProofController as RiderProofController;
 use App\Http\Controllers\Api\Rider\ProviderController as RiderProviderController;
+use App\Http\Controllers\Api\Rider\ReturnPickupController as RiderReturnPickupController;
 use App\Http\Controllers\Api\Rider\TokenController as RiderTokenController;
+use App\Http\Controllers\Api\Rider\WaybillController as RiderWaybillController;
 use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
@@ -150,6 +155,10 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
         Route::middleware('throttle:60,1')->group(function (): void {
             Route::get('/jobs', [RiderJobController::class, 'index'])->name('jobs.index');
             Route::get('/earnings', [RiderJobController::class, 'earnings'])->name('earnings');
+            Route::get('/cod', [RiderCashController::class, 'index'])->name('cod');
+            Route::get('/payouts', [RiderPayoutController::class, 'index'])->name('payouts');
+            Route::get('/waybills/{sellerOrder}', [RiderWaybillController::class, 'show'])->name('waybills.show');
+            Route::get('/proofs/{deliveryProof}', [RiderProofController::class, 'show'])->name('proofs.show');
             Route::get('/notifications', [RiderNotificationController::class, 'index'])->name('notifications.index');
             Route::post('/notifications/read-all', [RiderNotificationController::class, 'markAllRead'])->name('notifications.readAll');
             Route::post('/notifications/{notification}/read', [RiderNotificationController::class, 'markRead'])->name('notifications.read');
@@ -168,11 +177,13 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
     // Fully operational riders only.
     Route::middleware(['auth:sanctum', 'api.role:rider'])->group(function (): void {
         Route::get('/history', [RiderJobController::class, 'history'])->middleware('throttle:60,1')->name('history');
+        Route::get('/return-pickups', [RiderReturnPickupController::class, 'index'])->middleware('throttle:60,1')->name('return-pickups.index');
         Route::middleware('throttle:20,1')->group(function (): void {
             Route::post('/availability', [RiderJobController::class, 'availability'])->name('availability');
             Route::post('/pickups/{sellerOrder}/confirm', [RiderParcelActionController::class, 'confirmPickup'])->name('pickups.confirm');
             Route::post('/pickups/{sellerOrder}/failed', [RiderPickupController::class, 'reportFailure'])->name('pickups.failed');
             Route::post('/pickups/stops/{pickupSession}/finish', [RiderPickupController::class, 'finishStop'])->name('pickups.stops.finish');
+            Route::post('/return-pickups/{parcelReturn}/collect', [RiderReturnPickupController::class, 'collect'])->name('return-pickups.collect');
             Route::post('/deliveries/{sellerOrder}/start', [RiderParcelActionController::class, 'startDelivery'])->name('deliveries.start');
         });
     });
@@ -188,6 +199,11 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
 });
 
 // Rider JSON reporting uses the existing session guard and CSRF protection.
+// Kept for compatibility: no screen in this repository calls it (the Rider web
+// form posts to /rider/parcels/{id}/report-incident and the mobile app uses the
+// bearer-token POST /api/rider/jobs/{id}/incidents). Both run the same
+// ParcelIncidentController and service. Remove only once no external caller
+// depends on it.
 Route::middleware(['web', 'auth:rider', 'rider.active'])->prefix('rider')->name('api.rider.')->group(function (): void {
     Route::post('/parcels/{sellerOrder}/incidents', [ParcelIncidentController::class, 'store'])
         ->name('parcels.incidents.store');

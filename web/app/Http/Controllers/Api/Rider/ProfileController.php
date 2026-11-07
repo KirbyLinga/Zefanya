@@ -44,6 +44,7 @@ class ProfileController extends Controller
             throw new AuthenticationException('Unauthenticated.');
         }
 
+        $rider->loadMissing(['station', 'courier.area']);
         $data = [
             'id' => $rider->id,
             'first_name' => $rider->first_name,
@@ -56,6 +57,18 @@ class ProfileController extends Controller
             'vehicle_type' => $rider->vehicle_type,
             'plate_number' => $rider->plate_number,
             'contact_no' => $rider->contact_no,
+            'station' => $rider->station === null ? null : [
+                'id' => $rider->station->id,
+                'name' => $rider->station->name,
+                'municipality' => $rider->station->municipality,
+                'province' => $rider->station->province_name,
+            ],
+            'coverage_area' => $rider->courier?->area === null ? null : [
+                'id' => $rider->courier->area->id,
+                'name' => $rider->courier->area->name,
+                'municipality' => $rider->courier->area->municipality,
+                'barangay' => $rider->courier->area->barangay_name,
+            ],
         ];
 
         return $this->success('Profile retrieved.', $data);

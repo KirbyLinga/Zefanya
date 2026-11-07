@@ -12,6 +12,9 @@ import '../../utils/microcopy.dart';
 import '../../utils/money_format.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
+import 'widgets/wind_down_banner.dart';
+import 'rider_history_screen.dart';
+import 'rider_waybill_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
@@ -40,7 +43,18 @@ class DeliveryDashboardScreen extends StatelessWidget {
       // Live mode: the rider's WebZefanya notifications (assignments, cash,
       // payouts). Mock mode keeps the bare bar it always had.
       appBar: AppBar(
-        actions: [if (courier.isServerAuthoritative) const NotificationBell()],
+        actions: [
+          if (courier.hasServerRecords && !courier.isWindingDown)
+            IconButton(
+              key: const ValueKey('rider-history-button'),
+              tooltip: 'Delivery history',
+              icon: const Icon(Icons.history),
+              onPressed: () => Navigator.of(context).push(
+                AppPageRoute(builder: (_) => const RiderHistoryScreen()),
+              ),
+            ),
+          if (courier.isServerAuthoritative) const NotificationBell(),
+        ],
       ),
       body: jobs.isEmpty
           ? Column(
@@ -51,6 +65,7 @@ class DeliveryDashboardScreen extends StatelessWidget {
                   trailing: tally,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 ),
+                const RiderWindDownBanner(margin: EdgeInsets.fromLTRB(20, 0, 20, 12)),
                 Expanded(child: _buildEmptyState(theme, courier)),
               ],
             )
@@ -61,24 +76,36 @@ class DeliveryDashboardScreen extends StatelessWidget {
                 if (i == 0) {
                   return EaseInFrame(
                     index: 0,
-                    child: EditorialHeader(
-                      eyebrow: 'FOR DELIVERY',
-                      title: 'Out for Delivery',
-                      trailing: tally,
-                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        EditorialHeader(
+                          eyebrow: 'FOR DELIVERY',
+                          title: 'Out for Delivery',
+                          trailing: tally,
+                          padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                        ),
+                        const RiderWindDownBanner(margin: EdgeInsets.only(bottom: 12)),
+                      ],
                     ),
                   );
                 }
                 final job = jobs[i - 1];
+                final card = DeliveryJobCard(
+                  assignedJob: job,
+                  index: i - 1,
+                  onTap: () => Navigator.of(context).push(
+                    AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: job.job.id)),
+                  ),
+                );
                 return EaseInFrame(
                   index: (i - 1).clamp(0, 5),
-                  child: DeliveryJobCard(
-                    assignedJob: job,
-                    index: i - 1,
-                    onTap: () => Navigator.of(context).push(
-                      AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: job.job.id)),
-                    ),
-                  ),
+                  child: courier.hasServerRecords && job.job.serverStatus != null
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [card, _WaybillLink(jobId: job.job.id)],
+                        )
+                      : card,
                 );
               },
             ),
@@ -159,3 +186,27 @@ class DeliveryDashboardScreen extends StatelessWidget {
     }
   }
 }
+
+/// Opens the private digital waybill for a live job.
+class _WaybillLink extends StatelessWidget {
+  const _WaybillLink({required this.jobId});
+
+  final String jobId;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextButton.icon(
+            key: ValueKey('waybill-$jobId'),
+            onPressed: () => Navigator.of(context).push(
+              AppPageRoute(builder: (_) => RiderWaybillScreen(jobId: jobId)),
+            ),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: const Text('Waybill'),
+          ),
+        ),
+      );
+}
+

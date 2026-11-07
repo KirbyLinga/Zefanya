@@ -43,7 +43,7 @@ class _FakeServer {
     final response =
         _script[_served < _script.length ? _served++ : _script.length - 1];
     return http.StreamedResponse(
-      Stream.value(utf8.encode(response.body)),
+      Stream.value(response.bodyBytes),
       response.statusCode,
       headers: {'content-type': 'application/json; charset=utf-8'},
     );
@@ -98,6 +98,29 @@ http.Response _verified(int id, List<String> actions) => _ok({
         for (final key in actions) {'key': key, 'verification_token': 'tok-$key'},
       ],
     });
+
+
+http.Response _cash({int holdingMinor = 0}) => _ok({
+      'summary': {
+        'collected_minor': holdingMinor,
+        'holding_minor': holdingMinor,
+        'holding_count': holdingMinor > 0 ? 1 : 0,
+        'overdue_count': 0,
+        'overdue_after_days': 2,
+        'remitted_minor': 0,
+        'remitted_month_minor': 0,
+      },
+      'holding': const [],
+      'remitted': const [],
+    });
+
+http.Response _payoutsResp() => _ok({
+      'summary': {'earned_month_minor': 0, 'paid_minor': 0, 'pending_minor': 0},
+      'payouts': const [],
+    });
+
+http.Response _returns([List<Map<String, Object?>> rows = const []]) =>
+    _ok({'returns': rows});
 
 class _Live {
   _Live(List<http.Response> script, {String baseUrl = 'https://api.zefanya.test'})
@@ -524,9 +547,15 @@ void main() {
       final live = _Live([
         _ok(stopsJobs(attempts: 1, online: true)), // refreshJobs
         _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}), // earnings
+        _cash(), // cod
+        _payoutsResp(), // payouts
+        _returns(), // return pickups
         _ok({'attempt': 2, 'attempts_remaining': 0, 'cancelled': true}), // report
         _ok(stopsJobs(attempts: 2)), // refresh after report
         _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _cash(), // cod
+        _payoutsResp(), // payouts
+        _returns(), // return pickups
       ]);
       await live.tokens.write('1|rider');
       final courier = CourierState(repository: live.repo);
@@ -548,9 +577,15 @@ void main() {
       final live = _Live([
         _ok(stopsJobs()),
         _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _cash(), // cod
+        _payoutsResp(), // payouts
+        _returns(), // return pickups
         _ok({'attempt': 1, 'attempts_remaining': 1, 'cancelled': false}),
         _ok(stopsJobs(attempts: 1)),
         _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _cash(), // cod
+        _payoutsResp(), // payouts
+        _returns(), // return pickups
       ]);
       await live.tokens.write('1|rider');
       final courier = CourierState(repository: live.repo);
@@ -568,6 +603,9 @@ void main() {
       final live = _Live([
         _ok(stopsJobs(online: false)),
         _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _cash(), // cod
+        _payoutsResp(), // payouts
+        _returns(), // return pickups
         _error(503, 'Service unavailable'),
       ]);
       await live.tokens.write('1|rider');
@@ -582,5 +620,230 @@ void main() {
       // Assigned jobs are untouched by the failed change.
       expect(courier.jobById('21'), isNotNull);
     });
+  });
+
+  // ── Phase B: COD from the server, return pickups, wind-down ──────────────
+
+  test('COD reads the server cash and records, never a local figure', () async {
+    final live = _Live([
+      _ok({
+        'summary': {
+          'collected_minor': 220000,
+          'holding_minor': 170000,
+          'holding_count': 2,
+          'overdue_count': 1,
+          'overdue_after_days': 2,
+          'remitted_minor': 49000,
+          'remitted_month_minor': 49000,
+        },
+        'holding': [
+          {'id': 1, 'tracking_number': 'TRK-1', 'status': 'PENDING_REMITTANCE', 'amount_minor': 150000, 'overdue': false},
+          {'id': 2, 'tracking_number': 'TRK-2', 'status': 'PENDING_REMITTANCE', 'amount_minor': 20000, 'overdue': true},
+        ],
+        'remitted': [
+          {'id': 3, 'tracking_number': 'TRK-3', 'status': 'REMITTED_TO_LOGISTICS', 'amount_minor': 50000, 'received_amount_minor': 49000, 'confirmed_at': '2026-11-06T02:00:00+00:00'},
+        ],
+      }),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final cash = await live.repo.cash();
+
+    expect(live.server.paths.single, '/rider/cod');
+    expect((cash.collected, cash.holding, cash.remitted, cash.overdueCount), (2200.0, 1700.0, 490.0, 1));
+    expect(cash.held.map((r) => (r.trackingNumber, r.overdue, r.isHeld)), [('TRK-1', false, true), ('TRK-2', true, true)]);
+    expect(cash.remittedRecords.single.receivedAmount, 490);
+    expect(cash.remittedRecords.single.isHeld, isFalse);
+  });
+
+  test('return pickups are listed and collected with the tracking number', () async {
+    final live = _Live([
+      _returns([
+        {'id': 9, 'tracking_number': 'TRK-RET', 'buyer_name': 'Ana', 'pickup_address': '1 Rizal St', 'reason': 'Damaged', 'item_count': 2},
+        {'id': 10, 'tracking_number': ''},
+      ]),
+      _ok({'id': 9, 'collected_at': '2026-11-07T02:00:00+00:00'}),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final returns = await live.repo.returnPickups();
+    await live.repo.collectReturn('9', trackingNumber: ' TRK-RET ');
+
+    // A row without a tracking number cannot be verified, so it is dropped.
+    expect(returns.map((r) => (r.id, r.trackingNumber, r.itemCount)), [('9', 'TRK-RET', 2)]);
+    expect(live.server.paths, ['/rider/return-pickups', '/rider/return-pickups/9/collect']);
+    expect(jsonDecode(live.server.bodies.last), {'tracking_number': 'TRK-RET'});
+  });
+
+  group('CourierState (Phase B)', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('live mode never records a remittance on the phone', () async {
+      final live = _Live([_ok(_jobs())]);
+      final courier = CourierState(repository: live.repo);
+
+      expect(courier.requestRemittance(100), isNotNull);
+      expect(courier.remittances, isEmpty);
+      expect(live.server.paths, isEmpty);
+    });
+
+    test('a refresh reads COD and returns from the server', () async {
+      final live = _Live([
+        _ok(stopsJobs()),
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _cash(holdingMinor: 150000),
+        _payoutsResp(), // payouts
+        _returns([{'id': 9, 'tracking_number': 'TRK-RET'}]),
+      ]);
+      await live.tokens.write('1|rider');
+      final courier = CourierState(repository: live.repo);
+
+      await courier.refreshJobs();
+
+      expect(courier.serverCash!.holding, 1500);
+      expect(courier.returnPickups.single.id, '9');
+      expect(live.server.paths, ['/rider/jobs', '/rider/earnings', '/rider/cod', '/rider/payouts', '/rider/return-pickups']);
+    });
+
+    test('a second collect tap while one is in flight sends nothing', () async {
+      final live = _Live([
+        _returns([{'id': 9, 'tracking_number': 'TRK-RET'}]),
+        _ok({'id': 9}),
+        _returns(),
+      ]);
+      await live.tokens.write('1|rider');
+      final courier = CourierState(repository: live.repo);
+      await courier.refreshReturns();
+
+      final first = courier.collectReturn('9', trackingNumber: 'TRK-RET');
+      final second = await courier.collectReturn('9', trackingNumber: 'TRK-RET');
+
+      expect(await first, isTrue);
+      expect(second, isFalse);
+      expect(live.server.paths.where((p) => p == '/rider/return-pickups/9/collect'), hasLength(1));
+      expect(courier.returnPickups, isEmpty);
+    });
+
+    test('wind-down adopts the server notice, closes going online and skips returns', () async {
+      final live = _Live([
+        _ok({
+          ..._jobs(),
+          'online': true,
+          'winding_down': true,
+          'winding_down_message': 'Your logistics company is suspended.',
+        }),
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _cash(),
+        _payoutsResp(), // payouts
+      ]);
+      await live.tokens.write('1|rider');
+      final courier = CourierState(repository: live.repo);
+
+      await courier.refreshJobs();
+
+      expect(courier.isWindingDown, isTrue);
+      expect(courier.windingDownMessage, 'Your logistics company is suspended.');
+      expect(courier.isOnline, isFalse);
+      expect(await courier.setOnline(true), 'Your logistics company is suspended.');
+      // No availability request and no return-pickups read during a wind-down.
+      expect(live.server.paths, ['/rider/jobs', '/rider/earnings', '/rider/cod', '/rider/payouts']);
+    });
+  });
+
+  // ── History, payouts, waybill, proof, coverage ───────────────────────────
+
+  test('history reads finished deliveries with their pay and proof link', () async {
+    final live = _Live([
+      _ok({
+        'history': [
+          {'id': 12, 'tracking_number': 'TRK-12', 'status': 'DELIVERED', 'status_label': 'Delivered', 'earning_minor': 6000, 'proof_id': 4, 'returned': false, 'delivered_at': '2026-11-06T02:00:00+00:00'},
+          {'id': 13, 'tracking_number': 'TRK-13', 'status': 'RETURNED', 'status_label': 'Returned', 'earning_minor': null, 'proof_id': null, 'returned': true},
+        ],
+      }),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final history = await live.repo.history();
+
+    expect(live.server.paths.single, '/rider/history');
+    expect(history.map((h) => (h.sellerOrderId, h.earning, h.proofId, h.returned)),
+        [('12', 60.0, '4', false), ('13', null, null, true)]);
+  });
+
+  test('payouts read what Logistics paid, with reversals flagged', () async {
+    final live = _Live([
+      _ok({
+        'summary': {'earned_month_minor': 8500, 'paid_minor': 6000, 'pending_minor': 5500},
+        'payouts': [
+          {'id': 1, 'reference': 'GCASH-001', 'paid_on': '2026-11-06', 'earning_count': 1, 'amount_minor': 6000, 'reversed': false},
+          {'id': 2, 'reference': 'GCASH-002', 'paid_on': '2026-11-06', 'earning_count': 1, 'amount_minor': 3000, 'reversed': true},
+        ],
+      }),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final pay = await live.repo.payouts();
+
+    expect(live.server.paths.single, '/rider/payouts');
+    expect((pay.paid, pay.pending, pay.earnedThisMonth), (60.0, 55.0, 85.0));
+    expect(pay.payouts.map((p) => (p.reference, p.reversed)), [('GCASH-001', false), ('GCASH-002', true)]);
+  });
+
+  test('the waybill shows only the party the server sent', () async {
+    final live = _Live([
+      _ok({
+        'context': 'delivery',
+        'seller_order_id': 12,
+        'tracking_number': 'TRK-12',
+        'status_label': 'Out for delivery',
+        'item_count': 2,
+        'seller': null,
+        'buyer': {'name': 'Ana', 'address': '1 Rizal St', 'phone': '0917'},
+        'collect_cod_minor': 150000,
+      }),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final waybill = await live.repo.waybill('12');
+
+    expect(live.server.paths.single, '/rider/waybills/12');
+    expect(waybill.seller, isNull);
+    expect(waybill.buyer!.name, 'Ana');
+    expect(waybill.collectCod, 1500);
+  });
+
+  test('the proof photo is fetched as bytes with the rider token', () async {
+    final live = _Live([http.Response.bytes([0xFF, 0xD8, 0xFF, 0xD9], 200)]);
+    await live.tokens.write('1|rider');
+
+    final bytes = await live.repo.proofPhoto('4');
+
+    expect(live.server.paths.single, '/rider/proofs/4');
+    expect(live.server.headers.single['authorization'], 'Bearer 1|rider');
+    expect(bytes, [0xFF, 0xD8, 0xFF, 0xD9]);
+  });
+
+  test("another rider's proof is the server 403, typed", () async {
+    final live = _Live([_error(403, 'This proof of delivery does not belong to you.')]);
+    await live.tokens.write('1|rider');
+
+    await expectLater(live.repo.proofPhoto('4'), throwsA(isA<ForbiddenException>()));
+  });
+
+  test('coverage reads the station and area from the profile', () async {
+    final live = _Live([
+      _ok({
+        'id': 1,
+        'station': {'id': 3, 'name': 'San Fernando Hub', 'municipality': 'San Fernando'},
+        'coverage_area': {'id': 7, 'name': 'Zone A', 'municipality': 'San Fernando', 'barangay': 'Dolores'},
+      }),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final coverage = await live.repo.coverage();
+
+    expect(live.server.paths.single, '/rider/profile');
+    expect(coverage.stationLabel, 'San Fernando Hub, San Fernando');
+    expect(coverage.areaLabel, 'Dolores, San Fernando');
   });
 }

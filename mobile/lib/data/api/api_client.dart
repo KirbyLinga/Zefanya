@@ -32,6 +32,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -98,6 +99,20 @@ class ApiClient {
       }
     }
     return headers;
+  }
+
+  /// `GET [path]` for a binary body (a private image), with the same token,
+  /// timeout and error mapping as every JSON call. A non-2xx answer throws the
+  /// same typed [ApiException] a JSON call would.
+  Future<Uint8List> getBytes(String path) async {
+    if (!isConfigured) throw const ApiNotConfiguredException();
+    final request = http.Request('GET', _uri(path))
+      ..headers.addAll(await _headers(authenticated: true));
+    final response = await _dispatch(request);
+    final status = response.statusCode;
+    if (status >= 200 && status < 300) return response.bodyBytes;
+    _interpret(response);
+    throw ServerException(statusCode: status);
   }
 
   /// `GET [path]`, decoded as a JSON object.

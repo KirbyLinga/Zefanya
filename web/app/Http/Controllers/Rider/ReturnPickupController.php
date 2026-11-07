@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Rider;
 
-use App\Enums\ParcelReturnStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\ParcelReturn;
 use App\Services\Logistics\ParcelReturnService;
@@ -12,15 +11,9 @@ use Illuminate\View\View;
 
 class ReturnPickupController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, ParcelReturnService $service): View
     {
-        $returns = ParcelReturn::query()
-            ->where('status', ParcelReturnStatus::Requested->value)
-            ->whereNull('collected_at')
-            ->whereHas('collectionCourier', fn ($courier) => $courier->where('rider_id', $request->user('rider')->id))
-            ->with(['sellerOrder.order.buyer', 'sellerOrder.orderItems'])
-            ->oldest('collection_assigned_at')
-            ->get();
+        $returns = $service->pendingBuyerCollectionsFor($request->user('rider'));
 
         return view('Rider.ReturnPickups.index', compact('returns'));
     }
