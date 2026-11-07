@@ -280,6 +280,9 @@ class OrderState extends ChangeNotifier {
     if (!order.canCancel) {
       return 'This order can no longer be cancelled because it has shipped.';
     }
+    if (!cancellationReasons.contains(reason.trim())) {
+      return 'Choose a reason from the list.';
+    }
     if (_cancelling.contains(order.id)) {
       return 'Cancellation is already being processed.';
     }

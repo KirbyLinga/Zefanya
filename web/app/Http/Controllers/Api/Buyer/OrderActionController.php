@@ -158,7 +158,7 @@ class OrderActionController extends Controller
             'shipments' => $order->sellerOrders->map(function (SellerOrder $shipment) use ($withTracking): array {
                 $row = (new ShipmentResource($shipment))->resolve();
                 $row['return_status'] = $shipment->parcelReturn?->status?->value;
-                $row['can_cancel'] = $shipment->status === OrderStatus::Placed;
+                $row['can_cancel'] = $shipment->status->canBuyerCancel();
                 if ($withTracking) {
                     $row['tracking'] = app(RouteExecutionService::class)->trackingSummary($shipment);
                     $row['history'] = $shipment->statusHistories->map(fn ($h): array => [

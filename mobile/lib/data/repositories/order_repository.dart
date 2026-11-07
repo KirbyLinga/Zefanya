@@ -187,6 +187,7 @@ class MockOrderRepository implements OrderRepository {
     cancellationReason: map['cancellationReason'] as String?,
     deliveredAt: DateTime.tryParse(map['deliveredAt'] as String? ?? ''),
     completedAt: DateTime.tryParse(map['completedAt'] as String? ?? ''),
+    cancellationAllowed: map['cancellationAllowed'] as bool?,
   );
 
   static Map<String, Object?> _orderToJson(Order o) => {
@@ -202,6 +203,7 @@ class MockOrderRepository implements OrderRepository {
     'cancellationReason': o.cancellationReason,
     'deliveredAt': o.deliveredAt?.toIso8601String(),
     'completedAt': o.completedAt?.toIso8601String(),
+    'cancellationAllowed': o.cancellationAllowed,
   };
 
   Future<void> _save() async {

@@ -217,7 +217,7 @@
                                         @endforeach
                                     </div>
                                 @endif
-                                @if ($sellerOrder->status === OrderStatus::Placed)
+                                @if ($sellerOrder->status->canBuyerCancel())
                                     <div class="pt-2" data-cancel-action="{{ $sellerOrder->id }}">
                                         <button
                                             type="button"
@@ -248,13 +248,15 @@
                 This cannot be undone. The seller will be notified and stock will be restored.
             </p>
             <label for="buyer-cancel-reason" class="mt-4 block font-sans text-sm font-semibold text-[var(--text-ink)]">Reason <span class="text-red-600">*</span></label>
-            <textarea
+            <select
                 id="buyer-cancel-reason"
-                maxlength="500"
-                rows="3"
                 class="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 font-sans text-sm text-[var(--text-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]"
-                placeholder="Tell the seller why you are cancelling"
-            ></textarea>
+            >
+                <option value="">Choose a reason</option>
+                @foreach (\App\Services\Buyer\BuyerOrderCancellation::REASONS as $reason)
+                    <option value="{{ $reason }}">{{ $reason }}</option>
+                @endforeach
+            </select>
             <p id="buyer-cancel-modal-error" class="mt-2 hidden font-sans text-sm text-red-600" role="alert"></p>
             <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button type="button" id="buyer-cancel-modal-dismiss" class="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2.5 font-sans text-sm font-semibold text-[var(--text-ink)] transition-colors hover:bg-secondary-200">

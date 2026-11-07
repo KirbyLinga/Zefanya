@@ -317,6 +317,21 @@ class SellerOrderStatusService
             if ($to === OrderStatus::Cancelled) {
                 $this->restoreStock($current, 'cancel');
                 $this->cancelPendingPayment($current);
+                $payment = $current->payment()->lockForUpdate()->first();
+                if ($payment?->status === PaymentStatus::Paid) {
+                    if (! \App\Support\RuntimeSchema::hasTable('payment_cancellation_refunds')) {
+                        throw ValidationException::withMessages(['payment' => 'Paid cancellation requires the refund ledger migration. No changes were saved.']);
+                    }
+                    $refund = new \App\Models\Shared\PaymentCancellationRefund;
+                    $refund->forceFill([
+                        'payment_id' => $payment->id,
+                        'seller_order_id' => $current->id,
+                        'buyer_id' => $current->order->buyer_id,
+                        'amount_minor' => $payment->amount_minor,
+                        'reason' => $note ?? 'Shipment cancelled',
+                        'status' => 'pending',
+                    ])->save();
+                }
                 $this->returnVouchers($current);
             }
 
@@ -528,7 +543,7 @@ class SellerOrderStatusService
                 }
 
                 $buyerId = $sellerOrder->order?->buyer_id;
-                if ($buyerId !== null) {
+                if ($buyerId !== null && ($voucher->expires_at === null || $voucher->expires_at->isFuture())) {
                     $voucher->claims()->firstOrCreate(['buyer_id' => $buyerId]);
                 }
             });
