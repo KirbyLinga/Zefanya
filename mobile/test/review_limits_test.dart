@@ -24,16 +24,14 @@ import 'package:zefanya/state/review_state.dart';
 import 'package:zefanya/state/wishlist_state.dart';
 import 'package:zefanya/theme/app_theme.dart';
 
-Order get _deliveredOrder =>
-    mockOrders.firstWhere((o) => o.status == OrderStatus.toRate);
+Order get _deliveredOrder => mockOrders
+    .firstWhere((o) => o.status == OrderStatus.toRate)
+    .copyWith(buyerConfirmed: true, completedAt: DateTime.now());
 
 Product get _deliveredProduct =>
     mockProducts.firstWhere((p) => p.id == _deliveredOrder.productIds.first);
 
-Future<void> _pumpReview(
-  WidgetTester tester, {
-  ReviewState? reviews,
-}) async {
+Future<void> _pumpReview(WidgetTester tester, {ReviewState? reviews}) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
   tester.view.physicalSize = const Size(390, 900);
@@ -77,17 +75,16 @@ ProductReview _review({
   int stars = 4,
   DateTime? createdAt,
   int editCount = 0,
-}) =>
-    ProductReview(
-      productId: 'p4',
-      orderId: 'ORD-09876',
-      stars: stars,
-      comment: comment,
-      photoPath: '/tmp/one.jpg',
-      photoPaths: const ['/tmp/one.jpg', '/tmp/two.jpg'],
-      editCount: editCount,
-      createdAt: createdAt ?? DateTime.now().subtract(const Duration(days: 10)),
-    );
+}) => ProductReview(
+  productId: 'p4',
+  orderId: 'ORD-09876',
+  stars: stars,
+  comment: comment,
+  photoPath: '/tmp/one.jpg',
+  photoPaths: const ['/tmp/one.jpg', '/tmp/two.jpg'],
+  editCount: editCount,
+  createdAt: createdAt ?? DateTime.now().subtract(const Duration(days: 10)),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -110,13 +107,14 @@ void main() {
       );
     });
 
-    testWidgets('0 stars disables Submit; 501 characters stop at 500',
-        (tester) async {
+    testWidgets('0 stars disables Submit; 501 characters stop at 500', (
+      tester,
+    ) async {
       await _pumpReview(tester);
 
       ElevatedButton submit() => tester.widget<ElevatedButton>(
-            find.widgetWithText(ElevatedButton, 'Submit Review'),
-          );
+        find.widgetWithText(ElevatedButton, 'Submit Review'),
+      );
       expect(submit().onPressed, isNull);
       expect(find.text('Tap a star to rate this item.'), findsOneWidget);
 
@@ -124,7 +122,11 @@ void main() {
       await tester.enterText(find.byType(TextField), 'a' * 501);
       await tester.pump();
       expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text.length,
+        tester
+            .widget<TextField>(find.byType(TextField))
+            .controller!
+            .text
+            .length,
         500,
       );
 
@@ -133,8 +135,9 @@ void main() {
       expect(submit().onPressed, isNotNull);
     });
 
-    testWidgets('five stored photos fill the strip and hide the add tile',
-        (tester) async {
+    testWidgets('five stored photos fill the strip and hide the add tile', (
+      tester,
+    ) async {
       const paths = [
         '/tmp/one.jpg',
         '/tmp/two.jpg',
@@ -158,15 +161,14 @@ void main() {
       await _pumpReview(tester, reviews: reviews);
 
       expect(
-        reviews.forOrderProduct(_deliveredOrder.id, _deliveredProduct.id)!
+        reviews
+            .forOrderProduct(_deliveredOrder.id, _deliveredProduct.id)!
             .photos,
         hasLength(5),
       );
       expect(find.byIcon(Icons.close), findsNWidgets(5));
       expect(
-        find.byKey(
-          ValueKey('review-photo-add-${_deliveredProduct.id}'),
-        ),
+        find.byKey(ValueKey('review-photo-add-${_deliveredProduct.id}')),
         findsNothing,
       );
     });
@@ -206,21 +208,23 @@ void main() {
       );
     });
 
-    test('a second edit is refused without changing the stored review',
-        () async {
-      final state = ReviewState();
-      await state.submit(_review(comment: 'First'));
-      await state.submit(_review(comment: 'Edited once'));
+    test(
+      'a second edit is refused without changing the stored review',
+      () async {
+        final state = ReviewState();
+        await state.submit(_review(comment: 'First'));
+        await state.submit(_review(comment: 'Edited once'));
 
-      await expectLater(
-        state.submit(_review(comment: 'Edited twice')),
-        throwsA(isA<ReviewEditException>()),
-      );
-      expect(
-        state.forOrderProduct('ORD-09876', 'p4')!.comment,
-        'Edited once',
-      );
-    });
+        await expectLater(
+          state.submit(_review(comment: 'Edited twice')),
+          throwsA(isA<ReviewEditException>()),
+        );
+        expect(
+          state.forOrderProduct('ORD-09876', 'p4')!.comment,
+          'Edited once',
+        );
+      },
+    );
 
     test('day 30 is outside the window; day 29 is inside', () async {
       final state = ReviewState();
@@ -229,10 +233,7 @@ void main() {
         _review(createdAt: now.subtract(const Duration(days: 29))),
       );
 
-      expect(
-        state.editRefusal('ORD-09876', 'p4', now: now),
-        isNull,
-      );
+      expect(state.editRefusal('ORD-09876', 'p4', now: now), isNull);
       expect(
         state.editRefusal(
           'ORD-09876',

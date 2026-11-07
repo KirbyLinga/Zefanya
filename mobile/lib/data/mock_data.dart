@@ -508,6 +508,7 @@ class Order {
     this.cancelled = false,
     this.cancellationReason,
     this.deliveredAt,
+    this.completedAt,
     this.serverOrderId,
   });
 
@@ -545,6 +546,7 @@ class Order {
   /// until the server exposes a delivered timestamp; an unknown date must not
   /// be invented.
   final DateTime? deliveredAt;
+  final DateTime? completedAt;
 
   /// The catalogue items this order actually contains — ids from
   /// `mockProducts`.
@@ -596,6 +598,7 @@ class Order {
     bool? cancelled,
     String? cancellationReason,
     DateTime? deliveredAt,
+    DateTime? completedAt,
   }) => Order(
     id: id,
     shopName: shopName,
@@ -608,6 +611,7 @@ class Order {
     cancelled: cancelled ?? this.cancelled,
     cancellationReason: cancellationReason ?? this.cancellationReason,
     deliveredAt: deliveredAt ?? this.deliveredAt,
+    completedAt: completedAt ?? this.completedAt,
     serverOrderId: serverOrderId,
   );
 }

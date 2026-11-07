@@ -56,6 +56,8 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
             ->middleware('throttle:20,1')->name('shipments.confirm');
 
         Route::middleware('throttle:60,1')->group(function (): void {
+            Route::get('/reviews/mine', [\App\Http\Controllers\Api\Buyer\ReviewController::class, 'index'])->name('reviews.mine');
+
             // Addresses (BuyerAddressBook).
             Route::get('/addresses', [AddressController::class, 'index'])->name('addresses.index');
             Route::post('/addresses', [AddressController::class, 'store'])->name('addresses.store');
@@ -97,6 +99,7 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
 
         // Checkout (COD) and order state changes: tighter limits.
         Route::middleware('throttle:20,1')->group(function (): void {
+            Route::patch('/shipments/{shipment}/products/{product}/review', [\App\Http\Controllers\Api\Buyer\ReviewController::class, 'save'])->name('reviews.save');
             Route::post('/checkout/quote', [CheckoutController::class, 'quote'])->name('checkout.quote');
             Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
             Route::post('/orders/{order}/shipments/{shipment}/cancel', [OrderActionController::class, 'cancel'])->name('orders.cancel');

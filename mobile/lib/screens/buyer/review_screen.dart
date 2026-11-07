@@ -105,7 +105,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
     for (final product in widget.products) {
       final review = existing.forOrderProduct(widget.order.id, product.id);
       _stars[product.id] = review?.stars ?? 0;
-      _comments[product.id] = TextEditingController(text: review?.comment ?? '');
+      _comments[product.id] = TextEditingController(
+        text: review?.comment ?? '',
+      );
       _photoPaths[product.id] = [...?review?.photos];
     }
 
@@ -134,7 +136,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   /// The delivery job that carried this order, if a real checkout dispatched
   /// one. Null for the seeded sample history.
-  DeliveryJob? get _job => context.read<CourierState>().jobForOrder(widget.order.id);
+  DeliveryJob? get _job =>
+      context.read<CourierState>().jobForOrder(widget.order.id);
 
   /// Whether to offer a courier rating — only when a named rider actually
   /// carried the parcel. Rating a rider who was never assigned would be
@@ -152,12 +155,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final courier = context.read<CourierState>();
     final job = courier.jobForOrder(widget.order.id);
     final now = DateTime.now();
+    final completedAt = widget.order.completedAt;
+    if (!widget.order.isCompleted ||
+        completedAt == null ||
+        completedAt.isAfter(now) ||
+        !now.isBefore(completedAt.add(const Duration(days: 30)))) {
+      setState(
+        () =>
+            _error = 'Reviews require a completed order from the last 30 days.',
+      );
+      return;
+    }
 
     // Check every item before writing any: submitting three products and
     // failing on the third would leave a half-edited order behind.
     for (final product in widget.products) {
-      final refusal =
-          reviews.editRefusal(widget.order.id, product.id, now: now);
+      final refusal = reviews.editRefusal(
+        widget.order.id,
+        product.id,
+        now: now,
+      );
       if (refusal != null) {
         setState(() => _error = refusal);
         return;
@@ -185,6 +202,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             // Stamped once for the whole submission rather than per item, so
             // the items in one review can't drift apart by a timestamp.
             createdAt: now,
+            completedAt: completedAt,
           ),
         );
       }
@@ -226,16 +244,22 @@ class _ReviewScreenState extends State<ReviewScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
       children: [
-        Text('${widget.order.shopName} · ${widget.order.id}',
-            style: AppType.eyebrow),
+        Text(
+          '${widget.order.shopName} · ${widget.order.id}',
+          style: AppType.eyebrow,
+        ),
         const SizedBox(height: 8),
-        Text(widget.products.length == 1 ? 'How was it?' : 'How were they?',
-            style: AppType.sectionDisplay),
+        Text(
+          widget.products.length == 1 ? 'How was it?' : 'How were they?',
+          style: AppType.sectionDisplay,
+        ),
         const SizedBox(height: 8),
         Text(
           'Your rating helps other buyers — and the maker. A few words are '
           'optional.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 22),
         for (var i = 0; i < widget.products.length; i++)
@@ -256,7 +280,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
               widget.products.length == 1
                   ? 'Tap a star to rate this item.'
                   : 'Tap a star for each item.',
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -356,8 +382,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     const SizedBox(height: 2),
                     Text(
                       product.sellerName,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -375,7 +402,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
           Text(
             stars == 0 ? 'Tap a star' : '${_ratingWords[stars]}',
             style: theme.textTheme.labelMedium?.copyWith(
-              color: stars == 0 ? AppColors.textSecondary : AppColors.textPrimary,
+              color: stars == 0
+                  ? AppColors.textSecondary
+                  : AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -431,13 +460,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final path in photoPaths)
-          _photoThumb(theme, product, path),
+        for (final path in photoPaths) _photoThumb(theme, product, path),
         if (photoPaths.length < maxPhotos)
           Semantics(
             button: true,
-            label:
-                'Add photo (${photoPaths.length} of $maxPhotos attached)',
+            label: 'Add photo (${photoPaths.length} of $maxPhotos attached)',
             child: InkWell(
               key: ValueKey('review-photo-add-${product.id}'),
               onTap: () => _attachPhoto(product),
@@ -545,7 +572,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
           'Your review now shows on ${widget.order.shopName}\'s product '
           '${widget.products.length == 1 ? 'page' : 'pages'}.',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 24),
         for (final product in widget.products)
@@ -554,10 +583,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium),
+                  child: Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 // Echo back what was submitted, so the confirmation states a
@@ -583,7 +614,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
         Text(
           'You can edit it once within 30 days.',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 26),
         ElevatedButton(
@@ -634,14 +667,21 @@ class _StarPicker extends StatelessWidget {
                 onTap: () => onChanged(star),
                 radius: 26,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 6,
+                  ),
                   child: Icon(
-                    star <= value ? Icons.star_rounded : Icons.star_border_rounded,
+                    star <= value
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
                     size: 34,
                     // Empty stars are outline *and* a legible neutral, not a
                     // pale rule: an unrated star still has to be visible
                     // enough to know it's there to be tapped.
-                    color: star <= value ? AppColors.ratingStar : AppColors.textSecondary,
+                    color: star <= value
+                        ? AppColors.ratingStar
+                        : AppColors.textSecondary,
                   ),
                 ),
               ),

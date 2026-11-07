@@ -352,8 +352,10 @@ class _MarketplaceAppState extends State<MarketplaceApp> {
                               child: SafeArea(
                                 bottom: false,
                                 child: NoInternetBanner(
-                                  onRetry: () => ConnectionWatcher.instance.check(),
-                                  onRefresh: () => ConnectionWatcher.instance.check(),
+                                  onRetry: () =>
+                                      ConnectionWatcher.instance.check(),
+                                  onRefresh: () =>
+                                      ConnectionWatcher.instance.check(),
                                 ),
                               ),
                             ),

@@ -244,6 +244,14 @@ class SellerOrder extends Model
         return $this->hasMany(StatusHistory::class)->orderBy('created_at');
     }
 
+    /** Completion comes from the trusted transition audit, never updated_at. */
+    public function completionTime(): ?\Illuminate\Support\Carbon
+    {
+        return $this->statusHistories()
+            ->where('to_status', OrderStatus::Completed->value)
+            ->first()?->created_at;
+    }
+
     /**
      * Lost/damaged incidents reported for this delivery parcel.
      */

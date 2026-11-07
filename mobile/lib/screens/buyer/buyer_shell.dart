@@ -12,6 +12,7 @@ import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
+import '../../state/review_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/money_format.dart';
@@ -76,7 +77,18 @@ class _BuyerShellState extends State<BuyerShell> {
     // Startup can fetch orders before a bearer token exists. Entering the
     // authenticated shell must replace that cached failure with fresh history.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<OrderState>().load();
+      if (!mounted) return;
+      context.read<OrderState>().load();
+      context.read<ReviewState>().load().catchError((Object error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your reviews could not be loaded. Please sign in again to retry.',
+            ),
+          ),
+        );
+      });
     });
   }
 

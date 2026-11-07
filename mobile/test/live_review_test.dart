@@ -16,6 +16,7 @@
 //    201 or 200 — the app treats the upsert as idempotent.
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -42,8 +43,10 @@ class _FakeServer {
 
   int get calls => paths.length;
 
-  late final http.Client client =
-      MockClient.streaming((request, bodyStream) async {
+  late final http.Client client = MockClient.streaming((
+    request,
+    bodyStream,
+  ) async {
     methods.add(request.method);
     paths.add(request.url.path);
     headers.add(request.headers);
@@ -61,11 +64,11 @@ class _FakeServer {
   String header(String name) => headers.isEmpty
       ? ''
       : headers.first.entries
-          .firstWhere(
-            (e) => e.key.toLowerCase() == name.toLowerCase(),
-            orElse: () => const MapEntry('', ''),
-          )
-          .value;
+            .firstWhere(
+              (e) => e.key.toLowerCase() == name.toLowerCase(),
+              orElse: () => const MapEntry('', ''),
+            )
+            .value;
 }
 
 http.Response _json(Map<String, Object?> body, [int status = 200]) =>
@@ -83,21 +86,20 @@ Map<String, Object?> _reviewJson({
   String comment = 'Lovely bowls.',
   String? photoUrl,
   String createdAt = '2026-10-05T14:23:00.000000Z',
-}) =>
-    {
-      'id': id,
-      'order_id': orderId,
-      'product_id': productId,
-      'stars': stars,
-      'comment': comment,
-      'photo_url': photoUrl,
-      'created_at': createdAt,
-    };
+}) => {
+  'id': id,
+  'order_id': orderId,
+  'product_id': productId,
+  'stars': stars,
+  'comment': comment,
+  'photo_url': photoUrl,
+  'created_at': createdAt,
+};
 
 class _Live {
   _Live(List<http.Response> script)
-      : server = _FakeServer(script),
-        tokens = InMemoryTokenStore() {
+    : server = _FakeServer(script),
+      tokens = InMemoryTokenStore() {
     client = ApiClient(
       baseUrl: 'https://api.zefanya.test',
       tokenStore: tokens,
@@ -117,21 +119,34 @@ class _Live {
 void main() {
   group('all()', () {
     test('asks GET /reviews/mine with the token', () async {
-      final live = _Live([_list([_reviewJson()])]);
+      final live = _Live([
+        _list([_reviewJson()]),
+      ]);
       await live.tokens.write('a-token');
 
       await live.repository.all();
 
       expect(live.server.methods.single, 'GET');
-      expect(live.server.paths.single, endsWith('/reviews/mine'));
+      expect(live.server.paths.single, endsWith('/buyer/reviews/mine'));
       expect(live.server.header('authorization'), 'Bearer a-token');
     });
 
     test('maps the list into ProductReview objects', () async {
       final live = _Live([
         _list([
-          _reviewJson(orderId: '7', productId: '3', stars: 4, comment: 'Lovely.'),
-          _reviewJson(id: '2', orderId: '8', productId: '5', stars: 5, comment: ''),
+          _reviewJson(
+            orderId: '7',
+            productId: '3',
+            stars: 4,
+            comment: 'Lovely.',
+          ),
+          _reviewJson(
+            id: '2',
+            orderId: '8',
+            productId: '5',
+            stars: 5,
+            comment: '',
+          ),
         ]),
       ]);
       await live.tokens.write('a-token');
@@ -222,85 +237,118 @@ void main() {
       // stores.
       expect(
         live.server.paths.single,
-        endsWith('/orders/7/items/3/review'),
+        endsWith('/buyer/shipments/7/products/3/review'),
       );
       expect(live.server.header('authorization'), 'Bearer a-token');
 
-      final body = jsonDecode(live.server.bodies.single) as Map<String, Object?>;
+      final body =
+          jsonDecode(live.server.bodies.single) as Map<String, Object?>;
       expect(body['stars'], 4);
       expect(body['comment'], 'Lovely bowls.');
       expect(body.containsKey('photo_path'), isFalse);
     });
 
-    test('includes photo_path when the review has one', () async {
-      final live = _Live([_json({'data': _reviewJson()}, 201)]);
-      await live.tokens.write('a-token');
+    test(
+      'uploads photo bytes with multipart PATCH override rather than a device path',
+      () async {
+        final live = _Live([
+          _json({'data': _reviewJson()}, 201),
+        ]);
+        await live.tokens.write('a-token');
+        final directory = await Directory.systemTemp.createTemp(
+          'review-upload-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final photo = File('${directory.path}/review.jpg');
+        await photo.writeAsString('review-photo-bytes');
 
-      await live.repository.submit(ProductReview(
-        orderId: '7',
-        productId: '3',
-        stars: 5,
-        comment: '',
-        photoPath: '/storage/emulated/0/review.jpg',
-        createdAt: DateTime(2026, 10, 5),
-      ));
+        await live.repository.submit(
+          ProductReview(
+            orderId: '7',
+            productId: '3',
+            stars: 5,
+            comment: '',
+            photoPath: photo.path,
+            createdAt: DateTime(2026, 10, 5),
+          ),
+        );
 
-      final body = jsonDecode(live.server.bodies.single) as Map<String, Object?>;
-      expect(body['photo_path'], '/storage/emulated/0/review.jpg');
-    });
+        expect(live.server.methods.single, 'POST');
+        expect(
+          live.server.paths.single,
+          endsWith('/buyer/shipments/7/products/3/review'),
+        );
+        expect(live.server.header('authorization'), 'Bearer a-token');
+        final body = live.server.bodies.single;
+        expect(body, contains('name="photos[0]"'));
+        expect(body, contains('review-photo-bytes'));
+        expect(body, contains('name="_method"'));
+        expect(body, contains('PATCH'));
+        expect(body, isNot(contains(photo.path)));
+      },
+    );
 
     test('omits comment from the body when it is empty', () async {
-      final live = _Live([_json({'data': _reviewJson(comment: '')}, 201)]);
+      final live = _Live([
+        _json({'data': _reviewJson(comment: '')}, 201),
+      ]);
       await live.tokens.write('a-token');
 
-      await live.repository.submit(ProductReview(
-        orderId: '7',
-        productId: '3',
-        stars: 3,
-        comment: '',
-        createdAt: DateTime(2026, 10, 5),
-      ));
+      await live.repository.submit(
+        ProductReview(
+          orderId: '7',
+          productId: '3',
+          stars: 3,
+          comment: '',
+          createdAt: DateTime(2026, 10, 5),
+        ),
+      );
 
-      final body = jsonDecode(live.server.bodies.single) as Map<String, Object?>;
+      final body =
+          jsonDecode(live.server.bodies.single) as Map<String, Object?>;
       // An explicit empty-string `comment` would be valid too, but omitting it
       // keeps the body clean and matches the convention in OrderLineRequest.
       expect(body.containsKey('comment'), isFalse);
     });
 
-    test('a 200 response (edit) is accepted the same as 201 (create)', () async {
-      // The upsert contract: the server answers 201 for a new review and 200
-      // for an edit. The app does not distinguish — it just needs to know the
-      // write succeeded.
-      final live = _Live([
-        _json({'data': _reviewJson(stars: 5, comment: 'Grew on me.')}, 200),
-      ]);
-      await live.tokens.write('a-token');
+    test(
+      'a 200 response (edit) is accepted the same as 201 (create)',
+      () async {
+        // The upsert contract: the server answers 201 for a new review and 200
+        // for an edit. The app does not distinguish — it just needs to know the
+        // write succeeded.
+        final live = _Live([
+          _json({'data': _reviewJson(stars: 5, comment: 'Grew on me.')}, 200),
+        ]);
+        await live.tokens.write('a-token');
 
-      // Must not throw.
-      await live.repository.submit(review);
+        // Must not throw.
+        await live.repository.submit(review);
 
-      expect(live.server.calls, 1);
-    });
+        expect(live.server.calls, 1);
+      },
+    );
 
-    test('a server 422 surfaces the message as a ValidationException', () async {
-      final live = _Live([
-        _json({
-          'message': 'That product was not part of this order.',
-        }, 422),
-      ]);
-      await live.tokens.write('a-token');
+    test(
+      'a server 422 surfaces the message as a ValidationException',
+      () async {
+        final live = _Live([
+          _json({'message': 'That product was not part of this order.'}, 422),
+        ]);
+        await live.tokens.write('a-token');
 
-      await expectLater(
-        live.repository.submit(review),
-        throwsA(
-          isA<ValidationException>().having(
-            (e) => e.message,
-            'message',
-            contains('not part of this order'),
+        await expectLater(
+          live.repository.submit(review),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.message,
+              'message',
+              contains('not part of this order'),
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('throws ApiNotConfiguredException when no base URL is set', () async {
       final repository = LiveReviewRepository(

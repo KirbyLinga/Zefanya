@@ -14,6 +14,7 @@ import 'package:zefanya/data/dto/registration_payload.dart';
 import 'package:zefanya/data/api/api_exception.dart';
 import 'package:zefanya/data/mock_data.dart' show Order;
 import 'package:zefanya/data/repositories/order_repository.dart';
+import 'package:zefanya/data/repositories/review_repository.dart';
 import 'package:zefanya/data/google_identity.dart';
 import 'package:zefanya/data/repositories/google_auth_repository.dart';
 import 'package:zefanya/data/repositories/repositories.dart';
@@ -51,6 +52,7 @@ Future<void> _pumpGate(
   WidgetTester tester,
   AuthState auth, {
   OrderState? orders,
+  ReviewState? reviews,
 }) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
@@ -83,7 +85,8 @@ Future<void> _pumpGate(
           create: (_) => RecentlyViewedState(catalog: repositories.catalog),
         ),
         ChangeNotifierProvider(
-          create: (_) => ReviewState(repository: repositories.review),
+          create: (_) =>
+              reviews ?? ReviewState(repository: repositories.review),
         ),
         ChangeNotifierProvider(
           create: (_) => WishlistState(catalog: repositories.catalog),
@@ -109,9 +112,41 @@ class _LoginOrders extends MockOrderRepository {
   }
 }
 
+class _LoginReviews extends MockReviewRepository {
+  int requests = 0;
+
+  @override
+  Future<List<ProductReview>> all() async {
+    if (++requests == 1) throw const UnauthorizedException();
+    return [
+      ProductReview(
+        productId: '1',
+        orderId: '2',
+        stars: 5,
+        editCount: 1,
+        createdAt: DateTime.now(),
+      ),
+    ];
+  }
+}
+
 void main() {
+  testWidgets('buyer entry refreshes server reviews after signed-out startup', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _LoginReviews();
+    final reviews = ReviewState(repository: repository);
+    await expectLater(reviews.load(), throwsA(isA<UnauthorizedException>()));
+    await _pumpGate(tester, await _signedIn(UserRole.buyer), reviews: reviews);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(repository.requests, 2);
+    expect(reviews.all.single.editCount, 1);
+  });
   for (final role in UserRole.values) {
-    testWidgets('logout and Back cannot reopen the ${role.name} shell', (tester) async {
+    testWidgets('logout and Back cannot reopen the ${role.name} shell', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
       final auth = await _signedIn(role);
       await _pumpGate(tester, auth);

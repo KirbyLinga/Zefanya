@@ -337,7 +337,9 @@ class OrderState extends ChangeNotifier {
       return 'You can confirm receipt only after the order is delivered.';
     }
 
-    await _repository.saveBuyerState(base.copyWith(buyerConfirmed: true));
+    await _repository.saveBuyerState(
+      base.copyWith(buyerConfirmed: true, completedAt: DateTime.now()),
+    );
     _orders = await _repository.orders();
     notifyListeners();
     return null;
@@ -372,20 +374,19 @@ class OrderState extends ChangeNotifier {
     // cannot promote _repository; take the capability through a cast.
     final repository = _repository;
     if (repository is! QuotesCheckout || items.isEmpty) return null;
-    return (repository as QuotesCheckout).quoteTotal(
-      [for (final item in items) _lineFor(item)],
-      voucherCodes: voucherCodes,
-    );
+    return (repository as QuotesCheckout).quoteTotal([
+      for (final item in items) _lineFor(item),
+    ], voucherCodes: voucherCodes);
   }
 
   OrderLineRequest _lineFor(CartItem item) => OrderLineRequest(
-        productId: item.product.id,
-        productName: item.product.name,
-        sellerName: item.product.sellerName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        variantId: item.product.variantForLabel(item.variant)?.id,
-      );
+    productId: item.product.id,
+    productName: item.product.name,
+    sellerName: item.product.sellerName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    variantId: item.product.variantForLabel(item.variant)?.id,
+  );
 
   Future<List<Order>> placeOrders(
     List<CartItem> items, {

@@ -62,6 +62,8 @@ ProductReview? reviewFromJson(Map<String, Object?> map) {
     orderId: orderId,
     productId: productId,
     stars: stars,
+    editCount: (map['edit_count'] as num?)?.toInt() ?? 0,
+    completedAt: DateTime.tryParse(map['completed_at'] as String? ?? ''),
     comment: map['comment'] as String? ?? '',
     // photo_url is deliberately not mapped to photoPath: photoPath is a local
     // file path, and a server URL is a different thing. Until photo upload

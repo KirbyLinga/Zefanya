@@ -56,6 +56,7 @@ class ProductReview {
     this.photoPath,
     this.photoPaths = const [],
     this.editCount = 0,
+    this.completedAt,
   });
 
   final String productId;
@@ -64,6 +65,7 @@ class ProductReview {
   /// 1–5. The form only submits at 1 or above, so this is never 0 in stored
   /// data — a 0 here would mean "rated nothing", which isn't a rating.
   final int stars;
+  final DateTime? completedAt;
 
   /// Optional free text. Empty string rather than null so every consumer can
   /// treat it as "no comment" without a null check.
@@ -101,28 +103,29 @@ class ProductReview {
     List<String>? photoPaths,
     DateTime? createdAt,
     int? editCount,
-  }) =>
-      ProductReview(
-        productId: productId,
-        orderId: orderId,
-        stars: stars ?? this.stars,
-        comment: comment ?? this.comment,
-        photoPath: photoPath ?? this.photoPath,
-        photoPaths: photoPaths ?? this.photoPaths,
-        createdAt: createdAt ?? this.createdAt,
-        editCount: editCount ?? this.editCount,
-      );
+  }) => ProductReview(
+    productId: productId,
+    orderId: orderId,
+    stars: stars ?? this.stars,
+    comment: comment ?? this.comment,
+    photoPath: photoPath ?? this.photoPath,
+    photoPaths: photoPaths ?? this.photoPaths,
+    createdAt: createdAt ?? this.createdAt,
+    completedAt: completedAt,
+    editCount: editCount ?? this.editCount,
+  );
 
   Map<String, dynamic> toJson() => {
-        'productId': productId,
-        'orderId': orderId,
-        'stars': stars,
-        'comment': comment,
-        'photoPath': photoPath,
-        'photoPaths': photoPaths,
-        'createdAt': createdAt.toIso8601String(),
-        'editCount': editCount,
-      };
+    'productId': productId,
+    'orderId': orderId,
+    'stars': stars,
+    'comment': comment,
+    'photoPath': photoPath,
+    'photoPaths': photoPaths,
+    'createdAt': createdAt.toIso8601String(),
+    'editCount': editCount,
+    'completedAt': completedAt?.toIso8601String(),
+  };
 
   /// Returns null for anything unreadable rather than throwing — a single
   /// corrupt entry should cost one review, not the whole list.
@@ -131,7 +134,10 @@ class ProductReview {
     final orderId = map['orderId'];
     final stars = map['stars'];
     final createdAt = DateTime.tryParse(map['createdAt'] as String? ?? '');
-    if (productId is! String || orderId is! String || stars is! int || createdAt == null) {
+    if (productId is! String ||
+        orderId is! String ||
+        stars is! int ||
+        createdAt == null) {
       return null;
     }
     final photoPath = map['photoPath'] as String?;
@@ -148,6 +154,7 @@ class ProductReview {
       photoPaths: photoPaths,
       editCount: map['editCount'] as int? ?? 0,
       createdAt: createdAt,
+      completedAt: DateTime.tryParse(map['completedAt'] as String? ?? ''),
     );
   }
 }
@@ -174,7 +181,7 @@ class ReviewState extends ChangeNotifier {
   /// truth for the same data, which is exactly the kind of drift this pass is
   /// meant to remove rather than introduce.
   ReviewState({ReviewRepository? repository})
-      : _repository = repository ?? MockReviewRepository();
+    : _repository = repository ?? MockReviewRepository();
 
   final ReviewRepository _repository;
 
@@ -195,7 +202,9 @@ class ReviewState extends ChangeNotifier {
   /// is what makes the form open pre-filled instead of blank.
   ProductReview? forOrderProduct(String orderId, String productId) {
     for (final review in _reviews) {
-      if (review.orderId == orderId && review.productId == productId) return review;
+      if (review.orderId == orderId && review.productId == productId) {
+        return review;
+      }
     }
     return null;
   }
@@ -206,7 +215,8 @@ class ReviewState extends ChangeNotifier {
   /// Whether this order has been reviewed at all. Orders are submitted as a
   /// whole (every item on one form), so this is all-or-nothing by
   /// construction — there's no half-reviewed order to represent.
-  bool hasReviewedOrder(String orderId) => _reviews.any((r) => r.orderId == orderId);
+  bool hasReviewedOrder(String orderId) =>
+      _reviews.any((r) => r.orderId == orderId);
 
   /// Call once before runApp (see main.dart).
   ///
@@ -216,6 +226,7 @@ class ReviewState extends ChangeNotifier {
   Future<void> load() async {
     await _repository.load();
     _reviews = await _repository.all();
+    notifyListeners();
   }
 
   /// Why this existing review can no longer be edited, or null when it can.
@@ -223,17 +234,15 @@ class ReviewState extends ChangeNotifier {
   /// [now] is injectable so the 30-day boundary is testable without waiting a
   /// month. New reviews return null: "edit" only has a meaning when there is
   /// already a first write.
-  String? editRefusal(
-    String orderId,
-    String productId, {
-    DateTime? now,
-  }) {
+  String? editRefusal(String orderId, String productId, {DateTime? now}) {
     final existing = forOrderProduct(orderId, productId);
     if (existing == null) return null;
     if (existing.editCount >= 1) {
       return 'This review has already been edited once.';
     }
-    final elapsed = (now ?? DateTime.now()).difference(existing.createdAt);
+    final elapsed = (now ?? DateTime.now()).difference(
+      existing.completedAt ?? existing.createdAt,
+    );
     if (elapsed.inDays >= 30) {
       return 'Reviews can only be edited within 30 days.';
     }

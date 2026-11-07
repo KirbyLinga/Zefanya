@@ -65,11 +65,13 @@ class MockReviewRepository implements ReviewRepository {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_storageKey);
       if (raw == null) return;
-      final decoded =
-          (jsonDecode(raw) as List<dynamic>).cast<Map<String, dynamic>>();
+      final decoded = (jsonDecode(raw) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
       _reviews
         ..clear()
-        ..addAll(decoded.map(ProductReview.fromJson).whereType<ProductReview>());
+        ..addAll(
+          decoded.map(ProductReview.fromJson).whereType<ProductReview>(),
+        );
     } catch (_) {
       // Corrupt or old shape — one bad entry should cost the list, not the app.
       _reviews.clear();
@@ -109,15 +111,17 @@ class LiveReviewRepository extends LiveRepository implements ReviewRepository {
   Future<List<ProductReview>> all() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
-    final body = await client.getJson('/reviews/mine', authenticated: true);
+    final body = await client.getJson(
+      '/buyer/reviews/mine',
+      authenticated: true,
+    );
 
     // Filter nulls: a review for a removed product has no product_id and
     // cannot be shown on a product page. The mapper returns null for those,
     // and they are silently dropped rather than crashing the list.
-    return unwrapList(body)
-        .map(reviewFromJson)
-        .whereType<ProductReview>()
-        .toList(growable: false);
+    return unwrapList(
+      body,
+    ).map(reviewFromJson).whereType<ProductReview>().toList(growable: false);
   }
 
   @override
@@ -128,12 +132,28 @@ class LiveReviewRepository extends LiveRepository implements ReviewRepository {
     // product_id — the same identity the mock uses for its unique-per-purchase
     // constraint. The server upserts: first submission is 201, any re-submission
     // for the same purchase is 200. The app treats both identically.
+    final path =
+        '/buyer/shipments/${review.orderId}/products/${review.productId}/review';
+    final photos = review.photos;
+    if (photos.isNotEmpty) {
+      await client.postMultipart(
+        path,
+        fields: {
+          '_method': 'PATCH',
+          'stars': '${review.stars}',
+          'comment': review.comment,
+        },
+        files: {
+          for (var i = 0; i < photos.length; i++) 'photos[$i]': photos[i],
+        },
+      );
+      return;
+    }
     await client.patchJson(
-      '/orders/${review.orderId}/items/${review.productId}/review',
+      path,
       body: {
         'stars': review.stars,
         if (review.comment.isNotEmpty) 'comment': review.comment,
-        if (review.photoPath != null) 'photo_path': review.photoPath,
       },
       authenticated: true,
     );

@@ -39,6 +39,13 @@ class ReviewButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final completedAt = order.completedAt;
+    if (!order.isCompleted ||
+        completedAt == null ||
+        completedAt.isAfter(DateTime.now()) ||
+        !DateTime.now().isBefore(completedAt.add(const Duration(days: 30)))) {
+      return const SizedBox.shrink();
+    }
     // Resolved here rather than passed in: this is the join from an order to
     // the catalogue, and it is the same lookup in both places the button
     // appears. Read from `CatalogState`, so in a live build the lookup is against
@@ -53,7 +60,16 @@ class ReviewButton extends StatelessWidget {
 
     // watch, not read: writing a review has to turn this button into its own
     // "Edit Your Review" state without the screen being rebuilt from scratch.
-    final reviewed = context.watch<ReviewState>().hasReviewedOrder(order.id);
+    final reviews = context.watch<ReviewState>();
+    final reviewed = reviews.hasReviewedOrder(order.id);
+    if (reviewed &&
+        products.any(
+          (product) =>
+              (reviews.forOrderProduct(order.id, product.id)?.editCount ?? 0) >=
+              1,
+        )) {
+      return const SizedBox.shrink();
+    }
 
     final icon = Icon(
       reviewed ? Icons.star_rounded : Icons.star_border,
@@ -63,15 +79,15 @@ class ReviewButton extends StatelessWidget {
       reviewed
           ? 'Edit Your Review'
           : products.length == 1
-              ? 'Leave a Review'
-              : 'Review ${products.length} Items',
+          ? 'Leave a Review'
+          : 'Review ${products.length} Items',
     );
 
     void open() => Navigator.of(context).push(
-          AppPageRoute(
-            builder: (_) => ReviewScreen(order: order, products: products),
-          ),
-        );
+      AppPageRoute(
+        builder: (_) => ReviewScreen(order: order, products: products),
+      ),
+    );
 
     // Reviewed orders get the quieter treatment: the job is done, and the
     // emphasis belongs back on the order itself rather than on a second

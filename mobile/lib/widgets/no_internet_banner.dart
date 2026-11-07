@@ -30,7 +30,11 @@ class NoInternetBanner extends StatefulWidget {
   /// Construct without a key or with explicit callbacks. The const ctor is
   /// retained for the widget tree we build in tests; this ctor exists so
   /// callers can pass non-constant VoidCallbacks without a const context.
-  const NoInternetBanner({super.key, required this.onRetry, required this.onRefresh});
+  const NoInternetBanner({
+    super.key,
+    required this.onRetry,
+    required this.onRefresh,
+  });
 
   /// Re-check the connection (used by the Retry button).
   final VoidCallback onRetry;

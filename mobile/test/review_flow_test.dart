@@ -34,8 +34,9 @@ import 'package:zefanya/state/wishlist_state.dart';
 import 'package:zefanya/theme/app_theme.dart';
 
 /// The seeded delivered order (ORD-09876, containing p4).
-Order get _deliveredOrder =>
-    mockOrders.firstWhere((o) => o.status == OrderStatus.toRate);
+Order get _deliveredOrder => mockOrders
+    .firstWhere((o) => o.status == OrderStatus.toRate)
+    .copyWith(buyerConfirmed: true, completedAt: DateTime.now());
 
 Product get _deliveredProduct =>
     mockProducts.firstWhere((p) => p.id == _deliveredOrder.productIds.first);
@@ -318,7 +319,7 @@ void main() {
   });
 
   group('The button that used to do nothing', () {
-    testWidgets('a delivered order now opens the review form', (tester) async {
+    testWidgets('a completed order now opens the review form', (tester) async {
       await _pump(tester, OrderDetailScreen(order: _deliveredOrder));
 
       await tester.tap(find.text('Leave a Review'));
@@ -327,6 +328,17 @@ void main() {
       expect(find.byType(ReviewScreen), findsOneWidget);
       // And it arrived knowing what it is reviewing.
       expect(find.textContaining(_deliveredProduct.name), findsWidgets);
+    });
+
+    testWidgets('delivered without buyer completion offers no review button', (
+      tester,
+    ) async {
+      final delivered = mockOrders.firstWhere(
+        (o) => o.status == OrderStatus.toRate,
+      );
+      await _pump(tester, OrderDetailScreen(order: delivered));
+      expect(find.text('Leave a Review'), findsNothing);
+      expect(find.text('Edit Your Review'), findsNothing);
     });
 
     testWidgets('an order with unresolvable items offers no button', (
@@ -369,12 +381,36 @@ void main() {
         status: OrderStatus.toRate,
         eta: 'Delivered today',
         itemSummary: 'Two things',
+        buyerConfirmed: true,
+        completedAt: DateTime.now(),
         productIds: ['p1', 'p2'],
       );
 
       await _pump(tester, ReviewButton(order: twoItems, expanded: true));
 
       expect(find.text('Review 2 Items'), findsOneWidget);
+    });
+
+    testWidgets('an already edited review does not offer another edit', (
+      tester,
+    ) async {
+      final reviews = ReviewState();
+      await reviews.submit(
+        ProductReview(
+          productId: _deliveredProduct.id,
+          orderId: _deliveredOrder.id,
+          stars: 5,
+          createdAt: DateTime.now(),
+          editCount: 1,
+        ),
+      );
+      await _pump(
+        tester,
+        ReviewButton(order: _deliveredOrder),
+        reviews: reviews,
+      );
+      expect(find.text('Edit Your Review'), findsNothing);
+      expect(find.text('Leave a Review'), findsNothing);
     });
   });
 

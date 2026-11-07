@@ -37,6 +37,8 @@ Order orderFromJson(Map<String, Object?> json) {
     itemSummary: _summary(json['items']),
     productIds: _productIds(json['product_ids']),
     productQuantities: _productQuantities(json['items']),
+    buyerConfirmed: _text(json['status']) == 'COMPLETED',
+    completedAt: DateTime.tryParse(_text(json['completed_at'])),
   );
 }
 
@@ -51,21 +53,26 @@ Order orderFromJson(Map<String, Object?> json) {
 /// claiming "in transit" for it would be a claim about a real delivery made out of
 /// ignorance.
 OrderStatus orderStatusFromServer(String status) => switch (status) {
-      'PLACED' || 'CONFIRMED' || 'PREPARING' || 'READY_FOR_PICKUP' => OrderStatus.toShip,
-      'PICKED_UP' || 'AT_SORTING_CENTER' || 'SORTED' => OrderStatus.inTransit,
-      'ASSIGNED_TO_RIDER' || 'OUT_FOR_DELIVERY' || 'DELIVERY_FAILED' => OrderStatus.outForDelivery,
-      'DELIVERED' || 'COMPLETED' => OrderStatus.toRate,
-      'RETURNED' => OrderStatus.inTransit,
-      _ => OrderStatus.toShip,
-    };
+  'PLACED' ||
+  'CONFIRMED' ||
+  'PREPARING' ||
+  'READY_FOR_PICKUP' => OrderStatus.toShip,
+  'PICKED_UP' || 'AT_SORTING_CENTER' || 'SORTED' => OrderStatus.inTransit,
+  'ASSIGNED_TO_RIDER' ||
+  'OUT_FOR_DELIVERY' ||
+  'DELIVERY_FAILED' => OrderStatus.outForDelivery,
+  'DELIVERED' || 'COMPLETED' => OrderStatus.toRate,
+  'RETURNED' => OrderStatus.inTransit,
+  _ => OrderStatus.toShip,
+};
 
 /// The sentence the order card shows for a stage.
 String _etaFor(OrderStatus status) => switch (status) {
-      OrderStatus.toShip => 'Seller ships within 1-2 days',
-      OrderStatus.inTransit => 'In transit to you',
-      OrderStatus.outForDelivery => 'Out for delivery',
-      OrderStatus.toRate => 'Delivered',
-    };
+  OrderStatus.toShip => 'Seller ships within 1-2 days',
+  OrderStatus.inTransit => 'In transit to you',
+  OrderStatus.outForDelivery => 'Out for delivery',
+  OrderStatus.toRate => 'Delivered',
+};
 
 /// The card's line: `'Handwoven Rattan Tote ×2, Kamagong Stool'`.
 ///
@@ -166,9 +173,12 @@ Order orderFromShipmentJson(Map<String, Object?> json) {
     productQuantities: _productQuantities(rows),
     cancelled: wire == 'CANCELLED',
     buyerConfirmed: wire == 'COMPLETED',
+    completedAt: DateTime.tryParse(_text(json['completed_at'])),
     deliveredAt: status == OrderStatus.toRate
         ? DateTime.tryParse(_text(json['updated_at']))
         : null,
-    serverOrderId: _text(json['order_id']).isEmpty ? null : _text(json['order_id']),
+    serverOrderId: _text(json['order_id']).isEmpty
+        ? null
+        : _text(json['order_id']),
   );
 }

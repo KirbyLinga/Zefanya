@@ -521,14 +521,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 padding: EdgeInsets.only(
                   // Reserve space for the bottom action bar plus the device's
                   // safe-area inset so the quantity stepper is always reachable.
-                  bottom: MediaQuery.of(context).padding.bottom + 80 + AppSpacing.s24,
+                  bottom:
+                      MediaQuery.of(context).padding.bottom +
+                      80 +
+                      AppSpacing.s24,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildGallery(ext),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s20,
+                        AppSpacing.s20,
+                        AppSpacing.s20,
+                        0,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -540,8 +548,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 _buildTitleAndPrice(theme),
                                 const SizedBox(height: AppSpacing.s8),
                                 _buildRatingRow(theme),
-const SizedBox(height: AppSpacing.s20),
-_buildShippingAndVoucher(theme),
+                                const SizedBox(height: AppSpacing.s20),
+                                _buildShippingAndVoucher(theme),
                               ],
                             ),
                           ),
@@ -592,7 +600,12 @@ _buildShippingAndVoucher(theme),
 
   Widget _buildAppBar(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.s12, AppSpacing.s8, AppSpacing.s12, 0),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s12,
+        AppSpacing.s8,
+        AppSpacing.s12,
+        0,
+      ),
       child: Row(
         children: [
           _circleIconButton(
@@ -690,7 +703,12 @@ _buildShippingAndVoucher(theme),
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s12, AppSpacing.s20, 0),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s12,
+        AppSpacing.s20,
+        0,
+      ),
       child: ClipRRect(
         // Asymmetric corners rather than a uniform cardRadius — same
         // shape language as the grid tiles this screen is entered from.
@@ -754,7 +772,10 @@ _buildShippingAndVoucher(theme),
         // no way to assert "one dot per photo" from outside the widget, since
         // the dots are private and AnimatedContainer is used elsewhere.
         key: const ValueKey('gallery-dots'),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s12,
+          vertical: AppSpacing.s4,
+        ),
         decoration: BoxDecoration(
           // 85% opaque, so the scrim stays a predictable near-surface
           // colour over a photo of any brightness — which is the premise
@@ -841,31 +862,42 @@ _buildShippingAndVoucher(theme),
               color: isFree ? AppColors.tertiary : AppColors.textSecondary,
             ),
             const SizedBox(width: AppSpacing.s4),
-            Expanded(child: Text(
-              isFree
-                  ? 'Free shipping on orders over \u20b11,000'
-                  : 'Shipping \u20b160',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isFree ? AppColors.tertiary : AppColors.textSecondary,
-                fontWeight: isFree ? FontWeight.w600 : FontWeight.w500,
+            Expanded(
+              child: Text(
+                isFree
+                    ? 'Free shipping on orders over \u20b11,000'
+                    : 'Shipping \u20b160',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isFree ? AppColors.tertiary : AppColors.textSecondary,
+                  fontWeight: isFree ? FontWeight.w600 : FontWeight.w500,
+                ),
               ),
-            )),
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.s12),
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s12,
+                vertical: AppSpacing.s4,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.primaryDark.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppSpacing.s20),
-                border: Border.all(color: AppColors.primaryDark.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.primaryDark.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.local_offer, size: 14, color: AppColors.primaryDark),
+                  Icon(
+                    Icons.local_offer,
+                    size: 14,
+                    color: AppColors.primaryDark,
+                  ),
                   const SizedBox(width: AppSpacing.s4),
                   Text(
                     'Apply voucher',
@@ -879,16 +911,24 @@ _buildShippingAndVoucher(theme),
             ),
             const SizedBox(width: AppSpacing.s8),
             OutlinedButton(
-              onPressed: () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => VouchersScreen()),
-              ),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(AppPageRoute(builder: (_) => VouchersScreen())),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s12,
+                  vertical: AppSpacing.s4,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: BorderSide(color: AppColors.divider),
               ),
-              child: Text('Add code', style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textPrimary)),
+              child: Text(
+                'Add code',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
           ],
         ),
@@ -1000,9 +1040,7 @@ _buildShippingAndVoucher(theme),
                       ? 'Usually replies within an hour'
                       : 'Browse the rest of their collection',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: _product.sellerOnVacation
-                        ? AppColors.danger
-                        : null,
+                    color: _product.sellerOnVacation ? AppColors.danger : null,
                     fontWeight: _product.sellerOnVacation
                         ? FontWeight.w600
                         : null,
@@ -1114,7 +1152,9 @@ _buildShippingAndVoucher(theme),
                     color: color,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: selected ? AppColors.primaryDark : AppColors.divider,
+                      color: selected
+                          ? AppColors.primaryDark
+                          : AppColors.divider,
                       width: selected ? 2.5 : 1,
                     ),
                     boxShadow: [
@@ -1131,7 +1171,8 @@ _buildShippingAndVoucher(theme),
                       ? Icon(
                           Icons.check,
                           size: 16,
-                          color: ThemeData.estimateBrightnessForColor(color) ==
+                          color:
+                              ThemeData.estimateBrightnessForColor(color) ==
                                   Brightness.dark
                               ? Colors.white
                               : Colors.black87,
@@ -1265,9 +1306,7 @@ _buildShippingAndVoucher(theme),
                     color: remaining == 0
                         ? AppColors.danger
                         : AppColors.textSecondary,
-                    fontWeight: remaining == 0
-                        ? FontWeight.w600
-                        : null,
+                    fontWeight: remaining == 0 ? FontWeight.w600 : null,
                   ),
                 ),
               ),
@@ -1432,19 +1471,19 @@ _buildShippingAndVoucher(theme),
               ],
             ),
           ),
-          if (_product.ratingDistribution.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.s12),
-              child: _RatingDistributionBars(
-                distribution: _product.ratingDistribution,
-                total: _product.ratingCount,
-              ),
+        if (_product.ratingDistribution.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.s12),
+            child: _RatingDistributionBars(
+              distribution: _product.ratingDistribution,
+              total: _product.ratingCount,
             ),
+          ),
         const SizedBox(height: AppSpacing.s16),
         for (final review in myReviews) _ownReviewTile(theme, review),
         if (myReviews.isEmpty && _product.ratingCount == 0)
           Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
             child: Text(
               'No reviews yet — be the first to leave one.',
               style: theme.textTheme.bodySmall,
@@ -1561,24 +1600,24 @@ _buildShippingAndVoucher(theme),
                       ),
                     ),
                     child: ClipRRect(
-                    borderRadius: editorialRadius(0, ShapeTier.accent),
-                    child: Image.file(
-                      File(photo),
-                      width: 88,
-                      height: 88,
-                      fit: BoxFit.cover,
-                      // The file is gone (cleared storage) — a label, not a
-                      // broken glyph.
-                      errorBuilder: (context, error, stack) => SizedBox(
+                      borderRadius: editorialRadius(0, ShapeTier.accent),
+                      child: Image.file(
+                        File(photo),
                         width: 88,
                         height: 88,
-                        child: Icon(
-                          Icons.image_not_supported_outlined,
-                          color: AppColors.textSecondary,
+                        fit: BoxFit.cover,
+                        // The file is gone (cleared storage) — a label, not a
+                        // broken glyph.
+                        errorBuilder: (context, error, stack) => SizedBox(
+                          width: 88,
+                          height: 88,
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   ),
               ],
             ),
@@ -1635,7 +1674,12 @@ _buildShippingAndVoucher(theme),
     final actionsDisabled = isOutOfStock || onVacation;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s16),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s16,
+        AppSpacing.s20,
+        AppSpacing.s16,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surface,
         // index 1 — the mirrored lean, so this bar and the cart's summary
@@ -1751,7 +1795,9 @@ class _RatingDistributionBars extends StatelessWidget {
   final Map<int, int> distribution;
   final int total;
 
-  double get _peak => distribution.values.isEmpty ? 0 : distribution.values.reduce(math.max).toDouble();
+  double get _peak => distribution.values.isEmpty
+      ? 0
+      : distribution.values.reduce(math.max).toDouble();
 
   @override
   Widget build(BuildContext context) {
@@ -1798,7 +1844,9 @@ class _RatingDistributionBars extends StatelessWidget {
           padding: const EdgeInsets.only(top: AppSpacing.s4),
           child: Text(
             '$total ${total == 1 ? 'RATING' : 'RATINGS'}',
-            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       ],
