@@ -271,6 +271,8 @@ class DeliveryJob {
     this.prepaid = false,
     this.deliveryOtp = kMockDeliveryOtp,
     this.serverStatus,
+    this.pickupSessionId,
+    this.pickupAttempts = 0,
   });
 
   final String id;
@@ -353,6 +355,15 @@ class DeliveryJob {
   /// present it is authoritative over any milestone this device recorded.
   final String? serverStatus;
 
+  /// The seller stop (WebZefanya `PickupSession`) a live pickup belongs to;
+  /// null for mock jobs and for parcels booked before stops existed.
+  final String? pickupSessionId;
+
+  /// Failed pickup attempts the server has recorded for this parcel. The app
+  /// sends `pickupAttempts + 1` with a new report so a retried request can
+  /// never be counted as the next attempt; the server owns the limit.
+  final int pickupAttempts;
+
   bool get hasCod => !prepaid && codAmount > 0;
 
   /// One-line payment label for the tracker and the job card.
@@ -385,6 +396,8 @@ class DeliveryJob {
         prepaid: prepaid,
         deliveryOtp: deliveryOtp,
         serverStatus: serverStatus,
+        pickupSessionId: pickupSessionId,
+        pickupAttempts: pickupAttempts,
       );
 }
 

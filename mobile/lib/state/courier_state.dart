@@ -446,6 +446,126 @@ class CourierState extends ChangeNotifier {
     }
   }
 
+  // ── Pickup stops and failed pickups (live mode) ─────────────────────────
+
+  List<PickupStop> _stops = const [];
+  List<PickupFailureReason> _pickupFailureReasons = const [];
+  int _maxPickupAttempts = 2;
+
+  /// Pickup actions (failed report, finish stop) still waiting for the server,
+  /// keyed `job:<id>` / `stop:<id>`. A second tap while one is in flight is
+  /// ignored rather than sent.
+  final Set<String> _pickupActionsInFlight = {};
+
+  /// The seller stops of the last job read (server data; empty in mock mode).
+  List<PickupStop> get pickupStops => List.unmodifiable(_stops);
+
+  /// The stop a job belongs to, when the server grouped it into one.
+  PickupStop? stopFor(DeliveryJob job) {
+    final id = job.pickupSessionId;
+    if (id == null) return null;
+    for (final stop in _stops) {
+      if (stop.id == id) return stop;
+    }
+    return null;
+  }
+
+  /// The failed-pickup reasons the server accepts.
+  List<PickupFailureReason> get pickupFailureReasons =>
+      List.unmodifiable(_pickupFailureReasons);
+
+  /// How many failed pickups the server allows before it cancels the order.
+  int get maxPickupAttempts => _maxPickupAttempts;
+
+  /// True when this server can take a failed-pickup report (live mode).
+  bool get canReportPickupFailure => _server != null;
+
+  bool isPickupActionBusy({String? jobId, String? stopId}) =>
+      (jobId != null && _pickupActionsInFlight.contains('job:$jobId')) ||
+      (stopId != null && _pickupActionsInFlight.contains('stop:$stopId'));
+
+  /// Adopts what the last job read said beside the lists (live mode only).
+  void _adoptJobsMeta() {
+    final meta = _server?.lastJobsMeta;
+    if (meta == null) return;
+    if (meta.online != null) _online = meta.online!;
+    _stops = List.unmodifiable(meta.stops);
+    if (meta.failureReasons.isNotEmpty) {
+      _pickupFailureReasons = List.unmodifiable(meta.failureReasons);
+    }
+    _maxPickupAttempts = meta.maxPickupAttempts;
+  }
+
+  /// Reports a failed pickup attempt (live mode).
+  ///
+  /// Sends the attempt this report should be (recorded attempts + 1); the
+  /// server refuses a mismatch with 409, so a retry after a lost response
+  /// cannot become the next attempt. Whether the order is cancelled is the
+  /// server's answer ([PickupFailureResult.cancelled]); the app never decides
+  /// it. Returns null when a report for this job is already in flight.
+  Future<PickupFailureResult?> reportPickupFailure(
+    String jobId, {
+    required String reason,
+    String? notes,
+  }) async {
+    final server = _server;
+    if (server == null) {
+      throw const ApiNotImplementedException('POST /api/rider/pickups/{id}/failed');
+    }
+    final key = 'job:$jobId';
+    if (!_pickupActionsInFlight.add(key)) return null;
+    notifyListeners();
+    try {
+      final expected = (jobById(jobId)?.pickupAttempts ?? 0) + 1;
+      PickupFailureResult? result;
+      await _guardedServerCall(() async {
+        result = await server.reportPickupFailure(
+          jobId,
+          reason: reason,
+          notes: notes,
+          expectedAttempt: expected,
+        );
+      });
+      try {
+        await refreshJobs();
+      } on ApiException {
+        // The report itself succeeded; the list refreshes on the next pull.
+      }
+      return result;
+    } finally {
+      _pickupActionsInFlight.remove(key);
+      notifyListeners();
+    }
+  }
+
+  /// Finishes a seller stop (live mode). Parcels not collected stay assigned
+  /// to this rider for the next visit; earnings are the server's. Returns null
+  /// when a finish for this stop is already in flight.
+  Future<PickupStop?> finishPickupStop(String stopId) async {
+    final server = _server;
+    if (server == null) {
+      throw const ApiNotImplementedException('POST /api/rider/pickups/stops/{id}/finish');
+    }
+    final key = 'stop:$stopId';
+    if (!_pickupActionsInFlight.add(key)) return null;
+    notifyListeners();
+    try {
+      PickupStop? stop;
+      await _guardedServerCall(() async {
+        stop = await server.finishPickupStop(stopId);
+      });
+      try {
+        await refreshJobs();
+      } on ApiException {
+        // The stop is finished; the list refreshes on the next pull.
+      }
+      return stop;
+    } finally {
+      _pickupActionsInFlight.remove(key);
+      notifyListeners();
+    }
+  }
+
   /// Completed jobs, most recent first — this is what CourierProfitScreen
   /// actually reads for its summary card and transaction list, rather
   /// than separate hardcoded numbers.
@@ -549,6 +669,7 @@ class CourierState extends ChangeNotifier {
       _assigned = List.of(await _repository.assignedJobs());
       _loadFailure = null;
       _adoptServerMilestones();
+      _adoptJobsMeta();
     } on ApiException catch (error) {
       _loadFailure = error;
       rethrow;
@@ -631,6 +752,48 @@ class CourierState extends ChangeNotifier {
     if (!_online) return;
     _online = false;
     notifyListeners();
+  }
+
+  bool _availabilityBusy = false;
+
+  /// True while an availability change is waiting for the server.
+  bool get availabilityBusy => _availabilityBusy;
+
+  /// Changes availability. Returns a message to show when it did not change.
+  ///
+  /// Live mode asks the server (`POST /api/rider/availability`) and adopts the
+  /// availability it recorded; nothing changes on a refusal or a network
+  /// failure, and a second change while one is in flight is ignored. Going
+  /// offline never removes an assigned job from the device: the jobs are
+  /// re-read and the server decides what happens to them. Mock mode is the
+  /// local switch ([goOnline] / [goOffline]).
+  Future<String?> setOnline(bool online) async {
+    final server = _server;
+    if (server == null) {
+      if (online) return goOnline();
+      goOffline();
+      return null;
+    }
+    if (_availabilityBusy) return null;
+    if (online && isSuspended) return goOnline();
+    if (online == _online) return null;
+
+    _availabilityBusy = true;
+    notifyListeners();
+    try {
+      _online = await server.setAvailability(online: online);
+    } on ApiException catch (error) {
+      return error.message;
+    } finally {
+      _availabilityBusy = false;
+      notifyListeners();
+    }
+    try {
+      await refreshJobs();
+    } on ApiException {
+      // Availability changed; the list refreshes on the next pull.
+    }
+    return null;
   }
 
   /// Applies a Logistics decision. The server is the authority; this is the
@@ -831,6 +994,7 @@ class CourierState extends ChangeNotifier {
     try {
       _assigned = List.of(await _repository.assignedJobs());
       _loadFailure = null;
+      _adoptJobsMeta();
     } on ApiNotConfiguredException {
       // Same rule as `OrderState.load()`: a build mistake stays fatal, a runtime
       // failure is recorded for the screen.

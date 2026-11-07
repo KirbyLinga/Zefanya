@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Buyer\AddressController;
 use App\Http\Controllers\Api\Buyer\CartController;
 use App\Http\Controllers\Api\Buyer\CatalogController;
 use App\Http\Controllers\Api\Buyer\CheckoutController;
+use App\Http\Controllers\Api\Buyer\CheckoutPreviewController;
 use App\Http\Controllers\Api\Buyer\LoginController;
 use App\Http\Controllers\Api\Buyer\LogoutController;
 use App\Http\Controllers\Api\Buyer\MessageController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Api\Buyer\NotificationController;
 use App\Http\Controllers\Api\Buyer\OrderActionController;
 use App\Http\Controllers\Api\Buyer\OrderController;
 use App\Http\Controllers\Api\Buyer\ProfileController;
+use App\Http\Controllers\Api\Buyer\ReviewController;
 use App\Http\Controllers\Api\Buyer\WishlistController;
 use App\Http\Controllers\Api\Rider\IncidentController as RiderIncidentController;
 use App\Http\Controllers\Api\Rider\JobController as RiderJobController;
@@ -18,6 +20,7 @@ use App\Http\Controllers\Api\Rider\LoginController as RiderLoginController;
 use App\Http\Controllers\Api\Rider\LogoutController as RiderLogoutController;
 use App\Http\Controllers\Api\Rider\NotificationController as RiderNotificationController;
 use App\Http\Controllers\Api\Rider\ParcelActionController as RiderParcelActionController;
+use App\Http\Controllers\Api\Rider\PickupController as RiderPickupController;
 use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
 use App\Http\Controllers\Api\Rider\ProviderController as RiderProviderController;
 use App\Http\Controllers\Api\Rider\TokenController as RiderTokenController;
@@ -25,7 +28,7 @@ use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/v1/buyer/checkout/quote', \App\Http\Controllers\Api\Buyer\CheckoutPreviewController::class)
+Route::post('/v1/buyer/checkout/quote', CheckoutPreviewController::class)
     ->middleware(['auth:sanctum', 'api.role:buyer', 'throttle:20,1'])->name('api.v1.buyer.checkout.quote');
 
 /* --------------------------------------------------------------------------
@@ -63,7 +66,7 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
             ->middleware('throttle:20,1')->name('shipments.confirm');
 
         Route::middleware('throttle:60,1')->group(function (): void {
-            Route::get('/reviews/mine', [\App\Http\Controllers\Api\Buyer\ReviewController::class, 'index'])->name('reviews.mine');
+            Route::get('/reviews/mine', [ReviewController::class, 'index'])->name('reviews.mine');
 
             // Addresses (BuyerAddressBook).
             Route::get('/addresses', [AddressController::class, 'index'])->name('addresses.index');
@@ -106,7 +109,7 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
 
         // Checkout (COD) and order state changes: tighter limits.
         Route::middleware('throttle:20,1')->group(function (): void {
-            Route::patch('/shipments/{shipment}/products/{product}/review', [\App\Http\Controllers\Api\Buyer\ReviewController::class, 'save'])->name('reviews.save');
+            Route::patch('/shipments/{shipment}/products/{product}/review', [ReviewController::class, 'save'])->name('reviews.save');
             Route::post('/checkout/quote', [CheckoutController::class, 'quote'])->name('checkout.quote');
             Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
             Route::post('/orders/{order}/shipments/{shipment}/cancel', [OrderActionController::class, 'cancel'])->name('orders.cancel');
@@ -168,6 +171,8 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
         Route::middleware('throttle:20,1')->group(function (): void {
             Route::post('/availability', [RiderJobController::class, 'availability'])->name('availability');
             Route::post('/pickups/{sellerOrder}/confirm', [RiderParcelActionController::class, 'confirmPickup'])->name('pickups.confirm');
+            Route::post('/pickups/{sellerOrder}/failed', [RiderPickupController::class, 'reportFailure'])->name('pickups.failed');
+            Route::post('/pickups/stops/{pickupSession}/finish', [RiderPickupController::class, 'finishStop'])->name('pickups.stops.finish');
             Route::post('/deliveries/{sellerOrder}/start', [RiderParcelActionController::class, 'startDelivery'])->name('deliveries.start');
         });
     });

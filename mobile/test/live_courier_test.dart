@@ -18,6 +18,8 @@ import 'package:zefanya/data/api/api_client.dart';
 import 'package:zefanya/data/api/api_exception.dart';
 import 'package:zefanya/data/api/token_store.dart';
 import 'package:zefanya/data/repositories/courier_repository.dart';
+import 'package:zefanya/state/courier_state.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeServer {
   _FakeServer(this._script);
@@ -402,5 +404,183 @@ void main() {
     expect(live.server.queries.first, {'barangay': '1374040001'});
     // Blank means "no address yet": the full list, no filter.
     expect(live.server.queries.last, isEmpty);
+  });
+
+  // ── Availability, failed pickups and pickup stops ────────────────────────
+
+  Map<String, Object?> stopsJobs({int attempts = 0, bool online = false}) => {
+        'online': online,
+        'pickups': [
+          {
+            ..._parcel(id: 21, leg: 'pickup', status: 'READY_FOR_PICKUP'),
+            'pickup_session_id': 5,
+            'pickup_attempts': attempts,
+          },
+          {
+            ..._parcel(id: 22, leg: 'pickup', status: 'PICKED_UP'),
+            'pickup_session_id': 5,
+            'pickup_attempts': 0,
+          },
+        ],
+        'deliveries': const [],
+        'stops': [
+          {
+            'id': 5,
+            'status': 'IN_PROGRESS',
+            'seller_name': 'Willow & Bloom Atelier',
+            'pickup_address': '12 Mabini Street',
+            'collected': 1,
+            'total': 2,
+            'remaining': 1,
+            'earned_minor': 3000,
+            'potential_minor': 3500,
+            'can_finish': true,
+          },
+        ],
+        'pickup_failure': {
+          'max_attempts': 2,
+          'reasons': [
+            {'value': 'recipient_unavailable', 'label': 'Recipient unavailable'},
+            {'value': 'other', 'label': 'Other'},
+          ],
+        },
+      };
+
+  test('jobs read the stops, attempts, reasons and server availability', () async {
+    final live = _Live([_ok(stopsJobs(attempts: 1, online: true))]);
+    await live.tokens.write('1|rider');
+
+    final jobs = await live.repo.assignedJobs();
+    final meta = live.repo.lastJobsMeta!;
+
+    expect(jobs.map((j) => (j.id, j.pickupSessionId, j.pickupAttempts)),
+        [('21', '5', 1), ('22', '5', 0)]);
+    expect(meta.online, isTrue);
+    expect(meta.maxPickupAttempts, 2);
+    expect(meta.failureReasons.map((r) => r.value), ['recipient_unavailable', 'other']);
+    final stop = meta.stops.single;
+    expect((stop.id, stop.collected, stop.total, stop.remaining, stop.canFinish), ('5', 1, 2, 1, true));
+    expect(stop.earned, 30);
+  });
+
+  test('availability posts {online} and adopts what the server recorded', () async {
+    final live = _Live([_ok({'online': false, 'changed': true, 'jobs_flagged_for_reassignment': 0})]);
+    await live.tokens.write('1|rider');
+
+    final recorded = await live.repo.setAvailability(online: true);
+
+    expect(live.server.paths.single, '/rider/availability');
+    expect(jsonDecode(live.server.bodies.single), {'online': true});
+    // The server's answer wins over what was asked.
+    expect(recorded, isFalse);
+  });
+
+  test('a failed pickup sends the reason, notes and the expected attempt', () async {
+    final live = _Live([
+      _ok({'attempt': 2, 'attempts_remaining': 0, 'cancelled': true, 'parcel': _parcel(id: 21, leg: 'pickup', status: 'CANCELLED')}),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final result = await live.repo.reportPickupFailure('21', reason: 'other', expectedAttempt: 2, notes: ' Shop closed ');
+
+    expect(live.server.paths.single, '/rider/pickups/21/failed');
+    expect(jsonDecode(live.server.bodies.single), {
+      'failure_reason': 'other',
+      'expected_attempt': 2,
+      'failure_notes': 'Shop closed',
+    });
+    // Cancellation is the server's answer, read as-is.
+    expect((result.attempt, result.attemptsRemaining, result.cancelled), (2, 0, true));
+  });
+
+  test('a duplicate failed pickup is the server 409, surfaced as a conflict', () async {
+    final live = _Live([_error(409, 'Pickup attempt #1 is already recorded. Refresh your pickups.')]);
+    await live.tokens.write('1|rider');
+
+    await expectLater(
+      live.repo.reportPickupFailure('21', reason: 'other', expectedAttempt: 1),
+      throwsA(isA<RequestRejectedException>().having((e) => e.isConflict, 'isConflict', isTrue)),
+    );
+  });
+
+  test('finishing a stop posts to the stop and reads the finished stop', () async {
+    final live = _Live([
+      _ok({'stop': {'id': 5, 'status': 'COMPLETED', 'seller_name': 'Willow', 'collected': 1, 'total': 1, 'can_finish': false}}),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final stop = await live.repo.finishPickupStop('5');
+
+    expect(live.server.methods.single, 'POST');
+    expect(live.server.paths.single, '/rider/pickups/stops/5/finish');
+    expect(stop!.status, 'COMPLETED');
+    expect(stop.canFinish, isFalse);
+  });
+
+  group('CourierState (live)', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('adopts server availability and stops, and reports attempt + 1', () async {
+      final live = _Live([
+        _ok(stopsJobs(attempts: 1, online: true)), // refreshJobs
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}), // earnings
+        _ok({'attempt': 2, 'attempts_remaining': 0, 'cancelled': true}), // report
+        _ok(stopsJobs(attempts: 2)), // refresh after report
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+      ]);
+      await live.tokens.write('1|rider');
+      final courier = CourierState(repository: live.repo);
+
+      await courier.refreshJobs();
+      expect(courier.isOnline, isTrue);
+      expect(courier.pickupStops.single.id, '5');
+      expect(courier.stopFor(courier.jobById('21')!)!.remaining, 1);
+      expect(courier.pickupFailureReasons, hasLength(2));
+
+      final result = await courier.reportPickupFailure('21', reason: 'other');
+
+      expect(result!.cancelled, isTrue);
+      final report = live.server.paths.indexOf('/rider/pickups/21/failed');
+      expect(jsonDecode(live.server.bodies[report])['expected_attempt'], 2);
+    });
+
+    test('a second tap while a report is in flight sends nothing', () async {
+      final live = _Live([
+        _ok(stopsJobs()),
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _ok({'attempt': 1, 'attempts_remaining': 1, 'cancelled': false}),
+        _ok(stopsJobs(attempts: 1)),
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+      ]);
+      await live.tokens.write('1|rider');
+      final courier = CourierState(repository: live.repo);
+      await courier.refreshJobs();
+
+      final first = courier.reportPickupFailure('21', reason: 'other');
+      final second = await courier.reportPickupFailure('21', reason: 'other');
+      await first;
+
+      expect(second, isNull);
+      expect(live.server.paths.where((p) => p == '/rider/pickups/21/failed'), hasLength(1));
+    });
+
+    test('a failed availability change leaves the switch unchanged', () async {
+      final live = _Live([
+        _ok(stopsJobs(online: false)),
+        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _error(503, 'Service unavailable'),
+      ]);
+      await live.tokens.write('1|rider');
+      final courier = CourierState(repository: live.repo);
+      await courier.refreshJobs();
+
+      final problem = await courier.setOnline(true);
+
+      expect(problem, isNotNull);
+      expect(courier.isOnline, isFalse);
+      expect(courier.availabilityBusy, isFalse);
+      // Assigned jobs are untouched by the failed change.
+      expect(courier.jobById('21'), isNotNull);
+    });
   });
 }

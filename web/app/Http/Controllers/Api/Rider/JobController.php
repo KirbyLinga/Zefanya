@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers\Api\Rider;
 
+use App\Enums\DeliveryFailureReason;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Http\Resources\Mobile\RiderParcelResource;
+use App\Http\Resources\Mobile\RiderPickupStopResource;
+use App\Models\Logistics\PickupSession;
 use App\Models\Rider\RiderEarning;
 use App\Models\Seller\StoreSale;
 use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\PickupPolicy;
+use App\Services\Rider\PickupFailureService;
 use App\Services\Rider\RiderAvailabilityService;
 use App\Services\Rider\RiderCashService;
 use App\Services\Rider\RiderEarningService;
@@ -42,15 +47,37 @@ class JobController extends Controller
         // narrows itself to OUT_FOR_DELIVERY in that state.
         $pickups = $windingDown
             ? new EloquentCollection
-            : $operations->pickupAssignments($rider)->load(self::RELATIONS);
+            : $operations->pickupAssignments($rider)->load(self::RELATIONS)->loadMax('pickupAttempts', 'attempt_number');
         $deliveries = $operations->deliveryAssignments($rider)->load(self::RELATIONS);
 
         return $this->success('Assigned jobs retrieved.', [
             'online' => (bool) $rider->fresh()->is_online,
             'winding_down' => $windingDown,
             'pickups' => $pickups->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('pickup')->resolve($request))->values(),
+            // One entry per seller stop the pickups belong to (collected / remaining
+            // counts and earnings come from PickupSessionService::summary).
+            'stops' => $this->stops($pickups, $request),
+            'pickup_failure' => [
+                'max_attempts' => PickupFailureService::MAX_ATTEMPTS,
+                'reasons' => collect(DeliveryFailureReason::cases())
+                    ->map(fn (DeliveryFailureReason $reason): array => ['value' => $reason->value, 'label' => $reason->label()])
+                    ->values(),
+            ],
             'deliveries' => $deliveries->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('delivery')->resolve($request))->values(),
         ]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function stops(EloquentCollection $pickups, Request $request): array
+    {
+        $ids = $pickups->pluck('pickup_session_id')->filter()->unique()->values();
+        if ($ids->isEmpty() || ! PickupPolicy::sessionsAvailable()) {
+            return [];
+        }
+
+        return PickupSession::query()->whereKey($ids->all())->with('seller')->orderBy('id')->get()
+            ->map(fn (PickupSession $session): array => (new RiderPickupStopResource($session))->resolve($request))
+            ->values()->all();
     }
 
     /**

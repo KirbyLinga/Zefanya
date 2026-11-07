@@ -92,6 +92,31 @@ abstract class RiderServerData {
   /// [barangayCode], only those whose validated coverage serves that barangay
   /// (the server's own coverage rule).
   Future<List<RiderProviderOption>> registrationProviders({String? barangayCode});
+
+  /// What the last [CourierRepository.assignedJobs] read said beside the job
+  /// lists: the rider's server-side availability, the seller stops, and the
+  /// failed-pickup reasons and limit. Null before the first read.
+  RiderJobsMeta? get lastJobsMeta;
+
+  /// `POST /api/rider/availability`. Returns the availability the server
+  /// recorded. Going offline never unassigns a job on the device; the server
+  /// decides what happens to open assignments.
+  Future<bool> setAvailability({required bool online});
+
+  /// `POST /api/rider/pickups/{id}/failed`. [expectedAttempt] is the attempt
+  /// the rider is reporting (the job's recorded attempts + 1); the server
+  /// refuses a mismatch with 409, so a retried request cannot count twice.
+  /// Whether the order is cancelled is the server's decision.
+  Future<PickupFailureResult> reportPickupFailure(
+    String jobId, {
+    required String reason,
+    required int expectedAttempt,
+    String? notes,
+  });
+
+  /// `POST /api/rider/pickups/stops/{id}/finish`: ends the seller stop. Parcels
+  /// not collected stay assigned for the next visit (server rule).
+  Future<PickupStop?> finishPickupStop(String stopId);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +206,53 @@ class LiveCourierRepository extends LiveRepository
   /// Tracking numbers from the last [assignedJobs], for the scan step.
   final Map<String, String> _tracking = {};
 
+  RiderJobsMeta? _lastJobsMeta;
+
+  @override
+  RiderJobsMeta? get lastJobsMeta => _lastJobsMeta;
+
+  @override
+  Future<bool> setAvailability({required bool online}) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final data = unwrapMap(
+      await client.postJson('/rider/availability', body: {'online': online}),
+    );
+    final recorded = data['online'];
+    return recorded is bool ? recorded : online;
+  }
+
+  @override
+  Future<PickupFailureResult> reportPickupFailure(
+    String jobId, {
+    required String reason,
+    required int expectedAttempt,
+    String? notes,
+  }) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final note = notes?.trim() ?? '';
+    final data = unwrapMap(
+      await client.postJson(
+        '/rider/pickups/$jobId/failed',
+        body: {
+          'failure_reason': reason,
+          'expected_attempt': expectedAttempt,
+          if (note.isNotEmpty) 'failure_notes': note,
+        },
+      ),
+    );
+    return pickupFailureResultFromJson(data);
+  }
+
+  @override
+  Future<PickupStop?> finishPickupStop(String stopId) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final data = unwrapMap(
+      await client.postJson('/rider/pickups/stops/$stopId/finish'),
+    );
+    final stop = data['stop'];
+    return stop is Map ? pickupStopFromJson(stop.cast<String, Object?>()) : null;
+  }
+
   @override
   bool get isServerAuthoritative => true;
 
@@ -195,6 +267,7 @@ class LiveCourierRepository extends LiveRepository
             ?deliveryJobFromRiderParcel(row.cast<String, Object?>()),
     ];
 
+    _lastJobsMeta = riderJobsMetaFromJson(data);
     _tracking
       ..clear()
       ..addEntries(

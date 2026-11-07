@@ -112,8 +112,137 @@ DeliveryJob? deliveryJobFromRiderParcel(Map<String, Object?> json) {
     prepaid: !requiresCod,
     deliveryOtp: '',
     serverStatus: json['status']?.toString(),
+    pickupSessionId: json['pickup_session_id']?.toString(),
+    pickupAttempts: (json['pickup_attempts'] as num?)?.toInt() ?? 0,
   );
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/jobs: stops, failed-pickup rules and availability
+// ---------------------------------------------------------------------------
+
+/// One seller stop (WebZefanya `PickupSession`). Every count and amount is
+/// the server's (`PickupSessionService::summary`); the app only displays it.
+class PickupStop {
+  const PickupStop({
+    required this.id,
+    required this.status,
+    required this.sellerName,
+    required this.collected,
+    required this.total,
+    required this.canFinish,
+    this.pickupAddress,
+    this.windowEndsAt,
+    this.earned = 0,
+    this.potential = 0,
+  });
+
+  final String id;
+
+  /// `OPEN`, `IN_PROGRESS`, `COMPLETED`, `MISSED` or `CANCELLED`.
+  final String status;
+  final String sellerName;
+  final String? pickupAddress;
+  final DateTime? windowEndsAt;
+  final int collected;
+  final int total;
+  final double earned;
+  final double potential;
+
+  /// The server's answer to "can this stop be finished now" (at least one
+  /// parcel collected and the stop still in progress).
+  final bool canFinish;
+
+  int get remaining => total - collected < 0 ? 0 : total - collected;
+}
+
+PickupStop? pickupStopFromJson(Map<String, Object?> json) {
+  final id = json['id']?.toString().trim();
+  if (id == null || id.isEmpty) return null;
+  double pesos(Object? minor) => (_int(minor) ?? 0) / 100;
+
+  return PickupStop(
+    id: id,
+    status: json['status']?.toString() ?? '',
+    sellerName: json['seller_name']?.toString() ?? 'Seller',
+    pickupAddress: json['pickup_address']?.toString(),
+    windowEndsAt: DateTime.tryParse('${json['window_ends_at']}')?.toLocal(),
+    collected: _int(json['collected']) ?? 0,
+    total: _int(json['total']) ?? 0,
+    earned: pesos(json['earned_minor']),
+    potential: pesos(json['potential_minor']),
+    canFinish: json['can_finish'] == true,
+  );
+}
+
+/// A failed-pickup reason the server accepts (`DeliveryFailureReason`).
+class PickupFailureReason {
+  const PickupFailureReason({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
+
+/// What `GET /api/rider/jobs` says beside the job lists.
+class RiderJobsMeta {
+  const RiderJobsMeta({
+    required this.online,
+    required this.stops,
+    required this.failureReasons,
+    required this.maxPickupAttempts,
+  });
+
+  /// The rider's availability as the server has it, or null when absent.
+  final bool? online;
+  final List<PickupStop> stops;
+  final List<PickupFailureReason> failureReasons;
+  final int maxPickupAttempts;
+}
+
+RiderJobsMeta riderJobsMetaFromJson(Map<String, Object?> data) {
+  final failure = (data['pickup_failure'] as Map?)?.cast<String, Object?>() ?? const {};
+  final online = data['online'];
+
+  return RiderJobsMeta(
+    online: online is bool ? online : null,
+    stops: [
+      for (final row in (data['stops'] as List?) ?? const [])
+        if (row is Map) ?pickupStopFromJson(row.cast<String, Object?>()),
+    ],
+    failureReasons: [
+      for (final row in (failure['reasons'] as List?) ?? const [])
+        if (row is Map && '${row['value'] ?? ''}'.isNotEmpty)
+          PickupFailureReason(
+            value: '${row['value']}',
+            label: '${row['label'] ?? row['value']}',
+          ),
+    ],
+    maxPickupAttempts: _int(failure['max_attempts']) ?? 2,
+  );
+}
+
+/// The server's answer to a failed-pickup report.
+class PickupFailureResult {
+  const PickupFailureResult({
+    required this.attempt,
+    required this.attemptsRemaining,
+    required this.cancelled,
+  });
+
+  final int attempt;
+  final int attemptsRemaining;
+
+  /// True when the server cancelled the order (the final allowed attempt).
+  /// Decided by the server, never by the app.
+  final bool cancelled;
+}
+
+PickupFailureResult pickupFailureResultFromJson(Map<String, Object?> data) =>
+    PickupFailureResult(
+      attempt: _int(data['attempt']) ?? 0,
+      attemptsRemaining: _int(data['attempts_remaining']) ?? 0,
+      cancelled: data['cancelled'] == true,
+    );
 
 // ---------------------------------------------------------------------------
 // GET /api/rider/earnings
