@@ -49,3 +49,5 @@ Final normal Artisan runner after the case-name correction:
 `{"tool":"phpunit","result":"passed","tests":8,"passed":8,"assertions":75,"duration_ms":6609}`
 
 No development migration or real payment/refund transfer was run. No real MySQL race proof is claimed.
+
+Follow-up strengthens the paid ewallet fixture with MCH50, requiring its wallet claim to return and usage to reach zero in the same successful cancellation. Final Artisan summary: `{"tool":"phpunit","result":"passed","tests":8,"passed":8,"assertions":77,"duration_ms":7727}`. No assertions removed; production guards unchanged.

@@ -1,21 +1,22 @@
-# Consolidation state
+# S6 EXTEND continuation — 2026-11-07
 
-Target: ZefanyaWM/Zefanya; branch codex/combined-web-mobile-hardening; base 3b87074.
-Original checkout retained unchanged. User authorized adaptation/test/commit/push; no merge authorized.
-S8B: awaited portrait, OTP autofill, API reachability/reactive Retry, dirty-form/system Back/logout tests, scaled category/shipping layouts.
-Focused S8B/default-mode tests: 25 passed (adaptation-mobile-tests.log).
-Existing login/orders fix retained; 20 focused login/orders tests passed before adaptation.
-Public image CORS: 6 tests, 15 assertions passed before adaptation; public uploads retained.
-S10: canonical switch adapted; default mock, explicit live, and obsolete-key-ignored mode tests each passed. Recording/build/install instructions adapted in demo-script.md; APK rebuild/device/HTTPS acceptance OPEN.
-S6.6: native API/service/UI adapted; trusted completion history, one edit, JPG/PNG up to five at 5 MB, multipart uploads. No new schema.
-Focused PHP: 35 passed, 227 assertions. Focused mobile review/auth/catalogue: 73 passed.
-Final full mobile: 03:34 +834: All tests passed! Web build: built in 10.02s.
-Analysis: 7 existing findings (6 infos, 1 unused test-helper warning), all in unchanged files; no new findings.
-Full backend run: 3696 tests, 3668 passed, 27 failed, 1 skipped; 24423 assertions, 1922930 ms. Started before web assets existed.
-After building assets, all affected admin classes plus final review/shipment/image tests passed: 95 tests, 556 assertions, 107448 ms. All 27 failures cleared; no clean full-suite rerun is claimed.
-Five native security mutations each failed as expected. All restored; affected suite: 37 passed, 233 assertions, 65185 ms. See mutation-proof.md.
-PHP syntax and source encoding checked; no UTF-8 BOM. Final syntax/encoding and push verification recorded in the consolidation commit.
-Formatting remains unrun: automatic approval review classified the required formatter as forbidden despite prior explicit approval.
-Open: public Buyer 2 reviews, independent variant-line addressing, remote review photos/removal, atomic multi-item submission, MySQL race proof. Ambiguous variants fail closed.
-Cancellation was not implemented in the source checkout and is not claimed here.
-No dev migration, environment change, merge, tag or APK commit.
+Target: ZefanyaWM/Zefanya; branch codex/combined-web-mobile-hardening. Original checkout unchanged.
+Verified implementation HEAD: 148ed11; subsequent follow-up strengthens the MCH50 test and records state only.
+Work order: C:/Users/Lenovo/Documents/lavarel/Zefanya/docs/MASTER_PLAN.md, schedule override and EXTEND order.
+S6.4 DONE in code: cancel PLACED/CONFIRMED/PREPARING; block READY_FOR_PICKUP and later; shared five preset reasons.
+Web/API/mobile use the same boundary; native stock/ledger/rollup and shared-voucher rules retained.
+Unexpired vouchers return with usage reduced once; paid cancellation records exact pending liability, uniquely per payment.
+Paid payment records remain intact; failures roll back all cancellation effects; pending refund blocks account deletion.
+New additive table payment_cancellation_refunds; migration 2026_11_07_062857_create_payment_cancellation_refunds_table.php NOT run on dev DB.
+Existing prepaid values are readable; checkout remains COD-only. Pending liability is not a transferred refund.
+Restored broader PHP suite: 113 passed, 735 assertions, 32224 ms (cancellation, actor, API, vouchers, account deletion).
+Final Artisan cancellation suite, including paid ewallet + MCH50: 8 passed, 77 assertions, 7727 ms.
+Full mobile: 02:33 +837: All tests passed! Web build: built in 8.42s.
+Analysis: 7 issues found. (ran in 9.9s); same 6 infos and 1 unused-test-helper warning in unchanged files.
+Seven deliberate security/money mutations each failed, all restored; four guard SHA256 checksums verified. See mutation-proof.md.
+14 changed/new PHP files passed syntax checks; follow-up test syntax passed; source BOM check passed.
+User waived the formatting gate for remaining authorized tasks; formatter stays UNRUN due prior automatic approval rejection.
+S6.6 earlier implementation retained; open public Buyer 2/variant-line/photo/atomic-submit review work and MySQL race proof remain documented.
+S10 HTTPS/device/APK gates remain OPEN. Historical missing-variant inventory requires reconciliation; mock flags are not a financial ledger.
+No dev migration, environment change, merge, tag, APK build or payment transfer. Prior consolidation verification is in commit 80fc7c8.
+PAUSED MID-STAGE: next item is S6.2 checkout quote/shipping/vouchers, using this newer checkout's existing native services.

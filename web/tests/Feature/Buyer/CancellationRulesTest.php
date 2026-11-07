@@ -74,6 +74,8 @@ class CancellationRulesTest extends RiderTestCase
     public function test_buy_can_003_paid_ewallet_records_exact_refund_liability_once(): void
     {
         $shipment = $this->parcel(OrderStatus::Preparing);
+        $voucher = Voucher::factory()->create(['code' => 'MCH50', 'times_used' => 1, 'expires_at' => now()->addDay()]);
+        $shipment->forceFill(['platform_voucher_id' => $voucher->id])->save();
         $payment = Payment::factory()->paid()->create(['seller_order_id' => $shipment->id, 'method' => PaymentMethod::Ewallet, 'amount_minor' => 108300]);
         $before = $payment->fresh()->getRawOriginal();
         $this->api()->postJson($this->path($shipment), ['reason' => 'Changed my mind', 'amount_minor' => 1, 'buyer_id' => 999])->assertOk();
@@ -82,6 +84,8 @@ class CancellationRulesTest extends RiderTestCase
         $this->assertSame($payment->id, $refund->payment_id);
         $this->assertSame($this->buyer->id, $refund->buyer_id);
         $this->assertSame('pending', $refund->status);
+        $this->assertSame(0, $voucher->fresh()->times_used);
+        $this->assertTrue($voucher->claims()->where('buyer_id', $this->buyer->id)->exists());
         $this->assertSame($before, $payment->fresh()->getRawOriginal());
         $this->api()->postJson($this->path($shipment), ['reason' => 'Changed my mind'])->assertStatus(409);
         $this->assertDatabaseCount('payment_cancellation_refunds', 1);
