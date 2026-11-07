@@ -1,5 +1,18 @@
 # Demo and recording in the newer checkout
 
+## Remaining Courier phone check
+
+Device discovery on 2026-11-08 found no connected Android device; Pixel_4a is a saved emulator, not a running device. Android declares INTERNET and CAMERA. Existing scanner/trip widget checks pass (8 tests); they do not verify camera permission, QR or Code128 decoding on hardware.
+
+1. Connect the intended Android phone with USB debugging enabled and accept its debugging prompt yourself. Confirm it appears as `device` in `adb devices -l`.
+2. Obtain a reachable HTTPS API address for this checkout before building/running live mode on the phone. PC loopback `127.0.0.1` is not the phone's backend address. Do not reuse a tunnel serving another checkout.
+3. Have Logistics prepare a new eligible demo transfer; batch #1 has already completed and cannot be replayed. Sign in through Courier login and accept the new assignment.
+4. Open Scan or enter parcel. First deny camera permission: check that manual entry still works and returning to the trip preserves its state. Reopen and grant camera access yourself when ready to test it.
+5. Scan an actual QR and a Code128 waybill for parcels on the new batch. Check that the correct tracking number loads once, an unrelated number is refused, closing/reopening the scanner works, and no permission prompt loops occur.
+6. Scan all parcels, enter a valid seal, depart, report arrival, and let Logistics receive every parcel. Refresh History and verify Completed with the correct received count. Check logout followed by Back does not reopen Courier data.
+
+Keep these results OPEN until observed on the intended phone. No new APK was built during this device-readiness check.
+
 Local browser rehearsal completed: separate approved zero-value fixture DEMO-COURIER-20261108-01 (parcel #8, batch #1) moved Pila Station Hub to Laguna Province Hub. Logistics assignment, Courier acceptance, manual scan, sealed departure, reported arrival and Logistics receiving succeeded. Courier history is Completed; the fixed API retains 1 parcel / 1 received. Existing orders, inventory and payments were untouched. This fixture has no sale lines and is only a hub-transfer rehearsal, not a checkout/delivery acceptance result. Phone camera/permissions remain open. The temporary local setup script was removed.
 
 ## ZefanyaWMI combined Courier demonstration

@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-08
 Stage: Courier design and local browser handover DONE; completed-history count FIXED; phone camera/device rehearsal OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified design/fix HEAD: e5f1c95 (design core 98ee278); follow-up records this hash only.
+Verified handover/history fix HEAD: 872a5e7; design core 98ee278. Device-readiness notes follow this verified code.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier. Branded login, Trips/History/Account use shared Zefanya fonts/colors/cards/nav/empty states.
 Logistics assigns one active forward manifest to an eligible same-company Courier; driver/manifest locks and ownership policy.
@@ -20,6 +20,6 @@ Design: no PHP changes. Ten widget-render previews inspected at 360x640/1.3 text
 Deferred: activation/document/vehicle/duty/capacity flows, 500 m GPS/tracking/push, reassignment, pay and full discrepancy rules.
 Existing gaps retained: PLACED-only cancellation conflicts with prior cutoff; S6.2 breakdown/wallet, review, HTTPS/device gates open.
 User approved separate local demo data: zero-value parcel #8 / batch #1, DEMO-COURIER-20261108-01. Existing orders/stock/payments untouched.
-Real HTTP: all three logins/profiles succeeded; Courier trips 200/empty, Rider access 403, Chrome CORS 204; own test tokens logged out.
+Real HTTP: all three logins/profiles succeeded; Courier trip #1 Completed/1 received, Rider access 403, Chrome CORS 204; own test tokens logged out.
 Latest design preview: http://127.0.0.1:5174; backend http://127.0.0.1:8000. Debug web recompile passed; see demo-script.md.
-Browser manual-entry trip #1 Completed after Logistics receipt; real API confirms 1 parcel/1 received. Next: phone camera/device. No merge/APK; Pint waived/UNRUN.
+Device check: no connected Android devices; Pixel_4a AVD saved only. Scanner/trip widgets: 00:03 +8: All tests passed! Next: phone/HTTPS checklist in demo-script.md. No merge/APK; Pint waived/UNRUN.
