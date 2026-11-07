@@ -87,8 +87,8 @@
                 <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_BODY_LENGTH }} characters.</p>
 
                 <label class="block text-sm text-buyer-ink" for="review-photos">Photos (optional)</label>
-                <input id="review-photos" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="upload-input">
-                <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_PHOTOS }} JPG, PNG or WebP photos, 3 MB each.</p>
+                <input id="review-photos" type="file" name="photos[]" accept="image/jpeg,image/png" multiple class="upload-input">
+                <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_PHOTOS }} JPG or PNG photos, 5 MB each.</p>
 
                 @include('Buyer.Products._review-errors')
 
@@ -134,7 +134,7 @@
                             <form method="POST" action="{{ route('buyer.reviews.update', $myReview) }}" enctype="multipart/form-data" class="mt-4 space-y-3 border-t border-buyer-line pt-4">
                                 @csrf
                                 @method('PATCH')
-                                <p class="text-xs text-buyer-ink-soft">You may edit this review once, within 30 days of posting it.</p>
+                                <p class="text-xs text-buyer-ink-soft">You may edit this review once, within 30 days of order completion.</p>
 
                                 <fieldset>
                                     <legend class="block text-sm text-buyer-ink">Your rating</legend>
@@ -168,7 +168,7 @@
                                 @endif
 
                                 <label class="block text-sm text-buyer-ink" for="edit-review-photos-{{ $myReview->id }}">Add photos (optional)</label>
-                                <input id="edit-review-photos-{{ $myReview->id }}" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="upload-input">
+                                <input id="edit-review-photos-{{ $myReview->id }}" type="file" name="photos[]" accept="image/jpeg,image/png" multiple class="upload-input">
 
                                 @include('Buyer.Products._review-errors')
 
@@ -176,7 +176,7 @@
                             </form>
                         @else
                             <p class="mt-3 text-xs text-buyer-ink-soft">
-                                This review can no longer be edited. Buyer reviews may be edited once, within 30 days of posting.
+                                This review can no longer be edited. Buyer reviews may be edited once, within 30 days of order completion.
                             </p>
                         @endif
                     </article>
