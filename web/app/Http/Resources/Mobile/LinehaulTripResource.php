@@ -29,7 +29,7 @@ class LinehaulTripResource extends JsonResource
             'seal_number' => $this->seal_number,
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'arrived_at' => $this->arrived_at?->toIso8601String(),
-            'items' => $manifest->items->whereNull('released_at')->map(fn ($item): array => [
+            'items' => $manifest->items->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null)->map(fn ($item): array => [
                 'id' => $item->id, 'tracking_number' => $item->tracking_number,
                 'loaded' => $manifest->dispatched_at !== null || isset(($this->loading_tokens ?? [])[$item->id]),
                 'received' => $item->received_at !== null,

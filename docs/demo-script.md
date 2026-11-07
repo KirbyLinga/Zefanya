@@ -1,5 +1,7 @@
 # Demo and recording in the newer checkout
 
+Local browser rehearsal completed: separate approved zero-value fixture DEMO-COURIER-20261108-01 (parcel #8, batch #1) moved Pila Station Hub to Laguna Province Hub. Logistics assignment, Courier acceptance, manual scan, sealed departure, reported arrival and Logistics receiving succeeded. Courier history is Completed; the fixed API retains 1 parcel / 1 received. Existing orders, inventory and payments were untouched. This fixture has no sale lines and is only a hub-transfer rehearsal, not a checkout/delivery acceptance result. Phone camera/permissions remain open. The temporary local setup script was removed.
+
 ## ZefanyaWMI combined Courier demonstration
 
 Local setup is verified after explicit user approval: backend on http://127.0.0.1:8000; the latest branded Courier preview is http://127.0.0.1:5174 (5173 is the earlier preview). Open the new URL in Chrome. All three demo logins/profile calls previously passed against MySQL; full assigned-trip and phone/camera rehearsal remain open. Credentials were handed over in chat and are not committed.

@@ -1,5 +1,7 @@
 # Decisions & Deviations
 
+- Browser rehearsal completed with explicitly approved separate zero-value local fixture parcel #8 / batch #1 (DEMO-COURIER-20261108-01), Pila Station Hub to Laguna Province Hub. No existing order, inventory or payment was changed. Manual entry only; physical camera remains unverified. Found completed-history count dropped received/released items; retain received items while excluding removed, unreceived items. Strengthened the existing full-trip test with retained item count and received flag assertions; no assertions removed.
+
 - Courier continuation: added a two-parcel handover regression without changing existing assertions. Departure with one unscanned parcel must fail atomically; Logistics receiving one parcel leaves Arrived, receiving both completes the trip. Separate factory orders respect the order/seller uniqueness constraint. Tests use SQLite only; local MySQL/order data untouched. PHP production code unchanged; Pint remains waived/unrun. Direct PHPUnit: 10 passed, 175 assertions, 6213 ms. Physical camera and real assigned-trip rehearsal remain open.
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.

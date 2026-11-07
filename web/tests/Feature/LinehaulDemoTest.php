@@ -142,7 +142,8 @@ class LinehaulDemoTest extends TestCase
         $token = $this->postJson(route('logistics.manifests.scan.verify', $manifest), ['tracking_number' => $parcel->tracking_number, 'phase' => 'receive', 'method' => 'manual'])->assertOk()->json('verification_token');
         $this->post(route('logistics.manifests.receive.store', [$manifest, $item]), ['verification_token' => $token])->assertRedirect();
         $this->assertSame(ManifestStatus::Received, $manifest->fresh()->status);
-        $this->api($driver)->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.status', 'Completed');
+        $this->api($driver)->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.status', 'Completed')
+            ->assertJsonCount(1, 'data.0.items')->assertJsonPath('data.0.items.0.received', true);
     }
 
     public function test_multi_parcel_trip_requires_all_loading_and_receiving_scans(): void

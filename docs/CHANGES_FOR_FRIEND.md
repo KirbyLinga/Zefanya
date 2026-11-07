@@ -1,5 +1,7 @@
 # Touched your files
 
+- Courier rehearsal fix: `web/app/Http/Resources/Mobile/LinehaulTripResource.php` retains received parcels after native receiving releases them, so completed history reports the actual received count. Removed/unreceived items stay excluded. Full-trip regression strengthened; no schema or route changes.
+
 ## Courier design integration — 2026-11-08
 
 - Final navigation regression fix: keep trip observation mounted on Account and immediately observe reload failures before the next frame; the original future still feeds the visible error/Retry panel. Added the background-refresh failure test. Final full mobile 886 pass; focused 20 pass; analyzer unchanged at eight existing findings.
