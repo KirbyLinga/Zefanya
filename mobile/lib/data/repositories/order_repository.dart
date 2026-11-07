@@ -353,7 +353,23 @@ class LiveOrderRepository extends LiveRepository
     List<OrderLineRequest> lines, {
     List<String> voucherCodes = const [],
   }) async {
-    final quote = await _quote(lines, voucherCodes);
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final quote = unwrapMap(
+      await client.postJson(
+        '/v1/buyer/checkout/quote',
+        body: {
+          'lines': [
+            for (final line in lines)
+              {
+                'product_id': line.productId,
+                if (line.variantId != null) 'variant_id': line.variantId,
+                'quantity': line.quantity,
+              },
+          ],
+          'voucher_codes': voucherCodes,
+        },
+      ),
+    );
     return _payable(quote) / 100;
   }
 
@@ -392,6 +408,8 @@ class LiveOrderRepository extends LiveRepository
           'checkout_token': quote['checkout_token'],
           'carriers': quote['carriers'],
           'vouchers': quote['vouchers_state'],
+          if (expectedTotal != null)
+            'expected_total': expectedTotal.toStringAsFixed(2),
           'price_fingerprint': fingerprints['price'],
           'address_fingerprint': fingerprints['address'],
           'shipping_fingerprint': fingerprints['shipping'],

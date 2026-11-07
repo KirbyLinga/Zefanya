@@ -1,5 +1,20 @@
 # Touched your files
 
+## S6.2 checkpoint — quote, reference shipping and reviewed total
+
+- New authenticated `POST /api/v1/buyer/checkout/quote`: provisional product/variant/quantity lines, optional owned address/carriers and voucher codes. Sanctum buyer role, 20/min throttle, `CheckoutPolicy`, `CheckoutPreviewRequest`, `CheckoutPreviewResource`, `CheckoutPreviewController` and `SpecCheckoutQuoteTest` cover ownership, 401/403/422/429 and success. Preview creates no cart, token, claim, order, payment or inventory records.
+- New `web/app/Services/Buyer/CheckoutPreviewService.php`: unsaved native CartItem adapter; delegates prices, stock, address choice, vouchers and operational routes to the existing services. No second pricing formula.
+- New `web/app/Models/Shared/ShippingRate.php`, migration `2026_11_07_071238_create_shipping_rates_table.php` and `SpecShippingRateSeeder`: table `shipping_rates` has id, origin_zone, destination_zone, first_kg_minor, additional_kg_minor, created_at, updated_at; unique origin/destination pair. Four reference cards, idempotent without overwriting existing rates. Neither migration nor seeder was run on the development database.
+- `web/app/Services/Logistics/ShippingRateService.php`: provider overrides retain priority; recognized NCR/Visayas reference cards join native rate snapshots. Existing fallback remains when reference cards are absent.
+- `web/app/Services/Buyer/CheckoutCarrierService.php`: seller/destination zone context for reference-rate fallback, retaining operational coverage, handoff/connection feasibility, per-store ceil-kg billing and frozen checkout snapshots.
+- `web/app/Services/Buyer/VoucherApplication.php`: platform centavo remainders use largest fractional shares, stable seller-ID ties and existing capacity ceilings. Worked PLAT100 shares are 6366/3634, not 6367/3633.
+- `web/app/Services/Buyer/CheckoutService.php`: optional reviewed-total comparison after locked prices/vouchers/shipping are rebuilt and before order writes; conflict rolls back token consumption and all business effects.
+- `web/app/Http/Controllers/Api/Buyer/CheckoutController.php`: validate/parse optional decimal expected_total to integer cents and pass to the transaction. Existing token/fingerprint API retained for compatible placement; preview uses the new read-only endpoint.
+- `web/app/Providers/AppServiceProvider.php`, `web/routes/api.php`: register quote ownership policy and additive versioned preview route.
+- `web/tests/Feature/Buyer/PlatformVoucherAllocationTest.php`: intended balanced-rounding expectation changes recorded in DECISIONS.md; sum/capacity/order/placement assertions retained. New SpecCheckoutQuoteTest verifies worked total, absence of business writes, authorization, operational serviceability, stock, throttling, forged values, voucher replacement, overrides/snapshots and atomic expected-total handling.
+- `mobile/lib/data/repositories/order_repository.dart`: quoteTotal performs one read-only provisional-line request; place sends the reviewed decimal expected_total in addition to existing native token/fingerprints. `mobile/test/live_orders_test.dart` asserts that preview performs no cart synchronization and placement sends the expected total.
+- Pending in S6.2: full server breakdown on checkout, 409 summary refresh, native claimable/claim/wallet APIs and live wallet transport, voucher creation code-format alignment and full workbook eligibility coverage. This checkpoint does not mark S6.2 DONE or advertise these features as implemented.
+
 - Mobile main/watcher/banner: await portrait; live-only `/buyer/products` probe; reactive offline Retry, coalesced requests.
 - Buyer category/product layouts: scaled text can grow/wrap without overflow.
 - OTP screen: one-time-code autofill.

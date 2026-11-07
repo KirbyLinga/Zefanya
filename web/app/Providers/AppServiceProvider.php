@@ -135,6 +135,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Incidents::class, IncidentsPolicy::class);
         Gate::policy(Order::class, BuyerOrderPolicy::class);
         Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
+        Gate::define('quote-checkout', [\App\Policies\CheckoutPolicy::class, 'quote']);
         Gate::define('remediate-shipment-address', [SellerOrderFleetPolicy::class, 'remediateAddress']);
         Gate::define('advance-shipment', [SellerOrderFleetPolicy::class, 'advance']);
 

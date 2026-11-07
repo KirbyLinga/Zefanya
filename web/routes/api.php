@@ -21,6 +21,9 @@ use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
+Route::post('/v1/buyer/checkout/quote', \App\Http\Controllers\Api\Buyer\CheckoutPreviewController::class)
+    ->middleware(['auth:sanctum', 'api.role:buyer', 'throttle:20,1'])->name('api.v1.buyer.checkout.quote');
+
 /* --------------------------------------------------------------------------
  * Buyer API
  * --------------------------------------------------------------------------

@@ -119,11 +119,11 @@ class CheckoutService
      * @param  Collection<int, CartItem>  $items  The buyer's validated selection
      * @param  array<int|string, mixed>  $notes  Seller id => the buyer's validated note
      */
-    public function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, array $carrierQuote = [], array $notes = [], ?BuyerAddress $address = null, ?VoucherSessionService $vouchers = null): Order
+    public function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, array $carrierQuote = [], array $notes = [], ?BuyerAddress $address = null, ?VoucherSessionService $vouchers = null, ?int $expectedTotalMinor = null): Order
     {
         $vouchers ??= app(VoucherSessionService::class);
 
-        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $carrierQuote, $notes, $address, $vouchers): Order {
+        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $carrierQuote, $notes, $address, $vouchers, $expectedTotalMinor): Order {
             // ONE-TIME TOKEN GUARD (double-submit): claim the token first,
             // inside this transaction, via a conditional UPDATE. On a
             // double-click the second request finds used=1 already and gets
@@ -279,6 +279,11 @@ class CheckoutService
             }
 
             $summary = $lockedSummary;
+
+            $payable = max(0, $summary->totalCentavos + $carrierQuote['shipping_total_minor'] - $application->shippingDiscountCentavos);
+            if ($expectedTotalMinor !== null && $expectedTotalMinor !== $payable) {
+                throw new CheckoutException('The order total is now ₱'.number_format($payable / 100, 2).'. Review the updated total before placing your order.');
+            }
 
             $order = new Order;
             $order->forceFill([

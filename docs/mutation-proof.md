@@ -51,3 +51,22 @@ Final normal Artisan runner after the case-name correction:
 No development migration or real payment/refund transfer was run. No real MySQL race proof is claimed.
 
 Follow-up strengthens the paid ewallet fixture with MCH50, requiring its wallet claim to return and usage to reach zero in the same successful cancellation. Final Artisan summary: `{"tool":"phpunit","result":"passed","tests":8,"passed":8,"assertions":77,"duration_ms":7727}`. No assertions removed; production guards unchanged.
+
+## S6.2 quote/shipping checkpoint — 2026-11-07
+
+On `tmp/mutation`, deliberately edited one guard at a time with explicit apply_patch hunks. Each row ran `vendor/phpunit/phpunit/phpunit tests/Feature/Buyer/SpecCheckoutQuoteTest.php --filter=<named test>`. Each result was `{"result":"failed","tests":1,"passed":0,"failed":1}`. Restored the exact hunk before the next mutation; never restored the entire dirty checkout.
+
+| Deliberate fault | Named test/filter | Observed FAIL line |
+| --- | --- | --- |
+| Allow a foreign address in CheckoutPolicy | test_quote_requires_auth | Expected response status code [403] but received 422. |
+| Disable locked expected-total comparison | test_expected_total_conflict | Expected response status code [409] but received 201. |
+| Allocate platform rounding cent to largest store | test_buy_chk_001 | Failed asserting that two arrays are identical. |
+| Save provisional cart items during preview | test_buy_chk_001 | Authentication last-use tracking is housekeeping, not a checkout write. |
+| Disable aggregate duplicate-variant stock check | test_duplicate_lines | Expected response status code [422] but received 200. |
+| Disable unsupported-route rejection | test_buy_chk_004 | Expected response status code [422] but received 200. |
+| Accept malformed voucher codes | test_quote_validates | Expected response status code [422] but received 200. |
+| Floor shipping weight instead of ceil | test_seed_is_idempotent | Failed asserting that 1 is identical to 2. |
+| Remove preview throttle | test_duplicate_lines | Expected response status code [429] but received 422. |
+| Read current reference rates instead of saved snapshot | test_expected_total_conflict | Expected response status code [201] but received 409. |
+
+All ten faults restored. Broader restored checkout/shipping/voucher/API/inventory run: `{"tool":"phpunit","result":"passed","tests":200,"passed":199,"assertions":1461,"duration_ms":62980,"skipped":1}`. After strengthening the rate-change fixture, final restored Artisan run: `{"tool":"phpunit","result":"passed","tests":18,"passed":18,"assertions":115,"duration_ms":23870}`. This includes every mutated test/filter passing after restoration. No development database migration, seeding or MySQL concurrency proof is claimed.
