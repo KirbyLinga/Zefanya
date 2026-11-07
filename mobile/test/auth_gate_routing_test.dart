@@ -21,6 +21,7 @@ import 'package:zefanya/data/repositories/repositories.dart';
 import 'package:zefanya/main.dart';
 import 'package:zefanya/screens/buyer/buyer_shell.dart';
 import 'package:zefanya/screens/courier/courier_shell.dart';
+import 'package:zefanya/screens/courier/linehaul_portal.dart';
 import 'package:zefanya/services/google_sign_in_service.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
@@ -40,7 +41,11 @@ Future<AuthState> _signedIn(UserRole role) async {
   final auth = AuthState();
   await auth.login(
     role: role,
-    email: role == UserRole.courier ? 'courier@example.ph' : 'buyer@example.ph',
+    email: switch (role) {
+      UserRole.buyer => 'buyer@example.ph',
+      UserRole.courier => 'courier@example.ph',
+      UserRole.linehaul => 'linehaul@example.ph',
+    },
     password: 'Password1!',
   );
   expect(auth.status, AccountStatus.active);
@@ -156,6 +161,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BuyerShell), findsNothing);
       expect(find.byType(CourierShell), findsNothing);
+      expect(find.byType(LinehaulPortal), findsNothing);
       expect(auth.isLoggedIn, isFalse);
     });
   }
@@ -194,6 +200,14 @@ void main() {
 
     expect(find.byType(BuyerShell), findsOneWidget);
     expect(find.byType(CourierShell), findsNothing);
+  });
+
+  testWidgets('linehaul session opens only the Courier portal and fails closed without a live client', (tester) async {
+    await _pumpGate(tester, await _signedIn(UserRole.linehaul));
+    expect(find.byType(LinehaulPortal), findsOneWidget);
+    expect(find.byType(CourierShell), findsNothing);
+    expect(find.byType(BuyerShell), findsNothing);
+    expect(find.text('Accept trip'), findsNothing);
   });
 
   test(

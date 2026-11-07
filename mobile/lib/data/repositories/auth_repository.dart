@@ -410,8 +410,11 @@ class LiveAuthRepository extends LiveRepository
   }
 
   /// `/buyer` or `/rider`: WebZefanya's per-role API prefix.
-  static String _prefix(UserRole role) =>
-      role == UserRole.buyer ? '/buyer' : '/rider';
+  static String _prefix(UserRole role) => switch (role) {
+    UserRole.buyer => '/buyer',
+    UserRole.courier => '/rider',
+    UserRole.linehaul => '/courier',
+  };
 
   /// The role's token-renewal route. Only riders have one on WebZefanya
   /// (`POST /api/rider/token/refresh`); a buyer token is not renewed.

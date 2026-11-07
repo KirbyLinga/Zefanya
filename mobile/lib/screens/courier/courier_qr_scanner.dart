@@ -21,12 +21,16 @@ class CourierQrScanner extends StatefulWidget {
   /// for a tracking number; the delivery handover asks for a delivery code.
   final String manualEntryLabel;
   final String manualHint;
+  final ValueChanged<String>? onInputMethod;
+  final bool allowCode128;
 
   const CourierQrScanner({
     super.key,
     this.expectedTrackingNumber = '',
     this.manualEntryLabel = 'tracking number',
     this.manualHint = 'e.g. ZEF-PICK-01',
+    this.onInputMethod,
+    this.allowCode128 = false,
   });
 
   @override
@@ -34,13 +38,14 @@ class CourierQrScanner extends StatefulWidget {
 }
 
 class _CourierQrScannerState extends State<CourierQrScanner> {
-  final _controller = MobileScannerController(
+  late final MobileScannerController _controller;
+  MobileScannerController _createController() => MobileScannerController(
     // Let MobileScanner request permission and start when it mounts. The
     // previous `autoStart: false` had no caller doing start(), so the camera
     // never came up at all.
     autoStart: true,
     detectionSpeed: DetectionSpeed.normal,
-    formats: const [BarcodeFormat.qrCode],
+    formats: [BarcodeFormat.qrCode, if (widget.allowCode128) BarcodeFormat.code128],
   );
   final _manualController = TextEditingController();
   String? _lastScanned;
@@ -50,6 +55,7 @@ class _CourierQrScannerState extends State<CourierQrScanner> {
   @override
   void initState() {
     super.initState();
+    _controller = _createController();
     _controller.addListener(_onControllerListener);
   }
 
@@ -153,6 +159,7 @@ class _CourierQrScannerState extends State<CourierQrScanner> {
             ),
             onSubmitted: (_) {
               if (!_isInCooldown()) {
+                widget.onInputMethod?.call('manual');
                 Navigator.pop(context, _manualController.text.trim());
               }
             },
@@ -164,6 +171,7 @@ class _CourierQrScannerState extends State<CourierQrScanner> {
               key: const ValueKey('qr-manual-confirm'),
               onPressed: () {
                 if (!_isInCooldown()) {
+                  widget.onInputMethod?.call('manual');
                   Navigator.pop(context, _manualController.text.trim());
                 }
               },
@@ -291,6 +299,7 @@ class _CourierQrScannerState extends State<CourierQrScanner> {
     _lastScanTime = DateTime.now();
     // Return scanned string via Navigator.pop — caller decides validation
     if (!mounted) return;
+    widget.onInputMethod?.call('camera');
     Navigator.pop(context, barcode);
   }
 

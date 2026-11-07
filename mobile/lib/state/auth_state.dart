@@ -67,7 +67,8 @@ import '../utils/order_tab_memory.dart';
 import '../utils/rider_validators.dart';
 import '../utils/validators.dart';
 
-enum UserRole { buyer, courier }
+// `courier` is the persisted legacy Rider role; linehaul is the separate Courier.
+enum UserRole { buyer, courier, linehaul }
 
 enum AccountStatus {
   /// No session — show the login screen.

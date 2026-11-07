@@ -19,6 +19,7 @@ import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/timed_snackbar.dart';
 import 'registration_screen.dart';
+import '../courier/linehaul_portal.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/google_mark.dart';
@@ -268,6 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
+                if (kUseLiveApi)
+                  TextButton(onPressed: () => Navigator.of(context).push(AppPageRoute(
+                    builder: (_) => const LinehaulLoginScreen())), child: const Text('Courier login · hub-to-hub')),
                 // ---- Labeled Switch Link -----------------------------
                 Align(
                   alignment: Alignment.centerLeft,

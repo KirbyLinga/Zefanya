@@ -33,6 +33,15 @@ use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
+Route::post('/courier/login', [\App\Http\Controllers\Api\LinehaulController::class, 'login'])->middleware('throttle:api-login');
+Route::prefix('courier')->middleware(['auth:sanctum', 'api.role:linehaul', 'throttle:60,1'])->group(function (): void {
+    Route::get('/profile', [\App\Http\Controllers\Api\LinehaulController::class, 'profile']);
+    Route::post('/logout', [\App\Http\Controllers\Api\LinehaulController::class, 'logout']);
+    Route::get('/trips', [\App\Http\Controllers\Api\LinehaulController::class, 'trips']);
+    Route::post('/trips/{manifest}/{action}', [\App\Http\Controllers\Api\LinehaulController::class, 'act'])
+        ->where('action', 'accept|scan|depart|arrive');
+});
+
 Route::post('/v1/buyer/checkout/quote', CheckoutPreviewController::class)
     ->middleware(['auth:sanctum', 'api.role:buyer', 'throttle:20,1'])->name('api.v1.buyer.checkout.quote');
 

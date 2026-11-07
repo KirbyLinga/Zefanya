@@ -30,6 +30,7 @@ import 'screens/auth/pending_approval_screen.dart';
 import 'screens/buyer/buyer_shell.dart';
 import 'screens/buyer/product_link_screen.dart';
 import 'screens/courier/courier_shell.dart';
+import 'screens/courier/linehaul_portal.dart';
 import 'screens/landing_screen.dart';
 import 'utils/motion.dart';
 import 'utils/product_link.dart';
@@ -455,9 +456,11 @@ class _AuthGateState extends State<AuthGate> {
         // on the login screen, and nothing at all on the landing screen.
         return Column(
           children: [
-            const StartupNotice(),
+            if (auth.role != UserRole.linehaul) const StartupNotice(),
             Expanded(
-              child: auth.role == UserRole.courier
+              child: auth.role == UserRole.linehaul
+                  ? const LinehaulPortal()
+                  : auth.role == UserRole.courier
                   ? const CourierShell()
                   : const BuyerShell(),
             ),

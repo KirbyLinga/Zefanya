@@ -145,7 +145,19 @@ class ManifestController extends Controller
                 ? $this->manifests->eligibleParcels($manifest)
                 : collect(),
             'hubs' => $this->hubs($request),
+            'courierAssignment' => \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
+                ? \App\Models\Logistics\LinehaulAssignment::query()->with('driver')->where('manifest_id', $manifest->id)->first() : null,
+            'linehaulDrivers' => \App\Support\RuntimeSchema::hasTable('linehaul_drivers')
+                ? \App\Models\Logistics\LinehaulDriver::query()->where('logistics_provider_id', $provider->id)->where('status', 'active')->orderBy('name')->get() : collect(),
         ]);
+    }
+
+    public function assignCourier(\App\Http\Requests\Logistics\LinehaulAssignRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulService $service): RedirectResponse
+    {
+        $driver = \App\Models\Logistics\LinehaulDriver::query()->findOrFail($request->validated('driver_id'));
+        $service->assign($this->provider($request), $manifest, $driver);
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier assigned. They can now accept and load this trip.');
     }
 
     public function addItem(Request $request, Manifest $manifest): RedirectResponse

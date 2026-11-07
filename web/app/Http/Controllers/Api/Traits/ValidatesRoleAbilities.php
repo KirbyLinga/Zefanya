@@ -47,6 +47,6 @@ trait ValidatesRoleAbilities
      */
     protected function accountIsOperational(object $account): bool
     {
-        return ! $account instanceof Rider || $account->isOperational();
+        return ! ($account instanceof Rider || $account instanceof \App\Models\Logistics\LinehaulDriver) || $account->isOperational();
     }
 }

@@ -23,7 +23,7 @@ class ApiRole
     use ValidatesRoleAbilities;
 
     /** @var array<int, string> */
-    private const ALLOWED_ROLES = ['buyer', 'rider'];
+    private const ALLOWED_ROLES = ['buyer', 'rider', 'linehaul'];
 
     public function __construct(private readonly Auth $auth) {}
 
@@ -60,7 +60,11 @@ class ApiRole
             throw new AuthenticationException('Unauthenticated. The token has expired.', ['sanctum']);
         }
 
-        $correctModel = $role === 'buyer' ? $user instanceof Buyer : $user instanceof Rider;
+        $correctModel = match ($role) {
+            'buyer' => $user instanceof Buyer,
+            'rider' => $user instanceof Rider,
+            'linehaul' => $user instanceof \App\Models\Logistics\LinehaulDriver,
+        };
 
         if (! $correctModel || ! $user->tokenCan($role)) {
             return response()->json([

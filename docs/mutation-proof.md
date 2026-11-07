@@ -1,3 +1,24 @@
+# Combined Courier security proof — 2026-11-08
+
+Temporary branch tmp/mutation; one deliberate fault at a time, restored with exact apply_patch hunks before the next fault. Nothing was committed with a broken guard. Each command used `vendor/phpunit/phpunit/phpunit tests/Feature/LinehaulDemoTest.php --filter=<filter>`. All ten final runs reported result failed, tests 1, passed 0, failed 1.
+
+| Deliberate fault | Filter | Observed failure |
+| --- | --- | --- |
+| Remove assignment ownership from policy | test_only_assigned | Expected response status code [403] but received 200. |
+| Bypass active company/hub eligibility | test_login_requires | Expected response status code [403] but received 200. |
+| Accept any model carrying linehaul ability | test_buyer_and_courier | Expected response status code [403] but received 200. |
+| Permit a second active trip | test_one_active_trip | Session is missing expected key [errors]. |
+| Permit loading before acceptance | test_live_trip_requires | Expected response status code [422] but received 200. |
+| Remove seal format constraint | test_live_trip_requires | Failed to find a validation error in the response for key: 'seal_number' |
+| Store scan tokens as plaintext JSON | test_expired_scans | Raw JSON contained the exact token; assertStringNotContainsString failed. Synthetic random test token omitted here. |
+| Remove Courier endpoint throttle | test_courier_endpoints | Expected response status code [429] but received 200. |
+| Omit Courier acceptance audit | test_live_trip_requires | Failed asserting that 0 is identical to 1. |
+| Bypass local/testing provisioning restriction | test_demo_provisioning_is_refused | Output "Courier demo provisioning is available only in local/testing environments." was not printed. |
+
+The first production-guard fault reached the lazy memory DB's production confirmation prompt. Strengthened the fixture to initialize the test DB before simulating production and repeated the fault: the final run above fails on the expected missing refusal message, not fixture setup. All prior no-write assertions retained.
+
+Restored broader run: `{"tool":"phpunit","result":"passed","tests":121,"passed":121,"assertions":1009,"duration_ms":32119}`. Final Artisan after strengthening that fixture: `{"tool":"phpunit","result":"passed","tests":9,"passed":9,"assertions":154,"duration_ms":5781}`. Every named filter passes after restoration. No real MySQL race, local development migration or device-camera verification is claimed.
+
 # Native review security proof — 2026-11-07
 
 Scope: this newer checkout, on temporary branch `tmp/mutation`. No mutation was committed or pushed. Tests use their isolated test database; no development migration was run.

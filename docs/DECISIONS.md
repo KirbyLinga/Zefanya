@@ -2,6 +2,18 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## 2026-11-08 — combined Courier presentation scope
+
+- User selected ZefanyaWMI and authorized a limited combined Buyer/Rider/Courier demo for early next week, superseding the old Courier exclusion/EXTEND order for this bounded scope. Branch from this newer integration snapshot 09d27aa into codex/combined-courier-demo, preserving the friend's work; no merge into integration/friend branches.
+- Keep persisted UserRole.courier as Rider. Add linehaul for Courier and its own Sanctum account model/ability. Reuse ManifestService and native Logistics receiving, with separate actual-Courier audits; no duplicate parcel/status/payment system.
+- Scope: explicitly provisioned local-demo accounts, one active assigned forward manifest, acceptance, QR/Code128/manual scans, sealed departure, reported arrival and Logistics-confirmed receipt. No public Courier registration. Missing live configuration fails closed; Courier login is live-only.
+- Deferred: email activation/deep links, professional-license/NBI/vehicle onboarding, capacity/duty/checklist rules, 500 m GPS enforcement, background tracking/push, decline/reassignment/breakdown handling, earnings and full seal/discrepancy rules. Reported arrival is not location-verified; saved seal is displayed, not automatically compared. Do not claim all 104 workbook cases pass.
+- Intended test change: auth_gate_routing_test now supplies a linehaul mock email for the added role, retaining every prior logout/Back assertion and adding portal absence plus root routing coverage. First full run caught this two-role fixture assumption. No assertions weakened or tests deleted.
+- Baseline first ran before Composer finished (missing vendor/autoload.php); rerun after restore required process-only GD for two image fixtures. Corrected baseline: 80 tests/622 assertions and 873 mobile tests pass. No PHP configuration, dependency versions or setup scripts changed.
+- Widget tests caught a missing exception import and a Future-returning setState callback; fix source and retain tests. Final mobile: 879 pass. Production-provisioning mutation initially reached lazy DB confirmation: initialize the memory test DB before simulating production, retain no-write assertions, and repeat the isolated proof successfully.
+- No `.env`, development migration, demo provisioning or MySQL data changes. This checkout has no `.env`; local setup requires a separate explicit exception to repository restrictions. Prior formatter waiver remains: Pint UNRUN, no bypass.
+- Retain/report existing gaps: canBuyerCancel currently allows PLACED only, conflicting with the earlier Ready-for-Pickup cutoff; detailed S6.2 checkout/wallet, review and HTTPS/device gates remain open. Courier work does not mark these done.
+
 ## Phase A: Baseline & Integration Setup
 
 1. **Base Branch Selection**:

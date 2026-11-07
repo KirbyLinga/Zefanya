@@ -3,6 +3,29 @@
 @section('title', 'Batch Details #'.$manifest->id)
 
 @section('content')
+@if (isset($courierAssignment) && $courierAssignment)
+    <section class="mb-4 rounded-md border p-4">
+        <h2 class="font-semibold">Courier: {{ $courierAssignment->driver->name }}</h2>
+        <p>{{ $courierAssignment->accepted_at ? 'Trip accepted' : 'Awaiting acceptance' }}
+            @if ($courierAssignment->seal_number) · Seal {{ $courierAssignment->seal_number }} @endif
+            @if ($courierAssignment->arrived_at) · Courier reported arrival @endif
+        </p>
+        <p>Logistics confirms parcel receipt using the existing receiving screen.</p>
+    </section>
+@elseif ($manifest->status === \App\Enums\ManifestStatus::Draft && $manifest->direction !== 'return' && isset($linehaulDrivers) && $linehaulDrivers->isNotEmpty())
+    <form class="mb-4 rounded-md border p-4" method="POST" action="{{ route('logistics.manifests.courier', $manifest) }}">
+        @csrf
+        <label for="linehaul-driver" class="font-semibold">Assign a Courier for hub-to-hub transport</label>
+        <select id="linehaul-driver" name="driver_id" required class="m-2 rounded-md border p-2">
+            @foreach ($linehaulDrivers as $driver)
+                <option value="{{ $driver->id }}">{{ $driver->name }}</option>
+            @endforeach
+        </select>
+        <button type="submit" class="rounded-md border px-4 py-2">Assign Courier</button>
+        @error('driver_id') <p role="alert">{{ $message }}</p> @enderror
+        @error('trip') <p role="alert">{{ $message }}</p> @enderror
+    </form>
+@endif
 @if ($manifest->direction === 'return')<p class="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Reverse physical return transport. Normal outgoing dispatch is blocked.</p>@endif
 @use('App\Enums\ManifestStatus')
 
