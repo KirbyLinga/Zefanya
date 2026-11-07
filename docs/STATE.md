@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-08
 Stage: Courier design integration DONE; limited Courier/local setup retained; assigned-trip/device rehearsal still OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Design core HEAD: 98ee278; verified final refresh fix hash recorded in follow-up state commit.
+Verified design/fix HEAD: e5f1c95 (design core 98ee278); follow-up records this hash only.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier. Branded login, Trips/History/Account use shared Zefanya fonts/colors/cards/nav/empty states.
 Logistics assigns one active forward manifest to an eligible same-company Courier; driver/manifest locks and ownership policy.
