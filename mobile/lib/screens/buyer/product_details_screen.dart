@@ -841,7 +841,7 @@ _buildShippingAndVoucher(theme),
               color: isFree ? AppColors.tertiary : AppColors.textSecondary,
             ),
             const SizedBox(width: AppSpacing.s4),
-            Text(
+            Expanded(child: Text(
               isFree
                   ? 'Free shipping on orders over \u20b11,000'
                   : 'Shipping \u20b160',
@@ -849,7 +849,7 @@ _buildShippingAndVoucher(theme),
                 color: isFree ? AppColors.tertiary : AppColors.textSecondary,
                 fontWeight: isFree ? FontWeight.w600 : FontWeight.w500,
               ),
-            ),
+            )),
           ],
         ),
         const SizedBox(height: AppSpacing.s12),

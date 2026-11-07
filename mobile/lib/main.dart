@@ -8,6 +8,9 @@ import 'package:provider/provider.dart';
 import 'config/dev_flags.dart';
 import 'data/ph_address_catalog.dart';
 import 'data/repositories/repositories.dart';
+import 'data/api/api_exception.dart';
+import 'services/connection_watcher.dart';
+import 'widgets/no_internet_banner.dart';
 import 'theme/app_theme.dart';
 import 'state/auth_state.dart';
 import 'state/cart_state.dart';
@@ -48,7 +51,7 @@ void main() async {
   // supported phone) resolves as a portrait Window. Nothing below calls
   // SystemChrome.setPreferredOrientations, so this is the single
   // orientation contract for the entire app.
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
@@ -58,6 +61,21 @@ void main() async {
     useLive: kUseLiveApi,
     baseUrl: kApiBaseUrl,
   );
+
+  if (repositories.client case final client?) {
+    ConnectionWatcher.instance.startPolling(
+      probe: () async {
+        try {
+          await client.getJson('/buyer/products', authenticated: false);
+          return true;
+        } on NetworkException {
+          return false;
+        } on ApiException {
+          return true;
+        }
+      },
+    );
+  }
 
   final authState = AuthState(
     repository: repositories.auth,
@@ -326,7 +344,23 @@ class _MarketplaceAppState extends State<MarketplaceApp> {
                     constraints: const BoxConstraints(
                       maxWidth: kMaxContentWidth,
                     ),
-                    child: SizedBox.expand(child: child!),
+                    child: SizedBox.expand(
+                      child: Column(
+                        children: [
+                          if (kUseLiveApi)
+                            Material(
+                              child: SafeArea(
+                                bottom: false,
+                                child: NoInternetBanner(
+                                  onRetry: () => ConnectionWatcher.instance.check(),
+                                  onRefresh: () => ConnectionWatcher.instance.check(),
+                                ),
+                              ),
+                            ),
+                          Expanded(child: child!),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],

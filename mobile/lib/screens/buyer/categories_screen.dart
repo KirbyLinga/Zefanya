@@ -127,7 +127,6 @@ class CategoriesScreen extends StatelessWidget {
                 sliver: SliverLayoutBuilder(
                   builder: (context, sliverConstraints) {
                     // Tile width at 2-column grid with 16px gap and 40px padding.
-                    final tileW = (sliverConstraints.crossAxisExtent - 16) / 2;
 
                     // Arch icon (52px) + the two text lines + 32px padding, where the
                     // label wraps to *two* lines. A category the server owns can be
@@ -138,11 +137,10 @@ class CategoriesScreen extends StatelessWidget {
                     final theme = Theme.of(context);
                     final titleStyle = theme.textTheme.titleSmall;
                     final bodyStyle = theme.textTheme.bodySmall;
-                    final titleLine = (titleStyle?.fontSize ?? 14) * (titleStyle?.height ?? 1.4);
-                    final bodyLine = (bodyStyle?.fontSize ?? 12) * (bodyStyle?.height ?? 1.4);
-                    final contentH = 52 + (titleLine * 2) + 2 + bodyLine + 32;
-
-                    final aspectRatio = tileW / contentH;
+                    final scaler = MediaQuery.textScalerOf(context);
+                    final titleLine = scaler.scale(titleStyle?.fontSize ?? 14) * (titleStyle?.height ?? 1.4);
+                    final bodyLine = scaler.scale(bodyStyle?.fontSize ?? 12) * (bodyStyle?.height ?? 1.4);
+                    final contentH = 52 + (titleLine * 2) + 2 + bodyLine + 32 + 16;
                     return SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
@@ -151,7 +149,7 @@ class CategoriesScreen extends StatelessWidget {
                         // The floor sits below the common case deliberately: a
                         // two-line label needs a taller tile, and clamping it back to a
                         // squarer ratio is exactly what would overflow again.
-                        childAspectRatio: aspectRatio.clamp(0.72, 1.3),
+                        mainAxisExtent: contentH,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, i) {
