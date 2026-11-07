@@ -368,9 +368,11 @@ class OrderState extends ChangeNotifier {
     List<CartItem> items, {
     List<String> voucherCodes = const [],
   }) async {
+    // QuotesCheckout is not a subtype of OrderRepository, so an `is` check
+    // cannot promote `_repository`; take the capability through a cast.
     final repository = _repository;
     if (repository is! QuotesCheckout || items.isEmpty) return null;
-    return repository.quoteTotal(
+    return (repository as QuotesCheckout).quoteTotal(
       [for (final item in items) _lineFor(item)],
       voucherCodes: voucherCodes,
     );

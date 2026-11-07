@@ -114,3 +114,105 @@ DeliveryJob? deliveryJobFromRiderParcel(Map<String, Object?> json) {
     serverStatus: json['status']?.toString(),
   );
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/earnings
+// ---------------------------------------------------------------------------
+
+/// One credited job from WebZefanya's `RiderEarning` ledger. The amount is
+/// what the server credited (pickup rates per seller visit, delivery rate);
+/// the app never computes it.
+class RiderEarningEntry {
+  const RiderEarningEntry({
+    required this.id,
+    required this.job,
+    required this.amount,
+    required this.earnedAt,
+    this.sellerOrderId,
+    this.trackingNumber,
+    this.sellerName,
+    this.paid = false,
+  });
+
+  final String id;
+
+  /// `pickup` or `delivery`.
+  final String job;
+  final double amount;
+  final DateTime earnedAt;
+  final String? sellerOrderId;
+  final String? trackingNumber;
+  final String? sellerName;
+  final bool paid;
+}
+
+/// The server's earnings answer: totals and the recent ledger rows.
+class RiderEarningsSnapshot {
+  const RiderEarningsSnapshot({
+    required this.today,
+    required this.week,
+    required this.allTime,
+    required this.recent,
+    this.codHolding = 0,
+  });
+
+  final double today;
+  final double week;
+  final double allTime;
+  final double codHolding;
+  final List<RiderEarningEntry> recent;
+}
+
+RiderEarningsSnapshot riderEarningsFromJson(Map<String, Object?> data) {
+  final totals = (data['totals'] as Map?)?.cast<String, Object?>() ?? const {};
+  final cod = (data['cod'] as Map?)?.cast<String, Object?>() ?? const {};
+  double pesos(Object? minor) => (_int(minor) ?? 0) / 100;
+
+  return RiderEarningsSnapshot(
+    today: pesos(totals['today_minor']),
+    week: pesos(totals['week_minor']),
+    allTime: pesos(totals['all_time_minor']),
+    codHolding: pesos(cod['holding_minor']),
+    recent: [
+      for (final row in (data['recent'] as List?) ?? const [])
+        if (row is Map)
+          if (DateTime.tryParse('${row['earned_at']}') case final at?)
+            RiderEarningEntry(
+              id: '${row['id']}',
+              job: '${row['job'] ?? 'delivery'}',
+              amount: pesos(row['amount_minor']),
+              earnedAt: at.toLocal(),
+              sellerOrderId: row['seller_order_id']?.toString(),
+              trackingNumber: row['tracking_number']?.toString(),
+              sellerName: row['seller_name']?.toString(),
+              paid: row['paid'] == true,
+            ),
+    ],
+  );
+}
+
+int? _int(Object? value) => switch (value) {
+      final int v => v,
+      final num v => v.round(),
+      final String v => int.tryParse(v),
+      _ => null,
+    };
+
+// ---------------------------------------------------------------------------
+// GET /api/rider/providers
+// ---------------------------------------------------------------------------
+
+/// A logistics company a new rider may apply to.
+class RiderProviderOption {
+  const RiderProviderOption({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
+List<RiderProviderOption> riderProvidersFromJson(Map<String, Object?> data) => [
+      for (final row in (data['providers'] as List?) ?? const [])
+        if (row is Map)
+          if (_int(row['id']) case final id?)
+            RiderProviderOption(id: id, name: '${row['name'] ?? ''}'),
+    ];

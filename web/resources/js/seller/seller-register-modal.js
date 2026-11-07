@@ -2,7 +2,7 @@
 // Behavior for the seller registration modal (Components/seller-register-modal.blade.php).
 // Mirrors resources/js/buyer/buyer-register-modal.js.
 
-import '../registration-validation.js';
+import { normalizeMobile } from '../registration-validation.js';
 import { registrationAddress } from '../registration-address.js';
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -96,20 +96,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ===== Contact number: numeric input only =====
-    var sellerContactNo = document.getElementById('sellerContactNo');
-    if (sellerContactNo) {
-        sellerContactNo.addEventListener('input', function () {
-            // Remove any non-digit characters
-            this.value = this.value.replace(/\D/g, '');
-        });
-        sellerContactNo.addEventListener('keypress', function (e) {
-            // Prevent non-numeric characters from being typed
-            if (!/\d/.test(String.fromCharCode(e.which))) {
-                e.preventDefault();
-            }
-        });
-    }
+    // Contact number typing is handled by registration-validation.js: digits
+    // and one leading "+" (for +639XXXXXXXXX), normalised to 09XXXXXXXXX on blur.
 
     if (businessPermitInput && businessPermitWrapper) {
         businessPermitWrapper.addEventListener('click', function () {
@@ -254,12 +242,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var sellerType = document.getElementById('sellerType');
     var secCertificate = document.getElementById('sellerSecCertificate');
+    var secCertificateName = document.getElementById('sellerSecCertificateName');
+    var secCertificatePrompt = secCertificateName ? secCertificateName.textContent : '';
+    // The upload card is a <label for> the hidden input, so it opens the file
+    // picker itself; this only shows the chosen file's name, like the ID card.
+    secCertificate.addEventListener('change', function () {
+        if (secCertificateName) {
+            secCertificateName.textContent = this.files.length ? this.files[0].name : secCertificatePrompt;
+        }
+    });
     function updateSellerDocuments() {
         var corporation = sellerType.value === 'corporation';
         document.getElementById('sellerSecCertificateFields').classList.toggle('hidden', !corporation);
         secCertificate.required = corporation;
         secCertificate.disabled = !corporation;
-        if (!corporation) secCertificate.value = '';
+        if (!corporation) {
+            secCertificate.value = '';
+            if (secCertificateName) secCertificateName.textContent = secCertificatePrompt;
+        }
     }
     sellerType.addEventListener('change', updateSellerDocuments);
     form.addEventListener('reset', function () { setTimeout(updateSellerDocuments, 0); });
@@ -327,8 +327,9 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (!field.value) {
                 showFieldError(field, 'This field is required.');
                 valid = false;
-            } else if (field.id === 'sellerContactNo' && !/^09\d{9}$/.test(field.value)) {
-                showFieldError(field, 'Enter a valid PH mobile number (09XXXXXXXXX).');
+            } else if (field.id === 'sellerContactNo' && normalizeMobile(field.value).error) {
+                // Same rule as the server (PhilippineMobile): 09XXXXXXXXX or +639XXXXXXXXX.
+                showFieldError(field, normalizeMobile(field.value).error);
                 valid = false;
             } else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value)) {
                 showFieldError(field, 'Enter a valid email address.');

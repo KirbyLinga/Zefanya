@@ -189,6 +189,32 @@ void main() {
       expect(prompt.style?.fontWeight, FontWeight.w600);
       expect(prompt.style?.color, AppColors.accent);
     });
+
+    testWidgets('vehicle type is Motorcycle only, even for an older saved value',
+        (tester) async {
+      _setPhoneSize(tester);
+      // A vehicle saved before riders were limited to motorcycles.
+      final auth = AuthState()..riderVehicleType = 'Tricycle';
+
+      await tester.pumpWidget(
+        _wrapWithProviders(
+          child: const RiderVehicleScreen(),
+          authState: auth,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Motorcycle'), findsOneWidget);
+      expect(find.text('Tricycle'), findsNothing);
+
+      await tester.tap(find.text('Motorcycle'));
+      await tester.pumpAndSettle();
+      // The open menu lists exactly one choice (selected + menu item).
+      expect(find.text('Motorcycle'), findsNWidgets(2));
+      expect(find.text('Van'), findsNothing);
+      expect(find.text('Sedan'), findsNothing);
+    });
   });
 
   group('Phase B2: EditProfileScreen card containers and input styling', () {

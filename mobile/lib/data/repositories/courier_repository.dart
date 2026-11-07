@@ -67,6 +67,33 @@ abstract class CourierRepository {
   });
 }
 
+/// Rider data that only a server has (live mode).
+///
+/// A separate interface, like `QuotesCheckout`, so the mock repository and
+/// test doubles of [CourierRepository] need not implement calls they have no
+/// server for. Callers check `is RiderServerData` and fall back to the mock
+/// behaviour otherwise.
+abstract class RiderServerData {
+  /// `GET /api/rider/earnings`: server totals and the credited ledger rows.
+  Future<RiderEarningsSnapshot> earnings({int limit = 50});
+
+  /// `POST /api/rider/jobs/{id}/incidents`: report a lost or damaged parcel.
+  /// [type] is `lost` or `damaged`; the server requires [photoPath] for
+  /// `damaged` and blocks the parcel's operations until Admin resolves it.
+  Future<void> reportIncident(
+    String jobId, {
+    required String type,
+    required String reason,
+    required String description,
+    String? photoPath,
+  });
+
+  /// `GET /api/rider/providers`: companies a new rider may apply to. With
+  /// [barangayCode], only those whose validated coverage serves that barangay
+  /// (the server's own coverage rule).
+  Future<List<RiderProviderOption>> registrationProviders({String? barangayCode});
+}
+
 // ---------------------------------------------------------------------------
 // Mock
 // ---------------------------------------------------------------------------
@@ -108,8 +135,48 @@ class MockCourierRepository implements CourierRepository {
 // Live (WebZefanya /api/rider/...)
 // ---------------------------------------------------------------------------
 
-class LiveCourierRepository extends LiveRepository implements CourierRepository {
+class LiveCourierRepository extends LiveRepository
+    implements CourierRepository, RiderServerData {
   LiveCourierRepository(super.client);
+
+  @override
+  Future<RiderEarningsSnapshot> earnings({int limit = 50}) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final data = unwrapMap(
+      await client.getJson('/rider/earnings', query: {'limit': '$limit'}),
+    );
+    return riderEarningsFromJson(data);
+  }
+
+  @override
+  Future<void> reportIncident(
+    String jobId, {
+    required String type,
+    required String reason,
+    required String description,
+    String? photoPath,
+  }) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final photo = photoPath?.trim() ?? '';
+    await client.postMultipart(
+      '/rider/jobs/$jobId/incidents',
+      fields: {'type': type, 'reason': reason.trim(), 'description': description.trim()},
+      files: {if (photo.isNotEmpty) 'photo': photo},
+    );
+  }
+
+  @override
+  Future<List<RiderProviderOption>> registrationProviders({String? barangayCode}) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final code = barangayCode?.trim() ?? '';
+    return riderProvidersFromJson(
+      unwrapMap(await client.getJson(
+        '/rider/providers',
+        query: code.isEmpty ? null : {'barangay': code},
+        authenticated: false,
+      )),
+    );
+  }
 
   /// Tracking numbers from the last [assignedJobs], for the scan step.
   final Map<String, String> _tracking = {};

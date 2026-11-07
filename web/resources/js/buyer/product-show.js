@@ -497,7 +497,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (response.ok) {
           const data = await response.json();
-          window.location.href = `/buyer/messages/${data.conversation_id}`;
+          if (!window.zfOpenBuyerConversation?.(data.conversation_id)) {
+            window.location.href = `/buyer/messages/${data.conversation_id}`;
+          }
         } else {
           alert('Failed to start conversation');
         }

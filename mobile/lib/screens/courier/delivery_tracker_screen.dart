@@ -191,6 +191,43 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     );
   }
 
+  /// Reports a lost or damaged parcel to WebZefanya (live mode).
+  ///
+  /// The server decides everything that follows: it accepts a report only
+  /// after a verified pickup, refuses a second open report, requires a photo
+  /// for damage, and blocks the parcel's operations until Admin resolves it.
+  Future<void> _reportIncident(CourierState courier) async {
+    final report = await showModalBottomSheet<_IncidentReport>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
+      builder: (_) => _IncidentSheet(jobId: widget.jobId),
+    );
+    if (report == null || !mounted) return;
+
+    try {
+      await courier.reportIncident(
+        widget.jobId,
+        type: report.type,
+        reason: report.reason,
+        description: report.description,
+        photoPath: report.photoPath,
+      );
+      if (!mounted) return;
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Incident reported. This parcel is on hold until Admin resolves it.')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      final message = error is ValidationException && error.fieldErrors.isNotEmpty
+          ? error.fieldErrors.values.first
+          : error.message;
+      showTimedSnackBar(context, SnackBar(content: Text(message)));
+    }
+  }
+
   void _retryDelivery(CourierState courier) {
     courier.advanceMilestone(widget.jobId, DeliveryMilestone.inTransit);
   }
@@ -567,6 +604,16 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
             Text(job.id, style: Theme.of(context).textTheme.titleSmall),
           ],
         ),
+        actions: [
+          // Live mode: WebZefanya's incident report (lost / damaged parcel).
+          if (courier.isServerAuthoritative)
+            IconButton(
+              key: const ValueKey('report-incident'),
+              tooltip: 'Report a problem with this parcel',
+              icon: const Icon(Icons.report_problem_outlined),
+              onPressed: () => _reportIncident(courier),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
@@ -1284,6 +1331,143 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       returned: _returned,
       celebrate: _celebrate,
       onDone: () => Navigator.of(context).pop(),
+    );
+  }
+}
+
+/// What the rider filled in on the incident sheet.
+typedef _IncidentReport = ({
+  String type,
+  String reason,
+  String description,
+  String? photoPath,
+});
+
+/// The incident form: the fields WebZefanya's `ParcelIncidentService::reportRules`
+/// asks for (type lost|damaged, reason ≤255, description ≤1000, photo for
+/// damage). The limits are mirrored only so the form can refuse early; the
+/// server still validates every one.
+class _IncidentSheet extends StatefulWidget {
+  const _IncidentSheet({required this.jobId});
+
+  final String jobId;
+
+  @override
+  State<_IncidentSheet> createState() => _IncidentSheetState();
+}
+
+class _IncidentSheetState extends State<_IncidentSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _reason = TextEditingController();
+  final _description = TextEditingController();
+  String _type = 'lost';
+  String? _photoPath;
+  bool _photoMissing = false;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final needsPhoto = _type == 'damaged' && _photoPath == null;
+    setState(() => _photoMissing = needsPhoto);
+    if (!(_formKey.currentState?.validate() ?? false) || needsPhoto) return;
+    Navigator.of(context).pop<_IncidentReport>((
+      type: _type,
+      reason: _reason.text.trim(),
+      description: _description.text.trim(),
+      photoPath: _type == 'damaged' ? _photoPath : null,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Report a problem', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'The parcel is put on hold until Admin reviews the report.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'lost', label: Text('Lost')),
+                    ButtonSegment(value: 'damaged', label: Text('Damaged')),
+                  ],
+                  selected: {_type},
+                  onSelectionChanged: (s) => setState(() => _type = s.first),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  key: const ValueKey('incident-reason'),
+                  controller: _reason,
+                  maxLength: 255,
+                  decoration: const InputDecoration(labelText: 'Reason'),
+                  validator: (v) => (v ?? '').trim().isEmpty ? 'Enter a reason' : null,
+                ),
+                TextFormField(
+                  key: const ValueKey('incident-description'),
+                  controller: _description,
+                  maxLength: 1000,
+                  minLines: 2,
+                  maxLines: 5,
+                  decoration: const InputDecoration(labelText: 'What happened?'),
+                  validator: (v) => (v ?? '').trim().isEmpty ? 'Describe what happened' : null,
+                ),
+                if (_type == 'damaged') ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const ValueKey('incident-photo'),
+                    onPressed: () async {
+                      final picked = await pickAndSaveImage(
+                        context,
+                        filenamePrefix: 'incident_${widget.jobId}',
+                      );
+                      if (picked != null && mounted) {
+                        setState(() {
+                          _photoPath = picked.path;
+                          _photoMissing = false;
+                        });
+                      }
+                    },
+                    icon: Icon(_photoPath == null ? Icons.add_a_photo_outlined : Icons.check_circle_outline),
+                    label: Text(_photoPath == null ? 'Add a photo of the damage' : 'Photo added'),
+                  ),
+                  if (_photoMissing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Attach a photo when reporting a damaged parcel.',
+                        style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  key: const ValueKey('incident-submit'),
+                  onPressed: _submit,
+                  child: const Text('Submit report'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

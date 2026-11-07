@@ -130,8 +130,69 @@ class _OtpScreenState extends State<OtpScreen> {
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _submit() async {
-    if (_isSubmitting) return;
+  /// True while the expired-link recovery dialog/request is running, so a
+  /// second tap cannot open another.
+  bool _isRenewing = false;
+
+  /// Renews an expired rider verification link (WebZefanya's resume route,
+  /// email + password). Returns true when fresh links were stored and the
+  /// interrupted action may be retried once.
+  Future<bool> _renewLink() async {
+    if (_isRenewing) return false;
+    final auth = context.read<AuthState>();
+    if (!auth.canResumeRiderRegistration) {
+      setState(() => _error = 'Your verification link has expired. Register again or contact support.');
+      return false;
+    }
+
+    setState(() => _isRenewing = true);
+    final password = await showDialog<String>(
+      context: context,
+      builder: (_) => const _RenewLinkDialog(),
+    );
+    if (!mounted) return false;
+    if (password == null || password.isEmpty) {
+      setState(() {
+        _isRenewing = false;
+        _error = 'Your verification link has expired. Enter your password to continue.';
+      });
+      return false;
+    }
+
+    try {
+      await auth.resumeRiderRegistration(password);
+    } on ApiException catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _isRenewing = false;
+        _error = _messageFor(e);
+      });
+      return false;
+    }
+    if (!mounted) return false;
+    setState(() => _isRenewing = false);
+    showTimedSnackBar(
+      context,
+      const SnackBar(content: Text('Verification link renewed.')),
+    );
+    return true;
+  }
+
+  /// One sentence per failure the person can act on: the server's own words
+  /// for a wrong or expired code, the wait for a cooldown, and the transport's
+  /// message for a network failure.
+  String _messageFor(ApiException e) => switch (e) {
+        RequestRejectedException(isRateLimited: true, :final retryAfter) =>
+          retryAfter == null
+              ? 'Too many attempts. Please wait a moment and try again.'
+              : 'Too many attempts. Try again in ${retryAfter.inSeconds}s.',
+        final ValidationException v =>
+          v.forField('otp') ?? v.forField('email') ?? v.message,
+        _ => e.message,
+      };
+
+  Future<void> _submit({bool afterRenewal = false}) async {
+    if (_isSubmitting || _isRenewing) return;
     if (_isExpired) {
       setState(() => _error = 'That code has expired. Send a new code.');
       return;
@@ -145,6 +206,16 @@ class _OtpScreenState extends State<OtpScreen> {
 
     try {
       await context.read<AuthState>().confirmEmail(_codeController.text.trim());
+    } on VerificationLinkExpiredException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      // Renew once, then retry the same code once; a second expiry is shown.
+      if (!afterRenewal && await _renewLink()) {
+        if (mounted) await _submit(afterRenewal: true);
+      } else if (afterRenewal && mounted) {
+        setState(() => _error = e.message);
+      }
+      return;
     } on ApiException catch (e) {
       // A rejection is a message, not a classification: the server answers
       // `422 {ok: false, message}` for a wrong code *and* for an expired one, and
@@ -154,7 +225,7 @@ class _OtpScreenState extends State<OtpScreen> {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _error = e.message;
+        _error = _messageFor(e);
       });
       return;
     }
@@ -174,8 +245,8 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  Future<void> _resend() async {
-    if (_isResending || _cooldownSeconds > 0) return;
+  Future<void> _resend({bool afterRenewal = false}) async {
+    if (_isResending || _isRenewing || _cooldownSeconds > 0) return;
 
     setState(() {
       _isResending = true;
@@ -184,6 +255,16 @@ class _OtpScreenState extends State<OtpScreen> {
 
     try {
       await context.read<AuthState>().resendConfirmationCode();
+    } on VerificationLinkExpiredException catch (e) {
+      if (!mounted) return;
+      setState(() => _isResending = false);
+      // The resend link itself expired: renew it, then ask once more.
+      if (!afterRenewal && await _renewLink()) {
+        if (mounted) await _resend(afterRenewal: true);
+      } else if (afterRenewal && mounted) {
+        setState(() => _error = e.message);
+      }
+      return;
     } on ApiException catch (e) {
       // Thrown rather than swallowed in AuthState precisely so this branch can
       // exist: a resend that failed silently leaves someone watching an inbox
@@ -191,8 +272,13 @@ class _OtpScreenState extends State<OtpScreen> {
       if (!mounted) return;
       setState(() {
         _isResending = false;
-        _error = e.message;
+        _error = _messageFor(e);
       });
+      // The server's cooldown (429) wins over this screen's own: wait as long
+      // as it said before offering the link again. Other failures start none.
+      if (e is RequestRejectedException && e.isRateLimited) {
+        _startCooldown(e.retryAfter ?? kResendCooldown);
+      }
       return;
     }
 
@@ -208,9 +294,9 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  void _startCooldown() {
+  void _startCooldown([Duration length = kResendCooldown]) {
     _cooldownTimer?.cancel();
-    setState(() => _cooldownSeconds = kResendCooldown.inSeconds);
+    setState(() => _cooldownSeconds = length.inSeconds);
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -459,6 +545,76 @@ class _OtpScreenState extends State<OtpScreen> {
         color: AppColors.textSecondary,
       ),
       textAlign: TextAlign.center,
+    );
+  }
+}
+
+/// Asks for the registration password so an expired rider verification link
+/// can be renewed. Pops the password, or null when cancelled.
+class _RenewLinkDialog extends StatefulWidget {
+  const _RenewLinkDialog();
+
+  @override
+  State<_RenewLinkDialog> createState() => _RenewLinkDialogState();
+}
+
+class _RenewLinkDialogState extends State<_RenewLinkDialog> {
+  final _password = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  void _done() {
+    final value = _password.text;
+    if (value.isEmpty) return;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Verification link expired'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'For your security the link in this registration has expired. '
+            'Enter the password you registered with to continue.',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('otp-renew-password'),
+            controller: _password,
+            obscureText: _obscure,
+            autofocus: true,
+            onSubmitted: (_) => _done(),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              suffixIcon: IconButton(
+                tooltip: _obscure ? 'Show password' : 'Hide password',
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('otp-renew-submit'),
+          onPressed: _done,
+          child: const Text('Continue'),
+        ),
+      ],
     );
   }
 }

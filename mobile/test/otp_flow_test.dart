@@ -652,6 +652,34 @@ void _widgetTests() {
       expect(find.textContaining('Send another in'), findsNothing);
     });
 
+    testWidgets("a server cooldown (429) waits as long as the server said",
+        (tester) async {
+      final repository = _ScriptedOtpRepository(
+        resendThrows: const RequestRejectedException(
+          statusCode: 429,
+          message: 'Too many verification codes requested. Please try again later.',
+          retryAfter: Duration(seconds: 42),
+        ),
+      );
+      final auth = await _registered(repository);
+      await _pump(tester, const OtpScreen(), auth: auth);
+
+      await tester.tap(find.text('Send a new code'));
+      await _settleSubmit(tester);
+
+      expect(find.text('Too many attempts. Try again in 42s.'), findsOneWidget);
+      expect(find.text('Send another in 42s'), findsOneWidget);
+
+      // Disabled while waiting: a second tap sends nothing.
+      repository.resendCalled = false;
+      await tester.tap(find.text('Send another in 42s'));
+      await tester.pump();
+      expect(repository.resendCalled, isFalse);
+
+      await tester.pump(const Duration(seconds: 43));
+      expect(find.text('Send a new code'), findsOneWidget);
+    });
+
     testWidgets('the test hint names the code the mock actually accepts',
         (tester) async {
       final auth = await _registered(_ScriptedOtpRepository());

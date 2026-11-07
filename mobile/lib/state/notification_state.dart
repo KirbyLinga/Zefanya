@@ -67,6 +67,19 @@ class NotificationState extends ChangeNotifier {
 
   final ApiClient? _client;
 
+  /// Whose WebZefanya inbox is read in live mode: `/buyer` or `/rider`.
+  String _prefix = '/buyer';
+
+  /// Points the live inbox at the signed-in role's notifications and reloads
+  /// when that changes. The rider shell calls this; mock mode ignores it.
+  Future<void> useInbox({required bool rider}) async {
+    final next = rider ? '/rider' : '/buyer';
+    if (next == _prefix) return;
+    _prefix = next;
+    final client = _client;
+    if (client != null) await _loadLive(client);
+  }
+
   static const _storageKey = 'notification_read_ids';
 
   final List<AppNotification> _items = [];
@@ -96,7 +109,7 @@ class NotificationState extends ChangeNotifier {
     final client = _client;
     if (client != null) {
       try {
-        await client.postJson('/buyer/notifications/$id/read');
+        await client.postJson('$_prefix/notifications/$id/read');
       } on ApiException {
         _readIds.remove(id);
         notifyListeners();
@@ -115,7 +128,7 @@ class NotificationState extends ChangeNotifier {
     final client = _client;
     if (client != null) {
       try {
-        await client.postJson('/buyer/notifications/read-all');
+        await client.postJson('$_prefix/notifications/read-all');
       } on ApiException {
         await _loadLive(client);
       }
@@ -128,7 +141,7 @@ class NotificationState extends ChangeNotifier {
   /// Signed out, offline or refused: an empty inbox, never fixture data.
   Future<void> _loadLive(ApiClient client) async {
     try {
-      final data = unwrapMap(await client.getJson('/buyer/notifications'));
+      final data = unwrapMap(await client.getJson('$_prefix/notifications'));
       _items.clear();
       _readIds.clear();
       for (final row in (data['data'] as List?) ?? const []) {

@@ -2,7 +2,6 @@
 
 use App\Enums\AuthRole;
 use App\Http\Middleware\Admin\EnsureAdminRole;
-use App\Http\Middleware\Admin\EnsureAdminTwoFactor;
 use App\Http\Middleware\ApiRole;
 use App\Http\Middleware\AuthenticateRoleSession;
 use App\Http\Middleware\Buyer\EnsureBuyerActive;
@@ -47,9 +46,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // Cloudflare Tunnel connector (or load balancer) that forwards requests
         // to this app. That value cannot be guessed from this repository.
 
+        // Only answer for our own host names (config/app.php trusted_hosts plus
+        // APP_URL's host, each with subdomains). A forged Host header is rejected
+        // instead of leaking into generated URLs. The framework skips this in the
+        // local environment and in unit tests.
+        $middleware->trustHosts(at: fn (): array => array_map(
+            fn (string $host): string => '^(.+\.)?'.preg_quote($host).'$',
+            array_values(array_filter(array_map('trim', explode(',', (string) config('app.trusted_hosts'))))),
+        ));
+
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
-            'admin.2fa' => EnsureAdminTwoFactor::class,
             'guest.role' => RedirectIfAuthenticatedRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
             'rider.active' => EnsureRiderActive::class,

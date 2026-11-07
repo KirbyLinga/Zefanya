@@ -10,6 +10,8 @@
 // whatever's currently assigned to this courier.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../state/notification_state.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/fade_through.dart';
 import '../../widgets/nav_icons.dart';
@@ -34,6 +36,20 @@ class _CourierShellState extends State<CourierShell> {
     NavBarItem(glyph: NavGlyph.peso, label: 'Earnings'),
     NavBarItem(glyph: NavGlyph.profile, label: 'Profile'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Live mode: this inbox is the rider's (`/api/rider/notifications`).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        context.read<NotificationState>().useInbox(rider: true);
+      } on ProviderNotFoundException {
+        // A test that pumps the shell alone has no inbox to point.
+      }
+    });
+  }
 
   static const _screens = [
     PickupDashboardScreen(),

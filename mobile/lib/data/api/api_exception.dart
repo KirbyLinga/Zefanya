@@ -220,9 +220,17 @@ final class RequestRejectedException extends ApiException {
     required this.statusCode,
     super.message = 'That request could not be completed.',
     super.cause,
+    this.retryAfter,
   });
 
   final int statusCode;
+
+  /// HTTP 429: how long the server asked the client to wait (its
+  /// `retry_after` field or `Retry-After` header), when it said.
+  final Duration? retryAfter;
+
+  /// HTTP 429: a server rate limit or cooldown.
+  bool get isRateLimited => statusCode == 429;
 
   /// HTTP 409: the record changed on the server after this screen loaded
   /// (WebZefanya's stale-state rejection). Nothing was written; the caller
@@ -276,6 +284,21 @@ final class ApiNotConfiguredException extends ApiException {
 /// explicit type rather than an `UnimplementedError` so a live build fails
 /// with a sentence naming the missing endpoint, and so mock mode is provably
 /// unaffected by code that has never run.
+/// A server-signed link (WebZefanya's rider `verify_url` / `resend_url`) has
+/// expired or no longer validates. The registration can be resumed with the
+/// account's email and password, which returns fresh links.
+final class VerificationLinkExpiredException extends ApiException {
+  const VerificationLinkExpiredException({
+    super.message =
+        'Your verification link has expired. Enter your password to continue.',
+    super.cause,
+  });
+
+  /// Not by repeating the same request: the link has to be renewed first.
+  @override
+  bool get isRetryable => false;
+}
+
 final class ApiNotImplementedException extends ApiException {
   const ApiNotImplementedException(this.endpoint, {this.contractSection})
       : super(

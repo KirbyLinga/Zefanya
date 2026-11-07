@@ -31,6 +31,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/api/api_exception.dart';
+import '../data/dto/remote_courier.dart';
 import '../data/repositories/courier_repository.dart';
 import '../data/mock_data.dart'
     show DeliveryJob, Order, kMockDeliveryOtp;
@@ -81,7 +82,12 @@ class CompletedJob {
     this.completedAt,
     this.payout, {
     this.returned = false,
+    this.resultOverride,
   });
+
+  /// The server's own label for a credited ledger row (live mode), e.g.
+  /// "Picked up" for pickup pay, which is neither a delivery nor a return.
+  final String? resultOverride;
 
   final DeliveryJob job;
   final DateTime completedAt;
@@ -102,7 +108,7 @@ class CompletedJob {
   /// history has to say which one happened (RID-EARN-001).
   final bool returned;
 
-  String get resultLabel => returned ? 'Returned' : 'Delivered';
+  String get resultLabel => resultOverride ?? (returned ? 'Returned' : 'Delivered');
 
   /// The waybill/reference the workbook's history column shows.
   String get trackingNumber => job.trackingNumber ?? job.id;
@@ -383,10 +389,91 @@ class CourierState extends ChangeNotifier {
       )
       .toList();
 
+  /// Live mode: WebZefanya's earnings answer (totals and credited ledger rows),
+  /// as of the last [refreshEarnings]. When set, every earnings figure below
+  /// reads it and nothing is computed from local payouts: pickup pay per seller
+  /// visit, the delivery rate and payouts are server rules.
+  RiderEarningsSnapshot? _serverEarnings;
+  ApiException? _earningsFailure;
+
+  /// Why the last earnings read failed (live mode), or null.
+  ApiException? get earningsFailure => _earningsFailure;
+
+  /// Server-only rider calls, when the repository has a server behind it.
+  RiderServerData? get _server {
+    final repository = _repository;
+    return repository is RiderServerData ? repository as RiderServerData : null;
+  }
+
+  /// Re-reads the server's earnings (live mode); a no-op in mock mode.
+  Future<void> refreshEarnings() async {
+    final server = _server;
+    if (server == null) return;
+    try {
+      _serverEarnings = await server.earnings();
+      _earningsFailure = null;
+    } on ApiException catch (error) {
+      _earningsFailure = error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  /// Reports a lost or damaged parcel (live mode). The server blocks the
+  /// parcel's operations until Admin resolves it, so the jobs are re-read.
+  Future<void> reportIncident(
+    String jobId, {
+    required String type,
+    required String reason,
+    required String description,
+    String? photoPath,
+  }) async {
+    final server = _server;
+    if (server == null) {
+      throw const ApiNotImplementedException('POST /api/rider/jobs/{id}/incidents');
+    }
+    await _guardedServerCall(() => server.reportIncident(
+          jobId,
+          type: type,
+          reason: reason,
+          description: description,
+          photoPath: photoPath,
+        ));
+    try {
+      await refreshJobs();
+    } on ApiException {
+      // The report itself succeeded; the list refreshes on the next pull.
+    }
+  }
+
   /// Completed jobs, most recent first — this is what CourierProfitScreen
   /// actually reads for its summary card and transaction list, rather
   /// than separate hardcoded numbers.
+  ///
+  /// Live mode: the server's credited ledger rows (pickups and deliveries).
   List<CompletedJob> get completedJobs {
+    final server = _serverEarnings;
+    if (server != null) {
+      return [
+        for (final entry in server.recent)
+          CompletedJob(
+            DeliveryJob(
+              id: entry.sellerOrderId ?? entry.id,
+              shopName: entry.sellerName ?? 'Seller',
+              pickupAddress: '',
+              buyerName: '',
+              deliveryArea: '',
+              packageSize: '',
+              fee: entry.amount,
+              trackingNumber: entry.trackingNumber,
+            ),
+            entry.earnedAt,
+            entry.amount,
+            resultOverride: entry.job == 'pickup' ? 'Picked up' : 'Delivered',
+          ),
+      ]..sort((a, b) => b.completedAt.compareTo(a.completedAt));
+    }
+
     final result = <CompletedJob>[];
     for (final job in allJobs) {
       final completedAt = _completedAt[job.id];
@@ -409,6 +496,8 @@ class CourierState extends ChangeNotifier {
   }
 
   double get todayEarnings {
+    final server = _serverEarnings;
+    if (server != null) return server.today;
     final now = DateTime.now();
     return completedJobs
         .where(
@@ -420,7 +509,10 @@ class CourierState extends ChangeNotifier {
         .fold(0.0, (sum, c) => sum + c.payout);
   }
 
+  /// Live mode: the server's calendar week (store timezone), not a rolling 7 days.
   double get weekEarnings {
+    final server = _serverEarnings;
+    if (server != null) return server.week;
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
     return completedJobs
         .where((c) => c.completedAt.isAfter(weekAgo))
@@ -428,6 +520,7 @@ class CourierState extends ChangeNotifier {
   }
 
   double get totalEarnings =>
+      _serverEarnings?.allTime ??
       completedJobs.fold(0.0, (sum, c) => sum + c.payout);
 
   /// The buyer's rating of this job's delivery, or null if they haven't rated
@@ -462,6 +555,10 @@ class CourierState extends ChangeNotifier {
     } finally {
       notifyListeners();
     }
+    // Earnings move when jobs do (a delivery or pickup is credited on the
+    // server), so a successful job read also re-reads them. Live mode only;
+    // a failure is kept in [earningsFailure], never thrown at the job list.
+    await refreshEarnings();
   }
 
   /// How many of this courier's deliveries have been rated.

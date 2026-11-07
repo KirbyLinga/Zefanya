@@ -12,11 +12,15 @@ use App\Http\Controllers\Api\Buyer\OrderActionController;
 use App\Http\Controllers\Api\Buyer\OrderController;
 use App\Http\Controllers\Api\Buyer\ProfileController;
 use App\Http\Controllers\Api\Buyer\WishlistController;
+use App\Http\Controllers\Api\Rider\IncidentController as RiderIncidentController;
 use App\Http\Controllers\Api\Rider\JobController as RiderJobController;
 use App\Http\Controllers\Api\Rider\LoginController as RiderLoginController;
 use App\Http\Controllers\Api\Rider\LogoutController as RiderLogoutController;
+use App\Http\Controllers\Api\Rider\NotificationController as RiderNotificationController;
 use App\Http\Controllers\Api\Rider\ParcelActionController as RiderParcelActionController;
 use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
+use App\Http\Controllers\Api\Rider\ProviderController as RiderProviderController;
+use App\Http\Controllers\Api\Rider\TokenController as RiderTokenController;
 use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
@@ -118,28 +122,48 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
     Route::post('/login', [RiderLoginController::class, 'login'])->middleware('throttle:api-login')->name('login');
 });
 
+// Public list for the registration form (same data as the web register page).
+Route::prefix('rider')->name('api.rider.')->group(function (): void {
+    Route::get('/providers', [RiderProviderController::class, 'index'])->middleware('throttle:60,1')->name('providers');
+});
+
 // Token-bearing routes.
 Route::prefix('rider')->name('api.rider.')->group(function (): void {
-    Route::middleware(['auth:sanctum', 'api.role:rider'])->group(function (): void {
+    // Open to a rider in an Admin-granted wind-down as well: the same set the
+    // web's EnsureRiderActive allows (account, deliveries out for delivery,
+    // scan, proof/OTP, failed delivery, money, notifications, incidents). The
+    // services still refuse anything but finishing a parcel already out.
+    Route::middleware(['auth:sanctum', 'api.role:rider,wind-down'])->group(function (): void {
         Route::get('/profile', [RiderProfileController::class, 'index'])->name('profile');
         Route::post('/logout', [RiderLogoutController::class, 'store'])->name('logout');
+        Route::post('/token/refresh', [RiderTokenController::class, 'refresh'])->middleware('throttle:10,1')->name('token.refresh');
 
-        // Mobile operations: thin adapters over RiderOperationsService & co.
         Route::middleware('throttle:60,1')->group(function (): void {
             Route::get('/jobs', [RiderJobController::class, 'index'])->name('jobs.index');
             Route::get('/earnings', [RiderJobController::class, 'earnings'])->name('earnings');
+            Route::get('/notifications', [RiderNotificationController::class, 'index'])->name('notifications.index');
+            Route::post('/notifications/read-all', [RiderNotificationController::class, 'markAllRead'])->name('notifications.readAll');
+            Route::post('/notifications/{notification}/read', [RiderNotificationController::class, 'markRead'])->name('notifications.read');
         });
         Route::middleware('throttle:20,1')->group(function (): void {
-            Route::post('/availability', [RiderJobController::class, 'availability'])->name('availability');
             Route::post('/scan/verify', [RiderParcelActionController::class, 'verify'])->name('scan.verify');
-            Route::post('/pickups/{sellerOrder}/confirm', [RiderParcelActionController::class, 'confirmPickup'])->name('pickups.confirm');
-            Route::post('/deliveries/{sellerOrder}/start', [RiderParcelActionController::class, 'startDelivery'])->name('deliveries.start');
             Route::post('/deliveries/{sellerOrder}/deliver', [RiderParcelActionController::class, 'deliver'])->name('deliveries.deliver');
             Route::post('/deliveries/{sellerOrder}/failed', [RiderParcelActionController::class, 'failDelivery'])->name('deliveries.failed');
+            Route::post('/jobs/{sellerOrder}/incidents', [RiderIncidentController::class, 'store'])->name('jobs.incidents.store');
         });
         // Same limit as the web route: the buyer receives a new code each time.
         Route::post('/deliveries/{sellerOrder}/otp', [RiderParcelActionController::class, 'sendOtp'])
             ->middleware('throttle:5,1')->name('deliveries.otp');
+    });
+
+    // Fully operational riders only.
+    Route::middleware(['auth:sanctum', 'api.role:rider'])->group(function (): void {
+        Route::get('/history', [RiderJobController::class, 'history'])->middleware('throttle:60,1')->name('history');
+        Route::middleware('throttle:20,1')->group(function (): void {
+            Route::post('/availability', [RiderJobController::class, 'availability'])->name('availability');
+            Route::post('/pickups/{sellerOrder}/confirm', [RiderParcelActionController::class, 'confirmPickup'])->name('pickups.confirm');
+            Route::post('/deliveries/{sellerOrder}/start', [RiderParcelActionController::class, 'startDelivery'])->name('deliveries.start');
+        });
     });
 });
 

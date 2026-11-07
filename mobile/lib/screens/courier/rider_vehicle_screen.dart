@@ -13,7 +13,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart' show courierVehicleTypes;
+import '../../data/dto/registration_payload.dart'
+    show kRiderRegistrationVehicleTypes;
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
@@ -47,7 +48,13 @@ class _RiderVehicleScreenState extends State<RiderVehicleScreen> {
     _licenseController = TextEditingController(
       text: auth.riderLicenseNumber,
     );
-    _vehicleType = auth.riderVehicleType;
+    // Motorcycle only, as at registration. A value saved before that rule
+    // (e.g. "Tricycle") is shown as Motorcycle rather than left outside the
+    // list, which the dropdown cannot display; it is saved only if the rider
+    // presses Save.
+    _vehicleType = kRiderRegistrationVehicleTypes.contains(auth.riderVehicleType)
+        ? auth.riderVehicleType
+        : kRiderRegistrationVehicleTypes.first;
     _licenseExpiry = auth.riderLicenseExpiry;
     _licensePath = auth.riderLicensePath;
     _orCrPath = auth.riderOrCrPath;
@@ -222,7 +229,7 @@ class _RiderVehicleScreenState extends State<RiderVehicleScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  items: courierVehicleTypes
+                  items: kRiderRegistrationVehicleTypes
                       .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                       .toList(),
                   onChanged: (value) => setState(() => _vehicleType = value),

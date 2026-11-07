@@ -86,6 +86,7 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
     if (authenticated) {
+      await _renewIfDue();
       final token = await _tokens.read();
       // No token is not an error at this layer: a public route that some
       // caller marked authenticated by mistake will get a 401 from the server,
@@ -115,6 +116,33 @@ class ApiClient {
     bool authenticated = true,
   }) =>
       _send('POST', path, authenticated: authenticated, body: body);
+
+  /// `POST` to a URL the server signed for this client (WebZefanya's rider
+  /// registration `verify_url` / `resend_url`), unauthenticated.
+  ///
+  /// The URL is sent exactly as the server issued it: Laravel's `signed`
+  /// middleware checks a signature over the whole URL, so changing any part
+  /// of it (scheme, host, path or query) would invalidate it. The only check
+  /// made here is that it points at this app's own API host, so a URL from a
+  /// response can never send the app's request somewhere else.
+  Future<Map<String, Object?>> postSigned(String signedUrl, {Object? body}) async {
+    if (!isConfigured) throw const ApiNotConfiguredException();
+
+    final target = Uri.tryParse(signedUrl);
+    final api = Uri.parse(baseUrl);
+    if (target == null ||
+        !target.isScheme('http') && !target.isScheme('https') ||
+        target.host.toLowerCase() != api.host.toLowerCase()) {
+      throw const MalformedResponseException(
+        message: 'The server sent a verification link for a different address.',
+      );
+    }
+    final request = http.Request('POST', target)
+      ..headers.addAll(await _headers(authenticated: false));
+    if (body != null) request.body = jsonEncode(body);
+
+    return _interpret(await _dispatch(request));
+  }
 
   /// `PUT [path]` with a JSON body.
   Future<Map<String, Object?>> putJson(
@@ -247,10 +275,91 @@ class ApiClient {
   /// Here rather than in a login screen because the client owns the vault:
   /// `TokenStore`'s reason for existing is that exactly one layer knows where a
   /// token lives, and a screen that wrote it directly would make that two.
-  Future<void> adoptToken(String token) => _tokens.write(token);
+  ///
+  /// [expiresAt] is the server's `expires_at` for this token, when it sent
+  /// one; it decides when [renewPath] is used. Unknown (a token restored from
+  /// storage after a restart) means "renew before the next request".
+  Future<void> adoptToken(String token, {DateTime? expiresAt}) {
+    _expiresAt = expiresAt;
+    _renewBlockedUntil = null;
+    return _tokens.write(token);
+  }
 
   /// Forgets the token — on logout, and when the server has rejected it.
-  Future<void> forgetToken() => _tokens.clear();
+  Future<void> forgetToken() {
+    _expiresAt = null;
+    renewPath = null;
+    return _tokens.clear();
+  }
+
+  // -------------------------------------------------------------------------
+  // Token renewal
+  // -------------------------------------------------------------------------
+
+  /// The signed-in role's token-renewal route (`/rider/token/refresh`), or
+  /// null when that role has none. Set by the auth repository after sign-in
+  /// and on session restore; cleared by [forgetToken].
+  ///
+  /// WebZefanya tokens live for `sanctum.expiration` (60 minutes) and an
+  /// expired token cannot be renewed, so a rider mid-shift would otherwise be
+  /// signed out every hour. The server rotates the token: same ability, same
+  /// lifetime, old token deleted.
+  String? renewPath;
+
+  DateTime? _expiresAt;
+  DateTime? _renewBlockedUntil;
+  Future<void>? _renewing;
+
+  /// How long before expiry the token is traded in.
+  static const Duration renewWindow = Duration(minutes: 10);
+
+  /// Renews the token when it is close to expiry (or its expiry is unknown).
+  ///
+  /// Best-effort: a failed renewal never fails the request that triggered it.
+  /// If the token really has expired, that request gets the server's 401 and
+  /// the normal signed-out path runs. Concurrent requests share one renewal.
+  Future<void> _renewIfDue() {
+    final path = renewPath;
+    if (path == null) return Future.value();
+    final now = DateTime.now();
+    final blocked = _renewBlockedUntil;
+    if (blocked != null && now.isBefore(blocked)) return Future.value();
+    final expiresAt = _expiresAt;
+    if (expiresAt != null && expiresAt.difference(now) > renewWindow) {
+      return Future.value();
+    }
+    return _renewing ??= _renew(path).whenComplete(() => _renewing = null);
+  }
+
+  Future<void> _renew(String path) async {
+    final token = await _tokens.read();
+    if (token == null || token.isEmpty) return;
+
+    // Built by hand rather than through [_send]: [_send] would call
+    // [_headers], which would call back into this renewal.
+    final request = http.Request('POST', _uri(path))
+      ..headers.addAll({
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+    try {
+      final payload = unwrapMap(_interpret(await _dispatch(request)));
+      final fresh = payload['token'];
+      if (fresh is String && fresh.isNotEmpty) {
+        await _tokens.write(fresh);
+        _expiresAt = DateTime.tryParse('${payload['expires_at']}')?.toLocal() ??
+            DateTime.now().add(renewWindow * 2);
+        _renewBlockedUntil = null;
+        return;
+      }
+    } on ApiException {
+      // Fall through: keep the current token and let the request decide.
+    }
+    // Do not retry before every request while the server or network is down.
+    _renewBlockedUntil = DateTime.now().add(const Duration(minutes: 1));
+  }
   /// Turns a raw response into either a decoded body or the right exception.
   ///
   /// The single place status codes become types. Everything above this line is
@@ -314,7 +423,20 @@ class ApiClient {
     throw RequestRejectedException(
       statusCode: status,
       message: message ?? 'That request could not be completed.',
+      retryAfter: status == 429 ? _retryAfter(response, decoded) : null,
     );
+  }
+
+  /// A 429's wait: WebZefanya's `retry_after` (seconds) in the body, else the
+  /// standard `Retry-After` header (Laravel's throttle middleware sets it).
+  static Duration? _retryAfter(http.Response response, Map<String, Object?>? decoded) {
+    final raw = decoded?['retry_after'] ?? response.headers['retry-after'];
+    final seconds = switch (raw) {
+      final num n => n.toInt(),
+      final String s => int.tryParse(s.trim()),
+      _ => null,
+    };
+    return seconds == null || seconds <= 0 ? null : Duration(seconds: seconds);
   }
 
   /// Decodes a JSON body, tolerating the shapes a real server sends.

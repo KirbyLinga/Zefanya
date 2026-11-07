@@ -5,12 +5,14 @@
 <head>
     <meta charset="utf-8">
     <title>Waybill {{ $sellerOrder->tracking_number }}</title>
+    <x-fonts />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 24px; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #111; background: #fff; }
+        body { margin: 0; padding: 24px; font-family: 'Montserrat', Helvetica, sans-serif; color: #111; background: #fff; }
         .toolbar { max-width: 720px; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; }
         .toolbar a, .toolbar button {
+            font-family: inherit;
             font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid #d4d4d8;
             background: #fff; cursor: pointer; text-decoration: none; color: #111;
         }

@@ -3,7 +3,8 @@
 // Path check: this file lives at lib/screens/auth/registration_screen.dart
 //   -> theme      => '../../theme/app_theme.dart'
 //   -> auth state => '../../state/auth_state.dart'
-//   -> mock data  => '../../data/mock_data.dart' (courierVehicleTypes)
+//   -> rider vehicle list => '../../data/dto/registration_payload.dart'
+//      (kRiderRegistrationVehicleTypes: motorcycle only)
 //
 // The address step uses the bundled offline PSGC catalogue through the same
 // shared PhAddressFields widget as the address book and Edit Profile, so the
@@ -60,8 +61,10 @@ import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/dto/registration_payload.dart';
 import '../../data/google_identity.dart';
-import '../../data/mock_data.dart';
 import '../../data/ph_address_catalog.dart';
+import '../../data/dto/remote_courier.dart';
+import '../../data/repositories/courier_repository.dart';
+import '../../data/repositories/repositories.dart';
 import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_picker_helper.dart';
@@ -152,6 +155,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _streetController = TextEditingController();
+  final _houseNumberController = TextEditingController();
+  final _addressDetailController = TextEditingController();
   final _plateController = TextEditingController();
   final _companyController = TextEditingController();
   final _licenseNumberController = TextEditingController();
@@ -196,6 +201,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   File? _govIdFile;
   File? _licenseFile;
   File? _orCrFile;
+
+  /// Live mode: the server's rider registration needs an approved logistics
+  /// company's id, so the Company field becomes a picker over
+  /// `GET /api/rider/providers`. Null in mock mode (free-text company).
+  RiderServerData? _riderServer;
+  List<RiderProviderOption>? _providers;
+  bool _providersFailed = false;
+  int? _providerId;
+
+  /// The rider chose to see every approved company, not only those covering
+  /// their barangay (registration accepts any approved company).
+  bool _showAllProviders = false;
+
+  /// Guards against an older provider answer landing after a newer one.
+  int _providerRequest = 0;
 
   bool _isSubmitting = false;
 
@@ -249,7 +269,53 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     super.initState();
     _prefillGoogleIdentity();
     _loadCatalog();
+    _loadProviders();
   }
+
+  /// Fetches the company list once, in live mode only.
+  Future<void> _loadProviders() async {
+    if (_riderServer == null) {
+      try {
+        final courier = context.read<Repositories>().courier;
+        if (courier is RiderServerData) _riderServer = courier as RiderServerData;
+      } on ProviderNotFoundException {
+        return; // No repositories above this screen (a widget test): mock form.
+      }
+    }
+    final server = _riderServer;
+    if (server == null) return;
+
+    // Companies serving the chosen barangay; the full list only when the
+    // rider asked for it. Nothing to ask before a barangay is picked.
+    final barangay = _showAllProviders ? null : _address.barangayCode;
+    if (!_showAllProviders && (barangay == null || barangay.isEmpty)) {
+      if (_providers != null || _providersFailed) {
+        setState(() {
+          _providers = null;
+          _providersFailed = false;
+        });
+      }
+      return;
+    }
+
+    final request = ++_providerRequest;
+    if (mounted) {
+      setState(() {
+        _providers = null;
+        _providersFailed = false;
+      });
+    }
+    try {
+      final providers = await server.registrationProviders(barangayCode: barangay);
+      // A later address change started a newer request: this answer is stale.
+      if (mounted && request == _providerRequest) setState(() => _providers = providers);
+    } on ApiException {
+      if (mounted && request == _providerRequest) setState(() => _providersFailed = true);
+    }
+  }
+
+  /// Riders register with a motorcycle only (both modes).
+  List<String> get _vehicleTypes => kRiderRegistrationVehicleTypes;
 
   /// Fills the parts Google already knows.
   ///
@@ -328,6 +394,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _streetController.dispose();
+    _houseNumberController.dispose();
+    _addressDetailController.dispose();
     _plateController.dispose();
     _companyController.dispose();
     _licenseNumberController.dispose();
@@ -392,6 +460,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       extraOk = _catalog != null && !_catalogLoading;
     } else if (id == _StepId.vehicle) {
       extraOk =
+          // Live mode: the server needs a logistics company's id.
+          (_riderServer == null || _providerId != null) &&
           _licenseExpiry != null &&
           _licenseExpiryError == null &&
           !isPlateRegisteredElsewhere(
@@ -456,7 +526,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     final fullName = [
       _firstNameController.text.trim(),
-      if (_middleInitialController.text.trim().isNotEmpty)
+      if (_role != UserRole.courier &&
+          _middleInitialController.text.trim().isNotEmpty)
         '${_middleInitialController.text.trim()}.',
       _lastNameController.text.trim(),
     ].where((p) => p.isNotEmpty).join(' ');
@@ -466,7 +537,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     // `!` here would claim more certainty than this widget can actually see.
     // The early return is the honest fallback for a state that cannot happen:
     // leave the form as it is rather than submit a null-riddled profile.
-    final sex = _sex;
+    // A rider's form does not ask for sex (the web rider form has none).
+    final isRider = _role == UserRole.courier;
+    final sex = isRider ? '' : _sex;
     final dob = _dob;
     final address = _address;
     final province = address.province;
@@ -485,7 +558,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final profile = RegistrationProfile(
       lastName: _lastNameController.text,
       firstName: _firstNameController.text,
-      middleInitial: _middleInitialController.text,
+      middleInitial: isRider ? null : _middleInitialController.text,
       sex: sex,
       phone: _phoneController.text,
       birthday: dob,
@@ -500,12 +573,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // courier note in registration_payload.dart.
       govIdPath: _govIdFile?.path,
       riderCompany: _companyController.text,
-      riderVehicleType: _vehicleType,
+      riderVehicleType: _vehicleTypes.contains(_vehicleType) ? _vehicleType : _vehicleTypes.first,
       riderPlate: _plateController.text,
       riderLicenseNumber: _licenseNumberController.text,
       riderLicenseExpiry: _licenseExpiry,
       riderLicensePath: _licenseFile?.path,
       riderOrCrPath: _orCrFile?.path,
+      riderProviderId: _providerId,
+      provinceCode: address.provinceCode,
+      municipalityCode: address.cityCode,
+      barangayCode: address.barangayCode,
+      houseNumber: isRider ? _houseNumberController.text : null,
+      addressDetail: isRider ? _addressDetailController.text : null,
     );
     try {
       if (_isGoogle) {
@@ -549,7 +628,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     auth.updateProfile(
       lastName: _lastNameController.text.trim(),
       firstName: _firstNameController.text.trim(),
-      middleInitial: _middleInitialController.text.trim(),
+      middleInitial: isRider ? '' : _middleInitialController.text.trim(),
       sex: sex,
       phone: _phoneController.text.trim(),
       region: address.region,
@@ -828,6 +907,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           validator: (v) => validatePersonName(v, label: 'First name'),
         ),
       ),
+      // The web rider form has no middle initial and no sex; a rider's form
+      // asks for the same fields as the web one.
+      if (_role != UserRole.courier) ...[
       const SizedBox(height: 16),
       _labeledField(
         theme,
@@ -867,6 +949,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           validator: (v) => v == null ? 'Select sex' : null,
         ),
       ),
+      ],
       const SizedBox(height: 16),
       _labeledField(
         theme,
@@ -1192,7 +1275,121 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           },
         ),
       ),
+      // The web rider form's two optional address lines.
+      if (_role == UserRole.courier) ...[
+        const SizedBox(height: 16),
+        _labeledField(
+          theme,
+          'House / Building Number (optional)',
+          TextFormField(
+            key: const ValueKey('registration-house-number'),
+            controller: _houseNumberController,
+            textInputAction: TextInputAction.next,
+            maxLength: 50,
+            decoration: const InputDecoration(hintText: 'e.g. Blk 4 Lot 12', counterText: ''),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _labeledField(
+          theme,
+          'Landmark / Address Details (optional)',
+          TextFormField(
+            key: const ValueKey('registration-address-detail'),
+            controller: _addressDetailController,
+            textInputAction: TextInputAction.next,
+            maxLength: 255,
+            decoration: const InputDecoration(hintText: 'e.g. near the barangay hall', counterText: ''),
+          ),
+        ),
+      ],
     ];
+  }
+
+  /// Live mode's Company field: the approved logistics companies that serve
+  /// the barangay picked on the address step (the server's coverage rule).
+  /// "Show all companies" falls back to the full list the web form offers.
+  Widget _providerPicker() {
+    final providers = _providers;
+    final noBarangay = (_address.barangayCode ?? '').isEmpty;
+    final showAll = TextButton(
+      key: const ValueKey('registration-providers-all'),
+      onPressed: () {
+        setState(() {
+          _showAllProviders = true;
+          _providerId = null;
+        });
+        _loadProviders();
+      },
+      child: const Text('Show all logistics companies'),
+    );
+
+    if (!_showAllProviders && noBarangay) {
+      return const Text('Choose your barangay on the address step to see the logistics companies serving it.');
+    }
+    if (providers == null) {
+      return _providersFailed
+          ? TextButton.icon(
+              key: const ValueKey('registration-providers-retry'),
+              onPressed: _loadProviders,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Could not load companies. Tap to retry.'),
+            )
+          : const LinearProgressIndicator();
+    }
+    if (providers.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_showAllProviders
+              ? 'No logistics providers are currently available.'
+              : 'No logistics company serves ${_address.barangay ?? 'your barangay'} yet.'),
+          if (!_showAllProviders) showAll,
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _providerDropdown(providers),
+        if (!_showAllProviders) showAll,
+        // Applying is not assignment: the company must still approve the
+        // rider onto one of its station hubs, and parcels are only assigned
+        // where that hub has validated coverage.
+        if (_showAllProviders)
+          Padding(
+            key: const ValueKey('registration-providers-out-of-area-note'),
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Some of these companies may not serve your barangay. Applying '
+              'does not guarantee approval or deliveries: the company assigns '
+              'your station hub if it approves you, and you only receive '
+              'parcels in areas that hub covers.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _providerDropdown(List<RiderProviderOption> providers) {
+    return DropdownButtonFormField<int>(
+      // Keyed by the list it shows, so a new list starts a fresh field rather
+      // than keeping a selection that is no longer among its items.
+      key: ValueKey('registration-provider-$_showAllProviders-${_address.barangayCode}'),
+      initialValue: providers.any((p) => p.id == _providerId) ? _providerId : null,
+      isExpanded: true,
+      decoration: const InputDecoration(hintText: 'Select logistics provider'),
+      items: [
+        for (final p in providers)
+          DropdownMenuItem(value: p.id, child: Text(p.name, overflow: TextOverflow.ellipsis)),
+      ],
+      onChanged: (id) => setState(() {
+        _providerId = id;
+        _companyController.text =
+            providers.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? '';
+      }),
+      validator: (id) => id == null ? 'Select a logistics provider' : null,
+    );
   }
 
   List<Widget> _vehicleFields(ThemeData theme) {
@@ -1202,29 +1399,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _labeledField(
         theme,
         'Company',
-        TextFormField(
-          controller: _companyController,
-          textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Bilis Hatid Express Inc.',
-          ),
-          validator: (v) {
-            final value = v?.trim() ?? '';
-            if (value.isEmpty) return 'Company name is required';
-            return null;
-          },
-        ),
+        _riderServer == null
+            ? TextFormField(
+                controller: _companyController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Bilis Hatid Express Inc.',
+                ),
+                validator: (v) {
+                  final value = v?.trim() ?? '';
+                  if (value.isEmpty) return 'Company name is required';
+                  return null;
+                },
+              )
+            : _providerPicker(),
       ),
       const SizedBox(height: 16),
       _labeledField(
         theme,
         'Vehicle Type',
         DropdownButtonFormField<String>(
-          initialValue: _vehicleType,
+          initialValue: _vehicleTypes.contains(_vehicleType) ? _vehicleType : _vehicleTypes.first,
           isExpanded: true,
           decoration: const InputDecoration(hintText: 'Select vehicle type'),
-          items: courierVehicleTypes
+          items: _vehicleTypes
               .map((v) => DropdownMenuItem(value: v, child: Text(v)))
               .toList(),
           onChanged: (v) => setState(() => _vehicleType = v),
@@ -1635,7 +1834,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return PhAddressFields(
       catalog: catalog,
       selection: _address,
-      onChanged: (selection) => setState(() => _address = selection),
+      onChanged: (selection) {
+        final barangayChanged = selection.barangayCode != _address.barangayCode;
+        setState(() => _address = selection);
+        // The companies on offer depend on the barangay: re-ask the server
+        // and drop a choice made for the previous address.
+        if (barangayChanged && _riderServer != null) {
+          _providerId = null;
+          _companyController.clear();
+          _loadProviders();
+        }
+      },
     );
   }
 

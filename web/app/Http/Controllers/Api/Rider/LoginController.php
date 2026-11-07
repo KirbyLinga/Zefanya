@@ -50,8 +50,11 @@ class LoginController extends Controller
 
         $role = 'rider';
 
-        // Check status: approved or active + verified + operational.
-        if (! $this->accountIsLoginable($account)) {
+        // Check status: approved or active + verified + operational. A rider in
+        // an Admin-granted wind-down may also sign in, as on the web
+        // (UnifiedLoginController); api.role then limits the token to the
+        // routes that finish a parcel already out for delivery.
+        if (! $this->accountIsLoginable($account) && ! $account->isInWindDown()) {
             return $this->accountNotActiveResponse($account);
         }
 

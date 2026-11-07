@@ -9,19 +9,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Reset password · Zefanya</title>
+    <x-fonts />
     <style>
         :root { color-scheme: light; }
         * { box-sizing: border-box; }
+        input, button, select, textarea { font-family: inherit; }
         body {
             margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
-            background: #faf7f5; font-family: 'Montserrat', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: #faf7f5; font-family: 'Montserrat', Helvetica, sans-serif;
             color: #1c1917; padding: 24px;
         }
         .card {
             width: 100%; max-width: 420px; background: #fff; border: 1px solid #e7e5e4;
             border-radius: 14px; padding: 32px; box-shadow: 0 10px 30px rgba(28, 25, 23, .06);
         }
-        h1 { font-family: Georgia, 'Playfair Display', serif; font-size: 26px; font-weight: 400; margin: 0 0 6px; }
+        h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 26px; font-weight: 400; margin: 0 0 6px; }
         p.lead { margin: 0 0 22px; color: #57534e; font-size: 14px; line-height: 1.5; }
         label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .3px; color: #57534e; margin-bottom: 6px; }
         input[type=email], input[type=password] {

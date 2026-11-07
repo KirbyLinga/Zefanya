@@ -14,6 +14,7 @@
 // so the flight still animates correctly from wherever the tap came from.
 
 import 'package:flutter/material.dart';
+import '../../../config/dev_flags.dart' show kApiBaseUrl;
 import '../../../data/mock_data.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/money_format.dart';
@@ -114,7 +115,7 @@ class ProductImage extends StatelessWidget {
   /// a product whose cover has not been uploaded yet.
   String? get _url {
     final override = imageUrl;
-    if (override != null && override.trim().isNotEmpty) return override;
+    if (override != null && override.trim().isNotEmpty) return _absolute(override);
     final photos = product.photos;
     if (photos.isEmpty) return null;
     // Out-of-range falls back to the *cover*, in both directions. The
@@ -126,7 +127,19 @@ class ProductImage extends StatelessWidget {
     final index = (photoIndex >= 0 && photoIndex < photos.length)
         ? photoIndex
         : 0;
-    return photos[index];
+    return _absolute(photos[index]);
+  }
+
+  /// A server path such as `/storage/thumbnails/...` has no host, which a
+  /// browser page would supply but an app cannot: `Image.network` would fail
+  /// and the placeholder would show. Resolved against the API's own origin
+  /// (`zefanya.apiBaseUrl`). Full URLs and mock asset strings pass through.
+  static String _absolute(String url) {
+    if (!url.startsWith('/') || url.startsWith('//') || kApiBaseUrl.isEmpty) {
+      return url;
+    }
+    final api = Uri.tryParse(kApiBaseUrl);
+    return api == null || !api.hasScheme ? url : api.resolve(url).toString();
   }
 
   @override
@@ -166,6 +179,13 @@ class ProductImage extends StatelessWidget {
           // exactly what cacheWidth means to the engine.
           cacheWidth: cachePixels,
           cacheHeight: cachePixels,
+          // Flutter web only (ignored on Android/iOS): the web build reads
+          // image bytes with a cross-origin request, which the browser
+          // refuses when the image server sends no
+          // Access-Control-Allow-Origin header — and the server's
+          // /storage files carry none. `fallback` retries such an image
+          // as a plain <img> element, which needs no CORS.
+          webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
           // Live mode serves photos over the network (4G): cross-fade
           // each image IN OVER its tinted placeholder when the first
           // frame arrives, instead of popping. The tint sits UNDER the
@@ -205,8 +225,12 @@ class ProductImage extends StatelessWidget {
           // No internet, or a broken seller URL — fall back to the same
           // neutral placeholder a product with no photo uses, rather than a
           // broken-image glyph.
-          errorBuilder: (context, error, stackTrace) =>
-              _ProductPlaceholder(tint: tint, iconSize: iconSize),
+          errorBuilder: (context, error, stackTrace) {
+            // Printed in release builds too (`flutter run --release` / adb
+            // logcat), so a photo that falls back to the placeholder says why.
+            debugPrint('[ProductImage] could not load $url: $error');
+            return _ProductPlaceholder(tint: tint, iconSize: iconSize);
+          },
         );
       },
     );

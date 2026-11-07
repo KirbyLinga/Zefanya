@@ -40,10 +40,18 @@ class CourierProfitScreen extends StatelessWidget {
     final courier = context.watch<CourierState>();
     final completed = courier.completedJobs;
 
+    // Live mode: pickups are credited too, so "Completed" counts deliveries.
+    final deliveries =
+        completed.where((c) => c.resultLabel != 'Picked up').length;
+
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(),
-      body: ListView(
+      body: RefreshIndicator(
+        // Live mode re-reads the server's earnings; mock mode has nothing to fetch.
+        onRefresh: courier.refreshEarnings,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
         children: [
           const EaseInFrame(
@@ -62,7 +70,7 @@ class CourierProfitScreen extends StatelessWidget {
                   theme,
                   weekEarnings: courier.weekEarnings,
                   todayEarnings: courier.todayEarnings,
-                  totalDeliveries: completed.length,
+                  totalDeliveries: deliveries,
                 ),
                 const SizedBox(height: 16),
                 _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
@@ -100,6 +108,7 @@ class CourierProfitScreen extends StatelessWidget {
                 child: _buildTransactionTile(theme, completed[i], i),
               ),
         ],
+        ),
       ),
     );
   }

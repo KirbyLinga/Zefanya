@@ -48,7 +48,7 @@ class AdminNavigationTest extends TestCase
 
         foreach ([
             'admin.dashboard', 'admin.users.index', 'admin.hubs.index', 'admin.partnerships.index', 'admin.products.index',
-            'admin.vouchers.index', 'admin.incidents.index', 'admin.returns.index', 'admin.settings.index', 'admin.two-factor.show',
+            'admin.vouchers.index', 'admin.incidents.index', 'admin.returns.index', 'admin.settings.index',
         ] as $route) {
             $this->assertArrayHasKey(route($route), $visited, $route);
         }
@@ -61,7 +61,7 @@ class AdminNavigationTest extends TestCase
     {
         $this->signedIn('super_admin');
 
-        $response = $this->get(route('admin.dashboard'))->assertOk()->assertDontSee('More tools');
+        $response = $this->get(route('admin.dashboard'))->assertOk()->assertDontSee('More tools')->assertDontSee('Two-factor security')->assertDontSee('/admin/two-factor', false);
 
         $this->assertSame(11, substr_count($response->getContent(), 'data-admin-nav-item'));
         $response->assertSeeInOrder(['Dashboard', 'Accounts', 'Registrations', 'User accounts', 'Marketplace &amp; operations', 'Logistics network', 'Products', 'Vouchers', 'Returns &amp; disputes', 'Parcel issues', 'Money', 'Settlements', 'Finance', 'Settings'], false);
@@ -103,13 +103,13 @@ class AdminNavigationTest extends TestCase
         }
     }
 
-    public function test_support_only_gets_the_dashboard_and_its_own_security_page(): void
+    public function test_support_only_gets_the_dashboard(): void
     {
         $this->signedIn('support');
 
         $links = $this->navigationLinks($this->get(route('admin.dashboard'))->assertOk()->getContent());
 
-        $this->assertEqualsCanonicalizing([route('admin.dashboard'), route('admin.two-factor.show')], $links);
+        $this->assertEqualsCanonicalizing([route('admin.dashboard')], $links);
     }
 
     /** @return array<string, array{0: string, 1: string}> */

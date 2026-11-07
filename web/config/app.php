@@ -56,6 +56,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Trusted Hosts
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated host names (each also allows its subdomains) the app will
+    | answer for outside local/testing. Requests with any other Host header are
+    | rejected, so generated links (password resets, signed OTP URLs) can never
+    | point at an attacker-chosen host. APP_URL's host is always trusted too.
+    | If the Cloudflare Tunnel rewrites the Host header, add that host here.
+    |
+    */
+
+    'trusted_hosts' => env('TRUSTED_HOSTS', 'zefanya.shop'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

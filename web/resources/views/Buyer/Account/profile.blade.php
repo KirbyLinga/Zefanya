@@ -56,6 +56,46 @@
                         @endif
                     </div>
 
+                    {{-- Profile photo: its own form (multipart), above the details form. --}}
+                    @php $hasPhoto = $buyer->profilePhotoPath() !== null; @endphp
+                    <div class="mb-6 border-b border-[var(--border)] pb-6">
+                        <span class="{{ $labelCls }}">Profile photo</span>
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+                            <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary-300 font-serif text-2xl font-semibold uppercase text-primary-950">
+                                @if ($hasPhoto)
+                                    <img src="{{ route('buyer.account.photo.show', ['v' => md5($buyer->profilePhotoPath())]) }}" alt="Your profile photo" class="size-full object-cover">
+                                @else
+                                    {{ mb_substr($buyer->first_name, 0, 1) }}{{ mb_substr($buyer->last_name, 0, 1) }}
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <form method="POST" action="{{ route('buyer.account.photo.update') }}" enctype="multipart/form-data" id="buyerPhotoForm">
+                                    @csrf
+                                    <label for="buyerProfilePhoto" class="upload-zone flex items-center gap-3">
+                                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="upload" width="18" height="18"></i></span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate font-sans text-sm font-semibold text-neutral-800" id="buyerProfilePhotoName">{{ $hasPhoto ? 'Change profile photo' : 'Upload a profile photo' }}</span>
+                                            <span class="block font-sans text-xs text-neutral-500">JPG, PNG or WebP · Max 2 MB</span>
+                                        </span>
+                                    </label>
+                                    <input type="file" name="photo" id="buyerProfilePhoto" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required class="sr-only"
+                                           onchange="if (this.files.length) { document.getElementById('buyerProfilePhotoName').textContent = 'Uploading ' + this.files[0].name + '…'; this.form.requestSubmit(); }">
+                                    <noscript><button type="submit" class="mt-2 rounded-full bg-[var(--btn-primary-bg)] px-4 py-2 font-sans text-xs font-semibold text-[var(--btn-primary-text)]">Upload</button></noscript>
+                                </form>
+                                @error('photo', 'photo')
+                                    <span class="{{ $errorCls }}" role="alert">{{ $message }}</span>
+                                @enderror
+                                @if ($hasPhoto)
+                                    <form method="POST" action="{{ route('buyer.account.photo.destroy') }}" class="mt-2">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="font-sans text-xs font-semibold text-[var(--text-muted)] underline-offset-2 hover:text-[var(--status-danger)] hover:underline">Remove photo</button>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
                     <form method="POST" action="{{ route('buyer.account.update') }}">
                         @csrf
                         @method('PATCH')

@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Api\Rider;
 
+use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Http\Resources\Mobile\RiderParcelResource;
 use App\Models\Rider\RiderEarning;
+use App\Models\Seller\StoreSale;
 use App\Models\Shared\SellerOrder;
 use App\Services\Rider\RiderAvailabilityService;
 use App\Services\Rider\RiderCashService;
 use App\Services\Rider\RiderEarningService;
 use App\Services\Rider\RiderOperationsService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * Rider mobile read endpoints and the online/offline switch.
@@ -32,14 +36,46 @@ class JobController extends Controller
     public function index(Request $request, RiderOperationsService $operations): JsonResponse
     {
         $rider = $request->user();
-        $pickups = $operations->pickupAssignments($rider)->load(self::RELATIONS);
+        $windingDown = $operations->isWindingDown($rider);
+        // A wind-down rider may only finish parcels already out for delivery,
+        // so (as on the web) no pickup list is offered; deliveryAssignments
+        // narrows itself to OUT_FOR_DELIVERY in that state.
+        $pickups = $windingDown
+            ? new EloquentCollection
+            : $operations->pickupAssignments($rider)->load(self::RELATIONS);
         $deliveries = $operations->deliveryAssignments($rider)->load(self::RELATIONS);
 
         return $this->success('Assigned jobs retrieved.', [
             'online' => (bool) $rider->fresh()->is_online,
-            'winding_down' => $operations->isWindingDown($rider),
+            'winding_down' => $windingDown,
             'pickups' => $pickups->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('pickup')->resolve($request))->values(),
             'deliveries' => $deliveries->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('delivery')->resolve($request))->values(),
+        ]);
+    }
+
+    /**
+     * GET /api/rider/history — the rider's finished deliveries (delivered,
+     * completed, failed, returned), newest first, from the same
+     * RiderOperationsService::deliveryHistory query as the web history page.
+     * Buyer contact details are not included for finished parcels.
+     */
+    public function history(Request $request, RiderOperationsService $operations): JsonResponse
+    {
+        $courier = $operations->operationalCourier($request->user());
+        $parcels = $operations->deliveryHistory($request->user())->load(['payment', 'orderItems', 'parcelReturn']);
+        $credited = RiderEarning::query()
+            ->where('courier_id', $courier->getKey())
+            ->where('job', RiderEarning::DELIVERY)
+            ->whereIn('seller_order_id', $parcels->modelKeys())
+            ->pluck('amount_minor', 'seller_order_id');
+
+        return $this->success('Delivery history retrieved.', [
+            'history' => $parcels->map(fn (SellerOrder $parcel): array => [
+                ...(new RiderParcelResource($parcel))->withLeg('history')->resolve($request),
+                'returned' => $parcel->status === OrderStatus::Returned || $parcel->parcelReturn !== null,
+                'earning_minor' => $credited->has($parcel->id) ? (int) $credited->get($parcel->id) : null,
+                'delivered_at' => $parcel->deliveryProof?->created_at?->toIso8601String(),
+            ])->values(),
         ]);
     }
 
@@ -65,20 +101,35 @@ class JobController extends Controller
     ): JsonResponse {
         $courier = $operations->operationalCourier($request->user(), allowWindDown: true);
         $cashSummary = $cash->summaryFor($courier);
+        $limit = min(max((int) $request->query('limit', 20), 1), 100);
+
+        // Sums of the credited RiderEarning rows only; amounts are never
+        // recomputed here. Day and week boundaries use the store timezone, as
+        // RiderEarningService does for the month.
+        $credited = RiderEarning::query()->where('courier_id', $courier->getKey());
+        $now = Carbon::now(StoreSale::TIMEZONE);
 
         return $this->success('Earnings retrieved.', [
             'summary' => $earnings->summaryFor($courier),
+            'totals' => [
+                'today_minor' => (int) (clone $credited)->where('earned_at', '>=', $now->copy()->startOfDay()->utc())->sum('amount_minor'),
+                'week_minor' => (int) (clone $credited)->where('earned_at', '>=', $now->copy()->startOfWeek()->utc())->sum('amount_minor'),
+                'all_time_minor' => (int) (clone $credited)->sum('amount_minor'),
+                'jobs' => (clone $credited)->count(),
+            ],
             'cod' => [
                 'holding_minor' => $cashSummary['holdingMinor'],
                 'holding_count' => $cashSummary['holdingCount'],
                 'overdue_count' => $cashSummary['overdueCount'],
                 'handed_over_minor' => $cashSummary['handedOverMinor'],
             ],
-            'recent' => $earnings->recentFor($courier, 20)->map(fn (RiderEarning $e): array => [
+            'recent' => $earnings->recentFor($courier, $limit)->load('sellerOrder.seller:id,business_name')->map(fn (RiderEarning $e): array => [
                 'id' => $e->id,
                 'job' => $e->job,
                 'amount_minor' => (int) $e->amount_minor,
+                'seller_order_id' => $e->seller_order_id,
                 'tracking_number' => $e->sellerOrder?->tracking_number,
+                'seller_name' => $e->sellerOrder?->seller?->business_name,
                 'earned_at' => $e->earned_at?->toIso8601String(),
                 'paid' => $e->rider_payout_id !== null,
                 'payout_reference' => $e->payout?->reference,

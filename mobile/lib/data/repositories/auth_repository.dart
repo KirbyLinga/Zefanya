@@ -287,7 +287,20 @@ class MockAuthRepository implements AuthRepository {
 // Live
 // ---------------------------------------------------------------------------
 
-class LiveAuthRepository extends LiveRepository implements AuthRepository {
+/// Rider registration recovery (live mode only). A separate interface, like
+/// `QuotesCheckout`, so the mock and the test doubles of [AuthRepository] need
+/// not implement a server-only call.
+abstract class ResumesRiderRegistration {
+  /// Fresh signed verification links for an unverified rider; returns the new
+  /// opaque [AuthResult.verificationId].
+  Future<String> resumeRiderRegistration({
+    required String email,
+    required String password,
+  });
+}
+
+class LiveAuthRepository extends LiveRepository
+    implements AuthRepository, ResumesRiderRegistration {
   LiveAuthRepository(super.client);
 
   @override
@@ -322,13 +335,21 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     // A missing token is a malformed answer rather than a failed sign-in — the
     // status was 200, so the server believed it signed someone in.
     // WebZefanya wraps it: {success, message, data: {token, ...}, errors}.
-    final token = unwrapMap(body)['token'];
+    final payload = unwrapMap(body);
+    final token = payload['token'];
     if (token is! String || token.isEmpty) {
       throw const MalformedResponseException(
         message: 'The server accepted the sign-in but sent no token.',
       );
     }
-    await client.adoptToken(token);
+    await client.adoptToken(
+      token,
+      // A token minted this instant: when the answer omits `expires_at`, the
+      // server's default lifetime (`sanctum.expiration`, 60 minutes) applies.
+      expiresAt: DateTime.tryParse('${payload['expires_at']}')?.toLocal() ??
+          DateTime.now().add(const Duration(minutes: 60)),
+    );
+    client.renewPath = _renewPath(role);
 
     // A shut gate never reaches here: the server answers `403` with its own
     // `code` and `registration_status`, which `ApiClient` turns into
@@ -343,9 +364,59 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     return _resultFrom(await client.getJson('${_prefix(role)}/profile'), role: role);
   }
 
+  /// Posts to one of the rider's signed URLs.
+  ///
+  /// A link past its `expires` time is not sent at all, and a 403 from the
+  /// `signed` middleware (expired or invalid signature) means the same thing:
+  /// both become [VerificationLinkExpiredException], whose remedy is
+  /// [resumeRiderRegistration].
+  Future<Map<String, Object?>> _signed(
+    RiderVerificationHandle handle,
+    String url, {
+    Object? body,
+  }) async {
+    if (handle.isExpired) throw const VerificationLinkExpiredException();
+    try {
+      return await client.postSigned(url, body: body);
+    } on ForbiddenException catch (e) {
+      throw VerificationLinkExpiredException(cause: e);
+    }
+  }
+
+  /// WebZefanya's recovery for an unverified rider whose links expired:
+  /// `POST /api/rider/registration/resume` with the account's email and
+  /// password answers with fresh `verify_url` / `resend_url` (the server's
+  /// `register` rate limit applies). No new code is sent by this call.
+  ///
+  /// Returns the new opaque handle for [AuthResult.verificationId].
+  @override
+  Future<String> resumeRiderRegistration({
+    required String email,
+    required String password,
+  }) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final body = await client.postJson(
+      '/rider/registration/resume',
+      authenticated: false,
+      body: {'email': email.trim(), 'password': password},
+    );
+    final handle = riderRegistrationResultFrom(body, email: email).verificationId;
+    if (handle == null) {
+      throw const MalformedResponseException(
+        message: 'The server resumed the registration but sent no verification link.',
+      );
+    }
+    return handle;
+  }
+
   /// `/buyer` or `/rider`: WebZefanya's per-role API prefix.
   static String _prefix(UserRole role) =>
       role == UserRole.buyer ? '/buyer' : '/rider';
+
+  /// The role's token-renewal route. Only riders have one on WebZefanya
+  /// (`POST /api/rider/token/refresh`); a buyer token is not renewed.
+  static String? _renewPath(UserRole role) =>
+      role == UserRole.courier ? '/rider/token/refresh' : null;
 
   @override
   Future<AuthResult> register({
@@ -354,34 +425,35 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required String password,
     required RegistrationProfile profile,
   }) async {
-    if (role == UserRole.courier && profile.riderPlate != null) {
+    if (role == UserRole.courier) {
       if (!client.isConfigured) throw const ApiNotConfiguredException();
 
-      final idPath = profile.govIdPath;
-      if (idPath == null || idPath.trim().isEmpty) {
+      // WebZefanya's StoreRiderRegistrationRequest: the two documents are
+      // required file parts; there is no government-ID upload for riders.
+      final license = profile.riderLicensePath?.trim() ?? '';
+      final orCr = profile.riderOrCrPath?.trim() ?? '';
+      if (license.isEmpty || orCr.isEmpty) {
+        throw ValidationException(fieldErrors: {
+          if (license.isEmpty) 'drivers_license': "Upload a photo or PDF of your driver's license.",
+          if (orCr.isEmpty) 'or_cr': 'Upload a photo or PDF of your vehicle OR/CR.',
+        });
+      }
+      if (profile.riderProviderId == null) {
         throw const ValidationException(
-          fieldErrors: {'upload_id': 'Upload a photo or PDF of your government ID.'},
+          fieldErrors: {'logistics_provider_id': 'Select a logistics provider.'},
         );
       }
 
-      final files = <String, String>{'upload_id': idPath};
-      if (profile.riderLicensePath != null && profile.riderLicensePath!.trim().isNotEmpty) {
-        files['license_doc'] = profile.riderLicensePath!.trim();
-      }
-      if (profile.riderOrCrPath != null && profile.riderOrCrPath!.trim().isNotEmpty) {
-        files['or_cr_doc'] = profile.riderOrCrPath!.trim();
-      }
-
       final body = await client.postMultipart(
-        '/register/courier',
+        '/rider/register',
         authenticated: false,
         fields: profile
-            .toCourierFields(email: email, password: password)
+            .toRiderFields(email: email, password: password)
             .map((key, value) => MapEntry(key, '$value')),
-        files: files,
+        files: {'drivers_license': license, 'or_cr': orCr},
       );
 
-      return _resultFrom(body, role: role);
+      return riderRegistrationResultFrom(body, email: email);
     }
 
     if (role != UserRole.buyer) return notWired('POST /register/logistics');
@@ -438,6 +510,12 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required String verificationId,
     required String code,
   }) async {
+    if (role == UserRole.courier) {
+      final handle = RiderVerificationHandle.parse(verificationId);
+      if (handle == null) return notWired(verifyOtpPath(role, verificationId));
+      final body = await _signed(handle, handle.verifyUrl, body: {'otp': code.trim()});
+      return _resultFrom(body, role: role);
+    }
     if (role != UserRole.buyer) {
       return notWired(verifyOtpPath(role, verificationId));
     }
@@ -469,6 +547,13 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     required UserRole role,
     required String verificationId,
   }) async {
+    if (role == UserRole.courier) {
+      final handle = RiderVerificationHandle.parse(verificationId);
+      if (handle != null) {
+        await _signed(handle, handle.resendUrl);
+        return;
+      }
+    }
     if (role != UserRole.buyer) {
       // A bare call rather than a `return`: `notWired` throws, and Dart rejects
       // `return <Never>` from an `async` method whose type is `Future<void>`
@@ -517,6 +602,9 @@ class LiveAuthRepository extends LiveRepository implements AuthRepository {
     // get a 403 rather than a 401, which would look like "account not approved"
     // rather than "this token is from a different role".
     final path = '${_prefix(role)}/profile';
+    // A restored session: the token's expiry is unknown here, so a rider's
+    // token is renewed before this first request goes out.
+    client.renewPath = _renewPath(role);
 
     try {
       final body = await client.getJson(path);
@@ -593,3 +681,68 @@ String? _webZefanyaStatus(Object? status) => switch (status?.toString()) {
       'rejected' => 'rejected',
       _ => null,
     };
+
+/// The two signed URLs WebZefanya returns after a rider registers, carried
+/// through the app as one opaque [AuthResult.verificationId].
+///
+/// Rider OTP routes are keyed by a server signature, not by an id the app
+/// could build, so the handle *is* the pair of URLs. Joined with a newline,
+/// which a URL cannot contain.
+class RiderVerificationHandle {
+  const RiderVerificationHandle(this.verifyUrl, this.resendUrl);
+
+  final String verifyUrl;
+  final String resendUrl;
+
+  String encode() => '$verifyUrl\n$resendUrl';
+
+  /// When the links stop working: the signed URLs' own `expires` parameter
+  /// (Unix seconds), read without altering the URL. Null if absent.
+  DateTime? get expiresAt {
+    final raw = Uri.tryParse(resendUrl)?.queryParameters['expires'] ??
+        Uri.tryParse(verifyUrl)?.queryParameters['expires'];
+    final seconds = raw == null ? null : int.tryParse(raw);
+    return seconds == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
+  }
+
+  /// True once [expiresAt] has passed; the request would only get a 403.
+  bool get isExpired {
+    final at = expiresAt;
+    return at != null && !DateTime.now().toUtc().isBefore(at);
+  }
+
+  static RiderVerificationHandle? parse(String handle) {
+    final parts = handle.split('\n');
+    if (parts.length != 2 || parts.any((p) => !p.startsWith('http'))) return null;
+    return RiderVerificationHandle(parts[0], parts[1]);
+  }
+}
+
+/// Reads `POST /api/rider/register`: `{message, data: {rider_id, status,
+/// email_masked, verify_url, resend_url}}`. A new rider must confirm the
+/// emailed code first, so the result opens the email gate when the server
+/// sent the signed URLs, and the approval gate otherwise.
+AuthResult riderRegistrationResultFrom(
+  Map<String, Object?> body, {
+  required String email,
+}) {
+  final data = unwrapMap(body);
+  final handle = switch ((data['verify_url'], data['resend_url'])) {
+    (final String verify, final String resend) =>
+      RiderVerificationHandle(verify, resend).encode(),
+    _ => null,
+  };
+  final remote = handle != null
+      ? RemoteRegistrationStatus.pendingVerification
+      : RemoteRegistrationStatus.pendingApproval;
+
+  return AuthResult(
+    role: UserRole.courier,
+    status: accountStatusFor(remote),
+    registrationStatus: remote,
+    email: email.trim(),
+    verificationId: handle,
+  );
+}

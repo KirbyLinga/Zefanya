@@ -16,6 +16,7 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/motion/ease_in_frame.dart';
+import '../../widgets/notification_bell.dart';
 
 class DeliveryDashboardScreen extends StatelessWidget {
   const DeliveryDashboardScreen({super.key});
@@ -36,7 +37,11 @@ class DeliveryDashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
-      appBar: AppBar(),
+      // Live mode: the rider's WebZefanya notifications (assignments, cash,
+      // payouts). Mock mode keeps the bare bar it always had.
+      appBar: AppBar(
+        actions: [if (courier.isServerAuthoritative) const NotificationBell()],
+      ),
       body: jobs.isEmpty
           ? Column(
               children: [

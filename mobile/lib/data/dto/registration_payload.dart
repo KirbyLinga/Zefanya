@@ -87,7 +87,30 @@ class RegistrationProfile {
     this.riderLicenseExpiry,
     this.riderLicensePath,
     this.riderOrCrPath,
+    this.riderProviderId,
+    this.provinceCode,
+    this.municipalityCode,
+    this.barangayCode,
+    this.houseNumber,
+    this.addressDetail,
   });
+
+  /// The chosen logistics company's id, from `GET /api/rider/providers`.
+  /// WebZefanya's `logistics_provider_id` must name an approved company, so
+  /// the free-text [riderCompany] alone cannot register a rider live.
+  final int? riderProviderId;
+
+  /// PSGC codes from the offline address catalogue. Rider registration on
+  /// WebZefanya requires `address_mode=api`, which takes the codes alongside
+  /// the `*_name` labels.
+  final String? provinceCode;
+  final String? municipalityCode;
+  final String? barangayCode;
+
+  /// The web rider form's two optional address lines (`house_number`,
+  /// `address_detail`), collected by the rider form only.
+  final String? houseNumber;
+  final String? addressDetail;
 
   final String lastName;
   final String firstName;
@@ -261,7 +284,50 @@ class RegistrationProfile {
 
   /// Courier fields sent when registering via Google.
   Map<String, Object?> toGoogleCourierFields() => toCourierProfileFields();
+
+  /// The scalar half of WebZefanya's `StoreRiderRegistrationRequest`
+  /// (`POST /api/rider/register`), read from the request, not guessed:
+  /// `license_no` (not `license_number`), PSGC codes with `address_mode=api`,
+  /// the approved `logistics_provider_id`, and `terms`. The two documents,
+  /// `drivers_license` and `or_cr`, are multipart parts sent separately.
+  /// No station hub: the server forbids it here; Logistics assigns one at
+  /// approval.
+  Map<String, Object?> toRiderFields({
+    required String email,
+    required String password,
+  }) => {
+    'first_name': firstName.trim(),
+    'last_name': lastName.trim(),
+    'birthday': birthdayWire,
+    'email': email.trim(),
+    'contact_no': phoneWire,
+    'license_no': (riderLicenseNumber ?? '').trim().toUpperCase(),
+    if (riderLicenseExpiry != null)
+      'license_expiry': formatWireDate(riderLicenseExpiry!),
+    'vehicle_type': riderVehicleType?.trim() ?? '',
+    'plate_number': (riderPlate ?? '').trim().toUpperCase(),
+    'address_mode': 'api',
+    'province': provinceCode ?? '',
+    'province_name': province.trim(),
+    'municipality': municipalityCode ?? '',
+    'municipality_name': municipality.trim(),
+    'barangay': barangayCode ?? '',
+    'barangay_name': barangay.trim(),
+    'street': street.trim(),
+    if (_present(houseNumber)) 'house_number': houseNumber!.trim(),
+    if (_present(addressDetail)) 'address_detail': addressDetail!.trim(),
+    if (_present(postalCode)) 'postal_code': postalCode!.trim(),
+    if (riderProviderId != null) 'logistics_provider_id': riderProviderId,
+    'password': password,
+    // The form only submits after the person ticked the terms checkbox.
+    'terms': '1',
+  };
 }
+
+/// The vehicle a rider may register with in this app: motorcycle only (a
+/// product decision). WebZefanya's `RiderValidation::VEHICLES` also accepts
+/// Car and Van, so Motorcycle is always valid on the server.
+const List<String> kRiderRegistrationVehicleTypes = ['Motorcycle'];
 
 /// `YYYY-MM-DD` — the date-only shape the server's `date` rule reads.
 ///

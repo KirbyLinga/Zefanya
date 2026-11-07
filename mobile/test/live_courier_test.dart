@@ -26,6 +26,7 @@ class _FakeServer {
 
   final List<String> methods = [];
   final List<String> paths = [];
+  final List<Map<String, String>> queries = [];
   final List<String> bodies = [];
   final List<Map<String, String>> headers = [];
 
@@ -33,6 +34,7 @@ class _FakeServer {
       MockClient.streaming((request, bodyStream) async {
     methods.add(request.method);
     paths.add(request.url.path);
+    queries.add(request.url.queryParameters);
     headers.add(request.headers);
     bodies.add(latin1.decode(await bodyStream.toBytes()));
 
@@ -315,5 +317,90 @@ void main() {
       throwsA(isA<ValidationException>()),
     );
     expect(live.server.paths, isEmpty);
+  });
+
+  // ── Server-only rider data (RiderServerData) ─────────────────────────────
+
+  test('earnings read the server totals and ledger, never a local rate', () async {
+    final live = _Live([
+      _ok({
+        'summary': {'monthMinor': 8500},
+        'totals': {'today_minor': 6000, 'week_minor': 6000, 'all_time_minor': 8500, 'jobs': 2},
+        'cod': {'holding_minor': 150000},
+        'recent': [
+          {
+            'id': 5,
+            'job': 'delivery',
+            'amount_minor': 6000,
+            'seller_order_id': 12,
+            'tracking_number': 'TRK-12',
+            'seller_name': 'Willow & Bloom Atelier',
+            'earned_at': '2026-11-06T02:00:00+00:00',
+            'paid': false,
+          },
+          {'id': 4, 'job': 'pickup', 'amount_minor': 2500, 'earned_at': 'not a date'},
+        ],
+      }),
+    ]);
+    await live.tokens.write('1|rider');
+
+    final snapshot = await live.repo.earnings(limit: 20);
+
+    expect(live.server.paths.single, '/rider/earnings');
+    expect(snapshot.today, 60);
+    expect(snapshot.week, 60);
+    expect(snapshot.allTime, 85);
+    expect(snapshot.codHolding, 1500);
+    // A row without a readable time is dropped rather than dated "now".
+    expect(snapshot.recent, hasLength(1));
+    expect(snapshot.recent.single.amount, 60);
+    expect(snapshot.recent.single.sellerOrderId, '12');
+  });
+
+  test('an incident is multipart with the type, reason and damage photo', () async {
+    final dir = Directory.systemTemp.createTempSync('zef_incident');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final photo = '${dir.path}${Platform.pathSeparator}damage.jpg';
+    File(photo).writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+    final live = _Live([_ok({'incident_id': 1, 'type': 'damaged'}, 201)]);
+    await live.tokens.write('1|rider');
+
+    await live.repo.reportIncident('12', type: 'damaged', reason: ' Crushed box ', description: 'Box crushed in transit.', photoPath: photo);
+
+    expect(live.server.paths.single, '/rider/jobs/12/incidents');
+    final body = live.server.bodies.single;
+    expect(body, contains('name="type"\r\n\r\ndamaged'));
+    expect(body, contains('name="reason"\r\n\r\nCrushed box'));
+    expect(body, contains('name="photo"'));
+  });
+
+  test('the registration provider list is read without a token', () async {
+    final live = _Live([
+      _ok({
+        'providers': [
+          {'id': 3, 'name': 'Bilis Hatid Express'},
+          {'id': 'x', 'name': 'Broken row'},
+        ],
+      }),
+    ]);
+    await live.tokens.write('1|leftover');
+
+    final providers = await live.repo.registrationProviders();
+
+    expect(live.server.paths.single, '/rider/providers');
+    expect(live.server.headers.single.containsKey('authorization'), isFalse);
+    expect(providers.map((p) => (p.id, p.name)), [(3, 'Bilis Hatid Express')]);
+  });
+
+  test("the provider list asks for the rider's barangay when one is chosen", () async {
+    final live = _Live([_ok({'barangay': '1374040001', 'providers': const []})]);
+
+    await live.repo.registrationProviders(barangayCode: '1374040001');
+    await live.repo.registrationProviders(barangayCode: ' ');
+
+    expect(live.server.paths, ['/rider/providers', '/rider/providers']);
+    expect(live.server.queries.first, {'barangay': '1374040001'});
+    // Blank means "no address yet": the full list, no filter.
+    expect(live.server.queries.last, isEmpty);
   });
 }

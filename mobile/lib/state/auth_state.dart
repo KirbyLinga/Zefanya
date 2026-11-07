@@ -706,6 +706,30 @@ class AuthState extends ChangeNotifier {
     await _save();
   }
 
+  /// Whether an expired rider verification link can be renewed here: a rider
+  /// mid-registration in live mode.
+  bool get canResumeRiderRegistration =>
+      role == UserRole.courier &&
+      email != null &&
+      _repository is ResumesRiderRegistration;
+
+  /// Renews an expired rider verification link through WebZefanya's resume
+  /// route (email + password), storing the fresh links (and so their new
+  /// expiry) in place of the old ones. The password is used for this one
+  /// request and never stored. A wrong password propagates as the server's
+  /// `ValidationException`.
+  Future<void> resumeRiderRegistration(String password) async {
+    final repository = _repository;
+    final address = email;
+    if (repository is! ResumesRiderRegistration || address == null) {
+      throw const ApiNotImplementedException('POST /api/rider/registration/resume');
+    }
+    verificationId = await (repository as ResumesRiderRegistration)
+        .resumeRiderRegistration(email: address, password: password);
+    notifyListeners();
+    await _save();
+  }
+
   /// Asks for a fresh code. A failure propagates so the screen can say so: a
   /// resend that quietly failed leaves someone watching an inbox for mail that
   /// is not coming, which is the worse of the two outcomes available here.
