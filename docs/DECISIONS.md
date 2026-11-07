@@ -2,6 +2,15 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## 2026-11-08 — Courier design integration
+
+- User prioritized making Courier feel part of Zefanya. Reuse the existing Playfair/Montserrat typography, AppColors palette, ZefanyaMark/Loader, EditorialHeader, EmptyState, editorial card shapes and FloatingNavBar. No new visual framework, dependencies, backend routes or database writes.
+- Trips/History/Account are views of the existing server list (up to 50 recent assignments) and authenticated name/email. History shows Completed/Received with Issues/Cancelled; active trips remain separate. No earnings, duty, live tracking or unsupported account controls advertised.
+- Existing trip buttons keep their server requests/guards. Show failed actions through the app's timed feedback so an error cannot remain above a scrolled viewport. Native Material cards preserve ExpansionTile ink/interaction. Password visibility is a local login-field control only.
+- Intended test harness adaptation: keep all linehaul_test refusal/state assertions, add a frame after ensureVisible scrolls, then drain the shared timed feedback's four-second test clock after assertions. No weakened/deleted assertions. New courier_design_test covers both palettes, 360x640 at text scale 1.3, server-backed navigation/history/account and empty/login layouts. Ten PNG renders were visually inspected; optional capture output stays under ignored mobile/build/courier-design.
+- Render checks exposed a stretched route connector; constrain it to one pixel. They also exposed missing test icon fonts, so load bundled MaterialIcons and all body/display font weights in the capture harness. No existing goldens regenerated.
+- Updated preview runs on 5174; previous 5173 preview had closed stdin and was preserved. New server started with tty input and hot restart recompiled successfully. UI is verified with widget renders/tests; no fresh native-browser/device/camera rehearsal claimed.
+
 ## 2026-11-08 — combined Courier presentation scope
 
 - Local setup exception: user explicitly answered "Yes, finish local setup" to reusing existing MySQL settings, installing only the two Courier tables and creating one demo Courier. Copied the existing ignored local configuration; verified local/mysql database zefanya_friend_20261107, persistent database cache and loopback APP_URL. Ran only the named Courier migration and provisioning command for approved Demo Laguna Express/Pila Station Hub. No other migration, order, inventory or payment was changed. Real HTTP login/profile/logout checks passed for all three demo roles; Courier cannot access Rider jobs, trips return empty until assigned; CORS preflight passed.

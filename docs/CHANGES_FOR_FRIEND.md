@@ -1,5 +1,10 @@
 # Touched your files
 
+## Courier design integration — 2026-11-08
+
+- mobile/lib/screens/courier/linehaul_portal.dart: Zefanya-branded login, shared fonts/colors/shapes, Material route cards with expandable parcels, shared loading/empty/error states, floating Trips/History/Account navigation and authenticated profile. Server trip actions unchanged; errors use existing timed feedback and pull-to-refresh retains error handling. History is the existing recent server list, not a new full-history API.
+- mobile/test/linehaul_test.dart: preserve all existing refusal/state assertions; allow post-scroll layout frames and timed-feedback teardown. New mobile/test/courier_design_test.dart verifies navigation/status filtering and both-theme small-screen layouts, and can render ten optional QA images into ignored build output. No dependencies, PHP, database or golden baseline changes.
+
 ## Combined Courier demo — 2026-11-08
 
 - Approved local setup follow-up: existing ignored backend config copied, only the new Courier migration applied, one Courier provisioned for Demo Laguna Express/Pila Station Hub. Real HTTP account/role/CORS checks passed; no existing orders/stock/payments changed. Initial "not migrated" checkpoint notes below are superseded only by this explicit user exception. No configuration or credentials committed.

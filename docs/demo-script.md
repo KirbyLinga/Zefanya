@@ -2,7 +2,9 @@
 
 ## ZefanyaWMI combined Courier demonstration
 
-Local setup is now verified after explicit user approval: backend on http://127.0.0.1:8000, combined app on http://127.0.0.1:5173. Open the app URL in Chrome. All three demo logins/profile calls passed against MySQL; full assigned-trip and phone/camera rehearsal remain open. Credentials were handed over in chat and are not committed.
+Local setup is verified after explicit user approval: backend on http://127.0.0.1:8000; the latest branded Courier preview is http://127.0.0.1:5174 (5173 is the earlier preview). Open the new URL in Chrome. All three demo logins/profile calls previously passed against MySQL; full assigned-trip and phone/camera rehearsal remain open. Credentials were handed over in chat and are not committed.
+
+Courier now uses shared Zefanya design components in both themes. Trips shows active assignments, History shows recent completed/cancelled/issue transfers, and Account shows the authenticated name/email and logout. These views do not add tracking, pay or onboarding claims. Rendering QA covers 360x640 with text scale 1.3; it is not a real browser/camera test.
 
 1. After approved backend configuration/table installation, provision one local-demo Courier with `php artisan linehaul:provision`, supplying --provider, --hub, --email and --name for an approved company's operational hub and unused email. Password is prompted and hidden. The command never overwrites an account and is disabled outside local/testing. Full email activation/onboarding is deferred.
 2. Start the configured backend on port 8000. From mobile run `flutter run -d chrome --dart-define=USE_LIVE_API=true --dart-define=zefanya.apiBaseUrl=http://127.0.0.1:8000/api`. Chrome can use loopback HTTP; Android needs a reachable HTTPS address. Courier login is hidden in mock mode.

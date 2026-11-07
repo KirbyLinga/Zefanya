@@ -165,10 +165,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Accept trip'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Accept trip'));
       await tester.pumpAndSettle();
       expect(find.text('Loading'), findsOneWidget);
       await tester.ensureVisible(find.text('Depart'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Depart'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'BH-0004521');
@@ -178,6 +180,8 @@ void main() {
       expect(find.text('Loading'), findsOneWidget);
       expect(find.text('In Transit'), findsNothing);
       expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
     },
   );
 
