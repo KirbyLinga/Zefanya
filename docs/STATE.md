@@ -1,7 +1,7 @@
 # S6 EXTEND continuation — 2026-11-07
 Stage: S6 EXTEND PAUSED MID-STAGE; S6.2 PARTIAL, not DONE.
 Target: ZefanyaWM/Zefanya; branch codex/combined-web-mobile-hardening. Original checkout unchanged.
-Verified starting HEAD: db306f1; this checkpoint's implementation hash is recorded in the follow-up state commit.
+Verified implementation HEAD: 5048d44; subsequent follow-up records its hash and continuation state only.
 Work order: C:/Users/Lenovo/Documents/lavarel/Zefanya/docs/MASTER_PLAN.md, schedule override and EXTEND order.
 S6.4 DONE in code at 148ed11 + db306f1: cancellation boundary, stock/voucher accounting, pending-refund ledger retained.
 S6.6 retained; public Buyer 2/variant-line/photo/atomic-submit review gaps and real MySQL race proof remain documented.
@@ -16,7 +16,7 @@ Restored broader PHP: {"tool":"phpunit","result":"passed","tests":200,"passed":1
 Final Artisan: {"tool":"phpunit","result":"passed","tests":18,"passed":18,"assertions":115,"duration_ms":23870}
 Full mobile: 03:24 +837: All tests passed! Focused transport: 16 passed.
 Analysis: 7 issues found. (ran in 11.0s); same 6 infos and 1 existing unused-test-helper warning.
-Ten deliberate guard mutations failed; exact hunks restored and all named tests pass. See mutation-proof.md.
+Ten deliberate guard mutations failed; exact hunks restored, all named tests pass, tmp/mutation deleted. See mutation-proof.md.
 All 17 changed/new PHP files passed syntax; source BOM and git diff whitespace checks passed.
 Exact next: S6.2 detailed server quote DTO + checkout breakdown/loading/retry; refresh summary on 409 and require confirmation again.
 Then native claimable/claim/wallet APIs + policy/request/resource/tests and mobile wallet transport; code-format alignment and workbook eligibility cases.
