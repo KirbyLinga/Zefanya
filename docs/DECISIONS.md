@@ -10,6 +10,7 @@ This file records deviations from the repository's baseline instructions or deci
 - Intended test harness adaptation: keep all linehaul_test refusal/state assertions, add a frame after ensureVisible scrolls, then drain the shared timed feedback's four-second test clock after assertions. No weakened/deleted assertions. New courier_design_test covers both palettes, 360x640 at text scale 1.3, server-backed navigation/history/account and empty/login layouts. Ten PNG renders were visually inspected; optional capture output stays under ignored mobile/build/courier-design.
 - Render checks exposed a stretched route connector; constrain it to one pixel. They also exposed missing test icon fonts, so load bundled MaterialIcons and all body/display font weights in the capture harness. No existing goldens regenerated.
 - Updated preview runs on 5174; previous 5173 preview had closed stdin and was preserved. New server started with tty input and hot restart recompiled successfully. UI is verified with widget renders/tests; no fresh native-browser/device/camera rehearsal claimed.
+- Follow-up lifecycle check: keep the trip FutureBuilder mounted across Account navigation, and immediately observe reload futures before the next frame can subscribe. An instant server failure must not become an unhandled future. A dedicated test verifies Account stays usable and Trips subsequently shows Retry, not fake empty data.
 
 ## 2026-11-08 — combined Courier presentation scope
 

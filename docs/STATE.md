@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-08
 Stage: Courier design integration DONE; limited Courier/local setup retained; assigned-trip/device rehearsal still OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified pre-design HEAD: a5a2af6; design commit hash recorded in follow-up state commit.
+Design core HEAD: 98ee278; verified final refresh fix hash recorded in follow-up state commit.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier. Branded login, Trips/History/Account use shared Zefanya fonts/colors/cards/nav/empty states.
 Logistics assigns one active forward manifest to an eligible same-company Courier; driver/manifest locks and ownership policy.
@@ -12,8 +12,8 @@ Explicitly provisioned one demo Courier at Demo Laguna Express/Pila Station Hub;
 Baseline: 80 PHP tests/622 assertions and 873 mobile tests passed after locked dependencies restored and process-only GD enabled.
 Restored broader PHP: {"tool":"phpunit","result":"passed","tests":121,"passed":121,"assertions":1009,"duration_ms":32119}
 Final Artisan: {"tool":"phpunit","result":"passed","tests":9,"passed":9,"assertions":154,"duration_ms":5781}
-Design full mobile: 03:37 +885: All tests passed! Focused 19 passed; final design/action render pass 10 passed.
-Design analysis: 8 issues found. (ran in 29.1s); existing 7 infos and 1 unused-test-helper warning, no new findings.
+Design final full mobile: 03:08 +886: All tests passed! Final focused navigation/action/design: 20 passed.
+Design final analysis: 8 issues found. (ran in 27.1s); existing 7 infos and 1 unused-test-helper warning, no new findings.
 Web assets: built in 7.30s. Live-mode Chrome build: Built build/web (222.4s). No live endpoint baked into build.
 Ten deliberate security faults detected, exact hunks restored and named tests pass; tmp/mutation deleted before commit.
 Design: no PHP changes. Ten widget-render previews inspected at 360x640/1.3 text, light/dark; source/whitespace checks passed.

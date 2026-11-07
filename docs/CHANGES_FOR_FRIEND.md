@@ -2,6 +2,7 @@
 
 ## Courier design integration — 2026-11-08
 
+- Final navigation regression fix: keep trip observation mounted on Account and immediately observe reload failures before the next frame; the original future still feeds the visible error/Retry panel. Added the background-refresh failure test. Final full mobile 886 pass; focused 20 pass; analyzer unchanged at eight existing findings.
 - mobile/lib/screens/courier/linehaul_portal.dart: Zefanya-branded login, shared fonts/colors/shapes, Material route cards with expandable parcels, shared loading/empty/error states, floating Trips/History/Account navigation and authenticated profile. Server trip actions unchanged; errors use existing timed feedback and pull-to-refresh retains error handling. History is the existing recent server list, not a new full-history API.
 - mobile/test/linehaul_test.dart: preserve all existing refusal/state assertions; allow post-scroll layout frames and timed-feedback teardown. New mobile/test/courier_design_test.dart verifies navigation/status filtering and both-theme small-screen layouts, and can render ten optional QA images into ignored build output. No dependencies, PHP, database or golden baseline changes.
 

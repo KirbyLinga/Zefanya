@@ -39,6 +39,7 @@ Future<void> _mount(
   Brightness brightness,
   Widget screen, {
   bool empty = false,
+  bool Function()? unavailable,
 }) async {
   AppColors.apply(brightness);
   tester.view.physicalSize = const Size(360, 640);
@@ -49,44 +50,50 @@ Future<void> _mount(
     baseUrl: 'https://example.test/api',
     tokenStore: InMemoryTokenStore(),
     httpClient: MockClient(
-      (request) async => http.Response(
-        jsonEncode({
-          'data': empty
-              ? []
-              : [
-                  {
-                    'id': 12,
-                    'status': 'Assigned',
-                    'origin': 'Pila Station Hub',
-                    'destination': 'Laguna Province Hub',
-                    'items': [
-                      {
-                        'id': 1,
-                        'tracking_number': 'TRK-DEMO-001',
-                        'loaded': false,
-                        'received': false,
-                      },
-                    ],
-                  },
-                  {
-                    'id': 11,
-                    'status': 'Completed',
-                    'origin': 'Lumban Station Hub',
-                    'destination': 'Pila Station Hub',
-                    'items': [
-                      {
-                        'id': 2,
-                        'tracking_number': 'TRK-DEMO-002',
-                        'loaded': true,
-                        'received': true,
-                      },
-                    ],
-                  },
-                ],
-        }),
-        200,
-        headers: {'content-type': 'application/json'},
-      ),
+      (request) async => unavailable?.call() == true
+          ? http.Response(
+              '{"message":"Connection interrupted"}',
+              503,
+              headers: {'content-type': 'application/json'},
+            )
+          : http.Response(
+              jsonEncode({
+                'data': empty
+                    ? []
+                    : [
+                        {
+                          'id': 12,
+                          'status': 'Assigned',
+                          'origin': 'Pila Station Hub',
+                          'destination': 'Laguna Province Hub',
+                          'items': [
+                            {
+                              'id': 1,
+                              'tracking_number': 'TRK-DEMO-001',
+                              'loaded': false,
+                              'received': false,
+                            },
+                          ],
+                        },
+                        {
+                          'id': 11,
+                          'status': 'Completed',
+                          'origin': 'Lumban Station Hub',
+                          'destination': 'Pila Station Hub',
+                          'items': [
+                            {
+                              'id': 2,
+                              'tracking_number': 'TRK-DEMO-002',
+                              'loaded': true,
+                              'received': true,
+                            },
+                          ],
+                        },
+                      ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            ),
     ),
   );
   final auth = AuthState()
@@ -129,6 +136,29 @@ void main() {
     await (FontLoader(
       'MaterialIcons',
     )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+  });
+  testWidgets('account navigation keeps background trip errors observed', (
+    tester,
+  ) async {
+    var unavailable = false;
+    await _mount(
+      tester,
+      Brightness.light,
+      const LinehaulPortal(),
+      unavailable: () => unavailable,
+    );
+    await tester.tap(find.text('Account'));
+    await tester.pumpAndSettle();
+    unavailable = true;
+    await tester.tap(find.byTooltip('Refresh trips'));
+    await tester.pumpAndSettle();
+    expect(find.text('Demo Pila Courier'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Trips'));
+    await tester.pumpAndSettle();
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Accept trip'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
   for (final brightness in Brightness.values) {
     testWidgets(

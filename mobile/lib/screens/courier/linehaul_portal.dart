@@ -224,6 +224,9 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
     final client = context.read<Repositories>().client;
     if (client != null) {
       final trips = _repository.trips();
+      // Observe immediate failures before the next frame subscribes the builder.
+      // The original future still carries the error for its Retry state.
+      trips.ignore();
       setState(() {
         _trips = trips;
       });
@@ -579,100 +582,95 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: _tab == 2
-              ? _account()
-              : FutureBuilder<List<LinehaulTrip>>(
-                  future: _trips,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const Center(child: ZefanyaLoader(size: 48));
-                    }
-                    if (snapshot.hasError) {
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.only(bottom: 100),
+          child: FutureBuilder<List<LinehaulTrip>>(
+            future: _trips,
+            builder: (context, snapshot) {
+              if (_tab == 2) return _account();
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(child: ZefanyaLoader(size: 48));
+              }
+              if (snapshot.hasError) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  child: EmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Your trips could not be loaded',
+                    subtitle: snapshot.error is ApiException
+                        ? (snapshot.error as ApiException).message
+                        : 'Please try again.',
+                    action: OutlinedButton(
+                      onPressed: _reload,
+                      child: const Text('Retry'),
+                    ),
+                  ),
+                );
+              }
+              final all = snapshot.data ?? const <LinehaulTrip>[];
+              bool isHistory(LinehaulTrip trip) => const [
+                'Completed',
+                'Received with Issues',
+                'Cancelled',
+              ].contains(trip.status);
+              final trips = all
+                  .where(
+                    (trip) => _tab == 1 ? isHistory(trip) : !isHistory(trip),
+                  )
+                  .toList();
+              return RefreshIndicator(
+                onRefresh: () async {
+                  _reload();
+                  try {
+                    await _trips;
+                  } on ApiException {
+                    // The FutureBuilder displays the server error and Retry.
+                  }
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                  children: [
+                    EditorialHeader(
+                      eyebrow: _tab == 1 ? 'EVERY HANDOVER' : 'HUB TO HUB',
+                      title: _tab == 1 ? 'Trip history' : 'Your journeys',
+                      padding: const EdgeInsets.only(bottom: 12),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Text(
+                        _tab == 1
+                            ? 'A record of your recent transfers.'
+                            : 'From loading to handover, one parcel at a time.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    if (_busy) const LinearProgressIndicator(),
+                    if (trips.isEmpty)
+                      _CourierCard(
                         child: EmptyState(
-                          icon: Icons.cloud_off_outlined,
-                          title: 'Your trips could not be loaded',
-                          subtitle: snapshot.error is ApiException
-                              ? (snapshot.error as ApiException).message
-                              : 'Please try again.',
+                          icon: _tab == 1
+                              ? Icons.history
+                              : Icons.local_shipping_outlined,
+                          title: _tab == 1
+                              ? 'No trip history yet'
+                              : 'No trips assigned',
+                          subtitle: _tab == 1
+                              ? 'Completed and cancelled transfers will appear here.'
+                              : 'Your next journey will appear here when Logistics assigns a trip.',
                           action: OutlinedButton(
                             onPressed: _reload,
-                            child: const Text('Retry'),
+                            child: const Text('Refresh trips'),
                           ),
                         ),
-                      );
-                    }
-                    final all = snapshot.data ?? const <LinehaulTrip>[];
-                    bool isHistory(LinehaulTrip trip) => const [
-                      'Completed',
-                      'Received with Issues',
-                      'Cancelled',
-                    ].contains(trip.status);
-                    final trips = all
-                        .where(
-                          (trip) =>
-                              _tab == 1 ? isHistory(trip) : !isHistory(trip),
-                        )
-                        .toList();
-                    return RefreshIndicator(
-                      onRefresh: () async {
-                        _reload();
-                        try {
-                          await _trips;
-                        } on ApiException {
-                          // The FutureBuilder displays the server error and Retry.
-                        }
-                      },
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                        children: [
-                          EditorialHeader(
-                            eyebrow: _tab == 1
-                                ? 'EVERY HANDOVER'
-                                : 'HUB TO HUB',
-                            title: _tab == 1 ? 'Trip history' : 'Your journeys',
-                            padding: const EdgeInsets.only(bottom: 12),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 24),
-                            child: Text(
-                              _tab == 1
-                                  ? 'A record of your recent transfers.'
-                                  : 'From loading to handover, one parcel at a time.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.5,
-                                  ),
-                            ),
-                          ),
-                          if (_busy) const LinearProgressIndicator(),
-                          if (trips.isEmpty)
-                            _CourierCard(
-                              child: EmptyState(
-                                icon: _tab == 1
-                                    ? Icons.history
-                                    : Icons.local_shipping_outlined,
-                                title: _tab == 1
-                                    ? 'No trip history yet'
-                                    : 'No trips assigned',
-                                subtitle: _tab == 1
-                                    ? 'Completed and cancelled transfers will appear here.'
-                                    : 'Your next journey will appear here when Logistics assigns a trip.',
-                                action: OutlinedButton(
-                                  onPressed: _reload,
-                                  child: const Text('Refresh trips'),
-                                ),
-                              ),
-                            ),
-                          for (final trip in trips) _tripCard(trip),
-                        ],
                       ),
-                    );
-                  },
+                    for (final trip in trips) _tripCard(trip),
+                  ],
                 ),
+              );
+            },
+          ),
         ),
       ),
     );
