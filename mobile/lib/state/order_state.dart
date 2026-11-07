@@ -280,6 +280,9 @@ class OrderState extends ChangeNotifier {
     if (!order.canCancel) {
       return 'This order can no longer be cancelled because it has shipped.';
     }
+    if (!cancellationReasons.contains(reason.trim())) {
+      return 'Choose a reason from the list.';
+    }
     if (_cancelling.contains(order.id)) {
       return 'Cancellation is already being processed.';
     }
@@ -337,7 +340,9 @@ class OrderState extends ChangeNotifier {
       return 'You can confirm receipt only after the order is delivered.';
     }
 
-    await _repository.saveBuyerState(base.copyWith(buyerConfirmed: true));
+    await _repository.saveBuyerState(
+      base.copyWith(buyerConfirmed: true, completedAt: DateTime.now()),
+    );
     _orders = await _repository.orders();
     notifyListeners();
     return null;
@@ -368,24 +373,23 @@ class OrderState extends ChangeNotifier {
     List<CartItem> items, {
     List<String> voucherCodes = const [],
   }) async {
-    // QuotesCheckout is not a subtype of OrderRepository, so an `is` check
-    // cannot promote `_repository`; take the capability through a cast.
+    // QuotesCheckout is not a subtype of OrderRepository, so an is check
+    // cannot promote _repository; take the capability through a cast.
     final repository = _repository;
     if (repository is! QuotesCheckout || items.isEmpty) return null;
-    return (repository as QuotesCheckout).quoteTotal(
-      [for (final item in items) _lineFor(item)],
-      voucherCodes: voucherCodes,
-    );
+    return (repository as QuotesCheckout).quoteTotal([
+      for (final item in items) _lineFor(item),
+    ], voucherCodes: voucherCodes);
   }
 
   OrderLineRequest _lineFor(CartItem item) => OrderLineRequest(
-        productId: item.product.id,
-        productName: item.product.name,
-        sellerName: item.product.sellerName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        variantId: item.product.variantForLabel(item.variant)?.id,
-      );
+    productId: item.product.id,
+    productName: item.product.name,
+    sellerName: item.product.sellerName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    variantId: item.product.variantForLabel(item.variant)?.id,
+  );
 
   Future<List<Order>> placeOrders(
     List<CartItem> items, {

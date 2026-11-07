@@ -18,6 +18,27 @@ use Illuminate\Validation\ValidationException;
 
 class ProductReviewService
 {
+    /** @param array<int, UploadedFile> $photos */
+    public function saveForShipment(\App\Models\Shared\SellerOrder $shipment, Product $product, Buyer $buyer, int $rating, ?string $body, array $photos = []): Review
+    {
+        return DB::transaction(function () use ($shipment, $product, $buyer, $rating, $body, $photos): Review {
+            Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
+            if ((int) $shipment->order->buyer_id !== (int) $buyer->id) {
+                throw new AuthorizationException('This shipment does not belong to you.');
+            }
+            $items = $shipment->orderItems()->where('product_id', $product->id)->lockForUpdate()->get();
+            if ($items->count() !== 1) {
+                throw ValidationException::withMessages(['review' => 'Select one purchased item. Multiple variants require item-level review support.']);
+            }
+            $item = $items->sole();
+            $existing = $item->review()->first();
+
+            return $existing === null
+                ? $this->save($product, $buyer, $rating, $body, $item->id, $photos)
+                : $this->update($existing, $buyer, $rating, $body, $photos);
+        });
+    }
+
     /**
      * Completed order items owned by the buyer that do not have a review yet.
      *
@@ -87,7 +108,7 @@ class ProductReviewService
     }
 
     /**
-     * BUY-RATE-005: the buyer may edit once, within 30 days of submission.
+     * BUY-RATE-005: the buyer may edit once, within 30 days of completion.
      * Seller replies are untouched by buyer edits.
      *
      * @param  array<int, UploadedFile>  $photos
@@ -112,7 +133,7 @@ class ProductReviewService
             }
             if (! $review->isEditableByBuyer()) {
                 throw ValidationException::withMessages([
-                    'review' => 'A review can be edited only once and within 30 days of submission.',
+                    'review' => 'A review can be edited only once and within 30 days of completion.',
                 ]);
             }
 
@@ -200,6 +221,10 @@ class ProductReviewService
             ->where('product_id', $product->id)
             ->whereHas('sellerOrder', fn (Builder $query): Builder => $query
                 ->where('status', OrderStatus::Completed->value)
+                ->whereHas('statusHistories', fn (Builder $history): Builder => $history
+                    ->where('to_status', OrderStatus::Completed->value)
+                    ->where('created_at', '>', now()->subDays(30))
+                    ->where('created_at', '<=', now()))
                 ->whereHas('order', fn (Builder $query): Builder => $query->where('buyer_id', $buyer->id)));
     }
 
@@ -238,6 +263,11 @@ class ProductReviewService
     /** @param array<int, UploadedFile> $photos */
     private function assertPayload(int $rating, ?string $body, array $photos): void
     {
+        \Illuminate\Support\Facades\Validator::make(['photos' => $photos], [
+            'photos' => ['array', 'max:'.Review::MAX_PHOTOS],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ])->validate();
+
         if ($rating < 1 || $rating > 5) {
             throw ValidationException::withMessages([
                 'rating' => 'The rating must be between 1 and 5.',

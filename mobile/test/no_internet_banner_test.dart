@@ -12,9 +12,28 @@ import 'package:zefanya/services/connection_watcher.dart';
 import 'package:zefanya/widgets/no_internet_banner.dart';
 
 void main() {
+  testWidgets('mounted banner follows offline and online transitions', (
+    tester,
+  ) async {
+    ConnectionWatcher.instance.state = NetConnectionState.online;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NoInternetBanner(onRetry: () {}, onRefresh: () {}),
+        ),
+      ),
+    );
+    expect(find.text('No internet connection'), findsNothing);
+    ConnectionWatcher.instance.markOffline();
+    await tester.pump();
+    expect(find.text('No internet connection'), findsOneWidget);
+    expect(find.byTooltip('Retry'), findsOneWidget);
+    ConnectionWatcher.instance.markOnline();
+    await tester.pump();
+    expect(find.text('No internet connection'), findsNothing);
+  });
   group('NoInternetBanner', () {
-    testWidgets('online: shrinks to zero height',
-        (WidgetTester tester) async {
+    testWidgets('online: shrinks to zero height', (WidgetTester tester) async {
       // Force online by setting the internal state directly.
       ConnectionWatcher.instance.state = NetConnectionState.online;
       ConnectionWatcher.instance.notifyListeners();
@@ -22,28 +41,34 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: NoInternetBanner(onRetry: (){}, onRefresh: (){}),
+            body: NoInternetBanner(onRetry: () {}, onRefresh: () {}),
           ),
         ),
       );
 
-      final banner = tester.widget<NoInternetBanner>(find.byType(NoInternetBanner));
+      final banner = tester.widget<NoInternetBanner>(
+        find.byType(NoInternetBanner),
+      );
+      expect(banner.onRetry, isNotNull);
       // When online, the banner's build returns SizedBox.shrink() which is
       // zero-height and effectively invisible.
-      final renderBox = tester.renderObject<RenderBox>(find.byType(NoInternetBanner));
+      final renderBox = tester.renderObject<RenderBox>(
+        find.byType(NoInternetBanner),
+      );
       expect(renderBox.size.width, 0.0);
       expect(renderBox.size.height, 0.0);
     });
 
-    testWidgets('offline: renders the full toolbar-height banner with Retry',
-        (WidgetTester tester) async {
+    testWidgets('offline: renders the full toolbar-height banner with Retry', (
+      WidgetTester tester,
+    ) async {
       ConnectionWatcher.instance.markOffline();
       ConnectionWatcher.instance.notifyListeners();
 
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: NoInternetBanner(onRetry: (){}, onRefresh: (){}),
+            body: NoInternetBanner(onRetry: () {}, onRefresh: () {}),
           ),
         ),
       );
@@ -52,8 +77,9 @@ void main() {
       expect(find.byIcon(Icons.refresh), findsOneWidget);
     });
 
-    testWidgets('Retry and refresh call the callbacks',
-        (WidgetTester tester) async {
+    testWidgets('Retry and refresh call the callbacks', (
+      WidgetTester tester,
+    ) async {
       ConnectionWatcher.instance.markOffline();
       ConnectionWatcher.instance.notifyListeners();
 

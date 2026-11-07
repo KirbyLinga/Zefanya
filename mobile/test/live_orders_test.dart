@@ -285,7 +285,8 @@ void main() {
       final submitted = jsonDecode(live.server.bodies.last) as Map;
       expect(submitted['checkout_token'], 'tok');
       expect(submitted['carriers'], {'3': 8});
-      // Nothing priced is sent: the server owns every amount.
+      // The reviewed total is a guard; the server calculates every amount.
+      expect(submitted['expected_total'], '2550.50');
       expect(submitted.keys, isNot(contains('unit_price')));
       expect(submitted.keys, isNot(contains('total_minor')));
       expect(placed.single.id, '12');
@@ -302,13 +303,16 @@ void main() {
       expect(live.server.paths, isNot(contains('/buyer/checkout')));
     });
 
-    test('quoteTotal reads the payable total in pesos', () async {
-      final live = _Live([ok({'items': [cartLine]}), ok({'items': [cartLine]}), ok(quote), ok(quote)]);
+    test('quoteTotal reads server pesos without cart or checkout-token writes', () async {
+      final live = _Live([ok(quote)]);
 
-      expect(await live.orders.quoteTotal(const [line]), 2550.50);
-      // An existing server line is updated to the quantity, not added to.
-      expect(live.server.methods[1], 'PATCH');
-      expect(live.server.paths[1], '/buyer/cart/items/31');
+      expect(await live.orders.quoteTotal(const [line], voucherCodes: ['MCH50']), 2550.50);
+      expect(live.server.paths, ['/v1/buyer/checkout/quote']);
+      expect(live.server.methods, ['POST']);
+      expect(jsonDecode(live.server.bodies.single), {
+        'lines': [{'product_id': '2', 'variant_id': '9', 'quantity': 2}],
+        'voucher_codes': ['MCH50'],
+      });
     });
 
     test('nothing to place is answered locally, without a request', () async {

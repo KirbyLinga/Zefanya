@@ -168,7 +168,7 @@ class CheckoutCarrierService
 
                 $hasApprovedPath = true;
 
-                $fee = $this->crossProvinceFeeMinor($provider, $groupSubtotalMinor, $groupWeightGrams, $rateSnapshot);
+                $fee = $this->crossProvinceFeeMinor($provider, $groupSubtotalMinor, $groupWeightGrams, $rateSnapshot, $seller, $buyer);
                 if ($fee === null) {
                     continue;
                 }
@@ -372,7 +372,7 @@ class CheckoutCarrierService
                 $destinationArea = $destinationProvider !== null
                     ? $this->hubs->areaForBarangay((int) $destinationProvider->id, (string) $buyer->barangay_code, lock: true)
                     : null;
-                $fee = $this->crossProvinceFeeMinor($provider, $subtotal, $weight, $rateSnapshot);
+                $fee = $this->crossProvinceFeeMinor($provider, $subtotal, $weight, $rateSnapshot, $seller, $buyer);
 
                 if ($route === null || $destinationProvider === null || $destinationArea === null
                     || ! $destinationProvider->isApproved() || $destinationProvider->archived_at !== null
@@ -478,9 +478,9 @@ class CheckoutCarrierService
      * means neither is set, so the route must stay unavailable rather than
      * inventing a price.
      */
-    private function crossProvinceFeeMinor(LogisticsProvider $provider, int $groupSubtotalMinor, int $groupWeightGrams, ?array $rateSnapshot = null): ?int
+    private function crossProvinceFeeMinor(LogisticsProvider $provider, int $groupSubtotalMinor, int $groupWeightGrams, ?array $rateSnapshot = null, ?Seller $seller = null, ?Buyer $buyer = null): ?int
     {
-        $rate = $this->quotedRate($provider, LogisticsShippingRate::CROSS_PROVINCE, $rateSnapshot);
+        $rate = $this->quotedRate($provider, LogisticsShippingRate::CROSS_PROVINCE, $rateSnapshot, $seller, $buyer);
         if ($rate === null) {
             return null;
         }
@@ -497,7 +497,7 @@ class CheckoutCarrierService
         $sameMunicipality = filled($seller->municipality_code)
             && filled($buyer->municipality_code)
             && (string) $seller->municipality_code === (string) $buyer->municipality_code;
-        $rate = $this->quotedRate($provider, $sameMunicipality ? LogisticsShippingRate::SAME_MUNICIPALITY : LogisticsShippingRate::SAME_PROVINCE, $rateSnapshot);
+        $rate = $this->quotedRate($provider, $sameMunicipality ? LogisticsShippingRate::SAME_MUNICIPALITY : LogisticsShippingRate::SAME_PROVINCE, $rateSnapshot, $seller, $buyer);
 
         return $rate['first_kg_minor'] + $this->additionalKgFee($rate['additional_kg_minor'], $groupWeightGrams);
     }
@@ -517,9 +517,20 @@ class CheckoutCarrierService
         return $this->rates->snapshotForProviders($providers);
     }
 
-    private function quotedRate(LogisticsProvider $provider, string $zone, ?array $snapshot): ?array
+    private function quotedRate(LogisticsProvider $provider, string $zone, ?array $snapshot, ?Seller $seller = null, ?Buyer $buyer = null): ?array
     {
-        return $snapshot === null ? $this->rates->rateFor($provider, $zone) : ($snapshot[$provider->id][$zone] ?? null);
+        $origin = \App\Models\Shared\ShippingRate::zoneFor((string) $seller?->province_code);
+        $destination = \App\Models\Shared\ShippingRate::zoneFor((string) $buyer?->province_code);
+        $route = $origin !== null && $destination !== null ? $origin.':'.$destination : null;
+        if ($snapshot === null) {
+            return $this->rates->rateFor($provider, $zone, $route);
+        }
+        $card = $snapshot[$provider->id] ?? [];
+        if ($route !== null && ! in_array($zone, $card['_overrides'] ?? [], true) && isset($card['_spec_routes'][$route])) {
+            return $card['_spec_routes'][$route];
+        }
+
+        return $card[$zone] ?? null;
     }
 
     /**

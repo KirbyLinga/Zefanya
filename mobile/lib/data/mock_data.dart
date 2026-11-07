@@ -508,12 +508,15 @@ class Order {
     this.cancelled = false,
     this.cancellationReason,
     this.deliveredAt,
+    this.completedAt,
     this.serverOrderId,
+    this.cancellationAllowed,
   });
 
   /// WebZefanya's parent order id for this per-seller shipment ([id]); the
   /// confirm/cancel routes need both. Null for mock orders.
   final String? serverOrderId;
+  final bool? cancellationAllowed;
 
   final String id;
   final String shopName;
@@ -545,6 +548,7 @@ class Order {
   /// until the server exposes a delivered timestamp; an unknown date must not
   /// be invented.
   final DateTime? deliveredAt;
+  final DateTime? completedAt;
 
   /// The catalogue items this order actually contains — ids from
   /// `mockProducts`.
@@ -583,7 +587,10 @@ class Order {
   /// the *resolved* status (so a courier pickup also blocks it), and this
   /// getter is the model-level rule the repository/state repeats.
   bool get canCancel =>
-      status == OrderStatus.toShip && !buyerConfirmed && !cancelled;
+      status == OrderStatus.toShip &&
+      !buyerConfirmed &&
+      !cancelled &&
+      (cancellationAllowed ?? true);
 
   /// Order Received is only offered after delivery and only once.
   bool get canConfirmReceived =>
@@ -596,6 +603,8 @@ class Order {
     bool? cancelled,
     String? cancellationReason,
     DateTime? deliveredAt,
+    DateTime? completedAt,
+    bool? cancellationAllowed,
   }) => Order(
     id: id,
     shopName: shopName,
@@ -608,7 +617,9 @@ class Order {
     cancelled: cancelled ?? this.cancelled,
     cancellationReason: cancellationReason ?? this.cancellationReason,
     deliveredAt: deliveredAt ?? this.deliveredAt,
+    completedAt: completedAt ?? this.completedAt,
     serverOrderId: serverOrderId,
+    cancellationAllowed: cancellationAllowed ?? this.cancellationAllowed,
   );
 }
 

@@ -154,6 +154,9 @@ Future<void> _renderAndCapture(
   if (advanceTime > Duration.zero) {
     await tester.pump(advanceTime);
   }
+  if (name == 'courier_home') {
+    await tester.pump(const Duration(milliseconds: 900));
+  }
 
   if (preCaptureAction != null) {
     preCaptureAction();

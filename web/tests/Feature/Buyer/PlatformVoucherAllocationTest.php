@@ -36,16 +36,16 @@ class PlatformVoucherAllocationTest extends TestCase
     public static function allocations(): array
     {
         return [
-            'largest subtotal rather than largest fraction' => [[100, 99, 1], 2, [2, 0, 0]],
-            'all remainder goes to largest store' => [[100, 99, 98], 2, [2, 0, 0]],
-            'unequal stores' => [[10000, 20000], 1001, [333, 668]],
+            'fractional rounding preserves total' => [[100, 99, 1], 2, [1, 1, 0]],
+            'largest fractional remainders' => [[100, 99, 98], 2, [1, 1, 0]],
+            'unequal stores' => [[10000, 20000], 1001, [334, 667]],
             'stable equal-subtotal tie' => [[101, 101, 98], 1, [1, 0, 0]],
             'full discount' => [[10000, 20000], 30000, [10000, 20000]],
         ];
     }
 
     #[DataProvider('allocations')]
-    public function test_platform_shares_use_subtotals_with_remainder_on_the_largest_store(array $subtotals, int $discount, array $expected): void
+    public function test_platform_shares_use_subtotals_with_balanced_centavo_rounding(array $subtotals, int $discount, array $expected): void
     {
         $base = $this->cart($subtotals);
         $platform = Voucher::factory()->platform()->fixed($discount)->create();
@@ -105,7 +105,7 @@ class PlatformVoucherAllocationTest extends TestCase
 
         $orders = SellerOrder::query()->whereHas('order', fn ($query) => $query->where('buyer_id', $buyer->id))->orderBy('seller_id')->get();
         $this->assertCount(3, $orders);
-        $this->assertSame([2, 0, 0], $orders->pluck('platform_voucher_discount_minor')->all());
+        $this->assertSame([1, 1, 0], $orders->pluck('platform_voucher_discount_minor')->all());
         $this->assertSame(2, $orders->sum('platform_voucher_discount_minor'));
     }
 }

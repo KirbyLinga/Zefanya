@@ -73,11 +73,11 @@ class OrderLineRequest {
   final double unitPrice;
 
   Map<String, Object?> toJson() => {
-        'product_id': productId,
-        'quantity': quantity,
-        // Sent, not trusted: see the class doc.
-        'unit_price': unitPrice,
-      };
+    'product_id': productId,
+    'quantity': quantity,
+    // Sent, not trusted: see the class doc.
+    'unit_price': unitPrice,
+  };
 }
 
 abstract class OrderRepository {
@@ -186,6 +186,8 @@ class MockOrderRepository implements OrderRepository {
     cancelled: map['cancelled'] as bool? ?? false,
     cancellationReason: map['cancellationReason'] as String?,
     deliveredAt: DateTime.tryParse(map['deliveredAt'] as String? ?? ''),
+    completedAt: DateTime.tryParse(map['completedAt'] as String? ?? ''),
+    cancellationAllowed: map['cancellationAllowed'] as bool?,
   );
 
   static Map<String, Object?> _orderToJson(Order o) => {
@@ -200,6 +202,8 @@ class MockOrderRepository implements OrderRepository {
     'cancelled': o.cancelled,
     'cancellationReason': o.cancellationReason,
     'deliveredAt': o.deliveredAt?.toIso8601String(),
+    'completedAt': o.completedAt?.toIso8601String(),
+    'cancellationAllowed': o.cancellationAllowed,
   };
 
   Future<void> _save() async {
@@ -243,7 +247,11 @@ class MockOrderRepository implements OrderRepository {
     final created = <Order>[];
     for (final entry in bySeller.entries) {
       final summary = entry.value
-          .map((l) => l.quantity > 1 ? '${l.productName} ×${l.quantity}' : l.productName)
+          .map(
+            (l) => l.quantity > 1
+                ? '${l.productName} ×${l.quantity}'
+                : l.productName,
+          )
           .join(', ');
 
       // Newest first. Each new order goes to the front, so a checkout with two
@@ -345,7 +353,23 @@ class LiveOrderRepository extends LiveRepository
     List<OrderLineRequest> lines, {
     List<String> voucherCodes = const [],
   }) async {
-    final quote = await _quote(lines, voucherCodes);
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final quote = unwrapMap(
+      await client.postJson(
+        '/v1/buyer/checkout/quote',
+        body: {
+          'lines': [
+            for (final line in lines)
+              {
+                'product_id': line.productId,
+                if (line.variantId != null) 'variant_id': line.variantId,
+                'quantity': line.quantity,
+              },
+          ],
+          'voucher_codes': voucherCodes,
+        },
+      ),
+    );
     return _payable(quote) / 100;
   }
 
@@ -369,7 +393,8 @@ class LiveOrderRepository extends LiveRepository
     if (expectedTotal != null && (expectedTotal * 100).round() != payable) {
       throw RequestRejectedException(
         statusCode: 409,
-        message: 'The order total is now ${_peso(payable)}. '
+        message:
+            'The order total is now ${_peso(payable)}. '
             'Review it and place your order again.',
       );
     }
@@ -383,6 +408,8 @@ class LiveOrderRepository extends LiveRepository
           'checkout_token': quote['checkout_token'],
           'carriers': quote['carriers'],
           'vouchers': quote['vouchers_state'],
+          if (expectedTotal != null)
+            'expected_total': expectedTotal.toStringAsFixed(2),
           'price_fingerprint': fingerprints['price'],
           'address_fingerprint': fingerprints['address'],
           'shipping_fingerprint': fingerprints['shipping'],
@@ -437,7 +464,8 @@ class LiveOrderRepository extends LiveRepository
     if (shipping['all_routes_available'] != true) {
       throw const RequestRejectedException(
         statusCode: 422,
-        message: 'Shipping is not available to your address for one or more '
+        message:
+            'Shipping is not available to your address for one or more '
             'shops. Check your delivery address.',
       );
     }
@@ -475,8 +503,9 @@ class LiveOrderRepository extends LiveRepository
           fieldErrors: {'product_id': '${line.productName} is not available.'},
         );
       }
-      final variantId =
-          line.variantId == null ? null : int.tryParse(line.variantId!);
+      final variantId = line.variantId == null
+          ? null
+          : int.tryParse(line.variantId!);
 
       final existing = _findLine(cart, productId, variantId);
       if (existing != null) {
@@ -510,7 +539,8 @@ class LiveOrderRepository extends LiveRepository
       if (quantity < line.quantity) {
         throw RequestRejectedException(
           statusCode: 409,
-          message: 'Only $quantity left for ${line.productName}. '
+          message:
+              'Only $quantity left for ${line.productName}. '
               'Reduce the quantity and try again.',
         );
       }
@@ -527,7 +557,8 @@ class LiveOrderRepository extends LiveRepository
     for (final row in (cart['items'] as List?) ?? const []) {
       if (row is! Map) continue;
       if ((row['product_id'] as num?)?.toInt() != productId) continue;
-      if (variantId != null && (row['variant_id'] as num?)?.toInt() != variantId) {
+      if (variantId != null &&
+          (row['variant_id'] as num?)?.toInt() != variantId) {
         continue;
       }
       return row;

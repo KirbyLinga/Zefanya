@@ -131,18 +131,18 @@ class _ScriptedOtpRepository implements AuthRepository {
 }
 
 RegistrationProfile _profile() => RegistrationProfile(
-      lastName: 'Dela Cruz',
-      firstName: 'Juan',
-      middleInitial: 'D',
-      sex: 'Male',
-      phone: '09171234567',
-      birthday: DateTime(1998, 4, 7),
-      province: 'Cebu',
-      municipality: 'Cebu City',
-      barangay: 'Lahug',
-      street: '12 Mabini Street',
-      govIdPath: '/data/user/0/ph.zefanya/files/gov_id_01.jpg',
-    );
+  lastName: 'Dela Cruz',
+  firstName: 'Juan',
+  middleInitial: 'D',
+  sex: 'Male',
+  phone: '09171234567',
+  birthday: DateTime(1998, 4, 7),
+  province: 'Cebu',
+  municipality: 'Cebu City',
+  barangay: 'Lahug',
+  street: '12 Mabini Street',
+  govIdPath: '/data/user/0/ph.zefanya/files/gov_id_01.jpg',
+);
 
 /// A session that has just registered, at whichever gate [repository] answers.
 Future<AuthState> _registered(AuthRepository repository) async {
@@ -177,16 +177,22 @@ void main() {
   // ---- What the mock is allowed to claim ------------------------------------
 
   group('the mock never claims an email gate it cannot serve', () {
-    test('a mock registration lands on the admin gate, with no handle', () async {
-      final auth = await _registeredWithMock();
+    test(
+      'a mock registration lands on the admin gate, with no handle',
+      () async {
+        final auth = await _registeredWithMock();
 
-      expect(auth.registrationStatus, RemoteRegistrationStatus.pendingApproval);
-      expect(auth.awaitsEmailVerification, isFalse);
-      // The half that makes the claim honest: no code was sent, so there is
-      // nothing to confirm, so no handle is invented for one.
-      expect(auth.verificationId, isNull);
-      expect(auth.canConfirmEmail, isFalse);
-    });
+        expect(
+          auth.registrationStatus,
+          RemoteRegistrationStatus.pendingApproval,
+        );
+        expect(auth.awaitsEmailVerification, isFalse);
+        // The half that makes the claim honest: no code was sent, so there is
+        // nothing to confirm, so no handle is invented for one.
+        expect(auth.verificationId, isNull);
+        expect(auth.canConfirmEmail, isFalse);
+      },
+    );
 
     test('the mock accepts its own code and rejects every other one', () async {
       // kMockOtpCode rather than the literal: a hardcoded '123456' here would
@@ -199,7 +205,10 @@ void main() {
       );
 
       expect(accepted.status, AccountStatus.pendingApproval);
-      expect(accepted.registrationStatus, RemoteRegistrationStatus.pendingApproval);
+      expect(
+        accepted.registrationStatus,
+        RemoteRegistrationStatus.pendingApproval,
+      );
 
       await expectLater(
         const MockAuthRepository().verifyOtp(
@@ -233,35 +242,44 @@ void main() {
   // ---- The seam -------------------------------------------------------------
 
   group('the confirmation goes through the repository', () {
-    test('the handle the registration returned is what the code is sent against',
-        () async {
-      final repository = _ScriptedOtpRepository(verificationId: 'buyer-77');
-      final auth = await _registered(repository);
-      expect(auth.canConfirmEmail, isTrue);
+    test(
+      'the handle the registration returned is what the code is sent against',
+      () async {
+        final repository = _ScriptedOtpRepository(verificationId: 'buyer-77');
+        final auth = await _registered(repository);
+        expect(auth.canConfirmEmail, isTrue);
 
-      await auth.confirmEmail('123456');
+        await auth.confirmEmail('123456');
 
-      // Both halves of the request, and the handle is the *server's* string
-      // rather than anything this app assembled — an email is not an id.
-      expect(repository.verificationIdSeen, 'buyer-77');
-      expect(repository.codeSeen, '123456');
-    });
+        // Both halves of the request, and the handle is the *server's* string
+        // rather than anything this app assembled — an email is not an id.
+        expect(repository.verificationIdSeen, 'buyer-77');
+        expect(repository.codeSeen, '123456');
+      },
+    );
 
-    test('the answer decides the new gate, and the handle goes with the old one',
-        () async {
-      final auth = await _registered(_ScriptedOtpRepository());
-      await auth.confirmEmail('123456');
+    test(
+      'the answer decides the new gate, and the handle goes with the old one',
+      () async {
+        final auth = await _registered(_ScriptedOtpRepository());
+        await auth.confirmEmail('123456');
 
-      expect(auth.registrationStatus, RemoteRegistrationStatus.pendingApproval);
-      expect(auth.awaitsEmailVerification, isFalse);
-      expect(auth.canConfirmEmail, isFalse);
-      // Cleared by the answer rather than by anyone remembering to clear it: a
-      // confirmed registration has nothing left to confirm.
-      expect(auth.verificationId, isNull);
-    });
+        expect(
+          auth.registrationStatus,
+          RemoteRegistrationStatus.pendingApproval,
+        );
+        expect(auth.awaitsEmailVerification, isFalse);
+        expect(auth.canConfirmEmail, isFalse);
+        // Cleared by the answer rather than by anyone remembering to clear it: a
+        // confirmed registration has nothing left to confirm.
+        expect(auth.verificationId, isNull);
+      },
+    );
 
     test('a gate with no handle offers nothing to confirm', () async {
-      final auth = await _registered(_ScriptedOtpRepository(verificationId: null));
+      final auth = await _registered(
+        _ScriptedOtpRepository(verificationId: null),
+      );
 
       expect(auth.awaitsEmailVerification, isTrue);
       // The half a screen forgets. Every call this app could make needs the
@@ -270,34 +288,44 @@ void main() {
       expect(auth.canConfirmEmail, isFalse);
     });
 
-    test('a refused code leaves the gate open rather than half-closed', () async {
-      final auth = await _registered(_ScriptedOtpRepository(
-        verifyThrows: const RequestRejectedException(
-          statusCode: 422,
-          message: 'That code does not match.',
-        ),
-      ));
+    test(
+      'a refused code leaves the gate open rather than half-closed',
+      () async {
+        final auth = await _registered(
+          _ScriptedOtpRepository(
+            verifyThrows: const RequestRejectedException(
+              statusCode: 422,
+              message: 'That code does not match.',
+            ),
+          ),
+        );
 
-      await expectLater(
-        auth.confirmEmail('000000'),
-        throwsA(isA<RequestRejectedException>()),
-      );
+        await expectLater(
+          auth.confirmEmail('000000'),
+          throwsA(isA<RequestRejectedException>()),
+        );
 
-      expect(auth.registrationStatus, RemoteRegistrationStatus.pendingVerification);
-      expect(auth.canConfirmEmail, isTrue);
-    });
+        expect(
+          auth.registrationStatus,
+          RemoteRegistrationStatus.pendingVerification,
+        );
+        expect(auth.canConfirmEmail, isTrue);
+      },
+    );
 
-    test('the handle survives a restart, or the code could not be entered later',
-        () async {
-      await _registered(_ScriptedOtpRepository(verificationId: 'buyer-77'));
+    test(
+      'the handle survives a restart, or the code could not be entered later',
+      () async {
+        await _registered(_ScriptedOtpRepository(verificationId: 'buyer-77'));
 
-      // A cold start: a brand-new state reading what the previous one saved.
-      final restarted = AuthState();
-      await restarted.load();
+        // A cold start: a brand-new state reading what the previous one saved.
+        final restarted = AuthState();
+        await restarted.load();
 
-      expect(restarted.canConfirmEmail, isTrue);
-      expect(restarted.verificationId, 'buyer-77');
-    });
+        expect(restarted.canConfirmEmail, isTrue);
+        expect(restarted.verificationId, 'buyer-77');
+      },
+    );
 
     test('signing out forgets the registration, handle included', () async {
       final auth = await _registered(_ScriptedOtpRepository());
@@ -330,36 +358,40 @@ void main() {
       expect(auth.verificationId, isNull);
     });
 
-    test('the dev-tools gate opens the mock gate, and the mock still checks the code',
-        () async {
-      final auth = await _registeredWithMock();
-      expect(auth.canConfirmEmail, isFalse);
+    test(
+      'the dev-tools gate opens the mock gate, and the mock still checks the code',
+      () async {
+        final auth = await _registeredWithMock();
+        expect(auth.canConfirmEmail, isFalse);
 
-      auth.debugStartEmailVerification();
+        auth.debugStartEmailVerification();
 
-      expect(auth.registrationStatus, RemoteRegistrationStatus.pendingVerification);
-      expect(auth.verificationId, kMockVerificationId);
-      expect(auth.canConfirmEmail, isTrue);
+        expect(
+          auth.registrationStatus,
+          RemoteRegistrationStatus.pendingVerification,
+        );
+        expect(auth.verificationId, kMockVerificationId);
+        expect(auth.canConfirmEmail, isTrue);
 
-      // The affordance opens the gate; it does not open the answer.
-      await expectLater(
-        auth.confirmEmail('000000'),
-        throwsA(isA<RequestRejectedException>()),
-      );
-      expect(auth.canConfirmEmail, isTrue);
+        // The affordance opens the gate; it does not open the answer.
+        await expectLater(
+          auth.confirmEmail('000000'),
+          throwsA(isA<RequestRejectedException>()),
+        );
+        expect(auth.canConfirmEmail, isTrue);
 
-      await auth.confirmEmail(kMockOtpCode);
+        await auth.confirmEmail(kMockOtpCode);
 
-      expect(auth.awaitsEmailVerification, isFalse);
-      expect(auth.verificationId, isNull);
-    });
+        expect(auth.awaitsEmailVerification, isFalse);
+        expect(auth.verificationId, isNull);
+      },
+    );
   });
 
   // ---- Live mode -----------------------------------------------------------
 
   group('live mode names what is missing instead of guessing at it', () {
-    test('the courier half names the endpoint the server does not have',
-        () async {
+    test('the courier half names the endpoint the server does not have', () async {
       final live = Repositories.forMode(
         useLive: true,
         baseUrl: 'https://api.example.test',
@@ -381,35 +413,46 @@ void main() {
           verificationId: '1',
           code: '123456',
         ),
-        throwsA(isA<ApiNotImplementedException>().having(
-          (e) => e.endpoint,
-          'endpoint',
-          '/register/logistics/verify-otp/1',
-        )),
+        throwsA(
+          isA<ApiNotImplementedException>().having(
+            (e) => e.endpoint,
+            'endpoint',
+            '/register/logistics/verify-otp/1',
+          ),
+        ),
       );
 
       await expectLater(
         live.resendOtp(role: UserRole.courier, verificationId: '1'),
-        throwsA(isA<ApiNotImplementedException>().having(
-          (e) => e.endpoint,
-          'endpoint',
-          '/register/logistics/verify-otp/1/resend',
-        )),
+        throwsA(
+          isA<ApiNotImplementedException>().having(
+            (e) => e.endpoint,
+            'endpoint',
+            '/register/logistics/verify-otp/1/resend',
+          ),
+        ),
       );
     });
 
-    test('a live build with no base URL says that, not "network error"', () async {
-      final live = Repositories.forMode(useLive: true, baseUrl: '').auth;
+    test(
+      'a live build with no base URL says that, not "network error"',
+      () async {
+        final live = Repositories.forMode(useLive: true, baseUrl: '').auth;
 
-      await expectLater(
-        () async => live.verifyOtp(role: UserRole.buyer, verificationId: '1', code: '123456'),
-        throwsA(isA<ApiNotConfiguredException>()),
-      );
-      await expectLater(
-        () async => live.resendOtp(role: UserRole.buyer, verificationId: '1'),
-        throwsA(isA<ApiNotConfiguredException>()),
-      );
-    });
+        await expectLater(
+          () async => live.verifyOtp(
+            role: UserRole.buyer,
+            verificationId: '1',
+            code: '123456',
+          ),
+          throwsA(isA<ApiNotConfiguredException>()),
+        );
+        await expectLater(
+          () async => live.resendOtp(role: UserRole.buyer, verificationId: '1'),
+          throwsA(isA<ApiNotConfiguredException>()),
+        );
+      },
+    );
   });
 
   // The widget half lives in its own function, declared below beside the harness
@@ -440,7 +483,10 @@ Future<void> _pump(
       value: auth,
       child: MaterialApp(
         theme: AppTheme.light,
-        home: MediaQuery(data: const MediaQueryData(size: size), child: child),
+        home: MediaQuery(
+          data: const MediaQueryData(size: size),
+          child: child,
+        ),
       ),
     ),
   );
@@ -482,9 +528,12 @@ Future<void> _enterCode(WidgetTester tester, String value) async {
 
 void _widgetTests() {
   group('the pending screen', () {
-    testWidgets('offers the code entry only when there is a handle to confirm',
-        (tester) async {
-      final auth = await _registered(_ScriptedOtpRepository(verificationId: 'buyer-77'));
+    testWidgets('offers the code entry only when there is a handle to confirm', (
+      tester,
+    ) async {
+      final auth = await _registered(
+        _ScriptedOtpRepository(verificationId: 'buyer-77'),
+      );
       await _pump(tester, const PendingApprovalScreen(), auth: auth);
       await _settleReveal(tester);
 
@@ -495,8 +544,12 @@ void _widgetTests() {
       expect(find.text('Under Review'), findsNothing);
     });
 
-    testWidgets('offers nothing when the gate arrived with no handle', (tester) async {
-      final auth = await _registered(_ScriptedOtpRepository(verificationId: null));
+    testWidgets('offers nothing when the gate arrived with no handle', (
+      tester,
+    ) async {
+      final auth = await _registered(
+        _ScriptedOtpRepository(verificationId: null),
+      );
       await _pump(tester, const PendingApprovalScreen(), auth: auth);
       await _settleReveal(tester);
 
@@ -506,8 +559,9 @@ void _widgetTests() {
       expect(find.textContaining('check that inbox'), findsOneWidget);
     });
 
-    testWidgets('a confirmed code lands back here, at the review gate',
-        (tester) async {
+    testWidgets('a confirmed code lands back here, at the review gate', (
+      tester,
+    ) async {
       final repository = _ScriptedOtpRepository(verificationId: 'buyer-77');
       final auth = await _registered(repository);
       await _pump(tester, const PendingApprovalScreen(), auth: auth);
@@ -533,8 +587,9 @@ void _widgetTests() {
   });
 
   group('the OTP screen', () {
-    testWidgets('a short code is refused before it reaches the repository',
-        (tester) async {
+    testWidgets('a short code is refused before it reaches the repository', (
+      tester,
+    ) async {
       final repository = _ScriptedOtpRepository();
       final auth = await _registered(repository);
       await _pump(tester, const OtpScreen(), auth: auth);
@@ -549,7 +604,9 @@ void _widgetTests() {
       expect(repository.codeSeen, isNull);
     });
 
-    testWidgets('the field cannot hold anything but six digits', (tester) async {
+    testWidgets('the field cannot hold anything but six digits', (
+      tester,
+    ) async {
       final auth = await _registered(_ScriptedOtpRepository());
       await _pump(tester, const OtpScreen(), auth: auth);
 
@@ -559,10 +616,13 @@ void _widgetTests() {
       // `regex:/^\d{6}$/` is the formatter's job here, which leaves the validator
       // answering only for completeness.
       expect(field.controller!.text, '123456');
+      final input = tester.widget<TextField>(find.byType(TextField));
+      expect(input.autofillHints, contains(AutofillHints.oneTimeCode));
     });
 
-    testWidgets('a refused code shows the server sentence and stays put',
-        (tester) async {
+    testWidgets('a refused code shows the server sentence and stays put', (
+      tester,
+    ) async {
       final repository = _ScriptedOtpRepository(
         verifyThrows: const RequestRejectedException(
           statusCode: 422,
@@ -577,14 +637,18 @@ void _widgetTests() {
       await _settleSubmit(tester);
 
       // The server's sentence, inline: it is about the field directly above it.
-      expect(find.text("That code doesn't match. Please try again."), findsOneWidget);
+      expect(
+        find.text("That code doesn't match. Please try again."),
+        findsOneWidget,
+      );
       expect(find.text('Confirm Code'), findsOneWidget);
       // And the gate is still open, because the answer said nothing changed.
       expect(auth.canConfirmEmail, isTrue);
     });
 
-    testWidgets('editing the code clears the error about the old one',
-        (tester) async {
+    testWidgets('editing the code clears the error about the old one', (
+      tester,
+    ) async {
       final repository = _ScriptedOtpRepository(
         verifyThrows: const RequestRejectedException(
           statusCode: 422,
@@ -597,7 +661,10 @@ void _widgetTests() {
       await _enterCode(tester, '000000');
       await tester.tap(find.text('Confirm Code'));
       await _settleSubmit(tester);
-      expect(find.text("That code doesn't match. Please try again."), findsOneWidget);
+      expect(
+        find.text("That code doesn't match. Please try again."),
+        findsOneWidget,
+      );
 
       await _enterCode(tester, '1');
 
@@ -607,10 +674,15 @@ void _widgetTests() {
       // screen), their `StaggeredReveal` delays would still be pending here and
       // the framework would fail this test on the timer. So this assertion is
       // also the pin against the Confirm button visibly re-fading on a retype.
-      expect(find.text("That code doesn't match. Please try again."), findsNothing);
+      expect(
+        find.text("That code doesn't match. Please try again."),
+        findsNothing,
+      );
     });
 
-    testWidgets('resending says so, counts down, and comes back', (tester) async {
+    testWidgets('resending says so, counts down, and comes back', (
+      tester,
+    ) async {
       final repository = _ScriptedOtpRepository();
       final auth = await _registered(repository);
       await _pump(tester, const OtpScreen(), auth: auth);
@@ -621,7 +693,10 @@ void _widgetTests() {
       expect(repository.resendCalled, isTrue);
       // The server's sentence, because only the server sent a mail.
       expect(find.text('A new code has been sent.'), findsOneWidget);
-      expect(find.text('Send another in ${kResendCooldown.inSeconds}s'), findsOneWidget);
+      expect(
+        find.text('Send another in ${kResendCooldown.inSeconds}s'),
+        findsOneWidget,
+      );
 
       await tester.pump(const Duration(seconds: 1));
       expect(
@@ -635,17 +710,22 @@ void _widgetTests() {
       expect(find.text('Send a new code'), findsOneWidget);
     });
 
-    testWidgets('a resend that fails says why, and starts no cooldown',
-        (tester) async {
-      final repository = _ScriptedOtpRepository(resendThrows: const NetworkException());
+    testWidgets('a resend that fails says why, and starts no cooldown', (
+      tester,
+    ) async {
+      final repository = _ScriptedOtpRepository(
+        resendThrows: const NetworkException(),
+      );
       final auth = await _registered(repository);
       await _pump(tester, const OtpScreen(), auth: auth);
 
       await tester.tap(find.text('Send a new code'));
       await _settleSubmit(tester);
 
-      expect(find.text('Could not reach the server. Check your connection.'),
-          findsOneWidget);
+      expect(
+        find.text('Could not reach the server. Check your connection.'),
+        findsOneWidget,
+      );
       // Nothing was sent, so there is nothing to wait for before asking again —
       // a cooldown here would punish the person for the network's failure.
       expect(find.text('Send a new code'), findsOneWidget);
@@ -680,8 +760,9 @@ void _widgetTests() {
       expect(find.text('Send a new code'), findsOneWidget);
     });
 
-    testWidgets('the test hint names the code the mock actually accepts',
-        (tester) async {
+    testWidgets('the test hint names the code the mock actually accepts', (
+      tester,
+    ) async {
       final auth = await _registered(_ScriptedOtpRepository());
       await _pump(tester, const OtpScreen(), auth: auth);
 

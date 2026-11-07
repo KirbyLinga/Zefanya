@@ -180,7 +180,12 @@ class CheckoutController extends Controller
         $summary = new CartSummary($items, $application, null);
 
         try {
-            $order = $this->checkout->placeOrder($buyer, $items, $summary, $data['checkout_token'], $carrierQuote, (array) ($data['notes'] ?? []), $address, $vouchers);
+            $expected = null;
+            if (isset($data['expected_total'])) {
+                $parts = explode('.', (string) $data['expected_total']);
+                $expected = ((int) $parts[0]) * 100 + (int) str_pad($parts[1] ?? '', 2, '0');
+            }
+            $order = $this->checkout->placeOrder($buyer, $items, $summary, $data['checkout_token'], $carrierQuote, (array) ($data['notes'] ?? []), $address, $vouchers, $expected);
         } catch (CheckoutException $e) {
             return $this->conflict($e->getMessage());
         }
@@ -206,6 +211,7 @@ class CheckoutController extends Controller
             'vouchers.*' => ['nullable', 'string', 'max:64'],
             ...($placing ? [
                 'checkout_token' => ['required', 'string', 'max:128'],
+                'expected_total' => ['nullable', 'regex:/\A\d{1,10}(?:\.\d{1,2})?\z/'],
                 'price_fingerprint' => ['required', 'string', 'max:128'],
                 'address_fingerprint' => ['required', 'string', 'max:128'],
                 'shipping_fingerprint' => ['required', 'string', 'max:128'],

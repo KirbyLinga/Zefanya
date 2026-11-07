@@ -21,12 +21,20 @@ import '../theme/app_theme.dart';
 
 /// The shared banner shown while the device is offline.
 class NoInternetBanner extends StatefulWidget {
-  NoInternetBanner.withCallbacks({super.key, required this.onRetry, required this.onRefresh});
+  const NoInternetBanner.withCallbacks({
+    super.key,
+    required this.onRetry,
+    required this.onRefresh,
+  });
 
   /// Construct without a key or with explicit callbacks. The const ctor is
   /// retained for the widget tree we build in tests; this ctor exists so
   /// callers can pass non-constant VoidCallbacks without a const context.
-  NoInternetBanner({super.key, required this.onRetry, required this.onRefresh});
+  const NoInternetBanner({
+    super.key,
+    required this.onRetry,
+    required this.onRefresh,
+  });
 
   /// Re-check the connection (used by the Retry button).
   final VoidCallback onRetry;
@@ -41,10 +49,19 @@ class NoInternetBanner extends StatefulWidget {
 class _NoInternetBannerState extends State<NoInternetBanner> {
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ConnectionWatcher.instance,
+      builder: (context, _) => _banner(context),
+    );
+  }
+
+  Widget _banner(BuildContext context) {
     final watcher = ConnectionWatcher.instance;
     // NetConnectionState is imported from the same library, so no collision
     // with Flutter's ConnectionState.
-    if (watcher.connectionState == NetConnectionState.online) return const SizedBox.shrink();
+    if (watcher.connectionState == NetConnectionState.online) {
+      return const SizedBox.shrink();
+    }
 
     final theme = Theme.of(context);
 
@@ -56,11 +73,7 @@ class _NoInternetBannerState extends State<NoInternetBanner> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(
-            Icons.wifi_off,
-            color: AppColors.warning,
-            size: 22,
-          ),
+          Icon(Icons.wifi_off, color: AppColors.warning, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
@@ -74,6 +87,7 @@ class _NoInternetBannerState extends State<NoInternetBanner> {
             ),
           ),
           IconButton(
+            tooltip: 'Retry',
             onPressed: widget.onRetry,
             icon: const Icon(Icons.refresh),
             splashRadius: 20,

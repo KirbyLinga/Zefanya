@@ -437,6 +437,7 @@ class _OtpScreenState extends State<OtpScreen> {
           controller: _codeController,
           autofocus: true,
           keyboardType: TextInputType.number,
+          autofillHints: const [AutofillHints.oneTimeCode],
           textInputAction: TextInputAction.done,
           textAlign: TextAlign.center,
           // Digits, and six of them: the server's own rule (`regex:/^\d{6}$/`)

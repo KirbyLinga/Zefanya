@@ -34,6 +34,8 @@ class ShipmentResource extends JsonResource
             'order_id' => $shipment->order_id,
             'tracking_number' => $shipment->tracking_number,
             'status' => $shipment->status->value,
+            'can_cancel' => $shipment->status->canBuyerCancel(),
+            'completed_at' => $shipment->completionTime()?->toIso8601String(),
             'status_label' => $shipment->status->label(),
             'seller' => [
                 'id' => $shipment->seller_id,

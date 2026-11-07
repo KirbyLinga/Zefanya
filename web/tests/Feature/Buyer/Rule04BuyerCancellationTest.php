@@ -83,11 +83,11 @@ class Rule04BuyerCancellationTest extends TestCase
 
     public static function buyerCancellationStates(): array
     {
-        return array_map(fn (OrderStatus $status): array => [$status, $status === OrderStatus::Placed], OrderStatus::cases());
+        return array_map(fn (OrderStatus $status): array => [$status, in_array($status, [OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing], true)], OrderStatus::cases());
     }
 
     #[DataProvider('buyerCancellationStates')]
-    public function test_a6_buyer_cancel_visibility_and_direct_http_enforce_the_seller_accept_boundary(OrderStatus $status, bool $allowed): void
+    public function test_a6_buyer_cancel_visibility_and_direct_http_enforce_the_ready_for_pickup_boundary(OrderStatus $status, bool $allowed): void
     {
         Notification::fake();
         $parcel = $this->parcel($status);

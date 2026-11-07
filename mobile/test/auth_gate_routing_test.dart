@@ -11,6 +11,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:zefanya/data/dto/registration_payload.dart';
+import 'package:zefanya/data/api/api_exception.dart';
+import 'package:zefanya/data/mock_data.dart' show Order;
+import 'package:zefanya/data/repositories/order_repository.dart';
+import 'package:zefanya/data/repositories/review_repository.dart';
 import 'package:zefanya/data/google_identity.dart';
 import 'package:zefanya/data/repositories/google_auth_repository.dart';
 import 'package:zefanya/data/repositories/repositories.dart';
@@ -44,7 +48,12 @@ Future<AuthState> _signedIn(UserRole role) async {
   return auth;
 }
 
-Future<void> _pumpGate(WidgetTester tester, AuthState auth) async {
+Future<void> _pumpGate(
+  WidgetTester tester,
+  AuthState auth, {
+  OrderState? orders,
+  ReviewState? reviews,
+}) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
 
@@ -70,13 +79,14 @@ Future<void> _pumpGate(WidgetTester tester, AuthState auth) async {
         ChangeNotifierProvider(create: (_) => CourierState()),
         ChangeNotifierProvider(create: (_) => NotificationState()),
         ChangeNotifierProvider(
-          create: (_) => OrderState(repository: repositories.order),
+          create: (_) => orders ?? OrderState(repository: repositories.order),
         ),
         ChangeNotifierProvider(
           create: (_) => RecentlyViewedState(catalog: repositories.catalog),
         ),
         ChangeNotifierProvider(
-          create: (_) => ReviewState(repository: repositories.review),
+          create: (_) =>
+              reviews ?? ReviewState(repository: repositories.review),
         ),
         ChangeNotifierProvider(
           create: (_) => WishlistState(catalog: repositories.catalog),
@@ -90,8 +100,83 @@ Future<void> _pumpGate(WidgetTester tester, AuthState auth) async {
   await tester.pump(const Duration(milliseconds: 900));
 }
 
+class _LoginOrders extends MockOrderRepository {
+  int requests = 0;
+
+  @override
+  Future<List<Order>> orders() async {
+    if (++requests == 1) {
+      throw const UnauthorizedException(message: 'Unauthenticated.');
+    }
+    return const [];
+  }
+}
+
+class _LoginReviews extends MockReviewRepository {
+  int requests = 0;
+
+  @override
+  Future<List<ProductReview>> all() async {
+    if (++requests == 1) throw const UnauthorizedException();
+    return [
+      ProductReview(
+        productId: '1',
+        orderId: '2',
+        stars: 5,
+        editCount: 1,
+        createdAt: DateTime.now(),
+      ),
+    ];
+  }
+}
+
 void main() {
+  testWidgets('buyer entry refreshes server reviews after signed-out startup', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _LoginReviews();
+    final reviews = ReviewState(repository: repository);
+    await expectLater(reviews.load(), throwsA(isA<UnauthorizedException>()));
+    await _pumpGate(tester, await _signedIn(UserRole.buyer), reviews: reviews);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(repository.requests, 2);
+    expect(reviews.all.single.editCount, 1);
+  });
+  for (final role in UserRole.values) {
+    testWidgets('logout and Back cannot reopen the ${role.name} shell', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final auth = await _signedIn(role);
+      await _pumpGate(tester, auth);
+      await auth.logout();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(BuyerShell), findsNothing);
+      expect(find.byType(CourierShell), findsNothing);
+      expect(auth.isLoggedIn, isFalse);
+    });
+  }
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('buyer entry reloads orders after a signed-out startup failure', (
+    tester,
+  ) async {
+    final repository = _LoginOrders();
+    final orders = OrderState(repository: repository);
+    await orders.load();
+    expect(orders.loadFailure, isA<UnauthorizedException>());
+
+    final auth = await _signedIn(UserRole.buyer);
+    await _pumpGate(tester, auth, orders: orders);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(repository.requests, 2);
+    expect(orders.loadFailure, isNull);
+    expect(find.byType(BuyerShell), findsOneWidget);
+  });
 
   testWidgets('an active courier session lands in CourierShell', (
     tester,

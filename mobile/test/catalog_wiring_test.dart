@@ -48,8 +48,10 @@ class _ForeignCatalog implements CatalogRepository {
   Future<List<Product>> products({CatalogQuery? query}) async => _all;
 
   @override
-  Future<List<Product>> productsInCategory(String category) async =>
-      [for (final product in _all) if (product.category == category) product];
+  Future<List<Product>> productsInCategory(String category) async => [
+    for (final product in _all)
+      if (product.category == category) product,
+  ];
 
   @override
   Future<Product?> productById(String id) async {
@@ -125,32 +127,34 @@ const List<String> _serverCategories = [
 
 /// A product shaped like a server row, for the fixture below.
 Product _row(String id, String category) => productFromJson({
-      'id': id,
-      'name': 'Item $id',
-      'category': category,
-      'price_minor': 10000,
-      'in_stock': true,
-      'seller': {'name': 'Loom & Larder'},
-      'description': '',
-      'images': const <String>[],
-    });
+  'id': id,
+  'name': 'Item $id',
+  'category': category,
+  'price_minor': 10000,
+  'in_stock': true,
+  'seller': {'name': 'Loom & Larder'},
+  'description': '',
+  'images': const <String>[],
+});
 
 /// A catalogue shaped like the server's: every curated label, and the **longest**
 /// label holding the most products — so it lands in the feature panel at the top
 /// *and* in the grid, which are the two places a one-line assumption overflowed.
 class _ServerShapedCatalog implements CatalogRepository {
   List<Product> get _all => [
-        _row('l1', 'Furniture and Office Equipment'),
-        _row('l2', 'Furniture and Office Equipment'),
-        _row('l3', 'Office and School Supplies'),
-      ];
+    _row('l1', 'Furniture and Office Equipment'),
+    _row('l2', 'Furniture and Office Equipment'),
+    _row('l3', 'Office and School Supplies'),
+  ];
 
   @override
   Future<List<Product>> products({CatalogQuery? query}) async => _all;
 
   @override
-  Future<List<Product>> productsInCategory(String category) async =>
-      [for (final product in _all) if (product.category == category) product];
+  Future<List<Product>> productsInCategory(String category) async => [
+    for (final product in _all)
+      if (product.category == category) product,
+  ];
 
   @override
   Future<Product?> productById(String id) async {
@@ -162,7 +166,10 @@ class _ServerShapedCatalog implements CatalogRepository {
   }
 
   @override
-  Future<List<String>> categories() async => const ['All', ..._serverCategories];
+  Future<List<String>> categories() async => const [
+    'All',
+    ..._serverCategories,
+  ];
 
   @override
   Future<String?> makerNote(String sellerName) async => null;
@@ -174,11 +181,17 @@ class _ServerShapedCatalog implements CatalogRepository {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('the category grid renders the catalogue it was handed', (tester) async {
+  testWidgets('the category grid renders the catalogue it was handed', (
+    tester,
+  ) async {
     final catalog = CatalogState(repository: _ForeignCatalog());
     await catalog.load();
 
-    await _pump(tester, const CategoryProductsScreen(category: 'Health and Beauty'), catalog: catalog);
+    await _pump(
+      tester,
+      const CategoryProductsScreen(category: 'Health and Beauty'),
+      catalog: catalog,
+    );
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.text('Ilang-Ilang Body Oil'), findsOneWidget);
@@ -187,69 +200,92 @@ void main() {
     expect(find.text(mockProducts.first.name), findsNothing);
   });
 
-  testWidgets('the seller screen lists what that shop sells, from the catalogue', (tester) async {
-    final catalog = CatalogState(repository: _ForeignCatalog());
-    await catalog.load();
+  testWidgets(
+    'the seller screen lists what that shop sells, from the catalogue',
+    (tester) async {
+      final catalog = CatalogState(repository: _ForeignCatalog());
+      await catalog.load();
 
-    await _pump(tester, const SellerScreen(sellerName: 'Alon Botanicals'), catalog: catalog);
-    await tester.pump(const Duration(milliseconds: 800));
+      await _pump(
+        tester,
+        const SellerScreen(sellerName: 'Alon Botanicals'),
+        catalog: catalog,
+      );
+      await tester.pump(const Duration(milliseconds: 800));
 
-    expect(find.text('Ilang-Ilang Body Oil'), findsOneWidget);
-  });
+      expect(find.text('Ilang-Ilang Body Oil'), findsOneWidget);
+    },
+  );
 
-  testWidgets('the review button joins an order to the catalogue, not to the mock file',
-      (tester) async {
-    final catalog = CatalogState(repository: _ForeignCatalog());
-    await catalog.load();
+  testWidgets(
+    'the review button joins an order to the catalogue, not to the mock file',
+    (tester) async {
+      final catalog = CatalogState(repository: _ForeignCatalog());
+      await catalog.load();
 
-    // An order whose only product exists in the catalogue and nowhere else. With a
-    // mock-only lookup the button found no products and rendered nothing at all,
-    // so a reviewable order in a live build silently lost its review button.
-    const order = Order(
-      id: 'ORD-L14',
-      shopName: 'Alon Botanicals',
-      status: OrderStatus.toRate,
-      eta: 'Delivered',
-      itemSummary: 'Ilang-Ilang Body Oil',
-      productIds: ['l14'],
-    );
+      // An order whose only product exists in the catalogue and nowhere else. With a
+      // mock-only lookup the button found no products and rendered nothing at all,
+      // so a reviewable order in a live build silently lost its review button.
+      final order = Order(
+        id: 'ORD-L14',
+        shopName: 'Alon Botanicals',
+        status: OrderStatus.toRate,
+        eta: 'Delivered',
+        itemSummary: 'Ilang-Ilang Body Oil',
+        productIds: ['l14'],
+        buyerConfirmed: true,
+        completedAt: DateTime.now().subtract(const Duration(days: 1)),
+      );
 
-    await _pump(tester, const ReviewButton(order: order), catalog: catalog);
+      await _pump(tester, ReviewButton(order: order), catalog: catalog);
 
-    expect(find.textContaining('Review'), findsWidgets);
-  });
+      expect(find.textContaining('Review'), findsWidgets);
+    },
+  );
 
   test('every label the app can be handed a category has its own icon', () {
     // The server curates fourteen and the mock has its own set. A label with no
     // entry renders the neutral fallback — which is how most of a live build's tiles
     // looked, because the map only knew the mock's three short names.
-    for (final label in [..._serverCategories, ...mockCategories.where((c) => c != 'All')]) {
+    for (final label in [
+      ..._serverCategories,
+      ...mockCategories.where((c) => c != 'All'),
+    ]) {
       expect(categoryIcons[label], isNotNull, reason: '$label has no icon');
     }
 
     // And nothing invented: an entry for a label that cannot arrive is a typo that
     // would silently never render.
-    final known = {..._serverCategories, ...mockCategories.where((c) => c != 'All')};
+    final known = {
+      ..._serverCategories,
+      ...mockCategories.where((c) => c != 'All'),
+    };
 
     for (final label in categoryIcons.keys) {
-      expect(known, contains(label), reason: '$label is not a label the app can receive');
+      expect(
+        known,
+        contains(label),
+        reason: '$label is not a label the app can receive',
+      );
     }
   });
 
-  testWidgets("the categories tab holds the server's own labels without overflowing",
-      (tester) async {
-    // Every existing fixture used the mock's three short names, which fit on one
-    // line and hid this completely. "Furniture and Office Equipment" is what a real
-    // label looks like, and a Flutter test fails on a RenderFlex overflow — so this
-    // asserts the geometry rather than any copy.
-    final catalog = CatalogState(repository: _ServerShapedCatalog());
-    await catalog.load();
+  testWidgets(
+    "the categories tab holds the server's own labels without overflowing",
+    (tester) async {
+      // Every existing fixture used the mock's three short names, which fit on one
+      // line and hid this completely. "Furniture and Office Equipment" is what a real
+      // label looks like, and a Flutter test fails on a RenderFlex overflow — so this
+      // asserts the geometry rather than any copy.
+      final catalog = CatalogState(repository: _ServerShapedCatalog());
+      await catalog.load();
 
-    await _pump(tester, const CategoriesScreen(), catalog: catalog);
+      await _pump(tester, const CategoriesScreen(), catalog: catalog);
 
-    expect(find.text('Furniture and Office Equipment'), findsWidgets);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('Furniture and Office Equipment'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('and it still fits on a narrow phone', (tester) async {
     // 320 logical pixels: the tiles are ~132 wide there, where a two-line label is
@@ -257,7 +293,12 @@ void main() {
     final catalog = CatalogState(repository: _ServerShapedCatalog());
     await catalog.load();
 
-    await _pump(tester, const CategoriesScreen(), catalog: catalog, size: const Size(320, 640));
+    await _pump(
+      tester,
+      const CategoriesScreen(),
+      catalog: catalog,
+      size: const Size(320, 640),
+    );
 
     expect(tester.takeException(), isNull);
   });
