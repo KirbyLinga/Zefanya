@@ -6,6 +6,6 @@ S8B: awaited portrait, OTP autofill, API reachability/reactive Retry, dirty-form
 Focused S8B/default-mode tests: 25 passed (adaptation-mobile-tests.log).
 Existing login/orders fix retained; 20 focused login/orders tests passed before adaptation.
 Public image CORS: 6 tests, 15 assertions passed before adaptation; public uploads retained.
-S10: switch adapted; mode matrix and broader checks pending.
+S10: canonical switch adapted; default mock, explicit live, and obsolete-key-ignored mode tests each passed. Recording/build/install instructions adapted in demo-script.md; APK rebuild/device/HTTPS acceptance OPEN.
 S6.6: native review adaptation pending. Cancellation was not implemented in the source checkout and is not claimed here.
 No dev migration, environment change, merge, tag or APK commit.

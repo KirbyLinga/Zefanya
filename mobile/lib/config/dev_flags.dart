@@ -56,7 +56,7 @@ const bool kShowDevTools = bool.fromEnvironment(
 // a build that defaulted to live would reach no first frame at all. Turning it
 // on is a deliberate act:
 //
-//   flutter run --dart-define=zefanya.useLiveApi=true \
+//   flutter run --dart-define=USE_LIVE_API=true \
 //               --dart-define=zefanya.apiBaseUrl=https://api.example.test/api
 //
 // Compile-time rather than runtime so the mock data and the mock
@@ -64,7 +64,7 @@ const bool kShowDevTools = bool.fromEnvironment(
 // build cannot be switched back to mock by editing a config file on a
 // device.
 const bool kUseLiveApi = bool.fromEnvironment(
-  'zefanya.useLiveApi',
+  'USE_LIVE_API',
   defaultValue: false,
 );
 
@@ -167,16 +167,13 @@ const String kGoogleIosClientId = String.fromEnvironment(
 /// committed. With no server client ID the ID token has no audience to verify
 /// against, so the Google flow cannot complete and the button must stay hidden.
 class GoogleConfig {
-  const GoogleConfig({
-    required this.serverClientId,
-    required this.iosClientId,
-  });
+  const GoogleConfig({required this.serverClientId, required this.iosClientId});
 
   /// Build-time values from the dart-defines. Empty when the build does not
   /// supply them.
   const GoogleConfig.fromEnvironment()
-      : serverClientId = kGoogleServerClientId,
-        iosClientId = kGoogleIosClientId;
+    : serverClientId = kGoogleServerClientId,
+      iosClientId = kGoogleIosClientId;
 
   /// The web (server) OAuth client ID — the ID token audience on Android.
   final String serverClientId;
