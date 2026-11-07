@@ -11,7 +11,7 @@ New migration installed ONLY linehaul_drivers/linehaul_assignments in zefanya_fr
 Explicitly provisioned one demo Courier at Demo Laguna Express/Pila Station Hub; no existing account overwritten.
 Baseline: 80 PHP tests/622 assertions and 873 mobile tests passed after locked dependencies restored and process-only GD enabled.
 Restored broader PHP: {"tool":"phpunit","result":"passed","tests":121,"passed":121,"assertions":1009,"duration_ms":32119}
-Final Artisan: {"tool":"phpunit","result":"passed","tests":9,"passed":9,"assertions":154,"duration_ms":5781}
+Courier handover regression: {"tool":"phpunit","result":"passed","tests":10,"passed":10,"assertions":175,"duration_ms":6213}
 Design final full mobile: 03:08 +886: All tests passed! Final focused navigation/action/design: 20 passed.
 Design final analysis: 8 issues found. (ran in 27.1s); existing 7 infos and 1 unused-test-helper warning, no new findings.
 Web assets: built in 7.30s. Live-mode Chrome build: Built build/web (222.4s). No live endpoint baked into build.
@@ -22,4 +22,4 @@ Existing gaps retained: PLACED-only cancellation conflicts with prior cutoff; S6
 User approved config/new tables/account explicitly; .env copied from existing local backend, ignored by Git. No order/stock/payment edits.
 Real HTTP: all three logins/profiles succeeded; Courier trips 200/empty, Rider access 403, Chrome CORS 204; own test tokens logged out.
 Latest design preview: http://127.0.0.1:5174; backend http://127.0.0.1:8000. Debug web recompile passed; see demo-script.md.
-Next: Logistics assigns a real demo manifest, rehearse full physical handover; verify phone camera/permissions. No merge/APK; Pint waived/UNRUN.
+Two-parcel handover verified in SQLite: partial loading blocks departure; partial receipt stays Arrived. Next: real manifest/device rehearsal. No merge/APK; Pint waived/UNRUN.

@@ -1,5 +1,7 @@
 # Decisions & Deviations
 
+- Courier continuation: added a two-parcel handover regression without changing existing assertions. Departure with one unscanned parcel must fail atomically; Logistics receiving one parcel leaves Arrived, receiving both completes the trip. Separate factory orders respect the order/seller uniqueness constraint. Tests use SQLite only; local MySQL/order data untouched. PHP production code unchanged; Pint remains waived/unrun. Direct PHPUnit: 10 passed, 175 assertions, 6213 ms. Physical camera and real assigned-trip rehearsal remain open.
+
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
 ## 2026-11-08 — Courier design integration

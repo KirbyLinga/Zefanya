@@ -145,6 +145,40 @@ class LinehaulDemoTest extends TestCase
         $this->api($driver)->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.status', 'Completed');
     }
 
+    public function test_multi_parcel_trip_requires_all_loading_and_receiving_scans(): void
+    {
+        ['driver' => $driver, 'manifest' => $manifest, 'provider' => $provider, 'item' => $item, 'parcel' => $parcel] = $this->fixture();
+        $second = SellerOrder::factory()->create(['tracking_number' => 'TRK-LINEHAUL-002']);
+        $second->forceFill($parcel->only([
+            'status', 'origin_station_hub_id', 'custody_hub_id', 'carrier_provider_id', 'custody_provider_id', 'handover_at',
+        ]))->save();
+        $secondItem = app(ManifestService::class)->addParcel($manifest, $second);
+        $path = '/api/courier/trips/'.$manifest->id;
+        $this->api($driver)->postJson($path.'/accept')->assertOk();
+        $this->postJson($path.'/scan', ['tracking_number' => $parcel->tracking_number])->assertOk();
+        $this->postJson($path.'/depart', ['seal_number' => 'BH-0004521'])->assertUnprocessable();
+        $this->assertSame(ManifestStatus::Draft, $manifest->fresh()->status);
+        $this->assertNull($item->fresh()->dispatched_at);
+        $this->assertNull($secondItem->fresh()->dispatched_at);
+        $this->postJson($path.'/scan', ['tracking_number' => $second->tracking_number, 'method' => 'camera'])->assertOk();
+        $this->postJson($path.'/depart', ['seal_number' => 'BH-0004521'])->assertOk()->assertJsonPath('data.status', 'In Transit');
+        $this->postJson($path.'/arrive')->assertOk()->assertJsonPath('data.status', 'Arrived');
+
+        foreach ([[$parcel, $item], [$second, $secondItem]] as $index => [$receivingParcel, $receivingItem]) {
+            $this->flushHeaders();
+            $this->app['auth']->forgetGuards();
+            $this->actingAs($provider, 'logistics');
+            $token = $this->postJson(route('logistics.manifests.scan.verify', $manifest), [
+                'tracking_number' => $receivingParcel->tracking_number, 'phase' => 'receive', 'method' => 'manual',
+            ])->assertOk()->json('verification_token');
+            $this->post(route('logistics.manifests.receive.store', [$manifest, $receivingItem]), ['verification_token' => $token])->assertRedirect();
+            $this->api($driver)->getJson('/api/courier/trips')->assertOk()
+                ->assertJsonPath('data.0.status', $index === 0 ? 'Arrived' : 'Completed');
+        }
+        $this->assertNotNull($item->fresh()->received_at);
+        $this->assertNotNull($secondItem->fresh()->received_at);
+    }
+
     public function test_demo_provisioning_never_overwrites_accounts(): void
     {
         ['provider' => $provider, 'station' => $station, 'driver' => $driver] = $this->fixture();
