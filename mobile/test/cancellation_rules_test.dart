@@ -8,15 +8,17 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test(
-    'BUY-CAN-001 only known stages before Ready for Pickup allow cancellation',
+    'BUY-CAN-001 only an order the seller has not accepted can be cancelled',
     () {
-      for (final status in ['PLACED', 'CONFIRMED', 'PREPARING']) {
+      for (final status in ['PLACED']) {
         expect(
           orderFromShipmentJson({'id': '1', 'status': status}).canCancel,
           isTrue,
         );
       }
       for (final status in [
+        'CONFIRMED',
+        'PREPARING',
         'READY_FOR_PICKUP',
         'PICKED_UP',
         'DELIVERED',
@@ -32,7 +34,7 @@ void main() {
       expect(
         orderFromShipmentJson({
           'id': '1',
-          'status': 'PREPARING',
+          'status': 'PLACED',
           'can_cancel': false,
         }).canCancel,
         isFalse,

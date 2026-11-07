@@ -875,6 +875,6 @@ class LogisticsRemittanceTest extends TestCase
         $this->assertTrue($cross->fresh()->isCrossProvider());
 
         $this->actingAs($this->admin(), 'admin')->get(route('admin.dashboard'))
-            ->assertOk()->assertSee('Liabilities and money in transit')->assertSee('Total owed by Zefanya');
+            ->assertOk()->assertSee('Money to settle')->assertSee('Zefanya owes');
     }
 }

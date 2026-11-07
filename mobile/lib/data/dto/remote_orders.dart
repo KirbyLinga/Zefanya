@@ -37,11 +37,8 @@ Order orderFromJson(Map<String, Object?> json) {
     itemSummary: _summary(json['items']),
     productIds: _productIds(json['product_ids']),
     productQuantities: _productQuantities(json['items']),
-    cancellationAllowed: const [
-      'PLACED',
-      'CONFIRMED',
-      'PREPARING',
-    ].contains(_text(json['status'])),
+    // Buyers may cancel only until the seller accepts (WebZefanya rule).
+    cancellationAllowed: _text(json['status']) == 'PLACED',
     buyerConfirmed: _text(json['status']) == 'COMPLETED',
     completedAt: DateTime.tryParse(_text(json['completed_at'])),
   );
@@ -180,7 +177,7 @@ Order orderFromShipmentJson(Map<String, Object?> json) {
     buyerConfirmed: wire == 'COMPLETED',
     cancellationAllowed:
         json['can_cancel'] as bool? ??
-        const ['PLACED', 'CONFIRMED', 'PREPARING'].contains(wire),
+        wire == 'PLACED',
     completedAt: DateTime.tryParse(_text(json['completed_at'])),
     deliveredAt: status == OrderStatus.toRate
         ? DateTime.tryParse(_text(json['updated_at']))

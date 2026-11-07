@@ -10,8 +10,11 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\PaymentCancellationRefund;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\Voucher;
+use App\Services\Buyer\BuyerAccountDeletionService;
 use App\Services\Buyer\BuyerOrderCancellation;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Validation\ValidationException;
 use Tests\Feature\Rider\RiderTestCase;
 
 class CancellationRulesTest extends RiderTestCase
@@ -30,6 +33,7 @@ class CancellationRulesTest extends RiderTestCase
     {
         $this->flushHeaders();
         $this->app['auth']->forgetGuards();
+
         return $this->withToken(($buyer ?? $this->buyer)->createToken('cancel-test', ['buyer'])->plainTextToken);
     }
 
@@ -38,15 +42,15 @@ class CancellationRulesTest extends RiderTestCase
         return "/api/buyer/orders/{$shipment->order_id}/shipments/{$shipment->id}/cancel";
     }
 
-    public function test_buy_can_001_api_allows_placed_confirmed_preparing_but_blocks_ready_and_later(): void
+    public function test_buy_can_001_api_allows_placed_but_blocks_once_the_seller_accepts(): void
     {
-        foreach ([OrderStatus::Placed, OrderStatus::Confirmed, OrderStatus::Preparing] as $status) {
+        foreach ([OrderStatus::Placed] as $status) {
             $shipment = $this->parcel($status);
             $this->api()->getJson("/api/buyer/shipments/{$shipment->id}")->assertOk()->assertJsonPath('data.can_cancel', true);
             $this->postJson($this->path($shipment), ['reason' => 'Changed my mind'])->assertOk()->assertJsonPath('data.can_cancel', false);
             $this->assertSame(OrderStatus::Cancelled, $shipment->fresh()->status);
         }
-        foreach ([OrderStatus::ReadyForPickup, OrderStatus::PickedUp, OrderStatus::Delivered] as $status) {
+        foreach ([OrderStatus::Confirmed, OrderStatus::Preparing, OrderStatus::ReadyForPickup, OrderStatus::PickedUp, OrderStatus::Delivered] as $status) {
             $shipment = $this->parcel($status);
             $this->api()->getJson("/api/buyer/shipments/{$shipment->id}")->assertOk()->assertJsonPath('data.can_cancel', false);
             $this->postJson($this->path($shipment), ['reason' => 'Changed my mind'])->assertStatus(409);
@@ -63,7 +67,7 @@ class CancellationRulesTest extends RiderTestCase
         try {
             app(BuyerOrderCancellation::class)->cancel($shipment->order, $shipment, $this->buyer, 'Invented reason');
             $this->fail('The service must enforce the preset list.');
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             $this->assertArrayHasKey('reason', $exception->errors());
         }
         $this->assertSame(OrderStatus::Placed, $shipment->fresh()->status);
@@ -73,7 +77,7 @@ class CancellationRulesTest extends RiderTestCase
 
     public function test_buy_can_003_paid_ewallet_records_exact_refund_liability_once(): void
     {
-        $shipment = $this->parcel(OrderStatus::Preparing);
+        $shipment = $this->parcel(OrderStatus::Placed);
         $voucher = Voucher::factory()->create(['code' => 'MCH50', 'times_used' => 1, 'expires_at' => now()->addDay()]);
         $shipment->forceFill(['platform_voucher_id' => $voucher->id])->save();
         $payment = Payment::factory()->paid()->create(['seller_order_id' => $shipment->id, 'method' => PaymentMethod::Ewallet, 'amount_minor' => 108300]);
@@ -92,7 +96,7 @@ class CancellationRulesTest extends RiderTestCase
         $this->assertDatabaseCount('inventory_transactions', 1);
         $this->assertDatabaseCount('status_histories', 1);
         $this->assertSame('You have a refund being processed. You can delete your account after you receive it.',
-            app(\App\Services\Buyer\BuyerAccountDeletionService::class)->blockingReason($this->buyer));
+            app(BuyerAccountDeletionService::class)->blockingReason($this->buyer));
     }
 
     public function test_buy_can_003_refund_write_failure_rolls_back_inventory_status_and_voucher(): void
@@ -154,7 +158,7 @@ class CancellationRulesTest extends RiderTestCase
         Payment::factory()->paid()->create(['seller_order_id' => $shipment->id, 'method' => PaymentMethod::Ewallet]);
         app(BuyerOrderCancellation::class)->cancel($shipment->order, $shipment, $this->buyer, 'Changed my mind');
         $refund = PaymentCancellationRefund::query()->sole();
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
         $refund->replicate()->save();
     }
 

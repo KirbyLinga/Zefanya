@@ -306,7 +306,7 @@ class BuyerOrderCancelTest extends TestCase
         Notification::assertNotSentTo($sellerB, BuyerOrderCancelled::class);
     }
 
-    public function test_show_page_and_http_allow_confirmed_cancellation_before_ready(): void
+    public function test_show_page_offers_cancel_only_before_the_seller_accepts(): void
     {
         [$buyer, , , , $soA, $soB, $order] = $this->multiSellerCheckout();
         $soB->forceFill(['status' => OrderStatus::Confirmed->value])->save();
@@ -315,11 +315,11 @@ class BuyerOrderCancelTest extends TestCase
             ->get(route('buyer.orders.show', $order))
             ->assertOk()
             ->assertSee(route('buyer.orders.cancelSellerOrder', [$order, $soA]), false)
-            ->assertSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
+            ->assertDontSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
 
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soB]), ['reason' => 'Changed my mind'])
-            ->assertOk();
-        $this->assertSame(OrderStatus::Cancelled, $soB->fresh()->status);
+            ->assertStatus(409);
+        $this->assertSame(OrderStatus::Confirmed, $soB->fresh()->status);
     }
 }

@@ -41,9 +41,10 @@ enum OrderStatus: string
     /** Seller declined their slice before handover (terminal; stock restored). */
     case Cancelled = 'CANCELLED';
 
+    /** Buyers may cancel a slice only until the seller accepts it. */
     public function canBuyerCancel(): bool
     {
-        return in_array($this, [self::Placed, self::Confirmed, self::Preparing], true);
+        return $this === self::Placed;
     }
 
     public function label(): string
