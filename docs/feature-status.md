@@ -4,11 +4,11 @@
 
 | Feature | Status | Evidence | Open gate |
 | --- | --- | --- | --- |
-| Separate Courier login and assigned-manifest portal in combined app | NEEDS-CREDENTIALS | LinehaulDriver/Policy/Service, /api/courier routes, LinehaulRepository/Portal; 9 backend tests and mobile transport/routing/widget coverage | This checkout lacks .env, new tables and a provisioned local Courier; real backend/device rehearsal not run |
-| Acceptance, loading scans and sealed departure | NEEDS-CREDENTIALS | Native ManifestService, encrypted expiring tokens, actor audits; native receiving completes trip | QR/Code128 camera and phone permissions need real-device verification |
+| Separate Courier login/profile in combined app | LIVE-READY (local login only) | Explicit local setup approved/applied; real MySQL login/profile/logout and role isolation checked; app/backend HTTP 200 | No assigned-trip or phone claim |
+| Assigned-manifest portal, acceptance, scans and departure | NEEDS-CREDENTIALS | Native ManifestService, encrypted expiring tokens, actor audits; 9 backend tests and mobile auth/routing/widgets | Assign a real demo manifest and rehearse it; QR/Code128/camera permissions need physical-device verification |
 | GPS proximity/tracking, activation/documents/duty/capacity, reassignment, Courier pay and full discrepancies | UNREACHABLE | Deferred, no corresponding Courier actions advertised | Outside limited presentation scope |
 
-Not LIVE-READY until approved local setup and rehearsal pass. See demo-script.md and DECISIONS.md. Existing Buyer/Rider status below is historical and not a complete audit of this newer integration snapshot.
+Courier login is locally verified; the full trip demo is not LIVE-READY until assignment/rehearsal passes. See demo-script.md and DECISIONS.md. Existing Buyer/Rider status below is historical and not a complete audit of this newer integration snapshot.
 
 ## S6.4 incremental feature status
 

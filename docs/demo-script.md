@@ -2,7 +2,7 @@
 
 ## ZefanyaWMI combined Courier demonstration
 
-Local setup and a device/camera rehearsal remain open. The compiled Chrome build is not live-backend or phone verification.
+Local setup is now verified after explicit user approval: backend on http://127.0.0.1:8000, combined app on http://127.0.0.1:5173. Open the app URL in Chrome. All three demo logins/profile calls passed against MySQL; full assigned-trip and phone/camera rehearsal remain open. Credentials were handed over in chat and are not committed.
 
 1. After approved backend configuration/table installation, provision one local-demo Courier with `php artisan linehaul:provision`, supplying --provider, --hub, --email and --name for an approved company's operational hub and unused email. Password is prompted and hidden. The command never overwrites an account and is disabled outside local/testing. Full email activation/onboarding is deferred.
 2. Start the configured backend on port 8000. From mobile run `flutter run -d chrome --dart-define=USE_LIVE_API=true --dart-define=zefanya.apiBaseUrl=http://127.0.0.1:8000/api`. Chrome can use loopback HTTP; Android needs a reachable HTTPS address. Courier login is hidden in mock mode.
@@ -12,7 +12,7 @@ Local setup and a device/camera rehearsal remain open. The compiled Chrome build
 6. In Logistics manually compare the recorded seal and use the existing receiving screen to scan/receive parcels. Refresh Courier trips: Completed appears only after native receipt finishes. Courier cannot confirm their own receiving. Do not claim full seal discrepancy automation.
 7. Record Buyer/Rider flows, this main Courier path and logout/Back. Disclose manual scanning if Chrome has no camera; rehearse real QR/Code128 camera/permissions on the intended phone before claiming device verification.
 
-Deferred: license/NBI/vehicle onboarding and activation, duty/checklist/capacity, 500 m GPS/location tracking, push, decline/reassignment/breakdown, pay and full discrepancy rules. No development migration, account provisioning or `.env` edit has been performed by the agent. Existing S6.2/cancellation conformance gaps remain in STATE/DECISIONS.
+Deferred: license/NBI/vehicle onboarding and activation, duty/checklist/capacity, 500 m GPS/location tracking, push, decline/reassignment/breakdown, pay and full discrepancy rules. User approved only local config, the Courier migration and one demo Courier; no other migration or existing order/stock/payment changes. Existing S6.2/cancellation conformance gaps remain in STATE/DECISIONS.
 
 Run commands from `mobile/`. This guide applies to this checkout's `/api/buyer` and `/api/rider` backend, not the original checkout.
 
