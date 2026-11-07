@@ -139,4 +139,28 @@ class MobileReviewApiTest extends RiderTestCase
         $this->patchJson($this->path($shipment), ['stars' => 5])->assertTooManyRequests();
         $this->assertDatabaseCount('reviews', 0);
     }
+
+    public function test_review_policy_explicitly_allows_only_the_shipment_owner(): void
+    {
+        $shipment = $this->purchase();
+        $stranger = Buyer::factory()->create();
+        $policy = new \App\Policies\SellerOrderPolicy;
+        $this->assertTrue($policy->writeMobileReview($this->buyer, $shipment));
+        $this->assertFalse($policy->writeMobileReview($stranger, $shipment));
+    }
+
+    public function test_multiple_variants_of_one_product_are_not_silently_reviewed_as_one_item(): void
+    {
+        $shipment = $this->purchase();
+        $item = $shipment->orderItems()->firstOrFail();
+        \App\Models\Shared\OrderItem::factory()->create([
+            'seller_order_id' => $shipment->id,
+            'product_id' => $item->product_id,
+            'product_name' => $item->product_name,
+            'quantity' => 1,
+            'price_minor' => 10000,
+        ]);
+        $this->api()->patchJson($this->path($shipment), ['stars' => 5])->assertUnprocessable();
+        $this->assertDatabaseCount('reviews', 0);
+    }
 }

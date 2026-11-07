@@ -22,10 +22,12 @@
 - `web/routes/api.php`: authenticated buyer GET /buyer/reviews/mine and PATCH /buyer/shipments/{shipment}/products/{product}/review, throttled with native API role middleware.
 - `web/resources/views/buyer/products/_reviews.blade.php`: display actual completion-window and JPG/PNG/5 MB rules.
 - `web/tests/Feature/Buyer/Rule08ProductReviewsTest.php`: trusted-history fixture and intended exact-day-30 refusal.
+- `web/tests/Feature/Buyer/BuyerShipmentApiTest.php`: verify trusted completion history is created and exposed after actual receipt confirmation.
 - New `ReviewPolicy`, `Api/Buyer/MobileReviewRequest`, `Api/Buyer/ReviewController`, `Mobile/ReviewResource`, `Buyer/MobileReviewApiTest`: policy/request/resource-backed native adapters and endpoint tests.
 - No new table, column or parallel review service. Existing status transitions, inventory and payment services retained.
 - Mobile review/order models, persistence, mappers, form and button: trusted completion date and server edit count; multipart bytes to native review route. Buyer entry refreshes reviews after signed-out startup.
 - Test fixtures: preserve catalogue/review assertions; use completed purchases. UTF-8 mock response fixes the pre-existing peso-symbol encoding failure.
+- Added direct ownership-policy and ambiguous-variant regression tests; all five deliberately broken security guards were restored and retested before committing.
 
 ## Remaining scope
 

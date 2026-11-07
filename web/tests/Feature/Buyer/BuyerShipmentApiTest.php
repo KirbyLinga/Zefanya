@@ -64,7 +64,9 @@ class BuyerShipmentApiTest extends RiderTestCase
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
 
         $this->api()->postJson("/api/buyer/orders/{$parcel->order_id}/shipments/{$parcel->id}/confirm-received")
-            ->assertOk()->assertJsonPath('data.status', OrderStatus::Completed->value);
+            ->assertOk()->assertJsonPath('data.status', OrderStatus::Completed->value)
+            ->assertJsonPath('data.completed_at', $parcel->fresh()->completionTime()?->toIso8601String());
+        $this->assertNotNull($parcel->fresh()->completionTime());
 
         // Idempotent repeat.
         $this->api()->postJson("/api/buyer/orders/{$parcel->order_id}/shipments/{$parcel->id}/confirm-received")->assertOk();
