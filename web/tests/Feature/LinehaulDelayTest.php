@@ -20,7 +20,7 @@ class LinehaulDelayTest extends TestCase
 {
     use LazilyRefreshDatabase, BootstrapsCrossProviderHandoffs;
 
-    private function fixture(): array
+    private function fixture(bool $depart = true): array
     {
         $this->withoutVite();
         $this->travelTo(\Carbon\Carbon::parse('2026-11-08T04:00:00Z'));
@@ -40,7 +40,9 @@ class LinehaulDelayTest extends TestCase
         $assignment = $service->assign($network['provider'], $manifest, $driver);
         $service->act($driver, $manifest, 'accept', [], request());
         $service->act($driver, $manifest, 'scan', ['tracking_number' => $parcel->tracking_number, 'method' => 'manual'], request());
-        $service->act($driver, $manifest, 'depart', ['seal_number' => 'BH-0000771'], request());
+        if ($depart) {
+            $service->act($driver, $manifest, 'depart', ['seal_number' => 'BH-0000771'], request());
+        }
 
         return [...$network, ...compact('driver', 'manifest', 'assignment', 'parcel')];
     }
@@ -199,6 +201,54 @@ class LinehaulDelayTest extends TestCase
             }
         }
         $this->assertSame('Heavy traffic', LinehaulTripDelay::sole()->reason);
+    }
+
+    public function test_capacity_blocks_assignment_with_unknown_or_overweight_parcels_and_allows_exact_limit(): void
+    {
+        $this->capacityScenario('assign');
+    }
+
+    public function test_capacity_rechecks_changed_weight_before_acceptance(): void
+    {
+        $this->capacityScenario('accept');
+    }
+
+    public function test_capacity_rechecks_changed_weight_before_departure(): void
+    {
+        $this->capacityScenario('depart');
+    }
+
+    private function capacityScenario(string $action): void
+    {
+        ['driver' => $driver, 'manifest' => $manifest, 'assignment' => $assignment, 'parcel' => $parcel, 'provider' => $provider] = $this->fixture(false);
+        $profile = new \App\Models\Logistics\LinehaulProfile;
+        $profile->forceFill(['linehaul_driver_id' => $driver->id, 'plate_number' => 'ABC1234', 'license_no' => 'N01-12-123456',
+            'license_expiry' => now()->addYear()->toDateString(), 'license_codes' => ['B'], 'vehicle_type' => 'Van',
+            'capacity_kg' => '3.60', 'documents' => [], 'review_status' => 'approved', 'version' => 1])->save();
+        if ($action === 'assign') {
+            $assignment->delete();
+        } elseif ($action === 'accept') {
+            $assignment->forceFill(['accepted_at' => null])->save();
+        }
+        foreach ([null, 0, 3601] as $weight) {
+            $parcel->forceFill(['parcel_weight_grams' => $weight])->save();
+            $before = [\App\Models\Logistics\LinehaulAssignment::get()->toArray(), $manifest->fresh()->getAttributes(), $parcel->fresh()->getAttributes(), ManifestAuditLog::count()];
+            try {
+                $action === 'assign'
+                    ? app(LinehaulService::class)->assign($provider, $manifest, $driver)
+                    : app(LinehaulService::class)->act($driver, $manifest, $action, ['seal_number' => 'BH-0000771'], request());
+                $this->fail('Invalid trip capacity was accepted.');
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $this->assertStringContainsString($weight === 3601 ? 'load capacity' : 'positive weight', $exception->getMessage());
+            }
+            $this->assertSame($before, [\App\Models\Logistics\LinehaulAssignment::get()->toArray(), $manifest->fresh()->getAttributes(), $parcel->fresh()->getAttributes(), ManifestAuditLog::count()]);
+        }
+        $parcel->forceFill(['parcel_weight_grams' => 3600])->save();
+        $result = $action === 'assign'
+            ? app(LinehaulService::class)->assign($provider, $manifest, $driver)
+            : app(LinehaulService::class)->act($driver, $manifest, $action, ['seal_number' => 'BH-0000771'], request());
+        $this->assertSame((int) $driver->id, (int) $result->linehaul_driver_id);
+        $this->assertSame($action === 'depart' ? ManifestStatus::Dispatched : ManifestStatus::Draft, $manifest->fresh()->status);
     }
 
     public function test_delay_route_shares_the_existing_authenticated_rate_limit(): void

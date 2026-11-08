@@ -1,5 +1,19 @@
 # Combined Courier security proof — 2026-11-08
 
+## Reviewed vehicle capacity
+
+On tmp/mutation, apply each literal fault independently, run LinehaulDelayTest named prefix in SQLite memory, wait for completion and exactly restore. All five detected. Return to codex/combined-courier-demo and delete temporary branch before final regression. No whole-tree restore or local migration.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| Remove new-assignment capacity check | test_capacity_blocks_assignment | Invalid trip capacity was accepted. (1 assertion, 3614ms) |
+| Remove acceptance recheck | test_capacity_rechecks_changed_weight_before_acceptance | Invalid trip capacity was accepted. (1 assertion, 3494ms) |
+| Remove departure recheck | test_capacity_rechecks_changed_weight_before_departure | Invalid trip capacity was accepted. (1 assertion, 3479ms) |
+| Treat missing/nonpositive weights as valid | test_capacity_blocks_assignment | Invalid trip capacity was accepted. (1 assertion, 3387ms) |
+| Permit one extra gram | test_capacity_blocks_assignment | Invalid trip capacity was accepted. (5 assertions, 3486ms) |
+
+Each was failed/tests 1/passed 0. Final restored PASS: `{"tool":"phpunit","result":"passed","tests":214,"passed":214,"assertions":2491,"duration_ms":56624}`. Existing no-profile compatibility is deliberate and tested by the unchanged Courier suite; it remains a documented scope gap. Concurrent MySQL proof is OPEN.
+
 ## Delay reporting
 
 Ten faults individually applied with literal hunks on tmp/mutation, tested using SQLite memory, then exactly restored. The temporary branch was deleted after returning to codex/combined-courier-demo. No whole-tree restore or development migration. Test prefixes below refer to LinehaulDelayTest; each result was failed, tests 1/passed 0. Transaction fault was repeated once to recapture truncated output.

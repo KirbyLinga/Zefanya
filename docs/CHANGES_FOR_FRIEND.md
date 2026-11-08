@@ -1,5 +1,10 @@
 # Touched your files
 
+## Courier reviewed vehicle capacity — 2026-11-08
+
+- Existing LinehaulService adds a private requireCapacity helper and calls it before new assignment, acceptance and departure. Uses existing submitted/reviewed LinehaulProfile.capacity_kg and positive SellerOrder.parcel_weight_grams snapshots; locks active order rows under existing driver/manifest transaction locks. Exact integer-gram comparison, no mutable catalog fallback. Missing or excessive weights return the existing validation error format before writes. No new table/column/route/service/package; native status/custody/stock/payment implementations unchanged.
+- Existing LinehaulDelayTest gains three additive boundary/rollback tests and an optional fixture departure argument (default true preserves old cases). Test-only approved metadata is in SQLite memory. Existing no-profile presentation exception remains; this is not universal capacity enforcement or an alteration of native Logistics dispatch. Mobile and web views untouched.
+
 ## Courier recorded trip details — 2026-11-08
 
 - Existing LinehaulTripResource adds parcel_count, recorded_weight_grams (nullable complete positive snapshot sum), and departed_at. Existing accepted_at/arrived_at are reused. One filtered item collection drives count, total and existing parcel rows; no new route/table/column/service. Removed unreceived rows are excluded, received/issue history remains visible. No current catalog weight fallback or hidden write.
