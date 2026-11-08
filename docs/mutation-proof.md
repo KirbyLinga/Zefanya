@@ -1,5 +1,21 @@
 # Combined Courier security proof — 2026-11-08
 
+## Earnings totals and date ranges — 2026-11-09
+
+Seven independent faults on tmp/mutation, named LinehaulEarningsTest prefix using SQLite memory, wait to finish then restore exact literal hunks. Return to authorized branch/delete temporary branch before final suite. No local migration or fabricated financial data.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| Remove actual Courier filter | test_total_covers_all_pages | Failed asserting that 2100000 is identical to 0. (10 assertions, 3555ms) |
+| Remove manifest company scope | test_company_scope | Failed asserting that 100000 is identical to 0. (2 assertions, 3541ms) |
+| Exclude first instant of start date | test_inclusive_philippine | Failed asserting that 100000 is identical to 200000. (2 assertions, 3531ms) |
+| Include following midnight | test_inclusive_philippine | Failed asserting that 300000 is identical to 200000. (2 assertions, 3135ms) |
+| Count unconfigured amount as confirmed | test_inclusive_philippine | Failed asserting that 3 is identical to 2. (3 assertions, 3444ms) |
+| Total only visible page | test_total_covers_all_pages | Failed asserting that 2000000 is identical to 2100000. (2 assertions, 4272ms) |
+| Remove maximum date range | test_date_range_and_page | Expected response status code [422] but received 200. (4 assertions, 3990ms) |
+
+Each failed/tests 1/passed 0. Shared authentication/throttle/policy remain unchanged with normal 401/403/429 coverage. Final restored PASS: `{"tool":"phpunit","result":"passed","tests":232,"passed":232,"assertions":2703,"duration_ms":92934}`. Mobile `00:28 +43: All tests passed!`. Real MySQL concurrent execution remains open.
+
 ## Per-trip pay foundation
 
 Six independent literal faults on tmp/mutation; run named LinehaulPayTest prefix using SQLite memory, wait for completion and restore exact hunks. Return to authorized branch and delete tmp/mutation before final regression. No dev migration. Previous shared-auth/ownership mutation proofs retained; normal new pay privacy test covers another Courier.

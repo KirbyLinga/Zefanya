@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier earnings dates and totals — 2026-11-09
+
+- New GET /api/courier/earnings in existing Sanctum/real linehaul/shared throttle group. New LinehaulEarningsRequest validates paired YYYY-MM-DD dates, ordered range/page and prohibited identity overrides using existing LinehaulPolicy::access. New LinehaulEarningsResource exposes only date bounds/timezone, integer summary/counts/pagination and trip ID/result/completion/pay. Existing Api/LinehaulController delegates earnings and sets no-store/private.
+- New LinehaulEarningsService scopes current assignment driver and manifest company, queries completed handovers by inclusive Philippine dates (at most 366 days), reuses LinehaulPayService eligibility/amounts, chunks all matches for total then returns a 20-row page. Unconfirmed amounts excluded/count explicit. No new table/column/migration or earnings/payout writes; native handover/Rider earnings unchanged. New LinehaulEarningsTest covers boundary/privacy/money/read-only/throttle cases.
+- New mobile linehaul_earnings.dart validates response count/integer-money rows. New linehaul_earnings_screen.dart gives server-backed Today/This week/custom dates, total/unknown warning, pagination, refresh/retry and explicit payout limitation. Existing linehaul_portal Account adds Earnings & dates entry. New linehaul_earnings_test.dart covers parsing and small-screen/preset/pagination/retry. No new packages/configuration.
+
 ## Courier per-trip pay foundation — 2026-11-08
 
 - New migration 2026_11_09_010000_add_linehaul_trip_pay_snapshot.php adds nullable unsigned trip_pay_minor and nullable trip_pay_vehicle_type (60) to linehaul_assignments. Owner approved local activation: only this file applied (106.48ms), alone in batch 79. Original manifest/assignment/audit fingerprints unchanged; both pay/type fields null. No defaults/backfill/earnings fabricated.

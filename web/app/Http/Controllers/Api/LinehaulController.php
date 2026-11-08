@@ -73,6 +73,12 @@ class LinehaulController extends Controller
         return $this->success('Trip declined. Logistics can assign another Courier.', new \App\Http\Resources\Mobile\LinehaulDeclineResource($decline));
     }
 
+    public function earnings(\App\Http\Requests\Api\LinehaulEarningsRequest $request, \App\Services\Logistics\LinehaulEarningsService $service): JsonResponse
+    {
+        return $this->success('Completed handover earnings.', new \App\Http\Resources\Mobile\LinehaulEarningsResource(
+            $service->report($request->user(), $request->validated())))->header('Cache-Control', 'no-store, private');
+    }
+
     public function duty(\App\Http\Requests\Api\LinehaulDutyRequest $request): JsonResponse
     {
         return $this->success('Your duty status.', new \App\Http\Resources\Mobile\LinehaulDutyResource($request->user()->fresh()))->header('Cache-Control', 'no-store, private');

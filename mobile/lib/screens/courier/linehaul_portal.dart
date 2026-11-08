@@ -21,6 +21,7 @@ import '../../utils/timed_snackbar.dart';
 import 'courier_qr_scanner.dart';
 import 'linehaul_profile_screen.dart';
 import 'linehaul_delay_dialog.dart';
+import 'linehaul_earnings_screen.dart';
 
 class LinehaulLoginScreen extends StatefulWidget {
   const LinehaulLoginScreen({super.key});
@@ -1076,6 +1077,18 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               ),
               const SizedBox(height: 24),
               _dutyCard(),
+              OutlinedButton.icon(
+                onPressed: _busy || context.read<Repositories>().client == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              LinehaulEarningsScreen(repository: _repository),
+                        ),
+                      ),
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('Earnings & dates'),
+              ),
               const SizedBox(height: 24),
               OutlinedButton(
                 onPressed: _busy ? null : _logout,

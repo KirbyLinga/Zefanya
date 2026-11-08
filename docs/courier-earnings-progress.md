@@ -1,0 +1,15 @@
+# Courier earnings dates and totals — extension 13
+
+Open Courier Account → Earnings & dates. Today and This week use Philippine calendar dates (week starts Monday); Choose dates selects a custom inclusive range of up to 366 days. Report rows are completed/exception handovers by native receiving date. Declined/cancelled zero-pay offers remain in existing Trip History, not this completed-handover list. This does not claim all-status history date filtering is implemented.
+
+The total uses existing frozen rates and LinehaulPayService earned eligibility. Whole-range integer centavo sum covers every matching record, independently of 20-row pagination. Unknown/unconfirmed completed trips stay visible and are counted as excluded. Confirmed earned pay is explicitly distinct from money paid; no payout recording or new ledger credit is created. Repeated refresh only reads.
+
+New authenticated/throttled GET /api/courier/earnings has a FormRequest, reused company/driver policy, safe resource and feature tests. Server prohibits identity overrides and scopes both actual driver and owning company before all reads. Date bounds are start-inclusive and next-midnight-exclusive after Manila-to-database-timezone conversion. Whole-range chunk summary and paged reads share a database read transaction; actual MySQL concurrent consistency remains unverified.
+
+Five new PHP cases cover exact date boundaries, known/unknown totals, 21-record pagination, repeated-read equality, real role/identity/ownership/company filtering, invalid dates/pages/range and shared throttle. Seven deliberate privacy/money/range faults detected/restored and temporary branch deleted. Three mobile tests cover integer/count response validity, Today/week/reset pagination/partial-total layout at 360x640/text scale 1.3, 503 retry and no writes. Initial retry test tapped a partially off-screen button; scroll fully into view and keep its original assertions.
+
+Final restored PHP: `{"tool":"phpunit","result":"passed","tests":232,"passed":232,"assertions":2703,"duration_ms":92934}`. Courier mobile: `00:28 +43: All tests passed!`. Initial analysis found two new brace-style infos; add braces, then final analysis `8 issues found. (ran in 6.2s)` — only the eight pre-existing issues. No schema/setup/configuration/package changes or real demo earning fabricated. No web frontend change, so build not repeated. Dart formatted; Pint waived/UNRUN. Last full-app suite remains earlier vehicle-stage 901, not rerun.
+
+Actual local GET for 2026-11-08 returns one completed handover (#1), earned_minor 0/earned_trips 0/unconfirmed_trips 1, unconfigured/null pay. It is explicitly excluded, not repriced from a fictitious vehicle. Own verification token logged out. Preview :5176 hot restarted in 1979ms, no client connected; backend :8000 unchanged.
+
+Remaining C7 gaps: all-status Trip History date filters, Van support/10-wheel rate decision, breakdown-reassigned history/pay and payout recording. Physical/device rehearsal, universal verified onboarding/capacity, geofence/background GPS/push and hosted HTTPS/APK remain separate. No database approval is needed for this read-only stage.
