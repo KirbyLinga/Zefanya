@@ -1,25 +1,25 @@
 # Combined Courier presentation scope — 2026-11-08
-Stage: Courier extension 10 (reviewed capacity gates at assign/accept/depart) DONE; universal A39 enforcement/schedule/pay OPEN.
+Stage: Courier extension 11 (audited planned departure) CODE DONE; local activation pending specific owner exception; pay OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified capacity source HEAD: 75e252c; this follow-up records state. Same authorized Courier branch; no merge.
+Verified scheduling source HEAD: 524588c; this follow-up records state. Same authorized Courier branch; no merge.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier; shared Zefanya styling. Native manifest/custody/status/stock/payment services and trip history remain intact.
 Assignment/accept/depart still require passed checklist, On Duty/fresh location; submitted vehicle records require approval/nonexpired license. Unsubmitted compatibility retained.
-For submitted vehicle profiles, new assignment/accept/depart require all active parcel weights positive and total <= reviewed capacity in integer grams.
-Existing driver/manifest transaction locks plus stable-ID parcel row locks; recheck on accept/depart. Exact 3.60kg allowed; 3.601kg refused.
-Missing/zero weight blocks before writes; no catalog fallback. Rejection preserves manifest/assignment/parcel/audit records. Existing native lifecycle remains.
-No-profile presentation exception remains explicitly; demo Courier not universally capacity-enforced. Native Logistics dispatch outside Courier service unchanged.
-Owner approved/applied ONLY 2026_11_08_230000_create_linehaul_trip_delays.php (387.04ms), alone in batch 77; zero reports; original assignments/statuses unchanged.
-Prior initial Courier/seal/duty/vehicle/decline migrations remain installed under their specific exceptions; no other pending migration run.
-Final related PHP: {"tool":"phpunit","result":"passed","tests":214,"passed":214,"assertions":2491,"duration_ms":56624}
-Three capacity boundary/rollback tests plus all Courier, native internal manifest/handoff/incidents and Rider registration regressions pass.
-Prior extension-9 Courier mobile: 00:19 +38: All tests passed! Unchanged mobile not rerun. Last full app prior vehicle-stage 901.
-Prior mobile analysis: 8 issues found. (ran in 8.4s); unchanged seven infos/one unused-test-helper warning; not rerun this PHP-only stage.
-No frontend changes; build not repeated. Pint waived/UNRUN. No new route/schema/service/dependency/configuration; no local setup needed.
-Five capacity faults detected/exactly restored; tmp/mutation deleted; earlier mutation proofs retained. No database update/demo mutation this stage.
-Prior local HTTP: #2 Loading/2 parcels/1600g, #1 Completed/1 parcel/800g; times returned, token logged out. Not rerun this stage.
+Submitted profiles retain reviewed capacity gates at assign/accept/depart; no-profile presentation exception remains; universal A39 enforcement OPEN.
+New Logistics plan editor: future Philippine-time input or clear on forward Draft batches only. Does not set actual departure or move parcels.
+Expected schedule version and manifest lock prevent stale edits; identical immediate saved retry is acknowledged without duplicate native audit.
+Native immutable audit stores before/after/version/actor atomically. Own-batch page shows latest ten changes; Courier plan distinct from actual times.
+New migration 2026_11_09_000000_add_linehaul_departure_schedule.php NOT RUN: manifests nullable schedule date/version 0, audit nullable schedule_change JSON.
+Earlier initial Courier/seal/duty/vehicle/decline/delay migrations remain installed under specific exceptions; no new database exception assumed.
+Final related PHP: {"tool":"phpunit","result":"passed","tests":220,"passed":220,"assertions":2573,"duration_ms":72644}
+Six schedule tests plus all Courier/native manifest/handoff/incidents/Rider registration pass: auth/ownership/422/success/429, time/phase/version/retry/audit.
+Final Courier mobile: 00:17 +38: All tests passed! Intended plan display assertions added. Last full app remains prior vehicle-stage 901, not rerun.
+Mobile analysis: 8 issues found. (ran in 11.9s); unchanged seven infos/one unused-test-helper warning, no new issues.
+Web build: 6.91s before PHP tests; generated lucide restored. Dart formatted; Pint waived/UNRUN. No dependency/configuration changes.
+Five scheduling faults detected/exactly restored; tmp/mutation deleted; prior proofs retained. No development migration/demo schedule this stage.
+Pre-activation actual HTTP: #2 Loading/#1 Completed, scheduled_departure_at null, actual times preserved; verification token logged out.
 Current demo #2 already accepted/Loading, so delay stays unavailable until genuine departure; #1 Completed. No fake report/GPS/docs/pay.
-Preview http://127.0.0.1:5176 hot restarted (1088ms), no client connected. API http://127.0.0.1:8000. No merge/APK.
-OPEN: physical C5/C1 document/decline/Maps rehearsal, simultaneous MySQL proof, universal verified onboarding/capacity, schedule/pay.
+Old sessions ended; restarted backend :8000 via local launcher (34174), preview :5176 ready in 63.2s (55913). No merge/APK.
+OPEN: local scheduling activation, physical C5/C1 document/decline/Maps rehearsal, simultaneous MySQL proof, universal verified onboarding/capacity/pay.
 OPEN: in-transit reassignment, geofence/background GPS/push, hosted HTTPS/APK and older S6.2 gates; Courier not fully complete.
-NEXT: backed departure scheduling or full real rehearsal; pay remains open. See courier-capacity-progress.md. STOP after this stage.
+NEXT: approved local scheduling activation, then backed pay or full real rehearsal. See courier-schedule-progress.md. STOP after this stage.
