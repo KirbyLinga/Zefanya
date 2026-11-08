@@ -1,0 +1,13 @@
+# Planned departure — Courier extension 11
+
+Logistics can save or clear a forward Draft batch's planned departure from batch details. Input and label explicitly use Philippine time (UTC+08:00); Courier displays the server's plan in local device time separately from actual departure. Missing plans say Planned departure not set. A plan does not dispatch a batch, change parcel custody, enforce an earliest departure or create pay.
+
+Existing company policy, session auth/approval middleware and new 20/min throttle protect the POST. FormRequest and service validate; native manifest transaction lock and schedule version prevent stale overwrites. Native immutable audit gets before/after/version and actor/request data atomically. An identical immediate lost-response retry is acknowledged without another audit, including after expiry/departure; older intervening-version requests are refused. No-op unchanged plans produce no audit. Own-batch page shows latest ten changes.
+
+Additive migration ONLY: 2026_11_09_000000_add_linehaul_departure_schedule.php adds nullable planned date, version default zero and nullable native audit JSON. Local activation NOT RUN, pending separate owner permission. Existing trips receive no invented schedule/audit. Schema probes hide the editor until installed; existing trips remain readable without the fields.
+
+Verification: six new PHP tests, final related result `{"tool":"phpunit","result":"passed","tests":220,"passed":220,"assertions":2573,"duration_ms":72644}`. Covers 401/403/422/success/429, explicit time/date/future, stale/retry, clear/phase, unchanged native records/actual departure, rollback, own view/history and trip resource distinction. Five faults caught/restored; tmp/mutation deleted. New generated PHPUnit example replaced, existing tests not weakened.
+
+Courier mobile `00:17 +38: All tests passed!`; intended plan assertions added to small-screen/large-text trip details case. Analysis `8 issues found. (ran in 11.9s)` — same seven infos and unused-helper warning. Web build 6.91s before PHP, generated lucide restored. Dart formatted; Pint waived/UNRUN; no dependencies/config changes. Last full-app suite is still earlier vehicle-stage 901, not rerun.
+
+Old runtime sessions had ended. Verified ports free, restarted backend using tools/serve-local.ps1 on 8000 and Flutter web preview on 5176. No .env/global PHP edits. Pre-activation real HTTP trip reads and final preview state recorded in STATE.md. Physical date-picker/rehearsal and concurrent MySQL proof remain open. Pay, universal verified onboarding/capacity, breakdown reassignment, geofence/background GPS/push and hosted HTTPS/APK remain separate stages. Do not mark all C3/Courier complete.

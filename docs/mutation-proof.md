@@ -1,5 +1,19 @@
 # Combined Courier security proof — 2026-11-08
 
+## Planned departure
+
+Five independent literal faults on tmp/mutation; run named LinehaulScheduleTest prefix against SQLite memory, wait, restore exact hunks. Return to authorized Courier branch and delete temporary branch before final regression. No development migration. Existing shared ownership/auth policy remains unchanged with new route 401/403/422/success/429 coverage.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| Ignore expected schedule version | test_schedule_stale | Expected response status code [422] but received 200. (4 assertions, 3550ms) |
+| Ignore forward-Draft phase | test_schedule_clear | Expected response status code [422] but received 200. (4 assertions, 3662ms) |
+| Accept past planned time | test_schedule_validates | Expected response status code [422] but received 200. (1 assertion, 3390ms) |
+| Remove transaction | test_schedule_audit_failure | Failed asserting that saved Carbon date is null. (2 assertions, 3593ms) |
+| Reject saved immediate retry | test_schedule_stale | Expected response status code [200] but received 422. The departure schedule changed. (2 assertions, 3621ms) |
+
+Each failed/tests 1/passed 0. Final restored PASS: `{"tool":"phpunit","result":"passed","tests":220,"passed":220,"assertions":2573,"duration_ms":72644}`. Mobile `00:17 +38: All tests passed!`; analysis eight unchanged issues (11.9s); web build 6.91s before PHP. MySQL concurrent execution remains OPEN.
+
 ## Reviewed vehicle capacity
 
 On tmp/mutation, apply each literal fault independently, run LinehaulDelayTest named prefix in SQLite memory, wait for completion and exactly restore. All five detected. Return to codex/combined-courier-demo and delete temporary branch before final regression. No whole-tree restore or local migration.

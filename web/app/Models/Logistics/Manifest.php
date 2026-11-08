@@ -39,6 +39,8 @@ class Manifest extends Model
         return [
             'status' => ManifestStatus::class,
             'dispatched_at' => 'datetime',
+            'scheduled_departure_at' => 'datetime',
+            'schedule_version' => 'integer',
             'received_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];

@@ -3,6 +3,32 @@
 @section('title', 'Batch Details #'.$manifest->id)
 
 @section('content')
+@if (\App\Services\Logistics\LinehaulScheduleService::installed())
+    <section class="mb-4 rounded-md border p-4">
+        <h2 class="font-semibold">Planned departure</h2>
+        <p>{{ $manifest->scheduled_departure_at?->copy()->timezone('Asia/Manila')->format('M j, Y H:i') ?? 'Not scheduled' }} · Philippine time (UTC+08:00)</p>
+        @if ($manifest->status === \App\Enums\ManifestStatus::Draft && $manifest->direction !== 'return')
+            <form method="POST" action="{{ route('logistics.manifests.schedule', $manifest) }}" class="mt-3 flex flex-wrap items-center gap-3">
+                @csrf
+                <input type="hidden" name="schedule_version" value="{{ $manifest->schedule_version }}">
+                <label for="planned-departure">Planned departure (Philippine time)</label>
+                <input id="planned-departure" type="datetime-local" name="scheduled_departure" value="{{ old('scheduled_departure', $manifest->scheduled_departure_at?->copy()->timezone('Asia/Manila')->format('Y-m-d\TH:i')) }}" class="rounded-md border p-2">
+                <button type="submit" class="rounded-md border px-4 py-2">Save planned departure</button>
+                <p class="w-full">Leave blank to clear the plan. This does not depart the batch or change its actual departure time.</p>
+                @error('scheduled_departure') <p role="alert">{{ $message }}</p> @enderror
+                @error('schedule_version') <p role="alert">{{ $message }}</p> @enderror
+            </form>
+        @endif
+        @if ($scheduleHistory->isNotEmpty())
+            <details class="mt-3">
+                <summary>Recent schedule changes</summary>
+                @foreach ($scheduleHistory as $change)
+                    <p class="mt-2">{{ $change->actor_name }} · {{ $change->created_at->format('M j, Y H:i T') }} · {{ $change->schedule_change['before'] ?? 'Not scheduled' }} → {{ $change->schedule_change['after'] ?? 'Not scheduled' }}</p>
+                @endforeach
+            </details>
+        @endif
+    </section>
+@endif
 @if (isset($courierDelay) && $courierDelay)
     <section class="mb-4 rounded-md border p-4">
         <h2 class="font-semibold">{{ $manifest->status === \App\Enums\ManifestStatus::Dispatched && !$courierAssignment?->arrived_at ? 'Delayed' : 'Last delay report' }}</h2>

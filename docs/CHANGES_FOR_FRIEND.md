@@ -1,5 +1,12 @@
 # Touched your files
 
+## Courier planned departure — 2026-11-08
+
+- New migration 2026_11_09_000000_add_linehaul_departure_schedule.php adds nullable manifests.scheduled_departure_at, unsigned schedule_version default 0, nullable manifest_audit_logs.schedule_change JSON. Existing rows/timestamps preserved. NOT RUN locally pending specific owner exception; no schedule/demo audit fabricated.
+- New LinehaulScheduleService handles explicit Manila time, validation/future/forward-Draft phase, manifest locking, expected-version updates, immediate retry/no-op and native atomic before/after audit. Existing Manifest adds guarded date/version casts; ManifestAuditLog adds JSON cast/action label while retaining append-only guards. No new notification/pay/status system.
+- New POST /logistics/manifests/{manifest}/schedule under existing auth:logistics/logistics.approved plus throttle:20,1. New LinehaulScheduleRequest uses existing LinehaulPolicy::assign; new LinehaulScheduleResource exposes id/plan/version for JSON requests. Existing ManifestController delegates schedule, redirects normal forms, and loads last ten owned batch schedule audits. Existing Logistics Manifests/show adds schema-gated Philippine-time editor/clear and history; actual departure unchanged. New LinehaulScheduleTest covers route boundaries, validation and transaction behavior.
+- Existing LinehaulTripResource adds scheduled_departure_at (nullable). Existing mobile linehaul_repository parses optional zoned timestamp; linehaul_portal shows plan distinctly from actual departure/not-set fallback. Existing linehaul_navigation_test strengthens intended schedule display assertions. No packages/configuration changes. New route does not permit Courier/buyer sessions to edit schedules.
+
 ## Courier reviewed vehicle capacity — 2026-11-08
 
 - Existing LinehaulService adds a private requireCapacity helper and calls it before new assignment, acceptance and departure. Uses existing submitted/reviewed LinehaulProfile.capacity_kg and positive SellerOrder.parcel_weight_grams snapshots; locks active order rows under existing driver/manifest transaction locks. Exact integer-gram comparison, no mutable catalog fallback. Missing or excessive weights return the existing validation error format before writes. No new table/column/route/service/package; native status/custody/stock/payment implementations unchanged.

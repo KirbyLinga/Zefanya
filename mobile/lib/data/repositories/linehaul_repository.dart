@@ -22,6 +22,7 @@ class LinehaulTrip {
     this.acceptedAt,
     this.departedAt,
     this.arrivedAt,
+    this.scheduledDepartureAt,
   });
 
   final String id;
@@ -42,6 +43,7 @@ class LinehaulTrip {
   final DateTime? acceptedAt;
   final DateTime? departedAt;
   final DateTime? arrivedAt;
+  final DateTime? scheduledDepartureAt;
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
@@ -137,6 +139,7 @@ class LinehaulTrip {
       acceptedAt: timestamp('accepted_at'),
       departedAt: timestamp('departed_at'),
       arrivedAt: timestamp('arrived_at'),
+      scheduledDepartureAt: timestamp('scheduled_departure_at'),
       canReportDelay: data['can_report_delay'] == true,
       delay: data['delay'] is Map
           ? LinehaulDelay.fromJson(

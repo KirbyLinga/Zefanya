@@ -134,6 +134,7 @@ void main() {
         'recorded_weight_grams': 3600,
         'accepted_at': '2026-11-08T03:00:00Z',
         'departed_at': '2026-11-08T04:00:00Z',
+        'scheduled_departure_at': '2026-11-08T03:30:00Z',
       }, posts);
       await tester.scrollUntilVisible(
         find.text('Recorded parcel weight: 3.6 kg'),
@@ -143,6 +144,7 @@ void main() {
       expect(find.text('1 parcel in this batch'), findsOneWidget);
       expect(find.textContaining('Accepted:'), findsOneWidget);
       expect(find.textContaining('Departed:'), findsOneWidget);
+      expect(find.textContaining('Planned departure:'), findsOneWidget);
       expect(find.textContaining('Scheduled departure:'), findsNothing);
       expect(posts, isEmpty);
       expect(tester.takeException(), isNull);

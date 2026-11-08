@@ -39,6 +39,11 @@ class ManifestAuditLog extends Model
         });
     }
 
+    protected function casts(): array
+    {
+        return ['schedule_change' => 'array'];
+    }
+
     /**
      * Bulk queries skip model events, so they are refused here as well.
      */
@@ -109,6 +114,7 @@ class ManifestAuditLog extends Model
             'receiving_closed' => 'Receiving closed with missing parcels',
             'courier_decline' => 'Courier declined trip',
             'courier_delay' => 'Courier reported a delay',
+            'courier_schedule' => 'Planned departure changed',
             'cancelled' => 'Manifest Cancelled',
             'deleted' => 'Manifest Deleted',
             default => ucfirst($this->action),

@@ -123,6 +123,16 @@ class ManifestController extends Controller
         ]);
     }
 
+    public function schedule(\App\Http\Requests\Logistics\LinehaulScheduleRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulScheduleService $service): JsonResponse|RedirectResponse
+    {
+        $manifest = $service->save($request->user('logistics'), $manifest, $request->validated(), $request);
+        if ($request->expectsJson()) {
+            return (new \App\Http\Resources\Mobile\LinehaulScheduleResource($manifest))->response();
+        }
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Planned departure saved.');
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $provider = $this->provider($request);
@@ -168,6 +178,8 @@ class ManifestController extends Controller
                 ? \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('logistics_provider_id', $provider->id)->latest('id')->get() : collect(),
             'courierDelay' => \App\Services\Logistics\LinehaulDelayService::installed()
                 ? \App\Services\Logistics\LinehaulDelayService::latest(\App\Models\Logistics\LinehaulAssignment::currentOffer()->where('manifest_id', $manifest->id)->with(['manifest', 'latestDelay'])->first()) : null,
+            'scheduleHistory' => \App\Services\Logistics\LinehaulScheduleService::installed()
+                ? \App\Models\Logistics\ManifestAuditLog::where('manifest_id', $manifest->id)->where('action', 'courier_schedule')->latest('id')->limit(10)->get() : collect(),
             'linehaulDrivers' => \App\Support\RuntimeSchema::hasTable('linehaul_drivers')
                 ? \App\Models\Logistics\LinehaulDriver::query()->where('logistics_provider_id', $provider->id)->where('status', 'active')->orderBy('name')->get()
                     ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)

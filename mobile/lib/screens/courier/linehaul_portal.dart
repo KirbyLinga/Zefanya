@@ -766,6 +766,11 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               const SizedBox(height: 16),
               Text('Trip details', style: theme.textTheme.titleMedium),
               Text(
+                trip.scheduledDepartureAt == null
+                    ? 'Planned departure not set'
+                    : 'Planned departure: ${DateFormat.yMMMd().add_jm().format(trip.scheduledDepartureAt!.toLocal())}',
+              ),
+              Text(
                 '${trip.parcelCount ?? trip.items.length} ${trip.items.length == 1 ? 'parcel' : 'parcels'} in this batch',
               ),
               Text(

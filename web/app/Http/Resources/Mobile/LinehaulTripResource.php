@@ -41,6 +41,7 @@ class LinehaulTripResource extends JsonResource
             'parcel_count' => $items->count(),
             'recorded_weight_grams' => $weight,
             'departed_at' => $manifest->dispatched_at?->toIso8601String(),
+            'scheduled_departure_at' => $manifest->scheduled_departure_at?->toIso8601String(),
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'arrived_at' => $this->arrived_at?->toIso8601String(),
             'items' => $items->map(fn ($item): array => [
