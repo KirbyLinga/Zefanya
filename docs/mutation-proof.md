@@ -1,5 +1,14 @@
 # Combined Courier security proof — 2026-11-08
 
+## Seal receiving extension
+
+On tmp/mutation, with SQLite only, `test_seal_mismatch_requires_note_before_receipt_and_is_audited_as_an_issue` detected both deliberate faults below. Exact hunks restored, temporary branch deleted, final Courier suite passed (11 tests / 232 assertions before the final once-per-manifest assertions).
+
+| Deliberate fault | Observed result |
+| --- | --- |
+| Skip required mismatch note | result failed, tests 1, passed 0: Expected response status code [422] but received 302. |
+| Return before enforcing Courier receipt seal | result failed, tests 1, passed 0: Expected response status code [422] but received 302. |
+
 Temporary branch tmp/mutation; one deliberate fault at a time, restored with exact apply_patch hunks before the next fault. Nothing was committed with a broken guard. Each command used `vendor/phpunit/phpunit/phpunit tests/Feature/LinehaulDemoTest.php --filter=<filter>`. All ten final runs reported result failed, tests 1, passed 0, failed 1.
 
 | Deliberate fault | Filter | Observed failure |

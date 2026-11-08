@@ -253,6 +253,8 @@ class ManifestController extends Controller
             'manifest' => $manifest,
             'items' => $this->visibleItems($manifest),
             'counts' => $this->manifests->counts($manifest),
+            'sealReceipt' => \App\Support\RuntimeSchema::hasColumn('linehaul_assignments', 'seal_receipt')
+                ? \App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->first()?->seal_receipt : null,
         ]);
     }
 
@@ -280,6 +282,7 @@ class ManifestController extends Controller
                 'logistics',
                 (int) $provider->id,
                 (string) $data['verification_token'],
+                $request,
             );
 
             $issueMessage = $issueType === 'missing'

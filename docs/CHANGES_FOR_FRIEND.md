@@ -1,5 +1,14 @@
 # Touched your files
 
+## Courier seal receiving stage — 2026-11-08
+
+- New nullable column `linehaul_assignments.seal_receipt` in `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php`; LOCAL MIGRATION NOT RUN.
+- New `LinehaulSealService` validates and stores first seal confirmation under the native manifest lock; mismatch notes/audit/database notification, with setup-pending refusal before migration.
+- New database-only `CourierSealDiscrepancy` notification; no mail/push or new routes.
+- `LinehaulAssignment` casts the guarded receipt JSON. `ManifestService` gates normal/missing/damaged receiving and preserves seal discrepancies on completion; existing non-Courier manifests unchanged.
+- `ManifestController` passes trusted request context and seal receipt to the existing receiving page. `parcel-scanner.js` renders seal/note fields from the server action; receiving Blade shows confirmation/discrepancy and closed-with-issues copy.
+- `LinehaulDemoTest` adds/refines receiving seal assertions without removing prior assertions. No Buyer/Rider mobile changes, stock/payment writes or existing demo trip changes.
+
 - Courier rehearsal fix: `web/app/Http/Resources/Mobile/LinehaulTripResource.php` retains received parcels after native receiving releases them, so completed history reports the actual received count. Removed/unreceived items stay excluded. Full-trip regression strengthened; no schema or route changes.
 
 ## Courier design integration — 2026-11-08

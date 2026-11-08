@@ -556,6 +556,7 @@ class ManifestService
                 'method' => 'POST',
                 'url' => $url,
                 'confirm_message' => $confirm,
+                'requires_seal' => $context === 'manifest_receive' && app(LinehaulSealService::class)->requiresConfirmation($manifest),
                 'verification_token' => $token,
             ]],
             'verification_token' => $token,
@@ -636,6 +637,7 @@ class ManifestService
             );
             $method = $payload['method'] ?? ParcelHandoffVerification::METHOD_MANUAL;
 
+            app(LinehaulSealService::class)->confirm($locked, $provider, $request);
             $lockedItem->markReceived(
                 ParcelHandoffVerification::ACTOR_LOGISTICS,
                 (int) $provider->id,
@@ -656,7 +658,8 @@ class ManifestService
 
             if (! $pending) {
                 $locked->forceFill([
-                    'status' => ManifestStatus::Received->value,
+                    'status' => app(LinehaulSealService::class)->hasDiscrepancy($locked)
+                        ? ManifestStatus::ReceivedWithExceptions->value : ManifestStatus::Received->value,
                     'received_at' => now(),
                     'received_by_type' => ParcelHandoffVerification::ACTOR_LOGISTICS,
                     'received_by_id' => $provider->id,
@@ -691,7 +694,7 @@ class ManifestService
     /**
      * Report an issue (missing or damaged) on a received item.
      */
-    public function reportIssue(Manifest $manifest, ManifestItem $item, string $issueType, string $note, string $actorType, ?int $actorId = null, ?string $token = null): void
+    public function reportIssue(Manifest $manifest, ManifestItem $item, string $issueType, string $note, string $actorType, ?int $actorId = null, ?string $token = null, ?Request $request = null): void
     {
         $provider = auth('logistics')->user();
         $this->assertManifestOwner($manifest, $provider);
@@ -704,7 +707,7 @@ class ManifestService
                 (int) $manifest->origin_hub_id, (int) $manifest->destination_hub_id, $provider, $currentItem);
         }
 
-        DB::transaction(function () use ($manifest, $item, $issueType, $note, $actorType, $actorId, $token): void {
+        DB::transaction(function () use ($manifest, $item, $issueType, $note, $actorType, $actorId, $token, $request): void {
             $locked = $this->lockManifest($manifest);
             $this->assertManifestOwner($locked, auth('logistics')->user());
 
@@ -741,9 +744,11 @@ class ManifestService
 
             if ($issueType === 'missing') {
                 // Missing: release without receiving
+                app(LinehaulSealService::class)->confirm($locked, $provider, $request);
                 $lockedItem->markMissing(trim($note));
             } else {
                 // Damaged: receive into custody with flag
+                app(LinehaulSealService::class)->confirm($locked, $provider, $request);
                 $lockedItem->markDamaged(trim($note), $actorType, $actorId);
                 $lockedItem->sellerOrder->forceFill([
                     'custody_provider_id' => $locked->logistics_provider_id,
@@ -782,7 +787,7 @@ class ManifestService
             ->whereNotNull('issue_type')
             ->exists();
 
-        if ($hasIssues) {
+        if ($hasIssues || app(LinehaulSealService::class)->hasDiscrepancy($manifest)) {
             $manifest->forceFill(['status' => ManifestStatus::ReceivedWithExceptions->value])->save();
         } elseif ($manifest->status === ManifestStatus::Dispatched) {
             $manifest->forceFill(['status' => ManifestStatus::Received->value])->save();

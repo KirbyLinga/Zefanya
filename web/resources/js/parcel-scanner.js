@@ -223,9 +223,21 @@
                     ? `<input type="hidden" name="verification_token" value="${escapeAttr(action.verification_token)}">`
                     : '';
 
+                const sealFields = action.requires_seal
+                    ? `<div class="mb-3 space-y-3 font-sans text-xs">
+                        <label class="block">Seal observed on arrival
+                            <input name="observed_seal" required pattern="BH-[0-9]{7}" maxlength="10" placeholder="BH-0004521" autocomplete="off" class="mt-1 block w-full rounded border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2 text-[var(--text-ink)]">
+                        </label>
+                        <label class="block">Seal discrepancy note (required if the seal differs)
+                            <textarea name="seal_note" maxlength="500" rows="3" class="mt-1 block w-full rounded border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2 text-[var(--text-ink)]"></textarea>
+                        </label>
+                        <p>Check the physical seal before opening the load. A mismatch is recorded and requires a note.</p>
+                    </div>` : '';
+
                 return `<form method="POST" action="${escapeAttr(action.url)}" class="inline"${confirmAttr}>
                     <input type="hidden" name="_token" value="${escapeAttr(csrf)}">
                     ${tokenField}
+                    ${sealFields}
                     <button type="submit" class="inline-flex h-9 items-center justify-center rounded-sm bg-primary-700 px-4 font-sans text-[11.5px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-primary-800">${escapeHtml(action.label)}</button>
                 </form>`;
             }).join(' ');

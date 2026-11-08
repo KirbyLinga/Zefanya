@@ -25,6 +25,15 @@
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 
+@if ($sealReceipt ?? null)
+    <section class="mb-5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans text-xs text-[var(--text-ink)]">
+        <h2 class="font-semibold">{{ $sealReceipt['mismatch'] ? 'Seal discrepancy recorded' : 'Arrival seal confirmed' }}</h2>
+        <p class="mt-1">Departure: {{ $sealReceipt['expected'] }} · Arrival: {{ $sealReceipt['observed'] }}</p>
+        @if ($sealReceipt['note']) <p class="mt-1">{{ $sealReceipt['note'] }}</p> @endif
+        <p class="mt-1 text-[var(--text-muted)]">Confirmed by {{ $sealReceipt['actor_name'] }} at {{ $sealReceipt['confirmed_at'] }}. The original departure seal is retained.</p>
+    </section>
+@endif
+
 @if (session('nextStep'))
     <div class="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 font-sans text-[12px] text-blue-800">
         <p class="font-semibold">Next steps</p>
@@ -52,7 +61,12 @@
     </div>
 </section>
 
-@if ($isReceived)
+@if ($manifest->status === ManifestStatus::ReceivedWithExceptions)
+    <section class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 font-sans text-xs text-amber-900">
+        <h2 class="font-semibold">Batch closed with issues</h2>
+        <p class="mt-1">Review the recorded seal or parcel discrepancies before treating this transfer as a clean handover.</p>
+    </section>
+@elseif ($isReceived)
     <section class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-5">
         <div class="flex items-start gap-3">
             <i data-lucide="check-circle-2" class="mt-0.5 size-5 shrink-0 text-emerald-700"></i>

@@ -1,5 +1,11 @@
 # Demo and recording in the newer checkout
 
+## Courier seal extension — activation pending
+
+The new seal check needs ONLY `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php`, adding nullable JSON `seal_receipt`. It has not run on local MySQL; do not run the whole migration backlog. Until the owner approves this additional setup, Courier receipt stops with a setup-pending message; existing non-Courier transfers are unchanged.
+
+Once enabled: receive a dispatched Courier trip using the existing Logistics receiving screen. After verifying its first parcel, type the seal physically observed on arrival. A matching seal permits receipt; a different seal requires a note (1–500 characters). Confirmation retains original/observed seals, note, actor and time; a mismatch adds an append-only event and database-only Logistics notification. Later parcels reuse this confirmation. Final receipt with a seal discrepancy appears as Received with Issues in Courier History, not a clean Completed trip. This stage does not add GPS, push, duty, pay or the complete missing/damaged closeout workflow.
+
 ## Ready-to-use local Courier trips
 
 User-requested fixtures created 2026-11-08: three separate zero-value transfer batches, two parcels each, Pila Station Hub to Laguna Province Hub. No existing order/stock/payment changes. These have no sale lines and only rehearse transfers.

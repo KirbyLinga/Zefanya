@@ -140,7 +140,7 @@ class LinehaulDemoTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->actingAs($provider, 'logistics');
         $token = $this->postJson(route('logistics.manifests.scan.verify', $manifest), ['tracking_number' => $parcel->tracking_number, 'phase' => 'receive', 'method' => 'manual'])->assertOk()->json('verification_token');
-        $this->post(route('logistics.manifests.receive.store', [$manifest, $item]), ['verification_token' => $token])->assertRedirect();
+        $this->post(route('logistics.manifests.receive.store', [$manifest, $item]), ['verification_token' => $token, 'observed_seal' => 'BH-0004521'])->assertRedirect();
         $this->assertSame(ManifestStatus::Received, $manifest->fresh()->status);
         $this->api($driver)->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.status', 'Completed')
             ->assertJsonCount(1, 'data.0.items')->assertJsonPath('data.0.items.0.received', true);
@@ -172,12 +172,61 @@ class LinehaulDemoTest extends TestCase
             $token = $this->postJson(route('logistics.manifests.scan.verify', $manifest), [
                 'tracking_number' => $receivingParcel->tracking_number, 'phase' => 'receive', 'method' => 'manual',
             ])->assertOk()->json('verification_token');
-            $this->post(route('logistics.manifests.receive.store', [$manifest, $receivingItem]), ['verification_token' => $token])->assertRedirect();
+            $this->post(route('logistics.manifests.receive.store', [$manifest, $receivingItem]), [
+                'verification_token' => $token, ...($index === 0 ? ['observed_seal' => 'BH-0004521'] : []),
+            ])->assertRedirect()->assertSessionHasNoErrors();
             $this->api($driver)->getJson('/api/courier/trips')->assertOk()
                 ->assertJsonPath('data.0.status', $index === 0 ? 'Arrived' : 'Completed');
         }
         $this->assertNotNull($item->fresh()->received_at);
         $this->assertNotNull($secondItem->fresh()->received_at);
+        $this->assertSame(1, ManifestAuditLog::where('manifest_id', $manifest->id)->where('action', 'seal_confirmed')->count());
+    }
+
+    public function test_seal_mismatch_requires_note_before_receipt_and_is_audited_as_an_issue(): void
+    {
+        ['driver' => $driver, 'manifest' => $manifest, 'provider' => $provider, 'item' => $item, 'parcel' => $parcel] = $this->fixture();
+        $path = '/api/courier/trips/'.$manifest->id;
+        $this->api($driver)->postJson($path.'/accept')->assertOk();
+        $this->postJson($path.'/scan', ['tracking_number' => $parcel->tracking_number])->assertOk();
+        $this->postJson($path.'/depart', ['seal_number' => 'BH-0004521'])->assertOk();
+        $this->postJson($path.'/arrive')->assertOk();
+        $this->flushHeaders();
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($provider, 'logistics');
+        $scan = $this->postJson(route('logistics.manifests.scan.verify', $manifest), [
+            'tracking_number' => $parcel->tracking_number, 'phase' => 'receive', 'method' => 'manual',
+        ])->assertOk()->assertJsonPath('actions.0.requires_seal', true);
+        $token = $scan->json('verification_token');
+        $url = route('logistics.manifests.receive.store', [$manifest, $item]);
+        foreach ([[], ['observed_seal' => 'invalid']] as $input) {
+            $this->postJson($url, ['verification_token' => $token, ...$input])->assertUnprocessable()->assertJsonValidationErrors('observed_seal');
+        }
+        foreach (['', '   ', str_repeat('x', 501)] as $note) {
+            $this->postJson($url, ['verification_token' => $token, 'observed_seal' => 'BH-0004522', 'seal_note' => $note])
+                ->assertUnprocessable()->assertJsonValidationErrors('seal_note');
+            $this->assertNull($item->fresh()->received_at);
+            $this->assertSame(ManifestStatus::Dispatched, $manifest->fresh()->status);
+            $this->assertNull(\App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->sole()->seal_receipt);
+        }
+        foreach (['missing', 'damaged'] as $issue) {
+            $this->postJson($url, ['verification_token' => $token, 'issue_type' => $issue, 'issue_note' => 'Rehearsal exception.'])
+                ->assertUnprocessable()->assertJsonValidationErrors('observed_seal');
+            $this->assertNull($item->fresh()->issue_type);
+            $this->assertNull($item->fresh()->received_at);
+        }
+        $this->post($url, ['verification_token' => $token, 'observed_seal' => 'BH-0004522', 'seal_note' => 'Seal differs from departure.'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $assignment = \App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->sole();
+        $this->assertSame('BH-0004521', $assignment->seal_number);
+        $this->assertSame('BH-0004522', $assignment->seal_receipt['observed']);
+        $this->assertSame('Seal differs from departure.', $assignment->seal_receipt['note']);
+        $this->assertSame($provider->id, $assignment->seal_receipt['actor_id']);
+        $this->assertSame(1, ManifestAuditLog::where('manifest_id', $manifest->id)->where('action', 'seal_discrepancy')->count());
+        $this->assertSame(1, $provider->notifications()->where('type', \App\Notifications\Logistics\CourierSealDiscrepancy::class)->count());
+        $this->get(route('logistics.manifests.receive.index', $manifest))->assertOk()->assertSee('Seal discrepancy recorded')->assertSee('Seal differs from departure.');
+        $this->api($driver)->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.status', 'Received with Issues')
+            ->assertJsonCount(1, 'data.0.items')->assertJsonPath('data.0.items.0.received', true);
     }
 
     public function test_demo_provisioning_never_overwrites_accounts(): void

@@ -4,11 +4,12 @@
 
 | Feature | Status | Evidence | Open gate |
 | --- | --- | --- | --- |
-| Separate Courier login/profile in combined app | LIVE-READY (local login only) | Explicit local setup approved/applied; real MySQL login/profile/logout and role isolation checked; app/backend HTTP 200 | No assigned-trip or phone claim |
-| Assigned-manifest portal, acceptance, scans and departure | NEEDS-CREDENTIALS | Native ManifestService, encrypted expiring tokens, actor audits; 9 backend tests and mobile auth/routing/widgets | Assign a real demo manifest and rehearse it; QR/Code128/camera permissions need physical-device verification |
+| Separate Courier login/profile in combined app | LIVE-READY locally | Real browser login/account checked, role isolation tested | HTTPS/physical-device release not verified |
+| Assigned-manifest portal, acceptance, scans, departure and Logistics receipt | LIVE-READY locally before seal extension activation | Full manual-entry browser rehearsal batch #1 Completed, received count verified; user reports camera works | Independent QR/Code128/permission coverage still open |
+| Arrival seal confirmation and documented mismatch | BACKEND-ONLY pending local activation | 11 Courier tests / 235 assertions; related native checks 53 tests / 599 assertions before final 3 assertions; assets built 5.90s; two deliberate bypasses detected | New nullable seal_receipt migration NOT RUN; local receiving intentionally refuses until enabled. No real seal-extension browser rehearsal yet |
 | GPS proximity/tracking, activation/documents/duty/capacity, reassignment, Courier pay and full discrepancies | UNREACHABLE | Deferred, no corresponding Courier actions advertised | Outside limited presentation scope |
 
-Courier login is locally verified; the full trip demo is not LIVE-READY until assignment/rehearsal passes. See demo-script.md and DECISIONS.md. Existing Buyer/Rider status below is historical and not a complete audit of this newer integration snapshot.
+The local core transfer rehearsal passed. User authorized expanding Courier; seal confirmation is the first extension stage, pending explicit local schema approval. Remaining Courier areas are not implemented by this stage. See demo-script.md and DECISIONS.md. Existing Buyer/Rider status below is historical and not a complete audit of this newer integration snapshot.
 
 ## S6.4 incremental feature status
 

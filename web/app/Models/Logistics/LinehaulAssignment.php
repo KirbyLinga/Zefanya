@@ -13,7 +13,7 @@ class LinehaulAssignment extends Model
 
     protected function casts(): array
     {
-        return ['accepted_at' => 'datetime', 'arrived_at' => 'datetime', 'loading_tokens' => 'encrypted:array'];
+        return ['accepted_at' => 'datetime', 'arrived_at' => 'datetime', 'loading_tokens' => 'encrypted:array', 'seal_receipt' => 'array'];
     }
 
     public function driver(): BelongsTo
