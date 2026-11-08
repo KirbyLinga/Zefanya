@@ -24,6 +24,8 @@ Choose **Are you a Courier? Sign in here** on the shared sign-in page. Use the c
 
 ## Safe walkthrough before moving the trip
 
+After restarting Flutter with the current source, History and Earnings refresh when returning from another tab, retaining the selected dates/page. Pull-to-refresh and Retry also retain that page; a failed refresh hides stale results. Selecting a different date preset starts at page one. This fetches on navigation, not by background push.
+
 | Screen | Verified data / expected display |
 | --- | --- |
 | Trips | #2 is already accepted: Loading, two parcels, recorded total 1.6 kg. Do not accept or decline it again. |

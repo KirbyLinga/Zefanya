@@ -185,6 +185,8 @@ void main() {
         150,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       expect(earnings.last['page'], '2');
@@ -231,6 +233,11 @@ void main() {
       expect(earnings.length, 4);
       expect(earnings.last, selectedEarnings);
       expect(find.text('₱4,000.00'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Page 2 of 2'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Page 2 of 2'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
