@@ -1,25 +1,25 @@
 # Combined Courier presentation scope — 2026-11-08
-Stage: Courier extension 5 item 1 (profile visibility) DONE; full C1 vehicle/document module OPEN. Prior seal/exception/duty/closeout retained.
+Stage: Courier extension 5 item 2 (vehicle/license/private documents/company review) CODE DONE; local activation and manual C1 acceptance OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified profile source HEAD: 954e05c; this follow-up only records state. Same Courier branch; no merge.
+Verified vehicle source HEAD: 6289d7e; this follow-up only records state. Same Courier branch; no merge.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
-Keep legacy Rider role and linehaul Courier. Branded login, Trips/History/Account use shared Zefanya fonts/colors/cards/nav/empty states.
-New assignment/accept/depart require On Duty, passed checklist and <5-minute location update; owning company, active-trip and driver/manifest locks retained.
-Courier accepts, scans QR/Code128/manual, departs with seal, reports arrival; native Logistics receiving alone yields Completed.
-Native ManifestService/custody/status retained; encrypted/hidden scan tokens expire; actual actor audits retained.
-New migration installed ONLY linehaul_drivers/linehaul_assignments in zefanya_friend_20261107, with explicit user exception.
-Explicitly provisioned one demo Courier at Demo Laguna Express/Pila Station Hub; no existing account overwritten.
-Baseline: 80 PHP tests/622 assertions and 873 mobile tests passed after locked dependencies restored and process-only GD enabled.
-Restored broader PHP: {"tool":"phpunit","result":"passed","tests":121,"passed":121,"assertions":1009,"duration_ms":32119}
-Profile final PHP: {"tool":"phpunit","result":"passed","tests":70,"passed":70,"assertions":1071,"duration_ms":16328}
-Profile/trip/duty mobile: 00:07 +12: All tests passed! Full mobile prior: 04:07 +890: All tests passed! Full not rerun this stage.
-Mobile analysis: 8 issues found. (ran in 11.5s); same existing 7 infos and 1 unused-test-helper warning; no new profile issues.
-No web frontend change/build this stage; previous closeout web build 14.43s. No dependency/schema/dev-data changes. Pint waived/UNRUN.
-Ten prior security faults + two seal + three exception + seven duty + seven closeout faults detected/restored; final 67 passed; tmp/mutation deleted.
-Closeout: owning active Logistics, named company 20/min limit, reviewed exact pending set, confirmed arrival/seal/note, atomic native missing incidents, preserved receipts/notes, idempotent replay.
-Profile: Account > Company & profile; live identity/email verification/company/hub, explicit missing vehicle/documents, retry/refresh, no-store allowlist, selector refusal.
-Existing gaps retained: PLACED-only cancellation conflicts with prior cutoff; S6.2 breakdown/wallet, review, HTTPS/device gates open.
-User approved separate local demo data: zero-value parcel #8 / batch #1, DEMO-COURIER-20261108-01. Existing orders/stock/payments untouched.
-Real HTTP: all three logins/profiles succeeded; Courier trip #1 Completed/1 received, Rider access 403, Chrome CORS 204; own test tokens logged out.
-Profile live HTTP: Demo Pila Courier / Demo Laguna Express / Pila Station Hub; no-store/private; own verification token logged out. Backend started on :8000.
-Preview http://127.0.0.1:5175 hot restart complete (1189ms); reused existing server after port-in-use refusal. Next item 2: vehicle/license/private documents + company review (docs/courier-profile-progress.md); migration exception required. Hardware/500m GPS/background/push/reassignment/pay OPEN.
+Keep legacy Rider role and linehaul Courier; shared Zefanya styling. Native manifest/custody/status/stock/payment services and trip history remain intact.
+New assignment/accept/depart require passed checklist, On Duty and <5-minute location; submitted vehicle records additionally need approval/nonexpired license.
+Vehicle edits require Off Duty/no active trip; optimistic versions; normalized cross-role plates under shared mutex/current locking reads in both Rider writers.
+Professional license/codes/expiry, truck type/capacity; private license/OR-CR/NBI uploads checked by content/type and <=5 MB; safe replacement/rollback.
+Logistics > Couriers: own-company list, private downloads, version-bound approval/corrections/capacity confirmation; immutable review replay; named 60/min limit.
+Presentation compatibility: ALL unsubmitted accounts retain previous access; Active/email verification is not document approval. Mandatory onboarding deferred.
+Earlier initial Courier, seal and duty migrations remain installed under prior specific exceptions; existing account/trip/order values unchanged this stage.
+NEW 2026_11_08_200000_create_linehaul_profiles.php NOT RUN: only linehaul_profiles and vehicle_plate_locks; separate owner exception required.
+Final related PHP: {"tool":"phpunit","result":"passed","tests":193,"passed":193,"assertions":2081,"duration_ms":63407}
+Latest focused PHP after view-case alignment: {"tool":"phpunit","result":"passed","tests":10,"passed":10,"assertions":279,"duration_ms":9358}
+Full mobile: 03:29 +901: All tests passed! Final focused after test-only style/minimal-diff corrections: 00:11 +19: All tests passed!
+Mobile analysis: 8 issues found. (ran in 9.0s); same existing 7 infos/1 unused-test-helper warning, no new issues.
+Web build: 8.72s. Added only file_selector 1.1.0 and its 3 missing platform packages; no upgrades. Pint remains waived/UNRUN.
+18 new safety faults detected/restored; tmp/mutation deleted; prior security/seal/exception/duty/closeout proofs retained in mutation-proof.md.
+Demo data preserved: zero-value completed batch #1/parcel #8; #2-4 unchanged by this stage. Demo Courier has an active draft: finish handover before editing.
+Backend :8000 now uses tools/serve-local.ps1, process-only 5M uploads/20M requests; global php.ini/.env unchanged. Default PHP was 2M/8M.
+Real login/vehicle HTTP 200: setup_required true/editable false/profile null; no-store/private; test token logged out. Browser preflight 204.
+Preview http://127.0.0.1:5175 recompiled (54.3s), includes file-selector plugin; API http://127.0.0.1:8000. No merge or release APK this stage.
+OPEN: real documents/camera/Files/PDF/device and 5 MB deployment acceptance; MySQL concurrency; hub GPS/background/push/reassignment/pay; older cancellation/S6.2/HTTPS gates.
+NEXT: request specific local migration exception, run ONLY the new file, verify setup false without fabricating documents; then own-company rehearsal. See courier-profile-progress.md.
