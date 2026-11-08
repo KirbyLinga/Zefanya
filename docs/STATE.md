@@ -1,5 +1,5 @@
 # Combined Courier presentation scope — 2026-11-08
-Stage: Courier extension 3 (duty/checklist) IMPLEMENTED/TESTED; local duty migration needs approval. Prior seal/exception stages retained; hardware rehearsal OPEN.
+Stage: Courier extension 3 (duty/checklist) IMPLEMENTED/TESTED/ENABLED locally after explicit approval; real duty/permission rehearsal OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
 Verified duty source HEAD: 586b2ed; this follow-up only records state. Same Courier branch; no merge.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
@@ -14,12 +14,12 @@ Restored broader PHP: {"tool":"phpunit","result":"passed","tests":121,"passed":1
 Duty related PHP: {"tool":"phpunit","result":"passed","tests":60,"passed":60,"assertions":819,"duration_ms":29601}
 Duty full mobile: 04:07 +890: All tests passed! Final focused: 00:10 +15: All tests passed!
 Duty final analysis: 8 issues found. (ran in 10.7s); existing 7 infos and 1 unused-test-helper warning, no new findings.
-Duty web assets built in 30.24s; no new dependency. New additive duty migration NOT RUN; existing Couriers default Off Duty.
+Duty web assets built in 30.24s; no new dependency. ONLY approved duty migration ran (360.52ms); demo Courier Off Duty, no checklist history.
 Ten prior security faults + two seal + three exception + seven duty faults detected; all guards restored, final 60 passed; tmp/mutation deleted.
 Duty: five checklist answers, failed note/history/Logistics database notice, active-trip Off Duty block, explicit foreground location, minute updates/pause/resume, private company readiness.
 Deferred: activation/document/vehicle/capacity flows, 500 m hub GPS/background tracking/push, reassignment, pay and bulk discrepancy closeout.
 Existing gaps retained: PLACED-only cancellation conflicts with prior cutoff; S6.2 breakdown/wallet, review, HTTPS/device gates open.
 User approved separate local demo data: zero-value parcel #8 / batch #1, DEMO-COURIER-20261108-01. Existing orders/stock/payments untouched.
 Real HTTP: all three logins/profiles succeeded; Courier trip #1 Completed/1 received, Rider access 403, Chrome CORS 204; own test tokens logged out.
-Latest duty preview: http://127.0.0.1:5175; hot restart recompile complete (2635ms, no client connected). Backend http://127.0.0.1:8000; actual duty API safely reports Setup pending.
-Real duty API reports setup_required true/Setup pending; write readiness gates fail closed until approval of ONLY 2026_11_08_180000. Then device/duty rehearsal; later vehicle/profile or bulk closeout. No merge/APK; Pint waived/UNRUN.
+Latest duty preview: http://127.0.0.1:5175; hot restart recompile complete (2635ms). Backend http://127.0.0.1:8000; actual duty API reports setup_required false/Off Duty.
+Activation verified: all four fields present, duty history count 0, batches #1 Received/#2-4 Draft unchanged. Next: user location/checklist rehearsal; later vehicle/profile or bulk closeout. No merge/APK; Pint waived/UNRUN.

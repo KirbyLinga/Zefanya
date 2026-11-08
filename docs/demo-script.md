@@ -1,8 +1,8 @@
 # Demo and recording in the newer checkout
 
-## Courier duty/checklist — activation pending
+## Courier duty/checklist — enabled locally
 
-Code and tests are ready; local API currently reports Setup pending. The owner must approve ONLY `2026_11_08_180000_add_linehaul_duty_readiness.php` (four driver readiness fields + checklist history table). Do not run the whole migration backlog. Existing Couriers default Off Duty; no demo trip has been changed or automatically marked ready.
+The owner explicitly approved and applied ONLY `2026_11_08_180000_add_linehaul_duty_readiness.php` (360.52ms). Verified all four fields and history table, real API setup_required false / Off Duty, empty checklist history, batches #1 Received and #2–#4 Draft unchanged. No Courier was automatically marked ready. Do not run the whole migration backlog. Actual user location/checklist/force-kill rehearsal remains open.
 
 After activation, open Courier Account → Duty & readiness → Go On Duty. Allow foreground location when prompted; a current location accurate to 100 m or better is required. Answer Tires, Lights, Brakes, Fuel and Cargo door lock explicitly. All OK puts the Courier On Duty. Any Not OK needs a note, leaves Off Duty and notifies the owning Logistics database inbox. Missing answers cannot submit.
 

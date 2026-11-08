@@ -2,7 +2,7 @@
 
 ## Courier duty/checklist stage — 2026-11-08
 
-- Migration 2026_11_08_180000_add_linehaul_duty_readiness.php adds linehaul_drivers.on_duty (default false), duty_checked_at, last_seen_at, duty_location and the linehaul_duty_checks history table. LOCAL MIGRATION NOT RUN.
+- Migration 2026_11_08_180000_add_linehaul_duty_readiness.php adds linehaul_drivers.on_duty (default false), duty_checked_at, last_seen_at, duty_location and the linehaul_duty_checks history table. Applied alone after explicit owner approval (360.52ms); real Courier Off Duty/history empty, existing batches unchanged.
 - New LinehaulDutyService, LinehaulDutyCheck, LinehaulDutyRequest and LinehaulDutyResource implement trusted duty/checklist state, bounded location input, locks/freshness, failed-check history and setup-pending refusal. New database-only CourierChecklistFailed notification.
 - GET /api/courier/duty and POST /api/courier/duty/{on|off|heartbeat} use existing Sanctum/linehaul/60-per-minute throttle, active-account policy, new request/resource and feature tests. No target driver is accepted from input; no Buyer/Rider position exposure.
 - LinehaulDriver casts new guarded fields and exposes latest checklist internally. LinehaulService guards assignment/accept/depart; its original active-trip lock remains. Login and completed-trip annotations do not require On Duty.
