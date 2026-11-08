@@ -59,11 +59,11 @@ class ManifestController extends Controller
         } else {
             // Outgoing: manifests this provider is sending from (origin_hub_id)
             $manifests = Manifest::query()
-                ->where('origin_hub_id', function ($query) use ($provider): void {
+                ->where('logistics_provider_id', $provider->id)
+                ->whereIn('origin_hub_id', function ($query) use ($provider): void {
                     $query->select('id')
                         ->from('logistics_hubs')
-                        ->where('logistics_provider_id', $provider->id)
-                        ->limit(1);
+                        ->where('logistics_provider_id', $provider->id);
                 })
                 ->with(['originHub:id,name,hub_type', 'destinationHub:id,name,hub_type'])
                 ->withCount([
@@ -78,12 +78,20 @@ class ManifestController extends Controller
                 ->withQueryString();
         }
 
+        $unassignedDeclines = collect();
+        if (\App\Services\Logistics\LinehaulDeclineService::installed()) {
+            $currentIds = \App\Models\Logistics\LinehaulAssignment::currentOffer()->whereIn('manifest_id', $manifests->pluck('id'))->pluck('manifest_id');
+            $unassignedDeclines = \App\Models\Logistics\LinehaulTripDecline::where('logistics_provider_id', $provider->id)
+                ->whereIn('manifest_id', $manifests->pluck('id'))->whereNotIn('manifest_id', $currentIds)->latest('id')->get()->unique('manifest_id')->keyBy('manifest_id');
+        }
+
         return view('Logistics.Manifests.index', [
             'provider' => $provider,
             'manifests' => $manifests,
             'status' => $status,
             'tab' => $tab,
             'statuses' => ManifestStatus::cases(),
+            'unassignedDeclines' => $unassignedDeclines,
         ]);
     }
 
@@ -146,10 +154,13 @@ class ManifestController extends Controller
                 : collect(),
             'hubs' => $this->hubs($request),
             'courierAssignment' => \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
-                ? \App\Models\Logistics\LinehaulAssignment::query()->with('driver')->where('manifest_id', $manifest->id)->first() : null,
+                ? \App\Models\Logistics\LinehaulAssignment::query()->currentOffer()->with('driver')->where('manifest_id', $manifest->id)->first() : null,
+            'courierDeclines' => \App\Services\Logistics\LinehaulDeclineService::installed()
+                ? \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('logistics_provider_id', $provider->id)->latest('id')->get() : collect(),
             'linehaulDrivers' => \App\Support\RuntimeSchema::hasTable('linehaul_drivers')
                 ? \App\Models\Logistics\LinehaulDriver::query()->where('logistics_provider_id', $provider->id)->where('status', 'active')->orderBy('name')->get()
-                    ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)) : collect(),
+                    ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)
+                        && (! \App\Services\Logistics\LinehaulDeclineService::installed() || ! \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('linehaul_driver_id', $driver->id)->exists())) : collect(),
             'courierReadiness' => \App\Services\Logistics\LinehaulDutyService::installed()
                 ? \App\Models\Logistics\LinehaulDriver::where('logistics_provider_id', $provider->id)->with('latestDutyCheck')->orderBy('name')->get() : collect(),
         ]);

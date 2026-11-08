@@ -76,6 +76,10 @@
                             </td>
                             <td class="px-4 py-4">
                                 <span class="inline-flex rounded-full border px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.5px] {{ $statusStyles[$manifest->status->value] ?? $statusStyles['DRAFT'] }}">{{ $manifest->status->label() }}</span>
+                                @if ($manifest->status === ManifestStatus::Draft && isset($unassignedDeclines[$manifest->id]))
+                                    <p class="mt-2 font-sans text-xs font-semibold">Courier unassigned</p>
+                                    <p class="mt-1 break-words font-sans text-xs text-[var(--text-muted)]">{{ $unassignedDeclines[$manifest->id]->reason }}</p>
+                                @endif
                                 @if ($manifest->dispatched_at)
                                     <p class="mt-2 font-sans text-[10px] text-[var(--text-muted)]">Dispatched {{ $manifest->dispatched_at->format('M j, g:i A') }}</p>
                                 @endif

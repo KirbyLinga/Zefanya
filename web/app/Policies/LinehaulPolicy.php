@@ -13,7 +13,7 @@ class LinehaulPolicy
     {
         return $driver->isOperational() && ($manifest === null || (
             (int) $manifest->logistics_provider_id === (int) $driver->logistics_provider_id
-            && LinehaulAssignment::query()->where('manifest_id', $manifest->id)->where('linehaul_driver_id', $driver->id)->exists()
+            && LinehaulAssignment::query()->currentOffer()->where('manifest_id', $manifest->id)->where('linehaul_driver_id', $driver->id)->exists()
         ));
     }
 
@@ -21,6 +21,14 @@ class LinehaulPolicy
     {
         return $provider->isApproved() && $provider->archived_at === null
             && (int) $manifest->logistics_provider_id === (int) $provider->id;
+    }
+
+    public function decline(LinehaulDriver $driver, Manifest $manifest): bool
+    {
+        return $driver->isOperational() && (int) $driver->logistics_provider_id === (int) $manifest->logistics_provider_id
+            && ($this->access($driver, $manifest) || (\App\Services\Logistics\LinehaulDeclineService::installed()
+                && \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)
+                    ->where('logistics_provider_id', $driver->logistics_provider_id)->where('linehaul_driver_id', $driver->id)->exists()));
     }
 
     public function closeReceiving(LogisticsProvider $provider, Manifest $manifest): bool

@@ -50,11 +50,25 @@ class LinehaulController extends Controller
 
     public function trips(LinehaulRequest $request): JsonResponse
     {
-        $trips = LinehaulAssignment::query()->where('linehaul_driver_id', $request->user()->id)
+        $trips = LinehaulAssignment::query()->currentOffer()->where('linehaul_driver_id', $request->user()->id)
             ->whereHas('manifest', fn ($query) => $query->where('logistics_provider_id', $request->user()->logistics_provider_id))
             ->with(['manifest.originHub', 'manifest.destinationHub', 'manifest.items'])->latest('id')->limit(50)->get();
 
-        return $this->success('Your trips.', LinehaulTripResource::collection($trips));
+        $rows = $trips->map(fn ($trip) => (new LinehaulTripResource($trip))->resolve($request));
+        if (\App\Services\Logistics\LinehaulDeclineService::installed()) {
+            $declines = \App\Models\Logistics\LinehaulTripDecline::where('linehaul_driver_id', $request->user()->id)
+                ->where('logistics_provider_id', $request->user()->logistics_provider_id)->latest('id')->limit(50)->get();
+            $rows = $rows->concat($declines->map(fn ($decline) => (new \App\Http\Resources\Mobile\LinehaulDeclineResource($decline))->resolve($request)));
+        }
+
+        return $this->success('Your trips.', new JsonResource($rows->values()));
+    }
+
+    public function decline(\App\Http\Requests\Api\LinehaulDeclineRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulDeclineService $service): JsonResponse
+    {
+        $decline = $service->decline($request->user(), $manifest, $request->validated(), $request);
+
+        return $this->success('Trip declined. Logistics can assign another Courier.', new \App\Http\Resources\Mobile\LinehaulDeclineResource($decline));
     }
 
     public function duty(\App\Http\Requests\Api\LinehaulDutyRequest $request): JsonResponse

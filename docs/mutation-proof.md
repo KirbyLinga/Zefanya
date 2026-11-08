@@ -1,5 +1,26 @@
 # Combined Courier security proof — 2026-11-08
 
+## Trip decline and retained offers
+
+On tmp/mutation, apply each fault separately with literal apply_patch hunks, run the named LinehaulDeclineTest method against SQLite memory, wait for completion, and restore the exact hunk. Preserve pending stage work rather than restoring the entire dirty tree. All ten faults detected; return to codex/combined-courier-demo and delete tmp/mutation before the final suite. No local dev migration or demo action used for these checks.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| Decline policy returns true | test_decline_requires_real_owner | Failed asserting true is false |
+| Bypass eligibility for accepted/loaded/non-Draft offers | test_accept_or_loading | Expected 422, received 200 |
+| Disable required-reason validation and nonblank guard | test_decline_requires_real_owner | Expected 422, received 200 |
+| Ignore expected offer version | test_decline_requires_real_owner | Expected 422, received 200 |
+| Remove shared current-offer filter | test_decline_unassigns | Failed asserting true is false (still busy) |
+| Ignore changed reason/version on replay | test_decline_unassigns | Expected 422, received 200 |
+| Reoffer the same declined batch to the original Courier | test_reassignment_has_one_new_owner | Declined Courier was reoffered the trip |
+| Read current parcel count instead of original snapshot | test_reassignment_has_one_new_owner | Failed asserting 2 is identical to 1 |
+| Disable history model/common ORM edit/delete guards | test_history_survives_native | Immutable history was changed |
+| Remove decline transaction boundary | test_audit_failure_rolls_back | Failed asserting 1 is identical to 0 (partial history persisted) |
+
+Final restored PASS: `{"tool":"phpunit","result":"passed","tests":203,"passed":203,"assertions":2281,"duration_ms":55297}`. Focused mobile `00:18 +31: All tests passed!`. Analysis `8 issues found. (ran in 10.4s)` (same baseline). Web build 6.60s.
+
+The new route shares unchanged Sanctum/real-role/60-per-minute middleware with the existing Courier group; new feature tests cover 401/403/ownership/422/success/429 and prior shared-middleware proofs remain. Both serialized accept-vs-decline outcomes and stale replays after reassignment are tested, not real simultaneous MySQL requests. MySQL concurrency proof remains OPEN. No earnings/pay rule added or claimed.
+
 ## Hub directions URL safety
 
 On tmp/mutation, apply each fault independently to DeviceCourierDirections.destinationUri and run `linehaul_navigation_test.dart --plain-name 'directions encode hub text'`. Restore the exact hunk afterward, return to codex/combined-courier-demo, delete the temporary branch.

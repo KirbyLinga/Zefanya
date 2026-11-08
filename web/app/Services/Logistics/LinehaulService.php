@@ -28,17 +28,27 @@ class LinehaulService
             $this->require($driver->isOperational() && (int) $driver->logistics_provider_id === (int) $provider->id, 'Choose an active Courier from your company.');
             $this->require($manifest->status === ManifestStatus::Draft, 'Only a draft manifest can be assigned.');
             $this->require($manifest->direction !== 'return', 'The Courier demo supports forward transfers only.');
-            $existing = LinehaulAssignment::query()->where('manifest_id', $manifest->id)->first();
-            if ($existing !== null) {
+            $existing = LinehaulAssignment::query()->where('manifest_id', $manifest->id)->lockForUpdate()->first();
+            if ($existing !== null && $existing->declined_at === null) {
                 $this->require((int) $existing->linehaul_driver_id === (int) $driver->id, 'This manifest is already assigned.');
 
                 return $existing;
             }
-            $busy = LinehaulAssignment::query()->where('linehaul_driver_id', $driver->id)
+            if (LinehaulDeclineService::installed()) {
+                $this->require(! \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('linehaul_driver_id', $driver->id)->exists(),
+                    'This Courier already declined this trip. Choose another Courier.');
+            }
+            $busy = LinehaulAssignment::query()->currentOffer()->where('linehaul_driver_id', $driver->id)
                 ->whereHas('manifest', fn ($query) => $query->whereIn('status', [ManifestStatus::Draft->value, ManifestStatus::Dispatched->value]))->exists();
             $this->require(! $busy, 'This Courier already has an active trip.');
             app(LinehaulDutyService::class)->requireReady($driver);
-            $assignment = new LinehaulAssignment;
+            $assignment = $existing ?? new LinehaulAssignment;
+            if ($existing !== null) {
+                $this->require(LinehaulDeclineService::installed() && $existing->accepted_at === null
+                    && empty($existing->loading_tokens) && $existing->seal_number === null && $existing->arrived_at === null,
+                    'This trip is not available for reassignment.');
+                $assignment->forceFill(['offer_version' => $existing->offer_version + 1, 'declined_at' => null]);
+            }
             $assignment->forceFill(['manifest_id' => $manifest->id, 'linehaul_driver_id' => $driver->id])->save();
             ManifestAuditLog::query()->create([
                 'manifest_id' => $manifest->id, 'action' => 'courier_assign', 'actor_type' => 'logistics',

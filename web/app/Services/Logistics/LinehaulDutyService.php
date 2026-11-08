@@ -52,7 +52,7 @@ class LinehaulDutyService
 
     public static function busy(LinehaulDriver $driver): bool
     {
-        return LinehaulAssignment::where('linehaul_driver_id', $driver->id)
+        return LinehaulAssignment::currentOffer()->where('linehaul_driver_id', $driver->id)
             ->whereHas('manifest', fn ($query) => $query->whereIn('status', ['DRAFT', 'DISPATCHED']))->exists();
     }
 

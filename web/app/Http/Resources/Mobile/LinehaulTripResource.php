@@ -25,6 +25,8 @@ class LinehaulTripResource extends JsonResource
 
         return [
             'id' => $manifest->id, 'status' => $stage,
+            'offer_version' => $this->offer_version ?? 1,
+            'can_decline' => \App\Services\Logistics\LinehaulDeclineService::canDecline($this->resource),
             'origin' => $manifest->originHub?->name, 'destination' => $manifest->destinationHub?->name,
             'origin_address' => $this->hubAddress($manifest->originHub),
             'destination_address' => $this->hubAddress($manifest->destinationHub),

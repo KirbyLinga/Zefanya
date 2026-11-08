@@ -11,6 +11,11 @@ class LinehaulTrip {
     this.seal,
     this.originAddress,
     this.destinationAddress,
+    this.offerVersion = 1,
+    this.canDecline = false,
+    this.declineReason,
+    this.declinedAt,
+    this.parcelCount,
   });
 
   final String id;
@@ -20,6 +25,11 @@ class LinehaulTrip {
   final String? seal;
   final String? originAddress;
   final String? destinationAddress;
+  final int offerVersion;
+  final bool canDecline;
+  final String? declineReason;
+  final String? declinedAt;
+  final int? parcelCount;
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
@@ -34,17 +44,42 @@ class LinehaulTrip {
           'Completed',
           'Received with Issues',
           'Cancelled',
+          'Declined',
         }.contains(data['status'])) {
       throw const MalformedResponseException(
         message: 'The server sent an incomplete Courier trip.',
       );
     }
-    for (final field in ['origin_address', 'destination_address']) {
+    for (final field in [
+      'origin_address',
+      'destination_address',
+      'decline_reason',
+      'declined_at',
+    ]) {
       if (data[field] != null && data[field] is! String) {
         throw const MalformedResponseException(
           message: 'Could not read the hub address.',
         );
       }
+    }
+    if ((data['offer_version'] != null &&
+            (data['offer_version'] is! int ||
+                (data['offer_version'] as int) < 1)) ||
+        (data['can_decline'] != null && data['can_decline'] is! bool) ||
+        (data['parcel_count'] != null &&
+            (data['parcel_count'] is! int ||
+                (data['parcel_count'] as int) < 0)) ||
+        (data['can_decline'] == true && data['status'] != 'Assigned') ||
+        (data['status'] == 'Declined' &&
+            (data['decline_reason'] is! String ||
+                (data['decline_reason'] as String).trim().isEmpty ||
+                data['declined_at'] is! String ||
+                DateTime.tryParse(data['declined_at'] as String) == null ||
+                data['parcel_count'] is! int ||
+                items.isNotEmpty))) {
+      throw const MalformedResponseException(
+        message: 'Could not read this Courier offer.',
+      );
     }
     return LinehaulTrip(
       id: '${data['id']}',
@@ -54,6 +89,11 @@ class LinehaulTrip {
       seal: data['seal_number'] as String?,
       originAddress: data['origin_address'] as String?,
       destinationAddress: data['destination_address'] as String?,
+      offerVersion: data['offer_version'] as int? ?? 1,
+      canDecline: data['can_decline'] == true,
+      declineReason: data['decline_reason'] as String?,
+      declinedAt: data['declined_at'] as String?,
+      parcelCount: data['parcel_count'] as int?,
       items: [
         for (final item in items)
           if (item is Map)

@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:provider/provider.dart';
-import '../../data/api/api_exception.dart' show ApiNotConfiguredException;
+import '../../data/api/api_exception.dart'
+    show ApiNotConfiguredException, ValidationException;
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/repositories.dart';
 import '../../state/auth_state.dart';
@@ -490,7 +492,13 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       if (mounted) _reload();
     } on ApiException catch (error) {
       if (mounted) {
-        showTimedSnackBar(context, SnackBar(content: Text(error.message)));
+        final message =
+            action == 'decline' &&
+                error is ValidationException &&
+                error.fieldErrors.isNotEmpty
+            ? error.fieldErrors.values.join('\n')
+            : error.message;
+        showTimedSnackBar(context, SnackBar(content: Text(message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -514,6 +522,20 @@ class _LinehaulPortalState extends State<LinehaulPortal>
         trip,
         'scan',
         body: {'tracking_number': value.trim(), 'method': method},
+      );
+    }
+  }
+
+  Future<void> _decline(LinehaulTrip trip) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => const _CourierDeclineDialog(),
+    );
+    if (reason != null && mounted) {
+      await _act(
+        trip,
+        'decline',
+        body: {'reason': reason, 'offer_version': trip.offerVersion},
       );
     }
   }
@@ -604,7 +626,14 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     final loaded = trip.items.where((item) => item.loaded).length;
     final received = trip.items.where((item) => item.received).length;
     final completed = trip.status == 'Completed';
-    final parcelLabel = (completed ? received : trip.items.length) == 1
+    final declined = trip.status == 'Declined';
+    final parcelLabel =
+        (declined
+                ? trip.parcelCount ?? 0
+                : completed
+                ? received
+                : trip.items.length) ==
+            1
         ? 'parcel'
         : 'parcels';
     final tint = completed ? AppColors.successText : AppColors.primaryDark;
@@ -712,7 +741,9 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      completed
+                      declined
+                          ? '${trip.parcelCount ?? 0} $parcelLabel in original offer'
+                          : completed
                           ? '$received $parcelLabel received'
                           : '$loaded of ${trip.items.length} $parcelLabel loaded',
                       style: theme.textTheme.bodySmall,
@@ -729,61 +760,87 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   style: theme.textTheme.bodySmall,
                 ),
               ),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: EdgeInsets.zero,
-              title: Text('Parcel details', style: theme.textTheme.labelLarge),
-              children: [
-                for (final item in trip.items)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      item.issue != null
-                          ? Icons.warning_amber_rounded
-                          : item.received
-                          ? Icons.inventory_2_outlined
-                          : item.loaded
-                          ? Icons.check_circle_outline
-                          : Icons.radio_button_unchecked,
-                      color: item.issue != null
-                          ? theme.colorScheme.error
-                          : item.loaded
-                          ? AppColors.successText
-                          : AppColors.textSecondary,
-                    ),
-                    title: Text(
-                      item.tracking,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    subtitle: item.issue == null
-                        ? null
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.issue == 'missing'
-                                    ? 'Missing at handover · reported'
-                                    : 'Received damaged · reported',
-                              ),
-                              if (item.courierNote != null)
-                                Text('Your note: ${item.courierNote}')
-                              else
-                                TextButton(
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _handoverNote(trip, item),
-                                  child: const Text('Add handover note'),
+            if (!declined)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                title: Text(
+                  'Parcel details',
+                  style: theme.textTheme.labelLarge,
+                ),
+                children: [
+                  for (final item in trip.items)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        item.issue != null
+                            ? Icons.warning_amber_rounded
+                            : item.received
+                            ? Icons.inventory_2_outlined
+                            : item.loaded
+                            ? Icons.check_circle_outline
+                            : Icons.radio_button_unchecked,
+                        color: item.issue != null
+                            ? theme.colorScheme.error
+                            : item.loaded
+                            ? AppColors.successText
+                            : AppColors.textSecondary,
+                      ),
+                      title: Text(
+                        item.tracking,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      subtitle: item.issue == null
+                          ? null
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.issue == 'missing'
+                                      ? 'Missing at handover · reported'
+                                      : 'Received damaged · reported',
                                 ),
-                            ],
-                          ),
-                  ),
-              ],
-            ),
+                                if (item.courierNote != null)
+                                  Text('Your note: ${item.courierNote}')
+                                else
+                                  TextButton(
+                                    onPressed: _busy
+                                        ? null
+                                        : () => _handoverNote(trip, item),
+                                    child: const Text('Add handover note'),
+                                  ),
+                              ],
+                            ),
+                    ),
+                ],
+              ),
             if (trip.status == 'Assigned')
               FilledButton(
                 onPressed: _busy ? null : () => _act(trip, 'accept'),
                 child: const Text('Accept trip'),
               ),
+            if (trip.status == 'Assigned' && trip.canDecline)
+              OutlinedButton(
+                onPressed: _busy ? null : () => _decline(trip),
+                child: const Text('Decline trip'),
+              ),
+            if (declined) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Reason: ${trip.declineReason ?? 'Decline recorded'}',
+                style: theme.textTheme.bodyMedium,
+              ),
+              if (trip.declinedAt != null &&
+                  DateTime.tryParse(trip.declinedAt!) != null)
+                Text(
+                  'Declined ${DateFormat.yMMMd().add_jm().format(DateTime.parse(trip.declinedAt!).toLocal())}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              const SizedBox(height: 8),
+              const Text(
+                'This offer was not completed. Logistics manages the next assignment.',
+              ),
+            ],
             if (trip.status == 'Loading') ...[
               OutlinedButton(
                 onPressed: _busy ? null : () => _scan(trip),
@@ -1031,6 +1088,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 'Completed',
                 'Received with Issues',
                 'Cancelled',
+                'Declined',
               ].contains(trip.status);
               final trips = all
                   .where(
@@ -1078,7 +1136,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                               ? 'No trip history yet'
                               : 'No trips assigned',
                           subtitle: _tab == 1
-                              ? 'Completed and cancelled transfers will appear here.'
+                              ? 'Completed, declined and cancelled transfers will appear here.'
                               : 'Your next journey will appear here when Logistics assigns a trip.',
                           action: OutlinedButton(
                             onPressed: _reload,
@@ -1096,6 +1154,83 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       ),
     );
   }
+}
+
+class _CourierDeclineDialog extends StatefulWidget {
+  const _CourierDeclineDialog();
+  @override
+  State<_CourierDeclineDialog> createState() => _CourierDeclineDialogState();
+}
+
+class _CourierDeclineDialogState extends State<_CourierDeclineDialog> {
+  final _controller = TextEditingController();
+  final _form = GlobalKey<FormState>();
+  bool _submitted = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Decline this trip?'),
+    content: SingleChildScrollView(
+      child: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Logistics can offer it to another Courier. Add a reason so they can plan the next handover.',
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(labelText: 'Suggested reason'),
+              isExpanded: true,
+              items: [
+                for (final value in [
+                  'Vehicle problem',
+                  'Schedule conflict',
+                  'Other',
+                ])
+                  DropdownMenuItem(value: value, child: Text(value)),
+              ],
+              onChanged: (value) =>
+                  _controller.text = value == 'Other' ? '' : value ?? '',
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _controller,
+              maxLength: 500,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Reason'),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter a reason for declining'
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Keep trip'),
+      ),
+      FilledButton(
+        onPressed: () {
+          if (!_submitted && _form.currentState!.validate()) {
+            _submitted = true;
+            Navigator.pop(context, _controller.text.trim());
+          }
+        },
+        child: const Text('Confirm decline'),
+      ),
+    ],
+  );
 }
 
 class _CourierCard extends StatelessWidget {

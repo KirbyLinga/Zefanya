@@ -3,6 +3,17 @@
 @section('title', 'Batch Details #'.$manifest->id)
 
 @section('content')
+@if (isset($courierDeclines) && $courierDeclines->isNotEmpty())
+    <section class="mb-4 rounded-md border p-4">
+        <h2 class="font-semibold">Courier decline history</h2>
+        @if ($manifest->status === \App\Enums\ManifestStatus::Draft && !$courierAssignment)<p>Courier unassigned</p>@endif
+        @foreach ($courierDeclines as $decline)
+            <p class="mt-2">{{ $decline->snapshot['courier_name'] }} · Offer {{ $decline->offer_version }} · {{ $decline->created_at->format('Y-m-d H:i T') }}</p>
+            <p>{{ $decline->reason }}</p>
+        @endforeach
+        <p class="mt-3">The declined offer is closed. Choose a different available Courier if this draft batch is still unassigned.</p>
+    </section>
+@endif
 @if (isset($courierReadiness) && $courierReadiness->isNotEmpty())
     <section class="mb-5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans text-xs text-[var(--text-ink)]">
         <h2 class="mb-3 font-semibold">Courier readiness</h2>
