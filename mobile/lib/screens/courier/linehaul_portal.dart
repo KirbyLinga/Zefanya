@@ -818,6 +818,22 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   style: theme.textTheme.bodySmall,
                 ),
               ),
+            if (trip.tripPay != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                trip.tripPay!.status == 'not_configured'
+                    ? 'Trip pay rate not configured'
+                    : '${switch (trip.tripPay!.status) {
+                        'earned' => 'Earned trip pay',
+                        'pending' => 'Trip pay after completed handover',
+                        'ineligible' => 'No trip pay',
+                        _ => 'Estimated trip pay',
+                      }}: ${NumberFormat.currency(symbol: '₱', decimalDigits: 2).format(trip.tripPay!.amountMinor! / 100)}',
+              ),
+              const Text(
+                'Trip pay is separate from payment. Payout recording is not available here.',
+              ),
+            ],
             if (!declined)
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,

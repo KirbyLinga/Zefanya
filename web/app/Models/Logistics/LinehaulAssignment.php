@@ -14,7 +14,7 @@ class LinehaulAssignment extends Model
     protected function casts(): array
     {
         return ['accepted_at' => 'datetime', 'arrived_at' => 'datetime', 'declined_at' => 'datetime',
-            'offer_version' => 'integer', 'loading_tokens' => 'encrypted:array', 'seal_receipt' => 'array'];
+            'offer_version' => 'integer', 'trip_pay_minor' => 'integer', 'loading_tokens' => 'encrypted:array', 'seal_receipt' => 'array'];
     }
 
     public function scopeCurrentOffer(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder

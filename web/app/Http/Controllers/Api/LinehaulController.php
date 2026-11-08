@@ -52,7 +52,7 @@ class LinehaulController extends Controller
     {
         $trips = LinehaulAssignment::query()->currentOffer()->where('linehaul_driver_id', $request->user()->id)
             ->whereHas('manifest', fn ($query) => $query->where('logistics_provider_id', $request->user()->logistics_provider_id))
-            ->with(['manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams'])
+            ->with(['driver', 'manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams'])
             ->when(\App\Services\Logistics\LinehaulDelayService::installed(), fn ($query) => $query->with('latestDelay'))
             ->latest('id')->limit(50)->get();
 

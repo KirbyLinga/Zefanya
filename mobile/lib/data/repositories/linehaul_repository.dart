@@ -23,6 +23,7 @@ class LinehaulTrip {
     this.departedAt,
     this.arrivedAt,
     this.scheduledDepartureAt,
+    this.tripPay,
   });
 
   final String id;
@@ -44,6 +45,7 @@ class LinehaulTrip {
   final DateTime? departedAt;
   final DateTime? arrivedAt;
   final DateTime? scheduledDepartureAt;
+  final LinehaulTripPay? tripPay;
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
@@ -140,6 +142,9 @@ class LinehaulTrip {
       departedAt: timestamp('departed_at'),
       arrivedAt: timestamp('arrived_at'),
       scheduledDepartureAt: timestamp('scheduled_departure_at'),
+      tripPay: data['trip_pay'] == null
+          ? null
+          : LinehaulTripPay.fromJson(data['trip_pay']),
       canReportDelay: data['can_report_delay'] == true,
       delay: data['delay'] is Map
           ? LinehaulDelay.fromJson(
@@ -165,6 +170,39 @@ class LinehaulTrip {
             throw const MalformedResponseException(),
       ],
     );
+  }
+}
+
+class LinehaulTripPay {
+  const LinehaulTripPay(this.status, this.amountMinor);
+  final String status;
+  final int? amountMinor;
+
+  factory LinehaulTripPay.fromJson(Object? value) {
+    if (value is! Map ||
+        !const {
+          'quote',
+          'pending',
+          'earned',
+          'ineligible',
+          'not_configured',
+        }.contains(value['status'])) {
+      throw const MalformedResponseException(
+        message: 'Could not read the trip pay.',
+      );
+    }
+    final status = value['status'] as String;
+    final amount = value['amount_minor'];
+    if ((status == 'not_configured' && amount != null) ||
+        (status == 'ineligible' && amount != 0) ||
+        (status != 'not_configured' && (amount is! int || amount < 0)) ||
+        (const {'quote', 'pending', 'earned'}.contains(status) &&
+            amount == 0)) {
+      throw const MalformedResponseException(
+        message: 'Could not read the trip pay.',
+      );
+    }
+    return LinehaulTripPay(status, amount as int?);
   }
 }
 

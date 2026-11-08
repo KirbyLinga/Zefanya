@@ -1,5 +1,12 @@
 # Touched your files
 
+## Courier per-trip pay foundation — 2026-11-08
+
+- New migration 2026_11_09_010000_add_linehaul_trip_pay_snapshot.php adds nullable unsigned trip_pay_minor and nullable trip_pay_vehicle_type (60) to linehaul_assignments. No defaults/backfill/earnings fabricated. Local activation pending specific approval.
+- New LinehaulPayService supplies supported server rates, profile-gated quote, immutable-after-freeze departure snapshot and read-only pending/earned/ineligible/unconfigured details. Existing LinehaulService invokes freeze inside departure transaction before native dispatch; LinehaulAssignment adds integer cast. Native receiving, custody, status, Rider earnings and payout writers untouched. No new route/table/payment transfer/notification.
+- Existing Api/LinehaulController eager-loads current driver for trip listing. Existing LinehaulTripResource adds trip_pay status/amount only; LinehaulDeclineResource explicitly returns zero/ineligible. Existing ownership/auth/throttle/policy/request boundaries reused. No vehicle documents/customer fields exposed.
+- Existing mobile linehaul_repository adds optional validated LinehaulTripPay; linehaul_portal labels quote/pending/earned/zero/unconfigured and payout limitation. Existing navigation tests gain two additive pay checks; new LinehaulPayTest covers native handover and money rules. No packages or configuration changes.
+
 ## Courier planned departure — 2026-11-08
 
 - New migration 2026_11_09_000000_add_linehaul_departure_schedule.php adds nullable manifests.scheduled_departure_at, unsigned schedule_version default 0, nullable manifest_audit_logs.schedule_change JSON. Owner explicitly approved local activation: only this file applied (248.67ms), alone in batch 78. Original manifest/assignment fingerprints identical, four plans null/version 0, eight audits unchanged/zero schedule audits; no schedule fabricated.

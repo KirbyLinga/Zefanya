@@ -1,5 +1,20 @@
 # Combined Courier security proof — 2026-11-08
 
+## Per-trip pay foundation
+
+Six independent literal faults on tmp/mutation; run named LinehaulPayTest prefix using SQLite memory, wait for completion and restore exact hunks. Return to authorized branch and delete tmp/mutation before final regression. No dev migration. Previous shared-auth/ownership mutation proofs retained; normal new pay privacy test covers another Courier.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| Change four-wheel rate by one cent | test_supported_rates | Expected amount_minor 100000, actual 99999. (1 assertion, 3599ms) |
+| Allow repricing an existing snapshot | test_supported_rates | Failed asserting that 150000 is identical to 100000. (4 assertions, 3587ms) |
+| Mark earned before native handover | test_pay_is_earned_only | Expected pending, actual earned. (1 assertion, 3665ms) |
+| Ignore dispatching Courier identity | test_pay_is_earned_only | Expected not_configured, actual earned. (5 assertions, 3483ms) |
+| Remove cancelled/declined zero classification | test_unknown_legacy_completion | Expected ineligible/0, actual not_configured/null. (2 assertions, 3490ms) |
+| Quote unreviewed/expired vehicle | test_unreviewed_or_expired | Expected not_configured, actual quote. (1 assertion, 3476ms) |
+
+All failed/tests 1/passed 0. Final restored PASS: `{"tool":"phpunit","result":"passed","tests":227,"passed":227,"assertions":2604,"duration_ms":79324}`. Mobile `00:20 +40: All tests passed!`; analysis unchanged eight issues (9.1s). Actual MySQL concurrent requests remain unverified; test-only approved profile metadata exists only in SQLite fixtures.
+
 ## Planned departure
 
 Five independent literal faults on tmp/mutation; run named LinehaulScheduleTest prefix against SQLite memory, wait, restore exact hunks. Return to authorized Courier branch and delete temporary branch before final regression. No development migration. Existing shared ownership/auth policy remains unchanged with new route 401/403/422/success/429 coverage.

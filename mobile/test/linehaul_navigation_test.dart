@@ -95,6 +95,70 @@ Future<void> _mount(
 
 void main() {
   test(
+    'trip pay distinguishes unknown, earned and zero without accepting malformed money',
+    () {
+      expect(
+        LinehaulTripPay.fromJson({
+          'status': 'earned',
+          'amount_minor': 100000,
+        }).amountMinor,
+        100000,
+      );
+      expect(
+        LinehaulTripPay.fromJson({
+          'status': 'not_configured',
+          'amount_minor': null,
+        }).amountMinor,
+        isNull,
+      );
+      expect(
+        LinehaulTripPay.fromJson({
+          'status': 'ineligible',
+          'amount_minor': 0,
+        }).amountMinor,
+        0,
+      );
+      for (final value in [
+        {'status': 'earned', 'amount_minor': -1},
+        {'status': 'earned', 'amount_minor': 0},
+        {'status': 'earned', 'amount_minor': '100000'},
+        {'status': 'earned', 'amount_minor': 1000.1},
+        {'status': 'not_configured', 'amount_minor': 100000},
+        {'status': 'ineligible', 'amount_minor': 100000},
+      ]) {
+        expect(
+          () => LinehaulTripPay.fromJson(value),
+          throwsA(isA<MalformedResponseException>()),
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'earned trip pay is separate from payout on a small history screen',
+    (tester) async {
+      final posts = <String>[];
+      await _mount(tester, _Directions(), {
+        ..._trip(status: 'Completed'),
+        'trip_pay': {'status': 'earned', 'amount_minor': 100000},
+      }, posts);
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Earned trip pay: ₱1,000.00'),
+        140,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.textContaining('Payout recording is not available'),
+        findsOneWidget,
+      );
+      expect(posts, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
     'trip details accept older APIs and reject invalid weight or unzoned times',
     () {
       expect(LinehaulTrip.fromJson(_trip()).recordedWeightGrams, isNull);

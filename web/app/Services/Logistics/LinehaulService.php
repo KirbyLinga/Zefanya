@@ -127,6 +127,7 @@ class LinehaulService
                     } elseif ($action === 'depart') {
                         app(LinehaulDutyService::class)->requireReady($driver);
                         $this->requireCapacity($driver, $manifest);
+                        LinehaulPayService::freeze($driver, $assignment);
                         $this->manifests->dispatch($manifest, $driver->provider, $assignment->loading_tokens ?? []);
                         $manifest->refresh()->forceFill(['dispatched_by_type' => 'linehaul', 'dispatched_by_id' => $driver->id])->save();
                         $assignment->forceFill(['seal_number' => $data['seal_number'], 'loading_tokens' => null])->save();

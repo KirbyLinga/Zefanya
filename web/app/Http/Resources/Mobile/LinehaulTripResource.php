@@ -30,6 +30,7 @@ class LinehaulTripResource extends JsonResource
 
         return [
             'id' => $manifest->id, 'status' => $stage,
+            'trip_pay' => \App\Services\Logistics\LinehaulPayService::details($this->resource),
             'offer_version' => $this->offer_version ?? 1,
             'can_decline' => \App\Services\Logistics\LinehaulDeclineService::canDecline($this->resource),
             'can_report_delay' => \App\Services\Logistics\LinehaulDelayService::canReport($this->resource),
