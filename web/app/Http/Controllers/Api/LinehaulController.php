@@ -79,6 +79,12 @@ class LinehaulController extends Controller
             $service->report($request->user(), $request->validated())))->header('Cache-Control', 'no-store, private');
     }
 
+    public function history(\App\Http\Requests\Api\LinehaulHistoryRequest $request, \App\Services\Logistics\LinehaulHistoryService $service): JsonResponse
+    {
+        return $this->success('Your dated trip history.', new \App\Http\Resources\Mobile\LinehaulHistoryResource(
+            $service->report($request->user(), $request->validated(), $request)))->header('Cache-Control', 'no-store, private');
+    }
+
     public function duty(\App\Http\Requests\Api\LinehaulDutyRequest $request): JsonResponse
     {
         return $this->success('Your duty status.', new \App\Http\Resources\Mobile\LinehaulDutyResource($request->user()->fresh()))->header('Cache-Control', 'no-store, private');

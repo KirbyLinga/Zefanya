@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier all-result history dates — 2026-11-09
+
+- New GET /api/courier/history in existing Sanctum/real linehaul/shared 60/min group; existing Api/LinehaulController delegates with no-store/private response. New LinehaulHistoryRequest inherits existing validated paired dates/page/prohibited IDs and policy from LinehaulEarningsRequest. New LinehaulHistoryResource exposes only bounds/timezone/page/last-page/total/safe trip rows. No new auth/status/financial system.
+- New LinehaulHistoryService scopes native terminal assignment and immutable declined-offer candidates to driver/company, unions before date/count/pagination (20 rows), stable recorded time/key order, and hydrates the page with existing LinehaulTripResource/LinehaulDeclineResource under repeated ownership checks. Date range <=366 days, Philippine start-inclusive/next-midnight-exclusive. Native event date or explicit legacy update fallback; declined snapshot remains readable without original manifest. No new schema/service writes; existing native lifecycle/history guards unchanged. New LinehaulHistoryTest covers auth, validation/throttle, complete pagination/deletion retention and privacy.
+- New mobile linehaul_history.dart validates metadata, unique keys, zoned record dates and terminal trip DTOs. New linehaul_history_screen.dart shows date controls, server pages, recorded date/route/parcel/pay/decline snapshots and read-only parcel details, refresh/retry. Existing linehaul_portal History adds Browse all history by date entry; active/recent flow unchanged. New linehaul_history_test.dart covers parsing and narrow large-text navigation/recovery. No packages/configuration/migration.
+
 ## Courier earnings dates and totals — 2026-11-09
 
 - New GET /api/courier/earnings in existing Sanctum/real linehaul/shared throttle group. New LinehaulEarningsRequest validates paired YYYY-MM-DD dates, ordered range/page and prohibited identity overrides using existing LinehaulPolicy::access. New LinehaulEarningsResource exposes only date bounds/timezone, integer summary/counts/pagination and trip ID/result/completion/pay. Existing Api/LinehaulController delegates earnings and sets no-store/private.

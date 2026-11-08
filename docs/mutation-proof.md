@@ -1,5 +1,20 @@
 # Combined Courier security proof — 2026-11-08
 
+## Full dated terminal history — 2026-11-09
+
+Six independent literal faults on tmp/mutation, named LinehaulHistoryTest prefix against SQLite memory, wait for completion and restore exact hunks. Authorized branch restored and temporary branch deleted before final suite. No local database change.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| Remove assignment-candidate Courier filter | test_history_reaches_records | Failed asserting that 51 is identical to 0. (13 assertions, 3583ms) |
+| Remove assignment-candidate company filter | test_history_company_filter | Failed asserting that 1 is identical to 0. (2 assertions, 3446ms) |
+| Exclude start midnight | test_history_date_boundaries | Failed asserting that 1 is identical to 2. (2 assertions, 3459ms) |
+| Include following midnight | test_history_date_boundaries | Failed asserting that 3 is identical to 2. (2 assertions, 3394ms) |
+| Omit retained declined-offer candidates | test_history_includes_all_terminal | Failed asserting that 3 is identical to 4. (4 assertions, 3554ms) |
+| Remove bounded date range | test_history_auth_validation | Expected response status code [422] but received 200. (10 assertions, 3418ms) |
+
+Each failed/tests 1/passed 0. Candidate-scope faults prove counts are private even with hydration guards intact. Existing shared auth/policy/throttle proofs retained; normal new route coverage includes 401/403/422/429/success. Final restored PASS: `{"tool":"phpunit","result":"passed","tests":238,"passed":238,"assertions":2805,"duration_ms":83091}`. Mobile `00:24 +46: All tests passed!`. Actual MySQL concurrent consistency remains OPEN.
+
 ## Earnings totals and date ranges — 2026-11-09
 
 Seven independent faults on tmp/mutation, named LinehaulEarningsTest prefix using SQLite memory, wait to finish then restore exact literal hunks. Return to authorized branch/delete temporary branch before final suite. No local migration or fabricated financial data.

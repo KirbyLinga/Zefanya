@@ -22,6 +22,7 @@ import 'courier_qr_scanner.dart';
 import 'linehaul_profile_screen.dart';
 import 'linehaul_delay_dialog.dart';
 import 'linehaul_earnings_screen.dart';
+import 'linehaul_history_screen.dart';
 
 class LinehaulLoginScreen extends StatefulWidget {
   const LinehaulLoginScreen({super.key});
@@ -1218,6 +1219,20 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                         ),
                       ),
                     ),
+                    if (_tab == 1)
+                      OutlinedButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => LinehaulHistoryScreen(
+                                    repository: _repository,
+                                  ),
+                                ),
+                              ),
+                        icon: const Icon(Icons.date_range_outlined),
+                        label: const Text('Browse all history by date'),
+                      ),
                     if (_busy) const LinearProgressIndicator(),
                     if (trips.isEmpty)
                       _CourierCard(
