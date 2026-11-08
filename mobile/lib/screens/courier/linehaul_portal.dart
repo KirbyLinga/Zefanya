@@ -7,6 +7,7 @@ import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/repositories.dart';
 import '../../state/auth_state.dart';
 import '../../services/courier_location_service.dart';
+import '../../services/courier_directions.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -204,8 +205,10 @@ class LinehaulPortal extends StatefulWidget {
   const LinehaulPortal({
     super.key,
     this.locationSource = const DeviceCourierLocationSource(),
+    this.directions = const DeviceCourierDirections(),
   });
   final CourierLocationSource locationSource;
+  final CourierDirections directions;
   @override
   State<LinehaulPortal> createState() => _LinehaulPortalState();
 }
@@ -638,7 +641,12 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               ],
             ),
             const SizedBox(height: 22),
-            _hub('FROM', trip.origin, Icons.trip_origin),
+            _hub(
+              'FROM',
+              trip.origin,
+              Icons.trip_origin,
+              address: trip.originAddress,
+            ),
             Padding(
               padding: const EdgeInsets.only(left: 10),
               child: Align(
@@ -650,7 +658,43 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 ),
               ),
             ),
-            _hub('TO', trip.destination, Icons.location_on_outlined),
+            _hub(
+              'TO',
+              trip.destination,
+              Icons.location_on_outlined,
+              address: trip.destinationAddress,
+            ),
+            if (const [
+              'Assigned',
+              'Loading',
+              'In Transit',
+              'Arrived',
+            ].contains(trip.status)) ...[
+              const SizedBox(height: 16),
+              if (DeviceCourierDirections.destinationUri(
+                    trip.destination,
+                    trip.destinationAddress ?? '',
+                  ) !=
+                  null)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _navigate(trip),
+                  icon: const Icon(Icons.directions_outlined),
+                  label: const Text('Directions to destination'),
+                )
+              else
+                const Text(
+                  'Destination address unavailable. Contact Logistics for directions.',
+                ),
+              if (DeviceCourierDirections.destinationUri(
+                    trip.destination,
+                    trip.destinationAddress ?? '',
+                  ) !=
+                  null)
+                Text(
+                  'Opens driving directions using the saved hub address.',
+                  style: theme.textTheme.bodySmall,
+                ),
+            ],
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(12),
@@ -779,28 +823,71 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     );
   }
 
-  Widget _hub(String label, String name, IconData icon) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, size: 22, color: AppColors.primaryDark),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: AppType.eyebrow),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+  Future<void> _navigate(LinehaulTrip trip) async {
+    setState(() => _busy = true);
+    try {
+      final opened = await widget.directions.open(
+        trip.destination,
+        trip.destinationAddress!,
+      );
+      if (!opened && mounted) {
+        showTimedSnackBar(
+          context,
+          const SnackBar(
+            content: Text(
+              'Could not open Maps. Try again or use the hub address shown above.',
             ),
-          ],
-        ),
-      ),
-    ],
-  );
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          const SnackBar(
+            content: Text(
+              'Could not open Maps. Try again or use the hub address shown above.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _hub(String label, String name, IconData icon, {String? address}) =>
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: AppColors.primaryDark),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppType.eyebrow),
+                const SizedBox(height: 4),
+                Text(
+                  name,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  address?.trim().isNotEmpty == true
+                      ? address!
+                      : 'Address not provided',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
 
   Widget _account() {
     final auth = context.watch<AuthState>();

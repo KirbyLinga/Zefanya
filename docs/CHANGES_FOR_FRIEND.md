@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier hub addresses and directions — 2026-11-08
+
+- LinehaulTripResource adds only origin_address/destination_address through native hub fullAddress(), with null for empty legacy addresses. Existing authentication, policy, driver/company scope, throttle, request and trip routes are unchanged. Added assigned-driver/other-driver/empty-address regression to LinehaulDemoTest; no previous assertions changed.
+- LinehaulTrip DTO accepts the two optional strings for older API compatibility, refusing malformed types. LinehaulPortal displays addresses in active/history cards and adds Directions to destination for active trips with usable saved addresses. Reuses shared theme/cards/snackbar and existing url_launcher; no new dependency.
+- New CourierDirections/DeviceCourierDirections service builds a fixed HTTPS Maps directions URL, encodes hub text, limits URL length and passes no token or customer/current-location data. False/exception is retryable without changing trip status; no app route is popped or pushed by map opening. New linehaul_navigation_test covers URI safety, missing/malformed addresses, 360x640/1.3 layout, launch/retry, pause/resume/no status POST and completed history. No schema, migration, order/payment/stock writes or web frontend changes.
+
 ## Courier vehicle and private records — 2026-11-08
 
 - Activation follow-up: owner explicitly approved and installed only the new two-table migration (397.78ms) in verified local zefanya_friend_20261107. API setup_required false; mutex 1, zero submitted profiles, existing Courier count and four batch statuses unchanged. Three 5 MB parts pass real local file validation and oversized parts are refused; deliberately missing required expiry prevented saving in both probes. No fake documents or vehicle records stored.

@@ -9,6 +9,8 @@ class LinehaulTrip {
     required this.destination,
     required this.items,
     this.seal,
+    this.originAddress,
+    this.destinationAddress,
   });
 
   final String id;
@@ -16,6 +18,8 @@ class LinehaulTrip {
   final String origin;
   final String destination;
   final String? seal;
+  final String? originAddress;
+  final String? destinationAddress;
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
@@ -35,12 +39,21 @@ class LinehaulTrip {
         message: 'The server sent an incomplete Courier trip.',
       );
     }
+    for (final field in ['origin_address', 'destination_address']) {
+      if (data[field] != null && data[field] is! String) {
+        throw const MalformedResponseException(
+          message: 'Could not read the hub address.',
+        );
+      }
+    }
     return LinehaulTrip(
       id: '${data['id']}',
       status: '${data['status']}',
       origin: '${data['origin'] ?? ''}',
       destination: '${data['destination'] ?? ''}',
       seal: data['seal_number'] as String?,
+      originAddress: data['origin_address'] as String?,
+      destinationAddress: data['destination_address'] as String?,
       items: [
         for (final item in items)
           if (item is Map)

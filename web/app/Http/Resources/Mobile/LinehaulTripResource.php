@@ -26,6 +26,8 @@ class LinehaulTripResource extends JsonResource
         return [
             'id' => $manifest->id, 'status' => $stage,
             'origin' => $manifest->originHub?->name, 'destination' => $manifest->destinationHub?->name,
+            'origin_address' => $this->hubAddress($manifest->originHub),
+            'destination_address' => $this->hubAddress($manifest->destinationHub),
             'seal_number' => $this->seal_number,
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'arrived_at' => $this->arrived_at?->toIso8601String(),
@@ -48,5 +50,12 @@ class LinehaulTripResource extends JsonResource
             ->first();
 
         return $event?->metadata['note'] ?? null;
+    }
+
+    private function hubAddress(?\App\Models\Logistics\LogisticsHub $hub): ?string
+    {
+        $address = trim($hub?->fullAddress() ?? '');
+
+        return $address === '' ? null : $address;
     }
 }

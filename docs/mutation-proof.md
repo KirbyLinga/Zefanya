@@ -1,5 +1,16 @@
 # Combined Courier security proof — 2026-11-08
 
+## Hub directions URL safety
+
+On tmp/mutation, apply each fault independently to DeviceCourierDirections.destinationUri and run `linehaul_navigation_test.dart --plain-name 'directions encode hub text'`. Restore the exact hunk afterward, return to codex/combined-courier-demo, delete the temporary branch.
+
+| Fault | Observed FAIL |
+| --- | --- |
+| Change fixed Maps host to example.test | Expected 'www.google.com', Actual 'example.test' |
+| Interpolate raw address into query instead of Uri.https encoding | Expected destination containing `&`, `#`, Unicode and a nested URL; actual truncated destination plus injected map key, missing travelmode |
+
+Final restored PASS: `00:13 +26: All tests passed!`. Related PHP PASS: `{"tool":"phpunit","result":"passed","tests":39,"passed":39,"assertions":994,"duration_ms":29054}`. Analysis `8 issues found. (ran in 9.4s)` (same existing baseline). No new backend authorization/money rule, route or migration; existing own-driver/company filtering is retained and tested for the added hub fields. This tests URL construction and injected launcher behavior, not an actual device's Maps app.
+
 ## Vehicle records and private documents
 
 On tmp/mutation, apply one deliberate fault at a time with literal apply_patch hunks, run the named LinehaulVehicleTest method against SQLite memory, and restore the exact hunk. Preserve all pending stage work; do not restore the entire working tree. All 18 faults below were detected. Return to codex/combined-courier-demo and delete tmp/mutation before the final clean run. No local MySQL schema/data was used for these faults.

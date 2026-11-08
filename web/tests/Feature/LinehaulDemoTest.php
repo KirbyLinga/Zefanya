@@ -103,6 +103,26 @@ class LinehaulDemoTest extends TestCase
         $this->assertDatabaseHas('manifests', ['id' => $manifest->id, 'status' => 'DRAFT']);
     }
 
+    public function test_assigned_trip_exposes_only_saved_hub_addresses_with_empty_address_fallback(): void
+    {
+        ['driver' => $driver, 'manifest' => $manifest, 'station' => $station, 'province' => $province] = $this->fixture();
+        $station->forceFill(['building' => 'Origin Warehouse', 'street' => 'Mabini Street', 'landmark' => null,
+            'barangay_name' => 'Poblacion', 'municipality' => 'Calamba', 'province_name' => 'Laguna', 'region_name' => 'CALABARZON', 'postal_code' => '4027'])->save();
+        $province->forceFill(['building' => 'Destination Warehouse', 'street' => 'Rizal Avenue', 'landmark' => null,
+            'barangay_name' => 'Poblacion', 'municipality' => 'Calamba', 'province_name' => 'Laguna', 'region_name' => 'CALABARZON', 'postal_code' => '4027'])->save();
+        $this->api($driver)->getJson('/api/courier/trips')->assertOk()
+            ->assertJsonPath('data.0.origin_address', 'Origin Warehouse, Mabini Street, Poblacion, Calamba, Laguna, CALABARZON, 4027')
+            ->assertJsonPath('data.0.destination_address', 'Destination Warehouse, Rizal Avenue, Poblacion, Calamba, Laguna, CALABARZON, 4027')
+            ->assertJsonMissingPath('data.0.latitude')->assertJsonMissingPath('data.0.buyer_address');
+        $other = $driver->replicate()->forceFill(['email' => 'address-private@example.com']);
+        $other->save();
+        $this->api($other)->getJson('/api/courier/trips')->assertOk()->assertJsonCount(0, 'data')
+            ->assertDontSee('Destination Warehouse');
+        $province->forceFill(array_fill_keys(['building', 'street', 'landmark', 'barangay_name', 'municipality', 'province_name', 'region_name', 'postal_code', 'location_details'], ''))->save();
+        $this->api($driver)->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.destination_address', null);
+        $this->assertDatabaseHas('manifests', ['id' => $manifest->id, 'status' => 'DRAFT']);
+    }
+
     public function test_one_active_trip_and_company_owned_assignment(): void
     {
         ['driver' => $driver, 'manifest' => $manifest, 'provider' => $provider, 'station' => $station, 'province' => $province] = $this->fixture(false);
