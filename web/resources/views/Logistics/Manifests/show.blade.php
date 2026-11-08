@@ -9,6 +9,7 @@
         <p class="mb-3 text-[var(--text-muted)]">Assignment requires a passed checklist and location reported within five minutes. Locations are reported by the Courier's app; this is not background tracking.</p>
         @foreach ($courierReadiness as $courier)
             <div class="border-t border-[var(--border-strong)] py-3">
+                <a class="underline" href="{{ route('logistics.couriers.vehicle', $courier) }}">Vehicle & documents: {{ $courier->name }}</a>
                 <p class="font-semibold">{{ $courier->name }} · {{ !$courier->isOperational() ? 'Unavailable account' : (!$courier->on_duty ? 'Off Duty' : (\App\Services\Logistics\LinehaulDutyService::available($courier) ? 'On Duty' : 'Location unknown')) }}</p>
                 <p>Passed checklist: {{ $courier->duty_checked_at?->format('M j, Y g:i A') ?? 'none' }} · Last update: {{ $courier->last_seen_at?->diffForHumans() ?? 'none' }}</p>
                 @if ($courier->duty_location)

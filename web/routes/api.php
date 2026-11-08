@@ -36,6 +36,9 @@ use Illuminate\Support\Facades\Route;
 Route::post('/courier/login', [\App\Http\Controllers\Api\LinehaulController::class, 'login'])->middleware('throttle:api-login');
 Route::prefix('courier')->middleware(['auth:sanctum', 'api.role:linehaul', 'throttle:60,1'])->group(function (): void {
     Route::get('/profile', [\App\Http\Controllers\Api\LinehaulController::class, 'profile']);
+    Route::get('/vehicle', [\App\Http\Controllers\Api\LinehaulVehicleController::class, 'show']);
+    Route::post('/vehicle', [\App\Http\Controllers\Api\LinehaulVehicleController::class, 'store']);
+    Route::get('/vehicle/documents/{document}', [\App\Http\Controllers\Api\LinehaulVehicleController::class, 'document'])->where('document', 'drivers_license|or_cr|nbi_clearance');
     Route::post('/logout', [\App\Http\Controllers\Api\LinehaulController::class, 'logout']);
     Route::get('/trips', [\App\Http\Controllers\Api\LinehaulController::class, 'trips']);
     Route::get('/duty', [\App\Http\Controllers\Api\LinehaulController::class, 'duty']);

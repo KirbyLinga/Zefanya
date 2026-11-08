@@ -60,6 +60,7 @@ class RiderController extends Controller
 
         try {
             DB::transaction(function () use ($provider, $data, $request) {
+                \App\Services\Logistics\VehiclePlateService::reserve($data['plate_number']);
                 $licensePath = $request->file('drivers_license')->store('rider-licenses', 'local');
                 $orcrPath = $request->file('or_cr')->store('rider-or-crs', 'local');
                 $row = new Rider([

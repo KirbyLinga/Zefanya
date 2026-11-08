@@ -38,6 +38,7 @@ dependencies:
   provider: ^6.1.5+1
   shared_preferences: ^2.5.5
   image_picker: ^1.2.3
+  file_selector: ^1.1.0
   path_provider: ^2.1.6
   share_plus: ^10.1.4
   http: ^1.6.0

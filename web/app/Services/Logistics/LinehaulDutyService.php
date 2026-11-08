@@ -45,7 +45,7 @@ class LinehaulDutyService
 
     public static function available(LinehaulDriver $driver): bool
     {
-        return self::installed() && $driver->isOperational() && $driver->on_duty
+        return self::installed() && $driver->isOperational() && LinehaulProfileService::ready($driver) && $driver->on_duty
             && $driver->duty_checked_at !== null && $driver->last_seen_at !== null
             && $driver->last_seen_at->gt(now()->subMinutes(5)) && $driver->duty_location !== null;
     }
@@ -91,6 +91,7 @@ class LinehaulDutyService
                 return $driver;
             }
             $this->require(! $driver->on_duty || ! self::busy($driver), 'Finish your active trip before submitting another checklist.');
+            $this->require(LinehaulProfileService::ready($driver), 'Your vehicle records need company approval and a valid professional license before going On Duty.');
             $failed = array_keys(array_filter($data['checklist'], fn ($value) => ! (bool) $value));
             $note = trim($data['note'] ?? '');
             $this->require($failed === [] || $note !== '', 'Add a note explaining each Not OK item.');

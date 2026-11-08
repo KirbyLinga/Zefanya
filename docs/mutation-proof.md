@@ -1,5 +1,36 @@
 # Combined Courier security proof — 2026-11-08
 
+## Vehicle records and private documents
+
+On tmp/mutation, apply one deliberate fault at a time with literal apply_patch hunks, run the named LinehaulVehicleTest method against SQLite memory, and restore the exact hunk. Preserve all pending stage work; do not restore the entire working tree. All 18 faults below were detected. Return to codex/combined-courier-demo and delete tmp/mutation before the final clean run. No local MySQL schema/data was used for these faults.
+
+| Fault | Test method prefix | Observed FAIL |
+| --- | --- | --- |
+| Company review policy returns true | test_other_company | Expected 403, received 200 |
+| Remove license expiry submission boundary | test_expiry_capacity | Expected 422, received 200 |
+| Remove 5 MB maximum | test_expiry_capacity | Expected 422, received 200 |
+| Disable MIME plus image-content validation | test_expiry_capacity | Expected 422, received 200 for renamed executable |
+| Disable shared plate collision refusal | test_duplicate_plates | Expected 422, received 200 |
+| Accept prohibited identity/review fields | test_vehicle_routes_require | Expected 422, received 200 |
+| Permit submissions while working | test_off_duty_active | Expected 422, received 200 |
+| Ignore submitted version on save | test_off_duty_active | Expected 422, received 200 |
+| Ignore submitted version on review | test_off_duty_active | Expected 422, received 302 |
+| Allow On Duty with unapproved submitted records | test_submission_private | Expected 422, received 200 |
+| Download first profile instead of authenticated profile | test_submission_private | Expected 404, received 200 |
+| Skip new-file cleanup after failed submission | test_missing_file_or_failed | Expected empty array, actual two orphaned files |
+| Permit overwriting an already reviewed version | test_submission_private | Expected 422, received 302 |
+| Remove named company route throttle | test_vehicle_and_company_routes_are_throttled | Expected 429, received 422 |
+| Approve a missing physical file | test_missing_file_or_failed | Expected 422, received 302 |
+| Ignore expiry in readiness after fresh location | test_approved_license_expiry | Failed asserting true is identical to false |
+| Remove capacity bounds/precision | test_expiry_capacity | Expected 422, received 200 |
+| Allow incomplete initial document set | test_missing_file_or_failed | Expected 422, received 200 |
+
+Restored focused PASS: `{"tool":"phpunit","result":"passed","tests":10,"passed":10,"assertions":279,"duration_ms":9829}`.
+Final restored related PASS: `{"tool":"phpunit","result":"passed","tests":193,"passed":193,"assertions":2081,"duration_ms":63407}`.
+Full mobile PASS: `03:29 +901: All tests passed!`; final focused after test-only style corrections: `00:11 +19: All tests passed!`; analysis `8 issues found. (ran in 9.0s)` (existing baseline).
+
+The global mutex/current locking reads are implemented for both application Rider creation paths and Courier profile submissions. SQLite does not prove concurrent MySQL behavior; that operational proof remains OPEN. Authenticated PDF download is tested on PHP; actual camera/Files/PDF open-share-save on a phone and real 5 MB upload through deployment PHP limits remain OPEN.
+
 ## Bulk receiving closeout extension
 
 On tmp/mutation, seven faults were applied one at a time and tested against SQLite, then restored exactly. Branch deleted before the final asset-ordered related suite passed: 67 tests / 979 assertions.

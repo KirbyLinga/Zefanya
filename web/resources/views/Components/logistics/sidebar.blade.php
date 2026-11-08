@@ -29,6 +29,7 @@
         // Set-up pages are rarely visited, so they stay folded to keep the list short.
         ['label' => 'Team & setup', 'icon' => 'settings-2', 'collapsible' => true, 'items' => [
             ['route' => 'logistics.riders.index', 'icon' => 'users', 'label' => 'Riders'],
+            ['route' => 'logistics.couriers.index', 'icon' => 'truck', 'label' => 'Couriers'],
             ['route' => 'logistics.hubs.index', 'icon' => 'network', 'label' => 'Hubs & stations'],
             ['route' => 'logistics.transport-connections.index', 'icon' => 'route', 'label' => 'Transport connections'],
             ['route' => 'logistics.partnerships.index', 'icon' => 'handshake', 'label' => 'Provider partnerships'],

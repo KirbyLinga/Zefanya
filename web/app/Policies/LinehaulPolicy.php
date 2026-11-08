@@ -27,4 +27,10 @@ class LinehaulPolicy
     {
         return $this->assign($provider, $manifest);
     }
+
+    public function reviewProfile(LogisticsProvider $provider, ?LinehaulDriver $driver = null): bool
+    {
+        return $provider->isApproved() && $provider->archived_at === null
+            && ($driver === null || (int) $driver->logistics_provider_id === (int) $provider->id);
+    }
 }

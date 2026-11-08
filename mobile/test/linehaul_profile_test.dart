@@ -91,7 +91,7 @@ void main() {
   );
 
   testWidgets(
-    'profile shows server data and honest document limits at narrow large text size',
+    'profile shows server data and vehicle-record entry at narrow large text size',
     (tester) async {
       final requests = <http.Request>[];
       await _mount(
@@ -121,9 +121,10 @@ void main() {
         scrollable: profileScroll,
       );
       expect(
-        find.textContaining('not available in this version'),
+        find.textContaining('Changes need company review'),
         findsOneWidget,
       );
+      expect(find.text('Vehicle records'), findsOneWidget);
       expect(requests.single.url.path, '/api/courier/profile');
       expect(requests.single.headers['authorization'], 'Bearer courier-token');
       expect(requests.single.method, 'GET');

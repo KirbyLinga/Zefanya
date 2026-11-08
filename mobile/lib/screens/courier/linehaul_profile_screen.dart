@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
+import '../../data/repositories/linehaul_vehicle_repository.dart';
+import 'linehaul_vehicle_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -132,7 +134,20 @@ class _LinehaulProfileScreenState extends State<LinehaulProfileScreen> {
                     ]),
                     _section('Vehicle & documents', Icons.folder_outlined, [
                       const Text(
-                        'Vehicle, license and document records are not available in this version. Uploads and company review are still being added.',
+                        'Manage your vehicle, professional license and private documents. Changes need company review.',
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => LinehaulVehicleScreen(
+                              repository: LinehaulVehicleRepository(
+                                widget.repository.client,
+                              ),
+                            ),
+                          ),
+                        ),
+                        child: const Text('Vehicle records'),
                       ),
                     ]),
                   ],

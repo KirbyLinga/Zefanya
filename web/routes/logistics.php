@@ -33,6 +33,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('logistics')->name('logistics.')->group(function (): void {
     Route::middleware(['auth:logistics', 'logistics.approved'])->group(function (): void {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::middleware('throttle:linehaul-vehicle-review')->group(function (): void {
+            Route::get('/couriers', [\App\Http\Controllers\Logistics\LinehaulVehicleController::class, 'index'])->name('couriers.index');
+            Route::get('/couriers/{driver}/vehicle', [\App\Http\Controllers\Logistics\LinehaulVehicleController::class, 'show'])->name('couriers.vehicle');
+            Route::post('/couriers/{driver}/vehicle', [\App\Http\Controllers\Logistics\LinehaulVehicleController::class, 'review'])->name('couriers.vehicle.review');
+            Route::get('/couriers/{driver}/vehicle/documents/{document}', [\App\Http\Controllers\Logistics\LinehaulVehicleController::class, 'document'])->where('document', 'drivers_license|or_cr|nbi_clearance')->name('couriers.vehicle.document');
+        });
 
         Route::get('/cod-remittances', [CodRemittanceController::class, 'index'])->name('cod-remittances.index');
         Route::post('/cod-remittances/{remittance}/confirm', [CodRemittanceController::class, 'confirm'])->name('cod-remittances.confirm');

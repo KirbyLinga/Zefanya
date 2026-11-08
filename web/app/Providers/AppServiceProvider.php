@@ -137,6 +137,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
         Gate::define('quote-checkout', [\App\Policies\CheckoutPolicy::class, 'quote']);
         Gate::define('linehaul-access', [\App\Policies\LinehaulPolicy::class, 'access']);
+        RateLimiter::for('linehaul-vehicle-review', fn (Request $request) =>
+            Limit::perMinute(60)->by('vehicle-logistics:'.($request->user('logistics')?->getAuthIdentifier() ?? $request->ip())));
         Gate::define('linehaul-assign', [\App\Policies\LinehaulPolicy::class, 'assign']);
         Gate::define('linehaul-close-receiving', [\App\Policies\LinehaulPolicy::class, 'closeReceiving']);
         RateLimiter::for('linehaul-close-receiving', fn (Request $request) =>

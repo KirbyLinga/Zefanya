@@ -49,6 +49,7 @@ class RiderRegistrationService
                 if (EmailRegistry::rolesFor($data['email']) !== []) {
                     throw ValidationException::withMessages(['email' => 'This email is already in use.']);
                 }
+                \App\Services\Logistics\VehiclePlateService::reserve($data['plate_number']);
                 $rider = new Rider(Arr::only($data, [
                     'first_name', 'last_name', 'birthday', 'email', 'contact_no',
                     'license_no', 'license_expiry', 'vehicle_type', 'plate_number',

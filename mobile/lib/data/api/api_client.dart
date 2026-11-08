@@ -257,6 +257,7 @@ class ApiClient {
     String path, {
     required Map<String, String> fields,
     Map<String, String> files = const {},
+    Map<String, ({List<int> bytes, String filename})> byteFiles = const {},
     bool authenticated = true,
   }) async {
     if (!isConfigured) throw const ApiNotConfiguredException();
@@ -269,6 +270,15 @@ class ApiClient {
     // generated — so this one has to come back off.
     request.headers.remove('Content-Type');
     request.fields.addAll(fields);
+    for (final entry in byteFiles.entries) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          entry.key,
+          entry.value.bytes,
+          filename: entry.value.filename,
+        ),
+      );
+    }
 
     for (final entry in files.entries) {
       try {
@@ -375,6 +385,7 @@ class ApiClient {
     // Do not retry before every request while the server or network is down.
     _renewBlockedUntil = DateTime.now().add(const Duration(minutes: 1));
   }
+
   /// Turns a raw response into either a decoded body or the right exception.
   ///
   /// The single place status codes become types. Everything above this line is
