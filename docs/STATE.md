@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-09
-Stage: Courier extension 18 (shared unsaved-delay confirmation) DONE; extensions 16/17 DONE; physical acceptance OPEN.
+Stage: Courier extension 19 (foreground state recovery) DONE; extensions 16-18 DONE; physical acceptance OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified extension-18 source HEAD: 0f9fce3; this follow-up records completion. Authorized Courier branch; no merge.
+Verified extension-19 source HEAD: 36cb626; this follow-up records completion. Authorized Courier branch; no merge.
 Owner prioritized consistency pass over next rehearsal; earlier limited Courier scope overrides retained; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier; shared Zefanya styling. Native manifest/custody/status/stock/payment services and trip history remain intact.
 Assignment/accept/depart still require passed checklist, On Duty/fresh location; submitted vehicle records require approval/nonexpired license. Unsubmitted compatibility retained.
@@ -11,9 +11,9 @@ Four direct shared tabs: Trips/History/Earnings/Profile. Lazy kept-alive date/pa
 History reuses full trip cards, preserving seal/delay/decline/notes; saving handover note refreshes dated history as well as Trips. Background errors observed.
 Profile editorial identity/Settings gear; shared role-safe Settings owns appearance and confirmed/awaited logout. Buyer/Rider-specific records hidden from Courier.
 Prior pay snapshot activation approved/applied alone in batch 79 (106.48ms), two original pay/type null; scheduling batch 78 and earlier exceptions retained.
-Current delay focused: 00:07 +7: All tests passed! Final five-file shared/Courier suite: 00:17 +32: All tests passed! Live flag/mocked HTTP.
-Unsent delay reason/ETA protected on Back/cancel by shared Stay/Discard dialog; busy send blocked, clean exit/success/retry retained. Three new tests.
-Current analysis: 8 issues found. (ran in 6.6s); seven existing infos/one unused-helper warning. Formatter two files/zero changes; PHP/full app not rerun.
+Current lifecycle focused: 00:08 +22: All tests passed! Final five-file Courier suite: 00:22 +38: All tests passed! Live flag/mocked HTTP.
+Actual foreground return refreshes trips/visible dated report; query and unsent delay fields retained; duplicate resume ignored; failed reload uses Retry. Four new tests.
+Current analysis: 8 issues found. (ran in 7.4s); seven existing infos/one unused-helper warning. Dart formatted; PHP/full app not rerun.
 Previous extension-16 real login/profile/duty/vehicle/trips/history/earnings/logout passed/revoked token 401; not rerun in this mobile-only continuation.
 No schema/migration/config-file/dependency/build/APK changes; PHP/Pint unnecessary. No development migration or new approval needed.
 Extension-16 domain fingerprints unchanged; no subsequent live writes this stage. No trip/readiness/GPS/documents/pay fabricated.
@@ -22,4 +22,4 @@ MySQL zefanya_friend_20261107: #2 accepted/Loading, two parcels/1600g, zero load
 Prior runtime: backend :8000/preview :5177, USE_LIVE_API=true; not restarted/reverified this continuation. Restart Flutter for latest source.
 OPEN: payouts/Van unsupported/10-wheel no rate; physical full Courier rehearsal/concurrent MySQL/universal reviewed onboarding/capacity.
 OPEN: in-transit reassignment, geofence/background GPS/push, hosted HTTPS/APK and older S6.2 gates; Courier not fully complete.
-NEXT: human rehearsal per docs/courier-rehearsal.md; in-transit breakdown/reassignment and payouts remain feature gaps, not completed by form fixes. STOP after this stage.
+NEXT implementation: breakdown incident/photo and in-transit reassignment with rescan/pay/audit preservation; payouts separately. Human rehearsal per courier-rehearsal.md. STOP after this stage.
