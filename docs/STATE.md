@@ -1,25 +1,26 @@
 # Combined Courier presentation scope — 2026-11-08
-Stage: Courier extension 7 (reason-required decline/immutable offer history/safe reassignment) CODE + LOCAL SETUP DONE; manual C1/C3 acceptance OPEN.
+Stage: Courier extension 8 (reason/future ETA delay reporting) CODE DONE; local activation OPEN pending specific owner exception.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified decline source HEAD: 2139094; this follow-up only records state. Same Courier branch; no merge.
+Verified delay source HEAD: e7eef1d; this follow-up records state. Same authorized Courier branch; no merge.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier; shared Zefanya styling. Native manifest/custody/status/stock/payment services and trip history remain intact.
-New assignment/accept/depart require passed checklist, On Duty and <5-minute location; submitted vehicle records additionally need approval/nonexpired license.
-Decline only unaccepted/unloaded Draft offers; required reason <=500 and exact offer version, driver/manifest locks, native audit and own-company database notice.
-Immutable original route/address/count/reason/date snapshots; no current parcel/private details; survive native Draft deletion; identical retries idempotent.
-Different ready Courier may receive the declined batch with incremented offer version; prior declining Courier cannot be reoffered; one unique assignment row retained.
-Presentation compatibility: ALL unsubmitted accounts retain previous access; Active/email verification is not document approval. Mandatory onboarding deferred.
-Earlier initial Courier, seal and duty migrations remain installed under prior specific exceptions; existing account/trip/order values unchanged this stage.
-Owner approved/applied ONLY 2026_11_08_220000_add_linehaul_trip_declines.php (357.18ms): both original offers version 1/declined_at null; decline history empty.
-Final related PHP: {"tool":"phpunit","result":"passed","tests":203,"passed":203,"assertions":2281,"duration_ms":55297}
-Nine decline tests include ownership, reason/version, phase/race order, immutable snapshot, another trip, native deletion, rollback, throttle and multi-hub privacy.
-Final decline/Courier mobile: 00:18 +31: All tests passed! Last full-suite prior stage: 03:29 +901: All tests passed! Full not rerun this stage.
-Mobile analysis: 8 issues found. (ran in 10.4s); same existing 7 infos/1 unused-test-helper warning, no new issues.
-Web build: 6.60s before dependent PHP tests. No new dependencies. Pint remains waived/UNRUN. Approved additive local migration only; no real decline created.
-10 decline faults detected/restored; tmp/mutation deleted; prior 2 URL/18 vehicle and earlier security/seal/exception/duty/closeout proofs retained.
-Declined offers leave actions/busy state; Logistics index/details show unassigned/reason. Fix outgoing first-hub-only filter to all owned origins; incoming unchanged.
-Backend :8000 now uses tools/serve-local.ps1, process-only 5M uploads/20M requests; global php.ini/.env unchanged. Default PHP was 2M/8M.
-Post-activation real GET: #2 Loading/#1 Completed, stored version 1/can_decline false; own test token logged out. Original drivers/accepted/arrived times/#1 RECEIVED/#2–4 DRAFT unchanged.
-Preview http://127.0.0.1:5176 hot restart complete (1033ms); API http://127.0.0.1:8000. No merge/APK. Existing accepted demo trip cannot decline after activation either.
-OPEN: real decline/reassignment/phone/C1 documents/Maps; concurrent MySQL proof; trip weight/schedule/pay; hub GPS/background/push/in-transit reassignment; older S6.2/HTTPS gates.
-NEXT: backed trip details/delay reporting; actual decline rehearsal requires an unaccepted offer and another ready Courier, without changing the accepted demo just to expose decline. See courier-decline-progress.md.
+Assignment/accept/depart still require passed checklist, On Duty/fresh location; submitted vehicle records require approval/nonexpired license. Unsubmitted compatibility retained.
+Delay requires assigned accepted actual dispatching Courier, In Transit before arrival, current offer version, reason <=500 and future timezone-explicit ETA.
+UTC-normalized append-only ORM history, deterministic canonical retry fingerprint, driver/manifest locks, atomic native audit/own-company database notice.
+Saved retry survives ETA expiry/arrival; old retry returns latest estimate. Metadata bound to current driver/provider/offer. Native status remains In Transit.
+Courier and own-company Logistics see reason/manual ETA; inbox includes both. After arrival retain Last delay report; past active ETA asks update.
+New table linehaul_trip_delays ONLY: 2026_11_08_230000_create_linehaul_trip_delays.php NOT RUN; no demo report or status transition.
+Prior initial Courier/seal/duty/vehicle/decline migrations remain installed under specific owner exceptions; no new database exception assumed.
+Final related PHP: {"tool":"phpunit","result":"passed","tests":210,"passed":210,"assertions":2444,"duration_ms":58286}
+Seven new delay tests: auth/ownership/input/phase, privacy/native records, timezone retry/latest, binding, rollback/history and shared 429.
+Final Courier mobile: 00:19 +36: All tests passed! Five new delay tests. Last full app suite prior vehicle stage: 03:29 +901: All tests passed! Full not rerun.
+Mobile analysis: 8 issues found. (ran in 10.8s); unchanged seven infos/one unused-test-helper warning, no new issues.
+Web build: 6.41s before PHP tests; generated lucide restored. No dependencies/config changes. Pint waived/UNRUN.
+Ten delay faults detected/exactly restored; tmp/mutation deleted; prior decline/navigation/vehicle/security proofs retained.
+Missing new schema hides delay action safely. Actual local HTTP trips: #2 Loading/#1 Completed, can_report_delay false/delay null; token logged out.
+Backend :8000 uses tools/serve-local.ps1, process-only 5M uploads/20M requests; global php.ini/.env unchanged.
+Current demo #2 already accepted/Loading, so delay stays unavailable until genuine departure; #1 Completed. No fake report/GPS/docs/pay.
+Preview http://127.0.0.1:5176 hot restarted (1643ms), no client connected. API http://127.0.0.1:8000. No merge/APK.
+OPEN: local delay activation approval, physical C5/C1 document/decline/Maps rehearsal, simultaneous MySQL proof, trip weight/schedule/pay.
+OPEN: in-transit reassignment, geofence/background GPS/push, hosted HTTPS/APK and older S6.2 gates; Courier not fully complete.
+NEXT: approved local activation, then backed trip details and real rehearsal; see courier-delay-progress.md. STOP after this stage.
