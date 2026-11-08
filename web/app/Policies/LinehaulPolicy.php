@@ -22,4 +22,9 @@ class LinehaulPolicy
         return $provider->isApproved() && $provider->archived_at === null
             && (int) $manifest->logistics_provider_id === (int) $provider->id;
     }
+
+    public function closeReceiving(LogisticsProvider $provider, Manifest $manifest): bool
+    {
+        return $this->assign($provider, $manifest);
+    }
 }

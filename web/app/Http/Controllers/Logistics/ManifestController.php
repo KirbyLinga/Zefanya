@@ -259,7 +259,23 @@ class ManifestController extends Controller
             'sealReceipt' => \App\Support\RuntimeSchema::hasColumn('linehaul_assignments', 'seal_receipt')
                 ? \App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->first()?->seal_receipt : null,
             'requiresSeal' => app(\App\Services\Logistics\LinehaulSealService::class)->requiresConfirmation($manifest),
+            'closeoutPending' => $manifest->items()->whereNull('received_at')->whereNull('released_at')->orderBy('id')->get(),
+            'canCloseReceiving' => $manifest->status === ManifestStatus::Dispatched && $manifest->dispatched_by_type === 'linehaul'
+                && \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
+                && \App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->whereNotNull('arrived_at')->exists(),
         ]);
+    }
+
+    public function closeReceiving(\App\Http\Requests\Logistics\LinehaulCloseReceivingRequest $request, Manifest $manifest,
+        \App\Services\Logistics\ManifestCloseoutService $closeout): \App\Http\Resources\Mobile\ManifestCloseoutResource|RedirectResponse
+    {
+        $result = $closeout->close($manifest, $this->provider($request), $request->validated(), $request);
+        if ($request->expectsJson()) {
+            return new \App\Http\Resources\Mobile\ManifestCloseoutResource($result);
+        }
+
+        return redirect()->route('logistics.manifests.receive.index', $manifest)
+            ->with('success', 'Receiving closed with missing parcels recorded for investigation.');
     }
 
     public function receiveStore(Request $request, Manifest $manifest, ManifestItem $item): RedirectResponse

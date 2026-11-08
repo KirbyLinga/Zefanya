@@ -105,6 +105,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/manifests/{manifest}/dispatch', [ManifestController::class, 'dispatch'])->name('manifests.dispatch');
         Route::post('/manifests/{manifest}/scan/verify', [ManifestController::class, 'verifyScan'])->name('manifests.scan.verify');
         Route::get('/manifests/{manifest}/receive', [ManifestController::class, 'receiveIndex'])->name('manifests.receive.index');
+        Route::post('/manifests/{manifest}/close-receiving', [ManifestController::class, 'closeReceiving'])->middleware('throttle:linehaul-close-receiving')->name('manifests.receive.close');
         Route::post('/manifests/{manifest}/items/{item}/receive', [ManifestController::class, 'receiveStore'])->name('manifests.receive.store');
 
         // ── Rider pickup: parcels waiting to be picked up ──────────────────

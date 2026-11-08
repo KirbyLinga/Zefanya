@@ -1,5 +1,12 @@
 # Touched your files
 
+## Courier bulk receiving closeout — 2026-11-08
+
+- New POST /logistics/manifests/{manifest}/close-receiving uses existing Logistics web auth/approval/CSRF, a named company-scoped 20/min throttle, LinehaulPolicy closeReceiving gate, new LinehaulCloseReceivingRequest and ManifestCloseoutResource, and feature tests.
+- New ManifestCloseoutService compares a locked exact pending snapshot, requires reported arrival/confirmation/note/seal, then reuses native missing reporting atomically. Replays do not duplicate incidents/audits or overwrite evidence. No new table/migration, no canonical order/stock/payment writes.
+- ManifestController/receiving Blade show the pending review form only after the assigned Courier reports arrival. Reuse existing scanner confirmation dialog. ManifestAuditLog adds a human-readable closeout label; AppServiceProvider registers gate/limiter. Other route throttles unchanged.
+- LinehaulTripResource sorts retained items by ID, keeping tracking/note presentation deterministic after receipt/missing releases. No Flutter source changes. LinehaulCloseReceivingTest covers native integration and preserves existing Courier notes.
+
 ## Courier duty/checklist stage — 2026-11-08
 
 - Migration 2026_11_08_180000_add_linehaul_duty_readiness.php adds linehaul_drivers.on_duty (default false), duty_checked_at, last_seen_at, duty_location and the linehaul_duty_checks history table. Applied alone after explicit owner approval (360.52ms); real Courier Off Duty/history empty, existing batches unchanged.

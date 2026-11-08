@@ -106,6 +106,7 @@ class ManifestAuditLog extends Model
         return match ($this->action) {
             'dispatched' => 'Manifest Dispatched',
             'received' => 'Parcel Received',
+            'receiving_closed' => 'Receiving closed with missing parcels',
             'cancelled' => 'Manifest Cancelled',
             'deleted' => 'Manifest Deleted',
             default => ucfirst($this->action),

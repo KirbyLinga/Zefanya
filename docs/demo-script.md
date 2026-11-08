@@ -1,5 +1,11 @@
 # Demo and recording in the newer checkout
 
+## Bulk closeout of missing handover parcels
+
+After Courier reports arrival, open Logistics → Transfer Batches → the batch → Receive parcels. Scan and receive every parcel that is present first. At the bottom, Review unreceived parcels before closing lists only those still unreceived. Verify every tracking number, add the missing-parcel explanation and confirm the checkbox/dialog. First seal confirmation is still required if not already recorded. Up to 500 pending parcels may be confirmed in one closeout.
+
+Closing reports each remaining parcel missing through the existing incident system, retains origin custody and existing receipts, and shows Received with Issues in Courier History. It does not fabricate receipt scans or change canonical delivery status. Existing Courier handover notes remain; the Courier can add their own note for each new missing parcel. A stale review page refuses and asks for refresh. Repeating an already completed bulk closeout does not duplicate incidents, notifications or audit records. No local demo batch was closed during verification; no migration is needed for this stage.
+
 ## Courier duty/checklist — enabled locally
 
 The owner explicitly approved and applied ONLY `2026_11_08_180000_add_linehaul_duty_readiness.php` (360.52ms). Verified all four fields and history table, real API setup_required false / Off Duty, empty checklist history, batches #1 Received and #2–#4 Draft unchanged. No Courier was automatically marked ready. Do not run the whole migration backlog. Actual user location/checklist/force-kill rehearsal remains open.
@@ -21,7 +27,7 @@ No new migration is needed; existing local incident evidence/event fields were c
 3. Native incidents notify Buyer/Seller/Logistics through their existing database notifications and block parcel movement for review. Canonical delivery status is not rewritten. Receiving the rest of the batch keeps Received with Issues; missing parcels stay listed rather than disappearing.
 4. Courier refreshes Trips/History, expands Parcel details and adds their own handover note. The note is tied to this manifest's incident and cannot be overwritten. Courier has no receiving/closeout action. Admin investigation/resolution remains in the native incident process.
 
-This stage provides individual exception controls. Bulk Close Receiving that proposes every unreceived parcel, GPS checks, push and pay are not implemented. No real local incident/photo was created during automated verification.
+Individual exception controls remain available alongside the bulk closeout described above. GPS proximity checks, push and pay remain unimplemented. No real local incident/photo was created during automated verification.
 
 ## Courier seal extension — enabled locally
 
@@ -67,10 +73,10 @@ Courier now uses shared Zefanya design components in both themes. Trips shows ac
 3. In Logistics create a forward transfer batch with real eligible parcels and a destination hub. Select a Courier on batch details and Assign Courier. A second active trip is refused.
 4. In Courier login sign in and Accept trip. Scan every tracking number using QR/Code128 or manual fallback. A number not on the manifest is refused. Depart before all scans must fail; expired scans require rescanning.
 5. Enter a seal such as BH-0004521 and Depart. Native manifest becomes dispatched with Courier actor/audit records. Report arrival leaves the trip Arrived, awaiting Logistics. Arrival is reported, not GPS-verified.
-6. In Logistics manually compare the recorded seal and use the existing receiving screen to scan/receive parcels. Refresh Courier trips: Completed appears only after native receipt finishes. Courier cannot confirm their own receiving. Do not claim full seal discrepancy automation.
+6. In Logistics enter the actual arrival seal when first receiving; a mismatch requires a note. Scan/receive the parcels present, then use the reviewed bulk closeout only for genuinely missing parcels. Courier history shows Completed for a clean handover or Received with Issues for recorded discrepancies. Courier cannot confirm their own receiving; GPS proximity and pay remain deferred.
 7. Record Buyer/Rider flows, this main Courier path and logout/Back. Disclose manual scanning if Chrome has no camera; rehearse real QR/Code128 camera/permissions on the intended phone before claiming device verification.
 
-Deferred: license/NBI/vehicle onboarding and activation, duty/checklist/capacity, 500 m GPS/location tracking, push, decline/reassignment/breakdown, pay and full discrepancy rules. User approved only local config, the Courier migration and one demo Courier; no other migration or existing order/stock/payment changes. Existing S6.2/cancellation conformance gaps remain in STATE/DECISIONS.
+Deferred: license/NBI/vehicle onboarding and activation, capacity, 500 m hub proximity/background tracking, push, decline/reassignment/breakdown and pay. Core Courier, seal and duty schema changes were individually approved/applied; bulk closeout needs no migration. Separate zero-value demo fixtures were explicitly approved; existing orders/stock/payments were untouched. Existing S6.2/cancellation conformance gaps remain in STATE/DECISIONS.
 
 Run commands from `mobile/`. This guide applies to this checkout's `/api/buyer` and `/api/rider` backend, not the original checkout.
 

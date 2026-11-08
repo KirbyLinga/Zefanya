@@ -1,5 +1,11 @@
 # Native API — S6.4 incremental contract
 
+## Logistics Courier closeout extension
+
+POST /logistics/manifests/{manifest}/close-receiving requires an approved owning Logistics web session, CSRF, LinehaulCloseReceivingRequest/policy and a dedicated company-scoped 20/min limiter. A Courier mobile bearer token is not a Logistics session and cannot close receiving. Body: accepted close_confirmed; exact pending_item_ids array (1–500 distinct positive integers); issue_note (nonblank, <=500 characters); observed_seal / seal_note when seal confirmation is still required.
+
+Only dispatched Courier batches with recorded arrival qualify. A changed pending list returns 422 without changes. The locked transaction confirms the seal and reports every pending parcel missing through native incidents; no invented scans or destination receipts. JSON requests receive ManifestCloseoutResource with id/status/received_count/pending_count/missing_count/items; forms redirect to receiving. Already bulk-closed replays return the closed result without editing notes or creating duplicates. Native delivery status stays unchanged; missing incident holds and origin custody remain. Courier trip items now have stable ascending item-ID order.
+
 ## Courier duty extension
 
 GET /api/courier/duty returns only the authenticated Courier's setup_required/on_duty/available/status, checklist time, last update time and last-check outcome, with no-store/private caching. POST /api/courier/duty/{on|off|heartbeat} shares Sanctum authentication, linehaul role + active-account policy and 60/minute throttle, and uses LinehaulDutyRequest/Resource. No driver identity or computed readiness is accepted from the client.

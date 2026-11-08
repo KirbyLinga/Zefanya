@@ -1,5 +1,21 @@
 # Combined Courier security proof — 2026-11-08
 
+## Bulk receiving closeout extension
+
+On tmp/mutation, seven faults were applied one at a time and tested against SQLite, then restored exactly. Branch deleted before the final asset-ordered related suite passed: 67 tests / 979 assertions.
+
+| Deliberate fault | Named test prefix | Observed failure |
+| --- | --- | --- |
+| Allow every company in closeout policy | test_only_owning_logistics | Failed asserting that true is false (direct policy check). |
+| Accept an unchecked bulk confirmation | test_confirmation_note_and_exact_snapshot | Expected response status code [422] but received 200. |
+| Ignore exact reviewed pending snapshot | test_confirmation_note_and_exact_snapshot | Expected response status code [422] but received 200. |
+| Skip reported arrival | test_close_requires_reported_arrival | Expected response status code [422] but received 200. |
+| Remove outer closeout transaction | test_mid_batch_failure_rolls_back | Expected null released_at; first parcel remained released after simulated second-parcel failure. |
+| Remove closeout throttle | test_close_route_is_throttled | Expected response status code [429] but received 422. |
+| Share one throttle bucket across companies | test_close_route_is_throttled | Expected response status code [403] but received 429. |
+
+Each fault reported tests 1, passed 0, failed 1. No broken guard was committed.
+
 ## Duty/checklist extension
 
 On tmp/mutation, each fault below was applied alone using apply_patch, tested only against SQLite, and restored exactly. Temporary branch deleted before the final 60-test/819-assertion related suite passed.

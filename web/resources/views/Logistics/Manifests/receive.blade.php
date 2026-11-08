@@ -159,6 +159,24 @@
         </div>
     @endif
 </section>
+@if ($canCloseReceiving && $closeoutPending->isNotEmpty())
+    <section class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 font-sans text-xs text-amber-950" aria-labelledby="close-receiving-title">
+        <h2 id="close-receiving-title" class="font-serif text-xl">Review unreceived parcels before closing</h2>
+        <p class="mt-2">The following parcels have no receiving scan. Receive any parcel that is present first. Closing will mark every parcel listed below Missing and open incidents for investigation; it will not receive them into this hub.</p>
+        <ul class="my-3 list-disc pl-5">@foreach ($closeoutPending as $pending)<li class="break-all font-mono">{{ $pending->tracking_number }}</li>@endforeach</ul>
+        <form method="POST" action="{{ route('logistics.manifests.receive.close', $manifest) }}" data-parcel-issue data-confirm="Close receiving and report every listed unreceived parcel as missing? Existing receipts will be retained." class="space-y-3">
+            @csrf
+            @foreach ($closeoutPending as $pending)<input type="hidden" name="pending_item_ids[]" value="{{ $pending->id }}">@endforeach
+            <label class="block">Missing-parcel explanation<textarea name="issue_note" required maxlength="500" rows="3" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></textarea></label>
+            @if ($requiresSeal)
+                <label class="block">Seal observed on arrival<input name="observed_seal" required pattern="BH-[0-9]{7}" maxlength="10" placeholder="BH-0004521" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></label>
+                <label class="block">Seal discrepancy note (required if different)<textarea name="seal_note" maxlength="500" rows="3" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></textarea></label>
+            @endif
+            <label class="flex items-start gap-2"><input type="checkbox" name="close_confirmed" value="1" required> I reviewed every tracking number above and confirm these parcels are missing.</label>
+            <button type="submit" class="rounded bg-primary-700 px-4 py-2 font-semibold text-white">Close receiving with missing parcels</button>
+        </form>
+    </section>
+@endif
 @endsection
 
 @if ($isDispatched && $counts['pending'] > 0)
