@@ -1,5 +1,10 @@
 # Touched your files
 
+## Courier unsaved delay form — 2026-11-09
+
+- Mobile linehaul_delay_dialog.dart uses the shared Discard changes?/Stay/Discard confirmation for unsent reason/ETA on Back or explicit cancel; preserves busy-send and successful-submit behavior. Existing shared guard and vehicle screen untouched.
+- Add regression tests in linehaul_delay_test.dart without changing existing assertions; no backend files, routes, schema, dependencies, settings or real demo records changed.
+
 ## Courier report freshness — 2026-11-09
 
 - Mobile only: linehaul_portal.dart refreshes visited History/Earnings when selected again after another tab. Report screens retain dates/requested page across refresh failures/retries, suppress overlapping refreshes and clear stale results. Active-tab reselection does not reload. Existing lazy kept-alive navigation and first-load behavior remain.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'support/linehaul_history_fixture.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,7 @@ Map<String, Object?> _delay() => {
 class _Backend {
   bool capability = true;
   bool failOnce = false;
+  Completer<void>? sending;
   String status = 'In Transit';
   Map<String, Object?>? delay;
   final bodies = <Map<String, dynamic>>[];
@@ -33,6 +35,7 @@ class _Backend {
       paths.add(request.url.path);
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       bodies.add(body);
+      await sending?.future;
       if (failOnce && bodies.length == 1) {
         return http.Response(
           jsonEncode({'message': 'Connection interrupted. Try again.'}),
@@ -144,6 +147,101 @@ Future<void> _fill(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('Back cannot discard or duplicate a report while it is sending', (
+    tester,
+  ) async {
+    final sending = Completer<void>();
+    final backend = _Backend()..sending = sending;
+    await _mount(tester, backend);
+    await _open(tester);
+    await _fill(tester);
+    await tester.tap(find.text('Send delay report'));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text('Sending…'), findsOneWidget);
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(backend.bodies.length, 1);
+    final cancel = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'Keep trip unchanged'),
+    );
+    expect(cancel.onPressed, isNull);
+    sending.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Report a delay'), findsNothing);
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(backend.bodies.length, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Back protects an unsent reason; Stay retains it and Discard never posts',
+    (tester) async {
+      final backend = _Backend();
+      await _mount(tester, backend);
+      await _open(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('delay-reason')),
+        'Road blocked',
+      );
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Discard changes?'), findsOneWidget);
+      expect(backend.bodies, isEmpty);
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      expect(find.text('Road blocked'), findsOneWidget);
+      await tester.tap(find.text('Keep trip unchanged'));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard changes?'), findsOneWidget);
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+      expect(find.text('Report a delay'), findsNothing);
+      expect(find.text('In Transit'), findsOneWidget);
+      expect(backend.bodies, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'ETA alone is unsaved input and clean Back exits without confirmation',
+    (tester) async {
+      final backend = _Backend();
+      await _mount(tester, backend);
+      await _open(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Discard changes?'), findsNothing);
+      expect(find.text('Report a delay'), findsNothing);
+      await _open(tester);
+      final scroll = find
+          .descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('1 hour from now'),
+        120,
+        scrollable: scroll,
+      );
+      await tester.tap(find.text('1 hour from now'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Discard changes?'), findsOneWidget);
+      await tester.tap(find.text('Stay'));
+      await tester.pumpAndSettle();
+      final eta = tester.widget<TextFormField>(
+        find.byKey(const ValueKey('delay-eta')),
+      );
+      expect(eta.controller!.text, isNotEmpty);
+      expect(backend.bodies, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'delay timestamps require timezone and valid data; Unicode reasons follow server character count',
     () {

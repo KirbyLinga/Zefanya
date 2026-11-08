@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
+import '../../widgets/dirty_guard.dart';
 
 class LinehaulDelayDialog extends StatefulWidget {
   const LinehaulDelayDialog({
@@ -23,9 +24,38 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
   String? _error;
   bool _busy = false;
   bool _saved = false;
+  bool _allowLeave = false;
+  bool _discardPrompt = false;
+  bool get _dirty => _reason.text.isNotEmpty || _eta != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(_reasonChanged);
+  }
+
+  void _reasonChanged() => setState(() {});
+
+  Future<void> _leave() async {
+    if (_busy || _saved || _discardPrompt) return;
+    _discardPrompt = true;
+    final discard =
+        !_dirty ||
+        await DirtyGuard.confirmDiscard(
+          context,
+          message:
+              'Your unsent delay reason and ETA will be discarded. Your trip stays unchanged.',
+        );
+    _discardPrompt = false;
+    if (!discard || !mounted) return;
+    setState(() => _allowLeave = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context, false);
+  }
 
   @override
   void dispose() {
+    _reason.removeListener(_reasonChanged);
     _reason.dispose();
     _etaText.dispose();
     super.dispose();
@@ -103,7 +133,10 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: !_busy,
+    canPop: !_busy && (_saved || _allowLeave || !_dirty),
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _leave();
+    },
     child: AlertDialog(
       title: const Text('Report a delay'),
       content: SingleChildScrollView(
@@ -186,9 +219,7 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _busy || _saved
-              ? null
-              : () => Navigator.pop(context, false),
+          onPressed: _busy || _saved ? null : _leave,
           child: const Text('Keep trip unchanged'),
         ),
         FilledButton(
