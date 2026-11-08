@@ -16,6 +16,7 @@ import '../../widgets/nav_icons.dart';
 import '../../widgets/zefanya_mark.dart';
 import '../../utils/timed_snackbar.dart';
 import 'courier_qr_scanner.dart';
+import 'linehaul_profile_screen.dart';
 
 class LinehaulLoginScreen extends StatefulWidget {
   const LinehaulLoginScreen({super.key});
@@ -836,6 +837,19 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               Text('COURIER', style: AppType.eyebrow),
               const SizedBox(height: 8),
               const Text('Hub-to-hub parcel transfers'),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: _busy || context.read<Repositories>().client == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              LinehaulProfileScreen(repository: _repository),
+                        ),
+                      ),
+                icon: const Icon(Icons.badge_outlined),
+                label: const Text('Company & profile'),
+              ),
               const SizedBox(height: 24),
               _dutyCard(),
               const SizedBox(height: 24),

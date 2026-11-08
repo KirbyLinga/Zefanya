@@ -82,6 +82,10 @@ class LinehaulRepository {
   const LinehaulRepository(this.client);
   final ApiClient client;
 
+  Future<LinehaulProfile> profile() async => LinehaulProfile.fromJson(
+    unwrapMap(await client.getJson('/courier/profile')),
+  );
+
   Future<LinehaulDuty> duty() async =>
       LinehaulDuty.fromJson(unwrapMap(await client.getJson('/courier/duty')));
 
@@ -115,6 +119,52 @@ class LinehaulRepository {
       body: body,
     );
     return LinehaulTrip.fromJson(unwrapMap(response));
+  }
+}
+
+class LinehaulProfile {
+  const LinehaulProfile({
+    required this.name,
+    required this.email,
+    required this.status,
+    required this.emailVerified,
+    required this.company,
+    required this.homeHub,
+  });
+  final String name;
+  final String email;
+  final String status;
+  final bool emailVerified;
+  final String company;
+  final String homeHub;
+
+  factory LinehaulProfile.fromJson(Map<String, Object?> data) {
+    final company = data['company'];
+    final hub = data['home_hub'];
+    if (data['name'] is! String ||
+        (data['name'] as String).trim().isEmpty ||
+        data['email'] is! String ||
+        (data['email'] as String).trim().isEmpty ||
+        data['email_verified'] is! bool ||
+        data['status'] != 'active' ||
+        company is! Map ||
+        company['name'] is! String ||
+        (company['name'] as String).trim().isEmpty ||
+        hub is! Map ||
+        hub['name'] is! String ||
+        (hub['name'] as String).trim().isEmpty) {
+      throw const MalformedResponseException(
+        message: 'Could not read your Courier profile.',
+      );
+    }
+    return LinehaulProfile(
+      name: data['name'] as String,
+      email: data['email'] as String,
+      status: 'Active',
+      emailVerified: data['email_verified'] as bool,
+      company: company['name'] as String,
+      homeHub: hub['name'] as String,
+    );
   }
 }
 

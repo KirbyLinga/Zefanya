@@ -37,7 +37,8 @@ class LinehaulController extends Controller
 
     public function profile(LinehaulRequest $request): JsonResponse
     {
-        return $this->success('Courier profile.', new JsonResource($request->user()->only(['id', 'name', 'email', 'status'])));
+        return $this->success('Courier profile.', new \App\Http\Resources\Mobile\LinehaulProfileResource($request->user()))
+            ->header('Cache-Control', 'no-store, private');
     }
 
     public function logout(LinehaulRequest $request): JsonResponse
