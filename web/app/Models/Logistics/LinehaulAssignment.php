@@ -27,6 +27,11 @@ class LinehaulAssignment extends Model
         return $this->belongsTo(LinehaulDriver::class, 'linehaul_driver_id');
     }
 
+    public function latestDelay(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LinehaulTripDelay::class)->latestOfMany();
+    }
+
     public function manifest(): BelongsTo
     {
         return $this->belongsTo(Manifest::class);

@@ -108,6 +108,7 @@ class ManifestAuditLog extends Model
             'received' => 'Parcel Received',
             'receiving_closed' => 'Receiving closed with missing parcels',
             'courier_decline' => 'Courier declined trip',
+            'courier_delay' => 'Courier reported a delay',
             'cancelled' => 'Manifest Cancelled',
             'deleted' => 'Manifest Deleted',
             default => ucfirst($this->action),

@@ -52,7 +52,9 @@ class LinehaulController extends Controller
     {
         $trips = LinehaulAssignment::query()->currentOffer()->where('linehaul_driver_id', $request->user()->id)
             ->whereHas('manifest', fn ($query) => $query->where('logistics_provider_id', $request->user()->logistics_provider_id))
-            ->with(['manifest.originHub', 'manifest.destinationHub', 'manifest.items'])->latest('id')->limit(50)->get();
+            ->with(['manifest.originHub', 'manifest.destinationHub', 'manifest.items'])
+            ->when(\App\Services\Logistics\LinehaulDelayService::installed(), fn ($query) => $query->with('latestDelay'))
+            ->latest('id')->limit(50)->get();
 
         $rows = $trips->map(fn ($trip) => (new LinehaulTripResource($trip))->resolve($request));
         if (\App\Services\Logistics\LinehaulDeclineService::installed()) {
@@ -76,6 +78,14 @@ class LinehaulController extends Controller
         return $this->success('Your duty status.', new \App\Http\Resources\Mobile\LinehaulDutyResource($request->user()->fresh()))->header('Cache-Control', 'no-store, private');
     }
 
+    public function reportDelay(\App\Http\Requests\Api\LinehaulDelayRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulDelayService $service): JsonResponse
+    {
+        $assignment = $service->report($request->user(), $manifest, $request->validated(), $request);
+        $assignment->load(['manifest.originHub', 'manifest.destinationHub', 'manifest.items', 'latestDelay']);
+
+        return $this->success('Delay reported to Logistics.', new LinehaulTripResource($assignment));
+    }
+
     public function changeDuty(\App\Http\Requests\Api\LinehaulDutyRequest $request, string $dutyAction, \App\Services\Logistics\LinehaulDutyService $service): JsonResponse
     {
         $driver = $service->change($request->user(), $dutyAction, $request->validated());
@@ -87,6 +97,9 @@ class LinehaulController extends Controller
     {
         $assignment = $service->act($request->user(), $manifest, $action, $request->validated(), $request);
         $assignment->load(['manifest.originHub', 'manifest.destinationHub', 'manifest.items']);
+        if (\App\Services\Logistics\LinehaulDelayService::installed()) {
+            $assignment->load('latestDelay');
+        }
 
         return $this->success('Trip updated.', new LinehaulTripResource($assignment));
     }

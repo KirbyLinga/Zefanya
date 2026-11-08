@@ -20,6 +20,7 @@ import '../../widgets/zefanya_mark.dart';
 import '../../utils/timed_snackbar.dart';
 import 'courier_qr_scanner.dart';
 import 'linehaul_profile_screen.dart';
+import 'linehaul_delay_dialog.dart';
 
 class LinehaulLoginScreen extends StatefulWidget {
   const LinehaulLoginScreen({super.key});
@@ -572,6 +573,15 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     }
   }
 
+  Future<void> _reportDelay(LinehaulTrip trip) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => LinehaulDelayDialog(trip: trip, repository: _repository),
+    );
+    if (saved == true && mounted) _reload();
+  }
+
   Future<void> _handoverNote(LinehaulTrip trip, LinehaulParcel parcel) async {
     var value = '';
     final note = await showDialog<String>(
@@ -752,6 +762,25 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 ],
               ),
             ),
+            if (trip.delay != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                trip.status == 'In Transit' ? 'Delayed' : 'Last delay report',
+                style: theme.textTheme.titleMedium,
+              ),
+              Text(
+                'Courier-reported ETA: ${DateFormat.yMMMd().add_jm().format(trip.delay!.newEta.toLocal())}',
+                style: theme.textTheme.bodyMedium,
+              ),
+              Text(trip.delay!.reason, style: theme.textTheme.bodyMedium),
+              Text(
+                'Reported ${DateFormat.yMMMd().add_jm().format(trip.delay!.reportedAt.toLocal())}',
+                style: theme.textTheme.bodySmall,
+              ),
+              if (trip.status == 'In Transit' &&
+                  !trip.delay!.newEta.isAfter(DateTime.now()))
+                const Text('Reported ETA has passed. Update Logistics.'),
+            ],
             if (trip.seal != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -856,6 +885,12 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               FilledButton(
                 onPressed: _busy ? null : () => _act(trip, 'arrive'),
                 child: const Text('Report arrival'),
+              ),
+            if (trip.canReportDelay)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _reportDelay(trip),
+                icon: const Icon(Icons.schedule_outlined),
+                label: const Text('Report delay'),
               ),
             if (trip.status == 'Arrived')
               Text(

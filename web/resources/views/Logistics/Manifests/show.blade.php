@@ -3,6 +3,14 @@
 @section('title', 'Batch Details #'.$manifest->id)
 
 @section('content')
+@if (isset($courierDelay) && $courierDelay)
+    <section class="mb-4 rounded-md border p-4">
+        <h2 class="font-semibold">{{ $manifest->status === \App\Enums\ManifestStatus::Dispatched && !$courierAssignment?->arrived_at ? 'Delayed' : 'Last delay report' }}</h2>
+        <p class="mt-2">Courier-reported ETA: {{ $courierDelay->new_eta->format('M j, Y H:i T') }}</p>
+        <p>{{ $courierDelay->reason }}</p>
+        <p class="mt-2">Reported {{ $courierDelay->created_at->format('M j, Y H:i T') }}. This estimate was entered by the Courier.</p>
+    </section>
+@endif
 @if (isset($courierDeclines) && $courierDeclines->isNotEmpty())
     <section class="mb-4 rounded-md border p-4">
         <h2 class="font-semibold">Courier decline history</h2>

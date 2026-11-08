@@ -16,6 +16,8 @@ class LinehaulTrip {
     this.declineReason,
     this.declinedAt,
     this.parcelCount,
+    this.canReportDelay = false,
+    this.delay,
   });
 
   final String id;
@@ -30,6 +32,8 @@ class LinehaulTrip {
   final String? declineReason;
   final String? declinedAt;
   final int? parcelCount;
+  final bool canReportDelay;
+  final LinehaulDelay? delay;
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
@@ -81,6 +85,14 @@ class LinehaulTrip {
         message: 'Could not read this Courier offer.',
       );
     }
+    if ((data['can_report_delay'] != null &&
+            data['can_report_delay'] is! bool) ||
+        (data['can_report_delay'] == true && data['status'] != 'In Transit') ||
+        (data['delay'] != null && data['delay'] is! Map)) {
+      throw const MalformedResponseException(
+        message: 'Could not read the trip delay report.',
+      );
+    }
     return LinehaulTrip(
       id: '${data['id']}',
       status: '${data['status']}',
@@ -94,6 +106,12 @@ class LinehaulTrip {
       declineReason: data['decline_reason'] as String?,
       declinedAt: data['declined_at'] as String?,
       parcelCount: data['parcel_count'] as int?,
+      canReportDelay: data['can_report_delay'] == true,
+      delay: data['delay'] is Map
+          ? LinehaulDelay.fromJson(
+              (data['delay'] as Map).cast<String, Object?>(),
+            )
+          : null,
       items: [
         for (final item in items)
           if (item is Map)
@@ -112,6 +130,40 @@ class LinehaulTrip {
           else
             throw const MalformedResponseException(),
       ],
+    );
+  }
+}
+
+class LinehaulDelay {
+  const LinehaulDelay({
+    required this.reason,
+    required this.newEta,
+    required this.reportedAt,
+  });
+  final String reason;
+  final DateTime newEta;
+  final DateTime reportedAt;
+
+  factory LinehaulDelay.fromJson(Map<String, Object?> data) {
+    DateTime? timestamp(Object? value) =>
+        value is String && RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(value)
+        ? DateTime.tryParse(value)
+        : null;
+    final eta = timestamp(data['new_eta']);
+    final reported = timestamp(data['reported_at']);
+    if (data['reason'] is! String ||
+        (data['reason'] as String).trim().isEmpty ||
+        (data['reason'] as String).runes.length > 500 ||
+        eta == null ||
+        reported == null) {
+      throw const MalformedResponseException(
+        message: 'Could not read the trip delay report.',
+      );
+    }
+    return LinehaulDelay(
+      reason: data['reason'] as String,
+      newEta: eta,
+      reportedAt: reported,
     );
   }
 }

@@ -81,6 +81,10 @@
                                     <p class="mt-1 break-words font-sans text-xs text-[var(--text-muted)]">{{ $unassignedDeclines[$manifest->id]->reason }}</p>
                                 @endif
                                 @if ($manifest->dispatched_at)
+                                    @if (isset($courierDelays[$manifest->id]) && $manifest->status === ManifestStatus::Dispatched)
+                                        <p class="mt-2 font-sans text-xs font-semibold">Delayed · Courier-reported ETA</p>
+                                        <p class="font-sans text-xs">{{ $courierDelays[$manifest->id]->new_eta->format('M j, Y H:i T') }}</p>
+                                    @endif
                                     <p class="mt-2 font-sans text-[10px] text-[var(--text-muted)]">Dispatched {{ $manifest->dispatched_at->format('M j, g:i A') }}</p>
                                 @endif
                             </td>

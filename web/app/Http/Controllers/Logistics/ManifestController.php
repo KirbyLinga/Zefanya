@@ -85,6 +85,14 @@ class ManifestController extends Controller
                 ->whereIn('manifest_id', $manifests->pluck('id'))->whereNotIn('manifest_id', $currentIds)->latest('id')->get()->unique('manifest_id')->keyBy('manifest_id');
         }
 
+        $courierDelays = collect();
+        if (\App\Services\Logistics\LinehaulDelayService::installed()) {
+            $courierDelays = \App\Models\Logistics\LinehaulAssignment::currentOffer()->whereIn('manifest_id', $manifests->pluck('id'))
+                ->whereHas('manifest', fn ($query) => $query->where('logistics_provider_id', $provider->id))
+                ->whereNull('arrived_at')->with(['manifest', 'latestDelay'])->get()
+                ->mapWithKeys(fn ($assignment) => [$assignment->manifest_id => \App\Services\Logistics\LinehaulDelayService::latest($assignment)])->filter();
+        }
+
         return view('Logistics.Manifests.index', [
             'provider' => $provider,
             'manifests' => $manifests,
@@ -92,6 +100,7 @@ class ManifestController extends Controller
             'tab' => $tab,
             'statuses' => ManifestStatus::cases(),
             'unassignedDeclines' => $unassignedDeclines,
+            'courierDelays' => $courierDelays,
         ]);
     }
 
@@ -157,6 +166,8 @@ class ManifestController extends Controller
                 ? \App\Models\Logistics\LinehaulAssignment::query()->currentOffer()->with('driver')->where('manifest_id', $manifest->id)->first() : null,
             'courierDeclines' => \App\Services\Logistics\LinehaulDeclineService::installed()
                 ? \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('logistics_provider_id', $provider->id)->latest('id')->get() : collect(),
+            'courierDelay' => \App\Services\Logistics\LinehaulDelayService::installed()
+                ? \App\Services\Logistics\LinehaulDelayService::latest(\App\Models\Logistics\LinehaulAssignment::currentOffer()->where('manifest_id', $manifest->id)->with(['manifest', 'latestDelay'])->first()) : null,
             'linehaulDrivers' => \App\Support\RuntimeSchema::hasTable('linehaul_drivers')
                 ? \App\Models\Logistics\LinehaulDriver::query()->where('logistics_provider_id', $provider->id)->where('status', 'active')->orderBy('name')->get()
                     ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)

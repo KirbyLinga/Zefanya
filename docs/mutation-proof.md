@@ -1,5 +1,24 @@
 # Combined Courier security proof — 2026-11-08
 
+## Delay reporting
+
+Ten faults individually applied with literal hunks on tmp/mutation, tested using SQLite memory, then exactly restored. The temporary branch was deleted after returning to codex/combined-courier-demo. No whole-tree restore or development migration. Test prefixes below refer to LinehaulDelayTest; each result was failed, tests 1/passed 0. Transaction fault was repeated once to recapture truncated output.
+
+| Fault | Test prefix | Observed FAIL |
+| --- | --- | --- |
+| canReport always true | test_new_reports_only | Expected response status code [422] but received 200. |
+| Accept past ETA | test_report_requires_real_owner | Expected response status code [422] but received 200. |
+| Omit UTC normalization | test_duplicate_offsets | Failed asserting that 2 is identical to 1. |
+| Ignore expected offer version | test_report_requires_real_owner | Expected response status code [422] but received 200. |
+| Randomize fingerprint | test_duplicate_offsets | Failed asserting that 2 is identical to 1. |
+| Omit latest report driver/provider/epoch binding | test_delay_metadata_is_bound | Expected null; received metadata array. |
+| Remove transaction | test_report_audit_failure | Failed asserting that 1 is identical to 0. (assertions 2, 3753ms) |
+| Disable model/common ORM history guards | test_report_audit_failure | Delay history was changed. (assertions 5, 3701ms) |
+| Remove reason maximum | test_report_requires_real_owner | Expected response status code [422] but received 200. (assertions 5, 3698ms) |
+| Check future eligibility before saved retry lookup | test_duplicate_offsets | Expected response status code [200] but received 422. The new ETA must be in the future. (assertions 9, 3886ms) |
+
+Shared real-role authentication, ownership policy and throttle remain unchanged, with new route 401/403/429 tests and earlier shared-layer mutation proofs retained. Final restored PASS: `{"tool":"phpunit","result":"passed","tests":210,"passed":210,"assertions":2444,"duration_ms":58286}`. Mobile: `00:19 +36: All tests passed!`; analysis unchanged eight existing issues; web build 6.41s. Concurrent MySQL execution is OPEN; SQLite checks are not evidence of production lock scheduling.
+
 ## Trip decline and retained offers
 
 On tmp/mutation, apply each fault separately with literal apply_patch hunks, run the named LinehaulDeclineTest method against SQLite memory, wait for completion, and restore the exact hunk. Preserve pending stage work rather than restoring the entire dirty tree. All ten faults detected; return to codex/combined-courier-demo and delete tmp/mutation before the final suite. No local dev migration or demo action used for these checks.

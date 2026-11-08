@@ -15,6 +15,7 @@ class LinehaulTripResource extends JsonResource
     public function toArray(Request $request): array
     {
         $manifest = $this->manifest;
+        $delay = \App\Services\Logistics\LinehaulDelayService::latest($this->resource);
         $stage = match ($manifest->status) {
             \App\Enums\ManifestStatus::Draft => $this->accepted_at === null ? 'Assigned' : 'Loading',
             \App\Enums\ManifestStatus::Dispatched => $this->arrived_at === null ? 'In Transit' : 'Arrived',
@@ -27,6 +28,8 @@ class LinehaulTripResource extends JsonResource
             'id' => $manifest->id, 'status' => $stage,
             'offer_version' => $this->offer_version ?? 1,
             'can_decline' => \App\Services\Logistics\LinehaulDeclineService::canDecline($this->resource),
+            'can_report_delay' => \App\Services\Logistics\LinehaulDelayService::canReport($this->resource),
+            'delay' => $delay === null ? null : (new LinehaulDelayResource($delay))->resolve($request),
             'origin' => $manifest->originHub?->name, 'destination' => $manifest->destinationHub?->name,
             'origin_address' => $this->hubAddress($manifest->originHub),
             'destination_address' => $this->hubAddress($manifest->destinationHub),
