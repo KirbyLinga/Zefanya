@@ -1,5 +1,17 @@
 # Demo and recording in the newer checkout
 
+## Ready-to-use local Courier trips
+
+User-requested fixtures created 2026-11-08: three separate zero-value transfer batches, two parcels each, Pila Station Hub to Laguna Province Hub. No existing order/stock/payment changes. These have no sale lines and only rehearse transfers.
+
+| Batch | Availability | Manual tracking numbers |
+| --- | --- | --- |
+| 2 | Assigned to Demo Pila Courier | DEMO-COURIER-B01-P01, DEMO-COURIER-B01-P02 |
+| 3 | Draft; Logistics assigns after the active trip finishes | DEMO-COURIER-B02-P01, DEMO-COURIER-B02-P02 |
+| 4 | Draft; Logistics assigns after the active trip finishes | DEMO-COURIER-B03-P01, DEMO-COURIER-B03-P02 |
+
+Refresh Courier Trips, accept batch 2, scan/enter both numbers, then depart with a seal such as BH-0004521. Report arrival; Logistics receives both parcels before assigning the next batch. One active trip per Courier remains enforced. Credentials stay in chat, not this document.
+
 ## Remaining Courier phone check
 
 Device discovery on 2026-11-08 found no connected Android device; Pixel_4a is a saved emulator, not a running device. Android declares INTERNET and CAMERA. Existing scanner/trip widget checks pass (8 tests); they do not verify camera permission, QR or Code128 decoding on hardware.
