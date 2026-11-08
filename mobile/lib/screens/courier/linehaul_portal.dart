@@ -762,6 +762,30 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 ],
               ),
             ),
+            if (!declined) ...[
+              const SizedBox(height: 16),
+              Text('Trip details', style: theme.textTheme.titleMedium),
+              Text(
+                '${trip.parcelCount ?? trip.items.length} ${trip.items.length == 1 ? 'parcel' : 'parcels'} in this batch',
+              ),
+              Text(
+                trip.recordedWeightGrams == null
+                    ? 'Parcel weight not fully recorded'
+                    : 'Recorded parcel weight: ${NumberFormat('0.###').format(trip.recordedWeightGrams! / 1000)} kg',
+              ),
+              if (trip.acceptedAt != null)
+                Text(
+                  'Accepted: ${DateFormat.yMMMd().add_jm().format(trip.acceptedAt!.toLocal())}',
+                ),
+              if (trip.departedAt != null)
+                Text(
+                  'Departed: ${DateFormat.yMMMd().add_jm().format(trip.departedAt!.toLocal())}',
+                ),
+              if (trip.arrivedAt != null)
+                Text(
+                  'Arrived: ${DateFormat.yMMMd().add_jm().format(trip.arrivedAt!.toLocal())}',
+                ),
+            ],
             if (trip.delay != null) ...[
               const SizedBox(height: 16),
               Text(

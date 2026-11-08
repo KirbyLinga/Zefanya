@@ -52,7 +52,7 @@ class LinehaulController extends Controller
     {
         $trips = LinehaulAssignment::query()->currentOffer()->where('linehaul_driver_id', $request->user()->id)
             ->whereHas('manifest', fn ($query) => $query->where('logistics_provider_id', $request->user()->logistics_provider_id))
-            ->with(['manifest.originHub', 'manifest.destinationHub', 'manifest.items'])
+            ->with(['manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams'])
             ->when(\App\Services\Logistics\LinehaulDelayService::installed(), fn ($query) => $query->with('latestDelay'))
             ->latest('id')->limit(50)->get();
 
@@ -81,7 +81,7 @@ class LinehaulController extends Controller
     public function reportDelay(\App\Http\Requests\Api\LinehaulDelayRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulDelayService $service): JsonResponse
     {
         $assignment = $service->report($request->user(), $manifest, $request->validated(), $request);
-        $assignment->load(['manifest.originHub', 'manifest.destinationHub', 'manifest.items', 'latestDelay']);
+        $assignment->load(['manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams', 'latestDelay']);
 
         return $this->success('Delay reported to Logistics.', new LinehaulTripResource($assignment));
     }
@@ -96,7 +96,7 @@ class LinehaulController extends Controller
     public function act(LinehaulRequest $request, Manifest $manifest, string $action, LinehaulService $service): JsonResponse
     {
         $assignment = $service->act($request->user(), $manifest, $action, $request->validated(), $request);
-        $assignment->load(['manifest.originHub', 'manifest.destinationHub', 'manifest.items']);
+        $assignment->load(['manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams']);
         if (\App\Services\Logistics\LinehaulDelayService::installed()) {
             $assignment->load('latestDelay');
         }

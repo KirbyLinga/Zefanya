@@ -18,6 +18,10 @@ class LinehaulTrip {
     this.parcelCount,
     this.canReportDelay = false,
     this.delay,
+    this.recordedWeightGrams,
+    this.acceptedAt,
+    this.departedAt,
+    this.arrivedAt,
   });
 
   final String id;
@@ -34,9 +38,32 @@ class LinehaulTrip {
   final int? parcelCount;
   final bool canReportDelay;
   final LinehaulDelay? delay;
+  final int? recordedWeightGrams;
+  final DateTime? acceptedAt;
+  final DateTime? departedAt;
+  final DateTime? arrivedAt;
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
+    DateTime? timestamp(String key) {
+      final value = data[key];
+      if (value == null) return null;
+      if (value is! String ||
+          !RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(value) ||
+          DateTime.tryParse(value) == null) {
+        throw const MalformedResponseException(
+          message: 'Could not read the recorded trip time.',
+        );
+      }
+      return DateTime.parse(value);
+    }
+
+    final weight = data['recorded_weight_grams'];
+    if (weight != null && (weight is! int || weight <= 0)) {
+      throw const MalformedResponseException(
+        message: 'Could not read the recorded parcel weight.',
+      );
+    }
     final items = data['items'];
     if (data['id'] == null ||
         items is! List ||
@@ -106,6 +133,10 @@ class LinehaulTrip {
       declineReason: data['decline_reason'] as String?,
       declinedAt: data['declined_at'] as String?,
       parcelCount: data['parcel_count'] as int?,
+      recordedWeightGrams: weight as int?,
+      acceptedAt: timestamp('accepted_at'),
+      departedAt: timestamp('departed_at'),
+      arrivedAt: timestamp('arrived_at'),
       canReportDelay: data['can_report_delay'] == true,
       delay: data['delay'] is Map
           ? LinehaulDelay.fromJson(

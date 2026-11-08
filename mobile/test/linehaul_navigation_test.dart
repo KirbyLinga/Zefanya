@@ -95,6 +95,61 @@ Future<void> _mount(
 
 void main() {
   test(
+    'trip details accept older APIs and reject invalid weight or unzoned times',
+    () {
+      expect(LinehaulTrip.fromJson(_trip()).recordedWeightGrams, isNull);
+      for (final weight in [0, -1, 3.6, '3600']) {
+        expect(
+          () => LinehaulTrip.fromJson({
+            ..._trip(),
+            'recorded_weight_grams': weight,
+          }),
+          throwsA(isA<MalformedResponseException>()),
+        );
+      }
+      expect(
+        () => LinehaulTrip.fromJson({
+          ..._trip(),
+          'departed_at': '2026-11-08 12:00:00',
+        }),
+        throwsA(isA<MalformedResponseException>()),
+      );
+      final trip = LinehaulTrip.fromJson({
+        ..._trip(),
+        'recorded_weight_grams': 3600,
+        'departed_at': '2026-11-08T12:00:00+08:00',
+      });
+      expect(trip.recordedWeightGrams, 3600);
+      expect(trip.departedAt!.toUtc(), DateTime.utc(2026, 11, 8, 4));
+    },
+  );
+
+  testWidgets(
+    'recorded trip details fit small screens without inventing schedule or pay',
+    (tester) async {
+      final posts = <String>[];
+      await _mount(tester, _Directions(), {
+        ..._trip(),
+        'parcel_count': 1,
+        'recorded_weight_grams': 3600,
+        'accepted_at': '2026-11-08T03:00:00Z',
+        'departed_at': '2026-11-08T04:00:00Z',
+      }, posts);
+      await tester.scrollUntilVisible(
+        find.text('Recorded parcel weight: 3.6 kg'),
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('1 parcel in this batch'), findsOneWidget);
+      expect(find.textContaining('Accepted:'), findsOneWidget);
+      expect(find.textContaining('Departed:'), findsOneWidget);
+      expect(find.textContaining('Scheduled departure:'), findsNothing);
+      expect(posts, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
     'directions encode hub text into a fixed HTTPS Maps host without session data',
     () {
       const address = 'Rizal & Mabini #2, Calamba?next=https://example.test/ñ';

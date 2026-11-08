@@ -16,6 +16,10 @@ class LinehaulTripResource extends JsonResource
     {
         $manifest = $this->manifest;
         $delay = \App\Services\Logistics\LinehaulDelayService::latest($this->resource);
+        $items = $manifest->items->sortBy('id')->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null || $item->issue_type !== null);
+        $weights = $items->map(fn ($item) => $item->sellerOrder?->parcel_weight_grams);
+        $weight = $items->isNotEmpty() && $weights->every(fn ($grams): bool => is_numeric($grams) && (int) $grams > 0)
+            ? (int) $weights->sum() : null;
         $stage = match ($manifest->status) {
             \App\Enums\ManifestStatus::Draft => $this->accepted_at === null ? 'Assigned' : 'Loading',
             \App\Enums\ManifestStatus::Dispatched => $this->arrived_at === null ? 'In Transit' : 'Arrived',
@@ -34,9 +38,12 @@ class LinehaulTripResource extends JsonResource
             'origin_address' => $this->hubAddress($manifest->originHub),
             'destination_address' => $this->hubAddress($manifest->destinationHub),
             'seal_number' => $this->seal_number,
+            'parcel_count' => $items->count(),
+            'recorded_weight_grams' => $weight,
+            'departed_at' => $manifest->dispatched_at?->toIso8601String(),
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'arrived_at' => $this->arrived_at?->toIso8601String(),
-            'items' => $manifest->items->sortBy('id')->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null || $item->issue_type !== null)->map(fn ($item): array => [
+            'items' => $items->map(fn ($item): array => [
                 'id' => $item->id, 'tracking_number' => $item->tracking_number,
                 'loaded' => $manifest->dispatched_at !== null || isset(($this->loading_tokens ?? [])[$item->id]),
                 'received' => $item->received_at !== null,

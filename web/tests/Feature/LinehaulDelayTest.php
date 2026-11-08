@@ -212,4 +212,31 @@ class LinehaulDelayTest extends TestCase
 
         $this->assertSame(0, LinehaulTripDelay::count());
     }
+
+    public function test_trip_details_use_only_recorded_parcel_weights_and_actual_times_without_writing_records(): void
+    {
+        ['driver' => $driver, 'manifest' => $manifest, 'assignment' => $assignment, 'parcel' => $parcel] = $this->fixture();
+        $parcel->forceFill(['parcel_weight_grams' => 3600])->save();
+        $before = [$manifest->fresh()->getAttributes(), $assignment->fresh()->getAttributes(), $parcel->fresh()->getAttributes()];
+        $this->api($driver)->getJson('/api/courier/trips')->assertOk()
+            ->assertJsonPath('data.0.parcel_count', 1)->assertJsonPath('data.0.recorded_weight_grams', 3600)
+            ->assertJsonPath('data.0.accepted_at', $assignment->fresh()->accepted_at->toIso8601String())
+            ->assertJsonPath('data.0.departed_at', $manifest->fresh()->dispatched_at->toIso8601String())
+            ->assertJsonMissingPath('data.0.scheduled_departure')->assertJsonMissingPath('data.0.pay');
+        $this->assertSame($before, [$manifest->fresh()->getAttributes(), $assignment->fresh()->getAttributes(), $parcel->fresh()->getAttributes()]);
+        foreach ([null, 0] as $missing) {
+            $parcel->forceFill(['parcel_weight_grams' => $missing])->save();
+            $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.recorded_weight_grams', null);
+        }
+        $parcel->forceFill(['parcel_weight_grams' => 1500])->save();
+        $extra = SellerOrder::factory()->create(['tracking_number' => 'DETAIL-EXTRA', 'parcel_weight_grams' => 2100]);
+        $item = $manifest->items()->create(['seller_order_id' => $extra->id, 'tracking_number' => $extra->tracking_number]);
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.parcel_count', 2)->assertJsonPath('data.0.recorded_weight_grams', 3600);
+        $item->forceFill(['released_at' => now()])->save();
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.parcel_count', 1)->assertJsonPath('data.0.recorded_weight_grams', 1500);
+        $item->forceFill(['received_at' => now()])->save();
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.parcel_count', 2)->assertJsonPath('data.0.recorded_weight_grams', 3600);
+        $extra->forceFill(['parcel_weight_grams' => null])->save();
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.recorded_weight_grams', null);
+    }
 }

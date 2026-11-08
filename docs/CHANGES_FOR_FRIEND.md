@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier recorded trip details — 2026-11-08
+
+- Existing LinehaulTripResource adds parcel_count, recorded_weight_grams (nullable complete positive snapshot sum), and departed_at. Existing accepted_at/arrived_at are reused. One filtered item collection drives count, total and existing parcel rows; no new route/table/column/service. Removed unreceived rows are excluded, received/issue history remains visible. No current catalog weight fallback or hidden write.
+- Existing Api/LinehaulController eager-loads manifest.items.sellerOrder:id,parcel_weight_grams for list/action/delay responses; private order fields remain unexposed. Existing authorization, throttles, policies, requests and native lifecycle services unchanged.
+- Existing mobile linehaul_repository.dart adds optional recorded weight and actual timestamps with type/positive-weight/timezone validation; old API omission remains compatible. Existing linehaul_portal.dart renders a Trip details section, explicit incomplete-weight copy, and local actual times. Declined snapshot history receives no invented new details. Existing LinehaulDelayTest and linehaul_navigation_test receive additive checks only. No packages/build assets/configuration or database setup changed.
+
 ## Courier delay reporting — 2026-11-08
 
 - New migration 2026_11_08_230000_create_linehaul_trip_delays.php creates linehaul_trip_delays only: id, assignment/provider/driver restrict-delete foreign keys, offer_version, unique fingerprint, reason, UTC new_eta and created_at. Owner approved local installation: only this migration applied (387.04ms), alone in batch 77. Zero reports; full original assignment records and batch statuses unchanged.
