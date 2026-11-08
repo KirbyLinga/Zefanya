@@ -18,7 +18,6 @@ Mobile analysis: 8 issues found. (ran in 10.8s); unchanged seven infos/one unuse
 Web build: 6.41s before PHP tests; generated lucide restored. No dependencies/config changes. Pint waived/UNRUN.
 Ten delay faults detected/exactly restored; tmp/mutation deleted; prior decline/navigation/vehicle/security proofs retained.
 Missing new schema hides delay action safely. Actual local HTTP trips: #2 Loading/#1 Completed, can_report_delay false/delay null; token logged out.
-Backend :8000 uses tools/serve-local.ps1, process-only 5M uploads/20M requests; global php.ini/.env unchanged.
 Current demo #2 already accepted/Loading, so delay stays unavailable until genuine departure; #1 Completed. No fake report/GPS/docs/pay.
 Preview http://127.0.0.1:5176 hot restarted (1643ms), no client connected. API http://127.0.0.1:8000. No merge/APK.
 OPEN: local delay activation approval, physical C5/C1 document/decline/Maps rehearsal, simultaneous MySQL proof, trip weight/schedule/pay.
