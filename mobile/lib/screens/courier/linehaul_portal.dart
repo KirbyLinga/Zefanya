@@ -53,6 +53,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   int _tab = 0;
   final _visitedTabs = <int>{0};
   final _historyKey = GlobalKey<LinehaulHistoryScreenState>();
+  final _earningsKey = GlobalKey<LinehaulEarningsScreenState>();
   LinehaulDuty? _duty;
   String? _dutyError;
   bool _dutyLocationError = false;
@@ -985,10 +986,22 @@ class _LinehaulPortalState extends State<LinehaulPortal>
           NavBarItem(glyph: NavGlyph.profile, label: 'Profile'),
         ],
         currentIndex: _tab,
-        onTap: (index) => setState(() {
-          _visitedTabs.add(index);
-          _tab = index;
-        }),
+        onTap: (index) {
+          if (index == _tab) return;
+          if (index == 1) {
+            unawaited(
+              _historyKey.currentState?.refresh() ?? Future<void>.value(),
+            );
+          } else if (index == 2) {
+            unawaited(
+              _earningsKey.currentState?.refresh() ?? Future<void>.value(),
+            );
+          }
+          setState(() {
+            _visitedTabs.add(index);
+            _tab = index;
+          });
+        },
       ),
       body: Center(
         child: ConstrainedBox(
@@ -1093,6 +1106,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 SafeArea(
                   bottom: false,
                   child: LinehaulEarningsScreen(
+                    key: _earningsKey,
                     repository: _repository,
                     embedded: true,
                   ),

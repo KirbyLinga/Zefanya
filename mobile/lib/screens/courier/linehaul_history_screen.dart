@@ -24,7 +24,9 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
   bool _busy = false;
   String? _error;
   LinehaulHistoryPage? _page;
-  Future<void> refresh() => _load(page: _page?.page ?? 1);
+  int _requestedPage = 1;
+  Future<void> refresh() =>
+      _busy ? Future.value() : _load(page: _requestedPage);
   static DateTime _today() {
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
     return DateTime(now.year, now.month, now.day);
@@ -40,6 +42,7 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
 
   Future<void> _load({int page = 1}) async {
     setState(() {
+      _requestedPage = page;
       _busy = true;
       _error = null;
       _page = null;
@@ -158,7 +161,7 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
           ? null
           : AppBar(title: const Text('History by date')),
       body: RefreshIndicator(
-        onRefresh: () => _busy ? Future.value() : _load(),
+        onRefresh: refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(20, 20, 20, widget.embedded ? 120 : 20),
@@ -207,7 +210,7 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
             if (_error != null) ...[
               Text(_error!),
               TextButton(
-                onPressed: _busy ? null : () => _load(),
+                onPressed: _busy ? null : refresh,
                 child: const Text('Retry'),
               ),
             ],

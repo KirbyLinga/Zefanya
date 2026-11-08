@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,8 +43,9 @@ Future<void> _mount(
   WidgetTester tester,
   Widget screen,
   _Auth auth,
-  List<String> paths,
-) async {
+  List<String> paths, {
+  Future<http.Response> Function(http.Request)? respond,
+}) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(360, 640);
   tester.view.devicePixelRatio = 1;
@@ -53,6 +55,7 @@ Future<void> _mount(
     tokenStore: InMemoryTokenStore(),
     httpClient: MockClient((request) async {
       paths.add(request.url.path);
+      if (respond != null) return respond(request);
       final Object data = switch (request.url.path.split('/').last) {
         'trips' => <Object>[],
         'history' => {
@@ -109,6 +112,130 @@ Future<void> _mount(
 }
 
 void main() {
+  testWidgets(
+    'revisited reports refresh selected dates and page, retry keeps context',
+    (tester) async {
+      final history = <Map<String, String>>[];
+      final earnings = <Map<String, String>>[];
+      final pending = Completer<http.Response>();
+      http.Response response(Object data) => http.Response(
+        jsonEncode({'data': data}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+      Map<String, Object?> report(http.Request request, {required bool pay}) =>
+          {
+            'page': int.parse(request.url.queryParameters['page']!),
+            'last_page': 2,
+            'timezone': 'Asia/Manila',
+            'trips': [],
+            if (pay) ...{
+              'earned_minor': earnings.length * 100000,
+              'earned_trips': 21,
+              'unconfirmed_trips': 0,
+              'completed_trips': 21,
+            } else
+              'total': 21 + history.length,
+          };
+      await _mount(
+        tester,
+        const LinehaulPortal(),
+        _Auth()..role = UserRole.linehaul,
+        [],
+        respond: (request) async {
+          expect(request.method, 'GET');
+          if (request.url.path.endsWith('/history')) {
+            history.add(request.url.queryParameters);
+            if (history.length == 3) return pending.future;
+            return response(report(request, pay: false));
+          }
+          if (request.url.path.endsWith('/earnings')) {
+            earnings.add(request.url.queryParameters);
+            if (earnings.length == 3) {
+              return http.Response(
+                jsonEncode({'message': 'Report unavailable'}),
+                503,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            return response(report(request, pay: true));
+          }
+          return response(
+            request.url.path.endsWith('/trips')
+                ? []
+                : {
+                    'setup_required': false,
+                    'on_duty': false,
+                    'available': false,
+                    'status': 'Off Duty',
+                  },
+          );
+        },
+      );
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(history.last['page'], '2');
+      final selectedHistory = Map<String, String>.of(history.last);
+      await tester.tap(find.text('Earnings'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Next'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(earnings.last['page'], '2');
+      final selectedEarnings = Map<String, String>.of(earnings.last);
+      await tester.tap(find.text('History'));
+      await tester.pump();
+      expect(history.last, selectedHistory);
+      expect(find.text('24 history records in this range'), findsNothing);
+      await tester.tap(find.text('Profile'));
+      await tester.pump();
+      await tester.tap(find.text('History'));
+      await tester.pump();
+      expect(
+        history.length,
+        3,
+        reason: 'Pending refresh must not be duplicated',
+      );
+      pending.complete(
+        response({
+          'page': 2,
+          'last_page': 2,
+          'timezone': 'Asia/Manila',
+          'trips': [],
+          'total': 24,
+        }),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('24 history records in this range'), findsOneWidget);
+      expect(find.text('Page 2 of 2'), findsOneWidget);
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      expect(
+        history.length,
+        3,
+        reason: 'Reselecting active tab must not reload',
+      );
+      await tester.tap(find.text('Earnings'));
+      await tester.pumpAndSettle();
+      expect(earnings.last, selectedEarnings);
+      expect(find.text('₱2,000.00'), findsNothing);
+      await tester.ensureVisible(find.text('Retry'));
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(earnings.length, 4);
+      expect(earnings.last, selectedEarnings);
+      expect(find.text('₱4,000.00'), findsOneWidget);
+      expect(find.text('Page 2 of 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   if (kUseLiveApi) {
     testWidgets(
       'live Courier role link switches the shared form without an extra route',
@@ -194,7 +321,7 @@ void main() {
       expect(find.text('Confirmed earned pay'), findsOneWidget);
       await tester.tap(find.text('History'));
       await tester.pumpAndSettle();
-      expect(paths.where((p) => p.endsWith('/history')).length, 1);
+      expect(paths.where((p) => p.endsWith('/history')).length, 2);
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Settings'));

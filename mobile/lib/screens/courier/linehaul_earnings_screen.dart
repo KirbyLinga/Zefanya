@@ -14,14 +14,17 @@ class LinehaulEarningsScreen extends StatefulWidget {
   final LinehaulRepository repository;
   final bool embedded;
   @override
-  State<LinehaulEarningsScreen> createState() => _LinehaulEarningsScreenState();
+  State<LinehaulEarningsScreen> createState() => LinehaulEarningsScreenState();
 }
 
-class _LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
+class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
   late DateTime _from, _to;
   LinehaulEarnings? _report;
   bool _busy = false;
   String? _error;
+  int _requestedPage = 1;
+  Future<void> refresh() =>
+      _busy ? Future.value() : _load(page: _requestedPage);
   static DateTime _today() {
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
     return DateTime(now.year, now.month, now.day);
@@ -36,6 +39,7 @@ class _LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
 
   Future<void> _load({int page = 1}) async {
     setState(() {
+      _requestedPage = page;
       _busy = true;
       _error = null;
       _report = null;
@@ -100,7 +104,7 @@ class _LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
           ? null
           : AppBar(title: const Text('Courier earnings')),
       body: RefreshIndicator(
-        onRefresh: () => _busy ? Future.value() : _load(),
+        onRefresh: refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(20, 20, 20, widget.embedded ? 120 : 20),
@@ -140,7 +144,7 @@ class _LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
             if (_error != null) ...[
               Text(_error!),
               TextButton(
-                onPressed: _busy ? null : () => _load(),
+                onPressed: _busy ? null : refresh,
                 child: const Text('Retry'),
               ),
             ],

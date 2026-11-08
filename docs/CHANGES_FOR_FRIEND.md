@@ -1,5 +1,10 @@
 # Touched your files
 
+## Courier report freshness — 2026-11-09
+
+- Mobile only: linehaul_portal.dart refreshes visited History/Earnings when selected again after another tab. Report screens retain dates/requested page across refresh failures/retries, suppress overlapping refreshes and clear stale results. Active-tab reselection does not reload. Existing lazy kept-alive navigation and first-load behavior remain.
+- courier_consistency_test.dart updates only the intentional cached-read expectation and adds GET-only regression coverage. No existing backend files, routes, schema, financial rules, configuration, dependencies or real demo records changed. Physical acceptance remains open.
+
 ## Courier rehearsal preflight — 2026-11-09
 
 - Documentation/runtime only: new courier-rehearsal.md gives verified current local state, exact startup flags, four-tab walkthrough, real movement gates, manual handover steps and explicit evidence/open checks. Existing demo-script.md links it as current and corrects Profile navigation and already-accepted batch #2 wording. Historical stage notes retained as such.
