@@ -1,8 +1,8 @@
 # Demo and recording in the newer checkout
 
-## Courier seal extension — activation pending
+## Courier seal extension — enabled locally
 
-The new seal check needs ONLY `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php`, adding nullable JSON `seal_receipt`. It has not run on local MySQL; do not run the whole migration backlog. Until the owner approves this additional setup, Courier receipt stops with a setup-pending message; existing non-Courier transfers are unchanged.
+The user explicitly approved and enabled ONLY `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php` on local MySQL (103.01ms), adding nullable JSON `seal_receipt`. Do not run the whole migration backlog. Verified the column, both existing assignments retained null receipts, and batch statuses unchanged (#1 Received; #2–#4 Draft). Logistics batch #2 receiving page loads; it correctly waits for dispatch. No demo trip was advanced to verify activation. A full real seal/mismatch trip rehearsal remains open; automated tests already cover those paths.
 
 Once enabled: receive a dispatched Courier trip using the existing Logistics receiving screen. After verifying its first parcel, type the seal physically observed on arrival. A matching seal permits receipt; a different seal requires a note (1–500 characters). Confirmation retains original/observed seals, note, actor and time; a mismatch adds an append-only event and database-only Logistics notification. Later parcels reuse this confirmation. Final receipt with a seal discrepancy appears as Received with Issues in Courier History, not a clean Completed trip. This stage does not add GPS, push, duty, pay or the complete missing/damaged closeout workflow.
 

@@ -6,10 +6,10 @@
 | --- | --- | --- | --- |
 | Separate Courier login/profile in combined app | LIVE-READY locally | Real browser login/account checked, role isolation tested | HTTPS/physical-device release not verified |
 | Assigned-manifest portal, acceptance, scans, departure and Logistics receipt | LIVE-READY locally before seal extension activation | Full manual-entry browser rehearsal batch #1 Completed, received count verified; user reports camera works | Independent QR/Code128/permission coverage still open |
-| Arrival seal confirmation and documented mismatch | BACKEND-ONLY pending local activation | 11 Courier tests / 235 assertions; related native checks 53 tests / 599 assertions before final 3 assertions; assets built 5.90s; two deliberate bypasses detected | New nullable seal_receipt migration NOT RUN; local receiving intentionally refuses until enabled. No real seal-extension browser rehearsal yet |
+| Arrival seal confirmation and documented mismatch | Enabled locally; end-to-end rehearsal pending | 11 Courier tests / 235 assertions; related native checks 53 tests / 599 assertions before final 3 assertions; assets built 5.90s; two deliberate bypasses detected; approved migration ran alone, receiving page loads | Real seal-extension trip rehearsal remains open; existing demo batches not advanced |
 | GPS proximity/tracking, activation/documents/duty/capacity, reassignment, Courier pay and full discrepancies | UNREACHABLE | Deferred, no corresponding Courier actions advertised | Outside limited presentation scope |
 
-The local core transfer rehearsal passed. User authorized expanding Courier; seal confirmation is the first extension stage, pending explicit local schema approval. Remaining Courier areas are not implemented by this stage. See demo-script.md and DECISIONS.md. Existing Buyer/Rider status below is historical and not a complete audit of this newer integration snapshot.
+The local core transfer rehearsal passed. User authorized expanding Courier and approved the seal schema exception; seal confirmation is enabled locally. Remaining Courier areas are not implemented by this stage. See demo-script.md and DECISIONS.md. Existing Buyer/Rider status below is historical and not a complete audit of this newer integration snapshot.
 
 ## S6.4 incremental feature status
 

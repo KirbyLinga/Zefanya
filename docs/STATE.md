@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-08
-Stage: Courier extension 1 (seal receiving) IMPLEMENTED/TESTED; local migration/extension browser rehearsal pending approval.
+Stage: Courier extension 1 (seal receiving) IMPLEMENTED/TESTED/ENABLED locally; full seal-extension trip rehearsal OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Prior verified handover/history HEAD: 872a5e7; seal extension recorded by this commit. Same Courier branch; no merge.
+Verified seal implementation HEAD: 06a4536; this follow-up records approved local activation. Same Courier branch; no merge.
 User explicitly prioritized this limited Courier scope over the old Courier exclusion/EXTEND order; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier. Branded login, Trips/History/Account use shared Zefanya fonts/colors/cards/nav/empty states.
 Logistics assigns one active forward manifest to an eligible same-company Courier; driver/manifest locks and ownership policy.
@@ -22,4 +22,4 @@ Existing gaps retained: PLACED-only cancellation conflicts with prior cutoff; S6
 User approved separate local demo data: zero-value parcel #8 / batch #1, DEMO-COURIER-20261108-01. Existing orders/stock/payments untouched.
 Real HTTP: all three logins/profiles succeeded; Courier trip #1 Completed/1 received, Rider access 403, Chrome CORS 204; own test tokens logged out.
 Latest design preview: http://127.0.0.1:5174; backend http://127.0.0.1:8000. Debug web recompile passed; see demo-script.md.
-Camera works per user; independent device/QR/Code128 coverage OPEN. Next: approve ONLY seal_receipt migration, then extension browser rehearsal; native missing/damaged UI next stage. No merge/APK; Pint waived/UNRUN.
+User approved seal migration: ONLY 2026_11_08_120000 ran (103.01ms); column exists, both existing receipts null, batches unchanged. Logistics receiving page loaded. Next: seal-trip rehearsal / missing-damaged UI. No merge/APK; Pint waived/UNRUN.

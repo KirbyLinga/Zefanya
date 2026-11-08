@@ -2,7 +2,7 @@
 
 ## Courier seal receiving stage — 2026-11-08
 
-- New nullable column `linehaul_assignments.seal_receipt` in `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php`; LOCAL MIGRATION NOT RUN.
+- New nullable column `linehaul_assignments.seal_receipt` in `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php`; local migration applied alone after explicit user approval (103.01ms). No existing assignment/trip advanced.
 - New `LinehaulSealService` validates and stores first seal confirmation under the native manifest lock; mismatch notes/audit/database notification, with setup-pending refusal before migration.
 - New database-only `CourierSealDiscrepancy` notification; no mail/push or new routes.
 - `LinehaulAssignment` casts the guarded receipt JSON. `ManifestService` gates normal/missing/damaged receiving and preserves seal discrepancies on completion; existing non-Courier manifests unchanged.
