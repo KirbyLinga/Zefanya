@@ -148,7 +148,10 @@ class ManifestController extends Controller
             'courierAssignment' => \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
                 ? \App\Models\Logistics\LinehaulAssignment::query()->with('driver')->where('manifest_id', $manifest->id)->first() : null,
             'linehaulDrivers' => \App\Support\RuntimeSchema::hasTable('linehaul_drivers')
-                ? \App\Models\Logistics\LinehaulDriver::query()->where('logistics_provider_id', $provider->id)->where('status', 'active')->orderBy('name')->get() : collect(),
+                ? \App\Models\Logistics\LinehaulDriver::query()->where('logistics_provider_id', $provider->id)->where('status', 'active')->orderBy('name')->get()
+                    ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)) : collect(),
+            'courierReadiness' => \App\Services\Logistics\LinehaulDutyService::installed()
+                ? \App\Models\Logistics\LinehaulDriver::where('logistics_provider_id', $provider->id)->with('latestDutyCheck')->orderBy('name')->get() : collect(),
         ]);
     }
 

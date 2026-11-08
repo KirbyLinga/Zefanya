@@ -16,7 +16,8 @@ class LinehaulDriver extends Authenticatable
 
     protected function casts(): array
     {
-        return ['password' => 'hashed', 'email_verified_at' => 'datetime'];
+        return ['password' => 'hashed', 'email_verified_at' => 'datetime', 'on_duty' => 'boolean',
+            'duty_checked_at' => 'datetime', 'last_seen_at' => 'datetime', 'duty_location' => 'array'];
     }
 
     public function provider(): BelongsTo
@@ -27,6 +28,11 @@ class LinehaulDriver extends Authenticatable
     public function homeHub(): BelongsTo
     {
         return $this->belongsTo(LogisticsHub::class, 'home_hub_id');
+    }
+
+    public function latestDutyCheck(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LinehaulDutyCheck::class)->latestOfMany();
     }
 
     public function isEmailVerified(): bool

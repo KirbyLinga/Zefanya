@@ -56,6 +56,18 @@ class LinehaulController extends Controller
         return $this->success('Your trips.', LinehaulTripResource::collection($trips));
     }
 
+    public function duty(\App\Http\Requests\Api\LinehaulDutyRequest $request): JsonResponse
+    {
+        return $this->success('Your duty status.', new \App\Http\Resources\Mobile\LinehaulDutyResource($request->user()->fresh()))->header('Cache-Control', 'no-store, private');
+    }
+
+    public function changeDuty(\App\Http\Requests\Api\LinehaulDutyRequest $request, string $dutyAction, \App\Services\Logistics\LinehaulDutyService $service): JsonResponse
+    {
+        $driver = $service->change($request->user(), $dutyAction, $request->validated());
+
+        return $this->success('Duty status updated.', new \App\Http\Resources\Mobile\LinehaulDutyResource($driver))->header('Cache-Control', 'no-store, private');
+    }
+
     public function act(LinehaulRequest $request, Manifest $manifest, string $action, LinehaulService $service): JsonResponse
     {
         $assignment = $service->act($request->user(), $manifest, $action, $request->validated(), $request);

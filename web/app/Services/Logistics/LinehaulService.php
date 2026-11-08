@@ -37,6 +37,7 @@ class LinehaulService
             $busy = LinehaulAssignment::query()->where('linehaul_driver_id', $driver->id)
                 ->whereHas('manifest', fn ($query) => $query->whereIn('status', [ManifestStatus::Draft->value, ManifestStatus::Dispatched->value]))->exists();
             $this->require(! $busy, 'This Courier already has an active trip.');
+            app(LinehaulDutyService::class)->requireReady($driver);
             $assignment = new LinehaulAssignment;
             $assignment->forceFill(['manifest_id' => $manifest->id, 'linehaul_driver_id' => $driver->id])->save();
             ManifestAuditLog::query()->create([
@@ -99,6 +100,7 @@ class LinehaulService
             } else {
                 $this->require($manifest->status === ManifestStatus::Draft, 'This trip can no longer be loaded or departed.');
                 if ($action === 'accept') {
+                    app(LinehaulDutyService::class)->requireReady($driver);
                     if ($assignment->accepted_at !== null) {
                         return $assignment;
                     }
@@ -111,6 +113,7 @@ class LinehaulService
                         $tokens[$scan['item']['id']] = $scan['verification_token'];
                         $assignment->forceFill(['loading_tokens' => $tokens])->save();
                     } elseif ($action === 'depart') {
+                        app(LinehaulDutyService::class)->requireReady($driver);
                         $this->manifests->dispatch($manifest, $driver->provider, $assignment->loading_tokens ?? []);
                         $manifest->refresh()->forceFill(['dispatched_by_type' => 'linehaul', 'dispatched_by_id' => $driver->id])->save();
                         $assignment->forceFill(['seal_number' => $data['seal_number'], 'loading_tokens' => null])->save();

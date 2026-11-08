@@ -1,5 +1,21 @@
 # Combined Courier security proof — 2026-11-08
 
+## Duty/checklist extension
+
+On tmp/mutation, each fault below was applied alone using apply_patch, tested only against SQLite, and restored exactly. Temporary branch deleted before the final 60-test/819-assertion related suite passed.
+
+| Deliberate fault | Named test prefix | Observed failure |
+| --- | --- | --- |
+| Skip assignment readiness | test_assignment_requires_fresh_readiness | Expected response status code [422] but received 302. |
+| Skip active-trip Off Duty restriction | test_assignment_requires_fresh_readiness | Expected response status code [422] but received 200. |
+| Remove five-minute expiry | test_assignment_requires_fresh_readiness | Expected Location unknown; actual On Duty. |
+| Make checklist answers optional | test_checklist_requires_every_answer | Expected response status code [422] but received 200. |
+| Remove maximum location accuracy | test_checklist_requires_every_answer | Expected response status code [422] but received 200. |
+| Allow a failed item without note | test_checklist_requires_every_answer | Expected response status code [422] but received 200. |
+| Treat a failed checklist as passed | test_checklist_requires_every_answer | Failed asserting that true is identical to false. |
+
+Every mutation reported result failed, tests 1, passed 0; no broken guard was committed.
+
 ## Missing/damaged handover extension
 
 On tmp/mutation, each deliberate fault was applied alone, tested with SQLite, restored with exact apply_patch hunks; branch deleted before the final related suite (55 passed, 687 assertions).

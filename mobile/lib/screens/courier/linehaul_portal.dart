@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:app_settings/app_settings.dart';
 import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart' show ApiNotConfiguredException;
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/repositories.dart';
 import '../../state/auth_state.dart';
+import '../../services/courier_location_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -197,28 +200,265 @@ class _LinehaulLoginScreenState extends State<LinehaulLoginScreen> {
 }
 
 class LinehaulPortal extends StatefulWidget {
-  const LinehaulPortal({super.key});
+  const LinehaulPortal({
+    super.key,
+    this.locationSource = const DeviceCourierLocationSource(),
+  });
+  final CourierLocationSource locationSource;
   @override
   State<LinehaulPortal> createState() => _LinehaulPortalState();
 }
 
-class _LinehaulPortalState extends State<LinehaulPortal> {
+class _LinehaulPortalState extends State<LinehaulPortal>
+    with WidgetsBindingObserver {
   late LinehaulRepository _repository;
   late Future<List<LinehaulTrip>> _trips;
   bool _busy = false;
   int _tab = 0;
+  LinehaulDuty? _duty;
+  String? _dutyError;
+  bool _dutyLocationError = false;
+  bool _dutyBusy = false;
+  bool _heartbeatBusy = false;
+  bool _foreground = true;
+  int _dutyRevision = 0;
+  Timer? _dutyTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final client = context.read<Repositories>().client;
     if (client == null) {
       _trips = Future.error(const ApiNotConfiguredException());
     } else {
       _repository = LinehaulRepository(client);
       _trips = _repository.trips();
+      unawaited(_loadDuty());
     }
   }
+
+  @override
+  void dispose() {
+    _dutyTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground && context.read<Repositories>().client != null) {
+      unawaited(_loadDuty());
+    }
+  }
+
+  void _setDuty(LinehaulDuty duty) {
+    setState(() {
+      _duty = duty;
+      _dutyError = null;
+      _dutyLocationError = false;
+    });
+    if (duty.onDuty) {
+      _dutyTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+        if (_foreground) unawaited(_loadDuty());
+      });
+    } else {
+      _dutyTimer?.cancel();
+      _dutyTimer = null;
+    }
+  }
+
+  void _dutyFailure(String message, {required bool location}) {
+    if (!mounted) return;
+    setState(() {
+      _dutyError = message;
+      _dutyLocationError = location;
+    });
+  }
+
+  Future<void> _loadDuty({bool requestPermission = false}) async {
+    if (_dutyBusy || _heartbeatBusy) return;
+    final revision = _dutyRevision;
+    _heartbeatBusy = true;
+    try {
+      var duty = await _repository.duty();
+      if (!mounted || revision != _dutyRevision) return;
+      _setDuty(duty);
+      if (duty.onDuty && _foreground) {
+        final point = await widget.locationSource.current(
+          requestPermission: requestPermission,
+        );
+        if (!mounted || !_foreground || revision != _dutyRevision) return;
+        duty = await _repository.changeDuty('heartbeat', point.toJson());
+        if (mounted && revision == _dutyRevision) _setDuty(duty);
+      }
+    } on ApiException catch (error) {
+      if (mounted && revision == _dutyRevision) {
+        _dutyFailure(error.message, location: false);
+      }
+    } on CourierLocationException catch (error) {
+      if (mounted && revision == _dutyRevision) {
+        _dutyFailure(error.message, location: true);
+      }
+    } finally {
+      _heartbeatBusy = false;
+    }
+  }
+
+  Future<void> _changeDuty() async {
+    if (_duty == null || _duty!.setupRequired || _dutyBusy) return;
+    _dutyRevision++;
+    setState(() => _dutyBusy = true);
+    try {
+      LinehaulDuty duty;
+      if (_duty!.onDuty) {
+        duty = await _repository.changeDuty('off', {});
+      } else {
+        final point = await widget.locationSource.current();
+        if (!mounted) return;
+        final data = await _checklist();
+        if (data == null || !mounted) return;
+        duty = await _repository.changeDuty('on', {...point.toJson(), ...data});
+      }
+      if (mounted) _setDuty(duty);
+    } on ApiException catch (error) {
+      if (mounted) _dutyFailure(error.message, location: false);
+    } on CourierLocationException catch (error) {
+      if (mounted) _dutyFailure(error.message, location: true);
+    } finally {
+      if (mounted) setState(() => _dutyBusy = false);
+    }
+  }
+
+  Future<Map<String, Object?>?> _checklist() async {
+    final form = GlobalKey<FormState>();
+    final answers = <String, bool>{};
+    var note = '';
+    const labels = {
+      'tires': 'Tires',
+      'lights': 'Lights',
+      'brakes': 'Brakes',
+      'fuel': 'Fuel',
+      'cargo_lock': 'Cargo door lock',
+    };
+    return showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Pre-trip checklist'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final entry in labels.entries)
+                  DropdownButtonFormField<bool>(
+                    decoration: InputDecoration(labelText: entry.value),
+                    items: const [
+                      DropdownMenuItem(value: true, child: Text('OK')),
+                      DropdownMenuItem(value: false, child: Text('Not OK')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) answers[entry.key] = value;
+                    },
+                    validator: (value) =>
+                        value == null ? 'Answer this item.' : null,
+                  ),
+                TextFormField(
+                  maxLength: 500,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Note for Not OK items',
+                  ),
+                  onChanged: (value) => note = value,
+                  validator: (_) =>
+                      answers.containsValue(false) && note.trim().isEmpty
+                      ? 'Explain the Not OK items.'
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(dialogContext, {
+                  'checklist': answers,
+                  'note': note.trim(),
+                });
+              }
+            },
+            child: const Text('Submit checklist'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dutyCard() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Duty & readiness', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 8),
+      Text(
+        _dutyError != null
+            ? (_duty == null
+                  ? 'Duty status unavailable'
+                  : 'Last known duty: ${_duty!.status}')
+            : _duty?.status ?? 'Loading duty status…',
+      ),
+      if (_dutyError != null) Text(_dutyError!),
+      if (_duty?.setupRequired == true)
+        const Text('Duty setup is pending. Contact your administrator.'),
+      if (_duty?.lastCheckPassed == false)
+        const Text(
+          'Checklist not passed. You remain Off Duty; Logistics has been notified.',
+        ),
+      const SizedBox(height: 8),
+      const Text(
+        'Keep the app open while On Duty. Location updates stop in the background; assignment readiness expires after five minutes without an update.',
+      ),
+      const SizedBox(height: 12),
+      if (_duty != null && !_duty!.setupRequired)
+        FilledButton(
+          onPressed: _dutyBusy ? null : _changeDuty,
+          child: Text(
+            _dutyBusy
+                ? 'Updating duty…'
+                : _duty!.onDuty
+                ? 'Go Off Duty'
+                : 'Go On Duty',
+          ),
+        ),
+      TextButton(
+        onPressed: _dutyBusy ? null : () => unawaited(_loadDuty()),
+        child: const Text('Refresh duty status'),
+      ),
+      if (_dutyLocationError && _duty?.onDuty == true)
+        TextButton(
+          onPressed: _dutyBusy
+              ? null
+              : () => unawaited(_loadDuty(requestPermission: true)),
+          child: const Text('Update location'),
+        ),
+      if (_dutyLocationError)
+        TextButton(
+          onPressed: () async {
+            try {
+              await AppSettings.openAppSettings();
+            } catch (_) {}
+          },
+          child: const Text('Open location settings'),
+        ),
+    ],
+  );
 
   void _reload() {
     final client = context.read<Repositories>().client;
@@ -597,6 +837,8 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
               const SizedBox(height: 8),
               const Text('Hub-to-hub parcel transfers'),
               const SizedBox(height: 24),
+              _dutyCard(),
+              const SizedBox(height: 24),
               OutlinedButton(
                 onPressed: _busy ? null : _logout,
                 child: const Text('Log out'),
@@ -615,12 +857,24 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
       backgroundColor: Colors.transparent,
       extendBody: true,
       appBar: AppBar(
-        title: Row(
+        title: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const ZefanyaMark(size: 24),
-            const SizedBox(width: 10),
-            Text('ZEFANYA COURIER', style: AppType.eyebrow),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ZefanyaMark(size: 24),
+                const SizedBox(width: 10),
+                Text('ZEFANYA COURIER', style: AppType.eyebrow),
+              ],
+            ),
+            Text(
+              'Duty: ${_dutyError != null ? 'status unavailable' : _duty?.status ?? 'checking…'}',
+              style: Theme.of(context).textTheme.labelSmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
         actions: [

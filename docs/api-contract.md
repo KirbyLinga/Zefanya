@@ -1,5 +1,11 @@
 # Native API — S6.4 incremental contract
 
+## Courier duty extension
+
+GET /api/courier/duty returns only the authenticated Courier's setup_required/on_duty/available/status, checklist time, last update time and last-check outcome, with no-store/private caching. POST /api/courier/duty/{on|off|heartbeat} shares Sanctum authentication, linehaul role + active-account policy and 60/minute throttle, and uses LinehaulDutyRequest/Resource. No driver identity or computed readiness is accepted from the client.
+
+On: latitude [-90,90], longitude [-180,180], accuracy [0,100] metres, and checklist with exactly tires/lights/brakes/fuel/cargo_lock, each a required boolean. A Not OK answer requires a nonblank note (<=500 chars); valid failed checks return 200 with Off Duty and send a database Logistics notice. Off: no body; rejected while any Draft/Dispatched manifest is assigned. Heartbeat: the same location fields, only while already On Duty. The server stamps update time. Availability expires at five minutes and gates new assignment, acceptance and departure. Coordinates are client-reported, not proof of hub proximity or continuous tracking. Missing local schema reports Setup pending; write actions refuse without data changes.
+
 ## Courier handover note extension
 
 `POST /api/courier/trips/{manifest}/exception-note` uses existing Sanctum authentication, linehaul role middleware, 60/minute throttle, LinehaulRequest and assignment ownership policy. Body: `tracking_number` (required, <=100 chars) and `note` (required, nonblank, <=500 chars). Only the assigned Courier can annotate an actual missing/damaged incident bound to this manifest item, during Dispatched or Received with Issues. Response uses the existing trip resource. Identical resubmission is idempotent; overwrite is rejected (422). This action cannot receive parcels or change custody/status.

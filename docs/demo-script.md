@@ -1,5 +1,15 @@
 # Demo and recording in the newer checkout
 
+## Courier duty/checklist — activation pending
+
+Code and tests are ready; local API currently reports Setup pending. The owner must approve ONLY `2026_11_08_180000_add_linehaul_duty_readiness.php` (four driver readiness fields + checklist history table). Do not run the whole migration backlog. Existing Couriers default Off Duty; no demo trip has been changed or automatically marked ready.
+
+After activation, open Courier Account → Duty & readiness → Go On Duty. Allow foreground location when prompted; a current location accurate to 100 m or better is required. Answer Tires, Lights, Brakes, Fuel and Cargo door lock explicitly. All OK puts the Courier On Duty. Any Not OK needs a note, leaves Off Duty and notifies the owning Logistics database inbox. Missing answers cannot submit.
+
+Keep the app open: it reports location once a minute, never automatically asks for new permission in the background/resume path, and stops reporting while paused. At five minutes without an update, the server shows Location unknown and excludes the Courier from new assignment/acceptance/departure. Resume/Refresh duty updates status; an explicit Update location action can request permission again. This is client-reported position, not continuous tracking, anti-spoofing or a 500 m hub check.
+
+Logistics → Transfer Batches → View shows owning-company Courier readiness, last passed checklist and last reported location. Only fresh On Duty Couriers appear in assignment choices. Go Off Duty clears the current location and is refused while a Draft/Dispatched trip remains assigned. An already-assigned pre-migration draft can complete a checklist to become ready. Real device/force-kill and local end-to-end duty rehearsal remain open. Existing Android foreground permissions are retained; iOS purpose copy now covers Courier duty; no background permission was added.
+
 ## Missing/damaged handover controls
 
 Latest mobile preview for this stage: http://127.0.0.1:5175 (HTTP 200). Earlier 5173/5174 previews are preserved; use the new URL or restart your own Flutter run to load the new mobile controls.

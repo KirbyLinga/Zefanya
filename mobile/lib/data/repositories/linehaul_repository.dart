@@ -82,6 +82,16 @@ class LinehaulRepository {
   const LinehaulRepository(this.client);
   final ApiClient client;
 
+  Future<LinehaulDuty> duty() async =>
+      LinehaulDuty.fromJson(unwrapMap(await client.getJson('/courier/duty')));
+
+  Future<LinehaulDuty> changeDuty(
+    String action,
+    Map<String, Object?> body,
+  ) async => LinehaulDuty.fromJson(
+    unwrapMap(await client.postJson('/courier/duty/$action', body: body)),
+  );
+
   Future<List<LinehaulTrip>> trips() async {
     final response = await client.getJson('/courier/trips');
     final rows = response['data'];
@@ -105,5 +115,45 @@ class LinehaulRepository {
       body: body,
     );
     return LinehaulTrip.fromJson(unwrapMap(response));
+  }
+}
+
+class LinehaulDuty {
+  const LinehaulDuty({
+    required this.onDuty,
+    required this.available,
+    required this.setupRequired,
+    required this.status,
+    this.checkedAt,
+    this.lastCheckPassed,
+  });
+  final bool onDuty;
+  final bool available;
+  final bool setupRequired;
+  final String status;
+  final String? checkedAt;
+  final bool? lastCheckPassed;
+  factory LinehaulDuty.fromJson(Map<String, Object?> data) {
+    if (data['on_duty'] is! bool ||
+        data['available'] is! bool ||
+        data['setup_required'] is! bool ||
+        !const {
+          'On Duty',
+          'Off Duty',
+          'Location unknown',
+          'Setup pending',
+        }.contains(data['status'])) {
+      throw const MalformedResponseException(
+        message: 'Could not read Courier duty status.',
+      );
+    }
+    return LinehaulDuty(
+      onDuty: data['on_duty'] as bool,
+      available: data['available'] as bool,
+      setupRequired: data['setup_required'] as bool,
+      status: data['status'] as String,
+      checkedAt: data['checked_at'] as String?,
+      lastCheckPassed: data['last_check_passed'] as bool?,
+    );
   }
 }

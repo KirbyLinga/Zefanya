@@ -1,5 +1,14 @@
 # Touched your files
 
+## Courier duty/checklist stage — 2026-11-08
+
+- Migration 2026_11_08_180000_add_linehaul_duty_readiness.php adds linehaul_drivers.on_duty (default false), duty_checked_at, last_seen_at, duty_location and the linehaul_duty_checks history table. LOCAL MIGRATION NOT RUN.
+- New LinehaulDutyService, LinehaulDutyCheck, LinehaulDutyRequest and LinehaulDutyResource implement trusted duty/checklist state, bounded location input, locks/freshness, failed-check history and setup-pending refusal. New database-only CourierChecklistFailed notification.
+- GET /api/courier/duty and POST /api/courier/duty/{on|off|heartbeat} use existing Sanctum/linehaul/60-per-minute throttle, active-account policy, new request/resource and feature tests. No target driver is accepted from input; no Buyer/Rider position exposure.
+- LinehaulDriver casts new guarded fields and exposes latest checklist internally. LinehaulService guards assignment/accept/depart; its original active-trip lock remains. Login and completed-trip annotations do not require On Duty.
+- ManifestController and batch details show owning-company readiness, last checklist/update and last reported location; assignment options exclude unavailable/stale drivers. Standalone Courier team roster remains deferred.
+- Mobile repository/portal and new courier_location_service add duty state, explicit permission/checklist controls and foreground-only minute updates, with pause/resume/dispose handling. Existing Android foreground permissions retained; iOS location-purpose wording updated. New LinehaulDutyTest and linehaul_duty_test.dart; prior trip assertions retained.
+
 ## Courier missing/damaged handover stage — 2026-11-08
 
 - No new table, column or migration. Existing local incident photo/event fields were verified present; demo batches unchanged.

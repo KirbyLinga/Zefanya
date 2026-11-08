@@ -27,6 +27,10 @@ class LinehaulDemoTest extends TestCase
         $driver->forceFill(['name' => 'Demo Courier', 'email' => 'courier@example.com', 'password' => 'Courier@Test2026',
             'logistics_provider_id' => $network['provider']->id, 'home_hub_id' => $network['station']->id,
             'status' => 'active', 'email_verified_at' => now()])->save();
+        app(\App\Services\Logistics\LinehaulDutyService::class)->change($driver, 'on', [
+            'latitude' => 14.2, 'longitude' => 121.3, 'accuracy' => 10,
+            'checklist' => array_fill_keys(\App\Services\Logistics\LinehaulDutyService::ITEMS, true),
+        ]);
         $parcel = SellerOrder::factory()->create(['tracking_number' => 'TRK-LINEHAUL-001']);
         $parcel->forceFill(['status' => OrderStatus::AtSortingCenter->value, 'origin_station_hub_id' => $network['station']->id,
             'custody_hub_id' => $network['station']->id, 'carrier_provider_id' => $network['provider']->id,
@@ -360,6 +364,7 @@ class LinehaulDemoTest extends TestCase
         $token = array_values($assignment->loading_tokens)[0];
         $this->assertStringNotContainsString($token, $assignment->getRawOriginal('loading_tokens'));
         $this->travel(11)->minutes();
+        $this->postJson('/api/courier/duty/heartbeat', ['latitude' => 14.2, 'longitude' => 121.3, 'accuracy' => 10])->assertOk();
         $this->postJson($path.'/depart', ['seal_number' => 'BH-0004521'])->assertUnprocessable()->assertJsonValidationErrors('verification_token');
         $this->assertSame(ManifestStatus::Draft, $manifest->fresh()->status);
         $this->assertNull($assignment->fresh()->seal_number);

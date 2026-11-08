@@ -3,6 +3,24 @@
 @section('title', 'Batch Details #'.$manifest->id)
 
 @section('content')
+@if (isset($courierReadiness) && $courierReadiness->isNotEmpty())
+    <section class="mb-5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans text-xs text-[var(--text-ink)]">
+        <h2 class="mb-3 font-semibold">Courier readiness</h2>
+        <p class="mb-3 text-[var(--text-muted)]">Assignment requires a passed checklist and location reported within five minutes. Locations are reported by the Courier's app; this is not background tracking.</p>
+        @foreach ($courierReadiness as $courier)
+            <div class="border-t border-[var(--border-strong)] py-3">
+                <p class="font-semibold">{{ $courier->name }} · {{ !$courier->isOperational() ? 'Unavailable account' : (!$courier->on_duty ? 'Off Duty' : (\App\Services\Logistics\LinehaulDutyService::available($courier) ? 'On Duty' : 'Location unknown')) }}</p>
+                <p>Passed checklist: {{ $courier->duty_checked_at?->format('M j, Y g:i A') ?? 'none' }} · Last update: {{ $courier->last_seen_at?->diffForHumans() ?? 'none' }}</p>
+                @if ($courier->duty_location)
+                    <p>Last reported location: {{ $courier->duty_location['latitude'] }}, {{ $courier->duty_location['longitude'] }} (accuracy {{ $courier->duty_location['accuracy'] }} m)</p>
+                @endif
+                @if ($courier->latestDutyCheck?->passed === false)
+                    <p class="mt-1">Checklist failed: {{ $courier->latestDutyCheck->note }}</p>
+                @endif
+            </div>
+        @endforeach
+    </section>
+@endif
 @if (isset($courierAssignment) && $courierAssignment)
     <section class="mb-4 rounded-md border p-4">
         <h2 class="font-semibold">Courier: {{ $courierAssignment->driver->name }}</h2>

@@ -1,5 +1,9 @@
 # S6.4 — B11 cancellation conformance
 
+## Courier extension 3 — C2 duty scope
+
+COU-SHIFT-001/002/003/004/005: checklist pass/fail/completeness, note + Logistics database notification, active-trip Off Duty block and persisted Off Duty/assignment exclusion are implemented and tested. Logistics readiness is on existing batch details, not a new team-roster screen. COU-SHIFT-006: explicit foreground permission request, actionable failure/settings path and no crash covered with an injected location source; physical Android/iOS permission acceptance remains open. COU-SHIFT-007: server availability expires at five minutes without a heartbeat, and foreground pause/resume is widget-tested. Device force-kill/browser geolocation rehearsal remains open. No continuous background tracking, hub geofence or anti-spoofing claim.
+
 ## Courier extension 2 — scoped C6 checks
 
 COU-ARR-003 partial: individual missing confirmation + Logistics note, native incident/recipient notifications, retained missing parcel history and Courier's immutable own note are implemented/tested. A bulk Close Receiving button that proposes all missing parcels is deferred. Native incident label/hold is used; no new canonical Missing in Transit order enum is introduced.
