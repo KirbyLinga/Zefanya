@@ -113,6 +113,161 @@ Future<void> _mount(
 
 void main() {
   testWidgets(
+    'foreground return refreshes trips; offline failure recovers without status writes',
+    (tester) async {
+      var status = 'Loading';
+      var offline = false;
+      var reads = 0;
+      final paths = <String>[];
+      await _mount(
+        tester,
+        const LinehaulPortal(),
+        _Auth()..role = UserRole.linehaul,
+        paths,
+        respond: (request) async {
+          expectSync(request.method, 'GET');
+          if (request.url.path.endsWith('/trips')) {
+            reads++;
+            if (offline) {
+              return http.Response(
+                jsonEncode({'message': 'No connection. Please retry.'}),
+                503,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+          }
+          return http.Response(
+            jsonEncode({
+              'data': request.url.path.endsWith('/trips')
+                  ? [
+                      {
+                        'id': 12,
+                        'status': status,
+                        'origin': 'Pila',
+                        'destination': 'Calamba',
+                        'seal_number': 'BH-0000771',
+                        'items': [
+                          {
+                            'tracking_number': 'TRK-001',
+                            'loaded': true,
+                            'received': false,
+                          },
+                        ],
+                      },
+                    ]
+                  : {
+                      'setup_required': false,
+                      'on_duty': false,
+                      'available': false,
+                      'status': 'Off Duty',
+                    },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        },
+      );
+      expect(reads, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(minutes: 2));
+      expect(reads, 1);
+      status = 'In Transit';
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(reads, 2);
+      expect(find.text('In Transit'), findsOneWidget);
+      expect(find.text('Loading'), findsNothing);
+      expect(find.text('Seal: BH-0000771'), findsOneWidget);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        reads,
+        2,
+        reason: 'Duplicate resumed notification must not reload',
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      offline = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Your trips could not be loaded'), findsOneWidget);
+      expect(find.text('In Transit'), findsNothing);
+      offline = false;
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(reads, 4);
+      expect(find.text('In Transit'), findsOneWidget);
+      expect(find.text('Seal: BH-0000771'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final tab in ['History', 'Earnings']) {
+    testWidgets(
+      'foreground return refreshes visible $tab and keeps its query',
+      (tester) async {
+        final queries = <Map<String, String>>[];
+        await _mount(
+          tester,
+          const LinehaulPortal(),
+          _Auth()..role = UserRole.linehaul,
+          [],
+          respond: (request) async {
+            expectSync(request.method, 'GET');
+            final endpoint = request.url.path.split('/').last;
+            final report = endpoint == tab.toLowerCase();
+            if (report) queries.add(request.url.queryParameters);
+            final Object data = report
+                ? {
+                    'page': int.parse(request.url.queryParameters['page']!),
+                    'last_page': 1,
+                    'timezone': 'Asia/Manila',
+                    'trips': [],
+                    if (tab == 'History')
+                      'total': queries.length
+                    else ...{
+                      'completed_trips': 1,
+                      'earned_trips': 1,
+                      'unconfirmed_trips': 0,
+                      'earned_minor': queries.length * 100000,
+                    },
+                  }
+                : endpoint == 'trips'
+                ? []
+                : {
+                    'setup_required': false,
+                    'on_duty': false,
+                    'available': false,
+                    'status': 'Off Duty',
+                  };
+            return http.Response(
+              jsonEncode({'data': data}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          },
+        );
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+        expect(queries.length, 1);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(queries.length, 2);
+        expect(queries.last, queries.first);
+        expect(
+          find.text(
+            tab == 'History' ? '2 history records in this range' : '₱2,000.00',
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
     'revisited reports refresh selected dates and page, retry keeps context',
     (tester) async {
       final history = <Map<String, String>>[];

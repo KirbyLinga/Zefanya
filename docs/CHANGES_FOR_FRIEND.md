@@ -1,5 +1,10 @@
 # Touched your files
 
+## Courier foreground recovery — 2026-11-09
+
+- Mobile linehaul_portal.dart re-reads trips and the visible dated report when returning from another app/Maps; duty refresh remains. Duplicate resumed notifications ignored; active trip mutations retain their own refresh path. Existing error/Retry handles unavailable server without displaying a false successful state.
+- Three additive lifecycle/offline/report tests in courier_consistency_test.dart; no existing assertions weakened, no backend/schema/configuration/dependency changes or demo writes. Background tracking and offline route buffering remain unimplemented.
+
 ## Courier unsaved delay form — 2026-11-09
 
 - Mobile linehaul_delay_dialog.dart uses the shared Discard changes?/Stay/Discard confirmation for unsent reason/ETA on Back or explicit cancel; preserves busy-send and successful-submit behavior. Existing shared guard and vehicle screen untouched.

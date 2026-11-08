@@ -86,9 +86,18 @@ class _LinehaulPortalState extends State<LinehaulPortal>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final wasForeground = _foreground;
     _foreground = state == AppLifecycleState.resumed;
-    if (_foreground && context.read<Repositories>().client != null) {
+    if (_foreground &&
+        !wasForeground &&
+        context.read<Repositories>().client != null) {
       unawaited(_loadDuty());
+      if (!_busy) _reload();
+      if (_tab == 1) {
+        unawaited(_historyKey.currentState?.refresh() ?? Future<void>.value());
+      } else if (_tab == 2) {
+        unawaited(_earningsKey.currentState?.refresh() ?? Future<void>.value());
+      }
     }
   }
 

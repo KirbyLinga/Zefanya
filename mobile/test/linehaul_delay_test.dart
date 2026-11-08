@@ -147,6 +147,43 @@ Future<void> _fill(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('foreground refresh preserves an unsent delay reason and ETA', (
+    tester,
+  ) async {
+    final backend = _Backend();
+    await _mount(tester, backend);
+    await _open(tester);
+    await _fill(tester);
+    final etaBefore = tester
+        .widget<TextFormField>(find.byKey(const ValueKey('delay-eta')))
+        .controller!
+        .text;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text('Report a delay'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('delay-reason')))
+          .controller!
+          .text,
+      'Heavy traffic',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('delay-eta')))
+          .controller!
+          .text,
+      etaBefore,
+    );
+    expect(backend.bodies, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Back cannot discard or duplicate a report while it is sending', (
     tester,
   ) async {
