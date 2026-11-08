@@ -1,5 +1,10 @@
 # Touched your files
 
+## Courier rehearsal preflight — 2026-11-09
+
+- Documentation/runtime only: new courier-rehearsal.md gives verified current local state, exact startup flags, four-tab walkthrough, real movement gates, manual handover steps and explicit evidence/open checks. Existing demo-script.md links it as current and corrects Profile navigation and already-accepted batch #2 wording. Historical stage notes retained as such.
+- No existing backend/mobile source, tests, routes, schema, dependencies, configuration files or real trip/financial records changed. Existing live API checks used a temporary Courier token then revoked it; domain row fingerprints identical. Existing automated lifecycle tests run only in SQLite memory. Existing 5176 preview preserved, new 5177 live preview started after the port collision; existing local launcher used for backend.
+
 ## Courier shared experience — 2026-11-09
 
 - Mobile-only consistency stage; no existing web/backend files, routes, database, pay/custody/status services or dependencies changed. Shared auth/login_screen.dart adds optional initial role and in-form Courier selection using existing auth; no duplicated login implementation, unsupported registration/Google hidden. Existing linehaul_portal delegates legacy login, adds four shared navigation tabs and retained/lazy dated History/Earnings, shared Profile styling/Settings entry and explicit historical-note refresh; duplicate logouts and obsolete history-route button removed.

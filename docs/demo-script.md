@@ -1,5 +1,7 @@
 # Demo and recording in the newer checkout
 
+**Current Courier guide (2026-11-09): [courier-rehearsal.md](courier-rehearsal.md).** Use shared login, Trips/History/Earnings/Profile and Profile → Settings logout. Fresh preview: http://127.0.0.1:5177 with `USE_LIVE_API=true`. Earlier URLs and stage-specific limitations below are historical notes. Batch #2 is already accepted/Loading. Physical rehearsal remains open; the live API preflight did not advance it.
+
 ## Bulk closeout of missing handover parcels
 
 After Courier reports arrival, open Logistics → Transfer Batches → the batch → Receive parcels. Scan and receive every parcel that is present first. At the bottom, Review unreceived parcels before closing lists only those still unreceived. Verify every tracking number, add the missing-parcel explanation and confirm the checkbox/dialog. First seal confirmation is still required if not already recorded. Up to 500 pending parcels may be confirmed in one closeout.
@@ -10,7 +12,7 @@ Closing reports each remaining parcel missing through the existing incident syst
 
 The owner explicitly approved and applied ONLY `2026_11_08_180000_add_linehaul_duty_readiness.php` (360.52ms). Verified all four fields and history table, real API setup_required false / Off Duty, empty checklist history, batches #1 Received and #2–#4 Draft unchanged. No Courier was automatically marked ready. Do not run the whole migration backlog. Actual user location/checklist/force-kill rehearsal remains open.
 
-After activation, open Courier Account → Duty & readiness → Go On Duty. Allow foreground location when prompted; a current location accurate to 100 m or better is required. Answer Tires, Lights, Brakes, Fuel and Cargo door lock explicitly. All OK puts the Courier On Duty. Any Not OK needs a note, leaves Off Duty and notifies the owning Logistics database inbox. Missing answers cannot submit.
+After activation, open Courier Profile → Duty & readiness → Go On Duty. Allow foreground location when prompted; a current location accurate to 100 m or better is required. Answer Tires, Lights, Brakes, Fuel and Cargo door lock explicitly. All OK puts the Courier On Duty. Any Not OK needs a note, leaves Off Duty and notifies the owning Logistics database inbox. Missing answers cannot submit.
 
 Keep the app open: it reports location once a minute, never automatically asks for new permission in the background/resume path, and stops reporting while paused. At five minutes without an update, the server shows Location unknown and excludes the Courier from new assignment/acceptance/departure. Resume/Refresh duty updates status; an explicit Update location action can request permission again. This is client-reported position, not continuous tracking, anti-spoofing or a 500 m hub check.
 
@@ -45,7 +47,7 @@ User-requested fixtures created 2026-11-08: three separate zero-value transfer b
 | 3 | Draft; Logistics assigns after the active trip finishes | DEMO-COURIER-B02-P01, DEMO-COURIER-B02-P02 |
 | 4 | Draft; Logistics assigns after the active trip finishes | DEMO-COURIER-B03-P01, DEMO-COURIER-B03-P02 |
 
-Refresh Courier Trips, accept batch 2, scan/enter both numbers, then depart with a seal such as BH-0004521. Report arrival; Logistics receives both parcels before assigning the next batch. One active trip per Courier remains enforced. Credentials stay in chat, not this document.
+Current batch 2 is already accepted/Loading: refresh Trips, complete real duty readiness, scan/enter its two numbers, then depart with the observed demo seal. Report arrival; Logistics receives both parcels before the next active assignment. Do not accept or decline this offer again. See the current rehearsal guide for exact gates and remaining physical checks. Credentials stay in chat.
 
 ## Remaining Courier phone check
 
