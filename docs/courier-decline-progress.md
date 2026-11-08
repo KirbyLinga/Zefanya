@@ -19,9 +19,9 @@ History survives native deletion of an unassigned Draft batch: the snapshot inte
 - Existing local demo not mutated: two original assignments and batches #1 RECEIVED/#2–4 DRAFT retained; current #2 is already accepted/Loading and cannot decline. Live GET before migration gracefully returns can_decline false / offer_version 1. Own test token revoked.
 - Preview port 5176 recompiled (1033ms). No new dependencies. No real offer declined or fake history created.
 
-## Local activation — pending explicit owner exception
+## Local activation — DONE under explicit owner exception
 
-Run only `2026_11_08_220000_add_linehaul_trip_declines.php` after the owner's explicit permission. It adds offer_version (default 1) and nullable declined_at to existing assignment rows, plus linehaul_trip_declines. Existing assignment driver/acceptance/arrival/status/receipt values remain unchanged. Do not run other pending migrations. Verify both columns, an empty history table, unchanged assignment snapshots and batch statuses, and normal live trip GET. No need to modify .env, PHP settings or any account/document/GPS data.
+The owner explicitly approved and installed only `2026_11_08_220000_add_linehaul_trip_declines.php` (357.18ms) in verified local `zefanya_friend_20261107`. It is alone in its migration batch. Both original assignments now have stored offer_version 1 and declined_at null; original driver/acceptance/arrival values are unchanged. History has zero rows, and batches remain #1 RECEIVED/#2–4 DRAFT. No other pending migration was run. Actual live trip GET succeeds with #2 Loading/#1 Completed and can_decline false, as both were already accepted; verification token logged out. No .env, PHP, account/document/GPS, parcel, payment, stock or receipt data changed; no real decline created.
 
 Actual decline/reassignment rehearsal needs an unaccepted offer and another ready company Courier. Do not discard the current accepted demo trip, generate false decline history or provision another account without appropriate authorization just to expose the button. The current Loading offer correctly remains non-declinable after activation.
 
