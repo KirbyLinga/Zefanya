@@ -23,187 +23,14 @@ import 'linehaul_profile_screen.dart';
 import 'linehaul_delay_dialog.dart';
 import 'linehaul_earnings_screen.dart';
 import 'linehaul_history_screen.dart';
+import '../shared/settings_screen.dart';
+import '../auth/login_screen.dart';
 
-class LinehaulLoginScreen extends StatefulWidget {
+class LinehaulLoginScreen extends StatelessWidget {
   const LinehaulLoginScreen({super.key});
   @override
-  State<LinehaulLoginScreen> createState() => _LinehaulLoginScreenState();
-}
-
-class _LinehaulLoginScreenState extends State<LinehaulLoginScreen> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  bool _busy = false;
-  String? _error;
-  bool _showPassword = false;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _login() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await context.read<AuthState>().login(
-        role: UserRole.linehaul,
-        email: _email.text.trim(),
-        password: _password.text,
-      );
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
-    } on ApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    AppColors.watch(context);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Courier login')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-            children: [
-              Row(
-                children: [
-                  const ZefanyaMark(size: 38),
-                  const SizedBox(width: 12),
-                  Text('ZEFANYA', style: AppType.eyebrow),
-                ],
-              ),
-              const SizedBox(height: 28),
-              const EditorialHeader(
-                eyebrow: 'COURIER PORTAL',
-                title: 'Every parcel.\nOne journey.',
-                padding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Move parcels between hubs, with every handover accounted for.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 28),
-              _CourierCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sign in with your company-provided Courier account.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    AutofillGroup(
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: _email,
-                            enabled: !_busy,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.username],
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: Icon(Icons.mail_outline),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _password,
-                            enabled: !_busy,
-                            obscureText: !_showPassword,
-                            autofillHints: const [AutofillHints.password],
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                tooltip: _showPassword
-                                    ? 'Hide password'
-                                    : 'Show password',
-                                onPressed: () => setState(
-                                  () => _showPassword = !_showPassword,
-                                ),
-                                icon: Icon(
-                                  _showPassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                ),
-                              ),
-                            ),
-                            onSubmitted: (_) {
-                              if (!_busy) _login();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Text(
-                          _error!,
-                          style: TextStyle(color: AppColors.danger),
-                          semanticsLabel: 'Login error: $_error',
-                        ),
-                      ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: _busy ? null : _login,
-                        child: Text(_busy ? 'Signing in…' : 'Login as Courier'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.hub_outlined,
-                    color: AppColors.primaryDark,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'For hub-to-hub Couriers. Buyer and Rider sign-in remain on the main login screen.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const LoginScreen(initialRole: UserRole.linehaul);
 }
 
 class LinehaulPortal extends StatefulWidget {
@@ -224,6 +51,8 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   late Future<List<LinehaulTrip>> _trips;
   bool _busy = false;
   int _tab = 0;
+  final _visitedTabs = <int>{0};
+  final _historyKey = GlobalKey<LinehaulHistoryScreenState>();
   LinehaulDuty? _duty;
   String? _dutyError;
   bool _dutyLocationError = false;
@@ -492,7 +321,10 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     });
     try {
       await _repository.act(trip.id, action, body: body);
-      if (mounted) _reload();
+      if (mounted) {
+        _reload();
+        unawaited(_historyKey.currentState?.refresh() ?? Future<void>.value());
+      }
     } on ApiException catch (error) {
       if (mounted) {
         final message =
@@ -620,16 +452,6 @@ class _LinehaulPortalState extends State<LinehaulPortal>
         'exception-note',
         body: {'tracking_number': parcel.tracking, 'note': note},
       );
-    }
-  }
-
-  Future<void> _logout() async {
-    try {
-      await context.read<AuthState>().logout();
-    } on ApiException catch (error) {
-      if (mounted) {
-        showTimedSnackBar(context, SnackBar(content: Text(error.message)));
-      }
     }
   }
 
@@ -1035,33 +857,66 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       children: [
         const EditorialHeader(
           eyebrow: 'YOUR ZEFANYA',
-          title: 'Your account',
+          title: 'Your profile',
           padding: EdgeInsets.only(bottom: 24),
         ),
         _CourierCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: ZefanyaMark(size: 48),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                auth.name ?? 'Courier',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              if (auth.email != null)
-                Text(
-                  auth.email!,
-                  style: Theme.of(context).textTheme.bodyMedium,
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryDark,
+                  borderRadius: radiusOf(ShapeTier.card),
                 ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'COURIER',
+                            style: AppType.eyebrow.copyWith(
+                              color: AppColors.textOnDark,
+                            ),
+                          ),
+                          Text(
+                            auth.name ?? 'Courier',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: AppColors.textOnDark),
+                          ),
+                          if (auth.email != null)
+                            Text(
+                              auth.email!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.textOnDark),
+                            ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('open-settings'),
+                      tooltip: 'Settings',
+                      color: AppColors.textOnDark,
+                      onPressed: _busy
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const SettingsScreen(),
+                              ),
+                            ),
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 12),
-              Text('COURIER', style: AppType.eyebrow),
-              const SizedBox(height: 8),
               const Text('Hub-to-hub parcel transfers'),
               const SizedBox(height: 20),
               OutlinedButton.icon(
@@ -1078,23 +933,6 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               ),
               const SizedBox(height: 24),
               _dutyCard(),
-              OutlinedButton.icon(
-                onPressed: _busy || context.read<Repositories>().client == null
-                    ? null
-                    : () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              LinehaulEarningsScreen(repository: _repository),
-                        ),
-                      ),
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-                label: const Text('Earnings & dates'),
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton(
-                onPressed: _busy ? null : _logout,
-                child: const Text('Log out'),
-              ),
             ],
           ),
         ),
@@ -1108,155 +946,161 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBody: true,
-      appBar: AppBar(
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const ZefanyaMark(size: 24),
-                const SizedBox(width: 10),
-                Text('ZEFANYA COURIER', style: AppType.eyebrow),
+      appBar: _tab == 0
+          ? AppBar(
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const ZefanyaMark(size: 24),
+                      const SizedBox(width: 10),
+                      Text('ZEFANYA COURIER', style: AppType.eyebrow),
+                    ],
+                  ),
+                  Text(
+                    'Duty: ${_dutyError != null ? 'status unavailable' : _duty?.status ?? 'checking…'}',
+                    style: Theme.of(context).textTheme.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  onPressed: _busy ? null : _reload,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh trips',
+                ),
               ],
-            ),
-            Text(
-              'Duty: ${_dutyError != null ? 'status unavailable' : _duty?.status ?? 'checking…'}',
-              style: Theme.of(context).textTheme.labelSmall,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: _busy ? null : _reload,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh trips',
-          ),
-          IconButton(
-            onPressed: _busy ? null : _logout,
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
-          ),
-        ],
-      ),
+            )
+          : null,
       bottomNavigationBar: FloatingNavBar(
         items: const [
           NavBarItem(glyph: NavGlyph.parcel, label: 'Trips'),
           NavBarItem(glyph: NavGlyph.orders, label: 'History'),
-          NavBarItem(glyph: NavGlyph.profile, label: 'Account'),
+          NavBarItem(glyph: NavGlyph.peso, label: 'Earnings'),
+          NavBarItem(glyph: NavGlyph.profile, label: 'Profile'),
         ],
         currentIndex: _tab,
-        onTap: (index) => setState(() => _tab = index),
+        onTap: (index) => setState(() {
+          _visitedTabs.add(index);
+          _tab = index;
+        }),
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: FutureBuilder<List<LinehaulTrip>>(
-            future: _trips,
-            builder: (context, snapshot) {
-              if (_tab == 2) return _account();
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: ZefanyaLoader(size: 48));
-              }
-              if (snapshot.hasError) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  child: EmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Your trips could not be loaded',
-                    subtitle: snapshot.error is ApiException
-                        ? (snapshot.error as ApiException).message
-                        : 'Please try again.',
-                    action: OutlinedButton(
-                      onPressed: _reload,
-                      child: const Text('Retry'),
-                    ),
-                  ),
-                );
-              }
-              final all = snapshot.data ?? const <LinehaulTrip>[];
-              bool isHistory(LinehaulTrip trip) => const [
-                'Completed',
-                'Received with Issues',
-                'Cancelled',
-                'Declined',
-              ].contains(trip.status);
-              final trips = all
-                  .where(
-                    (trip) => _tab == 1 ? isHistory(trip) : !isHistory(trip),
-                  )
-                  .toList();
-              return RefreshIndicator(
-                onRefresh: () async {
-                  _reload();
-                  try {
-                    await _trips;
-                  } on ApiException {
-                    // The FutureBuilder displays the server error and Retry.
+          child: IndexedStack(
+            index: _tab,
+            children: [
+              FutureBuilder<List<LinehaulTrip>>(
+                future: _trips,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: ZefanyaLoader(size: 48));
                   }
-                },
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                  children: [
-                    EditorialHeader(
-                      eyebrow: _tab == 1 ? 'EVERY HANDOVER' : 'HUB TO HUB',
-                      title: _tab == 1 ? 'Trip history' : 'Your journeys',
-                      padding: const EdgeInsets.only(bottom: 12),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: Text(
-                        _tab == 1
-                            ? 'A record of your recent transfers.'
-                            : 'From loading to handover, one parcel at a time.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                          height: 1.5,
+                  if (snapshot.hasError) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 100),
+                      child: EmptyState(
+                        icon: Icons.cloud_off_outlined,
+                        title: 'Your trips could not be loaded',
+                        subtitle: snapshot.error is ApiException
+                            ? (snapshot.error as ApiException).message
+                            : 'Please try again.',
+                        action: OutlinedButton(
+                          onPressed: _reload,
+                          child: const Text('Retry'),
                         ),
                       ),
-                    ),
-                    if (_tab == 1)
-                      OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => LinehaulHistoryScreen(
-                                    repository: _repository,
-                                  ),
+                    );
+                  }
+                  final all = snapshot.data ?? const <LinehaulTrip>[];
+                  bool isHistory(LinehaulTrip trip) => const [
+                    'Completed',
+                    'Received with Issues',
+                    'Cancelled',
+                    'Declined',
+                  ].contains(trip.status);
+                  final trips = all.where((trip) => !isHistory(trip)).toList();
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      _reload();
+                      try {
+                        await _trips;
+                      } on ApiException {
+                        // The FutureBuilder displays the server error and Retry.
+                      }
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                      children: [
+                        EditorialHeader(
+                          eyebrow: 'HUB TO HUB',
+                          title: 'Your journeys',
+                          padding: const EdgeInsets.only(bottom: 12),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Text(
+                            'From loading to handover, one parcel at a time.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: AppColors.textSecondary,
+                                  height: 1.5,
                                 ),
-                              ),
-                        icon: const Icon(Icons.date_range_outlined),
-                        label: const Text('Browse all history by date'),
-                      ),
-                    if (_busy) const LinearProgressIndicator(),
-                    if (trips.isEmpty)
-                      _CourierCard(
-                        child: EmptyState(
-                          icon: _tab == 1
-                              ? Icons.history
-                              : Icons.local_shipping_outlined,
-                          title: _tab == 1
-                              ? 'No trip history yet'
-                              : 'No trips assigned',
-                          subtitle: _tab == 1
-                              ? 'Completed, declined and cancelled transfers will appear here.'
-                              : 'Your next journey will appear here when Logistics assigns a trip.',
-                          action: OutlinedButton(
-                            onPressed: _reload,
-                            child: const Text('Refresh trips'),
                           ),
                         ),
-                      ),
-                    for (final trip in trips) _tripCard(trip),
-                  ],
-                ),
-              );
-            },
+                        if (_busy) const LinearProgressIndicator(),
+                        if (trips.isEmpty)
+                          _CourierCard(
+                            child: EmptyState(
+                              icon: Icons.local_shipping_outlined,
+                              title: 'No trips assigned',
+                              subtitle:
+                                  'Your next journey will appear here when Logistics assigns a trip.',
+                              action: OutlinedButton(
+                                onPressed: _reload,
+                                child: const Text('Refresh trips'),
+                              ),
+                            ),
+                          ),
+                        for (final trip in trips) _tripCard(trip),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              if (_visitedTabs.contains(1) &&
+                  context.read<Repositories>().client != null)
+                SafeArea(
+                  bottom: false,
+                  child: LinehaulHistoryScreen(
+                    key: _historyKey,
+                    repository: _repository,
+                    embedded: true,
+                    tripBuilder: _tripCard,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
+              if (_visitedTabs.contains(2) &&
+                  context.read<Repositories>().client != null)
+                SafeArea(
+                  bottom: false,
+                  child: LinehaulEarningsScreen(
+                    repository: _repository,
+                    embedded: true,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
+              SafeArea(bottom: false, child: _account()),
+            ],
           ),
         ),
       ),

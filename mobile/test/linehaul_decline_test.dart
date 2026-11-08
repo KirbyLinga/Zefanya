@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'support/linehaul_history_fixture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -62,6 +63,8 @@ class _Backend {
       }
       status = 'Declined';
       data = _offer(status: status, canDecline: false);
+    } else if (request.url.path.endsWith('/history')) {
+      data = historyFixture([_offer(status: status, canDecline: false)]);
     } else if (request.url.path.endsWith('/trips')) {
       data = [
         _offer(status: status, canDecline: capability && status == 'Assigned'),

@@ -3,19 +3,28 @@ import 'package:intl/intl.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/linehaul_history.dart';
+import '../../widgets/editorial_header.dart';
 
 class LinehaulHistoryScreen extends StatefulWidget {
-  const LinehaulHistoryScreen({super.key, required this.repository});
+  const LinehaulHistoryScreen({
+    super.key,
+    required this.repository,
+    this.embedded = false,
+    this.tripBuilder,
+  });
   final LinehaulRepository repository;
+  final bool embedded;
+  final Widget Function(LinehaulTrip)? tripBuilder;
   @override
-  State<LinehaulHistoryScreen> createState() => _LinehaulHistoryScreenState();
+  State<LinehaulHistoryScreen> createState() => LinehaulHistoryScreenState();
 }
 
-class _LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
+class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
   late DateTime _from, _to;
   bool _busy = false;
   String? _error;
   LinehaulHistoryPage? _page;
+  Future<void> refresh() => _load(page: _page?.page ?? 1);
   static DateTime _today() {
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
     return DateTime(now.year, now.month, now.day);
@@ -81,6 +90,17 @@ class _LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
 
   Widget _row(LinehaulHistoryEntry entry) {
     final trip = entry.trip;
+    if (widget.tripBuilder != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Recorded ${DateFormat.yMMMd().add_jm().format(entry.recordedAt.toUtc().add(const Duration(hours: 8)))} Philippine time',
+          ),
+          widget.tripBuilder!(trip),
+        ],
+      );
+    }
     final pay = trip.tripPay;
     return Card(
       key: ValueKey(entry.key),
@@ -133,19 +153,23 @@ class _LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
   Widget build(BuildContext context) {
     final page = _page;
     return Scaffold(
-      appBar: AppBar(title: const Text('History by date')),
+      backgroundColor: Colors.transparent,
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: const Text('History by date')),
       body: RefreshIndicator(
         onRefresh: () => _busy ? Future.value() : _load(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, widget.embedded ? 120 : 20),
           children: [
-            Text(
-              'Your past journeys',
-              style: Theme.of(context).textTheme.headlineSmall,
+            const EditorialHeader(
+              eyebrow: 'EVERY HANDOVER',
+              title: 'Trip history',
+              padding: EdgeInsets.only(bottom: 12),
             ),
             const Text(
-              'Completed, completed with issues, cancelled and declined offers. Dates use Philippine time; legacy records may use their last recorded update.',
+              'Past trips by Philippine date. Older records may use their last recorded update.',
             ),
             const SizedBox(height: 12),
             Wrap(

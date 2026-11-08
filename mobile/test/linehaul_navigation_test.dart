@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'support/linehaul_history_fixture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -61,6 +62,8 @@ Future<void> _mount(
         jsonEncode({
           'data': request.url.path.endsWith('/trips')
               ? [trip]
+              : request.url.path.endsWith('/history')
+              ? historyFixture([trip])
               : {
                   'setup_required': false,
                   'on_duty': false,

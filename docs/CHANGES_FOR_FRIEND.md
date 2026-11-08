@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier shared experience — 2026-11-09
+
+- Mobile-only consistency stage; no existing web/backend files, routes, database, pay/custody/status services or dependencies changed. Shared auth/login_screen.dart adds optional initial role and in-form Courier selection using existing auth; no duplicated login implementation, unsupported registration/Google hidden. Existing linehaul_portal delegates legacy login, adds four shared navigation tabs and retained/lazy dated History/Earnings, shared Profile styling/Settings entry and explicit historical-note refresh; duplicate logouts and obsolete history-route button removed.
+- Existing linehaul_history_screen/linehaul_earnings_screen gain embedded presentation, bottom-nav padding and shared editorial headers. History can reuse existing full trip cards so handover notes/seal/delay information remains available. Existing shared/settings_screen adds role-safe Courier records entry, prevents Buyer/Rider-specific settings exposure, awaits existing logout/handles refusal, and remains the sole logout/appearance hub.
+- Existing Courier design/duty/navigation/decline/delay/handover tests adapt only intended entry labels, login scroll host and mock dated-history route; assertions retained. New courier_consistency_test and support/linehaul_history_fixture.dart exercise unified flow/state retention/Settings; light/dark screenshots generated under ignored mobile/build/courier-design, no tracked goldens changed. Full mobile suite and focused/live checks recorded in STATE.md.
+
 ## Courier all-result history dates — 2026-11-09
 
 - New GET /api/courier/history in existing Sanctum/real linehaul/shared 60/min group; existing Api/LinehaulController delegates with no-store/private response. New LinehaulHistoryRequest inherits existing validated paired dates/page/prohibited IDs and policy from LinehaulEarningsRequest. New LinehaulHistoryResource exposes only bounds/timezone/page/last-page/total/safe trip rows. No new auth/status/financial system.

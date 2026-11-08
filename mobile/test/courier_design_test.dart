@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'support/linehaul_history_fixture.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -58,7 +59,45 @@ Future<void> _mount(
             )
           : http.Response(
               jsonEncode({
-                'data': empty
+                'data': request.url.path.endsWith('/duty')
+                    ? {
+                        'setup_required': false,
+                        'on_duty': false,
+                        'available': false,
+                        'status': 'Off Duty',
+                      }
+                    : request.url.path.endsWith('/earnings')
+                    ? {
+                        'page': 1,
+                        'last_page': 1,
+                        'timezone': 'Asia/Manila',
+                        'earned_minor': 0,
+                        'earned_trips': 0,
+                        'completed_trips': 1,
+                        'unconfirmed_trips': 1,
+                        'trips': [],
+                      }
+                    : request.url.path.endsWith('/history')
+                    ? historyFixture(
+                        empty
+                            ? []
+                            : [
+                                {
+                                  'id': 11,
+                                  'status': 'Completed',
+                                  'origin': 'Lumban Station Hub',
+                                  'destination': 'Pila Station Hub',
+                                  'items': [
+                                    {
+                                      'tracking_number': 'TRK-DEMO-002',
+                                      'loaded': true,
+                                      'received': true,
+                                    },
+                                  ],
+                                },
+                              ],
+                      )
+                    : empty
                     ? []
                     : [
                         {
@@ -147,10 +186,13 @@ void main() {
       const LinehaulPortal(),
       unavailable: () => unavailable,
     );
-    await tester.tap(find.text('Account'));
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     unavailable = true;
+    await tester.tap(find.text('Trips'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Refresh trips'));
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     expect(find.text('Demo Pila Courier'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -178,11 +220,17 @@ void main() {
         expect(find.text('Completed'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await _picture(tester, 'history-${brightness.name}');
-        await tester.tap(find.text('Account'));
+        await tester.tap(find.text('Earnings'));
+        await tester.pumpAndSettle();
+        expect(find.text('Confirmed earned pay'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await _picture(tester, 'earnings-${brightness.name}');
+        await tester.tap(find.text('Profile'));
         await tester.pumpAndSettle();
         expect(find.text('Demo Pila Courier'), findsOneWidget);
         expect(find.text('courier@example.test'), findsOneWidget);
-        expect(find.text('Log out'), findsOneWidget);
+        expect(find.byTooltip('Settings'), findsOneWidget);
+        expect(find.text('Log out'), findsNothing);
         expect(tester.takeException(), isNull);
         await _picture(tester, 'account-${brightness.name}');
       },
@@ -196,7 +244,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNWidgets(2));
       expect(tester.takeException(), isNull);
-      await tester.drag(find.byType(ListView), const Offset(0, 800));
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 800));
       await tester.pumpAndSettle();
       await _picture(tester, 'login-${brightness.name}');
     });

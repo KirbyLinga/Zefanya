@@ -3,10 +3,16 @@ import 'package:intl/intl.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/linehaul_earnings.dart';
+import '../../widgets/editorial_header.dart';
 
 class LinehaulEarningsScreen extends StatefulWidget {
-  const LinehaulEarningsScreen({super.key, required this.repository});
+  const LinehaulEarningsScreen({
+    super.key,
+    required this.repository,
+    this.embedded = false,
+  });
   final LinehaulRepository repository;
+  final bool embedded;
   @override
   State<LinehaulEarningsScreen> createState() => _LinehaulEarningsScreenState();
 }
@@ -89,20 +95,24 @@ class _LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
   Widget build(BuildContext context) {
     final report = _report;
     return Scaffold(
-      appBar: AppBar(title: const Text('Courier earnings')),
+      backgroundColor: Colors.transparent,
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: const Text('Courier earnings')),
       body: RefreshIndicator(
         onRefresh: () => _busy ? Future.value() : _load(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, widget.embedded ? 120 : 20),
           children: [
-            Text(
-              'Completed handovers',
-              style: Theme.of(context).textTheme.headlineSmall,
+            const EditorialHeader(
+              eyebrow: 'YOUR JOURNEYS',
+              title: 'Your earnings',
+              padding: EdgeInsets.only(bottom: 12),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Dates use Philippine time. Declined and cancelled trips earn no pay and remain in Trip History. Payout recording is not available.',
+              'Completed handovers by Philippine date. Payout recording is not available.',
             ),
             const SizedBox(height: 16),
             Wrap(

@@ -102,7 +102,7 @@ Future<void> _mount(
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Account'));
+  await tester.tap(find.text('Profile'));
   await tester.pumpAndSettle();
 }
 

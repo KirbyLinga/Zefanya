@@ -19,7 +19,6 @@ import '../../state/auth_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/timed_snackbar.dart';
 import 'registration_screen.dart';
-import '../courier/linehaul_portal.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/google_mark.dart';
@@ -29,7 +28,8 @@ import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.initialRole = UserRole.buyer});
+  final UserRole initialRole;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -43,14 +43,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSubmitting = false;
   bool _isGoogleSubmitting = false;
   bool _isRiderMode = false;
+  bool _isLinehaulMode = false;
   final _passwordFocus = FocusNode();
 
   bool get _isBusy => _isSubmitting || _isGoogleSubmitting;
 
+  @override
+  void initState() {
+    super.initState();
+    _isRiderMode = widget.initialRole == UserRole.courier;
+    _isLinehaulMode = widget.initialRole == UserRole.linehaul;
+  }
+
   /// Google sign-in is usable when mock mode is on
   /// (`MockGoogleSignInService` needs no client ID) or when a live build
   /// supplies the web client ID. Never show a button that cannot complete.
-  bool get _googleAvailable => !kUseLiveApi || GoogleConfig.current.isConfigured;
+  bool get _googleAvailable =>
+      !kUseLiveApi || GoogleConfig.current.isConfigured;
 
   /// Friendly copy shown when Google sign-in cannot complete in this build.
   static const String _googleNotAvailableMessage =
@@ -73,7 +82,11 @@ class _LoginScreenState extends State<LoginScreen> {
       // The role selector determines which endpoint to call: buyers hit
       // /login/buyer, riders hit /login/courier.
       await context.read<AuthState>().login(
-        role: _isRiderMode ? UserRole.courier : UserRole.buyer,
+        role: _isLinehaulMode
+            ? UserRole.linehaul
+            : _isRiderMode
+            ? UserRole.courier
+            : UserRole.buyer,
         email: _identifierController.text.trim(),
         password: _passwordController.text,
       );
@@ -110,7 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         const SnackBar(content: Text('Signed in as a buyer account')),
       );
-    } else if (!_isRiderMode && actualRole == UserRole.courier) {
+    } else if (!_isRiderMode &&
+        !_isLinehaulMode &&
+        actualRole == UserRole.courier) {
       showTimedSnackBar(
         context,
         const SnackBar(content: Text('Signed in as a rider account')),
@@ -194,7 +209,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted || e.cancelled) return;
       // Configuration error: the flow cannot complete in this build.
       if (e.message.contains('configured')) {
-        showTimedSnackBar(context, SnackBar(content: Text(_googleNotAvailableMessage)));
+        showTimedSnackBar(
+          context,
+          SnackBar(content: Text(_googleNotAvailableMessage)),
+        );
       } else {
         showTimedSnackBar(context, SnackBar(content: Text(e.message)));
       }
@@ -202,25 +220,36 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       // Account conflict: this Google identity is linked to a different account.
       if (e.statusCode == 409) {
-        showTimedSnackBar(context, const SnackBar(
-          content: Text(
-            'This Google account is already linked to a different account. '
-            'Please sign in with email and password instead.',
+        showTimedSnackBar(
+          context,
+          const SnackBar(
+            content: Text(
+              'This Google account is already linked to a different account. '
+              'Please sign in with email and password instead.',
+            ),
           ),
-        ));
+        );
       } else {
         showTimedSnackBar(context, SnackBar(content: Text(e.message)));
       }
     } on SocketException catch (_) {
       if (!mounted) return;
-      showTimedSnackBar(context, const SnackBar(
-        content: Text('No internet connection. Please check your network and try again.'),
-      ));
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text(
+            'No internet connection. Please check your network and try again.',
+          ),
+        ),
+      );
     } on TimeoutException catch (_) {
       if (!mounted) return;
-      showTimedSnackBar(context, const SnackBar(
-        content: Text('The request timed out. Please try again.'),
-      ));
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text('The request timed out. Please try again.'),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       showTimedSnackBar(
@@ -256,11 +285,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 // ---- Wordmark lockup --------------------------------
                 StaggeredReveal(
                   index: 0,
-                  child: _LoginMasthead(isRiderMode: isRider),
+                  child: _LoginMasthead(
+                    isRiderMode: isRider,
+                    isLinehaulMode: _isLinehaulMode,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  isRider
+                  _isLinehaulMode
+                      ? 'Sign in to move parcels between hubs'
+                      : isRider
                       ? 'Sign in to accept jobs and deliver parcels'
                       : 'Sign in to browse, shop, and track your orders',
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -269,14 +303,38 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                if (kUseLiveApi)
-                  TextButton(onPressed: () => Navigator.of(context).push(AppPageRoute(
-                    builder: (_) => const LinehaulLoginScreen())), child: const Text('Courier login · hub-to-hub')),
+                if (kUseLiveApi && !_isLinehaulMode)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: const ValueKey('courier-mode-switch-link'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 12,
+                        ),
+                        alignment: Alignment.centerLeft,
+                        foregroundColor: AppColors.primaryDark,
+                        textStyle: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      onPressed: _isBusy
+                          ? null
+                          : () => setState(() {
+                              _isLinehaulMode = true;
+                              _isRiderMode = false;
+                            }),
+                      child: const Text('Are you a Courier? Sign in here'),
+                    ),
+                  ),
                 // ---- Labeled Switch Link -----------------------------
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Semantics(
-                    label: isRider
+                    label: isRider || _isLinehaulMode
                         ? 'Back to shopper sign in'
                         : 'Are you a rider? Sign in here',
                     button: true,
@@ -287,7 +345,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: TextButton(
                         key: const ValueKey('role-mode-switch-link'),
-                        onPressed: () => setState(() => _isRiderMode = !_isRiderMode),
+                        onPressed: _isBusy
+                            ? null
+                            : () => setState(() {
+                                if (_isLinehaulMode) {
+                                  _isLinehaulMode = false;
+                                  _isRiderMode = false;
+                                } else {
+                                  _isRiderMode = !_isRiderMode;
+                                }
+                              }),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
@@ -296,14 +363,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           alignment: Alignment.centerLeft,
                         ),
                         child: Text(
-                          isRider
+                          isRider || _isLinehaulMode
                               ? 'Back to shopper sign in'
                               : 'Are you a rider? Sign in here',
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: isRider
                                 ? (AppColors.isDark
-                                    ? AppColors.tertiary
-                                    : AppColors.sageIcon)
+                                      ? AppColors.tertiary
+                                      : AppColors.sageIcon)
                                 : AppColors.primaryDark,
                             fontWeight: FontWeight.w700,
                             decoration: TextDecoration.underline,
@@ -324,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Email or Phone Number',
+                            _isLinehaulMode ? 'Email' : 'Email or Phone Number',
                             style: theme.textTheme.labelLarge,
                           ),
                           const SizedBox(height: 8),
@@ -338,13 +405,23 @@ class _LoginScreenState extends State<LoginScreen> {
                             textInputAction: TextInputAction.next,
                             onFieldSubmitted: (_) =>
                                 _passwordFocus.requestFocus(),
-                            decoration: const InputDecoration(
-                              hintText: 'you@example.com or 09XXXXXXXXX',
-                              prefixIcon: Icon(Icons.person_outline),
+                            decoration: InputDecoration(
+                              hintText: _isLinehaulMode
+                                  ? 'you@example.com'
+                                  : 'you@example.com or 09XXXXXXXXX',
+                              prefixIcon: const Icon(Icons.person_outline),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Enter your email or phone number';
+                                return _isLinehaulMode
+                                    ? 'Enter your email'
+                                    : 'Enter your email or phone number';
+                              }
+                              if (_isLinehaulMode &&
+                                  !RegExp(
+                                    r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                                  ).hasMatch(value.trim())) {
+                                return 'Enter a valid email';
                               }
                               return null;
                             },
@@ -385,20 +462,20 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
-                          if (!kUseLiveApi)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                // TODO: forgot-password flow (mock only)
-                              },
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.textSecondary,
-                                textStyle: theme.textTheme.bodySmall,
+                          if (!kUseLiveApi && !_isLinehaulMode)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  // TODO: forgot-password flow (mock only)
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.textSecondary,
+                                  textStyle: theme.textTheme.bodySmall,
+                                ),
+                                child: const Text('Forgot password?'),
                               ),
-                              child: const Text('Forgot password?'),
                             ),
-                          ),
                           const SizedBox(height: 16),
                           ElevatedButton(
                             style: isRider
@@ -416,14 +493,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: AppColors.textOnDark,
                                     strokeWidth: 4,
                                   )
-                                : Text(isRider ? 'Login as Rider' : 'Login'),
+                                : Text(
+                                    _isLinehaulMode
+                                        ? 'Login as Courier'
+                                        : isRider
+                                        ? 'Login as Rider'
+                                        : 'Login',
+                                  ),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                if (_googleAvailable) ...[
+                if (_googleAvailable && !_isLinehaulMode) ...[
                   const SizedBox(height: 14),
                   StaggeredReveal(
                     index: 2,
@@ -444,19 +527,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Text('Continue with Google'),
                               ],
                             ),
+                    ),
                   ),
-                  )],
-
+                ],
 
                 const SizedBox(height: 28),
-                const StaggeredReveal(index: 3, child: _OrDivider()),
+                if (!_isLinehaulMode)
+                  const StaggeredReveal(index: 3, child: _OrDivider()),
                 const SizedBox(height: 18),
                 StaggeredReveal(
                   index: 4,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (!isRider)
+                      if (_isLinehaulMode)
+                        const Text(
+                          'Your Logistics company provides your Courier account. Contact them for account access.',
+                        )
+                      else if (!isRider)
                         ElevatedButton(
                           onPressed: () => Navigator.of(context).push(
                             AppPageRoute(
@@ -498,9 +586,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
 /// The wordmark lockup, matching the app's editorial brand style.
 class _LoginMasthead extends StatelessWidget {
-  const _LoginMasthead({required this.isRiderMode});
+  const _LoginMasthead({
+    required this.isRiderMode,
+    this.isLinehaulMode = false,
+  });
 
   final bool isRiderMode;
+  final bool isLinehaulMode;
 
   @override
   Widget build(BuildContext context) {
@@ -509,23 +601,35 @@ class _LoginMasthead extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isRiderMode ? 'RIDER PORTAL' : 'WELCOME BACK',
+          isLinehaulMode
+              ? 'COURIER PORTAL'
+              : isRiderMode
+              ? 'RIDER PORTAL'
+              : 'WELCOME BACK',
           style: AppType.eyebrow,
         ),
         const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              isRiderMode ? 'Zefanya Rider' : 'Zefanya',
-              style: AppType.masthead,
+            Flexible(
+              child: Text(
+                isLinehaulMode
+                    ? 'Zefanya Courier'
+                    : isRiderMode
+                    ? 'Zefanya Rider'
+                    : 'Zefanya',
+                style: AppType.masthead,
+              ),
             ),
             const SizedBox(width: 10),
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: isRiderMode
+              child: isRiderMode || isLinehaulMode
                   ? Icon(
-                      Icons.two_wheeler_outlined,
+                      isLinehaulMode
+                          ? Icons.local_shipping_outlined
+                          : Icons.two_wheeler_outlined,
                       size: 22,
                       color: AppColors.isDark
                           ? AppColors.tertiary
