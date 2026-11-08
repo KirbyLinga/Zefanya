@@ -1,5 +1,18 @@
 # Demo and recording in the newer checkout
 
+## Missing/damaged handover controls
+
+Latest mobile preview for this stage: http://127.0.0.1:5175 (HTTP 200). Earlier 5173/5174 previews are preserved; use the new URL or restart your own Flutter run to load the new mobile controls.
+
+No new migration is needed; existing local incident evidence/event fields were checked. Demo trips were left unchanged. During receiving a dispatched Courier batch:
+
+1. For a damaged parcel, verify its actual tracking number first. Choose Damaged in Parcel condition, add a note and upload a genuine JPEG/PNG/WebP photo up to 5 MB. Required seal confirmation still applies. Damage refuses a missing/spoofed/oversized photo and uses the existing private incident store.
+2. For an absent parcel, expand Report this parcel missing in Expected parcels, enter a note, complete the seal check if still required, tick the explicit confirmation and confirm the dialog. No fictional scan is needed; it is not received into destination custody.
+3. Native incidents notify Buyer/Seller/Logistics through their existing database notifications and block parcel movement for review. Canonical delivery status is not rewritten. Receiving the rest of the batch keeps Received with Issues; missing parcels stay listed rather than disappearing.
+4. Courier refreshes Trips/History, expands Parcel details and adds their own handover note. The note is tied to this manifest's incident and cannot be overwritten. Courier has no receiving/closeout action. Admin investigation/resolution remains in the native incident process.
+
+This stage provides individual exception controls. Bulk Close Receiving that proposes every unreceived parcel, GPS checks, push and pay are not implemented. No real local incident/photo was created during automated verification.
+
 ## Courier seal extension — enabled locally
 
 The user explicitly approved and enabled ONLY `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php` on local MySQL (103.01ms), adding nullable JSON `seal_receipt`. Do not run the whole migration backlog. Verified the column, both existing assignments retained null receipts, and batch statuses unchanged (#1 Received; #2–#4 Draft). Logistics batch #2 receiving page loads; it correctly waits for dispatch. No demo trip was advanced to verify activation. A full real seal/mismatch trip rehearsal remains open; automated tests already cover those paths.

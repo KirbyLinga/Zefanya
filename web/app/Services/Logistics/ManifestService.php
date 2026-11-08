@@ -557,6 +557,7 @@ class ManifestService
                 'url' => $url,
                 'confirm_message' => $confirm,
                 'requires_seal' => $context === 'manifest_receive' && app(LinehaulSealService::class)->requiresConfirmation($manifest),
+                'can_report_damage' => $context === 'manifest_receive' && $manifest->dispatched_by_type === 'linehaul',
                 'verification_token' => $token,
             ]],
             'verification_token' => $token,
@@ -658,7 +659,8 @@ class ManifestService
 
             if (! $pending) {
                 $locked->forceFill([
-                    'status' => app(LinehaulSealService::class)->hasDiscrepancy($locked)
+                    'status' => (app(LinehaulSealService::class)->hasDiscrepancy($locked)
+                        || ManifestItem::where('manifest_id', $locked->id)->whereNotNull('issue_type')->exists())
                         ? ManifestStatus::ReceivedWithExceptions->value : ManifestStatus::Received->value,
                     'received_at' => now(),
                     'received_by_type' => ParcelHandoffVerification::ACTOR_LOGISTICS,
@@ -735,6 +737,11 @@ class ManifestService
             if ($locked->status !== ManifestStatus::Dispatched || $lockedItem->received_at !== null || $lockedItem->released_at !== null) {
                 throw ValidationException::withMessages(['manifest' => 'Only an active dispatched parcel can receive an issue report.']);
             }
+            if ($locked->dispatched_by_type === 'linehaul' && $issueType === 'missing') {
+                \Illuminate\Support\Facades\Validator::make($request?->only('missing_confirmed') ?? [], [
+                    'missing_confirmed' => ['required', 'accepted'],
+                ])->validate();
+            }
             if ($issueType === 'damaged') {
                 ParcelIncidentService::assertReceivingAllowed($parcel);
                 $this->handoff->assertValidForManifestItem($provider, $lockedItem,
@@ -756,9 +763,24 @@ class ManifestService
                 ])->save();
             }
 
-            app(ParcelIncidentService::class)->recordRoutingBlocker($parcel->fresh(),
-                $issueType === 'missing' ? ParcelIncidentType::Missing : ParcelIncidentType::Damaged,
-                trim($note), (int) $provider->id);
+            if ($locked->dispatched_by_type === 'linehaul') {
+                $incident = app(ParcelIncidentService::class)->reportOperational($parcel->fresh(), $provider, [
+                    'type' => $issueType, 'reason' => mb_substr(trim($note), 0, 255),
+                    'description' => trim($note), 'photo' => $request?->file('photo'),
+                ]);
+                $incident->events()->create([
+                    'event' => 'manifest_handover', 'label' => 'Manifest handover discrepancy',
+                    'detail' => $issueType, 'occurred_at' => now(), 'actor_type' => 'logistics_provider',
+                    'actor_id' => $provider->id, 'metadata' => ['manifest_id' => $locked->id, 'manifest_item_id' => $lockedItem->id],
+                ]);
+                if ($request !== null) {
+                    ManifestAuditLog::record($provider, 'parcel_'.$issueType, $locked, $lockedItem, $request);
+                }
+            } else {
+                app(ParcelIncidentService::class)->recordRoutingBlocker($parcel->fresh(),
+                    $issueType === 'missing' ? ParcelIncidentType::Missing : ParcelIncidentType::Damaged,
+                    trim($note), (int) $provider->id);
+            }
 
             // Update manifest status if all items are resolved
             $this->updateManifestStatusForExceptions($locked);
@@ -788,7 +810,9 @@ class ManifestService
             ->exists();
 
         if ($hasIssues || app(LinehaulSealService::class)->hasDiscrepancy($manifest)) {
-            $manifest->forceFill(['status' => ManifestStatus::ReceivedWithExceptions->value])->save();
+            $manifest->forceFill(['status' => ManifestStatus::ReceivedWithExceptions->value,
+                'received_at' => $manifest->received_at ?? now(), 'received_by_type' => 'logistics',
+                'received_by_id' => $manifest->logistics_provider_id])->save();
         } elseif ($manifest->status === ManifestStatus::Dispatched) {
             $manifest->forceFill(['status' => ManifestStatus::Received->value])->save();
         }
@@ -890,7 +914,7 @@ class ManifestService
     {
         $items = $manifest->items()
             ->where(function ($q): void {
-                $q->whereNull('released_at')->orWhereNotNull('received_at');
+                  $q->whereNull('released_at')->orWhereNotNull('received_at')->orWhereNotNull('issue_type');
             });
 
         $total = (clone $items)->count();
@@ -899,7 +923,7 @@ class ManifestService
         return [
             'total' => $total,
             'received' => $received,
-            'pending' => max(0, $total - $received),
+            'pending' => (clone $items)->whereNull('received_at')->whereNull('released_at')->count(),
         ];
     }
 

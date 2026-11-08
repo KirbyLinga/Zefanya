@@ -306,6 +306,45 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
     }
   }
 
+  Future<void> _handoverNote(LinehaulTrip trip, LinehaulParcel parcel) async {
+    var value = '';
+    final note = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Your handover note'),
+        content: TextField(
+          maxLength: 500,
+          maxLines: 4,
+          onChanged: (text) => value = text,
+          decoration: const InputDecoration(
+            labelText: 'What happened to this parcel?',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (value.trim().isNotEmpty) {
+                Navigator.pop(dialogContext, value.trim());
+              }
+            },
+            child: const Text('Save note'),
+          ),
+        ],
+      ),
+    );
+    if (note != null && mounted) {
+      await _act(
+        trip,
+        'exception-note',
+        body: {'tracking_number': parcel.tracking, 'note': note},
+      );
+    }
+  }
+
   Future<void> _logout() async {
     try {
       await context.read<AuthState>().logout();
@@ -414,12 +453,16 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
-                      item.received
+                      item.issue != null
+                          ? Icons.warning_amber_rounded
+                          : item.received
                           ? Icons.inventory_2_outlined
                           : item.loaded
                           ? Icons.check_circle_outline
                           : Icons.radio_button_unchecked,
-                      color: item.loaded
+                      color: item.issue != null
+                          ? theme.colorScheme.error
+                          : item.loaded
                           ? AppColors.successText
                           : AppColors.textSecondary,
                     ),
@@ -427,6 +470,27 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
                       item.tracking,
                       style: theme.textTheme.bodySmall,
                     ),
+                    subtitle: item.issue == null
+                        ? null
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.issue == 'missing'
+                                    ? 'Missing at handover · reported'
+                                    : 'Received damaged · reported',
+                              ),
+                              if (item.courierNote != null)
+                                Text('Your note: ${item.courierNote}')
+                              else
+                                TextButton(
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _handoverNote(trip, item),
+                                  child: const Text('Add handover note'),
+                                ),
+                            ],
+                          ),
                   ),
               ],
             ),
@@ -461,7 +525,9 @@ class _LinehaulPortalState extends State<LinehaulPortal> {
               ),
             if (completed)
               Text(
-                'Handover confirmed by Logistics.',
+                trip.status == 'Received with Issues'
+                    ? 'Closed by Logistics with recorded issues.'
+                    : 'Handover confirmed by Logistics.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.successText,
                 ),

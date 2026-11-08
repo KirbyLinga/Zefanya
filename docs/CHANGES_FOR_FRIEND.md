@@ -1,5 +1,14 @@
 # Touched your files
 
+## Courier missing/damaged handover stage — 2026-11-08
+
+- No new table, column or migration. Existing local incident photo/event fields were verified present; demo batches unchanged.
+- `ManifestController` permits token-free missing reports only, preserves existing scanned receiving for normal/damaged, exposes seal requirement and retains missing items in receiving lists.
+- `ManifestService` requires explicit missing confirmation, reuses `ParcelIncidentService::reportOperational` for Courier evidence/notifications, binds incidents to manifest items with native events, writes issue audits, retains issue completion/timestamps and correct counts. Legacy non-Courier issue behavior retained.
+- `parcel-scanner.js` / receiving Blade add multipart damage condition/note/photo controls and explicit missing confirmation; notes/labels are escaped. Images stay in native private storage.
+- API action `POST /api/courier/trips/{manifest}/exception-note` added to the existing authenticated/role-guarded/60-per-minute action route; existing LinehaulRequest/policy/resource and feature tests enforce scope. Native incident events store immutable Courier note + actual actor.
+- `LinehaulTripResource`, mobile repository and portal retain missing/damaged parcel outcomes, show issue labels and Courier's own note, and provide note entry. Backend and narrow-screen mobile regressions added; existing assertions retained.
+
 ## Courier seal receiving stage — 2026-11-08
 
 - New nullable column `linehaul_assignments.seal_receipt` in `2026_11_08_120000_add_seal_receipt_to_linehaul_assignments.php`; local migration applied alone after explicit user approval (103.01ms). No existing assignment/trip advanced.

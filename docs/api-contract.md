@@ -1,5 +1,11 @@
 # Native API — S6.4 incremental contract
 
+## Courier handover note extension
+
+`POST /api/courier/trips/{manifest}/exception-note` uses existing Sanctum authentication, linehaul role middleware, 60/minute throttle, LinehaulRequest and assignment ownership policy. Body: `tracking_number` (required, <=100 chars) and `note` (required, nonblank, <=500 chars). Only the assigned Courier can annotate an actual missing/damaged incident bound to this manifest item, during Dispatched or Received with Issues. Response uses the existing trip resource. Identical resubmission is idempotent; overwrite is rejected (422). This action cannot receive parcels or change custody/status.
+
+Trip items now include nullable `issue` (`missing`/`damaged`) and `courier_note`. Received and missing issue items remain in history; removed/unreceived non-issue items stay excluded. No incident photo path is exposed.
+
 This documents the cancellation change in the newer checkout only. Other endpoints are not audited by this page.
 
 `POST /api/buyer/orders/{order}/shipments/{shipment}/cancel`

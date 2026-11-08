@@ -26,6 +26,10 @@ class LinehaulRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...($this->route('action') === 'exception-note' ? [
+                'tracking_number' => ['required', 'string', 'max:100'],
+                'note' => ['required', 'string', 'max:500'],
+            ] : []),
             ...($this->route('action') === 'scan' ? [
                 'tracking_number' => ['required', 'string', 'max:100'],
                 'method' => ['nullable', 'in:camera,manual'],

@@ -39,7 +39,7 @@ Route::prefix('courier')->middleware(['auth:sanctum', 'api.role:linehaul', 'thro
     Route::post('/logout', [\App\Http\Controllers\Api\LinehaulController::class, 'logout']);
     Route::get('/trips', [\App\Http\Controllers\Api\LinehaulController::class, 'trips']);
     Route::post('/trips/{manifest}/{action}', [\App\Http\Controllers\Api\LinehaulController::class, 'act'])
-        ->where('action', 'accept|scan|depart|arrive');
+        ->where('action', 'accept|scan|depart|arrive|exception-note');
 });
 
 Route::post('/v1/buyer/checkout/quote', CheckoutPreviewController::class)

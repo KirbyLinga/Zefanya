@@ -185,6 +185,94 @@ void main() {
     },
   );
 
+  testWidgets(
+    'handover issues stay visible and Courier can save their own note',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      String? note;
+      Map<String, Object?>? submitted;
+      final client = ApiClient(
+        baseUrl: 'https://example.test/api',
+        tokenStore: InMemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          if (request.method == 'POST') {
+            expect(request.url.path, '/api/courier/trips/12/exception-note');
+            submitted = jsonDecode(request.body) as Map<String, Object?>;
+            note = submitted!['note'] as String;
+          }
+          final data = {
+            ...trip('Received with Issues'),
+            'items': [
+              {
+                'tracking_number': 'TRK-MISSING',
+                'loaded': true,
+                'received': false,
+                'issue': 'missing',
+                'courier_note': note,
+              },
+              {
+                'tracking_number': 'TRK-DAMAGED',
+                'loaded': true,
+                'received': true,
+                'issue': 'damaged',
+                'courier_note': 'Box damaged at unloading.',
+              },
+            ],
+          };
+          return answer(request.method == 'GET' ? [data] : data);
+        }),
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<Repositories>.value(value: Repositories.live(client)),
+            ChangeNotifierProvider(create: (_) => AuthState()),
+          ],
+          child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(1.3)),
+              child: child!,
+            ),
+            home: const LinehaulPortal(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Parcel details'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Parcel details'));
+      await tester.pumpAndSettle();
+      expect(find.text('Missing at handover · reported'), findsOneWidget);
+      expect(find.text('Received damaged · reported'), findsOneWidget);
+      await tester.ensureVisible(find.text('Add handover note'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add handover note'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '  Loaded at origin.  ');
+      await tester.tap(find.text('Save note'));
+      await tester.pumpAndSettle();
+      expect(submitted, {
+        'tracking_number': 'TRK-MISSING',
+        'note': 'Loaded at origin.',
+      });
+      await tester.ensureVisible(find.text('Parcel details'));
+      await tester.pumpAndSettle();
+      if (find.text('Your note: Loaded at origin.').evaluate().isEmpty) {
+        await tester.tap(find.text('Parcel details'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('Your note: Loaded at origin.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('trip loading failure offers Retry instead of an empty success', (
     tester,
   ) async {

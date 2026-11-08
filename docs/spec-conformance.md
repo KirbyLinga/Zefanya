@@ -1,5 +1,11 @@
 # S6.4 — B11 cancellation conformance
 
+## Courier extension 2 — scoped C6 checks
+
+COU-ARR-003 partial: individual missing confirmation + Logistics note, native incident/recipient notifications, retained missing parcel history and Courier's immutable own note are implemented/tested. A bulk Close Receiving button that proposes all missing parcels is deferred. Native incident label/hold is used; no new canonical Missing in Transit order enum is introduced.
+
+COU-ARR-004: Courier damage receipt refuses missing/spoofed/oversized photos, stores valid images privately in the native incident, shows Damaged and Received with Issues. Tests: LinehaulDemoTest::test_damaged_parcel_requires_private_photo_and_cannot_be_reported_by_another_provider. Hardware photo upload rehearsal remains open. COU-ARR-006 boundary retained: only authenticated owning Logistics receives; the Courier note action cannot receive or close the trip.
+
 Source: original work order's S6.4/OVERRIDES and `B11 Cancellation.csv`. Accepted/packing orders remain cancellable until Ready for Pickup.
 
 | Case | Evidence | Result/limit |

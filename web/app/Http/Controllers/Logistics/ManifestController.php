@@ -255,6 +255,7 @@ class ManifestController extends Controller
             'counts' => $this->manifests->counts($manifest),
             'sealReceipt' => \App\Support\RuntimeSchema::hasColumn('linehaul_assignments', 'seal_receipt')
                 ? \App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->first()?->seal_receipt : null,
+            'requiresSeal' => app(\App\Services\Logistics\LinehaulSealService::class)->requiresConfirmation($manifest),
         ]);
     }
 
@@ -265,7 +266,7 @@ class ManifestController extends Controller
         abort_unless((int) $item->manifest_id === (int) $manifest->id, 404);
 
         $data = $request->validate([
-            'verification_token' => ['required', 'string', 'max:128'],
+            'verification_token' => ['required_unless:issue_type,missing', 'nullable', 'string', 'max:128'],
             'issue_type' => ['nullable', 'string', 'in:missing,damaged'],
             'issue_note' => ['nullable', 'string', 'max:500'],
         ]);
@@ -281,7 +282,7 @@ class ManifestController extends Controller
                 (string) ($data['issue_note'] ?? ''),
                 'logistics',
                 (int) $provider->id,
-                (string) $data['verification_token'],
+                $data['verification_token'] ?? null,
                 $request,
             );
 
@@ -292,7 +293,7 @@ class ManifestController extends Controller
             return redirect()
                 ->route('logistics.manifests.receive.index', $manifest)
                 ->with('success', 'Issue reported: '.$issueMessage)
-                ->with('nextStep', 'The issue has been recorded for investigation. Parcel status updated accordingly.');
+                ->with('nextStep', 'The issue has been recorded for investigation. Canonical delivery status is unchanged; the incident blocks further parcel movement.');
         }
 
         // Normal receive
@@ -366,7 +367,7 @@ class ManifestController extends Controller
     {
         return $manifest->items()
             ->where(function ($q): void {
-                $q->whereNotNull('received_at')->orWhereNull('released_at');
+                  $q->whereNotNull('received_at')->orWhereNull('released_at')->orWhereNotNull('issue_type');
             })
             ->with([
                 'sellerOrder.order.buyer',

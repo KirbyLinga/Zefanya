@@ -1,5 +1,15 @@
 # Combined Courier security proof — 2026-11-08
 
+## Missing/damaged handover extension
+
+On tmp/mutation, each deliberate fault was applied alone, tested with SQLite, restored with exact apply_patch hunks; branch deleted before the final related suite (55 passed, 687 assertions).
+
+| Deliberate fault | Named test | Observed result |
+| --- | --- | --- |
+| Skip missing confirmation | test_missing_parcel_needs_confirmation | tests 1, passed 0; Expected response status code [422] but received 302. |
+| Replace private-photo operational reporting with no-photo blocker | test_damaged_parcel_requires_private_photo | tests 1, passed 0; Expected response status code [422] but received 302. |
+| Bypass immutable Courier-note check | test_missing_parcel_needs_confirmation | tests 1, passed 0; Expected response status code [422] but received 200. |
+
 ## Seal receiving extension
 
 On tmp/mutation, with SQLite only, `test_seal_mismatch_requires_note_before_receipt_and_is_audited_as_an_issue` detected both deliberate faults below. Exact hunks restored, temporary branch deleted, final Courier suite passed (11 tests / 232 assertions before the final once-per-manifest assertions).

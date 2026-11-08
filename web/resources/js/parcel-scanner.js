@@ -234,10 +234,20 @@
                         <p>Check the physical seal before opening the load. A mismatch is recorded and requires a note.</p>
                     </div>` : '';
 
-                return `<form method="POST" action="${escapeAttr(action.url)}" class="inline"${confirmAttr}>
+                const damageFields = action.can_report_damage
+                    ? `<div class="mb-3 space-y-3 font-sans text-xs">
+                        <label class="block">Parcel condition
+                            <select name="issue_type" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"><option value="">Receive normally</option><option value="damaged">Damaged — report incident and receive</option></select>
+                        </label>
+                        <label class="block">Damage note (required for damage)<textarea name="issue_note" maxlength="500" rows="3" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></textarea></label>
+                        <label class="block">Damage photo (required for damage, up to 5 MB)<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" class="mt-1 block w-full"></label>
+                    </div>` : '';
+
+                return `<form method="POST" enctype="multipart/form-data" action="${escapeAttr(action.url)}" class="inline"${confirmAttr}>
                     <input type="hidden" name="_token" value="${escapeAttr(csrf)}">
                     ${tokenField}
                     ${sealFields}
+                    ${damageFields}
                     <button type="submit" class="inline-flex h-9 items-center justify-center rounded-sm bg-primary-700 px-4 font-sans text-[11.5px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-primary-800">${escapeHtml(action.label)}</button>
                 </form>`;
             }).join(' ');
@@ -358,6 +368,13 @@
     }
 
     // Opened from a parcel's "Scan to confirm" link: verify that tracking number straight away.
+    document.querySelectorAll('form[data-parcel-issue]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            confirmInPage(form.dataset.confirm, () => form.submit());
+        });
+    });
+
     if (root.hasAttribute('data-auto-verify') && trackingInput?.value.trim()) {
         submitTracking(trackingInput.value, 'manual');
     }

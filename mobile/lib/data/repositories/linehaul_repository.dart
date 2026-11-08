@@ -48,6 +48,13 @@ class LinehaulTrip {
               '${item['tracking_number'] ?? ''}',
               item['loaded'] == true,
               item['received'] == true,
+              issue: switch (item['issue']) {
+                null => null,
+                'missing' => 'missing',
+                'damaged' => 'damaged',
+                _ => throw const MalformedResponseException(),
+              },
+              courierNote: item['courier_note'] as String?,
             )
           else
             throw const MalformedResponseException(),
@@ -57,10 +64,18 @@ class LinehaulTrip {
 }
 
 class LinehaulParcel {
-  const LinehaulParcel(this.tracking, this.loaded, this.received);
+  const LinehaulParcel(
+    this.tracking,
+    this.loaded,
+    this.received, {
+    this.issue,
+    this.courierNote,
+  });
   final String tracking;
   final bool loaded;
   final bool received;
+  final String? issue;
+  final String? courierNote;
 }
 
 class LinehaulRepository {

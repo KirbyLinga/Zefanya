@@ -126,11 +126,30 @@
                                 <p class="mt-0.5 font-sans text-[10px] text-[var(--text-muted)]">{{ $item->sellerOrder?->order?->buyer?->fullName() }}</p>
                             </td>
                             <td class="px-4 py-3">
-                                @if ($item->received_at)
+                                @if ($item->issue_type)
+                                    <span class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-sans text-[10px] font-semibold text-amber-800">{{ ucfirst($item->issue_type) }}</span>
+                                    <p class="mt-1 font-sans text-[11px] text-[var(--text-muted)]">{{ $item->issue_note }}</p>
+                                @elseif ($item->received_at)
                                     <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-sans text-[10px] font-semibold text-emerald-800"><i data-lucide="check" class="size-3"></i>Received</span>
                                     <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">{{ $item->received_at->format('M j, Y g:i A') }} · {{ $actorName }}</p>
                                 @else
                                     <span class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-sans text-[10px] font-semibold text-amber-800">Pending scan</span>
+                                @endif
+                                @if ($isDispatched && !$item->received_at && !$item->released_at && $manifest->dispatched_by_type === 'linehaul')
+                                    <details class="mt-3 font-sans text-xs text-[var(--text-ink)]">
+                                        <summary class="cursor-pointer font-semibold">Report this parcel missing</summary>
+                                        <form method="POST" action="{{ route('logistics.manifests.receive.store', [$manifest, $item]) }}" data-parcel-issue data-confirm="Report {{ $item->tracking_number }} missing? It will not be received into this hub; an incident will be opened for investigation." class="mt-3 space-y-3">
+                                            @csrf
+                                            <input type="hidden" name="issue_type" value="missing">
+                                            <label class="block">Missing parcel note<textarea name="issue_note" required maxlength="500" rows="3" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></textarea></label>
+                                            @if ($requiresSeal)
+                                                <label class="block">Seal observed on arrival<input name="observed_seal" required pattern="BH-[0-9]{7}" maxlength="10" placeholder="BH-0004521" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></label>
+                                                <label class="block">Seal discrepancy note (required if different)<textarea name="seal_note" maxlength="500" rows="3" class="mt-1 block w-full rounded border p-2 bg-[var(--bg-surface)] text-[var(--text-ink)]"></textarea></label>
+                                            @endif
+                                            <label class="flex items-start gap-2"><input type="checkbox" name="missing_confirmed" value="1" required> I checked the expected parcel and confirm it is missing from this load.</label>
+                                            <button type="submit" class="rounded bg-primary-700 px-3 py-2 font-semibold text-white">Confirm missing parcel</button>
+                                        </form>
+                                    </details>
                                 @endif
                             </td>
                         </tr>

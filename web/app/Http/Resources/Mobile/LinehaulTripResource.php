@@ -29,11 +29,24 @@ class LinehaulTripResource extends JsonResource
             'seal_number' => $this->seal_number,
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'arrived_at' => $this->arrived_at?->toIso8601String(),
-            'items' => $manifest->items->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null)->map(fn ($item): array => [
+            'items' => $manifest->items->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null || $item->issue_type !== null)->map(fn ($item): array => [
                 'id' => $item->id, 'tracking_number' => $item->tracking_number,
                 'loaded' => $manifest->dispatched_at !== null || isset(($this->loading_tokens ?? [])[$item->id]),
                 'received' => $item->received_at !== null,
+                'issue' => $item->issue_type,
+                'courier_note' => $item->issue_type === null ? null : $this->courierNote($item, $manifest->id),
             ])->values()->all(),
         ];
+    }
+
+    private function courierNote($item, int $manifestId): ?string
+    {
+        $event = \App\Models\Shared\IncidentEvents::where('event', 'courier_handover_note')
+            ->where('actor_type', 'linehaul')->where('actor_id', $this->linehaul_driver_id)
+            ->where('metadata->manifest_id', $manifestId)
+            ->whereHas('incident', fn ($query) => $query->where('incident_seller_order_id', $item->seller_order_id)->where('type', $item->issue_type))
+            ->first();
+
+        return $event?->metadata['note'] ?? null;
     }
 }

@@ -56,6 +56,40 @@ class LinehaulService
             $manifest = Manifest::query()->whereKey($manifest->id)->lockForUpdate()->firstOrFail();
             abort_unless((new LinehaulPolicy)->access($driver, $manifest), 403);
             $assignment = LinehaulAssignment::query()->where('manifest_id', $manifest->id)->lockForUpdate()->firstOrFail();
+            if ($action === 'exception-note') {
+                $this->require(in_array($manifest->status, [ManifestStatus::Dispatched, ManifestStatus::ReceivedWithExceptions], true), 'This trip has no handover exception to annotate.');
+                $data = \Illuminate\Support\Facades\Validator::make($data, [
+                    'tracking_number' => ['required', 'string', 'max:100'], 'note' => ['required', 'string', 'max:500'],
+                ])->validate();
+                $this->require(trim($data['note']) !== '', 'Enter your handover note.');
+                $item = $manifest->items()->where('tracking_number', $data['tracking_number'])->whereNotNull('issue_type')->first();
+                $this->require($item !== null, 'Choose a parcel with a recorded handover issue on this trip.');
+                $incident = \App\Models\Shared\Incidents::where('incident_seller_order_id', $item->seller_order_id)->where('type', $item->issue_type)
+                    ->whereHas('events', fn ($query) => $query->where('event', 'manifest_handover')
+                        ->where('metadata->manifest_id', $manifest->id)->where('metadata->manifest_item_id', $item->id))->first();
+                $this->require($incident !== null, 'The handover incident is not available.');
+                $existing = $incident->events()->where('event', 'courier_handover_note')->first();
+                if ($existing !== null) {
+                    $this->require((int) $existing->actor_id === (int) $driver->id
+                        && (int) ($existing->metadata['manifest_id'] ?? 0) === (int) $manifest->id
+                        && ($existing->metadata['note'] ?? '') === trim($data['note']), 'A handover note is already recorded. It cannot be overwritten.');
+
+                    return $assignment;
+                }
+                $incident->events()->create([
+                    'event' => 'courier_handover_note', 'label' => 'Courier handover note',
+                    'detail' => mb_substr(trim($data['note']), 0, 191), 'occurred_at' => now(),
+                    'actor_type' => 'linehaul', 'actor_id' => $driver->id,
+                    'metadata' => ['manifest_id' => $manifest->id, 'note' => trim($data['note'])],
+                ]);
+                ManifestAuditLog::create([
+                    'manifest_id' => $manifest->id, 'manifest_item_id' => $item->id, 'action' => 'courier_note',
+                    'actor_type' => 'linehaul', 'actor_id' => $driver->id, 'actor_name' => $driver->name,
+                    'ip_address' => $request->ip(), 'user_agent' => $request->userAgent(), 'verification_method' => 'manual',
+                ]);
+
+                return $assignment;
+            }
             if ($action === 'arrive') {
                 $this->require($manifest->status === ManifestStatus::Dispatched, 'Only an in-transit trip can arrive.');
                 if ($assignment->arrived_at !== null) {
