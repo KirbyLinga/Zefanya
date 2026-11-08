@@ -29,7 +29,7 @@ Restored focused PASS: `{"tool":"phpunit","result":"passed","tests":10,"passed":
 Final restored related PASS: `{"tool":"phpunit","result":"passed","tests":193,"passed":193,"assertions":2081,"duration_ms":63407}`.
 Full mobile PASS: `03:29 +901: All tests passed!`; final focused after test-only style corrections: `00:11 +19: All tests passed!`; analysis `8 issues found. (ran in 9.0s)` (existing baseline).
 
-The global mutex/current locking reads are implemented for both application Rider creation paths and Courier profile submissions. SQLite does not prove concurrent MySQL behavior; that operational proof remains OPEN. Authenticated PDF download is tested on PHP; actual camera/Files/PDF open-share-save on a phone and real 5 MB upload through deployment PHP limits remain OPEN.
+The global mutex/current locking reads are implemented for both application Rider creation paths and Courier profile submissions. SQLite does not prove concurrent MySQL behavior; that operational proof remains OPEN. Authenticated PDF download is tested on PHP; actual camera/Files/PDF open-share-save on a phone and hosted PHP upload limits remain OPEN. After owner-approved local activation, a real non-saving HTTP probe proved three simultaneous 5 MB image parts pass file validation and oversized parts fail; deliberately missing required expiry guaranteed no submission/private document was saved. Profile rows remain zero and all demo batches unchanged.
 
 ## Bulk receiving closeout extension
 
