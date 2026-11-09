@@ -13,6 +13,7 @@ class LinehaulDutyResource extends JsonResource
         $installed = LinehaulDutyService::installed();
 
         return ['setup_required' => ! $installed, 'on_duty' => $installed && (bool) $this->on_duty,
+            'trip_location_sharing' => $installed,
             'available' => $installed && LinehaulDutyService::available($this->resource),
             'status' => ! $installed ? 'Setup pending' : (! $this->on_duty ? 'Off Duty'
                 : (LinehaulDutyService::available($this->resource) ? 'On Duty' : 'Location unknown')),

@@ -1,5 +1,10 @@
 # Touched your files
 
+## Android trip location sharing draft
+
+- Courier Trips adds an opt-in location control for active Android legs. The existing location plugin starts an Android foreground service when sharing begins in the visible app.
+- The existing duty heartbeat checks the assigned driver, company, current offer version and in-transit leg before saving a scoped position. Logistics reads the latest point in the existing manifest panel. No new table, route or dependency.
+
 ## Courier release controls and payout draft
 
 - Configured hubs require a fresh Courier location within 500 m for the corresponding departure or arrival. Logistics supplies verified hub coordinates. The strict setting requires coordinates for both actions. Current foreground location checks remain in place.

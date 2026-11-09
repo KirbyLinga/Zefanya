@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'support/linehaul_history_fixture.dart';
 import 'package:flutter/material.dart';
@@ -54,6 +55,19 @@ class _ActionLocation implements CourierLocationSource {
   }
 }
 
+class _TripLocation implements CourierTripLocationSource {
+  final points = StreamController<CourierPosition>();
+
+  @override
+  bool get supported => true;
+
+  @override
+  Stream<CourierPosition> watchTrip({required bool Function() canStart}) {
+    expect(canStart(), isTrue);
+    return points.stream;
+  }
+}
+
 Future<void> _mount(
   WidgetTester tester,
   _Directions directions,
@@ -61,6 +75,7 @@ Future<void> _mount(
   List<String> posts, {
   void Function(http.Request)? onAction,
   CourierLocationSource? locationSource,
+  CourierTripLocationSource? tripLocationSource,
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(360, 640);
@@ -76,7 +91,10 @@ Future<void> _mount(
       }
       return http.Response(
         jsonEncode({
-          'data': request.method == 'POST' && onAction != null
+          'data':
+              request.method == 'POST' &&
+                  onAction != null &&
+                  !request.url.path.contains('/duty/')
               ? trip
               : request.url.path.endsWith('/trips')
               ? [trip]
@@ -84,9 +102,10 @@ Future<void> _mount(
               ? historyFixture([trip])
               : {
                   'setup_required': false,
-                  'on_duty': false,
-                  'available': false,
-                  'status': 'Off Duty',
+                  'on_duty': tripLocationSource != null,
+                  'available': tripLocationSource != null,
+                  'status': tripLocationSource != null ? 'On Duty' : 'Off Duty',
+                  'trip_location_sharing': tripLocationSource != null,
                 },
         }),
         200,
@@ -110,6 +129,8 @@ Future<void> _mount(
         home: LinehaulPortal(
           directions: directions,
           locationSource: locationSource ?? const DeviceCourierLocationSource(),
+          tripLocationSource:
+              tripLocationSource ?? const DeviceCourierLocationSource(),
         ),
       ),
     ),
@@ -118,6 +139,53 @@ Future<void> _mount(
 }
 
 void main() {
+  testWidgets('explicit trip sharing sends a scoped fix while paused', (
+    tester,
+  ) async {
+    final location = _TripLocation();
+    addTearDown(() => unawaited(location.points.close()));
+    final scopedReports = <Object?>[];
+    await _mount(
+      tester,
+      _Directions(),
+      {..._trip(), 'offer_version': 2},
+      <String>[],
+      locationSource: _ActionLocation(),
+      tripLocationSource: location,
+      onAction: (request) {
+        final payload = jsonDecode(request.body) as Map;
+        if (payload.containsKey('trip_id')) scopedReports.add(payload);
+      },
+    );
+    expect(location.points.hasListener, isFalse);
+    final share = find.text('Share trip location');
+    await tester.scrollUntilVisible(
+      share,
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(ListView).first, const Offset(0, -120));
+    await tester.pumpAndSettle();
+    await tester.tap(share);
+    await tester.pump();
+    expect(location.points.hasListener, isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    location.points.add(const CourierPosition(14.5, 121.3, 20));
+    await tester.pump();
+    expect(scopedReports.single, {
+      'trip_id': '12',
+      'offer_version': 2,
+      'latitude': 14.5,
+      'longitude': 121.3,
+      'accuracy': 20,
+    });
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(location.points.hasListener, isFalse);
+  });
+
   testWidgets(
     'configured arrival reads a fresh position and submits it with the action',
     (tester) async {

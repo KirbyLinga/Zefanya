@@ -425,6 +425,7 @@ class LinehaulDuty {
     required this.available,
     required this.setupRequired,
     required this.status,
+    this.tripLocationSharing = false,
     this.checkedAt,
     this.lastCheckPassed,
   });
@@ -432,6 +433,7 @@ class LinehaulDuty {
   final bool available;
   final bool setupRequired;
   final String status;
+  final bool tripLocationSharing;
   final String? checkedAt;
   final bool? lastCheckPassed;
   factory LinehaulDuty.fromJson(Map<String, Object?> data) {
@@ -453,6 +455,7 @@ class LinehaulDuty {
       available: data['available'] as bool,
       setupRequired: data['setup_required'] as bool,
       status: data['status'] as String,
+      tripLocationSharing: data['trip_location_sharing'] == true,
       checkedAt: data['checked_at'] as String?,
       lastCheckPassed: data['last_check_passed'] as bool?,
     );

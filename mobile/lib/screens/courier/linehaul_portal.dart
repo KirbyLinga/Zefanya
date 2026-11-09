@@ -38,10 +38,12 @@ class LinehaulPortal extends StatefulWidget {
   const LinehaulPortal({
     super.key,
     this.locationSource = const DeviceCourierLocationSource(),
+    this.tripLocationSource = const DeviceCourierLocationSource(),
     this.directions = const DeviceCourierDirections(),
     this.photoPicker = const DeviceCourierDocumentPicker(),
   });
   final CourierLocationSource locationSource;
+  final CourierTripLocationSource tripLocationSource;
   final CourierDirections directions;
   final CourierDocumentPicker photoPicker;
   @override
@@ -66,6 +68,13 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   bool _foreground = true;
   int _dutyRevision = 0;
   Timer? _dutyTimer;
+  StreamSubscription<CourierPosition>? _tripLocation;
+  (String, int)? _sharingLeg;
+  int _sharingRevision = 0;
+  bool _tripReportBusy = false;
+  Stopwatch? _tripReportInterval;
+  DateTime? _lastSharedAt;
+  String? _tripSharingError;
 
   @override
   void initState() {
@@ -84,6 +93,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   @override
   void dispose() {
     _dutyTimer?.cancel();
+    unawaited(_tripLocation?.cancel());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -92,6 +102,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final wasForeground = _foreground;
     _foreground = state == AppLifecycleState.resumed;
+    if (state == AppLifecycleState.detached) _stopTripSharing();
     if (_foreground &&
         !wasForeground &&
         context.read<Repositories>().client != null) {
@@ -106,6 +117,9 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   }
 
   void _setDuty(LinehaulDuty duty) {
+    if (_sharingLeg != null && (!duty.onDuty || !duty.tripLocationSharing)) {
+      _stopTripSharing('Trip location sharing is unavailable.');
+    }
     setState(() {
       _duty = duty;
       _dutyError = null;
@@ -137,11 +151,16 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       var duty = await _repository.duty();
       if (!mounted || revision != _dutyRevision) return;
       _setDuty(duty);
-      if (duty.onDuty && _foreground) {
+      if (duty.onDuty && _foreground && _sharingLeg == null) {
         final point = await widget.locationSource.current(
           requestPermission: requestPermission,
         );
-        if (!mounted || !_foreground || revision != _dutyRevision) return;
+        if (!mounted ||
+            !_foreground ||
+            revision != _dutyRevision ||
+            _sharingLeg != null) {
+          return;
+        }
         duty = await _repository.changeDuty('heartbeat', point.toJson());
         if (mounted && revision == _dutyRevision) _setDuty(duty);
       }
@@ -155,6 +174,93 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       }
     } finally {
       _heartbeatBusy = false;
+    }
+  }
+
+  void _startTripSharing(LinehaulTrip trip) {
+    if (!_foreground || _sharingLeg != null || _duty?.onDuty != true) return;
+    final revision = ++_sharingRevision;
+    setState(() {
+      _sharingLeg = (trip.id, trip.offerVersion);
+      _tripSharingError = null;
+    });
+    _tripLocation = widget.tripLocationSource
+        .watchTrip(
+          canStart: () =>
+              mounted && _foreground && revision == _sharingRevision,
+        )
+        .listen(
+          (point) => unawaited(_reportTripPosition(trip, point, revision)),
+          onError: (Object error) {
+            if (!mounted || revision != _sharingRevision) return;
+            _stopTripSharing(
+              error is CourierLocationException
+                  ? error.message
+                  : 'Trip location sharing stopped. Try again.',
+            );
+          },
+          onDone: () {
+            if (mounted && revision == _sharingRevision) {
+              _stopTripSharing('Trip location sharing stopped.');
+            }
+          },
+        );
+  }
+
+  void _stopTripSharing([String? message]) {
+    if (_sharingLeg == null) return;
+    _sharingRevision++;
+    unawaited(_tripLocation?.cancel());
+    _tripLocation = null;
+    setState(() {
+      _sharingLeg = null;
+      _tripReportInterval = null;
+      _lastSharedAt = null;
+      _tripSharingError = message;
+    });
+  }
+
+  Future<void> _reportTripPosition(
+    LinehaulTrip trip,
+    CourierPosition point,
+    int revision,
+  ) async {
+    if (!mounted ||
+        revision != _sharingRevision ||
+        _tripReportBusy ||
+        (_tripReportInterval?.elapsed ?? const Duration(minutes: 1)) <
+            const Duration(minutes: 1)) {
+      return;
+    }
+    _tripReportBusy = true;
+    _tripReportInterval = Stopwatch()..start();
+    try {
+      final duty = await _repository.changeDuty('heartbeat', {
+        ...point.toJson(),
+        'trip_id': trip.id,
+        'offer_version': trip.offerVersion,
+      });
+      if (!mounted || revision != _sharingRevision) return;
+      _lastSharedAt = DateTime.now();
+      _tripSharingError = null;
+      _setDuty(duty);
+    } on ApiException catch (error) {
+      if (!mounted || revision != _sharingRevision) return;
+      if (error.isRetryable) {
+        setState(
+          () => _tripSharingError =
+              'Location update failed. Waiting for the next fix.',
+        );
+      } else {
+        final message = error is ValidationException
+            ? error.fieldErrors['trip_id'] ?? error.fieldErrors['duty']
+            : null;
+        _stopTripSharing(
+          message ?? 'Trip location sharing stopped. Refresh and try again.',
+        );
+      }
+    } finally {
+      _tripReportBusy = false;
     }
   }
 
@@ -379,7 +485,22 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   void _reload() {
     final client = context.read<Repositories>().client;
     if (client != null) {
-      final trips = _repository.trips();
+      final revision = _sharingRevision;
+      final trips = _repository.trips().then((trips) {
+        final leg = _sharingLeg;
+        if (mounted &&
+            revision == _sharingRevision &&
+            leg != null &&
+            !trips.any(
+              (trip) =>
+                  (trip.id, trip.offerVersion) == leg &&
+                  trip.status == 'In Transit' &&
+                  !trip.needsRescan,
+            )) {
+          _stopTripSharing('Location sharing ended for this trip.');
+        }
+        return trips;
+      });
       // Observe immediate failures before the next frame subscribes the builder.
       // The original future still carries the error for its Retry state.
       trips.ignore();
@@ -426,6 +547,9 @@ class _LinehaulPortalState extends State<LinehaulPortal>
         body: {...body, if (position != null) 'location': position.toJson()},
       );
       if (mounted) {
+        if (action == 'arrive' && _sharingLeg == (trip.id, trip.offerVersion)) {
+          _stopTripSharing();
+        }
         _reload();
         unawaited(_historyKey.currentState?.refresh() ?? Future<void>.value());
       }
@@ -894,6 +1018,35 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 onPressed: _busy ? null : () => _act(trip, 'arrive'),
                 child: const Text('Report arrival'),
               ),
+            if (trip.status == 'In Transit' &&
+                !trip.needsRescan &&
+                widget.tripLocationSource.supported &&
+                _duty?.tripLocationSharing == true) ...[
+              if (_sharingLeg == (trip.id, trip.offerVersion))
+                Text(
+                  _lastSharedAt == null
+                      ? 'Waiting for an accurate location.'
+                      : 'Last location sent at ${DateFormat.jm().format(_lastSharedAt!)}.',
+                )
+              else
+                const Text(
+                  'Let Logistics see your latest trip location while you use other apps. Foreground duty updates continue separately.',
+                ),
+              if (_tripSharingError != null) Text(_tripSharingError!),
+              OutlinedButton.icon(
+                onPressed: _sharingLeg == (trip.id, trip.offerVersion)
+                    ? _stopTripSharing
+                    : _sharingLeg == null && _duty?.onDuty == true && !_busy
+                    ? () => _startTripSharing(trip)
+                    : null,
+                icon: const Icon(Icons.location_on_outlined),
+                label: Text(
+                  _sharingLeg == (trip.id, trip.offerVersion)
+                      ? 'Stop background sharing'
+                      : 'Share trip location',
+                ),
+              ),
+            ],
             if (trip.canReportDelay)
               OutlinedButton.icon(
                 onPressed: _busy ? null : () => _reportDelay(trip),

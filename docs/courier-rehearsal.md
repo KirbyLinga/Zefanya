@@ -28,7 +28,7 @@ Breakdown reporting is locally enabled (batch 80). After genuine departure, use 
 
 Reassignment is enabled in local MySQL through the approved migration in batch 81. Trip #2's company has two demo Courier accounts. Sign in to the replacement account as `zef-demo-linehaul-replacement@zefanya.test` using the password shared in chat. Use separate browser profiles or devices to keep both sessions signed in. The replacement starts Off Duty and unassigned. Complete the real duty checklist and location check before Logistics selects the replacement. To verify actual earnings, use an approved vehicle with a configured rate before the replacement takes the trip. At preflight, there were zero approved vehicle profiles.
 
-Returning from Maps/another app refreshes trip state and the currently visible History/Earnings report. If the server is unreachable, use the explicit Retry state after restoring connectivity; do not interpret a failed refresh as a successful trip action. Unsent delay form input is retained while switching apps. Background route recording/push remain unavailable.
+Returning from Maps/another app refreshes trip state and the currently visible History/Earnings report. If the server is unreachable, use Retry after restoring connectivity. Unsent delay form input is retained while switching apps. Push remains open.
 
 While a Courier is carrying the In Transit trip, refresh its Logistics manifest and check **Last trip location**. The panel shows the last point reported during the current leg, its accuracy and Philippine timestamp. A report five minutes old or older is stale. The replacement's point appears after continuation and a report for the new leg. Reported arrival ends the panel.
 
@@ -77,7 +77,9 @@ Draft batches #3/#4 each retain two demo parcels and are unassigned. A decline r
 
 Isolated tests prove software behavior, not actual location/documents/custody or simultaneous MySQL scheduling. No full-mobile rerun/analysis was needed for this documentation/runtime-only stage; prior stage has 931 mobile passes and eight existing analysis issues.
 
-Physical acceptance and simultaneous MySQL reassignment verification are deferred. The 10-wheel rate, background tracking, push and a hosted HTTPS phone build remain open. The loopback preview runs on the PC. A separate phone needs a reachable API.
+Physical acceptance and simultaneous MySQL reassignment verification are deferred. The 10-wheel rate, push and a reachable HTTPS backend remain open. Build the APK after the other page changes. The loopback preview runs on the PC. A separate phone needs a reachable API.
+
+When Android verification resumes, tap **Share trip location** on a continued in-transit leg, confirm Android starts the sharing service, then switch to Maps or lock the phone. Check that Logistics sees a newer point and timestamp after a fresh accurate fix. Check manual stop, arrival, logout and reassignment. Restart the app to resume foreground duty updates after a process stop and opt in again for the active leg. The feature sends the latest point, and offline fixes are discarded. Chrome and iOS keep foreground duty updates.
 
 For the unverified release controls, set `LINEHAUL_HUB_COORDINATES` to a JSON object keyed by actual hub ID. Each value has numeric `latitude` and `longitude` fields from Logistics. `LINEHAUL_REQUIRE_HUB_GEOFENCE=true` blocks Courier departure or arrival if that hub is missing valid coordinates. `LINEHAUL_REQUIRE_REVIEWED_VEHICLE=true` requires an approved profile and current license. Review profiles before activating the requirement, or finish active trips first so Couriers can submit their profiles while Off Duty.
 

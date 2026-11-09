@@ -34,6 +34,10 @@ class LinehaulDutyService
                 'longitude' => ['required', 'numeric', 'between:-180,180'],
                 'accuracy' => ['required', 'numeric', 'between:0,100']];
         }
+        if ($action === 'heartbeat') {
+            $rules['trip_id'] = ['required_with:offer_version', 'integer', 'min:1'];
+            $rules['offer_version'] = ['required_with:trip_id', 'integer', 'min:1'];
+        }
         if ($action === 'on') {
             $rules['checklist'] = ['required', 'array:'.implode(',', self::ITEMS)];
             foreach (self::ITEMS as $item) {
@@ -125,6 +129,9 @@ class LinehaulDutyService
             $point = ['latitude' => (float) $data['latitude'], 'longitude' => (float) $data['longitude'], 'accuracy' => (float) $data['accuracy']];
             if ($action === 'heartbeat') {
                 $this->require($driver->on_duty, 'Go On Duty before sending a location update.');
+                if (isset($data['trip_id'])) {
+                    $this->requireActiveLeg($driver, (int) $data['trip_id'], (int) $data['offer_version']);
+                }
                 $driver->forceFill(['last_seen_at' => now(), 'duty_location' => $point])->save();
 
                 return $driver;
@@ -146,6 +153,24 @@ class LinehaulDutyService
 
             return $driver;
         });
+    }
+
+    private function requireActiveLeg(LinehaulDriver $driver, int $tripId, int $offerVersion): void
+    {
+        $manifest = Manifest::whereKey($tripId)->where('logistics_provider_id', $driver->logistics_provider_id)
+            ->lockForUpdate()->first();
+        $assignment = $manifest?->status === ManifestStatus::Dispatched
+            ? LinehaulAssignment::currentOffer()->where('manifest_id', $tripId)
+                ->where('linehaul_driver_id', $driver->id)->whereNull('arrived_at')->lockForUpdate()->first()
+            : null;
+        if ($assignment !== null && ($assignment->offer_version ?? 1) === $offerVersion) {
+            $assignment->setRelation('manifest', $manifest);
+            if (LinehaulTransferService::carrier($assignment)) {
+                return;
+            }
+        }
+
+        throw ValidationException::withMessages(['trip_id' => 'Location sharing ended because you no longer have this active trip leg.']);
     }
 
     private function require(bool $condition, string $message): void

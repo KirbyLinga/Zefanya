@@ -273,6 +273,40 @@ class LinehaulTransferTest extends TestCase
         $this->get($show)->assertOk()->assertDontSee('Last trip location')->assertDontSee($replacementPoint);
     }
 
+    public function test_trip_location_heartbeat_requires_the_current_continued_leg(): void
+    {
+        $f = $this->transferFixture();
+        $manifest = $f['manifest'];
+        $url = '/api/courier/duty/heartbeat';
+        $point = ['latitude' => 14.12345, 'longitude' => 121.12345, 'accuracy' => 18];
+        $leg = [...$point, 'trip_id' => $manifest->id, 'offer_version' => 1];
+        $this->postJson($url, $leg)->assertUnauthorized();
+        $this->transferApi($f['driver'])->postJson($url, [...$point, 'trip_id' => $manifest->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('offer_version');
+        $this->postJson($url, $leg)->assertOk()->assertJsonPath('data.trip_location_sharing', true);
+        $this->assertEquals($point, $f['driver']->fresh()->duty_location);
+        $this->transfer($f);
+
+        $this->postJson($url, [...$leg, 'latitude' => 14.3])
+            ->assertUnprocessable()->assertJsonValidationErrors('trip_id');
+        $this->assertEquals($point, $f['driver']->fresh()->duty_location);
+        $replacement = [...$leg, 'offer_version' => 2];
+        $this->transferApi($f['replacement'])->postJson($url, $replacement)
+            ->assertUnprocessable()->assertJsonValidationErrors('trip_id');
+        $service = app(LinehaulService::class);
+        foreach ([$f['parcel'], $f['secondParcel']] as $parcel) {
+            $service->act($f['replacement'], $manifest, 'takeover-scan',
+                ['offer_version' => 2, 'tracking_number' => $parcel->tracking_number], request());
+        }
+        $service->act($f['replacement'], $manifest, 'takeover-continue', ['offer_version' => 2], request());
+        $this->postJson($url, $leg)->assertUnprocessable()->assertJsonValidationErrors('trip_id');
+        $this->postJson($url, $replacement)->assertOk();
+        $service->act($f['replacement'], $manifest, 'arrive', [], request());
+        $this->postJson($url, [...$replacement, 'latitude' => 14.3])
+            ->assertUnprocessable()->assertJsonValidationErrors('trip_id');
+        $this->assertEquals($point, $f['replacement']->fresh()->duty_location);
+    }
+
     public function test_continue_rechecks_fresh_readiness_and_capacity_after_all_scans(): void
     {
         $f = $this->transferFixture(); $this->transfer($f);

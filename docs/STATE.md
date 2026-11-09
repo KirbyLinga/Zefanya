@@ -1,5 +1,5 @@
 # Combined Courier presentation scope — 2026-11-09
-Stage: Courier release controls and payout recording drafted locally. Verification deferred by owner. Physical acceptance OPEN.
+Stage: Android active-trip background location sharing drafted locally. Verification and APK deferred by owner.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
 Verified source HEAD: f58c50e (reassignment notice); prior last trip location ff79d9b. This state commit records verification.
 Owner prioritized consistency pass over next rehearsal; earlier limited Courier scope overrides retained; see DECISIONS.md.
@@ -20,6 +20,6 @@ Original assignment fields and all manifest/item/order/audit/delay/breakdown fin
 Browser automation previously stopped because URL could not be verified; no alternate UI bypass. Real Back/camera/location/handover checks OPEN.
 MySQL zefanya_friend_20261107: #2 accepted/Loading, two parcels/1600g, zero loading tokens; #1 Completed. Off Duty/zero vehicle submissions.
 Backend :8000 verified HTTP401 for anonymous Courier trips. Fresh live preview :5177 session13721 HTTP200, ready54.6s; login cross-origin preflight204.
-Local draft: optional strict reviewed-vehicle requirement, 500 m geofences on Courier depart/arrive, and Logistics payment recording for confirmed earned trips. Tests authored, none run for this draft.
-OPEN: payout migration approval/activation, verified hub coordinates, strict vehicle rollout, 10-wheel rate, background GPS/push, hosted HTTPS/APK.
-NEXT: complete remaining release work, then run automated checks and physical reassignment rehearsal when the owner resumes testing.
+Local drafts: strict vehicle review, hub geofences, payout recording, configurable 10-wheeler pay, and opt-in Android location sharing for active trip legs. Tests authored and deferred.
+OPEN: payout migration approval/activation, verified hub coordinates, strict vehicle rollout, 10-wheel rate, push, Android device verification and hosted HTTPS.
+NEXT: continue release work. Build the APK after the owner's other page changes. Run tests and physical acceptance when requested.
