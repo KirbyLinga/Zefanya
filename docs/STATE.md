@@ -1,7 +1,7 @@
 # Combined Courier presentation scope — 2026-11-09
-Stage: Courier extension 19 (foreground state recovery) DONE; extensions 16-18 DONE; physical acceptance OPEN.
+Stage: Courier extension 20 (breakdown evidence backend) DONE; extension 21 (app/Logistics evidence access) NEXT; physical acceptance OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
-Verified extension-19 source HEAD: 36cb626; this follow-up records completion. Authorized Courier branch; no merge.
+Verified extension-20 source HEAD: c5749e6; this follow-up records completion. Owner authorized continuous stages; no merge.
 Owner prioritized consistency pass over next rehearsal; earlier limited Courier scope overrides retained; see DECISIONS.md.
 Keep legacy Rider role and linehaul Courier; shared Zefanya styling. Native manifest/custody/status/stock/payment services and trip history remain intact.
 Assignment/accept/depart still require passed checklist, On Duty/fresh location; submitted vehicle records require approval/nonexpired license. Unsubmitted compatibility retained.
@@ -11,15 +11,15 @@ Four direct shared tabs: Trips/History/Earnings/Profile. Lazy kept-alive date/pa
 History reuses full trip cards, preserving seal/delay/decline/notes; saving handover note refreshes dated history as well as Trips. Background errors observed.
 Profile editorial identity/Settings gear; shared role-safe Settings owns appearance and confirmed/awaited logout. Buyer/Rider-specific records hidden from Courier.
 Prior pay snapshot activation approved/applied alone in batch 79 (106.48ms), two original pay/type null; scheduling batch 78 and earlier exceptions retained.
-Current lifecycle focused: 00:08 +22: All tests passed! Final five-file Courier suite: 00:22 +38: All tests passed! Live flag/mocked HTTP.
-Actual foreground return refreshes trips/visible dated report; query and unsent delay fields retained; duplicate resume ignored; failed reload uses Retry. Four new tests.
-Current analysis: 8 issues found. (ran in 7.4s); seven existing infos/one unused-helper warning. Dart formatted; PHP/full app not rerun.
+Current PHP breakdown: 5 passed/80 assertions (7011ms); related six-file Courier suite: 48 passed/886 assertions (20034ms), SQLite memory/fake storage.
+Required bounded private re-encoded photo links immutable delay; same-photo replay stable, changed evidence refused, rollback cleans orphan file/inbox/audits. Four faults caught/restored.
+Prior mobile 38/analysis eight existing issues not rerun (backend-only). PHP syntax checked; Pint waived/UNRUN. No full-app/web build needed yet.
 Previous extension-16 real login/profile/duty/vehicle/trips/history/earnings/logout passed/revoked token 401; not rerun in this mobile-only continuation.
-No schema/migration/config-file/dependency/build/APK changes; PHP/Pint unnecessary. No development migration or new approval needed.
+Additive breakdown reports table migration 2026_11_09_020000 pending local activation; no dev migration/config/dependency/build/APK change.
 Extension-16 domain fingerprints unchanged; no subsequent live writes this stage. No trip/readiness/GPS/documents/pay fabricated.
 Browser automation previously stopped because URL could not be verified; no alternate UI bypass. Real Back/camera/location/handover checks OPEN.
 MySQL zefanya_friend_20261107: #2 accepted/Loading, two parcels/1600g, zero loading tokens; #1 Completed. Off Duty/zero vehicle submissions.
 Prior runtime: backend :8000/preview :5177, USE_LIVE_API=true; not restarted/reverified this continuation. Restart Flutter for latest source.
 OPEN: payouts/Van unsupported/10-wheel no rate; physical full Courier rehearsal/concurrent MySQL/universal reviewed onboarding/capacity.
 OPEN: in-transit reassignment, geofence/background GPS/push, hosted HTTPS/APK and older S6.2 gates; Courier not fully complete.
-NEXT implementation: breakdown incident/photo and in-transit reassignment with rescan/pay/audit preservation; payouts separately. Human rehearsal per courier-rehearsal.md. STOP after this stage.
+NEXT: app breakdown submission and authorized Logistics photo access; then reassignment/rescan/pay/audit preservation. New local migration needs separate explicit exception.
