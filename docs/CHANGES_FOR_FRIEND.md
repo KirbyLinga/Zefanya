@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier breakdown evidence backend — 2026-11-09
+
+- Existing web/routes/api.php adds authenticated/throttled POST Courier breakdown before wildcard actions. Existing Api/LinehaulController.php adds only reportBreakdown, using new FormRequest/service/safe resource. Existing delay/manifest/notification services are reused, not changed.
+- New LinehaulBreakdownService/LinehaulBreakdown model, inherited-authorized LinehaulBreakdownRequest and safe LinehaulBreakdownResource; new linehaul_breakdown_reports migration (unique restrictive delay FK/photo path/hash/created_at), not applied locally. Required bounded photo is re-encoded/random private storage; exact replay is stable, evidence immutable and transaction failure removes orphan uploads. No native status/custody/pay change.
+- New LinehaulBreakdownTest only; existing tests untouched. Backend-only at this stage, app/photo-view/reassignment follow. No configuration/dependency/document/demo writes or development migration.
+
 ## Courier foreground recovery — 2026-11-09
 
 - Mobile linehaul_portal.dart re-reads trips and the visible dated report when returning from another app/Maps; duty refresh remains. Duplicate resumed notifications ignored; active trip mutations retain their own refresh path. Existing error/Retry handles unavailable server without displaying a false successful state.

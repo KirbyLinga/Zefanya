@@ -47,6 +47,7 @@ Route::prefix('courier')->middleware(['auth:sanctum', 'api.role:linehaul', 'thro
     Route::post('/duty/{dutyAction}', [\App\Http\Controllers\Api\LinehaulController::class, 'changeDuty'])->where('dutyAction', 'on|off|heartbeat');
     Route::post('/trips/{manifest}/decline', [\App\Http\Controllers\Api\LinehaulController::class, 'decline']);
     Route::post('/trips/{manifest}/delay', [\App\Http\Controllers\Api\LinehaulController::class, 'reportDelay']);
+    Route::post('/trips/{manifest}/breakdown', [\App\Http\Controllers\Api\LinehaulController::class, 'reportBreakdown']);
     Route::post('/trips/{manifest}/{action}', [\App\Http\Controllers\Api\LinehaulController::class, 'act'])
         ->where('action', 'accept|scan|depart|arrive|exception-note');
 });

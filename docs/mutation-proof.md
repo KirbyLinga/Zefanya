@@ -1,5 +1,16 @@
 # Combined Courier security proof — 2026-11-08
 
+## Breakdown evidence backend — 2026-11-09
+
+Four literal faults on tmp/mutation, isolated SQLite/fake storage; restore each before the next, final five tests passed/80 assertions/7011ms. Authorized Courier branch restored; temporary branch deleted. Existing assignment/phase/offer policy proofs retained through reused delay service.
+
+| Fault | Named test prefix | Observed detection |
+| --- | --- | --- |
+| Store photo publicly | test_photo_is_required | failed, 0 passed/13 assertions; missing private image, getimagesizefromstring error |
+| Skip re-encoding | test_photo_is_required | failed, 0 passed/14 assertions; expected image/jpeg, actual image/png |
+| Remove retry photo hash guard | test_identical_retry | failed, 0 passed/4 assertions; expected 422, actual 200 |
+| Skip failure cleanup | test_draft_reports | failed, 0 passed/6 assertions; expected empty files, actual leftover courier-breakdowns/*.jpg |
+
 ## Full dated terminal history — 2026-11-09
 
 Six independent literal faults on tmp/mutation, named LinehaulHistoryTest prefix against SQLite memory, wait for completion and restore exact hunks. Authorized branch restored and temporary branch deleted before final suite. No local database change.

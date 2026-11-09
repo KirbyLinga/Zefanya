@@ -98,6 +98,12 @@ class LinehaulController extends Controller
         return $this->success('Delay reported to Logistics.', new LinehaulTripResource($assignment));
     }
 
+    public function reportBreakdown(\App\Http\Requests\Api\LinehaulBreakdownRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulBreakdownService $service): JsonResponse
+    {
+        return $this->success('Breakdown reported to Logistics.', new \App\Http\Resources\Mobile\LinehaulBreakdownResource(
+            $service->report($request->user(), $manifest, $request->validated(), $request)))->header('Cache-Control', 'no-store, private');
+    }
+
     public function changeDuty(\App\Http\Requests\Api\LinehaulDutyRequest $request, string $dutyAction, \App\Services\Logistics\LinehaulDutyService $service): JsonResponse
     {
         $driver = $service->change($request->user(), $dutyAction, $request->validated());
