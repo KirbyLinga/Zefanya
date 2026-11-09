@@ -54,6 +54,7 @@ class LinehaulController extends Controller
             ->whereHas('manifest', fn ($query) => $query->where('logistics_provider_id', $request->user()->logistics_provider_id))
             ->with(['driver', 'manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams'])
             ->when(\App\Services\Logistics\LinehaulDelayService::installed(), fn ($query) => $query->with('latestDelay'))
+            ->when(\App\Services\Logistics\LinehaulTransferService::installed(), fn ($query) => $query->with('latestTransfer'))
             ->latest('id')->limit(50)->get();
 
         $rows = $trips->map(fn ($trip) => (new LinehaulTripResource($trip))->resolve($request));
@@ -61,6 +62,12 @@ class LinehaulController extends Controller
             $declines = \App\Models\Logistics\LinehaulTripDecline::where('linehaul_driver_id', $request->user()->id)
                 ->where('logistics_provider_id', $request->user()->logistics_provider_id)->latest('id')->limit(50)->get();
             $rows = $rows->concat($declines->map(fn ($decline) => (new \App\Http\Resources\Mobile\LinehaulDeclineResource($decline))->resolve($request)));
+        }
+
+        if (\App\Services\Logistics\LinehaulTransferService::installed()) {
+            $transfers = \App\Models\Logistics\LinehaulTransfer::where('from_driver_id', $request->user()->id)
+                ->where('logistics_provider_id', $request->user()->logistics_provider_id)->latest('id')->limit(50)->get();
+            $rows = $rows->concat($transfers->map(fn ($transfer) => (new \App\Http\Resources\Mobile\LinehaulTransferResource($transfer))->resolve($request)));
         }
 
         return $this->success('Your trips.', new JsonResource($rows->values()));

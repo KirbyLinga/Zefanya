@@ -47,6 +47,7 @@ class LinehaulHistoryEntry {
       'Received with Issues',
       'Cancelled',
       'Declined',
+      'Reassigned',
     }.contains(trip.status)) {
       throw const MalformedResponseException();
     }

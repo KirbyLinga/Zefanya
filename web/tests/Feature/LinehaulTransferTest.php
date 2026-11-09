@@ -91,8 +91,15 @@ class LinehaulTransferTest extends TestCase
         $this->assertSame([], $row['items']);
         $this->assertArrayNotHasKey('_dispatch_actor_id', $row);
         $this->transferApi($f['driver'])->postJson($this->takeoverUrl($f, 'arrive'))->assertForbidden();
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.status', 'Reassigned')->assertJsonPath('data.0.trip_pay.amount_minor', 0);
+        $this->getJson('/api/courier/history')->assertOk()->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.trips.0.history_key', 'transfer:'.$transfer->id)
+            ->assertJsonPath('data.trips.0.reassignment_reason', 'Recovery after engine failure')
+            ->assertJsonPath('data.trips.0.items', []);
         $this->transferApi($f['replacement'])->getJson('/api/courier/trips')->assertOk()
             ->assertJsonPath('data.0.needs_rescan', true)->assertJsonPath('data.0.items.0.loaded', false)->assertJsonPath('data.0.can_report_delay', false);
+        $this->getJson('/api/courier/history')->assertOk()->assertJsonPath('data.total', 0);
     }
 
     public function test_every_parcel_must_be_rescanned_before_continue_arrival_or_native_receiving(): void
@@ -206,8 +213,11 @@ class LinehaulTransferTest extends TestCase
         $other->forceFill(['status' => \App\Enums\LogisticsProviderStatus::Approved])->save();
         $this->actingAs($other, 'logistics')->postJson($url, $this->transferData($f))->assertForbidden();
         $this->actingAs($f['provider'], 'logistics')->postJson($url, [])->assertUnprocessable();
+        $show = route('logistics.manifests.show', $f['manifest']);
+        $this->get($show)->assertOk()->assertSee('Reassign Courier')->assertSee('Replacement Courier');
         $this->postJson($url, [...$this->transferData($f), 'trip_pay_minor' => 999999])->assertUnprocessable();
         $this->postJson($url, $this->transferData($f))->assertCreated()->assertJsonPath('data.status', 'Reassigned');
+        $this->get($show)->assertOk()->assertSee('Replacement Courier must rescan every parcel')->assertDontSee('Reassign Courier');
         for ($index = 0; $index < 21; $index++) { $response = $this->postJson($url, []); }
         $response->assertTooManyRequests();
         $buyer = \App\Models\Buyer\Buyer::factory()->create(); $this->flushHeaders(); $this->app['auth']->forgetGuards();

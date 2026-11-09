@@ -29,7 +29,8 @@ class LinehaulEarningsService
                 ->whereHas('manifest', fn ($q) => $q->where('logistics_provider_id', $driver->logistics_provider_id)
                     ->whereIn('status', [ManifestStatus::Received->value, ManifestStatus::ReceivedWithExceptions->value])
                     ->where('received_at', '>=', $start)->where('received_at', '<', $end))
-                ->with(['manifest', 'driver']);
+                ->with(['manifest', 'driver'])
+                ->when(LinehaulTransferService::installed(), fn ($query) => $query->with('latestTransfer'));
             $total = 0; $count = 0; $earned = 0;
             (clone $query)->chunkById(100, function ($assignments) use (&$total, &$count, &$earned): void {
                 foreach ($assignments as $assignment) {

@@ -70,6 +70,33 @@ class LinehaulTransferService
         return self::latest($assignment) !== null && ! self::carrier($assignment);
     }
 
+    public static function eligibleBreakdown(LinehaulAssignment $assignment): ?LinehaulBreakdown
+    {
+        if (! self::installed() || ! self::canReassign($assignment)) {
+            return null;
+        }
+
+        return self::currentEvidence($assignment)->latest('id')->first();
+    }
+
+    private static function canReassign(LinehaulAssignment $assignment): bool
+    {
+        $manifest = $assignment->manifest;
+
+        return $manifest->direction !== 'return' && $assignment->seal_receipt === null
+            && LinehaulDelayService::canReport($assignment)
+            && ! $manifest->items()->where(fn ($query) => $query->whereNotNull('received_at')->orWhereNotNull('issue_type'))->exists();
+    }
+
+    private static function currentEvidence(LinehaulAssignment $assignment): \Illuminate\Database\Eloquent\Builder
+    {
+        return LinehaulBreakdown::whereHas('delay', fn ($query) => $query
+            ->where('linehaul_assignment_id', $assignment->id)
+            ->where('logistics_provider_id', $assignment->manifest->logistics_provider_id)
+            ->where('linehaul_driver_id', $assignment->linehaul_driver_id)
+            ->where('offer_version', $assignment->offer_version));
+    }
+
     public function reassign(LogisticsProvider $provider, Manifest $manifest, array $input, Request $request): LinehaulTransfer
     {
         abort_unless((new LinehaulPolicy)->assign($provider, $manifest), 403);
@@ -78,8 +105,12 @@ class LinehaulTransferService
         $reason = trim($data['reason']);
         $this->require($reason !== '', 'Enter the reassignment reason.');
 
-        return DB::transaction(function () use ($provider, $manifest, $data, $reason, $request): LinehaulTransfer {
-            $peek = LinehaulAssignment::where('manifest_id', $manifest->id)->firstOrFail();
+        // Find the driver IDs before opening a repeatable-read transaction.
+        // Recheck the assignment after acquiring the driver and manifest locks.
+        $peek = LinehaulAssignment::where('manifest_id', $manifest->id)->first();
+        $this->require($peek !== null, 'Assign a Courier before reassigning this trip.');
+
+        return DB::transaction(function () use ($provider, $manifest, $data, $reason, $request, $peek): LinehaulTransfer {
             $drivers = LinehaulDriver::whereIn('id', [$peek->linehaul_driver_id, $data['driver_id']])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $manifest = Manifest::whereKey($manifest->id)->lockForUpdate()->firstOrFail();
             abort_unless((new LinehaulPolicy)->assign($provider->fresh(), $manifest), 403);
@@ -95,20 +126,10 @@ class LinehaulTransferService
             }
             $this->require((int) $assignment->linehaul_driver_id === (int) $peek->linehaul_driver_id
                 && (int) $assignment->offer_version === (int) $data['offer_version'], 'The Courier offer changed. Refresh before reassigning.');
-            $this->require($manifest->status === ManifestStatus::Dispatched && $manifest->direction !== 'return'
-                && $assignment->arrived_at === null && $assignment->accepted_at !== null && $assignment->seal_receipt === null
-                && self::carrier($assignment), 'Reassign only a carried In Transit trip before arrival or receiving.');
-            $this->require(! $manifest->items()->where(fn ($q) => $q->whereNotNull('received_at')->orWhereNotNull('issue_type'))->exists(), 'Receiving has already started.');
-            $report = LinehaulBreakdown::with('delay')->whereHas('delay', fn ($query) => $query
-                ->where('linehaul_assignment_id', $assignment->id)->where('logistics_provider_id', $provider->id)
-                ->where('linehaul_driver_id', $assignment->linehaul_driver_id)->where('offer_version', $assignment->offer_version))
-                ->find($data['breakdown_id']);
+            $assignment->setRelation('manifest', $manifest);
+            $this->require(self::canReassign($assignment), 'Reassign only a carried In Transit trip before arrival or receiving.');
+            $report = self::currentEvidence($assignment)->find($data['breakdown_id']);
             $this->require($report !== null, 'Choose photo evidence for the current Courier offer.');
-            $delay = $report->delay;
-            $this->require((int) $delay->linehaul_assignment_id === (int) $assignment->id
-                && (int) $delay->linehaul_driver_id === (int) $assignment->linehaul_driver_id
-                && (int) $delay->logistics_provider_id === (int) $provider->id
-                && (int) $delay->offer_version === (int) $assignment->offer_version, 'Choose photo evidence for the current Courier offer.');
             $driver = $drivers->get((int) $data['driver_id']);
             $this->require($driver !== null && (int) $driver->id !== (int) $assignment->linehaul_driver_id
                 && $driver->isOperational() && (int) $driver->logistics_provider_id === (int) $provider->id, 'Choose another active Courier from your company.');
@@ -170,9 +191,6 @@ class LinehaulTransferService
                 $assignment->forceFill(['loading_tokens' => $scans])->save();
             } else {
                 $this->require($action === 'takeover-continue', 'Unknown takeover action.');
-                if ($assignment->takeover_resumed_at !== null) {
-                    return $assignment;
-                }
                 $ids = $manifest->items()->whereNull('released_at')->orderBy('id')->lockForUpdate()->pluck('id');
                 $this->require($ids->isNotEmpty() && $ids->every(fn ($id) => isset($scans[$id])), 'Rescan every parcel before continuing.');
                 app(LinehaulDutyService::class)->requireReady($driver);

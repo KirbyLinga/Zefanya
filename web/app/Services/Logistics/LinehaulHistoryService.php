@@ -5,8 +5,10 @@ namespace App\Services\Logistics;
 use App\Enums\ManifestStatus;
 use App\Http\Resources\Mobile\LinehaulDeclineResource;
 use App\Http\Resources\Mobile\LinehaulTripResource;
+use App\Http\Resources\Mobile\LinehaulTransferResource;
 use App\Models\Logistics\LinehaulAssignment;
 use App\Models\Logistics\LinehaulDriver;
+use App\Models\Logistics\LinehaulTransfer;
 use App\Models\Logistics\LinehaulTripDecline;
 use App\Policies\LinehaulPolicy;
 use Carbon\Carbon;
@@ -38,6 +40,12 @@ class LinehaulHistoryService
                     ->selectRaw("'decline' as kind, id as source_id, created_at as recorded_at");
                 $trips->unionAll($declines);
             }
+            $transfersInstalled = LinehaulTransferService::installed();
+            if ($transfersInstalled) {
+                $trips->unionAll(DB::table('linehaul_transfers')->where('from_driver_id', $driver->id)
+                    ->where('logistics_provider_id', $driver->logistics_provider_id)
+                    ->selectRaw("'transfer' as kind, id as source_id, created_at as recorded_at"));
+            }
             $page = DB::query()->fromSub($trips, 'history')
                 ->where('recorded_at', '>=', $from->copy()->setTimezone(config('app.timezone')))
                 ->where('recorded_at', '<', $to->copy()->addDay()->setTimezone(config('app.timezone')))
@@ -48,13 +56,25 @@ class LinehaulHistoryService
                 ->where('linehaul_driver_id', $driver->id)
                 ->whereHas('manifest', fn ($q) => $q->where('logistics_provider_id', $driver->logistics_provider_id))
                 ->with(['driver', 'manifest.originHub', 'manifest.destinationHub', 'manifest.items.sellerOrder:id,parcel_weight_grams'])
-                ->when(LinehaulDelayService::installed(), fn ($q) => $q->with('latestDelay'))->get()->keyBy('id');
+                ->when(LinehaulDelayService::installed(), fn ($q) => $q->with('latestDelay'))
+                ->when($transfersInstalled, fn ($q) => $q->with('latestTransfer'))->get()->keyBy('id');
             $declines = LinehaulDeclineService::installed() ? LinehaulTripDecline::whereIn('id', $records->where('kind', 'decline')->pluck('source_id'))
                 ->where('linehaul_driver_id', $driver->id)->where('logistics_provider_id', $driver->logistics_provider_id)->get()->keyBy('id') : collect();
-            $rows = $records->map(function ($record) use ($assignments, $declines, $request): ?array {
-                $model = $record->kind === 'trip' ? $assignments->get($record->source_id) : $declines->get($record->source_id);
+            $transfers = $transfersInstalled ? LinehaulTransfer::whereIn('id', $records->where('kind', 'transfer')->pluck('source_id'))
+                ->where('from_driver_id', $driver->id)->where('logistics_provider_id', $driver->logistics_provider_id)->get()->keyBy('id') : collect();
+            $rows = $records->map(function ($record) use ($assignments, $declines, $transfers, $request): ?array {
+                $model = match ($record->kind) {
+                    'trip' => $assignments->get($record->source_id),
+                    'decline' => $declines->get($record->source_id),
+                    'transfer' => $transfers->get($record->source_id),
+                };
                 if ($model === null) return null;
-                $row = $record->kind === 'trip' ? (new LinehaulTripResource($model))->resolve($request) : (new LinehaulDeclineResource($model))->resolve($request);
+                $resource = match ($record->kind) {
+                    'trip' => new LinehaulTripResource($model),
+                    'decline' => new LinehaulDeclineResource($model),
+                    'transfer' => new LinehaulTransferResource($model),
+                };
+                $row = $resource->resolve($request);
 
                 return [...$row, 'history_key' => $record->kind.':'.$record->source_id,
                     'recorded_at' => Carbon::parse($record->recorded_at, config('app.timezone'))->toIso8601String()];

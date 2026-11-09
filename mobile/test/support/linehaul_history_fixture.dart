@@ -6,6 +6,7 @@ Map<String, Object?> historyFixture(List<Map<String, Object?>> trips) {
           'Received with Issues',
           'Cancelled',
           'Declined',
+          'Reassigned',
         }.contains(trip['status']),
       )
       .map(

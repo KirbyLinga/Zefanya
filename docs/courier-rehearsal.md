@@ -24,7 +24,9 @@ Choose **Are you a Courier? Sign in here** on the shared sign-in page. Use the c
 
 ## Safe walkthrough before moving the trip
 
-Breakdown reporting is implemented and locally enabled under explicit approval (new table only, batch80, no reports seeded). The local launcher enables GD for its process without changing global PHP settings. After genuine departure, use Report breakdown for a reason, future ETA and required JPG/PNG photo; sending shows a delay and notifies Logistics. The owning Logistics manifest page lists private photo downloads. Failed uploads retain the form/file for Retry. This does not reassign the trip; replacement-driver rescanning/pay transfer remain unfinished. Demo #2 remains Loading, so its breakdown action stays hidden. Do not advance it or fabricate a breakdown just to expose the action.
+Breakdown reporting is locally enabled (batch 80). After genuine departure, use Report breakdown to enter a reason, a future ETA and a JPG/PNG photo. Logistics receives the report and can download the photo from its manifest page. Retry keeps the form and photo. Demo #2 remains Loading.
+
+Reassignment requires separate local activation of migration 2026_11_09_030000. After activation, use an eligible in-transit breakdown and a second ready Courier from the same company. On the Logistics manifest page, select the replacement and record the reason. The first Courier should see Reassigned in History with zero pay. The replacement must rescan every parcel before Continue trip becomes available. Check that Report arrival appears after continuation, then complete the normal Logistics receiving and seal confirmation. Only the finishing Courier should see the configured rate as earned after handover. Physical rehearsal with two devices remains open.
 
 Returning from Maps/another app refreshes trip state and the currently visible History/Earnings report. If the server is unreachable, use the explicit Retry state after restoring connectivity; do not interpret a failed refresh as a successful trip action. Unsent delay form input is retained while switching apps. Background route recording/push remain unavailable.
 

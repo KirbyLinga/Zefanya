@@ -1,5 +1,13 @@
 # Touched your files
 
+## Courier reassignment after breakdown
+
+- Logistics manifest controller/view and routes/logistics.php expose the approved-company reassignment form and versioned submission. The new LinehaulTransferRequest and LinehaulTransferResource handle validation and snapshots.
+- Courier routes/api.php and LinehaulRequest add takeover scan and continue actions on the existing authenticated route. LinehaulService delegates those actions and gates arrival. LinehaulSealService gates native receiving until continuation.
+- LinehaulTransferService checks current breakdown evidence, replacement readiness and capacity, and records the transfer and native audit atomically. Migration 2026_11_09_030000 creates linehaul_transfers and adds nullable takeover_resumed_at. LinehaulAssignment relates to the latest transfer. Local activation is separate.
+- LinehaulPayService and LinehaulDelayService recognize the recorded replacement only after continuation while verifying original dispatch provenance. LinehaulTripResource exposes rescan progress. API LinehaulController and LinehaulHistoryService expose owner-scoped Reassigned snapshots, and LinehaulEarningsService eager loads transfer context for pay reads.
+- Mobile trip and history decoders, Courier portal and history card display the rescan and continuation actions and the former Courier's zero-pay history entry. Transfer tests cover the form, APIs, receiving and frozen pay. Existing breakdown assertions were preserved when extracting the shared fixture.
+
 ## Breakdown local activation — 2026-11-09
 
 - Owner approved and applied only the new evidence table migration, alone in batch80; evidence empty and original trip/custody/order/audit/delay fingerprints unchanged. Real Courier API read/validation/logout verified without incident creation.

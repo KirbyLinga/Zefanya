@@ -127,6 +127,8 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
             Text('${trip.parcelCount ?? trip.items.length} parcels'),
             if (trip.declineReason != null)
               Text('Decline reason: ${trip.declineReason}'),
+            if (trip.reassignmentReason != null)
+              Text('Reassigned by Logistics: ${trip.reassignmentReason}'),
             if (pay != null)
               Text(
                 pay.status == 'not_configured'

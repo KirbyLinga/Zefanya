@@ -80,11 +80,33 @@
 @if (isset($courierAssignment) && $courierAssignment)
     <section class="mb-4 rounded-md border p-4">
         <h2 class="font-semibold">Courier: {{ $courierAssignment->driver->name }}</h2>
-        <p>{{ $courierAssignment->accepted_at ? 'Trip accepted' : 'Awaiting acceptance' }}
+        <p>{{ $courierNeedsRescan ? 'Replacement Courier must rescan every parcel' : ($courierAssignment->accepted_at ? 'Trip accepted' : 'Awaiting acceptance') }}
             @if ($courierAssignment->seal_number) · Seal {{ $courierAssignment->seal_number }} @endif
             @if ($courierAssignment->arrived_at) · Courier reported arrival @endif
         </p>
         <p>Logistics confirms parcel receipt using the existing receiving screen.</p>
+        @if ($breakdownOffer && $replacementDrivers->isNotEmpty())
+            <form method="POST" action="{{ route('logistics.manifests.courier.reassign', $manifest) }}" class="mt-4 space-y-2">
+                @csrf
+                <input type="hidden" name="breakdown_id" value="{{ $breakdownOffer->id }}">
+                <input type="hidden" name="offer_version" value="{{ $courierAssignment->offer_version }}">
+                <label class="block font-semibold" for="replacement-driver">Replacement Courier</label>
+                <select id="replacement-driver" name="driver_id" required class="rounded-md border p-2">
+                    <option value="">Choose a Courier</option>
+                    @foreach ($replacementDrivers as $driver)
+                        <option value="{{ $driver->id }}">{{ $driver->name }}</option>
+                    @endforeach
+                </select>
+                <label class="block" for="reassignment-reason">Reason for reassignment</label>
+                <textarea id="reassignment-reason" name="reason" required maxlength="500" class="block w-full rounded-md border p-2">{{ old('reason') }}</textarea>
+                <button type="submit" class="rounded-md border px-4 py-2">Reassign Courier</button>
+                @foreach (['driver_id', 'reason', 'breakdown_id', 'offer_version', 'trip'] as $field)
+                    @error($field) <p role="alert">{{ $message }}</p> @enderror
+                @endforeach
+            </form>
+        @elseif ($breakdownOffer)
+            <p class="mt-2">No replacement Courier is ready right now.</p>
+        @endif
     </section>
 @elseif ($manifest->status === \App\Enums\ManifestStatus::Draft && $manifest->direction !== 'return' && isset($linehaulDrivers) && $linehaulDrivers->isNotEmpty())
     <form class="mb-4 rounded-md border p-4" method="POST" action="{{ route('logistics.manifests.courier', $manifest) }}">

@@ -16,7 +16,8 @@ class LinehaulTripResource extends JsonResource
     {
         $manifest = $this->manifest;
         $delay = \App\Services\Logistics\LinehaulDelayService::latest($this->resource);
-        $takeover = \App\Services\Logistics\LinehaulTransferService::pending($this->resource);
+        $takeover = $manifest->status === \App\Enums\ManifestStatus::Dispatched && $this->arrived_at === null
+            && \App\Services\Logistics\LinehaulTransferService::pending($this->resource);
         $items = $manifest->items->sortBy('id')->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null || $item->issue_type !== null);
         $weights = $items->map(fn ($item) => $item->sellerOrder?->parcel_weight_grams);
         $weight = $items->isNotEmpty() && $weights->every(fn ($grams): bool => is_numeric($grams) && (int) $grams > 0)

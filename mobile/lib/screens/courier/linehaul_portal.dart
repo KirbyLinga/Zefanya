@@ -368,8 +368,12 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       // Both camera and manual entry pass through the same server scan guard.
       await _act(
         trip,
-        'scan',
-        body: {'tracking_number': value.trim(), 'method': method},
+        trip.needsRescan ? 'takeover-scan' : 'scan',
+        body: {
+          'tracking_number': value.trim(),
+          'method': method,
+          if (trip.needsRescan) 'offer_version': trip.offerVersion,
+        },
       );
     }
   }
@@ -768,7 +772,29 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 child: const Text('Depart'),
               ),
             ],
-            if (trip.status == 'In Transit')
+            if (trip.reassignmentReason != null)
+              Text('Reassigned by Logistics: ${trip.reassignmentReason}'),
+            if (trip.needsRescan) ...[
+              const Text('Rescan every parcel before continuing this trip.'),
+              OutlinedButton(
+                onPressed: _busy ? null : () => _scan(trip),
+                child: const Text('Rescan parcel'),
+              ),
+              FilledButton(
+                onPressed:
+                    _busy ||
+                        trip.items.isEmpty ||
+                        trip.items.any((parcel) => !parcel.loaded)
+                    ? null
+                    : () => _act(
+                        trip,
+                        'takeover-continue',
+                        body: {'offer_version': trip.offerVersion},
+                      ),
+                child: const Text('Continue trip'),
+              ),
+            ],
+            if (trip.status == 'In Transit' && !trip.needsRescan)
               FilledButton(
                 onPressed: _busy ? null : () => _act(trip, 'arrive'),
                 child: const Text('Report arrival'),
@@ -1062,6 +1088,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                     'Received with Issues',
                     'Cancelled',
                     'Declined',
+                    'Reassigned',
                   ].contains(trip.status);
                   final trips = all.where((trip) => !isHistory(trip)).toList();
                   return RefreshIndicator(

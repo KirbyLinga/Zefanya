@@ -169,6 +169,16 @@ class ManifestController extends Controller
 
         $items = $this->visibleItems($manifest);
         $counts = $this->manifests->counts($manifest);
+        $courierAssignment = \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
+            ? \App\Models\Logistics\LinehaulAssignment::currentOffer()->with('driver')
+                ->where('manifest_id', $manifest->id)->first() : null;
+        $breakdownOffer = $courierAssignment !== null
+            ? \App\Services\Logistics\LinehaulTransferService::eligibleBreakdown($courierAssignment) : null;
+        $replacementDrivers = $breakdownOffer === null ? collect() :
+            \App\Models\Logistics\LinehaulDriver::where('logistics_provider_id', $provider->id)
+                ->where('status', 'active')->where('id', '!=', $courierAssignment->linehaul_driver_id)->orderBy('name')->get()
+                ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)
+                    && ! \App\Services\Logistics\LinehaulDutyService::busy($driver));
 
         return view('Logistics.Manifests.show', [
             'provider' => $provider,
@@ -179,8 +189,10 @@ class ManifestController extends Controller
                 ? $this->manifests->eligibleParcels($manifest)
                 : collect(),
             'hubs' => $this->hubs($request),
-            'courierAssignment' => \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
-                ? \App\Models\Logistics\LinehaulAssignment::query()->currentOffer()->with('driver')->where('manifest_id', $manifest->id)->first() : null,
+            'courierAssignment' => $courierAssignment,
+            'breakdownOffer' => $breakdownOffer,
+            'replacementDrivers' => $replacementDrivers,
+            'courierNeedsRescan' => $courierAssignment !== null && \App\Services\Logistics\LinehaulTransferService::pending($courierAssignment),
             'courierDeclines' => \App\Services\Logistics\LinehaulDeclineService::installed()
                 ? \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('logistics_provider_id', $provider->id)->latest('id')->get() : collect(),
             'courierDelay' => \App\Services\Logistics\LinehaulDelayService::installed()

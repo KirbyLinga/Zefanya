@@ -1,5 +1,23 @@
 # Combined Courier security proof — 2026-11-08
 
+## Breakdown reassignment and takeover
+
+Eleven separate deliberate faults on tmp/mutation, all restored before the integrated regression run. SQLite memory and fake storage only.
+
+| Fault | Test prefix | Observed failure |
+| --- | --- | --- |
+| Accept one rescan | test_every_parcel | Expected 422, actual 200 after partial scan |
+| Bypass arrival guard | test_every_parcel | Expected 422, actual 200 |
+| Bypass receiving guard | test_every_parcel | Unrescanned takeover reached receiving |
+| Ignore original dispatch actor | test_only_finishing | Expected not_configured, actual earned |
+| Carry over the old pay rate | test_reassignment_preserves | Expected null, actual 100000 |
+| Ignore continuation marker | test_reassignment_preserves | Expected needs_rescan true, actual false |
+| Skip reassignment duty check | test_replacement_readiness | Unready replacement accepted |
+| Skip reassignment capacity check | test_replacement_readiness | Overweight replacement accepted |
+| Skip continuation duty check | test_continue_rechecks | Off Duty continuation accepted |
+| Skip continuation capacity check | test_continue_rechecks | Overweight continuation accepted |
+| Remove reassignment transaction | test_exact_reassignment_retry | Assignment changed after injected audit failure |
+
 ## Breakdown photo company access — 2026-11-09
 
 On tmp/mutation remove only company-ID equality from LinehaulPolicy::viewBreakdown. Named test test_logistics_photo fails: expected 403, received 200 (0 passed/3 assertions/3269ms). Restore exact check; delete temporary branch and run all twelve Courier PHP files: 89 passed/1806 assertions/28104ms. No fault remains; only SQLite/fake storage used.

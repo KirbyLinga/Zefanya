@@ -19,6 +19,8 @@ class LinehaulTrip {
     this.parcelCount,
     this.canReportDelay = false,
     this.canReportBreakdown = false,
+    this.needsRescan = false,
+    this.reassignmentReason,
     this.delay,
     this.recordedWeightGrams,
     this.acceptedAt,
@@ -42,6 +44,8 @@ class LinehaulTrip {
   final int? parcelCount;
   final bool canReportDelay;
   final bool canReportBreakdown;
+  final bool needsRescan;
+  final String? reassignmentReason;
   final LinehaulDelay? delay;
   final int? recordedWeightGrams;
   final DateTime? acceptedAt;
@@ -83,6 +87,7 @@ class LinehaulTrip {
           'Received with Issues',
           'Cancelled',
           'Declined',
+          'Reassigned',
         }.contains(data['status'])) {
       throw const MalformedResponseException(
         message: 'The server sent an incomplete Courier trip.',
@@ -119,7 +124,13 @@ class LinehaulTrip {
         message: 'Could not read this Courier offer.',
       );
     }
-    if ((data['can_report_delay'] != null &&
+    if ((data['needs_rescan'] != null && data['needs_rescan'] is! bool) ||
+        (data['needs_rescan'] == true && data['status'] != 'In Transit') ||
+        (data['status'] == 'Reassigned' &&
+            (data['reassignment_reason'] is! String ||
+                (data['reassignment_reason'] as String).trim().isEmpty ||
+                items.isNotEmpty)) ||
+        (data['can_report_delay'] != null &&
             data['can_report_delay'] is! bool) ||
         (data['can_report_breakdown'] != null &&
             data['can_report_breakdown'] is! bool) ||
@@ -154,6 +165,10 @@ class LinehaulTrip {
           : LinehaulTripPay.fromJson(data['trip_pay']),
       canReportDelay: data['can_report_delay'] == true,
       canReportBreakdown: data['can_report_breakdown'] == true,
+      needsRescan: data['needs_rescan'] == true,
+      reassignmentReason: data['status'] == 'Reassigned'
+          ? data['reassignment_reason'] as String
+          : null,
       delay: data['delay'] is Map
           ? LinehaulDelay.fromJson(
               (data['delay'] as Map).cast<String, Object?>(),

@@ -47,8 +47,9 @@ Future<void> _mount(
   WidgetTester tester,
   _Directions directions,
   Map<String, Object?> trip,
-  List<String> posts,
-) async {
+  List<String> posts, {
+  void Function(http.Request)? onAction,
+}) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(360, 640);
   tester.view.devicePixelRatio = 1;
@@ -57,10 +58,15 @@ Future<void> _mount(
     baseUrl: 'https://example.test/api',
     tokenStore: InMemoryTokenStore(),
     httpClient: MockClient((request) async {
-      if (request.method == 'POST') posts.add(request.url.path);
+      if (request.method == 'POST') {
+        posts.add(request.url.path);
+        onAction?.call(request);
+      }
       return http.Response(
         jsonEncode({
-          'data': request.url.path.endsWith('/trips')
+          'data': request.method == 'POST' && onAction != null
+              ? trip
+              : request.url.path.endsWith('/trips')
               ? [trip]
               : request.url.path.endsWith('/history')
               ? historyFixture([trip])
@@ -97,6 +103,107 @@ Future<void> _mount(
 }
 
 void main() {
+  testWidgets(
+    'replacement scans a parcel and continues with the current offer',
+    (tester) async {
+      final posts = <String>[];
+      final payloads = <Object?>[];
+      final item = {
+        'id': 1,
+        'tracking_number': 'TRK-001',
+        'loaded': false,
+        'received': false,
+      };
+      final trip = {
+        ..._trip(),
+        'needs_rescan': true,
+        'offer_version': 2,
+        'items': [item],
+      };
+      await _mount(
+        tester,
+        _Directions(),
+        trip,
+        posts,
+        onAction: (request) {
+          payloads.add(jsonDecode(request.body));
+          if (request.url.path.endsWith('/takeover-scan')) {
+            item['loaded'] = true;
+          } else if (request.url.path.endsWith('/takeover-continue')) {
+            trip['needs_rescan'] = false;
+          }
+        },
+      );
+      Future<void> scrollTo(String label) async {
+        await tester.scrollUntilVisible(
+          find.text(label),
+          160,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await scrollTo('Continue trip');
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Continue trip'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('Report arrival'), findsNothing);
+      await tester.ensureVisible(find.text('Rescan parcel'));
+      await tester.tap(find.text('Rescan parcel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.enterText(
+        find.byKey(const ValueKey('qr-manual-entry')),
+        'TRK-001',
+      );
+      await tester.tap(find.byKey(const ValueKey('qr-manual-confirm')));
+      await tester.pumpAndSettle();
+      await scrollTo('Continue trip');
+      await tester.drag(find.byType(ListView).first, const Offset(0, -140));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue trip'));
+      await tester.pumpAndSettle();
+      await scrollTo('Report arrival');
+      expect(posts, [
+        '/api/courier/trips/12/takeover-scan',
+        '/api/courier/trips/12/takeover-continue',
+      ]);
+      expect(payloads, [
+        {'tracking_number': 'TRK-001', 'method': 'manual', 'offer_version': 2},
+        {'offer_version': 2},
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('reassigned snapshot appears in History with no trip actions', (
+    tester,
+  ) async {
+    await _mount(tester, _Directions(), {
+      ..._trip(status: 'Reassigned'),
+      'items': [],
+      'reassignment_reason': 'Engine failure',
+      'trip_pay': {'status': 'ineligible', 'amount_minor': 0},
+    }, []);
+    expect(find.text('Trip #12'), findsNothing);
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Reassigned by Logistics: Engine failure'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Reassigned'), findsOneWidget);
+    expect(find.text('Report arrival'), findsNothing);
+    expect(find.text('Continue trip'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   test(
     'trip pay distinguishes unknown, earned and zero without accepting malformed money',
     () {
