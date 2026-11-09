@@ -16,6 +16,7 @@ class LinehaulTripResource extends JsonResource
     {
         $manifest = $this->manifest;
         $delay = \App\Services\Logistics\LinehaulDelayService::latest($this->resource);
+        $takeover = \App\Services\Logistics\LinehaulTransferService::pending($this->resource);
         $items = $manifest->items->sortBy('id')->filter(fn ($item): bool => $item->released_at === null || $item->received_at !== null || $item->issue_type !== null);
         $weights = $items->map(fn ($item) => $item->sellerOrder?->parcel_weight_grams);
         $weight = $items->isNotEmpty() && $weights->every(fn ($grams): bool => is_numeric($grams) && (int) $grams > 0)
@@ -30,6 +31,7 @@ class LinehaulTripResource extends JsonResource
 
         return [
             'id' => $manifest->id, 'status' => $stage,
+            'needs_rescan' => $takeover,
             'trip_pay' => \App\Services\Logistics\LinehaulPayService::details($this->resource),
             'offer_version' => $this->offer_version ?? 1,
             'can_decline' => \App\Services\Logistics\LinehaulDeclineService::canDecline($this->resource),
@@ -49,7 +51,7 @@ class LinehaulTripResource extends JsonResource
             'arrived_at' => $this->arrived_at?->toIso8601String(),
             'items' => $items->map(fn ($item): array => [
                 'id' => $item->id, 'tracking_number' => $item->tracking_number,
-                'loaded' => $manifest->dispatched_at !== null || isset(($this->loading_tokens ?? [])[$item->id]),
+                'loaded' => (! $takeover && $manifest->dispatched_at !== null) || isset(($this->loading_tokens ?? [])[$item->id]),
                 'received' => $item->received_at !== null,
                 'issue' => $item->issue_type,
                 'courier_note' => $item->issue_type === null ? null : $this->courierNote($item, $manifest->id),

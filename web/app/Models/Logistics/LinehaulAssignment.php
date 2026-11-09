@@ -14,7 +14,7 @@ class LinehaulAssignment extends Model
     protected function casts(): array
     {
         return ['accepted_at' => 'datetime', 'arrived_at' => 'datetime', 'declined_at' => 'datetime',
-            'offer_version' => 'integer', 'trip_pay_minor' => 'integer', 'loading_tokens' => 'encrypted:array', 'seal_receipt' => 'array'];
+            'offer_version' => 'integer', 'trip_pay_minor' => 'integer', 'loading_tokens' => 'encrypted:array', 'seal_receipt' => 'array', 'takeover_resumed_at' => 'datetime'];
     }
 
     public function scopeCurrentOffer(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
@@ -25,6 +25,11 @@ class LinehaulAssignment extends Model
     public function driver(): BelongsTo
     {
         return $this->belongsTo(LinehaulDriver::class, 'linehaul_driver_id');
+    }
+
+    public function latestTransfer(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LinehaulTransfer::class)->latestOfMany();
     }
 
     public function latestDelay(): \Illuminate\Database\Eloquent\Relations\HasOne

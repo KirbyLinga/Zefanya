@@ -63,6 +63,9 @@ class LinehaulService
 
     public function act(LinehaulDriver $driver, Manifest $manifest, string $action, array $data, Request $request): LinehaulAssignment
     {
+        if (in_array($action, ['takeover-scan', 'takeover-continue'], true)) {
+            return app(LinehaulTransferService::class)->act($driver, $manifest, $action, $data, $request);
+        }
         return DB::transaction(function () use ($driver, $manifest, $action, $data, $request): LinehaulAssignment {
             $driver = LinehaulDriver::query()->whereKey($driver->id)->lockForUpdate()->firstOrFail();
             $manifest = Manifest::query()->whereKey($manifest->id)->lockForUpdate()->firstOrFail();
@@ -103,6 +106,7 @@ class LinehaulService
                 return $assignment;
             }
             if ($action === 'arrive') {
+                $this->require(! LinehaulTransferService::pending($assignment), 'Rescan every parcel and continue the takeover before reporting arrival.');
                 $this->require($manifest->status === ManifestStatus::Dispatched, 'Only an in-transit trip can arrive.');
                 if ($assignment->arrived_at !== null) {
                     return $assignment;
@@ -147,7 +151,7 @@ class LinehaulService
         });
     }
 
-    private function requireCapacity(LinehaulDriver $driver, Manifest $manifest): void
+    public function requireCapacity(LinehaulDriver $driver, Manifest $manifest): void
     {
         $profile = LinehaulProfileService::current($driver);
         // Retain the explicitly agreed presentation exception for unsubmitted accounts.

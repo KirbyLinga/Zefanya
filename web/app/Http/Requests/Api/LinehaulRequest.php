@@ -26,6 +26,9 @@ class LinehaulRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...(in_array($this->route('action'), ['takeover-scan', 'takeover-continue'], true) ? [
+                'offer_version' => ['required', 'integer', 'min:1'],
+            ] : []),
             ...($this->isMethod('GET') && $this->is('api/courier/profile') ? [
                 'id' => ['prohibited'],
                 'driver_id' => ['prohibited'],
@@ -37,7 +40,7 @@ class LinehaulRequest extends FormRequest
                 'tracking_number' => ['required', 'string', 'max:100'],
                 'note' => ['required', 'string', 'max:500'],
             ] : []),
-            ...($this->route('action') === 'scan' ? [
+            ...(in_array($this->route('action'), ['scan', 'takeover-scan'], true) ? [
                 'tracking_number' => ['required', 'string', 'max:100'],
                 'method' => ['nullable', 'in:camera,manual'],
             ] : []),

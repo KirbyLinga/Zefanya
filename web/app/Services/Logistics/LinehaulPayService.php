@@ -49,8 +49,7 @@ class LinehaulPayService
             return ['status' => 'not_configured', 'amount_minor' => null];
         }
         if ($assignment->trip_pay_minor !== null) {
-            $sameDriver = $manifest->dispatched_by_type === 'linehaul'
-                && (int) $manifest->dispatched_by_id === (int) $assignment->linehaul_driver_id;
+            $sameDriver = LinehaulTransferService::carrier($assignment);
             if (! $sameDriver) {
                 return ['status' => 'not_configured', 'amount_minor' => null];
             }

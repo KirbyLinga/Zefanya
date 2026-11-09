@@ -208,6 +208,16 @@ class ManifestController extends Controller
         return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier assigned. They can now accept and load this trip.');
     }
 
+    public function reassignCourier(\App\Http\Requests\Logistics\LinehaulTransferRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulTransferService $service): \Illuminate\Http\Resources\Json\JsonResource|RedirectResponse
+    {
+        $transfer = $service->reassign($this->provider($request), $manifest, $request->validated(), $request);
+        if ($request->expectsJson()) {
+            return new \App\Http\Resources\Mobile\LinehaulTransferResource($transfer);
+        }
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier reassigned. Every parcel must be rescanned before continuing.');
+    }
+
     public function addItem(Request $request, Manifest $manifest): RedirectResponse
     {
         $provider = $this->provider($request);

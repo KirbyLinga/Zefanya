@@ -40,7 +40,7 @@ class LinehaulDelayService
 
         return self::installed() && $assignment->declined_at === null && $assignment->accepted_at !== null
             && $assignment->arrived_at === null && $manifest->status === ManifestStatus::Dispatched
-            && $manifest->dispatched_by_type === 'linehaul' && (int) $manifest->dispatched_by_id === (int) $assignment->linehaul_driver_id;
+            && LinehaulTransferService::carrier($assignment);
     }
 
     public static function latest(?LinehaulAssignment $assignment): ?LinehaulTripDelay

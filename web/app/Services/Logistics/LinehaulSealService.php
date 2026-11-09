@@ -34,6 +34,9 @@ class LinehaulSealService
             throw ValidationException::withMessages(['observed_seal' => 'Courier seal receiving setup is pending. Contact the administrator before receiving this trip.']);
         }
         $assignment = LinehaulAssignment::where('manifest_id', $manifest->id)->lockForUpdate()->firstOrFail();
+        if (LinehaulTransferService::pending($assignment)) {
+            throw ValidationException::withMessages(['observed_seal' => 'The replacement Courier must rescan every parcel and continue before handover.']);
+        }
         if ($assignment->seal_receipt !== null) {
             return;
         }
