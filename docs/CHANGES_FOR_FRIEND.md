@@ -1,5 +1,10 @@
 # Touched your files
 
+## Breakdown local activation — 2026-11-09
+
+- Owner approved and applied only the new evidence table migration, alone in batch80; evidence empty and original trip/custody/order/audit/delay fingerprints unchanged. Real Courier API read/validation/logout verified without incident creation.
+- Existing tools/serve-local.ps1 enables GD only for its local server process when absent (needed for photo sanitization), preserving process-only upload limits. No global PHP/.env/dependency change. Local API restarted on free port8000; demo trips unchanged.
+
 ## Courier breakdown app and Logistics evidence — 2026-11-09
 
 - Existing LinehaulTripResource adds schema/GD/phase-gated can_report_breakdown. Existing LinehaulPolicy adds company-scoped viewBreakdown; Logistics ManifestController adds protected photo download and a ten-record company/manifest evidence query. Existing routes/logistics.php adds approved-session/throttled photo GET; existing Logistics/Manifests/show.blade.php adds private evidence links. New Logistics/LinehaulBreakdownPhotoRequest validates access and forbids client-selected file paths; existing private download Resource reused.
