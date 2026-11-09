@@ -1,5 +1,5 @@
 # Combined Courier presentation scope — 2026-11-09
-Stage: Courier extension 25 two-Courier preflight complete. Physical acceptance OPEN. Extensions 22–24 implemented and verified.
+Stage: Courier extension 25 two-Courier preflight and replacement account setup complete. Physical acceptance OPEN.
 Target: C:/Users/Lenovo/Documents/lavarel/ZefanyaWMI/Zefanya; branch codex/combined-courier-demo.
 Verified source HEAD: af15542 (Van/activation); integrated reassignment 1aa4056. This state commit records verification.
 Owner prioritized consistency pass over next rehearsal; earlier limited Courier scope overrides retained; see DECISIONS.md.
@@ -22,4 +22,4 @@ MySQL zefanya_friend_20261107: #2 accepted/Loading, two parcels/1600g, zero load
 Backend :8000 verified HTTP401 for anonymous Courier trips. Fresh live preview :5177 session13721 HTTP200, ready54.6s; login cross-origin preflight204.
 OPEN: payouts, 10-wheel rate unspecified, universal reviewed onboarding/capacity.
 OPEN: two-Courier physical reassignment rehearsal and simultaneous MySQL transfer verification, arrival geofence/background GPS/push, hosted HTTPS/APK.
-NEXT: await approval for one same-company local replacement account. Preflight found zero replacements, zero reviewed profiles, no scans on #2 and no breakdowns/transfers. Rehearse per updated guide.
+NEXT: rehearse per updated guide with two same-company Courier accounts. Replacement API login/profile/duty/trips/logout verified, Off Duty and unassigned. Trip #2 has zero scans and transfer history is empty.
