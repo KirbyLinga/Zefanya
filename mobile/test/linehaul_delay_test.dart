@@ -24,6 +24,7 @@ Map<String, Object?> _delay() => {
 
 class _Backend {
   bool capability = true;
+  bool breakdownCapability = false;
   bool failOnce = false;
   Completer<void>? sending;
   String status = 'In Transit';
@@ -57,6 +58,7 @@ class _Backend {
       'destination': 'Laguna Province Hub',
       'offer_version': 3,
       'can_report_delay': capability && status == 'In Transit',
+      'can_report_breakdown': breakdownCapability && status == 'In Transit',
       'delay': delay,
       'seal_number': 'BH-0000771',
       'items': [
@@ -147,6 +149,26 @@ Future<void> _fill(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'server-backed breakdown action opens the photo report from Trips',
+    (tester) async {
+      final backend = _Backend()..breakdownCapability = true;
+      await _mount(tester, backend);
+      await tester.scrollUntilVisible(
+        find.text('Report breakdown'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Report breakdown'));
+      await tester.pumpAndSettle();
+      expect(find.text('Report a breakdown'), findsOneWidget);
+      expect(find.text('Send breakdown report'), findsOneWidget);
+      expect(backend.bodies, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('foreground refresh preserves an unsent delay reason and ETA', (
     tester,
   ) async {
@@ -380,6 +402,7 @@ void main() {
       final backend = _Backend()..capability = false;
       await _mount(tester, backend);
       expect(find.text('Report delay'), findsNothing);
+      expect(find.text('Report breakdown'), findsNothing);
       backend.status = 'Completed';
       backend.delay = _delay();
       await tester.tap(find.byTooltip('Refresh trips'));

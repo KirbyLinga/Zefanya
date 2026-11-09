@@ -24,6 +24,8 @@ Choose **Are you a Courier? Sign in here** on the shared sign-in page. Use the c
 
 ## Safe walkthrough before moving the trip
 
+Breakdown reporting is now implemented but its new evidence table still needs explicit local setup approval. Until installed (and server GD available), Report breakdown stays hidden. After genuine departure, use that separate action for a reason, future ETA and required JPG/PNG photo; sending shows a delay and notifies Logistics. The owning Logistics manifest page lists private photo downloads. Failed uploads retain the form/file for Retry. This does not reassign the trip; replacement-driver rescanning/pay transfer remain unfinished. Do not advance demo #2 or fabricate a breakdown to expose the action.
+
 Returning from Maps/another app refreshes trip state and the currently visible History/Earnings report. If the server is unreachable, use the explicit Retry state after restoring connectivity; do not interpret a failed refresh as a successful trip action. Unsent delay form input is retained while switching apps. Background route recording/push remain unavailable.
 
 After restarting Flutter with the current source, History and Earnings refresh when returning from another tab, retaining the selected dates/page. Pull-to-refresh and Retry also retain that page; a failed refresh hides stale results. Selecting a different date preset starts at page one. This fetches on navigation, not by background push.

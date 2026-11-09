@@ -131,10 +131,12 @@ class LinehaulBreakdownTest extends TestCase
         ['driver' => $driver, 'manifest' => $manifest, 'provider' => $provider] = $this->fixture();
         $data = $this->payload();
         $this->api($driver)->post($this->url($manifest), $data)->assertOk();
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.can_report_breakdown', true);
         $id = LinehaulBreakdown::sole()->id;
         $this->post($this->url($manifest), [...$data, 'new_eta' => '2026-11-08T13:00:00+08:00'])->assertOk()->assertJsonPath('data.id', $id);
         $this->post($this->url($manifest), [...$data, 'photo' => UploadedFile::fake()->image('other.jpg', 10, 10)])->assertUnprocessable();
         app(LinehaulService::class)->act($driver, $manifest, 'arrive', [], request());
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.can_report_breakdown', false);
         $this->travel(2)->hours();
         $this->post($this->url($manifest), $data)->assertOk()->assertJsonPath('data.id', $id);
         $this->post($this->url($manifest), [...$this->payload(), 'reason' => 'New issue'])->assertUnprocessable();
@@ -188,8 +190,31 @@ class LinehaulBreakdownTest extends TestCase
         $cache->setValue(null, []);
         try {
             $this->post($this->url($manifest), $this->payload())->assertUnprocessable();
+            $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.can_report_breakdown', false);
+            $this->actingAs($driver->provider, 'logistics')->getJson(route('logistics.courier-breakdowns.photo', $report))->assertNotFound();
         } finally {
             $cache->setValue(null, $previous);
         }
+    }
+
+    public function test_logistics_photo_is_private_company_scoped_validated_and_throttled(): void
+    {
+        ['driver' => $driver, 'manifest' => $manifest, 'provider' => $provider] = $this->fixture();
+        $this->api($driver)->post($this->url($manifest), $this->payload())->assertOk();
+        $report = LinehaulBreakdown::sole();
+        $url = route('logistics.courier-breakdowns.photo', $report);
+        $this->flushHeaders();
+        $this->app['auth']->forgetGuards();
+        $this->getJson($url)->assertUnauthorized();
+        $other = \App\Models\Logistics\LogisticsProvider::factory()->create();
+        $other->forceFill(['status' => \App\Enums\LogisticsProviderStatus::Approved, 'archived_at' => null])->save();
+        $this->actingAs($other, 'logistics')->getJson($url)->assertForbidden();
+        $this->actingAs($provider, 'logistics')->getJson($url.'?photo_path=forged')->assertUnprocessable();
+        $this->get($url)->assertOk()->assertHeader('Content-Type', 'image/jpeg')->assertDownload('courier-document.jpg');
+        $this->get(route('logistics.manifests.show', $manifest))->assertOk()->assertSee('Courier breakdown reports')->assertSee('Download breakdown photo')->assertDontSee($report->photo_path);
+        for ($index = 0; $index < 21; $index++) {
+            $response = $this->getJson($url);
+        }
+        $response->assertTooManyRequests();
     }
 }

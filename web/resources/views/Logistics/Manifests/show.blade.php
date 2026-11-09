@@ -37,6 +37,16 @@
         <p class="mt-2">Reported {{ $courierDelay->created_at->format('M j, Y H:i T') }}. This estimate was entered by the Courier.</p>
     </section>
 @endif
+@if (isset($courierBreakdowns) && $courierBreakdowns->isNotEmpty())
+    <section class="mb-4 rounded-md border p-4">
+        <h2 class="font-semibold">Courier breakdown reports</h2>
+        @foreach ($courierBreakdowns as $breakdown)
+            <p class="mt-2">{{ $breakdown->delay->reason }} · {{ $breakdown->created_at->format('M j, Y H:i T') }}</p>
+            <a href="{{ route('logistics.courier-breakdowns.photo', $breakdown) }}" class="underline">Download breakdown photo</a>
+        @endforeach
+        <p class="mt-2">Evidence does not reassign the Courier or change parcel custody.</p>
+    </section>
+@endif
 @if (isset($courierDeclines) && $courierDeclines->isNotEmpty())
     <section class="mb-4 rounded-md border p-4">
         <h2 class="font-semibold">Courier decline history</h2>

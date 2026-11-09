@@ -36,6 +36,12 @@ class LinehaulPolicy
         return $this->assign($provider, $manifest);
     }
 
+    public function viewBreakdown(LogisticsProvider $provider, \App\Models\Logistics\LinehaulBreakdown $breakdown): bool
+    {
+        return $provider->isApproved() && $provider->archived_at === null
+            && (int) $breakdown->delay->logistics_provider_id === (int) $provider->id;
+    }
+
     public function reviewProfile(LogisticsProvider $provider, ?LinehaulDriver $driver = null): bool
     {
         return $provider->isApproved() && $provider->archived_at === null

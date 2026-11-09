@@ -10,6 +10,7 @@ import '../../data/repositories/repositories.dart';
 import '../../state/auth_state.dart';
 import '../../services/courier_location_service.dart';
 import '../../services/courier_directions.dart';
+import '../../services/courier_document_picker.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -38,9 +39,11 @@ class LinehaulPortal extends StatefulWidget {
     super.key,
     this.locationSource = const DeviceCourierLocationSource(),
     this.directions = const DeviceCourierDirections(),
+    this.photoPicker = const DeviceCourierDocumentPicker(),
   });
   final CourierLocationSource locationSource;
   final CourierDirections directions;
+  final CourierDocumentPicker photoPicker;
   @override
   State<LinehaulPortal> createState() => _LinehaulPortalState();
 }
@@ -417,11 +420,16 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     }
   }
 
-  Future<void> _reportDelay(LinehaulTrip trip) async {
+  Future<void> _reportDelay(LinehaulTrip trip, {bool breakdown = false}) async {
     final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => LinehaulDelayDialog(trip: trip, repository: _repository),
+      builder: (_) => LinehaulDelayDialog(
+        trip: trip,
+        repository: _repository,
+        breakdown: breakdown,
+        photoPicker: widget.photoPicker,
+      ),
     );
     if (saved == true && mounted) _reload();
   }
@@ -770,6 +778,14 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 onPressed: _busy ? null : () => _reportDelay(trip),
                 icon: const Icon(Icons.schedule_outlined),
                 label: const Text('Report delay'),
+              ),
+            if (trip.canReportBreakdown)
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _reportDelay(trip, breakdown: true),
+                icon: const Icon(Icons.car_repair_outlined),
+                label: const Text('Report breakdown'),
               ),
             if (trip.status == 'Arrived')
               Text(

@@ -103,6 +103,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::get('/manifests/suggest-destinations', [ManifestController::class, 'suggestDestinations'])->name('manifests.suggest-destinations');
         Route::post('/manifests', [ManifestController::class, 'store'])->name('manifests.store');
         Route::get('/manifests/{manifest}', [ManifestController::class, 'show'])->name('manifests.show');
+        Route::get('/courier-breakdowns/{breakdown}/photo', [ManifestController::class, 'breakdownPhoto'])->middleware('throttle:20,1')->name('courier-breakdowns.photo');
         Route::post('/manifests/{manifest}/courier', [ManifestController::class, 'assignCourier'])->middleware('throttle:20,1')->name('manifests.courier');
         Route::post('/manifests/{manifest}/schedule', [ManifestController::class, 'schedule'])->middleware('throttle:20,1')->name('manifests.schedule');
         Route::post('/manifests/{manifest}/items', [ManifestController::class, 'addItem'])->name('manifests.items.store');

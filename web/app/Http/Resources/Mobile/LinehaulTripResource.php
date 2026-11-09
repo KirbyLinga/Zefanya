@@ -34,6 +34,8 @@ class LinehaulTripResource extends JsonResource
             'offer_version' => $this->offer_version ?? 1,
             'can_decline' => \App\Services\Logistics\LinehaulDeclineService::canDecline($this->resource),
             'can_report_delay' => \App\Services\Logistics\LinehaulDelayService::canReport($this->resource),
+            'can_report_breakdown' => \App\Services\Logistics\LinehaulBreakdownService::installed()
+                && function_exists('imagecreatefromstring') && \App\Services\Logistics\LinehaulDelayService::canReport($this->resource),
             'delay' => $delay === null ? null : (new LinehaulDelayResource($delay))->resolve($request),
             'origin' => $manifest->originHub?->name, 'destination' => $manifest->destinationHub?->name,
             'origin_address' => $this->hubAddress($manifest->originHub),

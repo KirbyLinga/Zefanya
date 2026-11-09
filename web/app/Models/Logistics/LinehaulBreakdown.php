@@ -17,6 +17,15 @@ class LinehaulBreakdown extends Model
 
     protected $hidden = ['photo_path', 'photo_hash'];
 
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        if (! \App\Support\RuntimeSchema::hasTable($this->getTable())) {
+            return null;
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
+
     public function delay(): BelongsTo
     {
         return $this->belongsTo(LinehaulTripDelay::class, 'linehaul_trip_delay_id');

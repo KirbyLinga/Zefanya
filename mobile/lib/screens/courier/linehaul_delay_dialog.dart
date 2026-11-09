@@ -3,15 +3,21 @@ import 'package:intl/intl.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
 import '../../widgets/dirty_guard.dart';
+import '../../services/courier_document_picker.dart';
+import '../../data/repositories/linehaul_vehicle_repository.dart';
 
 class LinehaulDelayDialog extends StatefulWidget {
   const LinehaulDelayDialog({
     super.key,
     required this.trip,
     required this.repository,
+    this.breakdown = false,
+    this.photoPicker = const DeviceCourierDocumentPicker(),
   });
   final LinehaulTrip trip;
   final LinehaulRepository repository;
+  final bool breakdown;
+  final CourierDocumentPicker photoPicker;
   @override
   State<LinehaulDelayDialog> createState() => _LinehaulDelayDialogState();
 }
@@ -26,7 +32,56 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
   bool _saved = false;
   bool _allowLeave = false;
   bool _discardPrompt = false;
-  bool get _dirty => _reason.text.isNotEmpty || _eta != null;
+  CourierDocument? _photo;
+  bool _picking = false;
+  bool get _dirty => _reason.text.isNotEmpty || _eta != null || _photo != null;
+
+  Future<void> _pickPhoto(bool camera) async {
+    if (_busy || _saved) return;
+    setState(() {
+      _busy = true;
+      _picking = true;
+      _error = null;
+    });
+    try {
+      final photo = await widget.photoPicker.pick(camera: camera);
+      if (!mounted || photo == null) return;
+      if (photo.bytes.isEmpty ||
+          photo.bytes.length > 5 * 1024 * 1024 ||
+          !const [
+            'jpg',
+            'jpeg',
+            'png',
+          ].contains(photo.name.split('.').last.toLowerCase())) {
+        throw const ValidationException(
+          fieldErrors: {'photo': 'Choose a JPG or PNG photo up to 5 MB.'},
+        );
+      }
+      setState(() => _photo = photo);
+    } on ApiException catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = error is ValidationException
+              ? error.fieldErrors.values.join('\n')
+              : error.message,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Could not open the camera or photo picker. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _picking = false;
+        });
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -43,8 +98,9 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
         !_dirty ||
         await DirtyGuard.confirmDiscard(
           context,
-          message:
-              'Your unsent delay reason and ETA will be discarded. Your trip stays unchanged.',
+          message: widget.breakdown
+              ? 'Your unsent breakdown report and selected photo will be discarded. Your trip stays unchanged.'
+              : 'Your unsent delay reason and ETA will be discarded. Your trip stays unchanged.',
         );
     _discardPrompt = false;
     if (!discard || !mounted) return;
@@ -90,20 +146,34 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
 
   Future<void> _submit() async {
     if (_busy || _saved || !_form.currentState!.validate()) return;
+    if (widget.breakdown && _photo == null) {
+      setState(() => _error = 'Add a photo of the vehicle breakdown.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await widget.repository.act(
-        widget.trip.id,
-        'delay',
-        body: {
-          'reason': _reason.text.trim(),
-          'new_eta': _eta!.toUtc().toIso8601String(),
-          'offer_version': widget.trip.offerVersion,
-        },
-      );
+      if (widget.breakdown) {
+        await widget.repository.reportBreakdown(
+          widget.trip.id,
+          reason: _reason.text.trim(),
+          eta: _eta!,
+          offerVersion: widget.trip.offerVersion,
+          photo: _photo!,
+        );
+      } else {
+        await widget.repository.act(
+          widget.trip.id,
+          'delay',
+          body: {
+            'reason': _reason.text.trim(),
+            'new_eta': _eta!.toUtc().toIso8601String(),
+            'offer_version': widget.trip.offerVersion,
+          },
+        );
+      }
       if (!mounted) return;
       setState(() {
         _saved = true;
@@ -138,7 +208,7 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
       if (!didPop) _leave();
     },
     child: AlertDialog(
-      title: const Text('Report a delay'),
+      title: Text(widget.breakdown ? 'Report a breakdown' : 'Report a delay'),
       content: SingleChildScrollView(
         child: Form(
           key: _form,
@@ -156,25 +226,26 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(_error!),
                 ),
-              DropdownButtonFormField<String>(
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Suggested reason',
+              if (!widget.breakdown)
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Suggested reason',
+                  ),
+                  items: [
+                    for (final reason in [
+                      'Heavy traffic',
+                      'Road closure',
+                      'Vehicle problem',
+                      'Other',
+                    ])
+                      DropdownMenuItem(value: reason, child: Text(reason)),
+                  ],
+                  onChanged: _busy || _saved
+                      ? null
+                      : (value) =>
+                            _reason.text = value == 'Other' ? '' : value ?? '',
                 ),
-                items: [
-                  for (final reason in [
-                    'Heavy traffic',
-                    'Road closure',
-                    'Vehicle problem',
-                    'Other',
-                  ])
-                    DropdownMenuItem(value: reason, child: Text(reason)),
-                ],
-                onChanged: _busy || _saved
-                    ? null
-                    : (value) =>
-                          _reason.text = value == 'Other' ? '' : value ?? '',
-              ),
               const SizedBox(height: 16),
               TextFormField(
                 key: const ValueKey('delay-reason'),
@@ -182,7 +253,7 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
                 enabled: !_busy && !_saved,
                 minLines: 2,
                 maxLines: 4,
-                maxLength: 500,
+                maxLength: widget.breakdown ? 480 : 500,
                 decoration: const InputDecoration(labelText: 'Reason'),
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Enter a delay reason'
@@ -213,6 +284,40 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
               const Text(
                 'This is your reported estimate. Logistics will see the reason and updated ETA.',
               ),
+              if (widget.breakdown) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'A JPG or PNG photo is required. Reporting does not reassign your trip.',
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _busy || _saved
+                          ? null
+                          : () => _pickPhoto(true),
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Take photo'),
+                    ),
+                    TextButton.icon(
+                      onPressed: _busy || _saved
+                          ? null
+                          : () => _pickPhoto(false),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('Choose photo'),
+                    ),
+                  ],
+                ),
+                if (_photo != null) ...[
+                  Text('Photo selected: ${_photo!.name}'),
+                  TextButton(
+                    onPressed: _busy || _saved
+                        ? null
+                        : () => setState(() => _photo = null),
+                    child: const Text('Remove photo'),
+                  ),
+                ],
+              ],
             ],
           ),
         ),
@@ -224,7 +329,13 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
         ),
         FilledButton(
           onPressed: _busy || _saved ? null : _submit,
-          child: Text(_busy ? 'Sending…' : 'Send delay report'),
+          child: Text(
+            _busy
+                ? (_picking ? 'Preparing photo…' : 'Sending…')
+                : widget.breakdown
+                ? 'Send breakdown report'
+                : 'Send delay report',
+          ),
         ),
       ],
     ),

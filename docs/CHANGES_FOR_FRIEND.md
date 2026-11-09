@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier breakdown app and Logistics evidence — 2026-11-09
+
+- Existing LinehaulTripResource adds schema/GD/phase-gated can_report_breakdown. Existing LinehaulPolicy adds company-scoped viewBreakdown; Logistics ManifestController adds protected photo download and a ten-record company/manifest evidence query. Existing routes/logistics.php adds approved-session/throttled photo GET; existing Logistics/Manifests/show.blade.php adds private evidence links. New Logistics/LinehaulBreakdownPhotoRequest validates access and forbids client-selected file paths; existing private download Resource reused.
+- Mobile linehaul repository adds validated capability and multipart breakdown submission; existing delay dialog gains photo mode, photo-only picker validation, retained retry/discard controls; portal wires server-backed action with injectable existing picker. No duplicate status/notification/payment system or public evidence storage.
+- New linehaul_breakdown_test.dart; existing new LinehaulBreakdownTest gains photo ownership/422/download/throttle/render/capability assertions. Existing linehaul_delay_test adds actual action wiring and strengthens old-server hidden-action check; all existing assertions retained. New migration remains pending, no settings/dependencies/demo records changed.
+
 ## Courier breakdown evidence backend — 2026-11-09
 
 - Existing web/routes/api.php adds authenticated/throttled POST Courier breakdown before wildcard actions. Existing Api/LinehaulController.php adds only reportBreakdown, using new FormRequest/service/safe resource. Existing delay/manifest/notification services are reused, not changed.

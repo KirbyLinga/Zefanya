@@ -1,5 +1,9 @@
 # Combined Courier security proof — 2026-11-08
 
+## Breakdown photo company access — 2026-11-09
+
+On tmp/mutation remove only company-ID equality from LinehaulPolicy::viewBreakdown. Named test test_logistics_photo fails: expected 403, received 200 (0 passed/3 assertions/3269ms). Restore exact check; delete temporary branch and run all twelve Courier PHP files: 89 passed/1806 assertions/28104ms. No fault remains; only SQLite/fake storage used.
+
 ## Breakdown evidence backend — 2026-11-09
 
 Four literal faults on tmp/mutation, isolated SQLite/fake storage; restore each before the next, final five tests passed/80 assertions/7011ms. Authorized Courier branch restored; temporary branch deleted. Existing assignment/phase/offer policy proofs retained through reused delay service.

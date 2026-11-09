@@ -1,5 +1,6 @@
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
+import 'linehaul_vehicle_repository.dart';
 
 class LinehaulTrip {
   const LinehaulTrip({
@@ -17,6 +18,7 @@ class LinehaulTrip {
     this.declinedAt,
     this.parcelCount,
     this.canReportDelay = false,
+    this.canReportBreakdown = false,
     this.delay,
     this.recordedWeightGrams,
     this.acceptedAt,
@@ -39,6 +41,7 @@ class LinehaulTrip {
   final String? declinedAt;
   final int? parcelCount;
   final bool canReportDelay;
+  final bool canReportBreakdown;
   final LinehaulDelay? delay;
   final int? recordedWeightGrams;
   final DateTime? acceptedAt;
@@ -118,6 +121,10 @@ class LinehaulTrip {
     }
     if ((data['can_report_delay'] != null &&
             data['can_report_delay'] is! bool) ||
+        (data['can_report_breakdown'] != null &&
+            data['can_report_breakdown'] is! bool) ||
+        (data['can_report_breakdown'] == true &&
+            data['status'] != 'In Transit') ||
         (data['can_report_delay'] == true && data['status'] != 'In Transit') ||
         (data['delay'] != null && data['delay'] is! Map)) {
       throw const MalformedResponseException(
@@ -146,6 +153,7 @@ class LinehaulTrip {
           ? null
           : LinehaulTripPay.fromJson(data['trip_pay']),
       canReportDelay: data['can_report_delay'] == true,
+      canReportBreakdown: data['can_report_breakdown'] == true,
       delay: data['delay'] is Map
           ? LinehaulDelay.fromJson(
               (data['delay'] as Map).cast<String, Object?>(),
@@ -262,6 +270,34 @@ class LinehaulRepository {
   Future<LinehaulProfile> profile() async => LinehaulProfile.fromJson(
     unwrapMap(await client.getJson('/courier/profile')),
   );
+
+  Future<void> reportBreakdown(
+    String tripId, {
+    required String reason,
+    required DateTime eta,
+    required int offerVersion,
+    required CourierDocument photo,
+  }) async {
+    final data = unwrapMap(
+      await client.postMultipart(
+        '/courier/trips/$tripId/breakdown',
+        fields: {
+          'reason': reason,
+          'new_eta': eta.toUtc().toIso8601String(),
+          'offer_version': '$offerVersion',
+        },
+        byteFiles: {'photo': (bytes: photo.bytes, filename: photo.name)},
+      ),
+    );
+    if (data['id'] is! int ||
+        (data['id'] as int) < 1 ||
+        data['type'] != 'vehicle_breakdown' ||
+        data['photo_received'] != true ||
+        data['delay'] is! Map) {
+      throw const MalformedResponseException();
+    }
+    LinehaulDelay.fromJson((data['delay'] as Map).cast<String, Object?>());
+  }
 
   Future<LinehaulDuty> duty() async =>
       LinehaulDuty.fromJson(unwrapMap(await client.getJson('/courier/duty')));

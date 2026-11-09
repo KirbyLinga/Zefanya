@@ -153,6 +153,13 @@ class ManifestController extends Controller
             ->with('success', 'Manifest created. Add parcels while it is still a draft.');
     }
 
+    public function breakdownPhoto(\App\Http\Requests\Logistics\LinehaulBreakdownPhotoRequest $request, \App\Models\Logistics\LinehaulBreakdown $breakdown): \App\Http\Resources\Mobile\LinehaulDocumentResource
+    {
+        abort_unless((new \App\Policies\LinehaulPolicy)->viewBreakdown($request->user('logistics'), $breakdown), 403);
+
+        return new \App\Http\Resources\Mobile\LinehaulDocumentResource(['path' => $breakdown->photo_path, 'mime' => 'image/jpeg']);
+    }
+
     public function show(Request $request, Manifest $manifest): View
     {
         $provider = $this->provider($request);
@@ -178,6 +185,10 @@ class ManifestController extends Controller
                 ? \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('logistics_provider_id', $provider->id)->latest('id')->get() : collect(),
             'courierDelay' => \App\Services\Logistics\LinehaulDelayService::installed()
                 ? \App\Services\Logistics\LinehaulDelayService::latest(\App\Models\Logistics\LinehaulAssignment::currentOffer()->where('manifest_id', $manifest->id)->with(['manifest', 'latestDelay'])->first()) : null,
+            'courierBreakdowns' => \App\Services\Logistics\LinehaulBreakdownService::installed()
+                ? \App\Models\Logistics\LinehaulBreakdown::whereIn('linehaul_trip_delay_id', \App\Models\Logistics\LinehaulTripDelay::where('logistics_provider_id', $provider->id)
+                    ->whereIn('linehaul_assignment_id', \App\Models\Logistics\LinehaulAssignment::where('manifest_id', $manifest->id)->select('id'))->select('id'))
+                    ->with('delay')->latest('id')->limit(10)->get() : collect(),
             'scheduleHistory' => \App\Services\Logistics\LinehaulScheduleService::installed()
                 ? \App\Models\Logistics\ManifestAuditLog::where('manifest_id', $manifest->id)->where('action', 'courier_schedule')->latest('id')->limit(10)->get() : collect(),
             'linehaulDrivers' => \App\Support\RuntimeSchema::hasTable('linehaul_drivers')
