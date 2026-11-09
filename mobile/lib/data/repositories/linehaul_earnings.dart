@@ -22,6 +22,11 @@ class LinehaulEarnings {
         data['trips'] is! List) {
       throw const MalformedResponseException();
     }
+    final payoutAvailability = data['payout_recording_available'];
+    if (payoutAvailability != null && payoutAvailability is! bool) {
+      throw const MalformedResponseException();
+    }
+    payoutRecordingAvailable = payoutAvailability == true;
     trips = [for (final row in data['trips'] as List) LinehaulEarningRow(row)];
     if (trips.length > 20) throw const MalformedResponseException();
   }
@@ -32,6 +37,7 @@ class LinehaulEarnings {
       page,
       lastPage;
   late final List<LinehaulEarningRow> trips;
+  late final bool payoutRecordingAvailable;
 }
 
 class LinehaulEarningRow {
@@ -53,9 +59,25 @@ class LinehaulEarningRow {
     completedAt = DateTime.parse(value['completed_at'] as String);
     result = value['result'] as String;
     pay = LinehaulTripPay.fromJson(value['trip_pay']);
+    final paidDate = value['paid_on'];
+    if (paidDate == null) {
+      paidOn = null;
+    } else {
+      if (paidDate is! String ||
+          !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(paidDate) ||
+          pay.status != 'earned') {
+        throw const MalformedResponseException();
+      }
+      final parsed = DateTime.tryParse('${paidDate}T00:00:00Z');
+      if (parsed == null || !parsed.toIso8601String().startsWith(paidDate)) {
+        throw const MalformedResponseException();
+      }
+      paidOn = parsed;
+    }
   }
   late final int tripId;
   late final DateTime completedAt;
   late final String result;
   late final LinehaulTripPay pay;
+  late final DateTime? paidOn;
 }

@@ -32,6 +32,11 @@ class LinehaulAssignment extends Model
         return $this->hasOne(LinehaulTransfer::class)->latestOfMany();
     }
 
+    public function payout(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LinehaulTripPayout::class);
+    }
+
     public function latestDelay(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(LinehaulTripDelay::class)->latestOfMany();

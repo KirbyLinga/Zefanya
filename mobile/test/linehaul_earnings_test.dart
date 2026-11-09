@@ -71,6 +71,28 @@ void main() {
     }
   });
 
+  test('paid dates are optional and attached only to confirmed earnings', () {
+    final unpaid = LinehaulEarnings(report());
+    expect(unpaid.payoutRecordingAvailable, isFalse);
+    expect(unpaid.trips.single.paidOn, isNull);
+
+    final base = report();
+    final row = (base['trips'] as List).single as Map;
+    final paid = LinehaulEarnings({
+      ...base,
+      'payout_recording_available': true,
+      'trips': [
+        {...row, 'paid_on': '2026-11-09'},
+      ],
+    });
+    expect(paid.payoutRecordingAvailable, isTrue);
+    expect(paid.trips.single.paidOn, DateTime.utc(2026, 11, 9));
+    expect(
+      () => LinehaulEarningRow({...row, 'paid_on': '2026-11-31'}),
+      throwsA(isA<MalformedResponseException>()),
+    );
+  });
+
   testWidgets(
     'Philippine presets pagination and partial totals fit narrow large text',
     (tester) async {

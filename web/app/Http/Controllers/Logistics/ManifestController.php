@@ -173,6 +173,16 @@ class ManifestController extends Controller
         $courierAssignment = \App\Support\RuntimeSchema::hasTable('linehaul_assignments')
             ? \App\Models\Logistics\LinehaulAssignment::currentOffer()->with('driver')
                 ->where('manifest_id', $manifest->id)->first() : null;
+        $payout = null;
+        $earnedPay = null;
+        if ($courierAssignment !== null && \App\Services\Logistics\LinehaulPayoutService::installed()) {
+            $courierAssignment->setRelation('manifest', $manifest);
+            $pay = \App\Services\Logistics\LinehaulPayService::details($courierAssignment);
+            if ($pay['status'] === 'earned') {
+                $earnedPay = $pay['amount_minor'];
+                $payout = $courierAssignment->payout;
+            }
+        }
         $breakdownOffer = $courierAssignment !== null
             ? \App\Services\Logistics\LinehaulTransferService::eligibleBreakdown($courierAssignment) : null;
         $replacementDrivers = $breakdownOffer === null ? collect() :
@@ -191,6 +201,8 @@ class ManifestController extends Controller
                 : collect(),
             'hubs' => $this->hubs($request),
             'courierAssignment' => $courierAssignment,
+            'courierEarnedPay' => $earnedPay,
+            'courierPayout' => $payout,
             'courierTripLocation' => \App\Services\Logistics\LinehaulDutyService::tripLocation($manifest, $courierAssignment),
             'breakdownOffer' => $breakdownOffer,
             'replacementDrivers' => $replacementDrivers,
@@ -230,6 +242,19 @@ class ManifestController extends Controller
         }
 
         return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier reassigned. Every parcel must be rescanned before continuing.');
+    }
+
+    public function recordCourierPayout(
+        \App\Http\Requests\Logistics\LinehaulPayoutRequest $request,
+        Manifest $manifest,
+        \App\Services\Logistics\LinehaulPayoutService $service,
+    ): \App\Http\Resources\Mobile\LinehaulPayoutResource|RedirectResponse {
+        $payout = $service->record($this->provider($request), $manifest, $request->validated(), $request);
+        if ($request->expectsJson()) {
+            return new \App\Http\Resources\Mobile\LinehaulPayoutResource($payout);
+        }
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier payment recorded.');
     }
 
     public function addItem(Request $request, Manifest $manifest): RedirectResponse

@@ -394,19 +394,49 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     String action, {
     Map<String, Object?> body = const {},
   }) async {
+    if (_busy) return;
+    final locationRequirement = switch (action) {
+      'depart' => trip.departureLocation,
+      'arrive' => trip.arrivalLocation,
+      _ => LinehaulLocationRequirement.off,
+    };
+    if (locationRequirement == LinehaulLocationRequirement.setupRequired) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(
+          content: Text(
+            'This hub needs verified coordinates. Contact Logistics.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() {
       _busy = true;
     });
     try {
-      await _repository.act(trip.id, action, body: body);
+      final position =
+          locationRequirement == LinehaulLocationRequirement.required
+          ? await widget.locationSource.current()
+          : null;
+      if (!mounted) return;
+      await _repository.act(
+        trip.id,
+        action,
+        body: {...body, if (position != null) 'location': position.toJson()},
+      );
       if (mounted) {
         _reload();
         unawaited(_historyKey.currentState?.refresh() ?? Future<void>.value());
       }
+    } on CourierLocationException catch (error) {
+      if (mounted) {
+        showTimedSnackBar(context, SnackBar(content: Text(error.message)));
+      }
     } on ApiException catch (error) {
       if (mounted) {
         final message =
-            action == 'decline' &&
+            (action == 'decline' || action == 'depart' || action == 'arrive') &&
                 error is ValidationException &&
                 error.fieldErrors.isNotEmpty
             ? error.fieldErrors.values.join('\n')

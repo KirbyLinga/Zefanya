@@ -57,6 +57,29 @@ class LinehaulDutyTest extends TestCase
         $this->postJson('/api/courier/duty/heartbeat', $this->payload())->assertForbidden();
     }
 
+    public function test_strict_vehicle_setting_requires_an_approved_unexpired_profile_before_duty(): void
+    {
+        ['driver' => $driver] = $this->fixture();
+        config(['linehaul.require_reviewed_vehicle' => true]);
+        $this->api($driver)->postJson('/api/courier/duty/on', $this->payload())
+            ->assertUnprocessable()->assertJsonValidationErrors('duty');
+        $this->assertFalse((bool) $driver->fresh()->on_duty);
+
+        $profile = new \App\Models\Logistics\LinehaulProfile;
+        $profile->forceFill([
+            'linehaul_driver_id' => $driver->id, 'plate_number' => 'GEO1234',
+            'license_no' => 'N01-12-123456', 'license_expiry' => now('Asia/Manila')->addYear()->toDateString(),
+            'license_codes' => ['C'], 'vehicle_type' => 'Van', 'capacity_kg' => '1000.00',
+            'documents' => [], 'review_status' => 'pending', 'version' => 1,
+        ])->save();
+        $this->postJson('/api/courier/duty/on', $this->payload())->assertUnprocessable();
+        $profile->forceFill(['review_status' => 'approved', 'license_expiry' => now('Asia/Manila')->subDay()->toDateString()])->save();
+        $this->postJson('/api/courier/duty/on', $this->payload())->assertUnprocessable();
+        $profile->forceFill(['license_expiry' => now('Asia/Manila')->addYear()->toDateString()])->save();
+        $this->postJson('/api/courier/duty/on', $this->payload())->assertOk()->assertJsonPath('data.on_duty', true);
+        $this->assertSame(1, LinehaulDutyCheck::count());
+    }
+
     public function test_checklist_requires_every_answer_location_and_failed_item_note(): void
     {
         ['driver' => $driver, 'provider' => $provider] = $this->fixture();

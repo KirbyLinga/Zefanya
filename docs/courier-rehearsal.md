@@ -53,7 +53,7 @@ Use Profile → Settings → Log Out. Stay must preserve the session; confirmati
 These steps change the demo trip and are outside the read-only preflight result.
 
 1. Profile → Duty & readiness → Go On Duty. Allow real foreground location yourself and answer the five checklist items based on the rehearsal. Missing answers block submission; Not OK requires a note and leaves Off Duty.
-2. Departure needs a passed checklist and location within five minutes, accurate to 100 m or better. If desktop Chrome cannot provide it, stop and use a suitable device with real location. Do not insert pretend readiness/coordinates. A 500 m hub geofence and background tracking are not implemented.
+2. Departure needs a passed checklist and location within five minutes, accurate to 100 m or better. If desktop Chrome cannot provide it, use a suitable device with real location. Once hub coordinates are configured, Courier departure and arrival request a fresh device point within 500 m of the corresponding hub.
 3. Batch #2 had zero loading scans at preflight. Scan actual demo labels or use manual entry for DEMO-COURIER-B01-P01 and DEMO-COURIER-B01-P02. Neither parcel was received or released. Confirm unrelated numbers refuse and repeats do not increase the count. Camera opening was user-reported; real QR/Code128 and permission-lifecycle checks remain open.
 4. In Logistics at http://127.0.0.1:8000/logistics/manifests, optionally save a future Philippine-time planned departure for #2. It should appear separately from actual departure and must not move the batch.
 5. Load both parcels, then depart with the demo label's seal (BH-0004521 is a valid format example). Check In Transit and retained parcel/seal details. No real departure was performed during preflight.
@@ -77,4 +77,10 @@ Draft batches #3/#4 each retain two demo parcels and are unassigned. A decline r
 
 Isolated tests prove software behavior, not actual location/documents/custody or simultaneous MySQL scheduling. No full-mobile rerun/analysis was needed for this documentation/runtime-only stage; prior stage has 931 mobile passes and eight existing analysis issues.
 
-Physical acceptance, simultaneous MySQL reassignment, payout recording, the unspecified 10-wheel rate, universal reviewed onboarding, geofencing, background tracking, push and a hosted HTTPS phone build remain open. The loopback preview runs on the PC. A separate phone needs a reachable API.
+Physical acceptance and simultaneous MySQL reassignment verification are deferred. The 10-wheel rate, background tracking, push and a hosted HTTPS phone build remain open. The loopback preview runs on the PC. A separate phone needs a reachable API.
+
+For the unverified release controls, set `LINEHAUL_HUB_COORDINATES` to a JSON object keyed by actual hub ID. Each value has numeric `latitude` and `longitude` fields from Logistics. `LINEHAUL_REQUIRE_HUB_GEOFENCE=true` blocks Courier departure or arrival if that hub is missing valid coordinates. `LINEHAUL_REQUIRE_REVIEWED_VEHICLE=true` requires an approved profile and current license. Review profiles before activating the requirement, or finish active trips first so Couriers can submit their profiles while Off Duty.
+
+After separate approval and verification, migration `2026_11_09_040000_create_linehaul_trip_payouts` enables recording one completed external payment per confirmed trip in Logistics. The trip's frozen amount is used. Courier Earnings shows the paid date after the payment is recorded.
+
+Set `LINEHAUL_TEN_WHEELER_PAY_MINOR` to the approved per-trip amount in centavos. Until configured, 10-wheeler trips have no quoted rate.

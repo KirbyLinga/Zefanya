@@ -1,5 +1,11 @@
 # Touched your files
 
+## Courier release controls and payout draft
+
+- Configured hubs require a fresh Courier location within 500 m for the corresponding departure or arrival. Logistics supplies verified hub coordinates. The strict setting requires coordinates for both actions. Current foreground location checks remain in place.
+- Strict vehicle review requires an approved vehicle profile and a current license for duty and readiness. Review existing active Couriers' profiles before enabling it.
+- Logistics can record an external payment against confirmed trip earnings. The company retains the reference. Courier Earnings shows the paid date. The migration and all new checks are pending.
+
 ## Courier reassignment notice
 
 - The Courier Trips screen reads the existing reassignment timestamp to show a recent notice with a History shortcut and a session-level close button. The original Courier keeps the full entry in dated History. Mobile navigation regressions cover the notice, close control and older records.

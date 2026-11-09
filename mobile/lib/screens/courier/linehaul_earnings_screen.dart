@@ -115,8 +115,10 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
               padding: EdgeInsets.only(bottom: 12),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Completed handovers by Philippine date. Payout recording is not available.',
+            Text(
+              report?.payoutRecordingAvailable == true
+                  ? 'Completed handovers by Philippine date. Logistics records payments after they are made.'
+                  : 'Completed handovers by Philippine date.',
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -187,7 +189,18 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
                   child: ListTile(
                     title: Text('Trip #${trip.tripId} · ${trip.result}'),
                     subtitle: Text(
-                      '${DateFormat.yMMMd().add_jm().format(trip.completedAt.toUtc().add(const Duration(hours: 8)))} Philippine time\n${trip.pay.status == 'earned' ? 'Earned: ${money(trip.pay.amountMinor!)}' : 'Pay not confirmed · excluded from total'}',
+                      [
+                        '${DateFormat.yMMMd().add_jm().format(trip.completedAt.toUtc().add(const Duration(hours: 8)))} Philippine time',
+                        if (trip.pay.status == 'earned')
+                          'Earned: ${money(trip.pay.amountMinor!)}'
+                        else
+                          'Pay not confirmed · excluded from total',
+                        if (trip.paidOn case final paidOn?)
+                          'Paid on ${DateFormat.yMMMd().format(paidOn)}'
+                        else if (report.payoutRecordingAvailable &&
+                            trip.pay.status == 'earned')
+                          'Payment not recorded',
+                      ].join('\n'),
                     ),
                   ),
                 ),

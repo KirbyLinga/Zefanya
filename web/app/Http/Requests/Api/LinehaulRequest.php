@@ -26,6 +26,8 @@ class LinehaulRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...(in_array($this->route('action'), ['depart', 'arrive'], true)
+                ? \App\Services\Logistics\LinehaulGeofence::locationRules() : []),
             ...(in_array($this->route('action'), ['takeover-scan', 'takeover-continue'], true) ? [
                 'offer_version' => ['required', 'integer', 'min:1'],
             ] : []),

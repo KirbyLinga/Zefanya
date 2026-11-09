@@ -2,6 +2,8 @@ import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import 'linehaul_vehicle_repository.dart';
 
+enum LinehaulLocationRequirement { off, required, setupRequired }
+
 class LinehaulTrip {
   const LinehaulTrip({
     required this.id,
@@ -20,6 +22,8 @@ class LinehaulTrip {
     this.canReportDelay = false,
     this.canReportBreakdown = false,
     this.needsRescan = false,
+    this.departureLocation = LinehaulLocationRequirement.off,
+    this.arrivalLocation = LinehaulLocationRequirement.off,
     this.reassignmentReason,
     this.reassignedAt,
     this.delay,
@@ -46,6 +50,8 @@ class LinehaulTrip {
   final bool canReportDelay;
   final bool canReportBreakdown;
   final bool needsRescan;
+  final LinehaulLocationRequirement departureLocation;
+  final LinehaulLocationRequirement arrivalLocation;
   final String? reassignmentReason;
   final DateTime? reassignedAt;
   final LinehaulDelay? delay;
@@ -58,6 +64,16 @@ class LinehaulTrip {
   final List<LinehaulParcel> items;
 
   factory LinehaulTrip.fromJson(Map<String, Object?> data) {
+    LinehaulLocationRequirement locationRequirement(String key) =>
+        switch (data[key]) {
+          null || 'off' => LinehaulLocationRequirement.off,
+          'required' => LinehaulLocationRequirement.required,
+          'setup_required' => LinehaulLocationRequirement.setupRequired,
+          _ => throw const MalformedResponseException(
+            message: 'Could not read the trip location requirements.',
+          ),
+        };
+
     DateTime? timestamp(String key) {
       final value = data[key];
       if (value == null) return null;
@@ -168,6 +184,8 @@ class LinehaulTrip {
       canReportDelay: data['can_report_delay'] == true,
       canReportBreakdown: data['can_report_breakdown'] == true,
       needsRescan: data['needs_rescan'] == true,
+      departureLocation: locationRequirement('departure_location'),
+      arrivalLocation: locationRequirement('arrival_location'),
       reassignmentReason: data['status'] == 'Reassigned'
           ? data['reassignment_reason'] as String
           : null,

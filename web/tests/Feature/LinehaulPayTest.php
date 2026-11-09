@@ -49,6 +49,43 @@ class LinehaulPayTest extends TestCase
         app(LinehaulService::class)->act($fixture['driver'], $fixture['manifest'], 'depart', ['seal_number' => 'BH-0000771'], request());
     }
 
+    public function test_geofence_blocks_departure_and_arrival_without_a_nearby_accurate_point(): void
+    {
+        $f = $this->fixture();
+        $manifest = $f['manifest'];
+        $tripPath = '/api/courier/trips/'.$manifest->id;
+        $this->withToken($f['driver']->createToken('geofence-test', ['linehaul'])->plainTextToken);
+        $seal = ['seal_number' => 'BH-0000771'];
+        $origin = ['latitude' => 14.2, 'longitude' => 121.3, 'accuracy' => 10];
+        $destination = ['latitude' => 14.3, 'longitude' => 121.4, 'accuracy' => 10];
+
+        config(['linehaul.require_hub_geofence' => true, 'linehaul.hub_coordinates' => []]);
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.departure_location', 'setup_required');
+        $this->postJson($tripPath.'/depart', [...$seal, 'location' => $origin])->assertUnprocessable()->assertJsonValidationErrors('location');
+
+        config(['linehaul.hub_coordinates' => [
+            $manifest->origin_hub_id => ['latitude' => 14.2, 'longitude' => 121.3],
+            $manifest->destination_hub_id => ['latitude' => 14.3, 'longitude' => 121.4],
+        ]]);
+        $this->getJson('/api/courier/trips')->assertOk()->assertJsonPath('data.0.departure_location', 'required');
+        $this->postJson($tripPath.'/depart', $seal)->assertUnprocessable()->assertJsonValidationErrors('location');
+        $this->postJson($tripPath.'/depart', [...$seal, 'location' => [...$origin, 'accuracy' => 101]])
+            ->assertUnprocessable()->assertJsonValidationErrors('location.accuracy');
+        $this->postJson($tripPath.'/depart', [...$seal, 'location' => [...$origin, 'latitude' => 14.205]])
+            ->assertUnprocessable()->assertJsonValidationErrors('location');
+        $this->assertSame(ManifestStatus::Draft, $manifest->fresh()->status);
+        $this->assertNull($f['assignment']->fresh()->trip_pay_minor);
+
+        $this->postJson($tripPath.'/depart', [...$seal, 'location' => [...$origin, 'latitude' => 14.2044]])
+            ->assertOk()->assertJsonPath('data.arrival_location', 'required');
+        $this->postJson($tripPath.'/arrive', ['location' => $origin])
+            ->assertUnprocessable()->assertJsonValidationErrors('location');
+        $this->assertNull($f['assignment']->fresh()->arrived_at);
+        $this->postJson($tripPath.'/arrive', ['location' => $destination])->assertOk()->assertJsonPath('data.status', 'Arrived');
+        $this->postJson($tripPath.'/arrive')->assertOk()->assertJsonPath('data.status', 'Arrived');
+        $this->assertDatabaseHas('manifest_audit_logs', ['manifest_id' => $manifest->id, 'action' => 'courier_arrive', 'verification_method' => 'hub_geofence']);
+    }
+
     public function test_supported_rates_are_server_quotes_then_frozen_at_actual_departure(): void
     {
         $f = $this->fixture();
@@ -92,6 +129,18 @@ class LinehaulPayTest extends TestCase
         $this->depart($f);
         $this->assertNull($f['assignment']->fresh()->trip_pay_minor);
         $this->assertSame('not_configured', LinehaulPayService::details($f['assignment']->fresh())['status']);
+    }
+
+    public function test_ten_wheeler_uses_only_an_explicitly_configured_rate(): void
+    {
+        $f = $this->fixture('10-Wheeler Truck');
+        config(['linehaul.ten_wheeler_pay_minor' => null]);
+        $this->assertSame('not_configured', LinehaulPayService::details($f['assignment']->fresh())['status']);
+        config(['linehaul.ten_wheeler_pay_minor' => '200000']);
+        $this->assertSame(200000, LinehaulPayService::details($f['assignment']->fresh())['amount_minor']);
+        $this->depart($f);
+        config(['linehaul.ten_wheeler_pay_minor' => '250000']);
+        $this->assertSame(200000, LinehaulPayService::details($f['assignment']->fresh())['amount_minor']);
     }
 
     public function test_unreviewed_or_expired_vehicle_cannot_advertise_pay_quote(): void
@@ -167,5 +216,42 @@ class LinehaulPayTest extends TestCase
             $this->assertSame(['status' => 'earned', 'amount_minor' => 100000], LinehaulPayService::details($f['assignment']->fresh()));
         }
         $this->assertSame($before, $f['assignment']->fresh()->getAttributes());
+    }
+
+    public function test_company_can_record_confirmed_trip_payment_once_and_courier_sees_paid_date(): void
+    {
+        $f = $this->fixture();
+        $url = route('logistics.manifests.courier.payout', $f['manifest']);
+        $date = now('Asia/Manila')->toDateString();
+        $payment = ['expected_amount_minor' => 100000, 'reference' => 'TRANSFER-102', 'paid_on' => $date];
+        $this->postJson($url, $payment)->assertUnauthorized();
+        $other = $this->handoffProvider('Other Pay Carrier');
+        $this->actingAs($other, 'logistics')->postJson($url, $payment)->assertForbidden();
+        $this->actingAs($f['provider'], 'logistics')->postJson($url, $payment)->assertUnprocessable();
+
+        $this->depart($f);
+        $scan = $this->postJson(route('logistics.manifests.scan.verify', $f['manifest']),
+            ['tracking_number' => $f['parcel']->tracking_number, 'phase' => 'receive', 'method' => 'manual'])
+            ->assertOk()->json('verification_token');
+        $this->post(route('logistics.manifests.receive.store', [$f['manifest'], $f['manifest']->items()->sole()]),
+            ['verification_token' => $scan, 'observed_seal' => 'BH-0000771'])->assertRedirect();
+        $this->postJson($url, [...$payment, 'expected_amount_minor' => 1])->assertUnprocessable();
+        $this->postJson($url, [...$payment, 'amount_minor' => 1])->assertUnprocessable();
+        $this->postJson($url, $payment)->assertCreated()->assertJsonPath('data.paid_on', $date)
+            ->assertJsonPath('data.amount_minor', 100000)->assertJsonMissingPath('data.reference');
+        $this->postJson($url, $payment)->assertOk();
+        $this->postJson($url, [...$payment, 'reference' => 'DIFFERENT'])->assertUnprocessable();
+        $this->assertDatabaseCount('linehaul_trip_payouts', 1);
+        $this->assertDatabaseHas('linehaul_trip_payouts', ['linehaul_assignment_id' => $f['assignment']->id,
+            'linehaul_driver_id' => $f['driver']->id, 'reference' => 'TRANSFER-102']);
+        $this->assertSame(1, \App\Models\Logistics\ManifestAuditLog::where('manifest_id', $f['manifest']->id)
+            ->where('action', 'courier_payout_recorded')->count());
+
+        $this->app['auth']->forgetGuards();
+        $token = $f['driver']->createToken('payout-test', ['linehaul'])->plainTextToken;
+        $this->withToken($token)->getJson('/api/courier/earnings?from='.$date.'&to='.$date)
+            ->assertOk()->assertJsonPath('data.payout_recording_available', true)
+            ->assertJsonPath('data.earned_minor', 100000)
+            ->assertJsonPath('data.trips.0.paid_on', $date)->assertJsonMissingPath('data.trips.0.reference');
     }
 }

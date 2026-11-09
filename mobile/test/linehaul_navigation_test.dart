@@ -13,6 +13,7 @@ import 'package:zefanya/data/repositories/linehaul_repository.dart';
 import 'package:zefanya/data/repositories/repositories.dart';
 import 'package:zefanya/screens/courier/linehaul_portal.dart';
 import 'package:zefanya/services/courier_directions.dart';
+import 'package:zefanya/services/courier_location_service.dart';
 import 'package:zefanya/state/auth_state.dart';
 
 Map<String, Object?> _trip({
@@ -43,12 +44,23 @@ class _Directions implements CourierDirections {
   }
 }
 
+class _ActionLocation implements CourierLocationSource {
+  int reads = 0;
+
+  @override
+  Future<CourierPosition> current({bool requestPermission = true}) async {
+    reads++;
+    return const CourierPosition(14.3, 121.4, 15);
+  }
+}
+
 Future<void> _mount(
   WidgetTester tester,
   _Directions directions,
   Map<String, Object?> trip,
   List<String> posts, {
   void Function(http.Request)? onAction,
+  CourierLocationSource? locationSource,
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(360, 640);
@@ -95,7 +107,10 @@ Future<void> _mount(
           ).copyWith(textScaler: const TextScaler.linear(1.3)),
           child: child!,
         ),
-        home: LinehaulPortal(directions: directions),
+        home: LinehaulPortal(
+          directions: directions,
+          locationSource: locationSource ?? const DeviceCourierLocationSource(),
+        ),
       ),
     ),
   );
@@ -103,6 +118,44 @@ Future<void> _mount(
 }
 
 void main() {
+  testWidgets(
+    'configured arrival reads a fresh position and submits it with the action',
+    (tester) async {
+      final posts = <String>[];
+      final location = _ActionLocation();
+      final trip = {..._trip(), 'arrival_location': 'required'};
+      final payloads = <Object?>[];
+      await _mount(
+        tester,
+        _Directions(),
+        trip,
+        posts,
+        locationSource: location,
+        onAction: (request) {
+          payloads.add(jsonDecode(request.body));
+          trip['status'] = 'Arrived';
+          trip['arrival_location'] = 'off';
+        },
+      );
+      final button = find.text('Report arrival');
+      await tester.scrollUntilVisible(
+        button,
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -120));
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(location.reads, 1);
+      expect(posts, ['/api/courier/trips/12/arrive']);
+      expect(payloads.single, {
+        'location': {'latitude': 14.3, 'longitude': 121.4, 'accuracy': 15},
+      });
+      expect(find.text('Arrived'), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'replacement scans a parcel and continues with the current offer',
     (tester) async {

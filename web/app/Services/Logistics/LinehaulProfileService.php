@@ -52,13 +52,16 @@ class LinehaulProfileService
         return self::installed() ? LinehaulProfile::where('linehaul_driver_id', $driver->id)->first() : null;
     }
 
-    // Presentation compatibility: no-submission accounts retain their previous access.
     public static function ready(LinehaulDriver $driver): bool
     {
         $profile = self::current($driver);
 
-        return $profile === null || ($profile->review_status === 'approved'
-            && RiderValidation::isExpiryValid($profile->license_expiry->toDateString()));
+        if ($profile === null) {
+            return ! config('linehaul.require_reviewed_vehicle');
+        }
+
+        return $profile->review_status === 'approved'
+            && RiderValidation::isExpiryValid($profile->license_expiry->toDateString());
     }
 
     public function submit(LinehaulDriver $driver, array $input): LinehaulProfile

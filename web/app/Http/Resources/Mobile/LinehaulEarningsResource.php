@@ -10,6 +10,6 @@ class LinehaulEarningsResource extends JsonResource
     public function toArray(Request $request): array
     {
         return \Illuminate\Support\Arr::only($this->resource, ['from', 'to', 'timezone', 'earned_minor', 'earned_trips',
-            'unconfirmed_trips', 'completed_trips', 'page', 'last_page', 'trips']);
+            'unconfirmed_trips', 'completed_trips', 'page', 'last_page', 'trips', 'payout_recording_available']);
     }
 }

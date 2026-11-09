@@ -105,12 +105,14 @@ class LinehaulService
 
                 return $assignment;
             }
+            $verifiedLocation = false;
             if ($action === 'arrive') {
                 $this->require(! LinehaulTransferService::pending($assignment), 'Rescan every parcel and continue the takeover before reporting arrival.');
                 $this->require($manifest->status === ManifestStatus::Dispatched, 'Only an in-transit trip can arrive.');
                 if ($assignment->arrived_at !== null) {
                     return $assignment;
                 }
+                $verifiedLocation = LinehaulGeofence::verify((int) $manifest->destination_hub_id, $data, 'destination');
                 $assignment->forceFill(['arrived_at' => now()])->save();
             } else {
                 $this->require($manifest->status === ManifestStatus::Draft, 'This trip can no longer be loaded or departed.');
@@ -131,6 +133,7 @@ class LinehaulService
                     } elseif ($action === 'depart') {
                         app(LinehaulDutyService::class)->requireReady($driver);
                         $this->requireCapacity($driver, $manifest);
+                        $verifiedLocation = LinehaulGeofence::verify((int) $manifest->origin_hub_id, $data, 'origin');
                         LinehaulPayService::freeze($driver, $assignment);
                         $this->manifests->dispatch($manifest, $driver->provider, $assignment->loading_tokens ?? []);
                         $manifest->refresh()->forceFill(['dispatched_by_type' => 'linehaul', 'dispatched_by_id' => $driver->id])->save();
@@ -144,7 +147,7 @@ class LinehaulService
                 'manifest_id' => $manifest->id, 'action' => 'courier_'.$action,
                 'actor_type' => 'linehaul', 'actor_id' => $driver->id, 'actor_name' => $driver->name,
                 'ip_address' => $request->ip(), 'user_agent' => $request->userAgent(),
-                'verification_method' => $data['method'] ?? 'manual',
+                'verification_method' => $verifiedLocation ? 'hub_geofence' : ($data['method'] ?? 'manual'),
             ]);
 
             return $assignment;

@@ -20,11 +20,21 @@ class LinehaulPayService
     private static function quote(LinehaulDriver $driver): ?array
     {
         $profile = LinehaulProfileService::current($driver);
-        if ($profile === null || ! LinehaulProfileService::ready($driver) || ! isset(self::RATES[$profile->vehicle_type])) {
+        if ($profile === null || ! LinehaulProfileService::ready($driver)) {
             return null;
         }
 
-        return ['amount_minor' => self::RATES[$profile->vehicle_type], 'vehicle_type' => $profile->vehicle_type];
+        $rate = self::RATES[$profile->vehicle_type] ?? null;
+        if ($profile->vehicle_type === '10-Wheeler Truck') {
+            $rate = filter_var(config('linehaul.ten_wheeler_pay_minor'), FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1, 'max_range' => 4294967295],
+            ]);
+        }
+        if ($rate === null || $rate === false) {
+            return null;
+        }
+
+        return ['amount_minor' => $rate, 'vehicle_type' => $profile->vehicle_type];
     }
 
     /** Caller holds driver, manifest and assignment locks inside departure transaction. */

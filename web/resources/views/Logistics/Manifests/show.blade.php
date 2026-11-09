@@ -82,6 +82,30 @@
             @if ($courierAssignment->arrived_at) · Courier reported arrival @endif
         </p>
         <p>Logistics confirms parcel receipt using the existing receiving screen.</p>
+        @if ($courierEarnedPay !== null)
+            <div class="mt-3 border-t pt-3">
+                <h3 class="font-semibold">Courier pay · ₱{{ number_format($courierEarnedPay / 100, 2) }}</h3>
+                @if ($courierPayout)
+                    <p>Paid on {{ $courierPayout->paid_on->toDateString() }} · Reference {{ $courierPayout->reference }}</p>
+                @else
+                    <p>Record a payment already made to this Courier.</p>
+                    <form method="POST" action="{{ route('logistics.manifests.courier.payout', $manifest) }}" class="mt-2 space-y-2">
+                        @csrf
+                        <input type="hidden" name="expected_amount_minor" value="{{ $courierEarnedPay }}">
+                        <label for="courier-paid-on" class="block">Payment date (Philippine time)</label>
+                        <input id="courier-paid-on" type="date" name="paid_on" class="rounded-md border p-2" required
+                            min="{{ $manifest->received_at->copy()->timezone('Asia/Manila')->toDateString() }}"
+                            max="{{ now('Asia/Manila')->toDateString() }}" value="{{ old('paid_on', now('Asia/Manila')->toDateString()) }}">
+                        <label for="courier-payout-reference" class="block">Payment reference</label>
+                        <input id="courier-payout-reference" name="reference" class="rounded-md border p-2" required maxlength="100" value="{{ old('reference') }}">
+                        <button type="submit" class="rounded-md border px-4 py-2">Record Courier payment</button>
+                        @foreach (['expected_amount_minor', 'paid_on', 'reference', 'payout'] as $field)
+                            @error($field) <p role="alert">{{ $message }}</p> @enderror
+                        @endforeach
+                    </form>
+                @endif
+            </div>
+        @endif
         @if ($manifest->status === \App\Enums\ManifestStatus::Dispatched && !$courierAssignment->arrived_at)
             <div class="mt-3 border-t pt-3">
                 <h3 class="font-semibold">Last trip location</h3>

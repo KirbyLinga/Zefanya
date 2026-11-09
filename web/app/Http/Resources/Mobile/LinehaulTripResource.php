@@ -33,6 +33,10 @@ class LinehaulTripResource extends JsonResource
         return [
             'id' => $manifest->id, 'status' => $stage,
             'needs_rescan' => $takeover,
+            'departure_location' => $stage === 'Loading'
+                ? \App\Services\Logistics\LinehaulGeofence::requirement((int) $manifest->origin_hub_id) : 'off',
+            'arrival_location' => $stage === 'In Transit' && ! $takeover
+                ? \App\Services\Logistics\LinehaulGeofence::requirement((int) $manifest->destination_hub_id) : 'off',
             'trip_pay' => \App\Services\Logistics\LinehaulPayService::details($this->resource),
             'offer_version' => $this->offer_version ?? 1,
             'can_decline' => \App\Services\Logistics\LinehaulDeclineService::canDecline($this->resource),
