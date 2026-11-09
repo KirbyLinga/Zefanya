@@ -18,7 +18,7 @@ class LinehaulProfileService
 {
     public const DOCUMENTS = ['drivers_license', 'or_cr', 'nbi_clearance'];
 
-    public const VEHICLES = ['4-Wheeler Closed Van Truck', '6-Wheeler Truck', '10-Wheeler Truck'];
+    public const VEHICLES = ['Van', '4-Wheeler Closed Van Truck', '6-Wheeler Truck', '10-Wheeler Truck'];
 
     public static function installed(): bool
     {

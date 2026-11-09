@@ -61,6 +61,28 @@ class LinehaulPayTest extends TestCase
         $this->assertSame(100000, $f['assignment']->fresh()->trip_pay_minor);
     }
 
+    public function test_reviewed_van_rate_is_frozen_at_departure(): void
+    {
+        $f = $this->fixture('Van');
+        $this->assertSame(['status' => 'quote', 'amount_minor' => 60000], LinehaulPayService::details($f['assignment']->fresh()));
+
+        $this->depart($f);
+        $f['profile']->forceFill(['vehicle_type' => '6-Wheeler Truck'])->save();
+
+        $this->assertSame('Van', $f['assignment']->fresh()->trip_pay_vehicle_type);
+        $this->assertSame(['status' => 'pending', 'amount_minor' => 60000], LinehaulPayService::details($f['assignment']->fresh()));
+
+        $this->actingAs($f['provider'], 'logistics');
+        $scan = $this->postJson(route('logistics.manifests.scan.verify', $f['manifest']), [
+            'tracking_number' => $f['parcel']->tracking_number, 'phase' => 'receive', 'method' => 'manual',
+        ])->assertOk()->json('verification_token');
+        $this->post(route('logistics.manifests.receive.store', [$f['manifest'], $f['manifest']->items()->sole()]), [
+            'verification_token' => $scan, 'observed_seal' => 'BH-0000771',
+        ])->assertRedirect();
+
+        $this->assertSame(['status' => 'earned', 'amount_minor' => 60000], LinehaulPayService::details($f['assignment']->fresh()));
+    }
+
     public function test_six_wheeler_rate_and_unknown_type_are_not_guessed(): void
     {
         $f = $this->fixture('6-Wheeler Truck');

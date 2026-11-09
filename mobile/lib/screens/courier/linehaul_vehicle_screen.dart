@@ -22,11 +22,6 @@ class LinehaulVehicleScreen extends StatefulWidget {
 }
 
 class _LinehaulVehicleScreenState extends State<LinehaulVehicleScreen> {
-  static const _vehicles = [
-    '4-Wheeler Closed Van Truck',
-    '6-Wheeler Truck',
-    '10-Wheeler Truck',
-  ];
   static const _labels = {
     'drivers_license': 'Professional driver’s license',
     'or_cr': 'OR/CR',
@@ -389,7 +384,7 @@ class _LinehaulVehicleScreenState extends State<LinehaulVehicleScreen> {
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Vehicle type'),
                 items: [
-                  for (final vehicle in _vehicles)
+                  for (final vehicle in records.vehicleTypes)
                     DropdownMenuItem(
                       value: vehicle,
                       child: Text(vehicle, overflow: TextOverflow.ellipsis),

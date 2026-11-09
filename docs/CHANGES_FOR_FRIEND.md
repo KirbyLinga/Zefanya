@@ -1,5 +1,10 @@
 # Touched your files
 
+## Reassignment local activation and Van rate
+
+- Applied only the approved reassignment migration in local batch 81. Existing trip, parcel, order, audit and evidence data fingerprints match. The transfer table starts empty.
+- LinehaulProfileService accepts Van and LinehaulVehicleResource exposes supported types. The app uses those choices and retains the previous list for older servers. LinehaulPayService freezes the A41 Van rate of 60,000 centavos under the existing vehicle review and handover rules. Existing string columns support the value.
+
 ## Courier reassignment after breakdown
 
 - Logistics manifest controller/view and routes/logistics.php expose the approved-company reassignment form and versioned submission. The new LinehaulTransferRequest and LinehaulTransferResource handle validation and snapshots.

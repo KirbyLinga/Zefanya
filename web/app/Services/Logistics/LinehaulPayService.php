@@ -9,7 +9,7 @@ use App\Support\RuntimeSchema;
 
 class LinehaulPayService
 {
-    private const RATES = ['4-Wheeler Closed Van Truck' => 100000, '6-Wheeler Truck' => 150000];
+    private const RATES = ['Van' => 60000, '4-Wheeler Closed Van Truck' => 100000, '6-Wheeler Truck' => 150000];
 
     public static function installed(): bool
     {

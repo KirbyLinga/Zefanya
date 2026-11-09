@@ -9,13 +9,33 @@ class CourierDocument {
 }
 
 class LinehaulVehicle {
-  const LinehaulVehicle(this.setupRequired, this.editable, this.profile);
+  const LinehaulVehicle(
+    this.setupRequired,
+    this.editable,
+    this.profile, {
+    this.vehicleTypes = _legacyVehicleTypes,
+  });
+  static const _legacyVehicleTypes = [
+    '4-Wheeler Closed Van Truck',
+    '6-Wheeler Truck',
+    '10-Wheeler Truck',
+  ];
   final bool setupRequired;
   final bool editable;
   final Map<String, Object?>? profile;
+  final List<String> vehicleTypes;
 
   factory LinehaulVehicle.fromJson(Map<String, Object?> data) {
     final profile = data['profile'];
+    final types = data['vehicle_types'] ?? _legacyVehicleTypes;
+    if (types is! List ||
+        types.isEmpty ||
+        types.toSet().length != types.length ||
+        types.any(
+          (type) => type != 'Van' && !_legacyVehicleTypes.contains(type),
+        )) {
+      throw const MalformedResponseException();
+    }
     if (data['setup_required'] is! bool ||
         data['editable'] is! bool ||
         (profile != null &&
@@ -46,11 +66,7 @@ class LinehaulVehicle {
           throw const MalformedResponseException();
         }
       }
-      if (!const [
-            '4-Wheeler Closed Van Truck',
-            '6-Wheeler Truck',
-            '10-Wheeler Truck',
-          ].contains(profile['vehicle_type']) ||
+      if (!types.contains(profile['vehicle_type']) ||
           (profile['license_codes'] as List).any(
             (code) =>
                 !const ['B', 'B1', 'B2', 'C', 'D', 'BE', 'CE'].contains(code),
@@ -76,6 +92,7 @@ class LinehaulVehicle {
       data['setup_required'] as bool,
       data['editable'] as bool,
       profile == null ? null : (profile as Map).cast<String, Object?>(),
+      vehicleTypes: List<String>.unmodifiable(types),
     );
   }
 }

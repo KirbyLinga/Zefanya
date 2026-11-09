@@ -42,6 +42,7 @@ class _Picker implements CourierDocumentPicker {
 
 class _Backend {
   Map<String, Object?>? profile;
+  List<String>? vehicleTypes;
   bool setup = false;
   bool editable = true;
   bool refuse = false;
@@ -78,6 +79,7 @@ class _Backend {
           'setup_required': setup,
           'editable': editable,
           'profile': profile,
+          if (vehicleTypes != null) 'vehicle_types': vehicleTypes,
         },
       }),
       200,
@@ -142,6 +144,42 @@ Future<void> _show(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('Van is selectable only when advertised by the server', (
+    tester,
+  ) async {
+    final backend = _Backend();
+    await _mount(tester, backend, _Picker());
+    await _show(tester, find.text('Add vehicle records'));
+    await tester.tap(find.text('Add vehicle records'));
+    await tester.pumpAndSettle();
+    final dropdown = find.byType(DropdownButtonFormField<String>);
+    await _show(tester, dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    expect(find.text('Van'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+
+    backend.vehicleTypes = [
+      'Van',
+      '4-Wheeler Closed Van Truck',
+      '6-Wheeler Truck',
+      '10-Wheeler Truck',
+    ];
+    await _mount(tester, backend, _Picker());
+    await _show(tester, find.text('Add vehicle records'));
+    await tester.tap(find.text('Add vehicle records'));
+    await tester.pumpAndSettle();
+    await _show(tester, dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Van'));
+    await tester.pumpAndSettle();
+    expect(find.text('Van'), findsOneWidget);
+    expect(backend.upload, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   test('malformed vehicle records fail closed', () {
     final valid = {
       'setup_required': false,

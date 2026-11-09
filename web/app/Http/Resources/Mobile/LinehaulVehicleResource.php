@@ -17,6 +17,7 @@ class LinehaulVehicleResource extends JsonResource
 
         return ['driver_id' => $this->id, 'name' => $this->name, 'status' => $this->status,
             'setup_required' => ! $installed, 'editable' => $installed && ! $this->on_duty && ! LinehaulDutyService::busy($this->resource),
+            'vehicle_types' => LinehaulProfileService::VEHICLES,
             'profile' => $profile === null ? null : [
                 'version' => $profile->version, 'plate_number' => $profile->plate_number,
                 'license_no' => $profile->license_no, 'license_type' => 'Professional',

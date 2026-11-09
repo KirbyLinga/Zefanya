@@ -82,6 +82,16 @@ class LinehaulVehicleTest extends TestCase
         $this->api($driver)->getJson('/api/courier/vehicle')->assertForbidden();
     }
 
+    public function test_van_is_an_advertised_vehicle_type_and_submission_still_requires_review(): void
+    {
+        $driver = $this->fixture();
+        $this->api($driver)->getJson('/api/courier/vehicle')
+            ->assertOk()->assertJsonFragment(['vehicle_types' => LinehaulProfileService::VEHICLES]);
+        $this->post('/api/courier/vehicle', [...$this->payload(), 'vehicle_type' => 'Van'])
+            ->assertOk()->assertJsonPath('data.profile.vehicle_type', 'Van')
+            ->assertJsonPath('data.profile.review_status', 'pending');
+    }
+
     public function test_submission_private_documents_company_review_and_replacement_require_reverification(): void
     {
         $driver = $this->fixture();

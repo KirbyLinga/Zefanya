@@ -1,5 +1,9 @@
 # Combined Courier security proof — 2026-11-08
 
+## Van trip rate
+
+Removed the Van rate on tmp/mutation. `test_reviewed_van_rate_is_frozen_at_departure` failed with expected quote/60000 and actual not_configured/null (0 passed, 1 assertion). Restored the rate and removed the temporary branch.
+
 ## Breakdown reassignment and takeover
 
 Eleven separate deliberate faults on tmp/mutation, all restored before the integrated regression run. SQLite memory and fake storage only.

@@ -1,5 +1,7 @@
 # Courier per-trip pay — extension 12
 
+Follow-up: the reviewed Van option now supports the A41 ₱600.00 rate. The server advertises available vehicle types, and older API responses retain the legacy options. The 10-Wheeler Truck remains eligible as a vehicle type with an unconfigured pay rate.
+
 Local activation DONE under explicit owner exception: verified local MySQL zefanya_friend_20261107/127.0.0.1, applied only 2026_11_09_010000_add_linehaul_trip_pay_snapshot.php (106.48ms), alone in batch 79. SHA256 fingerprints of manifests, original assignment fields and native audit records match before/after; both original assignments retain null pay/type. Post-activation real login/trips/logout returns #2 Loading/#1 Completed and not_configured/null pay, with own token revoked. No demo rate, earning, approval, payout or other migration created. The pending-activation description below records pre-approval state.
 
 This stage implements the per-trip pay foundation, not the full C7 Earnings module. Supported server rates per A41: 4-Wheeler Closed Van Truck ₱1,000.00; 6-Wheeler Truck ₱1,500.00. Van ₱600.00 remains open because Van is not a current supported vehicle option. The current 10-Wheeler Truck has no specified rate and shows not configured. No undocumented rate or fake demo vehicle is created.
