@@ -1,5 +1,9 @@
 # Touched your files
 
+## Courier push server draft
+
+- Adds a Courier-only registration endpoint and encrypted device registrations tied to Sanctum sessions. Assignment and reassignment queue a generic alert on the existing database queue after commit. Push stays unavailable without Firebase settings and its migration.
+
 ## Android trip location sharing draft
 
 - Courier Trips adds an opt-in location control for active Android legs. The existing location plugin starts an Android foreground service when sharing begins in the visible app.

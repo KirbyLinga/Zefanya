@@ -44,6 +44,7 @@ Route::prefix('courier')->middleware(['auth:sanctum', 'api.role:linehaul', 'thro
     Route::get('/earnings', [\App\Http\Controllers\Api\LinehaulController::class, 'earnings']);
     Route::get('/history', [\App\Http\Controllers\Api\LinehaulController::class, 'history']);
     Route::get('/duty', [\App\Http\Controllers\Api\LinehaulController::class, 'duty']);
+    Route::put('/push-registration', [\App\Http\Controllers\Api\LinehaulController::class, 'changePush'])->middleware('throttle:10,1,courier-push:');
     Route::post('/duty/{dutyAction}', [\App\Http\Controllers\Api\LinehaulController::class, 'changeDuty'])->where('dutyAction', 'on|off|heartbeat');
     Route::post('/trips/{manifest}/decline', [\App\Http\Controllers\Api\LinehaulController::class, 'decline']);
     Route::post('/trips/{manifest}/delay', [\App\Http\Controllers\Api\LinehaulController::class, 'reportDelay']);

@@ -151,6 +151,8 @@ class LinehaulTransferService
             ManifestAuditLog::create(['manifest_id' => $manifest->id, 'action' => 'courier_reassign', 'actor_type' => 'logistics',
                 'actor_id' => $provider->id, 'actor_name' => $provider->business_name, 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(), 'verification_method' => 'manual']);
+            LinehaulPushService::queue((int) $transfer->from_driver_id, $provider->id);
+            LinehaulPushService::queue((int) $transfer->to_driver_id, $provider->id);
 
             return $transfer;
         });

@@ -56,6 +56,7 @@ class LinehaulService
                 'actor_id' => $provider->id, 'actor_name' => $provider->business_name ?: 'Logistics #'.$provider->id,
                 'verification_method' => 'manual',
             ]);
+            LinehaulPushService::queue($driver->id, $provider->id);
 
             return $assignment;
         });

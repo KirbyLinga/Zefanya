@@ -142,6 +142,76 @@ class LinehaulDutyTest extends TestCase
         $this->postJson(route('logistics.manifests.courier', $manifest), ['driver_id' => $driver->id])->assertUnprocessable();
     }
 
+    public function test_push_registration_is_private_session_bound_and_can_be_disabled(): void
+    {
+        ['driver' => $driver] = $this->fixture();
+        $url = '/api/courier/push-registration';
+        $token = 'device-token:long-enough-for-registration';
+        $payload = ['enabled' => true, 'device_token' => $token];
+        config(['linehaul.push_project' => null, 'linehaul.push_credentials_path' => null]);
+        $this->putJson($url, $payload)->assertUnauthorized();
+        $buyer = \App\Models\Buyer\Buyer::factory()->create();
+        $this->withToken($buyer->createToken('forged', ['linehaul'])->plainTextToken)
+            ->putJson($url, $payload)->assertForbidden();
+        $this->api($driver)->putJson($url, $payload)->assertUnprocessable()->assertJsonValidationErrors('enabled');
+        config(['linehaul.push_project' => 'courier-test', 'linehaul.push_credentials_path' => __FILE__]);
+
+        $this->getJson('/api/courier/duty')->assertOk()->assertJsonPath('data.push_available', true);
+        $this->putJson($url, ['enabled' => true])->assertUnprocessable()->assertJsonValidationErrors('device_token');
+        $this->putJson($url, $payload)->assertOk()->assertJsonPath('data.enabled', true)->assertJsonMissingPath('data.device_token');
+        $session = $driver->tokens()->sole();
+        $table = \Illuminate\Support\Facades\DB::table('linehaul_push_registrations');
+        $registration = $table->sole();
+        $this->assertSame(hash('sha256', $token), $registration->token_hash);
+        $this->assertSame($session->id, (int) $registration->personal_access_token_id);
+        $this->assertNotSame($token, $registration->encrypted_token);
+        $this->assertSame($token, \Illuminate\Support\Facades\Crypt::decryptString($registration->encrypted_token));
+
+        $replacement = 'refreshed-device-token:long-enough-for-registration';
+        $this->putJson($url, ['enabled' => true, 'device_token' => $replacement])->assertOk();
+        $this->assertSame(hash('sha256', $replacement), $table->sole()->token_hash);
+        $this->putJson($url, ['enabled' => false])->assertOk()->assertJsonPath('data.enabled', false);
+        $this->assertDatabaseCount('linehaul_push_registrations', 0);
+        $this->putJson($url, $payload)->assertOk();
+        $this->postJson('/api/courier/logout')->assertOk();
+        $this->assertDatabaseCount('linehaul_push_registrations', 0);
+    }
+
+    public function test_push_worker_sends_only_to_a_live_courier_session_and_removes_unregistered_devices(): void
+    {
+        ['driver' => $driver, 'provider' => $provider] = $this->fixture();
+        $credentials = tempnam(sys_get_temp_dir(), 'courier-fcm-');
+        try {
+            $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+            $this->assertNotFalse($key);
+            $this->assertTrue(openssl_pkey_export($key, $privateKey));
+            file_put_contents($credentials, json_encode([
+                'client_email' => 'example@example.test', 'private_key' => $privateKey,
+            ], JSON_THROW_ON_ERROR));
+            config(['linehaul.push_project' => 'courier-test', 'linehaul.push_credentials_path' => $credentials]);
+            $token = 'active-device:long-enough-for-registration';
+            $url = '/api/courier/push-registration';
+            $this->api($driver)->putJson($url, ['enabled' => true, 'device_token' => $token])->assertOk();
+            $this->api($driver)->putJson($url, ['enabled' => true, 'device_token' => 'expired-device:long-enough-for-registration'])->assertOk();
+            $driver->tokens()->latest('id')->firstOrFail()->forceFill(['expires_at' => now()->subMinute()])->save();
+
+            $fcmUrl = 'https://fcm.googleapis.com/v1/projects/courier-test/messages:send';
+            \Illuminate\Support\Facades\Http::preventStrayRequests()->fake([
+                'https://oauth2.googleapis.com/token' => \Illuminate\Support\Facades\Http::response(['access_token' => 'fake-oauth-token']),
+                $fcmUrl => \Illuminate\Support\Facades\Http::response(['error' => ['details' => [['errorCode' => 'UNREGISTERED']]]], 404),
+            ]);
+            (new \App\Jobs\SendLinehaulTripPush($driver->id, $provider->id, now()->addMinutes(5)->timestamp))->handle();
+            \Illuminate\Support\Facades\Http::assertSentCount(2);
+            \Illuminate\Support\Facades\Http::assertSent(fn ($request) =>
+                $request->url() === $fcmUrl && $request->hasHeader('Authorization', 'Bearer fake-oauth-token')
+                && $request['message']['token'] === $token && ! isset($request['message']['data']));
+            $this->assertDatabaseMissing('linehaul_push_registrations', ['token_hash' => hash('sha256', $token)]);
+            $this->assertDatabaseCount('linehaul_push_registrations', 1);
+        } finally {
+            unlink($credentials);
+        }
+    }
+
     public function test_duty_actions_share_the_authenticated_throttle(): void
     {
         ['driver' => $driver] = $this->fixture();

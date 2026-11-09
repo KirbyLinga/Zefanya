@@ -86,3 +86,5 @@ For the unverified release controls, set `LINEHAUL_HUB_COORDINATES` to a JSON ob
 After separate approval and verification, migration `2026_11_09_040000_create_linehaul_trip_payouts` enables recording one completed external payment per confirmed trip in Logistics. The trip's frozen amount is used. Courier Earnings shows the paid date after the payment is recorded.
 
 Set `LINEHAUL_TEN_WHEELER_PAY_MINOR` to the approved per-trip amount in centavos. Until configured, 10-wheeler trips have no quoted rate.
+
+The unverified push server needs a Firebase project with FCM HTTP v1 enabled, a service-account credential stored outside the repository, and the matching Android client configuration. Configure `LINEHAUL_FCM_PROJECT` and `LINEHAUL_FCM_CREDENTIALS_PATH` on the backend after approval. Apply the dedicated registration migration separately and run a worker for `php artisan queue:work database --queue=courier-push` when rehearsing. A phone must opt in again for a new login session. The server only sends to unexpired Courier sessions. Current mobile logins expire after one hour.

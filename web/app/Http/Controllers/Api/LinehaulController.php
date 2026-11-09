@@ -97,6 +97,14 @@ class LinehaulController extends Controller
         return $this->success('Your duty status.', new \App\Http\Resources\Mobile\LinehaulDutyResource($request->user()->fresh()))->header('Cache-Control', 'no-store, private');
     }
 
+    public function changePush(\App\Http\Requests\Api\LinehaulPushRequest $request, \App\Services\Logistics\LinehaulPushService $service): JsonResponse
+    {
+        $enabled = $service->change($request->user(), $request->boolean('enabled'), $request->validated('device_token'));
+
+        return $this->success('Courier notification preference saved.', new \App\Http\Resources\Mobile\LinehaulPushResource($enabled))
+            ->header('Cache-Control', 'no-store, private');
+    }
+
     public function reportDelay(\App\Http\Requests\Api\LinehaulDelayRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulDelayService $service): JsonResponse
     {
         $assignment = $service->report($request->user(), $manifest, $request->validated(), $request);
