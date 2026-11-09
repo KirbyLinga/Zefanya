@@ -30,6 +30,8 @@ Reassignment is enabled in local MySQL through the approved migration in batch 8
 
 Returning from Maps/another app refreshes trip state and the currently visible History/Earnings report. If the server is unreachable, use the explicit Retry state after restoring connectivity; do not interpret a failed refresh as a successful trip action. Unsent delay form input is retained while switching apps. Background route recording/push remain unavailable.
 
+While a Courier is carrying the In Transit trip, refresh its Logistics manifest and check **Last trip location**. The panel shows the last point reported during the current leg, its accuracy and Philippine timestamp. A report five minutes old or older is stale. The replacement's point appears after continuation and a report for the new leg. Reported arrival ends the panel.
+
 After restarting Flutter with the current source, History and Earnings refresh when returning from another tab, retaining the selected dates/page. Pull-to-refresh and Retry also retain that page; a failed refresh hides stale results. Selecting a different date preset starts at page one. This fetches on navigation, not by background push.
 
 | Screen | Verified data / expected display |

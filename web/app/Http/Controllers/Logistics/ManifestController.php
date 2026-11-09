@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -160,7 +161,7 @@ class ManifestController extends Controller
         return new \App\Http\Resources\Mobile\LinehaulDocumentResource(['path' => $breakdown->photo_path, 'mime' => 'image/jpeg']);
     }
 
-    public function show(Request $request, Manifest $manifest): View
+    public function show(Request $request, Manifest $manifest): Response
     {
         $provider = $this->provider($request);
         $this->ownedManifest($provider->id, $manifest);
@@ -180,7 +181,7 @@ class ManifestController extends Controller
                 ->filter(fn ($driver) => \App\Services\Logistics\LinehaulDutyService::available($driver)
                     && ! \App\Services\Logistics\LinehaulDutyService::busy($driver));
 
-        return view('Logistics.Manifests.show', [
+        return response()->view('Logistics.Manifests.show', [
             'provider' => $provider,
             'manifest' => $manifest,
             'items' => $items,
@@ -190,6 +191,7 @@ class ManifestController extends Controller
                 : collect(),
             'hubs' => $this->hubs($request),
             'courierAssignment' => $courierAssignment,
+            'courierTripLocation' => \App\Services\Logistics\LinehaulDutyService::tripLocation($manifest, $courierAssignment),
             'breakdownOffer' => $breakdownOffer,
             'replacementDrivers' => $replacementDrivers,
             'courierNeedsRescan' => $courierAssignment !== null && \App\Services\Logistics\LinehaulTransferService::pending($courierAssignment),
@@ -209,7 +211,7 @@ class ManifestController extends Controller
                         && (! \App\Services\Logistics\LinehaulDeclineService::installed() || ! \App\Models\Logistics\LinehaulTripDecline::where('manifest_id', $manifest->id)->where('linehaul_driver_id', $driver->id)->exists())) : collect(),
             'courierReadiness' => \App\Services\Logistics\LinehaulDutyService::installed()
                 ? \App\Models\Logistics\LinehaulDriver::where('logistics_provider_id', $provider->id)->with('latestDutyCheck')->orderBy('name')->get() : collect(),
-        ]);
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function assignCourier(\App\Http\Requests\Logistics\LinehaulAssignRequest $request, Manifest $manifest, \App\Services\Logistics\LinehaulService $service): RedirectResponse

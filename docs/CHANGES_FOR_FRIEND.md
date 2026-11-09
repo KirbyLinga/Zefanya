@@ -1,5 +1,10 @@
 # Touched your files
 
+## Logistics last trip location
+
+- ManifestController and Logistics/Manifests/show.blade.php display the active leg's last reported Courier position on the existing company-owned manifest page with private/no-store caching. Readiness keeps checklist and freshness metadata, and coordinates are scoped to the active trip panel.
+- LinehaulDutyService validates the stored point and checks carrier provenance, the start of the current leg and freshness. Uses existing foreground duty reports and transfer continuation. Transfer feature tests cover company isolation, stale data, takeover and arrival.
+
 ## Reassignment local activation and Van rate
 
 - Applied only the approved reassignment migration in local batch 81. Existing trip, parcel, order, audit and evidence data fingerprints match. The transfer table starts empty.

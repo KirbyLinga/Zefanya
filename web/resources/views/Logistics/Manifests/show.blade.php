@@ -67,9 +67,6 @@
                 <a class="underline" href="{{ route('logistics.couriers.vehicle', $courier) }}">Vehicle & documents: {{ $courier->name }}</a>
                 <p class="font-semibold">{{ $courier->name }} · {{ !$courier->isOperational() ? 'Unavailable account' : (!$courier->on_duty ? 'Off Duty' : (\App\Services\Logistics\LinehaulDutyService::available($courier) ? 'On Duty' : 'Location unknown')) }}</p>
                 <p>Passed checklist: {{ $courier->duty_checked_at?->format('M j, Y g:i A') ?? 'none' }} · Last update: {{ $courier->last_seen_at?->diffForHumans() ?? 'none' }}</p>
-                @if ($courier->duty_location)
-                    <p>Last reported location: {{ $courier->duty_location['latitude'] }}, {{ $courier->duty_location['longitude'] }} (accuracy {{ $courier->duty_location['accuracy'] }} m)</p>
-                @endif
                 @if ($courier->latestDutyCheck?->passed === false)
                     <p class="mt-1">Checklist failed: {{ $courier->latestDutyCheck->note }}</p>
                 @endif
@@ -85,6 +82,18 @@
             @if ($courierAssignment->arrived_at) · Courier reported arrival @endif
         </p>
         <p>Logistics confirms parcel receipt using the existing receiving screen.</p>
+        @if ($manifest->status === \App\Enums\ManifestStatus::Dispatched && !$courierAssignment->arrived_at)
+            <div class="mt-3 border-t pt-3">
+                <h3 class="font-semibold">Last trip location</h3>
+                @if ($courierTripLocation)
+                    <p>{{ $courierTripLocation['stale'] ? 'Stale location' : 'Recent location' }} · {{ $courierTripLocation['reported_at'] }} Philippine time · Accuracy {{ $courierTripLocation['accuracy'] }} m</p>
+                    <p>Latitude {{ $courierTripLocation['latitude'] }}, longitude {{ $courierTripLocation['longitude'] }}</p>
+                @else
+                    <p>No location reported for this leg yet.</p>
+                @endif
+                <p class="mt-1 text-xs">Refresh this page to check for another report.</p>
+            </div>
+        @endif
         @if ($breakdownOffer && $replacementDrivers->isNotEmpty())
             <form method="POST" action="{{ route('logistics.manifests.courier.reassign', $manifest) }}" class="mt-4 space-y-2">
                 @csrf

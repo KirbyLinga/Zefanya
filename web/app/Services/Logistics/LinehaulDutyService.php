@@ -2,9 +2,11 @@
 
 namespace App\Services\Logistics;
 
+use App\Enums\ManifestStatus;
 use App\Models\Logistics\LinehaulAssignment;
 use App\Models\Logistics\LinehaulDriver;
 use App\Models\Logistics\LinehaulDutyCheck;
+use App\Models\Logistics\Manifest;
 use App\Policies\LinehaulPolicy;
 use App\Support\RuntimeSchema;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +56,43 @@ class LinehaulDutyService
     {
         return LinehaulAssignment::currentOffer()->where('linehaul_driver_id', $driver->id)
             ->whereHas('manifest', fn ($query) => $query->whereIn('status', ['DRAFT', 'DISPATCHED']))->exists();
+    }
+
+    /** @return array{latitude: float, longitude: float, reported_at: string, accuracy: float, stale: bool}|null */
+    public static function tripLocation(Manifest $manifest, ?LinehaulAssignment $assignment): ?array
+    {
+        if (! self::installed() || $manifest->status !== ManifestStatus::Dispatched
+            || $manifest->dispatched_at === null || $assignment === null || $assignment->arrived_at !== null) {
+            return null;
+        }
+
+        $assignment->setRelation('manifest', $manifest);
+        $driver = $assignment->driver;
+        $since = $assignment->takeover_resumed_at ?? $manifest->dispatched_at;
+        $seen = $driver?->last_seen_at;
+        if ($driver === null || (int) $driver->logistics_provider_id !== (int) $manifest->logistics_provider_id
+            || ! LinehaulTransferService::carrier($assignment)
+            || $seen === null || $seen->lt($since) || $seen->isFuture()) {
+            return null;
+        }
+
+        $point = $driver->duty_location ?? [];
+        $latitude = $point['latitude'] ?? null;
+        $longitude = $point['longitude'] ?? null;
+        $accuracy = $point['accuracy'] ?? null;
+        if (! is_numeric($latitude) || ! is_finite((float) $latitude) || $latitude < -90 || $latitude > 90
+            || ! is_numeric($longitude) || ! is_finite((float) $longitude) || $longitude < -180 || $longitude > 180
+            || ! is_numeric($accuracy) || ! is_finite((float) $accuracy) || $accuracy < 0 || $accuracy > 100) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $latitude,
+            'longitude' => (float) $longitude,
+            'reported_at' => $seen->copy()->timezone('Asia/Manila')->format('M j, Y H:i:s'),
+            'accuracy' => (float) $accuracy,
+            'stale' => ! $driver->on_duty || ! $seen->gt(now()->subMinutes(5)),
+        ];
     }
 
     public function requireReady(LinehaulDriver $driver): void

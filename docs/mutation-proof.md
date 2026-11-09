@@ -1,5 +1,9 @@
 # Combined Courier security proof — 2026-11-08
 
+## Last trip location
+
+On tmp/mutation, removing the current-carrier check failed the takeover empty-state assertion (0 passed, 14 assertions). Removing the current-leg timestamp check failed the post-continuation empty-state assertion before a new heartbeat (0 passed, 18 assertions). Both faults were restored and the temporary branch removed. Named regression: `test_logistics_trip_location_tracks_only_the_current_leg_and_marks_old_reports_stale`.
+
 ## Van trip rate
 
 Removed the Van rate on tmp/mutation. `test_reviewed_van_rate_is_frozen_at_departure` failed with expected quote/60000 and actual not_configured/null (0 passed, 1 assertion). Restored the rate and removed the temporary branch.

@@ -227,6 +227,52 @@ class LinehaulTransferTest extends TestCase
         $response->assertTooManyRequests();
     }
 
+    public function test_logistics_trip_location_tracks_only_the_current_leg_and_marks_old_reports_stale(): void
+    {
+        $f = $this->transferFixture();
+        $owner = $f['provider'];
+        $manifest = $f['manifest'];
+        $show = route('logistics.manifests.show', $manifest);
+        $duty = app(LinehaulDutyService::class);
+        $firstPoint = 'Latitude 14.12345, longitude 121.12345';
+        $replacementPoint = 'Latitude 14.54321, longitude 121.54321';
+
+        $this->travel(1)->seconds();
+        $duty->change($f['driver'], 'heartbeat', ['latitude' => 14.12345, 'longitude' => 121.12345, 'accuracy' => 18]);
+        $duty->change($f['replacement'], 'heartbeat', ['latitude' => 14.54321, 'longitude' => 121.54321, 'accuracy' => 10]);
+
+        $this->actingAs($owner, 'logistics')->get($show)->assertOk()
+            ->assertHeaderContains('Cache-Control', 'no-store')
+            ->assertSee('Recent location')->assertSee('Accuracy 18 m')
+            ->assertSee($firstPoint)->assertDontSee('14.54321');
+        $other = \App\Models\Logistics\LogisticsProvider::factory()->create();
+        $other->forceFill(['status' => \App\Enums\LogisticsProviderStatus::Approved])->save();
+        $this->actingAs($other, 'logistics')->get($show)->assertNotFound()->assertDontSee($firstPoint);
+
+        $this->travel(6)->minutes();
+        $this->actingAs($owner, 'logistics')->get($show)->assertOk()
+            ->assertSee('Stale location')->assertSee($firstPoint);
+        $duty->change($f['replacement'], 'heartbeat', ['latitude' => 14.54321, 'longitude' => 121.54321, 'accuracy' => 10]);
+        $this->transfer($f);
+        $this->get($show)->assertOk()->assertSee('No location reported for this leg yet.')
+            ->assertDontSee($firstPoint)->assertDontSee($replacementPoint);
+
+        $this->travel(1)->seconds();
+        $service = app(LinehaulService::class);
+        foreach ([$f['parcel'], $f['secondParcel']] as $parcel) {
+            $service->act($f['replacement'], $manifest, 'takeover-scan',
+                ['offer_version' => 2, 'tracking_number' => $parcel->tracking_number], request());
+        }
+        $service->act($f['replacement'], $manifest, 'takeover-continue', ['offer_version' => 2], request());
+        $this->get($show)->assertOk()->assertSee('No location reported for this leg yet.')
+            ->assertDontSee($replacementPoint);
+
+        $duty->change($f['replacement'], 'heartbeat', ['latitude' => 14.54321, 'longitude' => 121.54321, 'accuracy' => 10]);
+        $this->get($show)->assertOk()->assertSee('Recent location')->assertSee($replacementPoint)->assertDontSee($firstPoint);
+        $service->act($f['replacement'], $manifest, 'arrive', [], request());
+        $this->get($show)->assertOk()->assertDontSee('Last trip location')->assertDontSee($replacementPoint);
+    }
+
     public function test_continue_rechecks_fresh_readiness_and_capacity_after_all_scans(): void
     {
         $f = $this->transferFixture(); $this->transfer($f);
