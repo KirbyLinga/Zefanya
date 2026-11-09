@@ -4,7 +4,7 @@ Use this guide instead of older Courier steps in demo-script.md. Checkout: C:/Us
 
 ## Start and sign in
 
-Fresh verified preview: http://127.0.0.1:5177. Backend: http://127.0.0.1:8000. The existing preview on 5176 was preserved; use 5177 for this rehearsal.
+Open the local Chrome preview at http://127.0.0.1:5177 while the Flutter server is running. It connects to the local API at http://127.0.0.1:8000.
 
 If restarting the backend, run from the checkout root:
 
@@ -26,7 +26,7 @@ Choose **Are you a Courier? Sign in here** on the shared sign-in page. Use the c
 
 Breakdown reporting is locally enabled (batch 80). After genuine departure, use Report breakdown to enter a reason, a future ETA and a JPG/PNG photo. Logistics receives the report and can download the photo from its manifest page. Retry keeps the form and photo. Demo #2 remains Loading.
 
-Reassignment is enabled in local MySQL through the approved migration in batch 81. Use an eligible in-transit breakdown and a second ready Courier from the same company. On the Logistics manifest page, select the replacement and record the reason. The first Courier should see Reassigned in History with zero pay. The replacement must rescan every parcel before Continue trip becomes available. Check that Report arrival appears after continuation, then complete the normal Logistics receiving and seal confirmation. Only the finishing Courier should see the configured rate as earned after handover. Physical rehearsal with two devices remains open.
+Reassignment is enabled in local MySQL through the approved migration in batch 81. The two-Courier rehearsal requires a second operational Courier in the same company. At preflight, the company had one Courier, who was Off Duty, and zero approved vehicle profiles. Use separate browser profiles or devices so both Courier sessions can stay signed in. To verify actual earnings during the rehearsal, the replacement needs an approved vehicle with a configured rate before taking the trip.
 
 Returning from Maps/another app refreshes trip state and the currently visible History/Earnings report. If the server is unreachable, use the explicit Retry state after restoring connectivity; do not interpret a failed refresh as a successful trip action. Unsent delay form input is retained while switching apps. Background route recording/push remain unavailable.
 
@@ -53,7 +53,7 @@ These steps change the demo trip and are outside the read-only preflight result.
 3. Batch #2 had zero loading scans at preflight. Scan actual demo labels or use manual entry for DEMO-COURIER-B01-P01 and DEMO-COURIER-B01-P02. Neither parcel was received or released. Confirm unrelated numbers refuse and repeats do not increase the count. Camera opening was user-reported; real QR/Code128 and permission-lifecycle checks remain open.
 4. In Logistics at http://127.0.0.1:8000/logistics/manifests, optionally save a future Philippine-time planned departure for #2. It should appear separately from actual departure and must not move the batch.
 5. Load both parcels, then depart with the demo label's seal (BH-0004521 is a valid format example). Check In Transit and retained parcel/seal details. No real departure was performed during preflight.
-6. While In Transit, before arrival, optionally report a truthful demo delay reason and chosen future ETA. Logistics should see both in batch details/database inbox. This is not push or automatic ETA. Breakdown reassignment remains unimplemented.
+6. While In Transit, before arrival, use Report breakdown for the reassignment rehearsal. Submit a reason, a future ETA and a JPG/PNG photo of the rehearsal evidence. In the owning Logistics manifest view, confirm that the photo downloads, select the ready replacement Courier and record the reassignment reason. The original Courier should see Reassigned in History with zero pay. Sign in as the replacement. Try continuing after one parcel scan and confirm it remains blocked. Rescan the second parcel, then tap Continue trip. Report arrival should now be available.
 7. Report arrival when appropriate. Courier-reported arrival is not verified geofencing. Logistics, not Courier, confirms handover.
 8. Logistics verifies/receives every present parcel and enters the observed demo seal on first receipt. A mismatch needs a note and yields an issue result. Missing/damaged controls belong to a separate genuine exception rehearsal; damaged evidence must be real. These actions change records and were not executed locally during preflight.
 9. Refresh History/Earnings for the actual handover date: one trip entry, no duplicate earnings. Without a supported reviewed vehicle/rate snapshot, pay stays unconfigured/excluded. Only resolve the current trip before another active assignment.
@@ -73,4 +73,4 @@ Draft batches #3/#4 each retain two demo parcels and are unassigned. A decline r
 
 Isolated tests prove software behavior, not actual location/documents/custody or simultaneous MySQL scheduling. No full-mobile rerun/analysis was needed for this documentation/runtime-only stage; prior stage has 931 mobile passes and eight existing analysis issues.
 
-Core local checks pass; physical acceptance is incomplete. Payouts, Van/10-wheel rate gaps, breakdown reassignment/pay/history, universal reviewed onboarding/capacity, geofence/background GPS and push remain open. A phone needs a reachable API: PC loopback is not its backend. No verified HTTPS release address or new live APK is supplied here.
+Physical acceptance, simultaneous MySQL reassignment, payout recording, the unspecified 10-wheel rate, universal reviewed onboarding, geofencing, background tracking, push and a hosted HTTPS phone build remain open. The loopback preview runs on the PC. A separate phone needs a reachable API.
