@@ -32,6 +32,8 @@ Returning from Maps/another app refreshes trip state and the currently visible H
 
 While a Courier is carrying the In Transit trip, refresh its Logistics manifest and check **Last trip location**. The panel shows the last point reported during the current leg, its accuracy and Philippine timestamp. A report five minutes old or older is stale. The replacement's point appears after continuation and a report for the new leg. Reported arrival ends the panel.
 
+After reassignment, refresh Trips on the original Courier's session. The newest reassignment from the past 48 hours appears above the active trips. **View trip history** opens the reason and zero-pay entry. The close button hides the notice for the current session.
+
 After restarting Flutter with the current source, History and Earnings refresh when returning from another tab, retaining the selected dates/page. Pull-to-refresh and Retry also retain that page; a failed refresh hides stale results. Selecting a different date preset starts at page one. This fetches on navigation, not by background push.
 
 | Screen | Verified data / expected display |

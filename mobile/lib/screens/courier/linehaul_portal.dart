@@ -54,6 +54,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   late Future<List<LinehaulTrip>> _trips;
   bool _busy = false;
   int _tab = 0;
+  (String, DateTime)? _dismissedReassignment;
   final _visitedTabs = <int>{0};
   final _historyKey = GlobalKey<LinehaulHistoryScreenState>();
   final _earningsKey = GlobalKey<LinehaulEarningsScreenState>();
@@ -310,6 +311,70 @@ class _LinehaulPortalState extends State<LinehaulPortal>
         ),
     ],
   );
+
+  void _selectTab(int index) {
+    if (index == _tab) return;
+    if (index == 1) {
+      unawaited(_historyKey.currentState?.refresh() ?? Future<void>.value());
+    } else if (index == 2) {
+      unawaited(_earningsKey.currentState?.refresh() ?? Future<void>.value());
+    }
+    setState(() {
+      _visitedTabs.add(index);
+      _tab = index;
+    });
+  }
+
+  Widget? _reassignmentNotice(List<LinehaulTrip> trips) {
+    final now = DateTime.now();
+    final cutoff = now.subtract(const Duration(hours: 48));
+    LinehaulTrip? latest;
+    for (final trip in trips) {
+      final time = trip.reassignedAt;
+      if (trip.status != 'Reassigned' ||
+          time == null ||
+          time.isBefore(cutoff) ||
+          time.isAfter(now)) {
+        continue;
+      }
+      if (latest == null || time.isAfter(latest.reassignedAt!)) {
+        latest = trip;
+      }
+    }
+    if (latest == null) return null;
+    final key = (latest.id, latest.reassignedAt!);
+    if (key == _dismissedReassignment) return null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _CourierCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Trip #${latest.id} was reassigned',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Dismiss reassignment notice',
+                  onPressed: () => setState(() => _dismissedReassignment = key),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const Text('Logistics assigned another Courier.'),
+            TextButton(
+              onPressed: () => _selectTab(1),
+              child: const Text('View trip history'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _reload() {
     final client = context.read<Repositories>().client;
@@ -1037,22 +1102,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
           NavBarItem(glyph: NavGlyph.profile, label: 'Profile'),
         ],
         currentIndex: _tab,
-        onTap: (index) {
-          if (index == _tab) return;
-          if (index == 1) {
-            unawaited(
-              _historyKey.currentState?.refresh() ?? Future<void>.value(),
-            );
-          } else if (index == 2) {
-            unawaited(
-              _earningsKey.currentState?.refresh() ?? Future<void>.value(),
-            );
-          }
-          setState(() {
-            _visitedTabs.add(index);
-            _tab = index;
-          });
-        },
+        onTap: _selectTab,
       ),
       body: Center(
         child: ConstrainedBox(
@@ -1091,6 +1141,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                     'Reassigned',
                   ].contains(trip.status);
                   final trips = all.where((trip) => !isHistory(trip)).toList();
+                  final reassignment = _reassignmentNotice(all);
                   return RefreshIndicator(
                     onRefresh: () async {
                       _reload();
@@ -1121,6 +1172,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                           ),
                         ),
                         if (_busy) const LinearProgressIndicator(),
+                        if (reassignment != null) reassignment,
                         if (trips.isEmpty)
                           _CourierCard(
                             child: EmptyState(

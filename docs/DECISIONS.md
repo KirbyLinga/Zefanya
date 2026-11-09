@@ -1,5 +1,9 @@
 # Decisions & Deviations
 
+- Notice layout retry: initial suite 31 passed / one failed because the Dismiss text button at y612 was under the floating bar at 360x640 and 1.3 text scale. Moved dismissal to a labelled close icon in the notice header, retaining the test assertions. Retry `00:13 +32: All tests passed!`.
+
+- Courier extension 27 covers the in-app notification part of COU-TRN-004. Trips shows the newest authenticated Reassigned snapshot from the previous 48 hours with a direct History action and dismissal for the current session. Older and untimed snapshots remain in History. Reuse the existing transfer resource and Trips refresh/foreground return; no notification write or push. New widget test covers the notice, History and dismissal across a reload. Existing terminal-history test now exercises a dated older snapshot and checks no notice, with existing assertions retained.
+
 - Courier extension 26 scopes last reported location to the current leg on the authenticated Logistics manifest. Show coordinates, Philippine time and accuracy, with stale at five minutes and an empty state during takeover or before a report for the current leg. Stop displaying after arrival. Removed coordinates from company-wide readiness, retained its checklist/freshness, and marked the manifest response private/no-store. Existing foreground duty heartbeat only. New transfer test covers owner/foreign company, staleness, pre- and post-takeover reports, and arrival. Existing assertions retained.
 - The first location patch used an incomplete controller hunk, then automatic approval review rejected the proposed Google Maps link due to precise coordinates reaching an external provider. Shipped the local authorized-page display. Logistics build passed in 8.02s with generated Lucide restored. Four-file SQLite suite passed 25 tests/427 assertions (16905ms). App code and schema unchanged. Pint previously waived and not run.
 

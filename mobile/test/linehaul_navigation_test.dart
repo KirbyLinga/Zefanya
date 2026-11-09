@@ -181,16 +181,56 @@ void main() {
     },
   );
 
-  testWidgets('reassigned snapshot appears in History with no trip actions', (
+  testWidgets('recent reassignment notice opens History and can be dismissed', (
+    tester,
+  ) async {
+    final posts = <String>[];
+    await _mount(tester, _Directions(), {
+      ..._trip(status: 'Reassigned'),
+      'items': [],
+      'reassignment_reason': 'Engine failure',
+      'reassigned_at': DateTime.now()
+          .toUtc()
+          .subtract(const Duration(hours: 2))
+          .toIso8601String(),
+      'trip_pay': {'status': 'ineligible', 'amount_minor': 0},
+    }, posts);
+
+    const notice = 'Trip #12 was reassigned';
+    expect(find.text(notice), findsOneWidget);
+    expect(find.text('Continue trip'), findsNothing);
+    await tester.tap(find.text('View trip history'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Reassigned by Logistics: Engine failure'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Trips'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Dismiss reassignment notice'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Refresh trips'));
+    await tester.pumpAndSettle();
+    expect(find.text(notice), findsNothing);
+    expect(posts, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('older reassignment stays in History with no trip actions', (
     tester,
   ) async {
     await _mount(tester, _Directions(), {
       ..._trip(status: 'Reassigned'),
       'items': [],
       'reassignment_reason': 'Engine failure',
+      'reassigned_at': DateTime.now()
+          .toUtc()
+          .subtract(const Duration(days: 3))
+          .toIso8601String(),
       'trip_pay': {'status': 'ineligible', 'amount_minor': 0},
     }, []);
     expect(find.text('Trip #12'), findsNothing);
+    expect(find.text('Trip #12 was reassigned'), findsNothing);
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(

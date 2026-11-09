@@ -1,5 +1,9 @@
 # Touched your files
 
+## Courier reassignment notice
+
+- The Courier Trips screen reads the existing reassignment timestamp to show a recent notice with a History shortcut and a session-level close button. The original Courier keeps the full entry in dated History. Mobile navigation regressions cover the notice, close control and older records.
+
 ## Logistics last trip location
 
 - ManifestController and Logistics/Manifests/show.blade.php display the active leg's last reported Courier position on the existing company-owned manifest page with private/no-store caching. Readiness keeps checklist and freshness metadata, and coordinates are scoped to the active trip panel.

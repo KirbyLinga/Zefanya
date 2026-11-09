@@ -21,6 +21,7 @@ class LinehaulTrip {
     this.canReportBreakdown = false,
     this.needsRescan = false,
     this.reassignmentReason,
+    this.reassignedAt,
     this.delay,
     this.recordedWeightGrams,
     this.acceptedAt,
@@ -46,6 +47,7 @@ class LinehaulTrip {
   final bool canReportBreakdown;
   final bool needsRescan;
   final String? reassignmentReason;
+  final DateTime? reassignedAt;
   final LinehaulDelay? delay;
   final int? recordedWeightGrams;
   final DateTime? acceptedAt;
@@ -168,6 +170,9 @@ class LinehaulTrip {
       needsRescan: data['needs_rescan'] == true,
       reassignmentReason: data['status'] == 'Reassigned'
           ? data['reassignment_reason'] as String
+          : null,
+      reassignedAt: data['status'] == 'Reassigned'
+          ? timestamp('reassigned_at')
           : null,
       delay: data['delay'] is Map
           ? LinehaulDelay.fromJson(
