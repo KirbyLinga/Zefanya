@@ -44,7 +44,7 @@ class SellerPayoutConcurrencyTest extends TestCase
     private function fixture(): array
     {
         $seller = Seller::factory()->create();
-        $admin = Admin::factory()->create(['role' => 'admin']);
+        $admin = Admin::factory()->create(['role' => 'super_admin']);
         $parent = Order::factory()->create(['discount_minor' => 5000]);
         $order = SellerOrder::factory()->status(OrderStatus::Completed)->create([
             'seller_id' => $seller->id, 'order_id' => $parent->id, 'subtotal_minor' => 69900,
@@ -63,7 +63,7 @@ class SellerPayoutConcurrencyTest extends TestCase
         ])->save();
         $settlement = app(SellerSettlementService::class)->prepare($remittance);
         app(CommissionFinalizationService::class)->finalize($order);
-        $this->assertSame(61655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(58410, app(SellerPayoutRequestService::class)->availableBalance($seller));
 
         return [$seller, $admin, $settlement->fresh(), [
             'order' => $order->fresh()->getRawOriginal(), 'payment' => $payment->fresh()->getRawOriginal(),
@@ -79,7 +79,7 @@ class SellerPayoutConcurrencyTest extends TestCase
     private function settlement(SellerSettlement $settlement, Admin $admin, string $reference = 'MYSQL-SETTLEMENT-A'): array
     {
         return ['action' => 'settlement', 'settlement' => $settlement->id, 'admin' => $admin->id,
-            'amount_minor' => 61655, 'reference' => $reference];
+            'amount_minor' => 58410, 'reference' => $reference, 'reason' => 'MySQL direct settlement race check.'];
     }
 
     private function assertCleanOverlap(array $results, SellerSettlement $settlement, array $snapshots): void
@@ -115,7 +115,7 @@ class SellerPayoutConcurrencyTest extends TestCase
         $this->assertDatabaseCount('seller_payout_allocations', 1);
         $this->assertSame(10000, SellerPayoutRequest::query()->sole()->amount_minor);
         $this->assertSame(10000, (int) SellerPayoutAllocation::query()->sum('amount_minor'));
-        $this->assertSame(51655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(48410, app(SellerPayoutRequestService::class)->availableBalance($seller));
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
         $this->assertNull($settlement->fresh()->paid_amount_minor);
         $this->assertCleanOverlap($results, $settlement, $snapshots);
@@ -136,26 +136,26 @@ class SellerPayoutConcurrencyTest extends TestCase
         $this->assertSame([$reservationFirst ? 201 : 200, 422], array_column($results, 'status'));
         $this->assertSame([$reservationFirst ? 'settlement' : 'amount'], $results['b']['validation_fields']);
         $this->assertSame($reservationFirst ? SellerSettlement::PENDING_PAYOUT : SellerSettlement::PAID, $settlement->fresh()->status);
-        $this->assertSame($reservationFirst ? null : 61655, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame($reservationFirst ? null : 58410, $settlement->fresh()->paid_amount_minor);
         $this->assertDatabaseCount('seller_payout_requests', $reservationFirst ? 1 : 0);
         $this->assertDatabaseCount('seller_payout_allocations', $reservationFirst ? 1 : 0);
-        $this->assertSame($reservationFirst ? 51655 : 0, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame($reservationFirst ? 48410 : 0, app(SellerPayoutRequestService::class)->availableBalance($seller));
         $this->assertCleanOverlap($results, $settlement, $snapshots);
     }
 
     public function test_two_admins_cannot_settle_the_same_earnings_twice(): void
     {
         [, $admin, $settlement, $snapshots] = $this->fixture();
-        $otherAdmin = Admin::factory()->create(['role' => 'admin']);
+        $otherAdmin = Admin::factory()->create(['role' => 'super_admin']);
         $results = Race::run(
             $this->settlement($settlement, $admin) + ['hold' => 'seller'],
             $this->settlement($settlement, $otherAdmin, 'MYSQL-SETTLEMENT-B') + ['watch' => 'seller'],
         );
 
-        $this->assertSame([200, 422], array_column($results, 'status'));
+        $this->assertSame([200, 409], array_column($results, 'status'));
         $this->assertSame(['settlement'], $results['b']['validation_fields']);
         $this->assertDatabaseCount('seller_settlements', 1);
-        $this->assertSame(61655, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame(58410, $settlement->fresh()->paid_amount_minor);
         $this->assertSame('MYSQL-SETTLEMENT-A', $settlement->fresh()->payout_reference);
         $this->assertSame($admin->id, $settlement->fresh()->paid_by_admin_id);
         $this->assertDatabaseCount('seller_payout_requests', 0);

@@ -155,7 +155,7 @@ final class T05Worker extends TestCase
         } elseif ($task['action'] === 'settlement') {
             $response = $this->actingAs(Admin::query()->findOrFail($task['admin']), 'admin')
                 ->postJson(route('admin.settlements.confirm', SellerSettlement::query()->findOrFail($task['settlement'])),
-                    ['amount_minor' => $task['amount_minor'], 'reference' => $task['reference']]);
+                    ['amount_minor' => $task['amount_minor'], 'reference' => $task['reference'], 'reason' => $task['reason']]);
             $result = ['status' => $response->getStatusCode(), 'success' => $response->getStatusCode() === 200,
                 'validation_fields' => array_keys($response->json('errors') ?? [])];
         } elseif ($task['action'] === 'return_request') {

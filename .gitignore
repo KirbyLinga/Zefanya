@@ -31,3 +31,7 @@ Thumbs.db
 /playwright/test-results/
 *.sqlite
 .empryo
+
+# Demo account directory: lists logins that work on the live site. Keep local only.
+/docs/DEMO-ACCOUNTS.md
+/docs/demo-accounts-riders.csv

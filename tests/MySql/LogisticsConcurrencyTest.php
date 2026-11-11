@@ -7,11 +7,13 @@ use App\Enums\OrderStatus;
 use App\Enums\ParcelIncidentStatus;
 use App\Models\Logistics\ParcelRoute;
 use App\Models\Logistics\ParcelRouteRereoute;
+use App\Models\Logistics\TransferCourier;
 use App\Models\Logistics\TransportConnection;
 use App\Models\Shared\StatusHistory;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\RoutePlannerService;
+use App\Services\Logistics\TransferCourierService;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
 use Tests\TestCase;
 
@@ -53,6 +55,16 @@ class LogisticsConcurrencyTest extends TestCase
         $service = app(ManifestService::class);
         $manifest = $service->create($f['a']['provider'], $f['a']['station']->id, $f['destination']->id);
         $item = $service->addParcel($manifest, $f['parcel']);
+        $courier = (new TransferCourier)->forceFill([
+            'logistics_provider_id' => $f['a']['provider']->id,
+            'name' => 'Custody Courier',
+            'contact_no' => '09170000001',
+            'vehicle_type' => 'Van',
+            'plate_number' => 'VAN 100',
+            'status' => TransferCourier::ACTIVE,
+        ]);
+        $courier->save();
+        app(TransferCourierService::class)->assignToManifest($manifest, $f['a']['provider'], $courier->id, null, null);
         $scan = $service->verifyScan($manifest, $f['a']['provider'], $f['parcel']->tracking_number, 'dispatch');
         $service->dispatch($manifest, $f['a']['provider'], [$item->id => $scan['verification_token']]);
         $task = ['action' => 'phase6_receive', 'provider' => $f['a']['provider']->id, 'manifest' => $manifest->id, 'item' => $item->id];

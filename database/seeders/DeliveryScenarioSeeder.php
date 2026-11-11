@@ -10,6 +10,7 @@ use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
 use App\Models\Logistics\LogisticsShippingRate;
+use App\Models\Logistics\TransferCourier;
 use App\Models\Logistics\TransportConnection;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
@@ -19,6 +20,7 @@ use App\Services\Buyer\CheckoutCarrierService;
 use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\ProviderHandoffSchemaService;
 use App\Services\Logistics\RoutePlannerService;
+use App\Services\Logistics\TransferCourierService;
 use App\Services\Seller\SellerShippingProviderService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -210,7 +212,8 @@ class DeliveryScenarioSeeder extends Seeder
             return;
         }
 
-        $admin = Admin::query()->orderBy('id')->first();
+        // The platform's own Admin approves partnerships; a demo Admin never does.
+        $admin = Admin::query()->where('email', 'not like', '%'.self::SLUG_PREFIX.'%')->orderBy('id')->first();
 
         if ($admin === null) {
             $this->command?->error('An Admin must exist to approve provider partnerships. Run AdminSeeder first.');
@@ -221,6 +224,7 @@ class DeliveryScenarioSeeder extends Seeder
         DB::transaction(function () use ($admin): void {
             foreach (self::PROVIDERS as $key => $definition) {
                 $this->network($key, $definition);
+                $this->transferCourier($key, $definition['name']);
             }
 
             foreach (self::SELLERS as $slug => [$provider, $station, $name]) {
@@ -423,6 +427,36 @@ class DeliveryScenarioSeeder extends Seeder
         // A rider linked to any barangay serves only linked barangays, so link
         // every barangay at the station: the rider handles pickups and deliveries.
         app(LogisticsHubService::class)->linkCourierToAreas($provider->id, $courier->id, $areaIds);
+    }
+
+    /**
+     * One Courier record per demo company, so its transfer batches and
+     * handoffs can be dispatched. Couriers are records, not accounts.
+     */
+    private function transferCourier(string $key, string $companyName): void
+    {
+        if (! TransferCourierService::available()) {
+            return;
+        }
+        $index = array_search($key, array_keys(self::PROVIDERS), true);
+        $name = str_replace('Express', 'Courier', $companyName);
+        // TransferCourier is fully guarded, so it is filled with forceFill(), never mass assigned.
+        $courier = TransferCourier::query()
+            ->where('logistics_provider_id', $this->providers[$key]->id)
+            ->where('name', $name)
+            ->first();
+        if ($courier === null) {
+            $courier = new TransferCourier;
+            $courier->forceFill([
+                'logistics_provider_id' => $this->providers[$key]->id,
+                'name' => $name,
+                'contact_no' => sprintf('0917000%04d', 101 + (int) $index),
+                'vehicle_type' => 'Van',
+                'plate_number' => sprintf('DEMO %d', 101 + (int) $index),
+                'status' => TransferCourier::ACTIVE,
+            ])->save();
+            $this->report['created'][] = 'Courier '.$courier->name;
+        }
     }
 
     private function sellerWithProduct(string $slug, string $provider, string $station, string $name): void

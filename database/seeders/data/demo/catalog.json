@@ -1,0 +1,1338 @@
+{
+    "themes": [
+        {
+            "key": "electronics",
+            "category": "Electronics and Gadgets",
+            "products": [
+                {
+                    "key": "speaker",
+                    "name": "Portable Bluetooth Speaker",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1299,
+                    "stock": 30,
+                    "weight_grams": 600,
+                    "dimensions": {
+                        "length": 22,
+                        "width": 8,
+                        "height": 8
+                    },
+                    "description": "Compact wireless speaker with a fabric grille and a rechargeable battery for a day of music at home or on the go. Pairs with phones, tablets and laptops over Bluetooth.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/speaker-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:JBL_CHARGE3_%E3%81%A8%E3%81%84%E3%81%86_Portable_Bluetooth_Speaker_%E3%80%81%E7%96%B2%E3%82%8C%E3%81%AA%E3%81%84%E9%9F%B3%E3%81%A7%E3%81%99%E3%81%AD%E3%80%82%E8%BB%8A%E8%BC%89%E3%81%99%E3%82%8B%E3%82%88%EF%BC%81_(28494681635).jpg",
+                            "author": "Masahiko OHKUBO from Kobe, Japan",
+                            "license": "CC BY 2.0",
+                            "title": "File:JBL CHARGE3 という Portable Bluetooth Speaker 、疲れない音ですね。車載するよ！ (28494681635).jpg"
+                        },
+                        {
+                            "file": "products/speaker-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:JBL_Flip_4.jpg",
+                            "author": "Freekhou5",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:JBL Flip 4.jpg"
+                        },
+                        {
+                            "file": "products/speaker-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Sony_SRS_X55_Personal_Audio_System.jpeg",
+                            "author": "Hrbrhauntr",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Sony SRS X55 Personal Audio System.jpeg"
+                        }
+                    ]
+                },
+                {
+                    "key": "headphones",
+                    "name": "Wireless Over-Ear Headphones",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 899,
+                    "stock": 25,
+                    "weight_grams": 260,
+                    "dimensions": {
+                        "length": 20,
+                        "width": 18,
+                        "height": 8
+                    },
+                    "description": "Padded over-ear headphones with a folding headband and a built-in microphone for calls. Comfortable for long study or gaming sessions.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/headphones-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:JLab_Studio_Black_Headphones.jpg",
+                            "author": "Maomaoox",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:JLab Studio Black Headphones.jpg"
+                        },
+                        {
+                            "file": "products/headphones-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:JBL_LIVE_650_BTNC_(Over-Ear_Noise_Cancelling_Headphone)._(51127342181).jpg",
+                            "author": "MIKI Yoshihito from Sapporo City,Hokkaido., JAPAN",
+                            "license": "CC BY 2.0",
+                            "title": "File:JBL LIVE 650 BTNC (Over-Ear Noise Cancelling Headphone). (51127342181).jpg"
+                        },
+                        {
+                            "file": "products/headphones-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Bose_QuietComfort_25_Acoustic_Noise_Cancelling_Headphones_with_Carry_Case.jpg",
+                            "author": "Florian Fuchs",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Bose QuietComfort 25 Acoustic Noise Cancelling Headphones with Carry Case.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "powerbank",
+                    "name": "10000mAh Power Bank",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1099,
+                    "stock": 40,
+                    "weight_grams": 230,
+                    "dimensions": {
+                        "length": 14,
+                        "width": 7,
+                        "height": 2
+                    },
+                    "description": "Slim 10000mAh power bank with a USB output and LED charge indicator. Charges a typical phone about two to three times. USB cable not included.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/powerbank-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Anker_power_bank_lit.jpg",
+                            "author": "Saucy",
+                            "license": "CC BY 4.0",
+                            "title": "File:Anker power bank lit.jpg"
+                        },
+                        {
+                            "file": "products/powerbank-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Anker_power_bank_and_cable.jpg",
+                            "author": "Saucy",
+                            "license": "CC BY 4.0",
+                            "title": "File:Anker power bank and cable.jpg"
+                        },
+                        {
+                            "file": "products/powerbank-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:%E3%83%A2%E3%83%90%E3%82%A4%E3%83%AB%E3%83%90%E3%83%83%E3%83%86%E3%83%AA%E3%83%BC_ANKER_Power_Bank_4,500mAh_(9716815187).jpg",
+                            "author": "Tranpan23",
+                            "license": "CC BY 2.0",
+                            "title": "File:モバイルバッテリー ANKER Power Bank 4,500mAh (9716815187).jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "mouse",
+                    "name": "Wireless Optical Mouse",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 449,
+                    "stock": 60,
+                    "weight_grams": 90,
+                    "dimensions": {
+                        "length": 11,
+                        "width": 7,
+                        "height": 4
+                    },
+                    "description": "Cordless optical mouse with a USB receiver, scroll wheel and a comfortable shape for everyday office and school work. 1 AA battery not included.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/mouse-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Amazon_Basics_Wireless_Computer_Mouse.jpg",
+                            "author": "TaurusEmerald",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Amazon Basics Wireless Computer Mouse.jpg"
+                        },
+                        {
+                            "file": "products/mouse-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:A_black_wireless_computer_mouse.jpg",
+                            "author": "Pixloom",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:A black wireless computer mouse.jpg"
+                        },
+                        {
+                            "file": "products/mouse-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Acer_computer_mouse_on_paper.jpg",
+                            "author": "Bhullargraphic",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Acer computer mouse on paper.jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "apparel",
+            "category": "Women's Apparel",
+            "products": [
+                {
+                    "key": "denimjacket",
+                    "name": "Classic Denim Jacket",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1499,
+                    "stock": 24,
+                    "weight_grams": 650,
+                    "dimensions": {
+                        "length": 40,
+                        "width": 30,
+                        "height": 6
+                    },
+                    "description": "Button-front denim jacket with two chest pockets. A mid-weight cotton denim that layers over tees and dresses.",
+                    "options": {
+                        "name": "Size",
+                        "values": [
+                            "S",
+                            "M",
+                            "L",
+                            "XL"
+                        ]
+                    },
+                    "images": [
+                        {
+                            "file": "products/denimjacket-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Denim_Jacket_(51079649933).jpg",
+                            "author": "ajay_suresh",
+                            "license": "CC BY 2.0",
+                            "title": "File:Denim Jacket (51079649933).jpg"
+                        },
+                        {
+                            "file": "products/denimjacket-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Jean_jacket.jpg",
+                            "author": "NikosLikomitros",
+                            "license": "CC0",
+                            "title": "File:Jean jacket.jpg"
+                        },
+                        {
+                            "file": "products/denimjacket-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Denim_Jacket_Pocket_-_Macro_(49851869231).jpg",
+                            "author": "Ajay Suresh from New York, NY, USA",
+                            "license": "CC BY 2.0",
+                            "title": "File:Denim Jacket Pocket - Macro (49851869231).jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "cap",
+                    "name": "Cotton Baseball Cap",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 349,
+                    "stock": 50,
+                    "weight_grams": 100,
+                    "dimensions": {
+                        "length": 25,
+                        "width": 20,
+                        "height": 12
+                    },
+                    "description": "Six-panel cotton cap with a curved brim and an adjustable back strap. Sun protection for commuting and weekends.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/cap-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Cornell_University_baseball_cap.jpg",
+                            "author": "Jonathan Schilling",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Cornell University baseball cap.jpg"
+                        },
+                        {
+                            "file": "products/cap-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Blue_baseball_cap_on_wooden_table.jpg",
+                            "author": "Will Daan",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Blue baseball cap on wooden table.jpg"
+                        },
+                        {
+                            "file": "products/cap-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Madras_plaid_baseball_cap_by_Polo_Ralph_Lauren.jpg",
+                            "author": "Menswear Market",
+                            "license": "CC BY 2.0",
+                            "title": "File:Madras plaid baseball cap by Polo Ralph Lauren.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "tshirt",
+                    "name": "Plain Cotton T-Shirt",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 299,
+                    "stock": 80,
+                    "weight_grams": 200,
+                    "dimensions": {
+                        "length": 30,
+                        "width": 25,
+                        "height": 3
+                    },
+                    "description": "Soft round-neck cotton T-shirt in plain white. A wardrobe basic that works on its own or as a layer.",
+                    "options": {
+                        "name": "Size",
+                        "values": [
+                            "S",
+                            "M",
+                            "L",
+                            "XL"
+                        ]
+                    },
+                    "images": [
+                        {
+                            "file": "products/tshirt-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:T-shirt2.jpg",
+                            "author": "Elkagye",
+                            "license": "Public domain",
+                            "title": "File:T-shirt2.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "umbrella",
+                    "name": "Compact Folding Umbrella",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 399,
+                    "stock": 45,
+                    "weight_grams": 300,
+                    "dimensions": {
+                        "length": 25,
+                        "width": 6,
+                        "height": 6
+                    },
+                    "description": "Light folding umbrella with a printed canopy that fits in a bag. For sudden rain and hot afternoons.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/umbrella-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Folding_umbrella_01.jpg",
+                            "author": "Kritzolina",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Folding umbrella 01.jpg"
+                        },
+                        {
+                            "file": "products/umbrella-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:London_2012_Olympics_Games_Maker_Umbrella_Folded.jpg",
+                            "author": "Daniel Fowler",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:London 2012 Olympics Games Maker Umbrella Folded.jpg"
+                        },
+                        {
+                            "file": "products/umbrella-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Folding_umbrella_02.jpg",
+                            "author": "Kritzolina",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Folding umbrella 02.jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "footwear",
+            "category": "Men's Apparel",
+            "products": [
+                {
+                    "key": "runningshoes",
+                    "name": "Lightweight Running Shoes",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 2499,
+                    "stock": 20,
+                    "weight_grams": 700,
+                    "dimensions": {
+                        "length": 32,
+                        "width": 20,
+                        "height": 12
+                    },
+                    "description": "Breathable mesh running shoes with a cushioned sole and a snug lace-up fit. Built for jogging, gym days and daily walking.",
+                    "options": {
+                        "name": "Size",
+                        "values": [
+                            "39",
+                            "40",
+                            "41",
+                            "42",
+                            "43"
+                        ]
+                    },
+                    "images": [
+                        {
+                            "file": "products/runningshoes-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:On_Clouds_running_shoes.jpg",
+                            "author": "Goodreg3",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:On Clouds running shoes.jpg"
+                        },
+                        {
+                            "file": "products/runningshoes-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:High_Beam_Led_Running_Shoes_01.jpg",
+                            "author": "Joegood22",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:High Beam Led Running Shoes 01.jpg"
+                        },
+                        {
+                            "file": "products/runningshoes-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Mizuno_Wave_Inspire_13_running_shoes_(Image_3).jpg",
+                            "author": "Ubcule",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Mizuno Wave Inspire 13 running shoes (Image 3).jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "loafers",
+                    "name": "Leather Penny Loafers",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1899,
+                    "stock": 15,
+                    "weight_grams": 800,
+                    "dimensions": {
+                        "length": 32,
+                        "width": 20,
+                        "height": 12
+                    },
+                    "description": "Slip-on penny loafers in smooth leather with a stitched saddle. Smart enough for the office, relaxed enough for the weekend.",
+                    "options": {
+                        "name": "Size",
+                        "values": [
+                            "40",
+                            "41",
+                            "42",
+                            "43"
+                        ]
+                    },
+                    "images": [
+                        {
+                            "file": "products/loafers-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:A_Penny_Loafer.jpg",
+                            "author": "Wikipedia-ce",
+                            "license": "CC0",
+                            "title": "File:A Penny Loafer.jpg"
+                        },
+                        {
+                            "file": "products/loafers-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Brown_JK_loafers_with_5cm_heel_(20200202020202).jpg",
+                            "author": "N509FZ",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Brown JK loafers with 5cm heel (20200202020202).jpg"
+                        },
+                        {
+                            "file": "products/loafers-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Handmade_Lake_Blue_Loafers_Shoe.jpg",
+                            "author": "Peachyeung316",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Handmade Lake Blue Loafers Shoe.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "flipflops",
+                    "name": "Rubber Flip-Flops",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 249,
+                    "stock": 100,
+                    "weight_grams": 300,
+                    "dimensions": {
+                        "length": 30,
+                        "width": 12,
+                        "height": 5
+                    },
+                    "description": "Everyday rubber flip-flops with a contoured footbed and a soft strap. Quick-drying for rainy days and the beach.",
+                    "options": {
+                        "name": "Size",
+                        "values": [
+                            "36",
+                            "37",
+                            "38",
+                            "39",
+                            "40",
+                            "41"
+                        ]
+                    },
+                    "images": [
+                        {
+                            "file": "products/flipflops-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Flip_flops_arranged_in_a_circle.jpg",
+                            "author": "Katy Warner from Orlando, FL, USA",
+                            "license": "CC BY-SA 2.0",
+                            "title": "File:Flip flops arranged in a circle.jpg"
+                        },
+                        {
+                            "file": "products/flipflops-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Zombies_flip_flops.jpg",
+                            "author": "Peachyeung316",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Zombies flip flops.jpg"
+                        },
+                        {
+                            "file": "products/flipflops-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Rainbow_flip-flops.jpg",
+                            "author": "alonis",
+                            "license": "CC BY-SA 2.0",
+                            "title": "File:Rainbow flip-flops.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "canvasshoes",
+                    "name": "Canvas Low-Top Sneakers",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1299,
+                    "stock": 30,
+                    "weight_grams": 650,
+                    "dimensions": {
+                        "length": 32,
+                        "width": 20,
+                        "height": 12
+                    },
+                    "description": "Classic canvas low-top sneakers with a rubber toe cap and lace-up closure. Easy to pair with jeans or shorts.",
+                    "options": {
+                        "name": "Size",
+                        "values": [
+                            "39",
+                            "40",
+                            "41",
+                            "42",
+                            "43"
+                        ]
+                    },
+                    "images": [
+                        {
+                            "file": "products/canvasshoes-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Converse_Jack_Purcell_sneakers_on_white_canvas.jpg",
+                            "author": "Mizael Contreras",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Converse Jack Purcell sneakers on white canvas.jpg"
+                        },
+                        {
+                            "file": "products/canvasshoes-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Black_Converse_sneakers.JPG",
+                            "author": "Brooke Fishwick",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Black Converse sneakers.JPG"
+                        },
+                        {
+                            "file": "products/canvasshoes-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Superga_Cotu_Classic_Sneaker_2750_Canvas_wei%C3%9F_(1).jpg",
+                            "author": "SPERA.de Designerschuhe, Taschen und Accessoires",
+                            "license": "CC BY 2.0",
+                            "title": "File:Superga Cotu Classic Sneaker 2750 Canvas weiß (1).jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "beauty",
+            "category": "Health and Beauty",
+            "products": [
+                {
+                    "key": "lipstick",
+                    "name": "Creamy Lipstick",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 349,
+                    "stock": 60,
+                    "weight_grams": 40,
+                    "dimensions": {
+                        "length": 9,
+                        "width": 3,
+                        "height": 3
+                    },
+                    "description": "Creamy, pigmented lipstick in a refillable metal tube. Comfortable all-day wear with a smooth satin finish.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/lipstick-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:MAC_pink_lipstick_(1).jpg",
+                            "author": "Jen",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:MAC pink lipstick (1).jpg"
+                        },
+                        {
+                            "file": "products/lipstick-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:DiorLippenstift.jpg",
+                            "author": "Sjr",
+                            "license": "Public domain",
+                            "title": "File:DiorLippenstift.jpg"
+                        },
+                        {
+                            "file": "products/lipstick-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Red_lipstick_gold_case.jpg",
+                            "author": "Doll Joints",
+                            "license": "CC BY 2.0",
+                            "title": "File:Red lipstick gold case.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "perfume",
+                    "name": "Eau de Parfum 50ml",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 799,
+                    "stock": 35,
+                    "weight_grams": 250,
+                    "dimensions": {
+                        "length": 10,
+                        "width": 6,
+                        "height": 12
+                    },
+                    "description": "Fresh everyday eau de parfum in a 50ml glass bottle. Light enough for the tropical heat, long enough to last the workday.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/perfume-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:A_bottle_of_BOSS_ALIVE_Perfume_that_smells_sweet_and_of_jasmine_sambac.jpg",
+                            "author": "Sleepytimecat",
+                            "license": "CC BY 4.0",
+                            "title": "File:A bottle of BOSS ALIVE Perfume that smells sweet and of jasmine sambac.jpg"
+                        },
+                        {
+                            "file": "products/perfume-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Perfume_glass_bottle.jpg",
+                            "author": "Santeri Viinamäki",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Perfume glass bottle.jpg"
+                        },
+                        {
+                            "file": "products/perfume-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Perfume_set_from_Sovjetunio_cca_1965.jpg",
+                            "author": "Takkk",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Perfume set from Sovjetunio cca 1965.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "hairbrush",
+                    "name": "Boar Bristle Hair Brush",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 249,
+                    "stock": 70,
+                    "weight_grams": 120,
+                    "dimensions": {
+                        "length": 24,
+                        "width": 7,
+                        "height": 5
+                    },
+                    "description": "Oval cushion hair brush with natural-style bristles that smooth and add shine while detangling.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/hairbrush-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Hairbrush_flat.JPG",
+                            "author": "en:User:Musical Linguist",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Hairbrush flat.JPG"
+                        },
+                        {
+                            "file": "products/hairbrush-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Mason_Pearson_BN_Pocket.jpg",
+                            "author": "TI1880",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Mason Pearson BN Pocket.jpg"
+                        },
+                        {
+                            "file": "products/hairbrush-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Conair-brush.jpg",
+                            "author": "Evan-Amos",
+                            "license": "Public domain",
+                            "title": "File:Conair-brush.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "makeupbrush",
+                    "name": "12-Piece Makeup Brush Set",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 599,
+                    "stock": 40,
+                    "weight_grams": 180,
+                    "dimensions": {
+                        "length": 20,
+                        "width": 15,
+                        "height": 4
+                    },
+                    "description": "Twelve-piece set covering face and eye brushes, with soft synthetic bristles and slim black handles.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/makeupbrush-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Makeup_weapons_Brushes_.jpg",
+                            "author": "Makeupweapons",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Makeup weapons Brushes .jpg"
+                        },
+                        {
+                            "file": "products/makeupbrush-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Set_of_Make_Up_Brushes_-_50887329463.jpg",
+                            "author": "geehairimages",
+                            "license": "CC BY 2.0",
+                            "title": "File:Set of Make Up Brushes - 50887329463.jpg"
+                        },
+                        {
+                            "file": "products/makeupbrush-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Make_Up_Brushes_on_Pink_Background_-_50901126041.jpg",
+                            "author": "geehairimages",
+                            "license": "CC BY 2.0",
+                            "title": "File:Make Up Brushes on Pink Background - 50901126041.jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "home",
+            "category": "Home and Garden",
+            "products": [
+                {
+                    "key": "ricecooker",
+                    "name": "1.8L Electric Rice Cooker",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1899,
+                    "stock": 18,
+                    "weight_grams": 3000,
+                    "dimensions": {
+                        "length": 30,
+                        "width": 30,
+                        "height": 26
+                    },
+                    "description": "1.8L electric rice cooker with a non-stick inner pot, steamer tray and rice paddle. Cooks enough rice for a family of five.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/ricecooker-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Panasonic_RICE_COOKER_SR-L15H8.jpg",
+                            "author": "Dinkun Chen",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Panasonic RICE COOKER SR-L15H8.jpg"
+                        },
+                        {
+                            "file": "products/ricecooker-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Rival_Rice_Cooker.jpg",
+                            "author": "Jugo Yokomizo",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Rival Rice Cooker.jpg"
+                        },
+                        {
+                            "file": "products/ricecooker-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Panasonic_RICE_COOKER_SR-DQ102-N.jpg",
+                            "author": "Dinkun Chen",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Panasonic RICE COOKER SR-DQ102-N.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "cookingpot",
+                    "name": "Stainless Steel Cooking Pot 24cm",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 799,
+                    "stock": 28,
+                    "weight_grams": 1500,
+                    "dimensions": {
+                        "length": 32,
+                        "width": 26,
+                        "height": 14
+                    },
+                    "description": "24cm stainless steel pot with a tempered lid and riveted handles. Suitable for gas and induction stoves.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/cookingpot-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Pot_(IMG_0261).jpg",
+                            "author": "Matti Blume",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Pot (IMG 0261).jpg"
+                        },
+                        {
+                            "file": "products/cookingpot-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Tarteira_de_aceiro_inoxidable.JPG",
+                            "author": "Baralloco",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Tarteira de aceiro inoxidable.JPG"
+                        },
+                        {
+                            "file": "products/cookingpot-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:All-Clad_Copper_Core_pots.jpeg",
+                            "author": "Didriks from Cambridge, MA, USA",
+                            "license": "CC BY 2.0",
+                            "title": "File:All-Clad Copper Core pots.jpeg"
+                        }
+                    ]
+                },
+                {
+                    "key": "mug",
+                    "name": "Ceramic Coffee Mug 350ml",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 199,
+                    "stock": 90,
+                    "weight_grams": 380,
+                    "dimensions": {
+                        "length": 12,
+                        "width": 9,
+                        "height": 10
+                    },
+                    "description": "Glazed ceramic mug with a comfortable handle, holds about 350ml. Dishwasher and microwave safe.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/mug-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Merchandising_Coffee_mug_from_band_Dead_Can_Dance_with_%27DCD%27_logo.jpeg",
+                            "author": "Pittigrilli",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Merchandising Coffee mug from band Dead Can Dance with 'DCD' logo.jpeg"
+                        },
+                        {
+                            "file": "products/mug-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Merchandising_Coffee_mug_from_band_Dead_Can_Dance_with_%27DCD%27_logo_-_black.jpg",
+                            "author": "Pittigrilli",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Merchandising Coffee mug from band Dead Can Dance with 'DCD' logo - black.jpg"
+                        },
+                        {
+                            "file": "products/mug-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:High_Altitude_Coffee_(6988667411).jpg",
+                            "author": "Joseph from Cabin On The Road, USA",
+                            "license": "CC BY-SA 2.0",
+                            "title": "File:High Altitude Coffee (6988667411).jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "choppingboard",
+                    "name": "Bamboo Chopping Board Set",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 349,
+                    "stock": 45,
+                    "weight_grams": 900,
+                    "dimensions": {
+                        "length": 38,
+                        "width": 25,
+                        "height": 2
+                    },
+                    "description": "Bamboo chopping boards in two sizes, each with a hanging hole. Gentle on knives and easy to wipe clean.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/choppingboard-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:(20260725)_Broken_wooden_cutting_boards_05.jpg",
+                            "author": "Roy Zuo",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:(20260725) Broken wooden cutting boards 05.jpg"
+                        },
+                        {
+                            "file": "products/choppingboard-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:(20260725)_Broken_wooden_cutting_boards_03.jpg",
+                            "author": "Roy Zuo",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:(20260725) Broken wooden cutting boards 03.jpg"
+                        },
+                        {
+                            "file": "products/choppingboard-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Wooden_cutting_board_2017.jpg",
+                            "author": "Fructibus",
+                            "license": "CC0",
+                            "title": "File:Wooden cutting board 2017.jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "school",
+            "category": "Office and School Supplies",
+            "products": [
+                {
+                    "key": "notebook",
+                    "name": "Spiral Notebook 3-Pack",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 149,
+                    "stock": 120,
+                    "weight_grams": 450,
+                    "dimensions": {
+                        "length": 21,
+                        "width": 15,
+                        "height": 3
+                    },
+                    "description": "Three spiral-bound notebooks with ruled pages, sized for classroom notes and planners.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/notebook-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Red_Spiral-Bound_Notebook.jpg",
+                            "author": "Zohasheikh",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Red Spiral-Bound Notebook.jpg"
+                        },
+                        {
+                            "file": "products/notebook-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Newone_-_Grand_spiral_notebook_A7.jpg",
+                            "author": "Newone",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Newone - Grand spiral notebook A7.jpg"
+                        },
+                        {
+                            "file": "products/notebook-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Spiralbinder%C3%BCcken_--_2022_--_9722.jpg",
+                            "author": "Dietmar Rabich",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Spiralbinderücken -- 2022 -- 9722.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "pens",
+                    "name": "4-Colour Ballpoint Pen",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 35,
+                    "stock": 300,
+                    "weight_grams": 15,
+                    "dimensions": {
+                        "length": 15,
+                        "width": 2,
+                        "height": 2
+                    },
+                    "description": "Click-action ballpoint pen with four ink colours in one barrel: black, blue, red and green.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/pens-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Bic_4_couleurs.jpg",
+                            "author": "Prog138",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Bic 4 couleurs.jpg"
+                        },
+                        {
+                            "file": "products/pens-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:BIC_4_colours_pen,_Hoogezand-Sappemeer_(2019)_05.jpg",
+                            "author": "Donald Trung Quoc Don (Chữ Hán: 徵國單) - Wikimedia Commons - © CC BY-SA 4.0 International.(Want to use this image?)Original publication 📤: --D",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:BIC 4 colours pen, Hoogezand-Sappemeer (2019) 05.jpg"
+                        },
+                        {
+                            "file": "products/pens-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Bic_4_couleurs_on_(quite)_white_background_2.jpg",
+                            "author": "Kvardek du",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Bic 4 couleurs on (quite) white background 2.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "backpack",
+                    "name": "Everyday School Backpack",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 899,
+                    "stock": 35,
+                    "weight_grams": 700,
+                    "dimensions": {
+                        "length": 45,
+                        "width": 30,
+                        "height": 15
+                    },
+                    "description": "Roomy backpack with a padded back, zip pockets and side bottle holders. Fits a 14-inch laptop and a day of books.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/backpack-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Ankara_backpack_made_in_Uganda.jpg",
+                            "author": "Owobusingye",
+                            "license": "CC BY 4.0",
+                            "title": "File:Ankara backpack made in Uganda.jpg"
+                        },
+                        {
+                            "file": "products/backpack-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Gregory,_OutDoor_2018,_Friedrichshafen_(1X7A9957)_(cropped).jpg",
+                            "author": "Matti Blume",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Gregory, OutDoor 2018, Friedrichshafen (1X7A9957) (cropped).jpg"
+                        },
+                        {
+                            "file": "products/backpack-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:EL_Wire_and_Camelbak_(14929206621).jpg",
+                            "author": "Billie Grace Ward from New York, USA",
+                            "license": "CC BY 2.0",
+                            "title": "File:EL Wire and Camelbak (14929206621).jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "calculator",
+                    "name": "Scientific Calculator",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 649,
+                    "stock": 40,
+                    "weight_grams": 130,
+                    "dimensions": {
+                        "length": 16,
+                        "width": 8,
+                        "height": 2
+                    },
+                    "description": "Scientific calculator with a multi-line display and a protective slide cover. Accepted for most school and college exams.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/calculator-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Casio_fx-991MS.jpg",
+                            "author": "Shwangtianyuan",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Casio fx-991MS.jpg"
+                        },
+                        {
+                            "file": "products/calculator-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Poundland_%C2%A31_scientific_calculator_(front).jpg",
+                            "author": "Multicherry",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Poundland £1 scientific calculator (front).jpg"
+                        },
+                        {
+                            "file": "products/calculator-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Sharp_Scientific_Calculator.jpg",
+                            "author": "Matti Blume",
+                            "license": "CC BY-SA 2.0",
+                            "title": "File:Sharp Scientific Calculator.jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "accessories",
+            "category": "Jewelry and Watches",
+            "products": [
+                {
+                    "key": "watch",
+                    "name": "Analog Wrist Watch",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1499,
+                    "stock": 22,
+                    "weight_grams": 120,
+                    "dimensions": {
+                        "length": 24,
+                        "width": 5,
+                        "height": 5
+                    },
+                    "description": "Analog quartz wrist watch with a clear dial, date window and a comfortable strap. Water resistant for daily splashes.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/watch-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Damasko_DC56_-_German_analog_chronograph_wristwatch_with_mechanical_movement_type_Valjoux_7750.jpg",
+                            "author": "Markdjwilliams",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Damasko DC56 - German analog chronograph wristwatch with mechanical movement type Valjoux 7750.jpg"
+                        },
+                        {
+                            "file": "products/watch-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:G-shock_G100.jpg",
+                            "author": "ProjectManhattan",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:G-shock G100.jpg"
+                        },
+                        {
+                            "file": "products/watch-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Junghans_Mega.jpg",
+                            "author": "J. Lunau",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Junghans Mega.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "sunglasses",
+                    "name": "UV400 Sunglasses",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 449,
+                    "stock": 55,
+                    "weight_grams": 40,
+                    "dimensions": {
+                        "length": 15,
+                        "width": 6,
+                        "height": 5
+                    },
+                    "description": "Tinted sunglasses with UV400 lenses and a lightweight frame. A summer essential for driving and the beach.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/sunglasses-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:2008-07-27_Sunglasses.jpg",
+                            "author": "Ildar Sagdejev (Specious)",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:2008-07-27 Sunglasses.jpg"
+                        },
+                        {
+                            "file": "products/sunglasses-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Sunglasses_in_Mexico.jpg",
+                            "author": "BORNTHISWAYMEDIA",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Sunglasses in Mexico.jpg"
+                        },
+                        {
+                            "file": "products/sunglasses-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Sunglasses_on_ground_outside_Varnado_Hall.jpg",
+                            "author": "Timothy Holdiness",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Sunglasses on ground outside Varnado Hall.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "wallet",
+                    "name": "Slim Leather Wallet",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 599,
+                    "stock": 40,
+                    "weight_grams": 110,
+                    "dimensions": {
+                        "length": 11,
+                        "width": 9,
+                        "height": 2
+                    },
+                    "description": "Slim wallet with card slots and a bill compartment, made with a soft synthetic-leather finish.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/wallet-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Aarong_leather_wallet.jpg",
+                            "author": "Nafis Fuad Ayon",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Aarong leather wallet.jpg"
+                        },
+                        {
+                            "file": "products/wallet-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Flap_Boy_Slim_Wallet_from_JAIMIE_JACOBS_03.jpg",
+                            "author": "www.kartenetui.info",
+                            "license": "CC BY 4.0",
+                            "title": "File:Flap Boy Slim Wallet from JAIMIE JACOBS 03.jpg"
+                        },
+                        {
+                            "file": "products/wallet-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Flap_Boy_Slim_Wallet_from_JAIMIE_JACOBS_01.jpg",
+                            "author": "www.kartenetui.info",
+                            "license": "CC BY 4.0",
+                            "title": "File:Flap Boy Slim Wallet from JAIMIE JACOBS 01.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "necklace",
+                    "name": "Freshwater Pearl Necklace",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 1299,
+                    "stock": 18,
+                    "weight_grams": 60,
+                    "dimensions": {
+                        "length": 45,
+                        "width": 2,
+                        "height": 2
+                    },
+                    "description": "Strand of cultured freshwater pearls with a silver-tone clasp. A classic piece for weddings and special occasions.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/necklace-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Perlas-Joyer%C3%ADa.JPG",
+                            "author": "Tamorlan",
+                            "license": "CC BY 3.0",
+                            "title": "File:Perlas-Joyería.JPG"
+                        },
+                        {
+                            "file": "products/necklace-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Long_pearl_necklace_with_cultured_baroque_saltwater_pearls_1.jpg",
+                            "author": "W.carter",
+                            "license": "CC BY 4.0",
+                            "title": "File:Long pearl necklace with cultured baroque saltwater pearls 1.jpg"
+                        },
+                        {
+                            "file": "products/necklace-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Long_pearl_necklace_with_cultured_baroque_saltwater_pearls_4.jpg",
+                            "author": "W.carter",
+                            "license": "CC BY 4.0",
+                            "title": "File:Long pearl necklace with cultured baroque saltwater pearls 4.jpg"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "local",
+            "category": "Food and Gourmet",
+            "products": [
+                {
+                    "key": "driedmango",
+                    "name": "Dried Mango 100g",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 180,
+                    "stock": 150,
+                    "weight_grams": 120,
+                    "dimensions": {
+                        "length": 16,
+                        "width": 10,
+                        "height": 4
+                    },
+                    "description": "Naturally sweet dried mango slices, packed in a resealable 100g pouch. A Philippine favourite for pasalubong.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/driedmango-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Cebu_Best_Dried_Mango.jpg",
+                            "author": "Ralff Nestor Nacor",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Cebu Best Dried Mango.jpg"
+                        },
+                        {
+                            "file": "products/driedmango-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Mangues_sechees.jpg",
+                            "author": "Asabengurtza",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Mangues sechees.jpg"
+                        },
+                        {
+                            "file": "products/driedmango-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Dried_mangoes.jpg",
+                            "author": "Adrian Michael",
+                            "license": "CC BY-SA 3.0",
+                            "title": "File:Dried mangoes.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "coffee",
+                    "name": "Roasted Coffee Beans 250g",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 380,
+                    "stock": 60,
+                    "weight_grams": 270,
+                    "dimensions": {
+                        "length": 18,
+                        "width": 10,
+                        "height": 6
+                    },
+                    "description": "Whole roasted coffee beans in a 250g bag. Grind fresh for a strong, aromatic cup in a French press or drip brewer.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/coffee-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Roasted_coffee_beans.jpg",
+                            "author": "MarkSweep",
+                            "license": "Public domain",
+                            "title": "File:Roasted coffee beans.jpg"
+                        },
+                        {
+                            "file": "products/coffee-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Equal_Exchange_coffee_beans.jpg",
+                            "author": "Mx. Granger",
+                            "license": "CC0",
+                            "title": "File:Equal Exchange coffee beans.jpg"
+                        },
+                        {
+                            "file": "products/coffee-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Amy_farms_typica_hybrid_coffee_beans.jpg",
+                            "author": "Vee Satayamas",
+                            "license": "CC BY 4.0",
+                            "title": "File:Amy farms typica hybrid coffee beans.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "ube",
+                    "name": "Ube Halaya 250g",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 220,
+                    "stock": 45,
+                    "weight_grams": 320,
+                    "dimensions": {
+                        "length": 10,
+                        "width": 10,
+                        "height": 6
+                    },
+                    "description": "Creamy purple yam jam in a 250g tub. Enjoy on pandesal, in halo-halo or as a dessert topped with latik.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/ube-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Ube_halaya,_Filipino_dessert.jpg",
+                            "author": "Lokalpedia",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Ube halaya, Filipino dessert.jpg"
+                        },
+                        {
+                            "file": "products/ube-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Ube001.jpg",
+                            "author": "Televido",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Ube001.jpg"
+                        },
+                        {
+                            "file": "products/ube-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Ube_halaya_-_mashed_purple_yam_(Philippines)_01.jpg",
+                            "author": "Obsidian Soul",
+                            "license": "CC0",
+                            "title": "File:Ube halaya - mashed purple yam (Philippines) 01.jpg"
+                        }
+                    ]
+                },
+                {
+                    "key": "bananachips",
+                    "name": "Banana Chips 200g",
+                    "brand": "No brand",
+                    "condition": "New",
+                    "price": 120,
+                    "stock": 110,
+                    "weight_grams": 230,
+                    "dimensions": {
+                        "length": 20,
+                        "width": 12,
+                        "height": 6
+                    },
+                    "description": "Crunchy fried banana chips in a 200g pack, lightly sweet and perfect for snacking.",
+                    "options": null,
+                    "images": [
+                        {
+                            "file": "products/bananachips-1.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Kerala_banana_chips_Upperi_varuthath.jpg",
+                            "author": "Ramesh NG",
+                            "license": "CC BY-SA 2.0",
+                            "title": "File:Kerala banana chips Upperi varuthath.jpg"
+                        },
+                        {
+                            "file": "products/bananachips-2.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Homemade_4_Cut_Banana_Chips.jpg",
+                            "author": "Kpsudeep",
+                            "license": "CC BY-SA 4.0",
+                            "title": "File:Homemade 4 Cut Banana Chips.jpg"
+                        },
+                        {
+                            "file": "products/bananachips-3.jpg",
+                            "source": "https://commons.wikimedia.org/wiki/File:Banana_chips_packets.jpg",
+                            "author": "Julien Menichini from Paris, France",
+                            "license": "CC BY 2.0",
+                            "title": "File:Banana chips packets.jpg"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
