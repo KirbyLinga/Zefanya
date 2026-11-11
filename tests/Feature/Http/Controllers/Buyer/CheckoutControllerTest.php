@@ -127,13 +127,13 @@ class CheckoutControllerTest extends TestCase
             $this->fail("Expected success redirect, got: $location. Session errors: ".json_encode(session('errors')?->all() ?? []).'. Session flash: '.json_encode(session()->all()));
         }
 
-        // subtotal = 2×10000 + 1×2550 = 22550; discount 5000; shipping 9800; total 27350.
+        // subtotal = 2×10000 + 1×2550 = 22550; discount 5000; shipping 10000; total 27550.
         $this->assertGreaterThan(0, Order::count(), 'No orders created after checkout');
         $order = Order::query()->first();
         $this->assertNotNull($order, 'Expected at least one order');
         $this->assertSame(22550, $order->subtotal_minor);
         $this->assertSame(5000, $order->discount_minor);
-        $this->assertSame(27350, $order->total_minor);
+        $this->assertSame(27550, $order->total_minor);
         $this->assertSame(OrderStatus::Placed, $order->status);
         $this->assertSame($this->buyer->id, $order->buyer_id);
         $this->assertMatchesRegularExpression('/^ORD-\d{8}-[A-Z0-9]{6}$/', $order->reference);
@@ -168,7 +168,7 @@ class CheckoutControllerTest extends TestCase
         $this->assertTrue($payments->every(fn (Payment $p): bool => $p->status === PaymentStatus::Pending));
         $this->assertTrue($payments->every(fn (Payment $p): bool => $p->method === PaymentMethod::Cod));
         $this->assertNull($payments->first()->paid_at);
-        $this->assertSame(27350, (int) $payments->sum('amount_minor'));
+        $this->assertSame(27550, (int) $payments->sum('amount_minor'));
         foreach ($payments as $payment) {
             $this->assertLessThanOrEqual($payment->sellerOrder->subtotal_minor + $payment->sellerOrder->shipping_fee_minor, $payment->amount_minor);
             $this->assertGreaterThan(0, $payment->amount_minor);
@@ -259,11 +259,11 @@ class CheckoutControllerTest extends TestCase
         $order = Order::query()->sole();
         $this->assertSame(10000, $order->subtotal_minor);
         $this->assertSame(5000, $order->discount_minor);
-        $this->assertSame(9900, $order->total_minor);
+        $this->assertSame(10000, $order->total_minor);
 
         // One shop: the whole discount lands on its payment.
         $this->assertSame(1, Payment::query()->count());
-        $this->assertSame(9900, (int) Payment::query()->value('amount_minor'));
+        $this->assertSame(10000, (int) Payment::query()->value('amount_minor'));
     }
 
     // ── Rejections (no partial writes) ───────────────────────────────────────
@@ -411,8 +411,8 @@ class CheckoutControllerTest extends TestCase
         $order = Order::query()->sole();
         $this->assertSame(10000, $order->subtotal_minor);
         $this->assertSame(0, $order->discount_minor);
-        $this->assertSame(14900, $order->total_minor);
-        $this->assertSame(14900, (int) Payment::query()->value('amount_minor'));
+        $this->assertSame(15000, $order->total_minor);
+        $this->assertSame(15000, (int) Payment::query()->value('amount_minor'));
     }
 
     // ── Checkout index: invalid / stale selections ───────────────────────

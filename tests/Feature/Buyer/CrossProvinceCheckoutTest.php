@@ -47,7 +47,9 @@ class CrossProvinceCheckoutTest extends TestCase
     {
         parent::setUp();
 
-        config(['buyer.cross_province.fee_minor' => 19900]);
+        // Cross-province parcels pay the same fixed fee as every route. Factory
+        // weights are random, so the per-kilo part is zeroed for these tests.
+        config(['buyer.shipping_fee' => ['base_minor' => 5000, 'base_kg' => 2, 'additional_kg_minor' => 0]]);
 
         $this->admin = Admin::factory()->create();
         $this->origin = $this->operationalHandoffProvider(
@@ -99,7 +101,7 @@ class CrossProvinceCheckoutTest extends TestCase
             ->assertSee('Cross-province delivery')
             ->assertSee('Origin Logistics')
             ->assertSee('Metro Destination Logistics')
-            ->assertSee('₱199.00')
+            ->assertSee('₱50.00')
             ->assertSee('name="carriers['.$this->seller->id.']"', false);
     }
 
@@ -121,20 +123,24 @@ class CrossProvinceCheckoutTest extends TestCase
             ->assertSee('Delivery from this shop to your address is not available yet');
     }
 
-    public function test_cross_province_route_is_blocked_when_no_rate_is_configured(): void
+    public function test_cross_province_route_is_priced_without_a_cross_province_rate(): void
     {
         config(['buyer.cross_province.fee_minor' => null]);
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
         $this->configureConnection($this->destination);
         $this->cart();
 
-        $this->actingAs($this->buyer, 'buyer')
+        $options = $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertSee('Shipping rates for this delivery route are not available yet');
+            ->assertDontSee('Shipping rates for this delivery route are not available yet')
+            ->viewData('carrierOptions');
+
+        $this->assertTrue($options[0]['available']);
+        $this->assertSame(5000, $options[0]['carriers'][0]['fee_minor']);
     }
 
-    public function test_the_origin_carriers_own_rate_opens_a_route_the_marketplace_has_not_priced(): void
+    public function test_a_saved_company_cross_province_rate_does_not_change_the_fixed_fee(): void
     {
         config(['buyer.cross_province.fee_minor' => null]);
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
@@ -155,7 +161,7 @@ class CrossProvinceCheckoutTest extends TestCase
 
         $this->assertTrue($options[0]['available']);
         $this->assertSame((int) $this->origin->id, $options[0]['carriers'][0]['id']);
-        $this->assertGreaterThanOrEqual(15000, $options[0]['carriers'][0]['fee_minor']);
+        $this->assertSame(5000, $options[0]['carriers'][0]['fee_minor']);
     }
 
     public function test_cross_province_order_saves_origin_carrier_and_destination_without_transferring_custody(): void
@@ -177,7 +183,7 @@ class CrossProvinceCheckoutTest extends TestCase
 
         $this->assertSame($this->origin->id, (int) $sellerOrder->carrier_provider_id);
         $this->assertSame($this->destination->id, (int) $sellerOrder->handoff_destination_provider_id);
-        $this->assertSame(19900, (int) $sellerOrder->shipping_fee_minor);
+        $this->assertSame(5000, (int) $sellerOrder->shipping_fee_minor);
         $this->assertNull($sellerOrder->custody_provider_id);
         $this->assertNull($sellerOrder->custody_hub_id);
         $this->assertSame(OrderStatus::Placed, $sellerOrder->status);
@@ -199,7 +205,7 @@ class CrossProvinceCheckoutTest extends TestCase
             $this->seller->id => $this->origin->id,
         ]);
         $this->assertTrue($quote['options'][0]['available']);
-        $this->assertSame(19900, $quote['fees'][$this->seller->id]);
+        $this->assertSame(5000, $quote['fees'][$this->seller->id]);
 
         app(ProviderHandoffSchemaService::class)->revoke($link, $this->admin, 'Route withdrawn between quote and payment.');
 
@@ -299,29 +305,28 @@ class CrossProvinceCheckoutTest extends TestCase
         foreach (SellerOrder::query()->get() as $sellerOrder) {
             $this->assertSame($this->origin->id, (int) $sellerOrder->carrier_provider_id);
             $this->assertSame($this->destination->id, (int) $sellerOrder->handoff_destination_provider_id);
-            $this->assertSame(19900, (int) $sellerOrder->shipping_fee_minor);
+            $this->assertSame(5000, (int) $sellerOrder->shipping_fee_minor);
             $this->assertNull($sellerOrder->custody_provider_id);
             $this->assertSame(OrderStatus::Placed, $sellerOrder->status);
         }
 
         $this->assertSame(40000, (int) Order::query()->sole()->subtotal_minor);
-        $this->assertSame(79800, (int) Order::query()->sole()->total_minor);
-        $this->assertSame([34900, 44900], Payment::query()->orderBy('amount_minor')->pluck('amount_minor')->all());
+        $this->assertSame(50000, (int) Order::query()->sole()->total_minor);
+        $this->assertSame([20000, 30000], Payment::query()->orderBy('amount_minor')->pluck('amount_minor')->all());
         $this->assertSame(2, Payment::query()->where('method', 'cod')->where('status', 'pending')->count());
 
         $this->assertDatabaseCount('parcel_handoffs', 0);
     }
 
-    public function test_invalid_cross_province_fees_never_become_a_zero_or_truncated_rate(): void
+    public function test_invalid_legacy_cross_province_settings_never_change_the_fixed_fee(): void
     {
         $this->activeHandoffLink($this->origin, $this->destination, $this->admin);
         $this->configureConnection($this->destination);
         foreach ([-0.5, 19900.5, '19900.5', 'not-configured', '99999999999999999999999999999'] as $fee) {
             config(['buyer.cross_province.fee_minor' => $fee]);
             $options = app(CheckoutCarrierService::class)->optionsForSellerGroup($this->buyer, $this->seller, 25000);
-            $this->assertFalse($options['available']);
-            $this->assertSame([], $options['carriers']);
-            $this->assertStringContainsString('rates for this delivery route are not available', $options['message']);
+            $this->assertTrue($options['available']);
+            $this->assertSame(5000, $options['carriers'][0]['fee_minor']);
         }
     }
 

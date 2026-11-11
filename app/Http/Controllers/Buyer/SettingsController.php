@@ -162,6 +162,8 @@ class SettingsController extends Controller
             OrderStatus::PickedUp,
             OrderStatus::AtSortingCenter,
             OrderStatus::Sorted,
+            OrderStatus::InTransit,
+            OrderStatus::ArrivedAtHub,
             OrderStatus::OutForDelivery,
             OrderStatus::Delivered,
         ];

@@ -58,13 +58,13 @@ class CheckoutCarrierPersistenceTest extends TestCase
         $this->post(route('buyer.checkout.store'), $payload)->assertSessionHasNoErrors();
 
         $order = Order::query()->sole();
-        $this->assertSame(169800, $order->total_minor);
-        $this->assertSame(169800, (int) Payment::query()->sum('amount_minor'));
+        $this->assertSame(170000, $order->total_minor);
+        $this->assertSame(170000, (int) Payment::query()->sum('amount_minor'));
         $parcels = $order->sellerOrders->keyBy('seller_id');
         $this->assertSame($this->checkoutCarrier->id, $parcels[$sellers[0]->id]->carrier_provider_id);
         $this->assertSame($second->id, $parcels[$sellers[1]->id]->carrier_provider_id);
-        $this->assertSame(4900, $parcels[$sellers[0]->id]->shipping_fee_minor);
-        $this->assertSame(4900, $parcels[$sellers[1]->id]->shipping_fee_minor);
+        $this->assertSame(5000, $parcels[$sellers[0]->id]->shipping_fee_minor);
+        $this->assertSame(5000, $parcels[$sellers[1]->id]->shipping_fee_minor);
         foreach ($parcels as $parcel) {
             $this->assertSame(OrderStatus::Placed, $parcel->status);
             $this->assertNull($parcel->courier_id);
@@ -101,7 +101,8 @@ class CheckoutCarrierPersistenceTest extends TestCase
         {
             public function validateSelectionForOrder(Buyer $buyer, Collection $sellerGroups, array $submitted, ?array $rateSnapshot = null): array
             {
-                $buyer->forceFill(['municipality_code' => '030540200'])->save();
+                // The marketplace fee changes while the order is being placed.
+                config(['buyer.shipping_fee.base_minor' => 6000]);
 
                 return parent::validateSelectionForOrder($buyer, $sellerGroups, $submitted, $rateSnapshot);
             }

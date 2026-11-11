@@ -104,10 +104,28 @@ class Courier extends Model
             + (int) ($this->active_deliveries_count ?? $this->activeDeliveries()->count());
     }
 
-    /** True when the Rider already holds the maximum number of active jobs. */
-    public function isAtJobLimit(): bool
+    /**
+     * True when the parcel is already one of this Rider's counted active jobs,
+     * e.g. a delivery auto-reserved for them. Assigning it again adds no job.
+     */
+    public function holdsActiveJob(?SellerOrder $parcel): bool
     {
-        return $this->activeWorkload() >= self::ACTIVE_CAPACITY;
+        if ($parcel === null) {
+            return false;
+        }
+        $id = (int) $this->getKey();
+
+        return ((int) $parcel->courier_id === $id && in_array($parcel->status, [OrderStatus::ReadyForPickup, OrderStatus::PickedUp], true))
+            || ((int) $parcel->delivery_courier_id === $id && in_array($parcel->status, [OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery], true));
+    }
+
+    /**
+     * True when the Rider already holds the maximum number of active jobs.
+     * Pass the parcel being assigned so its own reservation is not counted.
+     */
+    public function isAtJobLimit(?SellerOrder $assigning = null): bool
+    {
+        return $this->activeWorkload() - ($this->holdsActiveJob($assigning) ? 1 : 0) >= self::ACTIVE_CAPACITY;
     }
 
     /**

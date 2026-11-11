@@ -187,7 +187,7 @@
         @endif
 
         {{-- ── Right group ── --}}
-        <div class="flex shrink-0 items-center gap-5 max-sm:gap-2">
+        <div class="flex shrink-0 items-center gap-5 max-sm:gap-2 lg:max-xl:gap-3">
 
             {{-- Leading separator (left of cart) --}}
             <div class="h-5 w-px shrink-0 max-sm:hidden" style="background-color: rgba(0,0,0,.14);"></div>
@@ -263,10 +263,15 @@
                     <button type="button"
                             class="js-account-toggle inline-flex items-center gap-1.5 rounded px-1.5 py-1 font-sans text-[14px] font-medium text-neutral-700 transition-colors hover:bg-primary-50"
                             aria-haspopup="true" aria-expanded="false">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-200 text-[13px] font-semibold text-primary-900">
-                            {{ $buyerInitial }}
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-200 text-[13px] font-semibold text-primary-900">
+                            {{-- Profile photo when the buyer set one (Account Settings), else the initial. --}}
+                            @if (method_exists($buyerUser, 'profilePhotoPath') && ($navPhoto = $buyerUser->profilePhotoPath()))
+                                <img src="{{ route('buyer.account.photo.show', ['v' => md5($navPhoto)]) }}" alt="" class="size-full object-cover">
+                            @else
+                                {{ $buyerInitial }}
+                            @endif
                         </span>
-                        <span class="hidden max-w-[110px] truncate sm:inline">{{ $buyerFullName }}</span>
+                        <span class="hidden max-w-[110px] truncate sm:inline lg:hidden xl:inline">{{ $buyerFullName }}</span>
                         <i data-lucide="chevron-down" width="13" height="13"></i>
                     </button>
 

@@ -20,8 +20,8 @@ return [
 
     // Centavos. Used until Admin saves the matching Platform Settings.
     'rates' => [
-        'first_minor' => 3000,
-        'additional_minor' => 500,
-        'delivery_minor' => 5000,
+        'first_minor' => 1000,
+        'additional_minor' => 1000,
+        'delivery_minor' => 3000,
     ],
 ];

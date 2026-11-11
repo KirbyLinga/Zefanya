@@ -23,9 +23,11 @@ use App\Models\Logistics\ParcelReturnEvent;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Incidents;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Buyer\ReturnDisputeResolved;
 use App\Notifications\Buyer\ReturnRequestDecided;
+use App\Notifications\Incident\ReturnRecoveryUpdate;
 use App\Notifications\Rider\BuyerReturnCollection;
 use App\Notifications\Rider\DeliveryReturned;
 use App\Notifications\Seller\BuyerReturnRequested;
@@ -35,12 +37,15 @@ use App\Services\Rider\RiderNotifier;
 use App\Services\Seller\SellerOrderStatusService;
 use App\Services\Seller\SellerSettlementService;
 use App\Services\Seller\StockService;
+use App\Support\RuntimeSchema;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ParcelReturnService
 {
@@ -201,7 +206,7 @@ class ParcelReturnService
      */
     public function recordRefund(ParcelReturn $record, Admin $admin, string $reference, int $amountMinor, string $recipient, string $paidOn, ?string $proofPath = null, ?string $reason = null): void
     {
-        $this->admin($admin);
+        $this->moneyAdmin($admin);
         $reference = trim($reference);
         $recipient = trim($recipient);
         $reason = trim((string) $reason);
@@ -213,6 +218,7 @@ class ParcelReturnService
         DB::transaction(function () use ($record, $admin, $reference, $amountMinor, $recipient, $paidOn, $proofPath, $reason): void {
             $record = $this->locked($record, investigation: true);
             $this->require($record->financial_review_required, 'refund', 'This return has no payment to refund.');
+            $this->conflict(! $record->isCancelled(), 'refund', 'This return was cancelled before collection. The buyer kept the item, so there is nothing to refund.');
             $this->conflict($record->refunded_at === null, 'refund', 'This return already has a recorded refund.');
             $this->require(! $record->needsAdminFaultDecision(), 'refund', 'The buyer gave "Other" as the reason. Decide who pays (Seller or Logistics) before recording the refund.');
             $collected = (int) $record->sellerOrder->payment()->value('amount_minor');
@@ -241,7 +247,7 @@ class ParcelReturnService
      */
     public function voidRefund(ParcelReturn $record, Admin $admin, string $reason): void
     {
-        $this->admin($admin);
+        $this->moneyAdmin($admin);
         $reason = trim($reason);
         $this->require(mb_strlen($reason) >= 10 && mb_strlen($reason) <= 1000, 'void_reason', 'Explain why the refund failed in 10 to 1000 characters.');
 
@@ -277,7 +283,7 @@ class ParcelReturnService
      */
     public function setFault(ParcelReturn $record, Admin $admin, string $party, string $note): void
     {
-        $this->admin($admin);
+        $this->moneyAdmin($admin);
         $note = trim($note);
         $this->require(in_array($party, [ParcelReturn::FAULT_SELLER, ParcelReturn::FAULT_LOGISTICS], true), 'fault_party', 'Choose who pays: the Seller or Logistics.');
         $this->require(mb_strlen($note) >= 10 && mb_strlen($note) <= 1000, 'fault_note', 'Explain the decision in 10 to 1000 characters.');
@@ -343,6 +349,8 @@ class ParcelReturnService
             $record = $this->locked($record);
             $this->owner($record->sellerOrder, $provider);
             $this->conflict($record->awaitingBuyerCollection(), 'return', 'This return is not waiting to be collected from a buyer.');
+            $this->conflict(! $record->collectionEscalated() || $record->canRetryCollection(), 'return',
+                'Collection failed '.ParcelReturn::MAX_COLLECTION_ATTEMPTS.' times. Admin must decide this return before another rider is sent.');
             $courier = Courier::query()->whereKey($courierId)->where('logistics_provider_id', $provider->id)->with('rider')->first();
             $this->require($courier?->rider !== null && in_array($courier->rider->status, Rider::ASSIGNABLE_STATUSES, true), 'courier_id', 'Choose an active rider from your own fleet.');
             $record->forceFill(['collection_courier_id' => $courier->id, 'collection_assigned_at' => now()])->save();
@@ -371,6 +379,339 @@ class ParcelReturnService
             $record->sellerOrder->forceFill(['custody_provider_id' => $courier->logistics_provider_id, 'custody_hub_id' => $rider->station_hub_id])->save();
             $this->event($record, 'collected_from_buyer', 'rider', (int) $rider->id);
         }, 3);
+    }
+
+    /**
+     * The assigned rider could not collect the parcel. The attempt is recorded
+     * with its reason, the rider is released so Logistics can send someone
+     * again, and after the limit the return goes to Admin. Nothing is refunded,
+     * cancelled or moved here, and custody stays with the buyer.
+     */
+    public function reportCollectionFailure(ParcelReturn $record, Rider $rider, string $reason, ?string $notes = null): void
+    {
+        $this->recoveryReady();
+        $notes = trim((string) $notes);
+        $this->require(array_key_exists($reason, ParcelReturn::COLLECTION_FAILURE_REASONS), 'reason', 'Choose why the parcel could not be collected.');
+        $this->require($reason !== 'other' || mb_strlen($notes) >= 10, 'notes', 'Describe what happened in at least 10 characters.');
+        $this->require(mb_strlen($notes) <= 500, 'notes', 'Keep the notes to 500 characters or fewer.');
+
+        $escalated = DB::transaction(function () use ($record, $rider, $reason, $notes): bool {
+            $record = $this->locked($record);
+            $courier = $record->collectionCourier;
+            abort_unless($courier !== null && (int) $courier->rider_id === (int) $rider->id && in_array($rider->status, Rider::ASSIGNABLE_STATUSES, true), 403);
+            $this->conflict($record->awaitingBuyerCollection() && (! $record->collectionEscalated() || $record->canRetryCollection()), 'return', 'This return is no longer waiting for you to collect it.');
+
+            $attempt = (int) $record->collection_failed_attempts + 1;
+            $escalate = $attempt >= ParcelReturn::MAX_COLLECTION_ATTEMPTS;
+            $record->forceFill([
+                'collection_failed_attempts' => $attempt,
+                'collection_last_failed_at' => now(),
+                // Released: the same assignment cannot fail twice, and Logistics must choose again.
+                'collection_courier_id' => null,
+                'collection_assigned_at' => null,
+                'collection_escalated_at' => $escalate ? now() : null,
+            ])->save();
+            $this->event($record, $this->numberedKey($record, 'collection_failed'), 'rider', (int) $rider->id, [
+                'attempt' => $attempt, 'courier_id' => (int) $courier->id, 'reason' => $reason, 'notes' => $notes !== '' ? $notes : null,
+            ]);
+            if ($escalate) {
+                $this->event($record, $this->numberedKey($record, 'collection_escalated'), 'system', null, ['attempts' => $attempt]);
+            }
+
+            return $escalate;
+        }, 3);
+
+        $record = $record->fresh(['sellerOrder.order.buyer', 'sellerOrder.seller']);
+        $reference = $record->sellerOrder->order?->reference ?? $record->sellerOrder->tracking_number;
+        $this->notify([$record->sellerOrder->order?->buyer], $record, 'collection_failed', 'Return pickup missed',
+            $escalated
+                ? "We could not collect your return for order {$reference} after ".ParcelReturn::MAX_COLLECTION_ATTEMPTS.' tries. An admin will contact you about what happens next.'
+                : "Our rider could not collect your return for order {$reference}. Logistics will send a rider again; please keep the parcel ready.");
+        if ($escalated) {
+            $this->notifyAdmins($record, 'collection_escalated', 'Return needs a decision',
+                'Collection of return #'.$record->id.' failed '.ParcelReturn::MAX_COLLECTION_ATTEMPTS.' times. Close it or contact the buyer.');
+        }
+    }
+
+    /**
+     * Admin explicitly allows one more rider visit after the normal collection
+     * limit. It is a single extra attempt, never automatic, and it does not
+     * move custody, refund money or change who pays.
+     */
+    public function authorizeCollectionRetry(ParcelReturn $record, Admin $admin, string $note): void
+    {
+        $this->recoveryReady();
+        $this->admin($admin);
+        if (! RuntimeSchema::hasColumn('parcel_returns', 'collection_retry_authorized_at')) {
+            throw ValidationException::withMessages(['retry_note' => 'Collection retry authorization is not available until the database update is applied.']);
+        }
+        $note = trim($note);
+        $this->require(mb_strlen($note) >= 10 && mb_strlen($note) <= 1000, 'retry_note', 'Explain why another collection is authorized, in 10 to 1000 characters.');
+
+        DB::transaction(function () use ($record, $admin, $note): void {
+            $record = $this->locked($record, investigation: true);
+            $this->conflict($record->awaitingBuyerCollection(), 'return', 'This return is not waiting to be collected from a buyer.');
+            $this->conflict($record->collectionEscalated() && (int) $record->collection_failed_attempts === ParcelReturn::MAX_COLLECTION_ATTEMPTS,
+                'return', 'Only a return that reached the collection limit can receive one more attempt.');
+            $this->conflict(! $record->collectionRetryAuthorized(), 'return', 'Another collection attempt is already authorized.');
+            $record->forceFill(['collection_retry_authorized_at' => now(), 'collection_retry_authorized_by_id' => $admin->id])->save();
+            $this->event($record, 'collection_retry_authorized', 'admin', (int) $admin->id, ['note' => $note]);
+            OperationsAuditLog::record($admin, 'return_collection_retry_authorized', $record, 'Return #'.$record->id,
+                ['attempts' => (int) $record->collection_failed_attempts], ['attempts' => (int) $record->collection_failed_attempts + 1], $note);
+        }, 3);
+
+        $record = $record->fresh(['sellerOrder.order.buyer']);
+        $this->notify([$record->sellerOrder->order?->buyer], $record, 'collection_retry_authorized', 'Another pickup scheduled',
+            'An admin authorized one more collection attempt for return #'.$record->id.'. Please keep the parcel ready.');
+    }
+
+    /**
+     * The buyer withdraws a return the rider has not collected. The buyer keeps
+     * the item, any held Seller earnings come back, and nothing is refunded.
+     */
+    public function cancelByBuyer(ParcelReturn $record, Buyer $buyer, ?string $reason = null): void
+    {
+        $this->recoveryReady();
+        $reason = trim((string) $reason);
+        $this->require(mb_strlen($reason) <= 500, 'reason', 'Keep the reason to 500 characters or fewer.');
+
+        DB::transaction(function () use ($record, $buyer, $reason): void {
+            $record = $this->locked($record, investigation: true);
+            abort_unless((int) $record->sellerOrder->order->buyer_id === (int) $buyer->id, 404);
+            $this->conflict($record->collected_at === null, 'return', 'The rider already collected this parcel, so the return can no longer be cancelled.');
+            $this->conflict($record->canBuyerCancel(), 'return', 'This return can no longer be cancelled.');
+            $this->closeUncollected($record, 'buyer', (int) $buyer->id, $reason !== '' ? $reason : 'Cancelled by the buyer.', 'buyer_cancelled');
+        }, 3);
+
+        $this->afterClosed($record->fresh(['sellerOrder.order.buyer', 'sellerOrder.seller']), 'buyer_cancelled', 'The buyer cancelled this return before it was collected.');
+    }
+
+    /**
+     * Admin ends a return that cannot finish on its own:
+     * - not yet collected (no-show, unreachable buyer, abandoned request): it is
+     *   cancelled, the buyer keeps the item and held Seller earnings come back;
+     * - collected but disputed at Seller receipt: it is closed where it stands.
+     *   Custody does not change and nothing is restocked, refunded or charged:
+     *   any refund and who pays stay Admin decisions on this return.
+     */
+    public function closeByAdmin(ParcelReturn $record, Admin $admin, string $reason): void
+    {
+        $this->recoveryReady();
+        $this->moneyAdmin($admin);
+        $reason = trim($reason);
+        $this->require(mb_strlen($reason) >= 10 && mb_strlen($reason) <= 1000, 'close_reason', 'Explain why this return is closed, in 10 to 1000 characters.');
+
+        $closed = DB::transaction(function () use ($record, $admin, $reason): string {
+            $record = $this->locked($record, investigation: true);
+            if ($record->receiptDisputed()) {
+                $holder = $this->custodyProviderId($record->sellerOrder);
+                $record->forceFill(['status' => State::Closed, 'closed_at' => now(), 'closed_by_type' => 'admin', 'closed_by_id' => $admin->id,
+                    'closed_reason' => $reason, 'handover_code_hash' => null, 'handover_expires_at' => null])->save();
+                $this->event($record, 'admin_closed', 'admin', (int) $admin->id, ['reason' => $reason, 'custody_provider_id' => $holder, 'custody_hub_id' => $record->sellerOrder->custody_hub_id]);
+                OperationsAuditLog::record($admin, 'return_closed', $record, 'Return #'.$record->id, ['status' => State::ReceiptDisputed->value], ['status' => State::Closed->value], $reason);
+
+                return 'admin_closed';
+            }
+
+            $this->conflict($record->isBuyerRequest() && $record->status === State::Requested && $record->collected_at === null,
+                'return', 'Only a return that was not collected, or whose Seller receipt is disputed, can be closed.');
+            $this->conflict($record->refunded_at === null, 'return', 'A refund is recorded for this return. Void it before closing the return.');
+            $this->closeUncollected($record, 'admin', (int) $admin->id, $reason, 'admin_closed');
+            OperationsAuditLog::record($admin, 'return_closed', $record, 'Return #'.$record->id, ['status' => State::Requested->value], ['status' => State::Cancelled->value], $reason);
+
+            return 'admin_cancelled';
+        }, 3);
+
+        $this->afterClosed($record->fresh(['sellerOrder.order.buyer', 'sellerOrder.seller']), $closed, 'An admin closed this return: '.$reason);
+    }
+
+    /**
+     * Record what physically happened to a parcel whose Seller receipt was
+     * disputed, or to a return already closed as lost, damaged or administratively.
+     * This is an audited record only: custody, refunds, charges and stock are
+     * never changed here.
+     */
+    public function recordDisposition(ParcelReturn $record, Admin $admin, string $disposition, string $note): void
+    {
+        $this->recoveryReady();
+        $this->moneyAdmin($admin);
+        if (! RuntimeSchema::hasColumn('parcel_returns', 'disposition')) {
+            throw ValidationException::withMessages(['disposition' => 'Disposition tracking is not available until the database update is applied.']);
+        }
+        $this->require(array_key_exists($disposition, ParcelReturn::DISPOSITIONS), 'disposition', 'Choose what physically happened to this parcel.');
+        $note = trim($note);
+        $this->require(mb_strlen($note) >= 10 && mb_strlen($note) <= 1000, 'disposition_note', 'Describe the physical disposition in 10 to 1000 characters.');
+
+        DB::transaction(function () use ($record, $admin, $disposition, $note): void {
+            $record = $this->locked($record, investigation: true);
+            $this->conflict($record->dispositionCanBeRecorded(), 'disposition',
+                'A physical disposition can be recorded only while Seller receipt is disputed or after the return is closed.');
+            $previous = $record->disposition;
+            $record->forceFill([
+                'disposition' => $disposition,
+                'disposition_note' => $note,
+                'disposition_set_at' => now(),
+                'disposition_set_by_admin_id' => $admin->id,
+            ])->save();
+            $this->event($record, $this->numberedKey($record, 'disposition_recorded'), 'admin', (int) $admin->id,
+                ['disposition' => $disposition, 'previous_disposition' => $previous, 'note' => $note]);
+            OperationsAuditLog::record($admin, 'return_disposition_recorded', $record, 'Return #'.$record->id,
+                ['disposition' => $previous], ['disposition' => $disposition], $note);
+        }, 3);
+    }
+
+    /**
+     * At physical handover the Seller reports the wrong item, damage, or refuses
+     * the parcel. Receipt is not recorded, the handover code is withdrawn and the
+     * parcel stays in Logistics custody until Admin decides.
+     *
+     * @param  list<UploadedFile>  $photos
+     */
+    public function disputeReceiptBySeller(ParcelReturn $record, Seller $seller, string $issue, string $note, array $photos = []): void
+    {
+        $this->recoveryReady();
+        $note = trim($note);
+        $this->require(array_key_exists($issue, ParcelReturn::RECEIPT_DISPUTE_ISSUES), 'issue', 'Choose what is wrong with the returned parcel.');
+        $this->require(mb_strlen($note) >= 10 && mb_strlen($note) <= 1000, 'note', 'Describe the problem in 10 to 1000 characters.');
+        $this->require(count($photos) <= 5, 'photos', 'Add up to 5 photos.');
+
+        $stored = [];
+        try {
+            DB::transaction(function () use ($record, $seller, $issue, $note, $photos, &$stored): void {
+                $record = $this->locked($record, investigation: true);
+                abort_unless($seller->isApproved() && (int) $record->sellerOrder->seller_id === (int) $seller->id, 403);
+                $this->conflict(in_array($record->status, [State::AtOrigin, State::AwaitingSeller], true) && $record->origin_arrived_at !== null,
+                    'return', 'A receipt problem can be reported only once the parcel is at the origin hub for handover.');
+                $stored = array_map(fn (UploadedFile $photo): string => $photo->store('return-receipt-disputes', 'local'), $photos);
+                $record->forceFill(['status' => State::ReceiptDisputed, 'receipt_dispute_issue' => $issue, 'receipt_dispute_note' => $note,
+                    'receipt_dispute_photos' => $stored, 'receipt_disputed_at' => now(), 'handover_code_hash' => null, 'handover_expires_at' => null])->save();
+                $this->event($record, $this->numberedKey($record, 'receipt_disputed'), 'seller', (int) $seller->id, ['issue' => $issue, 'note' => $note, 'photos' => count($stored)]);
+            }, 3);
+        } catch (Throwable $exception) {
+            foreach ($stored as $path) {
+                rescue(fn () => Storage::disk('local')->delete($path), report: true);
+            }
+            throw $exception;
+        }
+
+        $record = $record->fresh(['sellerOrder.order.buyer']);
+        $this->notifyAdmins($record, 'receipt_disputed', 'Seller disputed a returned parcel',
+            'The Seller reported "'.ParcelReturn::RECEIPT_DISPUTE_ISSUES[$issue].'" for return #'.$record->id.'. The parcel stays with Logistics until you decide.');
+    }
+
+    /** Admin sends a disputed return back to handover: the Seller must receive it with the normal verified scan. */
+    public function resumeHandoverAfterDispute(ParcelReturn $record, Admin $admin, string $note): void
+    {
+        $this->recoveryReady();
+        $this->moneyAdmin($admin);
+        $note = trim($note);
+        $this->require(mb_strlen($note) >= 10 && mb_strlen($note) <= 1000, 'resume_note', 'Explain the decision in 10 to 1000 characters.');
+
+        DB::transaction(function () use ($record, $admin, $note): void {
+            $record = $this->locked($record, investigation: true);
+            $this->conflict($record->receiptDisputed(), 'return', 'Only a disputed Seller receipt can go back to handover.');
+            $record->forceFill(['status' => State::AtOrigin, 'handover_code_hash' => null, 'handover_expires_at' => null])->save();
+            $this->event($record, $this->numberedKey($record, 'receipt_dispute_resumed'), 'admin', (int) $admin->id, ['note' => $note]);
+            OperationsAuditLog::record($admin, 'return_receipt_dispute_resumed', $record, 'Return #'.$record->id, ['status' => State::ReceiptDisputed->value], ['status' => State::AtOrigin->value], $note);
+        }, 3);
+
+        $record = $record->fresh(['sellerOrder.seller']);
+        $this->notify([$record->sellerOrder->seller], $record, 'receipt_dispute_resumed', 'Returned parcel ready for handover again',
+            'An admin reviewed your report for return #'.$record->id.'. Logistics will hand the parcel over again: '.$note, route('seller.returns.index'));
+    }
+
+    /**
+     * Called by ParcelLossService inside the loss transaction, with the parcel
+     * locked: the parcel was lost or damaged beyond return inside the network.
+     * Nothing is restocked, the refund and who pays stay Admin decisions, and
+     * the original delivered order is not cancelled.
+     */
+    public function closeAsLoss(ParcelReturn $record, Admin $admin, string $kind, string $reason): ParcelReturn
+    {
+        $this->recoveryReady();
+        $record = ParcelReturn::query()->whereKey($record->id)->with('sellerOrder')->lockForUpdate()->firstOrFail();
+        $this->require(in_array($kind, ['lost', 'damaged'], true), 'resolution', 'Choose lost or damaged.');
+        $this->require($record->inReturnNetwork(), 'return', 'Only a return parcel inside the Logistics network can be confirmed lost or damaged.');
+        $state = $kind === 'lost' ? State::Lost : State::Damaged;
+        $record->forceFill(['status' => $state, 'closed_at' => now(), 'closed_by_type' => 'admin', 'closed_by_id' => $admin->id,
+            'closed_reason' => $reason, 'handover_code_hash' => null, 'handover_expires_at' => null])->save();
+        $this->event($record, $kind.'_in_return', 'admin', (int) $admin->id, ['reason' => $reason,
+            'custody_provider_id' => $record->sellerOrder->custody_provider_id, 'custody_hub_id' => $record->sellerOrder->custody_hub_id]);
+
+        return $record;
+    }
+
+    /**
+     * Logistics holding a return parcel reports it missing or damaged. The
+     * existing incident hold stops every movement until Admin resolves it.
+     *
+     * @param  array{type: string, reason: string, description?: ?string, photo?: ?UploadedFile}  $payload
+     */
+    public function reportTransitProblem(ParcelReturn $record, LogisticsProvider $provider, array $payload): Incidents
+    {
+        $this->recoveryReady();
+        $record = $record->fresh(['sellerOrder']);
+        $this->owner($record->sellerOrder, $provider);
+        $this->require($record->inReturnNetwork(), 'return', 'Only a return parcel your company holds can be reported missing or damaged.');
+        $this->require(in_array($payload['type'] ?? null, ['missing', 'damaged'], true), 'type', 'Report the parcel as missing or damaged.');
+
+        return DB::transaction(function () use ($record, $provider, $payload): Incidents {
+            $incident = app(ParcelIncidentService::class)->reportOperational($record->sellerOrder, $provider, $payload);
+            $locked = $this->locked($record, investigation: true);
+            // A repeated report returns the same open incident and adds no second history row.
+            if (! $locked->events()->where('metadata->incident_id', $incident->id)->exists()) {
+                $this->event($locked, $this->numberedKey($locked, 'transit_'.$payload['type']), 'logistics', (int) $provider->id, ['incident_id' => $incident->id]);
+            }
+
+            return $incident;
+        }, 3);
+    }
+
+    /** Shared by buyer cancellation and Admin closure before collection. Caller holds the locks. */
+    private function closeUncollected(ParcelReturn $record, string $actor, int $actorId, string $reason, string $event): void
+    {
+        $record->forceFill(['status' => State::Cancelled, 'closed_at' => now(), 'closed_by_type' => $actor, 'closed_by_id' => $actorId,
+            'closed_reason' => $reason, 'collection_courier_id' => null, 'collection_assigned_at' => null])->save();
+        $this->event($record, $event, $actor, $actorId, ['reason' => $reason]);
+        $this->clearException($record, 'Return closed before collection.', $actor === 'admin' ? $actorId : null);
+        app(SellerSettlementService::class)->restoreAfterCancelledReturn($record->sellerOrder);
+        app(ReturnChargeService::class)->sync($record->fresh('sellerOrder'));
+    }
+
+    private function afterClosed(ParcelReturn $record, string $event, string $message): void
+    {
+        $reference = $record->sellerOrder->order?->reference ?? $record->sellerOrder->tracking_number;
+        $buyerMessage = $record->isCancelled()
+            ? "Your return for order {$reference} is closed. You keep the item and no refund is due."
+            : "Your return for order {$reference} was closed by an admin. Any refund is handled separately.";
+        $this->notify([$record->sellerOrder->order?->buyer], $record, $event, 'Return closed', $buyerMessage);
+        $this->notify([$record->sellerOrder->seller], $record, $event, 'Return closed', $message, route('seller.returns.index'));
+    }
+
+    /** @param  list<object|null>  $recipients */
+    private function notify(array $recipients, ParcelReturn $record, string $event, string $title, string $message, ?string $url = null): void
+    {
+        foreach (array_filter($recipients) as $recipient) {
+            rescue(fn () => $recipient->notify(new ReturnRecoveryUpdate($record, $event, $title, $message, $url)), report: true);
+        }
+    }
+
+    private function notifyAdmins(ParcelReturn $record, string $event, string $title, string $message): void
+    {
+        $this->notify(Admin::query()->whereIn('role', ['admin', 'super_admin'])->get()->all(), $record, $event, $title, $message, route('admin.returns.index'));
+    }
+
+    /** Closing returns and deciding disputes change who is owed money, so moderators may only look. */
+    private function moneyAdmin(Admin $admin): void
+    {
+        abort_unless(in_array($admin->role, ['super_admin', 'admin'], true), 403);
+    }
+
+    private function recoveryReady(): void
+    {
+        if (! ParcelReturn::recoveryAvailable()) {
+            throw ValidationException::withMessages(['return' => 'Return recovery is not available until the database update is applied.']);
+        }
     }
 
     private function lockedForDecision(ParcelReturn $record, Seller $seller): ParcelReturn
@@ -706,9 +1047,11 @@ class ParcelReturnService
             $record->forceFill(['seller_received_at' => now(), 'received_by_seller_id' => $seller->id, 'stock_condition' => $condition])->save();
             $this->setState($record, State::Completed, 'completed', 'seller', $seller->id);
 
-            // Restore returned item quantities exactly once when Seller receipt is verified.
+            // Restore returned item quantities exactly once, and only when the Seller
+            // verified the goods as resellable. Damaged, wrong or pending-review items
+            // stay out of sellable stock.
             // Idempotent: stock_restored_at prevents duplicate restoration on replay.
-            if ($record->stock_restored_at === null && $this->restoreReturnStock($record->sellerOrder)) {
+            if ($condition === 'resellable' && $record->stock_restored_at === null && $this->restoreReturnStock($record->sellerOrder)) {
                 $record->forceFill(['stock_restored_at' => now()])->save();
             }
 

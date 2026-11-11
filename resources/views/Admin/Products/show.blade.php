@@ -112,6 +112,7 @@
     @if ($product->variants->count() > 0)
         <div class="bg-white border border-neutral-200 rounded-lg p-5">
             <h2 class="text-[13px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-4">Variants ({{ $product->variants->count() }})</h2>
+            <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-neutral-500 border-b border-neutral-100">
@@ -137,6 +138,7 @@
                     @endforeach
                 </tbody>
             </table>
+            </div>
         </div>
     @endif
 </div>

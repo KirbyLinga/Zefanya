@@ -81,7 +81,7 @@ class CrossProviderOperationsTest extends TestCase
         $parcel = $f['parcel']->fresh();
         $payment = Payment::factory()->create(['seller_order_id' => $parcel->id, 'amount_minor' => 44900]);
         $courier = $this->courierAt($f['b']);
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->status);
         $this->assertSame($f['a']['provider']->id, $parcel->carrier_provider_id);
         $this->assertSame($f['b']['provider']->id, $parcel->custody_provider_id);
 
@@ -168,7 +168,7 @@ class CrossProviderOperationsTest extends TestCase
         $parcel = $f['parcel']->fresh();
         $this->assertSame($f['b']['province']->id, $service->currentHubId($parcel));
         $this->assertSame($f['a']['station']->id, (int) $parcel->origin_station_hub_id);
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->status);
         $this->assertSame($f['a']['provider']->id, $parcel->carrier_provider_id);
     }
 

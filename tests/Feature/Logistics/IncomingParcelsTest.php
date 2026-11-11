@@ -160,8 +160,9 @@ class IncomingParcelsTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
+        // Received at its only hub, so the same verified scan also sorted it.
         $pickedUp->refresh();
-        $this->assertSame(OrderStatus::AtSortingCenter, $pickedUp->status);
+        $this->assertSame(OrderStatus::Sorted, $pickedUp->status);
         $this->assertTrue($courier->fresh()->is_available, 'pickup courier released');
     }
 

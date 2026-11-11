@@ -36,6 +36,7 @@ class ManifestItem extends Model
             'released_at' => 'datetime',
             'issue_recorded_at' => 'datetime',
             'verified_for_dispatch_at' => 'datetime',
+            'recovered_at' => 'datetime',
         ];
     }
 
@@ -61,6 +62,27 @@ class ManifestItem extends Model
         return $this->belongsTo(SellerOrder::class);
     }
 
+    public function recoveredHub(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsHub::class, 'recovered_hub_id');
+    }
+
+    /**
+     * The parcel left its hub on a transfer that was later cancelled, and no
+     * hub has verified where it is since. It stays under exception until a
+     * recovery scan records its physical location.
+     */
+    public function awaitsRecovery(): bool
+    {
+        $manifest = $this->manifest;
+
+        return $manifest !== null
+            && $manifest->status === ManifestStatus::Cancelled
+            && $manifest->dispatched_at !== null
+            && $this->received_at === null
+            && $this->recovered_at === null;
+    }
+
     public function isReceived(): bool
     {
         return $this->received_at !== null;
@@ -83,6 +105,14 @@ class ManifestItem extends Model
     {
         if ($this->received_at !== null) {
             return 'Received at destination';
+        }
+
+        if ($this->recovered_at !== null) {
+            return 'Recovered at '.($this->recoveredHub?->name ?? 'a hub');
+        }
+
+        if ($this->awaitsRecovery()) {
+            return 'Awaiting recovery scan';
         }
 
         if ($this->released_at !== null) {

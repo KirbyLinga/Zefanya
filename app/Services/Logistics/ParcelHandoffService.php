@@ -3,6 +3,7 @@
 namespace App\Services\Logistics;
 
 use App\Enums\ParcelHandoffStatus;
+use App\Enums\ParcelIncidentType;
 use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
 use App\Models\Logistics\LogisticsHub;
@@ -12,6 +13,7 @@ use App\Models\Logistics\ParcelHandoff;
 use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Logistics\ParcelRoute;
 use App\Models\Shared\SellerOrder;
+use App\Support\RuntimeSchema;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,9 @@ class ParcelHandoffService
     public const PHASE_DISPATCH = 'dispatch';
 
     public const PHASE_RECEIVE = 'receive';
+
+    /** A cancelled in-transit handoff's parcel verified back at the sending hub. */
+    public const PHASE_RECOVER = 'recover';
 
     public const ACTOR_LOGISTICS = 'logistics';
 
@@ -345,6 +350,15 @@ class ParcelHandoffService
             $url = route('logistics.handoffs.receive', $handoff);
             $confirm = 'Confirm this parcel was physically received? This transfers custody to your provider and never changes delivery status.';
             $context = 'handoff_receive';
+        } elseif ($phase === self::PHASE_RECOVER) {
+            $this->require((int) $handoff->origin_provider_id === (int) $provider->id, 'provider', 'Only the sending provider can record this parcel back at its sending hub.');
+            $this->conflict($handoff->awaitsRecovery(), 'status', 'Only a handoff cancelled after dispatch, and not yet recovered, needs a recovery scan.');
+            $expectedHubId = (int) $handoff->sending_hub_id;
+            $action = ParcelHandoffVerification::ACTION_HANDOFF_RECOVER;
+            $label = 'Record back at '.($handoff->sendingHub?->name ?? 'the sending hub');
+            $url = route('logistics.handoffs.recover', $handoff);
+            $confirm = 'Confirm this parcel is physically back at the sending hub? It stays held as an exception until its route is decided.';
+            $context = 'handoff_recover';
         } else {
             throw ValidationException::withMessages([
                 'phase' => 'Choose whether this scan is for dispatch or receiving.',
@@ -358,11 +372,17 @@ class ParcelHandoffService
             ]);
         }
 
-        $hubOwnerId = $phase === self::PHASE_DISPATCH
+        $fromOrigin = $phase !== self::PHASE_RECEIVE;
+        $hubOwnerId = $fromOrigin
             ? (int) $handoff->origin_provider_id
             : (int) $handoff->destination_provider_id;
-        $this->assertHandoffHub($hubOwnerId, $expectedHubId, $phase === self::PHASE_DISPATCH ? 'sending_hub_id' : 'receiving_hub_id');
-        $this->assertOriginCustody($order, $handoff->originProvider()->firstOrFail());
+        $this->assertHandoffHub($hubOwnerId, $expectedHubId, $fromOrigin ? 'sending_hub_id' : 'receiving_hub_id');
+        if ($phase === self::PHASE_RECOVER) {
+            // A cancelled transfer is held as an exception; only custody is checked.
+            $this->require($order->currentCustodyProviderId() === (int) $handoff->origin_provider_id, 'seller_order_id', 'Only the provider holding this parcel can record it.');
+        } else {
+            $this->assertOriginCustody($order, $handoff->originProvider()->firstOrFail());
+        }
 
         $token = $this->verification->issueForHandoff($provider, $handoff, $action, $expectedHubId, $method);
 
@@ -400,6 +420,7 @@ class ParcelHandoffService
 
             $this->assertOriginProvider($locked, $origin);
             $this->conflict($locked->status === ParcelHandoffStatus::Accepted, 'status', 'Only accepted handoffs can be dispatched.');
+            app(TransferCourierService::class)->assertReadyForDispatch($locked, $origin);
             app(RoutePlannerService::class)->requireAvailableDeparture($parcel);
             $this->assertOriginCustody($parcel, $origin);
             $hub = $this->assertHandoffHub((int) $origin->id, (int) $locked->sending_hub_id, 'sending_hub_id');
@@ -418,6 +439,10 @@ class ParcelHandoffService
                 'dispatched_by_type' => self::ACTOR_LOGISTICS,
                 'dispatched_by_id' => $origin->id,
             ])->save();
+
+            // Custody stays with the origin until the destination's verified scan.
+            app(ParcelTransitStatusService::class)->departed($parcel, $origin,
+                'Handed off from '.$hub->name.' to '.($locked->receivingHub?->name ?? 'the partner hub').' (handoff #'.$locked->id.').', 'handoff');
 
             app(ParcelReturnService::class)->movement($parcel, $locked);
 
@@ -481,8 +506,9 @@ class ParcelHandoffService
                 'custody_provider_id' => $destination->id,
                 'custody_hub_id' => $hub->id,
             ])->save();
-
             app(ParcelLegService::class)->advanceAfterReceipt($parcel, $locked);
+            app(ParcelTransitStatusService::class)->arrivedAtHub($parcel, $destination,
+                'Received at '.$hub->name.' from handoff #'.$locked->id.'.', 'handoff');
             app(ParcelReturnService::class)->movement($parcel, $locked);
 
             return $locked;
@@ -499,6 +525,106 @@ class ParcelHandoffService
         app(CourierAssignmentService::class)->dispatchAfterCommit($received->sellerOrder);
 
         return $received->fresh(['sellerOrder', 'link', 'originProvider', 'destinationProvider', 'sendingHub', 'receivingHub']);
+    }
+
+    /**
+     * The sending company cancels a handoff, with a reason.
+     *
+     * Before dispatch the parcel never left the sending hub, so it simply goes
+     * back to the sending company's handoff queue. After dispatch, nothing is
+     * assumed: custody stays with the sending company, the parcel stays in
+     * transit, and an exception holds it until a verified recovery scan.
+     */
+    public function cancel(ParcelHandoff $handoff, LogisticsProvider $origin, string $reason): ParcelHandoff
+    {
+        $this->assertOriginProvider($handoff, $origin);
+        $reason = trim($reason);
+        $this->require($reason !== '' && mb_strlen($reason) <= 1000, 'cancellation_reason', 'Provide a cancellation reason of 1000 characters or fewer.');
+
+        return DB::transaction(function () use ($handoff, $origin, $reason): ParcelHandoff {
+            $parcel = SellerOrder::query()->whereKey($handoff->seller_order_id)->lockForUpdate()->firstOrFail();
+            $locked = $this->lockHandoff($handoff);
+            $this->assertOriginProvider($locked, $origin);
+
+            if ($locked->status === ParcelHandoffStatus::Cancelled) {
+                return $locked; // A repeated submit changes nothing.
+            }
+            $this->conflict(in_array($locked->status, [ParcelHandoffStatus::Requested, ParcelHandoffStatus::Accepted, ParcelHandoffStatus::InTransit], true),
+                'status', 'Only a handoff that has not been received can be cancelled.');
+            $leftTheHub = $locked->status === ParcelHandoffStatus::InTransit;
+
+            $locked->forceFill([
+                'status' => ParcelHandoffStatus::Cancelled->value,
+                'cancelled_at' => now(),
+                'cancelled_by_type' => self::ACTOR_LOGISTICS,
+                'cancelled_by_id' => $origin->id,
+                'cancellation_reason' => $reason,
+            ])->save();
+
+            if ($leftTheHub) {
+                app(ParcelIncidentService::class)->recordRoutingBlocker($parcel, ParcelIncidentType::FailedTransfer,
+                    'Dispatched handoff #'.$locked->id.' cancelled: '.$reason, (int) $origin->id);
+            }
+
+            return $locked;
+        });
+    }
+
+    /**
+     * Verified recovery of a parcel from a handoff cancelled after dispatch,
+     * scanned back at the sending hub. Records where it is; its exception
+     * still decides whether the route resumes or changes.
+     */
+    public function recover(ParcelHandoff $handoff, LogisticsProvider $origin, ?string $token): ParcelHandoff
+    {
+        $this->assertOriginProvider($handoff, $origin);
+
+        $recovered = DB::transaction(function () use ($handoff, $origin, $token): ParcelHandoff {
+            $parcel = SellerOrder::query()->whereKey($handoff->seller_order_id)->lockForUpdate()->firstOrFail();
+            $locked = $this->lockHandoff($handoff);
+            $this->assertOriginProvider($locked, $origin);
+
+            if ($locked->status === ParcelHandoffStatus::Cancelled && $locked->recovered_at !== null) {
+                return $locked; // Already recorded; a repeated submit changes nothing.
+            }
+            $this->conflict($locked->awaitsRecovery(), 'status', 'Only a handoff cancelled after dispatch needs a recovery scan.');
+            $hub = $this->assertHandoffHub((int) $origin->id, (int) $locked->sending_hub_id, 'sending_hub_id');
+            $this->verification->assertValidForHandoff($origin, $locked, ParcelHandoffVerification::ACTION_HANDOFF_RECOVER, $token, (int) $hub->id);
+
+            $locked->forceFill([
+                'recovered_at' => now(),
+                'recovered_by_type' => self::ACTOR_LOGISTICS,
+                'recovered_by_id' => $origin->id,
+            ])->save();
+            $parcel->forceFill(['custody_provider_id' => $origin->id, 'custody_hub_id' => $hub->id])->save();
+            app(ParcelTransitStatusService::class)->arrivedAtHub($parcel, $origin,
+                'Recovered at '.$hub->name.' after handoff #'.$locked->id.' was cancelled.', 'recovery', resumeSorted: false);
+            app(ParcelIncidentService::class)->recordCancelledHandoffRecovery($parcel, $locked, $hub, (int) $origin->id);
+
+            return $locked;
+        });
+
+        if ($token !== null) {
+            $this->verification->consumeAfterSuccess(fn () => $this->verification->consumeForHandoff(
+                $origin, $recovered, ParcelHandoffVerification::ACTION_HANDOFF_RECOVER, $token, (int) $recovered->sending_hub_id,
+            ));
+        }
+
+        return $recovered->fresh(['sellerOrder', 'link', 'originProvider', 'destinationProvider', 'sendingHub', 'receivingHub']);
+    }
+
+    /** True while a handoff of this parcel was cancelled in transit and not yet recovered. */
+    public function awaitingRecovery(SellerOrder $parcel): bool
+    {
+        if (! RuntimeSchema::hasColumn('parcel_handoffs', 'recovered_at')) {
+            return false;
+        }
+
+        return $parcel->parcelHandoffs()
+            ->where('status', ParcelHandoffStatus::Cancelled->value)
+            ->whereNotNull('dispatched_at')
+            ->whereNull('recovered_at')
+            ->exists();
     }
 
     /**
@@ -596,7 +722,12 @@ class ParcelHandoffService
             'requested_at' => now(),
             'requested_by_type' => self::ACTOR_LOGISTICS,
             'requested_by_id' => $origin->id,
-        ])->save();
+        ]);
+        if (TransferCourierService::available()) {
+            // Handoffs requested from now on need the sending company's Courier before dispatch.
+            $handoff->forceFill(['transport_required' => (bool) config('transfers.require_transport')]);
+        }
+        $handoff->save();
 
         // A restored route makes the Admin-visible exception stale. Keep the
         // row for history but close it so dashboards reflect the live state.

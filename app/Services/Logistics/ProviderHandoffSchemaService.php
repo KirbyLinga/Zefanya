@@ -307,12 +307,16 @@ class ProviderHandoffSchemaService
             }
         }
 
-        $events = ['requested' => 'origin', 'accepted' => 'destination', 'rejected' => 'destination', 'dispatched' => 'origin', 'received' => 'destination'];
+        $events = ['requested' => 'origin', 'accepted' => 'destination', 'rejected' => 'destination', 'dispatched' => 'origin', 'received' => 'destination',
+            'cancelled' => 'origin', 'recovered' => 'origin'];
         foreach ($events as $event => $side) {
             $at = $handoff->{$event.'_at'};
             $id = $handoff->{$event.'_by_id'};
             $type = $handoff->{$event.'_by_type'};
+            // Admin may close a handoff when it confirms the parcel lost.
+            $byAdmin = $event === 'cancelled' && $type === 'admin' && $id !== null;
             $this->require(($at === null && $id === null && $type === null)
+                || $byAdmin
                 || ($at !== null && $type === 'logistics' && (int) $id === (int) $handoff->{$side.'_provider_id'}), $event.'_by_id', 'Handoff event requires its participating provider and timestamp.');
         }
         $required = match ($handoff->status) {
@@ -321,11 +325,15 @@ class ProviderHandoffSchemaService
             ParcelHandoffStatus::Rejected => ['requested', 'rejected'],
             ParcelHandoffStatus::InTransit => ['requested', 'accepted', 'dispatched'],
             ParcelHandoffStatus::Received => ['requested', 'accepted', 'dispatched', 'received'],
+            ParcelHandoffStatus::Cancelled => ['requested', 'cancelled'],
         };
         foreach ($required as $event) {
             $this->require($handoff->{$event.'_at'} !== null, $event.'_at', 'The handoff status requires this audit event.');
         }
         $this->require($handoff->status !== ParcelHandoffStatus::Rejected || filled($handoff->rejection_reason), 'rejection_reason', 'Rejected handoffs require a reason.');
+        $this->require($handoff->status !== ParcelHandoffStatus::Cancelled || filled($handoff->cancellation_reason), 'cancellation_reason', 'Cancelled handoffs require a reason.');
+        $this->require($handoff->recovered_at === null || ($handoff->status === ParcelHandoffStatus::Cancelled && $handoff->dispatched_at !== null),
+            'recovered_at', 'Only a handoff cancelled after dispatch can be recovered.');
     }
 
     private function requirePriority(int $priority): void

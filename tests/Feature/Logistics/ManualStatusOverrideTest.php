@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Logistics;
 
+use App\Enums\ManifestStatus;
 use App\Enums\OrderStatus;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Logistics\Manifest;
+use App\Models\Logistics\ManifestItem;
 use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Incidents;
@@ -177,6 +180,53 @@ class ManualStatusOverrideTest extends TestCase
         $this->actingAs($this->provider, 'logistics')->post(route('logistics.delivery-monitoring.override', $parcel),
             $this->payload(OrderStatus::Sorted, OrderStatus::AssignedToRider))->assertSessionHasErrors('status');
         $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertSame(0, OperationsAuditLog::count());
+    }
+
+    public function test_override_is_refused_while_a_cancelled_transfer_still_needs_a_recovery_scan(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp);
+        $hubId = (int) $this->courier->rider->station_hub_id;
+        $manifest = Manifest::query()->create([
+            'logistics_provider_id' => $this->provider->id,
+            'origin_hub_id' => $hubId,
+            'destination_hub_id' => $hubId,
+            'dispatched_at' => now(),
+        ]);
+        $manifest->forceFill(['status' => ManifestStatus::Cancelled->value])->save();
+        ManifestItem::query()->create([
+            'manifest_id' => $manifest->id,
+            'seller_order_id' => $parcel->id,
+        ]);
+
+        $response = $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.delivery-monitoring.override', $parcel),
+                $this->payload(OrderStatus::PickedUp, OrderStatus::AtSortingCenter));
+        $response->assertSessionHasErrors('status');
+
+        $this->assertStringContainsString('recovery scan',
+            $response->getSession()->get('errors')->first('status'));
+        $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
+        $this->assertSame(0, OperationsAuditLog::count());
+    }
+
+    public function test_override_refuses_claimed_custody_without_a_verified_hub_receipt(): void
+    {
+        $parcel = $this->parcel(OrderStatus::Sorted);
+        $parcel->forceFill([
+            'custody_provider_id' => $this->provider->id,
+            'custody_hub_id' => $this->courier->rider->station_hub_id,
+        ])->save();
+
+        $response = $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.delivery-monitoring.override', $parcel),
+                $this->payload(OrderStatus::Sorted, OrderStatus::AssignedToRider));
+        $response->assertSessionHasErrors('status');
+
+        $this->assertStringContainsString('verified hub receipt',
+            $response->getSession()->get('errors')->first('status'));
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertNull($parcel->fresh()->delivery_courier_id);
         $this->assertSame(0, OperationsAuditLog::count());
     }
 

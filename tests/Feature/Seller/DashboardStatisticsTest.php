@@ -236,9 +236,9 @@ class DashboardStatisticsTest extends TestCase
         $this->actingAs($seller, 'seller')->get(route('seller.dashboard'))
             ->assertOk()
             ->assertViewHas('completedOrders', 2)
-            ->assertViewHas('netEarningsMinor', 26600)
+            ->assertViewHas('netEarningsMinor', 25200)
             ->assertViewHas('earningsPendingCount', 0)
-            ->assertSee('₱266.00');
+            ->assertSee('₱252.00');
     }
 
     public function test_unknown_or_partial_financials_are_flagged_instead_of_estimated(): void
@@ -256,7 +256,7 @@ class DashboardStatisticsTest extends TestCase
         $this->actingAs($seller, 'seller')->get(route('seller.dashboard'))
             ->assertOk()
             ->assertViewHas('completedOrders', 3)
-            ->assertViewHas('netEarningsMinor', 9500)
+            ->assertViewHas('netEarningsMinor', 9000)
             ->assertViewHas('earningsPendingCount', 2)
             ->assertSee('2 completed orders awaiting finalized earnings.');
 

@@ -175,9 +175,13 @@ class EndToEndLogisticsStabilizationTest extends TestCase
             $this->assertSame(['ROAD', 'SEA', 'AIR'], array_column($route->fresh()->legs, 'transport_mode'));
         }
 
-        $token = $this->logisticsScan($f['b'], $parcel);
-        $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $token])
-            ->assertRedirect()->assertSessionHasNoErrors();
+        if ($scenario !== 'local') {
+            // A parcel that travelled is sorted by its destination hub's own scan;
+            // a local one was already sorted by its origin receipt scan.
+            $token = $this->logisticsScan($f['b'], $parcel);
+            $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $token])
+                ->assertRedirect()->assertSessionHasNoErrors();
+        }
         $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
         $this->post(route('logistics.parcel-sorting.assignDelivery', $parcel), ['courier_id' => $delivery->id, 'reason' => 'Destination delivery'])
             ->assertRedirect()->assertSessionHasNoErrors();

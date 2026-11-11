@@ -170,7 +170,7 @@ class PhysicalReturnTest extends TestCase
         app(ParcelReturnService::class)->receiveBySeller($return, $f['seller'], 'resellable', $token);
     }
 
-    public function test_stock_is_restored_on_seller_receipt_regardless_of_condition(): void
+    public function test_damaged_stock_is_not_restored_on_seller_receipt(): void
     {
         config(['returns.restore_verified_resellable' => true]);
         $f = $this->fixture();
@@ -179,10 +179,10 @@ class PhysicalReturnTest extends TestCase
         $token = $this->receiptToken($f, $return, 'damaged');
         app(ParcelReturnService::class)->receiveBySeller($return, $f['seller'], 'damaged', $token);
         $this->assertSame(ParcelReturnStatus::Completed, $return->fresh()->status);
-        // No condition-based restocking: damaged goods are restored too.
-        $this->assertSame(5, $f['variant']->fresh()->stock_quantity);
-        $this->assertSame(1, InventoryTransaction::query()->where('reason', 'return')->count());
-        $this->assertNotNull($return->fresh()->stock_restored_at);
+        // Only verified resellable goods return to sellable stock.
+        $this->assertSame(3, $f['variant']->fresh()->stock_quantity);
+        $this->assertSame(0, InventoryTransaction::query()->where('reason', 'return')->count());
+        $this->assertNull($return->fresh()->stock_restored_at);
     }
 
     public function test_reverse_cross_provider_route_requires_an_explicit_b_to_a_link_and_verified_receipt(): void

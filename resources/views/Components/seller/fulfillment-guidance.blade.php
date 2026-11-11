@@ -8,12 +8,14 @@
             OrderStatus::Confirmed => 'Pack the order after checking the items and buyer note.',
             OrderStatus::Preparing => 'Finish packing, then mark the parcel ready for pickup.',
             OrderStatus::ReadyForPickup => 'Prepare the waybill and wait for the assigned pickup rider.',
-            OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery => 'Logistics is handling delivery. Follow the shipment timeline for updates.',
+            OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::InTransit, OrderStatus::ArrivedAtHub,
+            OrderStatus::AssignedToRider, OrderStatus::OutForDelivery => 'Logistics is handling delivery. Follow the shipment timeline for updates.',
             OrderStatus::DeliveryFailed => 'Logistics will arrange the next authorized delivery or return step.',
             OrderStatus::Delivered => 'Delivered to the buyer; waiting for receipt confirmation or the return window to end.',
             OrderStatus::Completed => 'Fulfillment is complete. No further shipping action is needed.',
             OrderStatus::Returned => 'The returned parcel has been received. Review its return details.',
             OrderStatus::Cancelled => 'This order is cancelled. No pickup or delivery action is needed.',
+            OrderStatus::Lost => 'Admin confirmed this parcel lost. No shipping action is needed. Any compensation owed to you is listed under Earnings.',
         };
     // Philippine-time window the parcel was booked into when it was marked ready.
     $pickupWindow = $shipment->status === OrderStatus::ReadyForPickup && ! $shipment->hasActiveReturn()

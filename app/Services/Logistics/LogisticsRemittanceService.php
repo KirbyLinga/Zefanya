@@ -56,9 +56,11 @@ class LogisticsRemittanceService
 
         $rows = $this->withShipping(CodRemittance::query()->where('cod_remittances.logistics_provider_id', $provider->getKey()))
             ->selectRaw(
-                'CASE WHEN cod_remittances.status = ? THEN ? WHEN cod_remittances.zefanya_received_at IS NOT NULL THEN ? '
+                'CASE WHEN cod_remittances.status = ? THEN ? WHEN cod_remittances.status = ? THEN ? '
+                .'WHEN cod_remittances.zefanya_received_at IS NOT NULL THEN ? '
                 .'WHEN cod_remittances.logistics_remittance_id IS NOT NULL THEN ? ELSE ? END as stage',
-                [CodRemittance::PENDING_REMITTANCE, self::STAGE_RIDER, self::STAGE_SETTLED, self::STAGE_SENT, self::STAGE_READY],
+                [CodRemittance::PENDING_REMITTANCE, self::STAGE_RIDER, CodRemittance::PARTIALLY_REMITTED, self::STAGE_RIDER,
+                    self::STAGE_SETTLED, self::STAGE_SENT, self::STAGE_READY],
             )
             ->selectRaw('COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
             ->groupBy('stage')
@@ -576,6 +578,42 @@ class LogisticsRemittanceService
             ->where('cod_remittances.origin_share_minor', 0)
             ->where('cod_remittances.kept_shipping_minor', 0)
             ->where('seller_orders.shipping_fee_minor', '>', 0);
+    }
+
+    /**
+     * Running parcel-cash balance for the Shipping fees table, oldest parcel
+     * first: + the cash once the rider hands it over, − Zefanya's part once it
+     * is sent (a rejected payment puts it back). Read only.
+     *
+     * @return array<int, array{cashIn: bool, sentOut: bool, balanceMinor: int}> keyed by cod_remittances.id
+     */
+    public function parcelBalances(LogisticsProvider $provider): array
+    {
+        $rows = $this->withShipping(CodRemittance::query()->where('cod_remittances.logistics_provider_id', $provider->getKey()))
+            ->leftJoin('logistics_remittances', 'logistics_remittances.id', '=', 'cod_remittances.logistics_remittance_id')
+            ->orderBy('cod_remittances.id')
+            ->get([
+                'cod_remittances.id', 'cod_remittances.status', 'cod_remittances.amount_minor', 'cod_remittances.received_amount_minor',
+                'logistics_remittances.status as sent_status',
+            ]);
+        $kept = $this->withShipping(CodRemittance::query()->where('cod_remittances.logistics_provider_id', $provider->getKey()))
+            ->pluck(DB::raw(CodRemittance::KEPT_SHIPPING_SQL.' as kept'), 'cod_remittances.id');
+
+        $balance = 0;
+        $out = [];
+        foreach ($rows as $row) {
+            $cashIn = $row->status !== CodRemittance::PENDING_REMITTANCE;
+            $sentOut = $cashIn && $row->sent_status !== null && $row->sent_status !== LogisticsRemittance::REJECTED;
+            if ($cashIn) {
+                $balance += (int) ($row->received_amount_minor ?? $row->amount_minor);
+            }
+            if ($sentOut) {
+                $balance -= (int) $row->amount_minor - (int) ($kept[$row->id] ?? 0);
+            }
+            $out[(int) $row->id] = ['cashIn' => $cashIn, 'sentOut' => $sentOut, 'balanceMinor' => $balance];
+        }
+
+        return $out;
     }
 
     private function withShipping(Builder $query): Builder

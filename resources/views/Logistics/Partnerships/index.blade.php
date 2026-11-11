@@ -1,19 +1,12 @@
 @extends('Layouts.logistics')
 
 @section('title', 'Provider Partnerships')
+@section('logistics-toolbar')<span hidden data-logistics-hosted-bell></span>@endsection
 
 @section('content')
+<x-logistics.tabs group="setup" />
 <div data-partnerships-page>
-    <header class="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-strong)] pb-6">
-        <div>
-            <p class="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-700">Logistics network</p>
-            <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Provider Partnerships</h1>
-            <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">{{ $provider->business_name }} <span aria-hidden="true">/</span> {{ $provider->province_name ?: 'Service province' }}</p>
-        </div>
-        <a href="{{ route('logistics.hubs.index') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm border border-[var(--border-strong)] px-3 font-sans text-[11px] font-semibold text-[var(--text-ink)] transition hover:bg-[var(--bg-surface)] focus-visible:outline-2 focus-visible:outline-primary-700">
-            <i data-lucide="network" class="size-3.5"></i>Hubs and Stations
-        </a>
-    </header>
+    <x-logistics.setup-header title="Provider Partnerships" description="Directed links that let you hand parcels to providers in other provinces. Each needs the other provider's acceptance and Admin approval." />
 
     <x-logistics-flash :messages="['success', 'warning', 'error']" />
     @if($errors->any())

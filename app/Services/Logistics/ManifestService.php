@@ -11,6 +11,7 @@ use App\Models\Logistics\Manifest;
 use App\Models\Logistics\ManifestAuditLog;
 use App\Models\Logistics\ManifestItem;
 use App\Models\Shared\SellerOrder;
+use App\Support\RuntimeSchema;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -31,6 +32,9 @@ class ManifestService
     public const PHASE_DISPATCH = 'dispatch';
 
     public const PHASE_RECEIVE = 'receive';
+
+    /** A verified scan that records where a parcel from a cancelled transfer physically is. */
+    public const PHASE_RECOVER = 'recover';
 
     public function __construct(
         private readonly ParcelHandoffVerification $handoff = new ParcelHandoffVerification,
@@ -64,7 +68,12 @@ class ManifestService
             'origin_hub_id' => $origin->id,
             'destination_hub_id' => $destination->id,
             'direction' => $direction,
-        ])->save();
+        ]);
+        if (TransferCourierService::available()) {
+            // Batches created from now on need an assigned Courier before dispatch.
+            $manifest->forceFill(['transport_required' => (bool) config('transfers.require_transport')]);
+        }
+        $manifest->save();
 
         return $manifest;
     }
@@ -146,6 +155,10 @@ class ManifestService
     {
         if ($parcel->handover_at === null) {
             return 'Not yet picked up';
+        }
+
+        if ($this->awaitingRecovery($parcel)) {
+            return 'Awaiting recovery scan after a cancelled transfer';
         }
 
         $current = $this->currentHubId($parcel);
@@ -355,6 +368,7 @@ class ManifestService
             $locked = $this->lockManifest($manifest);
             $this->assertManifestOwner($locked, $provider);
             $this->assertDraft($locked, 'This manifest has already been dispatched.');
+            app(TransferCourierService::class)->assertReadyForDispatch($locked, $provider);
 
             $items = $locked->items()
                 ->whereNull('released_at')
@@ -412,6 +426,17 @@ class ManifestService
                 'dispatched_by_type' => ParcelHandoffVerification::ACTOR_LOGISTICS,
                 'dispatched_by_id' => $provider->id,
             ])->save();
+
+            // Every parcel was just verified on this batch, so each one is now
+            // on the road. Custody still stays with the origin hub.
+            $locked->loadMissing(['originHub', 'destinationHub']);
+            foreach ($items as $dispatchedItem) {
+                app(ParcelTransitStatusService::class)->departed(
+                    $dispatchedItem->sellerOrder,
+                    $provider,
+                    'Dispatched on transfer batch #'.$locked->id.' from '.($locked->originHub?->name ?? 'origin hub').' to '.($locked->destinationHub?->name ?? 'destination hub').'.',
+                );
+            }
             foreach ($items as $returnItem) {
                 app(ParcelReturnService::class)->movement($returnItem->sellerOrder, $returnItem);
             }
@@ -447,8 +472,13 @@ class ManifestService
         string $trackingNumber,
         string $phase,
         string $method = ParcelHandoffVerification::METHOD_MANUAL,
+        ?int $recoveryHubId = null,
     ): array {
         $this->assertManifestOwner($manifest, $provider);
+
+        if ($phase === self::PHASE_RECOVER) {
+            return $this->verifyRecoveryScan($manifest, $provider, $trackingNumber, $method, $recoveryHubId);
+        }
 
         if (! in_array($phase, [self::PHASE_DISPATCH, self::PHASE_RECEIVE], true)) {
             throw ValidationException::withMessages([
@@ -645,6 +675,11 @@ class ManifestService
                 'custody_hub_id' => $locked->destination_hub_id,
             ])->save();
             app(ParcelLegService::class)->advanceAfterReceipt($lockedItem->sellerOrder, $lockedItem);
+            app(ParcelTransitStatusService::class)->arrivedAtHub(
+                $lockedItem->sellerOrder,
+                $provider,
+                'Received at '.(LogisticsHub::query()->whereKey($locked->destination_hub_id)->value('name') ?? 'destination hub').' from transfer batch #'.$locked->id.'.',
+            );
             app(ParcelReturnService::class)->movement($lockedItem->sellerOrder->fresh(), $lockedItem);
             $receivedItem = $lockedItem;
 
@@ -883,10 +918,11 @@ class ManifestService
      */
     public function counts(Manifest $manifest): array
     {
+        $leftTheHub = $manifest->status === ManifestStatus::Cancelled && $manifest->dispatched_at !== null;
         $items = $manifest->items()
-            ->where(function ($q): void {
+            ->unless($leftTheHub, fn ($query) => $query->where(function ($q): void {
                 $q->whereNull('released_at')->orWhereNotNull('received_at');
-            });
+            }));
 
         $total = (clone $items)->count();
         $received = (clone $items)->whereNotNull('received_at')->count();
@@ -948,6 +984,203 @@ class ManifestService
         }
 
         return $hub;
+    }
+
+    public static function recoverySchemaAvailable(): bool
+    {
+        return RuntimeSchema::hasColumn('manifest_items', 'recovered_at');
+    }
+
+    /** True while a parcel's last transfer was cancelled after leaving its hub and no hub has verified it since. */
+    public function awaitingRecovery(SellerOrder $parcel): bool
+    {
+        return $this->unrecoveredItems($parcel)->isNotEmpty();
+    }
+
+    /** @return Collection<int, ManifestItem> */
+    public function unrecoveredItems(SellerOrder $parcel): Collection
+    {
+        // Until the recovery columns are migrated, no recovery can be pending.
+        if (! self::recoverySchemaAvailable()) {
+            return collect();
+        }
+
+        return ManifestItem::query()
+            ->where('seller_order_id', $parcel->getKey())
+            ->whereNull('received_at')
+            ->whereNull('recovered_at')
+            ->whereHas('manifest', fn ($manifest) => $manifest
+                ->where('status', ManifestStatus::Cancelled->value)
+                ->whereNotNull('dispatched_at'))
+            ->whereHas('sellerOrder', fn ($order) => $order->where('status', '!=', 'LOST'))
+            ->with('manifest')
+            ->get();
+    }
+
+    /**
+     * The hubs where a cancelled transfer's parcels may be recovered: its own
+     * origin and destination, both run by the sending company.
+     *
+     * @return Collection<int, LogisticsHub>
+     */
+    public function recoveryHubs(Manifest $manifest): Collection
+    {
+        return LogisticsHub::query()
+            ->whereKey([$manifest->origin_hub_id, $manifest->destination_hub_id])
+            ->where('logistics_provider_id', $manifest->logistics_provider_id)
+            ->orderByRaw('id = ? desc', [$manifest->origin_hub_id])
+            ->get();
+    }
+
+    /** @return array<string, mixed> */
+    private function verifyRecoveryScan(Manifest $manifest, LogisticsProvider $provider, string $trackingNumber, string $method, ?int $hubId): array
+    {
+        $manifest = $manifest->fresh(['originHub', 'destinationHub', 'provider']);
+        $hub = $this->assertRecoveryHub($manifest, $hubId);
+        $item = $this->findItemByTracking($manifest, $trackingNumber);
+
+        if ($item->recovered_at !== null) {
+            throw ValidationException::withMessages([
+                'tracking_number' => 'This parcel was already recovered at '.($item->recoveredHub?->name ?? 'a hub').'.',
+            ]);
+        }
+        if (! $item->awaitsRecovery()) {
+            throw ValidationException::withMessages([
+                'tracking_number' => 'This parcel does not need a recovery scan on this batch.',
+            ]);
+        }
+
+        $token = $this->handoff->issueForManifestItem($provider, $item, ParcelHandoffVerification::ACTION_MANIFEST_RECOVER, (int) $hub->id, $method);
+
+        return [
+            'context' => 'manifest_recover',
+            'manifest' => $this->manifestSummary($manifest),
+            'item' => [
+                'id' => $item->id,
+                'tracking_number' => $item->tracking_number,
+                'received_at' => null,
+            ],
+            'parcel' => $this->parcelSummary($item->sellerOrder),
+            'actions' => [[
+                'key' => ParcelHandoffVerification::ACTION_MANIFEST_RECOVER,
+                'label' => 'Recover at '.$hub->name,
+                'method' => 'POST',
+                'url' => route('logistics.manifests.items.recover', [$manifest, $item, 'hub' => $hub->id]),
+                'confirm_message' => 'Confirm this parcel is physically here at '.$hub->name.'? This records where it is; it does not resume its route.',
+                'verification_token' => $token,
+            ]],
+            'verification_token' => $token,
+        ];
+    }
+
+    /**
+     * Record where a parcel from a cancelled, already-dispatched transfer
+     * physically is. Needs a valid single-use recovery scan at that hub.
+     * Custody moves to the scanning hub, and the transfer exception stays open
+     * for an authorized resume or reroute decision.
+     */
+    public function recoverItem(Manifest $manifest, ManifestItem $item, LogisticsProvider $provider, ?string $token, int $hubId, ?Request $request = null): ManifestItem
+    {
+        $this->assertManifestOwner($manifest, $provider);
+
+        $recovered = DB::transaction(function () use ($manifest, $item, $provider, $token, $hubId, $request): ManifestItem {
+            $locked = $this->lockManifest($manifest);
+            $this->assertManifestOwner($locked, $provider);
+            $hub = $this->assertRecoveryHub($locked, $hubId);
+
+            /** @var ManifestItem $lockedItem */
+            $lockedItem = ManifestItem::query()->whereKey($item->getKey())->where('manifest_id', $locked->id)->lockForUpdate()->firstOrFail();
+            $lockedItem->setRelation('manifest', $locked);
+            $parcel = SellerOrder::query()->whereKey($lockedItem->seller_order_id)->lockForUpdate()->firstOrFail();
+            $lockedItem->setRelation('sellerOrder', $parcel);
+
+            if ($lockedItem->recovered_at !== null) {
+                if ((int) $lockedItem->recovered_hub_id === (int) $hub->id) {
+                    return $lockedItem; // A repeated submit changes nothing.
+                }
+                throw ValidationException::withMessages([
+                    'tracking_number' => 'This parcel was already recovered at another hub.',
+                ]);
+            }
+            if (! $lockedItem->awaitsRecovery()) {
+                throw ValidationException::withMessages([
+                    'tracking_number' => 'This parcel does not need a recovery scan on this batch.',
+                ]);
+            }
+
+            $this->handoff->assertValidForManifestItem($provider, $lockedItem, ParcelHandoffVerification::ACTION_MANIFEST_RECOVER, $token, (int) $hub->id);
+
+            $lockedItem->forceFill([
+                'recovered_at' => now(),
+                'recovered_hub_id' => $hub->id,
+                'recovered_by_type' => ParcelHandoffVerification::ACTOR_LOGISTICS,
+                'recovered_by_id' => $provider->id,
+            ])->save();
+
+            // The verified scan is the only proof of where the parcel is now.
+            $parcel->forceFill([
+                'custody_provider_id' => $provider->id,
+                'custody_hub_id' => $hub->id,
+            ])->save();
+            app(ParcelTransitStatusService::class)->arrivedAtHub($parcel, $provider, 'Recovered at '.$hub->name.' after cancelled transfer batch #'.$locked->id, 'recovery', resumeSorted: false);
+
+            app(ParcelIncidentService::class)->recordCancelledTransferRecovery($parcel, $lockedItem, $hub, (int) $provider->id);
+
+            if ($request !== null) {
+                ManifestAuditLog::record($provider, 'recovered', $locked, $lockedItem, $request, 'qr_scan');
+            }
+
+            return $lockedItem;
+        });
+
+        $this->handoff->consumeAfterSuccess(fn () => $this->handoff->consumeForManifestItem(
+            $provider,
+            $recovered,
+            ParcelHandoffVerification::ACTION_MANIFEST_RECOVER,
+            $token,
+            $hubId,
+        ));
+
+        return $recovered->fresh(['recoveredHub', 'manifest']);
+    }
+
+    private function assertRecoveryHub(Manifest $manifest, ?int $hubId): LogisticsHub
+    {
+        if ($manifest->status !== ManifestStatus::Cancelled || $manifest->dispatched_at === null) {
+            throw ValidationException::withMessages([
+                'tracking_number' => 'Only a batch cancelled after dispatch needs recovery scans.',
+            ]);
+        }
+
+        $hub = $hubId === null ? null : $this->recoveryHubs($manifest)->firstWhere('id', $hubId);
+        if ($hub === null) {
+            throw ValidationException::withMessages([
+                'hub' => 'Choose the hub where the parcel is now: this batch\'s origin or destination.',
+            ]);
+        }
+
+        return $hub;
+    }
+
+    private function findItemByTracking(Manifest $manifest, string $trackingNumber): ManifestItem
+    {
+        $trackingNumber = trim($trackingNumber);
+        if ($trackingNumber === '') {
+            throw ValidationException::withMessages(['tracking_number' => 'Scan the waybill QR or enter the tracking number.']);
+        }
+
+        $item = $manifest->items()
+            ->where(fn ($q) => $q->where('tracking_number', $trackingNumber)
+                ->orWhere(fn ($fallback) => $fallback->whereNull('tracking_number')
+                    ->whereHas('sellerOrder', fn ($order) => $order->where('tracking_number', $trackingNumber))))
+            ->with(['sellerOrder.order.buyer', 'sellerOrder.seller', 'sellerOrder.orderItems', 'sellerOrder.payment', 'manifest', 'recoveredHub'])
+            ->first();
+
+        if ($item === null) {
+            throw ValidationException::withMessages(['tracking_number' => 'That parcel is not on this manifest.']);
+        }
+
+        return $item;
     }
 
     private function lockManifest(Manifest $manifest): Manifest

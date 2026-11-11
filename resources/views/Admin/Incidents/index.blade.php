@@ -1,95 +1,67 @@
 @extends('Admin.Layouts.app')
-
-@section('title', 'Lost/Damaged Incidents')
-
+@section('title', 'Parcel incidents')
+@section('content-width', 'max-w-none')
 @section('content')
+<section class="case-workspace" aria-labelledby="case-heading">
 <x-admin.tabs :tabs="[
-    ['label' => 'Incidents', 'route' => 'admin.incidents.index'],
-    ['label' => 'Return exceptions', 'route' => 'admin.returns.index'],
+    ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
+    ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
+    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
 ]" />
-    @if (session('success'))
-        <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            {{ session('success') }}
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {{ session('error') }}
-        </div>
-    @endif
-
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h1 class="text-[28px] font-bold text-neutral-950 mb-1">Lost/Damaged Incidents</h1>
-            <p class="text-base text-neutral-600">Unresolved lost and damaged incidents awaiting Admin resolution.</p>
-        </div>
-    </div>
-
-    <div class="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+    <header class="case-heading">
+        <div><p class="case-eyebrow">Returns &amp; disputes</p><h1 id="case-heading">Parcel incidents</h1><p class="case-description">Open and under-review lost or damaged parcel reports.</p></div>
+        <span class="case-total"><i data-lucide="package-search" aria-hidden="true"></i><strong>{{ number_format($incidents->total()) }}</strong> awaiting review</span>
+    </header>
+    <x-logistics-flash :messages="['success', 'warning', 'error']" />
+    <div class="case-panel">
+        <div class="case-panel-heading"><h2>Incident review queue</h2><span><i data-lucide="arrow-down-wide-narrow" aria-hidden="true"></i>Newest reported first</span></div>
         @if ($incidents->count() > 0)
-            <table class="w-full text-base">
-                <thead class="bg-neutral-50 border-b border-neutral-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Parcel</th>
-                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Incident type</th>
-                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Reporter</th>
-                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Status</th>
-                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Resolved</th>
-                        <th class="px-6 py-4 text-center font-semibold text-neutral-700">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-neutral-200">
+            <div class="case-table-hint"><i data-lucide="move-horizontal" aria-hidden="true"></i>Scroll to see all parcel details and actions</div>
+            <div class="case-table-scroll" role="region" aria-label="Parcel incidents table" tabindex="0">
+                <table class="case-table">
+                    <thead><tr>@if ($lossAvailable)<th scope="col"><span class="sr-only">Select</span></th>@endif<th scope="col">Parcel</th><th scope="col">Incident type</th><th scope="col">Reporter</th><th scope="col">Status</th><th scope="col">Events</th><th scope="col">Actions</th></tr></thead>
+                    <tbody>
                     @foreach ($incidents as $incident)
                         @php
                             $statusValue = $incident->status instanceof \BackedEnum ? $incident->status->value : $incident->status;
-                            $opens = ($incident->eventCounts()['reported'] ?? 0);
-                            $resolves = ($incident->eventCounts()['resolved'] ?? 0);
+                            $eventCounts = $incident->events->countBy('event');
                         @endphp
-                        <tr class="hover:bg-neutral-50">
-                            <td class="px-6 py-4 font-semibold text-neutral-950">
-                                Parcel #{{ $incident->incident_seller_order_id }}
-                                @if ($incident->sellerOrder->tracking_number)
-                                    <span class="ml-2 text-xs text-neutral-500">{{ $incident->sellerOrder->tracking_number }}</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 text-neutral-700">{{ $incident->type }}</td>
-                            <td class="px-6 py-4 text-neutral-700">{{ $incident->reporter_type ?? '—' }} #{{ $incident->reporter_id ?? '—' }}</td>
-                            <td class="px-6 py-4">
-                                @if ($incident->isOpen())
-                                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700">{{ strtoupper($statusValue) }}</span>
-                                @else
-                                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">{{ strtoupper($statusValue) }}</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 text-center text-neutral-500 text-xs">
-                                {{ $resolves }}/{{ $opens }}
-                            </td>
-                            <td class="px-6 py-4 text-center">
-                                <a href="{{ route('admin.incidents.detail', $incident) }}" class="text-xs font-semibold text-primary-600 hover:text-primary-800">Open</a>
-                            </td>
+                        <tr>
+                            @if ($lossAvailable)
+                                <td>@if (in_array(strtolower($incident->type), ['lost', 'missing', 'failed_transfer'], true))<input type="checkbox" name="incident_ids[]" value="{{ $incident->id }}" form="bulk-lost" aria-label="Select parcel {{ $incident->incident_seller_order_id }}" class="size-4">@endif</td>
+                            @endif
+                            <td><strong>Parcel #{{ $incident->incident_seller_order_id }}</strong><small>{{ $incident->sellerOrder?->tracking_number ?? 'No tracking number' }}</small></td>
+                            <td><span class="case-type"><i data-lucide="{{ $incident->type === 'lost' ? 'package-search' : 'package-x' }}" aria-hidden="true"></i>{{ $incident->typeLabel() }}</span></td>
+                            <td>{{ $incident->reporter_type ? ucfirst(str_replace('_', ' ', $incident->reporter_type)) : 'Unknown reporter' }}<small>{{ $incident->reporter_id ? 'ID #'.$incident->reporter_id : 'No reporter ID' }}</small></td>
+                            <td><span class="case-status {{ $statusValue === 'under_review' ? 'case-status-review' : 'case-status-open' }}">{{ $incident->status instanceof \App\Enums\ParcelIncidentStatus ? $incident->status->label() : ucfirst(str_replace('_', ' ', $statusValue)) }}</span></td>
+                            <td><span>{{ $eventCounts['reported'] ?? 0 }} reported</span><small>{{ $eventCounts['resolved'] ?? 0 }} resolved</small></td>
+                            <td><a class="case-action" href="{{ route('admin.incidents.detail', $incident) }}" aria-label="Review incident {{ $incident->id }} for parcel {{ $incident->incident_seller_order_id }}"><i data-lucide="eye" aria-hidden="true"></i>Review</a></td>
                         </tr>
                     @endforeach
-                </tbody>
-            </table>
-            <div class="px-6 py-4 border-t border-neutral-200">
-                {{ $incidents->links() }}
+                    </tbody>
+                </table>
             </div>
+        @elseif ($incidents->total() > 0)
+            <div class="case-empty"><span class="case-empty-icon"><i data-lucide="files" aria-hidden="true"></i></span><h3>No incidents on this page</h3><p>There are incidents awaiting review on an earlier page.</p><a class="case-action" href="{{ $incidents->url(1) }}">Back to first page</a></div>
         @else
-            <div class="px-6 py-16 text-center text-neutral-500">
-                <i data-lucide="bell-off" class="w-12 h-12 mx-auto mb-4 text-neutral-300"></i>
-                <p class="font-semibold text-neutral-600">No incidents yet</p>
-                <p class="text-sm text-neutral-500">Report lost/damaged parcels to see them here.</p>
-            </div>
+            <div class="case-empty"><span class="case-empty-icon"><i data-lucide="clipboard-check" aria-hidden="true"></i></span><h3>No incidents awaiting review</h3><p>There are no open or under-review lost or damaged parcel reports.</p><a class="case-action" href="{{ route('admin.returns.index') }}"><i data-lucide="arrow-right" aria-hidden="true"></i>View returns &amp; disputes</a></div>
+        @endif
+        @if ($lossAvailable && $incidents->count() > 0)
+            <form id="bulk-lost" method="POST" action="{{ route('admin.incidents.confirm-lost') }}" class="case-bulk" data-bulk-lost onsubmit="return confirm('Confirm every selected parcel lost? Each is closed and cannot be reopened here.');" style="padding:1rem 1.25rem;border-top:1px solid #e5e5e5">
+                @csrf
+                <p class="text-sm font-semibold text-neutral-950">Confirm the selected parcels lost together</p>
+                <p class="mt-1 text-xs text-neutral-600">Each parcel is confirmed on its own: one that cannot be closed does not stop the others. No stock is restored.</p>
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label class="block text-xs font-semibold text-neutral-600">Reason<input name="reason" required maxlength="1000" class="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"></label>
+                    <label class="block text-xs font-semibold text-neutral-600">Liable company
+                        <select name="liable_provider_id" class="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"><option value="">Decide from verified custody</option>@foreach ($liableProviders as $p)<option value="{{ $p->id }}">{{ $p->business_name }}</option>@endforeach</select></label>
+                </div>
+                <button type="submit" class="mt-3 h-10 rounded-lg bg-primary-800 px-4 text-[13px] font-semibold text-white hover:bg-primary-900">Confirm selected as lost</button>
+            </form>
+        @endif
+        @if ($incidents->total() > 0)
+            <footer class="case-pagination"><p>Showing <strong>{{ $incidents->firstItem() ?? 0 }} to {{ $incidents->lastItem() ?? 0 }}</strong> of <strong>{{ number_format($incidents->total()) }}</strong> incidents</p>{{ $incidents->links() }}</footer>
         @endif
     </div>
+</section>
 @endsection
-
-@once
-    @push('styles')
-        <style>
-            .relative {
-                position: relative;
-            }
-        </style>
-    @endpush
-@endonce

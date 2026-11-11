@@ -21,7 +21,7 @@ class SellerEarningsService
     /**
      * Pending is finalized net still waiting on remittance. Available is the
      * withdrawable balance. Net is gross merchandise minus seller store sales,
-     * minus seller vouchers, minus 5% commission. Platform vouchers and shipping
+     * minus seller vouchers, minus the platform commission (CommissionFinalizationService::COMMISSION_BPS, saved per order). Platform vouchers and shipping
      * are reported and never deducted.
      *
      * @return array{

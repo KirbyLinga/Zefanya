@@ -356,6 +356,7 @@ class HubsController extends Controller
             ->whereIn('status', [
                 OrderStatus::AtSortingCenter->value,
                 OrderStatus::Sorted->value,
+                OrderStatus::ArrivedAtHub->value,
                 OrderStatus::AssignedToRider->value,
                 OrderStatus::DeliveryFailed->value,
             ])
@@ -396,7 +397,7 @@ class HubsController extends Controller
 
             return [$stationId => [
                 'inside' => $inside,
-                'to_sort' => $parcels->filter(fn (SellerOrder $parcel) => $parcel->status === OrderStatus::AtSortingCenter)->count(),
+                'to_sort' => $parcels->filter(fn (SellerOrder $parcel) => in_array($parcel->status, [OrderStatus::AtSortingCenter, OrderStatus::ArrivedAtHub], true))->count(),
                 'exceptions' => $exceptions->get($stationId, 0),
                 'inbound' => $inbound,
                 'total' => $inside + $inbound,

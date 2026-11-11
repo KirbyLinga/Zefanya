@@ -47,11 +47,28 @@ class ShippingRateService
         return $snapshot;
     }
 
+    /**
+     * Every zone and every company now uses the one marketplace fee
+     * (config buyer.shipping_fee); saved company rate cards are ignored.
+     */
     private function resolveRate(?LogisticsShippingRate $own, string $zone): ?array
     {
-        return $own !== null
-            ? ['first_kg_minor' => $own->first_kg_minor, 'additional_kg_minor' => (int) $own->additional_kg_minor]
-            : $this->marketplaceRate($zone);
+        return self::fixedRate();
+    }
+
+    /**
+     * The marketplace-wide fee: first_kg_minor covers the first included_kg
+     * kilos, then additional_kg_minor per kilo.
+     *
+     * @return array{first_kg_minor: int, additional_kg_minor: int, included_kg: int}
+     */
+    public static function fixedRate(): array
+    {
+        return [
+            'first_kg_minor' => (int) config('buyer.shipping_fee.base_minor', 5000),
+            'additional_kg_minor' => (int) config('buyer.shipping_fee.additional_kg_minor', 2000),
+            'included_kg' => max(1, (int) config('buyer.shipping_fee.base_kg', 2)),
+        ];
     }
 
     /**

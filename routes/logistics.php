@@ -11,6 +11,7 @@ use App\Http\Controllers\Logistics\ExceptionsController;
 use App\Http\Controllers\Logistics\HandoffController;
 use App\Http\Controllers\Logistics\HubsController;
 use App\Http\Controllers\Logistics\IncomingParcelsController;
+use App\Http\Controllers\Logistics\LostParcelController;
 use App\Http\Controllers\Logistics\ManifestController;
 use App\Http\Controllers\Logistics\NotificationController;
 use App\Http\Controllers\Logistics\OperationsAuditLogController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Logistics\ReturnController;
 use App\Http\Controllers\Logistics\RiderApplicationController;
 use App\Http\Controllers\Logistics\RiderController;
 use App\Http\Controllers\Logistics\ShippingRateController;
+use App\Http\Controllers\Logistics\TransferCourierController;
 use App\Http\Controllers\Logistics\TransportConnectionController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +38,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
 
         Route::get('/cod-remittances', [CodRemittanceController::class, 'index'])->name('cod-remittances.index');
         Route::post('/cod-remittances/{remittance}/confirm', [CodRemittanceController::class, 'confirm'])->name('cod-remittances.confirm');
+        Route::post('/cod-remittances/{remittance}/shortage-recovery', [CodRemittanceController::class, 'recoverShortage'])->name('cod-remittances.shortage-recovery');
 
         Route::get('/earnings', [EarningsController::class, 'index'])->name('earnings.index');
         Route::post('/earnings/remit', [EarningsController::class, 'remit'])->name('earnings.remit');
@@ -72,6 +75,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/returns/{return}/handover', [ReturnController::class, 'handover'])->name('returns.handover');
         Route::post('/returns/{return}/manifest', [ReturnController::class, 'manifest'])->name('returns.manifest');
         Route::post('/returns/{return}/handoff', [ReturnController::class, 'handoff'])->name('returns.handoff');
+        Route::post('/returns/{return}/report-problem', [ReturnController::class, 'reportProblem'])->name('returns.report-problem');
 
         Route::get('/handoffs', [HandoffController::class, 'index'])->name('handoffs.index');
         Route::post('/handoffs/parcels', [HandoffController::class, 'store'])->name('handoffs.store');
@@ -79,6 +83,10 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/handoffs/{handoff}/accept', [HandoffController::class, 'accept'])->name('handoffs.accept');
         Route::post('/handoffs/{handoff}/reject', [HandoffController::class, 'reject'])->name('handoffs.reject');
         Route::post('/handoffs/{handoff}/scan/verify', [HandoffController::class, 'verifyScan'])->name('handoffs.scan.verify');
+        Route::post('/handoffs/{handoff}/report-missing', [HandoffController::class, 'reportMissing'])->name('handoffs.report-missing');
+        Route::post('/handoffs/{handoff}/cancel', [HandoffController::class, 'cancel'])->name('handoffs.cancel');
+        Route::post('/handoffs/{handoff}/recover', [HandoffController::class, 'recover'])->name('handoffs.recover');
+        Route::post('/handoffs/{handoff}/courier', [HandoffController::class, 'assignCourier'])->name('handoffs.courier');
         Route::post('/handoffs/{handoff}/dispatch', [HandoffController::class, 'dispatch'])->name('handoffs.dispatch');
         Route::post('/handoffs/{handoff}/receive', [HandoffController::class, 'receive'])->name('handoffs.receive');
 
@@ -92,6 +100,17 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/scan/verify', [ParcelScanController::class, 'verify'])->name('scan.verify');
 
         // ── Internal hub-to-hub manifests (same provider only) ──────────────
+        // Lost parcels: what this company owes Sellers, and the verified scan that records a find.
+        Route::get('/lost-parcels', [LostParcelController::class, 'index'])->name('lost-parcels.index');
+        Route::post('/lost-parcels/{case}/scan/verify', [LostParcelController::class, 'verifyScan'])->name('lost-parcels.scan.verify');
+        Route::post('/lost-parcels/{case}/recover', [LostParcelController::class, 'recover'])->name('lost-parcels.recover');
+
+        // Courier Management: transport personnel records (not accounts).
+        Route::get('/transfer-couriers', [TransferCourierController::class, 'index'])->name('transfer-couriers.index');
+        Route::post('/transfer-couriers', [TransferCourierController::class, 'store'])->name('transfer-couriers.store');
+        Route::patch('/transfer-couriers/{transferCourier}', [TransferCourierController::class, 'update'])->name('transfer-couriers.update');
+        Route::post('/transfer-couriers/{transferCourier}/status', [TransferCourierController::class, 'status'])->name('transfer-couriers.status');
+
         Route::get('/manifests', [ManifestController::class, 'index'])->name('manifests.index');
         Route::get('/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
         Route::get('/manifests/suggest-destinations', [ManifestController::class, 'suggestDestinations'])->name('manifests.suggest-destinations');
@@ -101,6 +120,9 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::delete('/manifests/{manifest}/items/{item}', [ManifestController::class, 'removeItem'])->name('manifests.items.destroy');
         Route::delete('/manifests/{manifest}', [ManifestController::class, 'destroy'])->name('manifests.destroy');
         Route::post('/manifests/{manifest}/cancel', [ManifestController::class, 'cancel'])->name('manifests.cancel');
+        Route::post('/manifests/{manifest}/items/{item}/recover', [ManifestController::class, 'recover'])->name('manifests.items.recover');
+        Route::post('/manifests/{manifest}/report-missing', [ManifestController::class, 'reportMissing'])->name('manifests.report-missing');
+        Route::post('/manifests/{manifest}/transport', [ManifestController::class, 'assignTransport'])->name('manifests.transport');
         Route::post('/manifests/{manifest}/dispatch', [ManifestController::class, 'dispatch'])->name('manifests.dispatch');
         Route::post('/manifests/{manifest}/scan/verify', [ManifestController::class, 'verifyScan'])->name('manifests.scan.verify');
         Route::get('/manifests/{manifest}/receive', [ManifestController::class, 'receiveIndex'])->name('manifests.receive.index');

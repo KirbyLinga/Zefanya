@@ -20,6 +20,7 @@ class LogisticsStatusOverrideService
         private readonly SellerOrderStatusService $statuses = new SellerOrderStatusService,
         private readonly LogisticsHubService $hubs = new LogisticsHubService,
         private readonly CourierAssignmentService $assignments = new CourierAssignmentService,
+        private readonly ParcelLegService $legs = new ParcelLegService,
     ) {}
 
     /** @return list<OrderStatus> */
@@ -56,9 +57,10 @@ class LogisticsStatusOverrideService
             if (! in_array($target, $this->options($parcel), true)) {
                 throw ValidationException::withMessages(['status' => 'This status change is not available to Logistics. Use the authorized rider, buyer or physical return workflow.']);
             }
+            $this->assertPhysicalState($provider, $parcel, $target);
             $old = $parcel->status;
             if ($target === OrderStatus::AtSortingCenter) {
-                $this->hubs->requireOriginStationHubId($provider->id, $parcel);
+                $stationHubId = $this->hubs->requireOriginStationHubId($provider->id, $parcel);
             } elseif ($target === OrderStatus::Sorted) {
                 if ($this->hubs->sortingHubId($provider->id, $parcel) === null) {
                     throw ValidationException::withMessages(['status' => 'Resolve the authorized sorting hub before changing this parcel status.']);
@@ -78,8 +80,14 @@ class LogisticsStatusOverrideService
                     note: 'Manual Logistics status override. Reason: '.$reason,
                     changedBy: $provider->fullName(), actor: OrderActor::Logistics,
                     actorId: $provider->id, source: 'web', expectedFrom: $expected);
-                if ($target === OrderStatus::AtSortingCenter && $parcel->courier !== null) {
-                    $this->assignments->release($parcel->courier);
+                if ($target === OrderStatus::AtSortingCenter) {
+                    // The audited manual receipt is the alternative to the
+                    // Station Hub scan, so it must establish the same verified
+                    // origin custody the scan would have recorded.
+                    $this->legs->receiveAtOrigin($parcel, (int) $provider->id, $stationHubId);
+                    if ($parcel->courier !== null) {
+                        $this->assignments->release($parcel->courier);
+                    }
                 }
             }
             $parcel->refresh();
@@ -89,5 +97,37 @@ class LogisticsStatusOverrideService
 
             return $parcel;
         });
+    }
+
+    /**
+     * A manual override never invents a physical location or moves custody to
+     * another provider. A cancelled transfer still awaiting its recovery scan
+     * must be located first; custody claimed without receipt evidence cannot
+     * be advanced; and the receiving override itself remains the audited
+     * alternative to the origin scan.
+     */
+    private function assertPhysicalState(LogisticsProvider $provider, SellerOrder $parcel, OrderStatus $target): void
+    {
+        if (app(ManifestService::class)->awaitingRecovery($parcel)
+            || app(ParcelHandoffService::class)->awaitingRecovery($parcel)) {
+            throw ValidationException::withMessages([
+                'status' => 'A cancelled transfer is awaiting a verified recovery scan. Record where the parcel is before applying a status override.',
+            ]);
+        }
+
+        $custodyProvider = $parcel->currentCustodyProviderId();
+        if ($custodyProvider !== null && $custodyProvider !== (int) $provider->id) {
+            throw ValidationException::withMessages([
+                'status' => 'Only the provider that verified custody of this parcel may change its status.',
+            ]);
+        }
+
+        if ($target !== OrderStatus::AtSortingCenter
+            && $parcel->custody_provider_id !== null
+            && $this->legs->verifiedLocation($parcel) === null) {
+            throw ValidationException::withMessages([
+                'status' => 'This parcel has no verified hub receipt. Record the physical receiving scan before changing its status.',
+            ]);
+        }
     }
 }

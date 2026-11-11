@@ -11,8 +11,12 @@
     {{-- User mini profile card --}}
     <div class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm">
         <div class="flex items-center gap-3.5">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary-300 font-serif text-lg font-semibold uppercase text-primary-950">
-                {{ mb_substr($sidebarBuyer->first_name, 0, 1) }}{{ mb_substr($sidebarBuyer->last_name, 0, 1) }}
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary-300 font-serif text-lg font-semibold uppercase text-primary-950">
+                @if ($sidebarPhoto = $sidebarBuyer->profilePhotoPath())
+                    <img src="{{ route('buyer.account.photo.show', ['v' => md5($sidebarPhoto)]) }}" alt="" class="size-full object-cover">
+                @else
+                    {{ mb_substr($sidebarBuyer->first_name, 0, 1) }}{{ mb_substr($sidebarBuyer->last_name, 0, 1) }}
+                @endif
             </div>
             <div class="min-w-0 flex-1">
                 <h2 class="truncate font-serif text-[17px] font-medium leading-snug text-[var(--text-ink)]">

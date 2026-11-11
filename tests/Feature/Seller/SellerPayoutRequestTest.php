@@ -41,7 +41,7 @@ class SellerPayoutRequestTest extends TestCase
 
     public static function acceptedAmounts(): array
     {
-        return ['minimum' => ['100.00', 10000, 51655], 'entire balance' => ['616.55', 61655, 0]];
+        return ['minimum' => ['100.00', 10000, 48410], 'entire balance' => ['584.10', 58410, 0]];
     }
 
     #[DataProvider('acceptedAmounts')]
@@ -65,7 +65,7 @@ class SellerPayoutRequestTest extends TestCase
     public static function invalidAmounts(): array
     {
         return [
-            'below minimum' => ['99.99'], 'above balance' => ['616.56'], 'zero' => ['0'],
+            'below minimum' => ['99.99'], 'above balance' => ['584.11'], 'zero' => ['0'],
             'negative' => ['-100'], 'nonnumeric' => ['abc'], 'extra decimals' => ['100.001'],
             'scientific notation' => ['1e2'], 'array' => [[100]], 'boolean' => [true],
             'missing' => [null], 'overflow' => ['9999999999999999999999999'],
@@ -83,7 +83,7 @@ class SellerPayoutRequestTest extends TestCase
 
         $this->assertDatabaseCount('seller_payout_requests', 0);
         $this->assertDatabaseCount('seller_payout_allocations', 0);
-        $this->assertSame(61655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(58410, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public function test_sel_earn_006_blocks_a_second_pending_request_even_with_a_new_key(): void
@@ -97,7 +97,7 @@ class SellerPayoutRequestTest extends TestCase
             ->assertJsonPath('errors.amount.0', 'A payout request is already pending.');
 
         $this->assertDatabaseCount('seller_payout_requests', 1);
-        $this->assertSame(51655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(48410, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public function test_sel_earn_007_replays_a_duplicate_submission_without_reserving_twice(): void
@@ -113,7 +113,7 @@ class SellerPayoutRequestTest extends TestCase
         $this->assertDatabaseCount('seller_payout_requests', 1);
         $this->assertDatabaseCount('seller_payout_allocations', 1);
         $this->assertSame(10000, (int) SellerPayoutAllocation::query()->sum('amount_minor'));
-        $this->assertSame(51655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(48410, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public function test_a_reused_submission_key_cannot_change_the_amount(): void
@@ -128,7 +128,7 @@ class SellerPayoutRequestTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('idempotency_key');
 
         $this->assertSame(10000, SellerPayoutRequest::query()->sole()->amount_minor);
-        $this->assertSame(51655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(48410, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public function test_uuid_case_does_not_create_another_submission(): void
@@ -143,7 +143,7 @@ class SellerPayoutRequestTest extends TestCase
 
         $this->assertSame($first->id, $second->id);
         $this->assertDatabaseCount('seller_payout_requests', 1);
-        $this->assertSame(51655, $service->availableBalance($seller));
+        $this->assertSame(48410, $service->availableBalance($seller));
     }
 
     public function test_the_database_rejects_a_second_pending_reservation_for_the_same_seller(): void
@@ -168,7 +168,7 @@ class SellerPayoutRequestTest extends TestCase
 
         $this->assertDatabaseCount('seller_payout_requests', 1);
         $this->assertDatabaseCount('seller_payout_allocations', 1);
-        $this->assertSame(51655, $service->availableBalance($seller));
+        $this->assertSame(48410, $service->availableBalance($seller));
     }
 
     public static function invalidKeys(): array
@@ -200,15 +200,15 @@ class SellerPayoutRequestTest extends TestCase
             ->assertOk()->assertJsonPath('status', SellerPayoutRequest::CANCELLED);
         $this->deleteJson(route('seller.payout-requests.destroy', $payout))->assertOk();
 
-        $this->assertSame(61655, $service->availableBalance($seller));
+        $this->assertSame(58410, $service->availableBalance($seller));
         $this->assertNull($payout->fresh()->pending_seller_id);
         $this->assertNotNull($payout->fresh()->cancelled_at);
         $this->assertDatabaseCount('seller_payout_allocations', 1);
         // A late retry of the cancelled submission must not create a new reservation.
         $this->postJson(route('seller.payout-requests.store'), $submission)
             ->assertOk()->assertJsonPath('status', SellerPayoutRequest::CANCELLED);
-        $this->assertSame(61655, $service->availableBalance($seller));
-        $this->postJson(route('seller.payout-requests.store'), $this->submission('616.55'))->assertCreated();
+        $this->assertSame(58410, $service->availableBalance($seller));
+        $this->postJson(route('seller.payout-requests.store'), $this->submission('584.10'))->assertCreated();
         $this->assertSame(0, $service->availableBalance($seller));
         $this->assertDatabaseCount('seller_payout_requests', 2);
     }
@@ -221,22 +221,22 @@ class SellerPayoutRequestTest extends TestCase
 
         $this->actingAs($seller, 'seller')->postJson(route('seller.payout-requests.store'), $this->submission('700'))->assertCreated();
 
-        $this->assertDatabaseHas('seller_payout_allocations', ['seller_settlement_id' => $first->id, 'amount_minor' => 61655]);
-        $this->assertDatabaseHas('seller_payout_allocations', ['seller_settlement_id' => $second->id, 'amount_minor' => 8345]);
-        $this->assertSame(53310, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertDatabaseHas('seller_payout_allocations', ['seller_settlement_id' => $first->id, 'amount_minor' => 58410]);
+        $this->assertDatabaseHas('seller_payout_allocations', ['seller_settlement_id' => $second->id, 'amount_minor' => 11590]);
+        $this->assertSame(46820, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public function test_historical_finalized_commissions_are_used_without_recalculation(): void
     {
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
-        // Historical 10% snapshot: gross 69900, seller discount 5000, commission 6990, net 57910.
+        // Historical 5% snapshot: gross 69900, seller discount 5000, commission 3245, net 61655.
         $order = $settlement->sellerOrder;
-        $order->forceFill(['commission_bps' => 1000, 'commission_minor' => 6990, 'seller_net_minor' => 57910])->save();
-        $settlement->forceFill(['commission_bps' => 1000, 'commission_minor' => 6990, 'seller_payout_minor' => 57910])->save();
+        $order->forceFill(['commission_bps' => 500, 'commission_minor' => 3245, 'seller_net_minor' => 61655])->save();
+        $settlement->forceFill(['commission_bps' => 500, 'commission_minor' => 3245, 'seller_payout_minor' => 61655])->save();
         $before = $order->getRawOriginal();
 
-        $this->actingAs($seller, 'seller')->postJson(route('seller.payout-requests.store'), $this->submission('579.10'))->assertCreated();
+        $this->actingAs($seller, 'seller')->postJson(route('seller.payout-requests.store'), $this->submission('616.55'))->assertCreated();
 
         $this->assertSame(0, app(SellerPayoutRequestService::class)->availableBalance($seller));
         $this->assertSame($before, $order->fresh()->getRawOriginal());
@@ -257,7 +257,7 @@ class SellerPayoutRequestTest extends TestCase
         $this->deleteJson(route('seller.payout-requests.destroy', $payout))->assertNotFound();
 
         $this->assertSame(SellerPayoutRequest::PENDING, $payout->fresh()->status);
-        $this->assertSame(51655, app(SellerPayoutRequestService::class)->availableBalance($owner));
+        $this->assertSame(48410, app(SellerPayoutRequestService::class)->availableBalance($owner));
     }
 
     public function test_submission_keys_are_scoped_to_each_seller(): void
@@ -273,8 +273,8 @@ class SellerPayoutRequestTest extends TestCase
         $two = $service->request($second, '100', $key);
 
         $this->assertNotSame($one->id, $two->id);
-        $this->assertSame(51655, $service->availableBalance($first));
-        $this->assertSame(51655, $service->availableBalance($second));
+        $this->assertSame(48410, $service->availableBalance($first));
+        $this->assertSame(48410, $service->availableBalance($second));
     }
 
     public static function excludedEarnings(): array
@@ -303,7 +303,7 @@ class SellerPayoutRequestTest extends TestCase
             'wrong_shipping' => $settlement->forceFill(['shipping_allocation_minor' => 1])->save(),
             'wrong_owner' => $order->forceFill(['seller_id' => Seller::factory()->create()->id])->save(),
             'unknown_funding' => $order->forceFill(['voucher_funding_source' => null])->save(),
-            'already_paid' => $settlement->forceFill(['status' => SellerSettlement::PAID, 'paid_amount_minor' => 61655, 'paid_at' => now()])->save(),
+            'already_paid' => $settlement->forceFill(['status' => SellerSettlement::PAID, 'paid_amount_minor' => 58410, 'paid_at' => now()])->save(),
         };
 
         $this->actingAs($seller, 'seller')->postJson(route('seller.payout-requests.store'), $this->submission('100'))
@@ -321,7 +321,7 @@ class SellerPayoutRequestTest extends TestCase
         $payout = app(SellerPayoutRequestService::class)->request($seller, '100', (string) Str::uuid());
         $admin = Admin::factory()->create(['role' => 'super_admin']);
         $this->actingAs($admin, 'admin');
-        $input = ['amount_minor' => 61655, 'reference' => 'RULE09-DIRECT', 'reason' => 'Seller asked for a direct transfer'];
+        $input = ['amount_minor' => 58410, 'reference' => 'RULE09-DIRECT', 'reason' => 'Seller asked for a direct transfer'];
 
         $this->postJson(route('admin.settlements.confirm', $settlement), $input)
             ->assertUnprocessable()->assertJsonValidationErrors('settlement');
@@ -351,11 +351,11 @@ class SellerPayoutRequestTest extends TestCase
         $seller = Seller::factory()->create(['business_name' => 'EdGaming']);
         $settlement = $this->earnings($seller);
         $service = app(SellerPayoutRequestService::class);
-        $payout = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $payout = $service->request($seller, '584.10', (string) Str::uuid(), 'GCash 09171234567');
         $admin = Admin::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin, 'admin')->get(route('admin.seller-payouts.index'))
-            ->assertOk()->assertSee('EdGaming')->assertSee('₱616.55')->assertSee('GCash 09171234567');
+            ->assertOk()->assertSee('EdGaming')->assertSee('₱584.10')->assertSee('GCash 09171234567');
 
         $this->post(route('admin.seller-payouts.pay', $payout), [])->assertSessionHasErrors('reference');
         $this->post(route('admin.seller-payouts.pay', $payout), ['reference' => 'BDO-777'])->assertSessionHasNoErrors()->assertSessionHas('success');
@@ -366,10 +366,10 @@ class SellerPayoutRequestTest extends TestCase
         $this->assertSame('BDO-777', $payout->payout_reference);
         $this->assertSame($admin->id, (int) $payout->decided_by_admin_id);
         $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
-        $this->assertSame(61655, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame(58410, $settlement->fresh()->paid_amount_minor);
         $this->assertSame(0, $service->availableBalance($seller));
         $this->assertSame('seller_payout_paid', $seller->notifications()->sole()->data['type']);
-        $this->assertSame('₱616.55', OperationsAuditLog::query()->where('action', 'seller_payout_paid')->sole()->new_values['amount']);
+        $this->assertSame('₱584.10', OperationsAuditLog::query()->where('action', 'seller_payout_paid')->sole()->new_values['amount']);
 
         $this->post(route('admin.seller-payouts.pay', $payout), ['reference' => 'BDO-777'])
             ->assertSessionHas('success', 'This payout was already recorded.');
@@ -388,19 +388,19 @@ class SellerPayoutRequestTest extends TestCase
 
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
         $this->assertSame(10000, $settlement->fresh()->paid_amount_minor);
-        $this->assertSame(51655, $service->availableBalance($seller));
+        $this->assertSame(48410, $service->availableBalance($seller));
 
         try {
-            $service->request($seller, '516.56', (string) Str::uuid());
+            $service->request($seller, '484.11', (string) Str::uuid());
             $this->fail('A request above what is left must be refused.');
         } catch (ValidationException) {
-            $this->assertSame(51655, $service->availableBalance($seller));
+            $this->assertSame(48410, $service->availableBalance($seller));
         }
 
-        $service->pay($service->request($seller, '516.55', (string) Str::uuid()), $admin, 'PART-2');
+        $service->pay($service->request($seller, '484.10', (string) Str::uuid()), $admin, 'PART-2');
 
         $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
-        $this->assertSame(61655, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame(58410, $settlement->fresh()->paid_amount_minor);
         $this->assertSame('PART-2', $settlement->fresh()->payout_reference);
         $this->assertSame(0, $service->availableBalance($seller));
     }
@@ -415,15 +415,15 @@ class SellerPayoutRequestTest extends TestCase
 
         $direct = app(SellerSettlementService::class);
         try {
-            $direct->confirmPayout($settlement->fresh(), $admin, 61655, 'TOO-MUCH');
+            $direct->confirmPayout($settlement->fresh(), $admin, 58410, 'TOO-MUCH');
             $this->fail('Paying the full amount again must be refused.');
         } catch (ValidationException) {
             $this->assertSame(10000, $settlement->fresh()->paid_amount_minor);
         }
 
-        $direct->confirmPayout($settlement->fresh(), $admin, 51655, 'THE-REST');
+        $direct->confirmPayout($settlement->fresh(), $admin, 48410, 'THE-REST');
         $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
-        $this->assertSame(61655, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame(58410, $settlement->fresh()->paid_amount_minor);
     }
 
     public function test_admin_rejects_a_request_and_the_earnings_come_back(): void
@@ -431,7 +431,7 @@ class SellerPayoutRequestTest extends TestCase
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
         $service = app(SellerPayoutRequestService::class);
-        $payout = $service->request($seller, '616.55', (string) Str::uuid());
+        $payout = $service->request($seller, '584.10', (string) Str::uuid());
         $this->assertSame(0, $service->availableBalance($seller));
 
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin');
@@ -439,7 +439,7 @@ class SellerPayoutRequestTest extends TestCase
         $this->post(route('admin.seller-payouts.reject', $payout), ['reason' => 'GCash number not registered'])->assertSessionHas('success');
 
         $this->assertSame(SellerPayoutRequest::REJECTED, $payout->fresh()->status);
-        $this->assertSame(61655, $service->availableBalance($seller));
+        $this->assertSame(58410, $service->availableBalance($seller));
         $this->assertNull($settlement->fresh()->paid_amount_minor);
         $this->assertSame('seller_payout_rejected', $seller->notifications()->sole()->data['type']);
 
@@ -486,13 +486,13 @@ class SellerPayoutRequestTest extends TestCase
         $this->assertSame(0, $service->availableBalance($seller));
 
         $this->actingAs(Admin::factory()->create(['role' => 'super_admin']), 'admin');
-        $input = ['amount_minor' => 61655, 'reference' => 'TOO-EARLY', 'reason' => 'Seller asked for a direct transfer'];
+        $input = ['amount_minor' => 58410, 'reference' => 'TOO-EARLY', 'reason' => 'Seller asked for a direct transfer'];
         $this->postJson(route('admin.settlements.confirm', $settlement), $input)
             ->assertUnprocessable()->assertJsonValidationErrors('settlement');
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
 
         $settlement->codRemittance->forceFill(['zefanya_received_at' => now()])->save();
-        $this->assertSame(61655, $service->availableBalance($seller));
+        $this->assertSame(58410, $service->availableBalance($seller));
         $this->postJson(route('admin.settlements.confirm', $settlement), $input)
             ->assertOk()->assertJsonPath('status', SellerSettlement::PAID);
     }
@@ -504,9 +504,9 @@ class SellerPayoutRequestTest extends TestCase
         $unreserved = $this->earnings($seller);
         app(SellerPayoutRequestService::class)->request($seller, '100', (string) Str::uuid());
 
-        app(SellerSettlementService::class)->confirmPayout($unreserved, Admin::factory()->create(), 61655, 'UNRESERVED');
+        app(SellerSettlementService::class)->confirmPayout($unreserved, Admin::factory()->create(), 58410, 'UNRESERVED');
 
-        $this->assertSame(51655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(48410, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public function test_a_failed_allocation_rolls_back_the_request_and_reservation(): void
@@ -525,7 +525,7 @@ class SellerPayoutRequestTest extends TestCase
 
         $this->assertDatabaseCount('seller_payout_requests', 0);
         $this->assertDatabaseCount('seller_payout_allocations', 0);
-        $this->assertSame(61655, app(SellerPayoutRequestService::class)->availableBalance($seller));
+        $this->assertSame(58410, app(SellerPayoutRequestService::class)->availableBalance($seller));
     }
 
     public static function nonSellerRoles(): array
@@ -561,43 +561,43 @@ class SellerPayoutRequestTest extends TestCase
         $seller = Seller::factory()->create();
         $this->earnings($seller);
         $response = $this->actingAs($seller, 'seller')->get(route('seller.payout-requests.index'))
-            ->assertOk()->assertSee('₱616.55')->assertSee('name="idempotency_key"', false);
+            ->assertOk()->assertSee('₱584.10')->assertSee('name="idempotency_key"', false);
 
         $this->post(route('seller.payout-requests.store'), ['amount' => '100', 'idempotency_key' => $response->viewData('idempotencyKey'), 'destination' => 'GCash 09171234567'])
             ->assertRedirect(route('seller.payout-requests.index'));
-        $this->get(route('seller.payout-requests.index'))->assertSee('₱516.55')->assertSee('A payout request is already pending');
+        $this->get(route('seller.payout-requests.index'))->assertSee('₱484.10')->assertSee('A payout request is already pending');
         $payout = SellerPayoutRequest::query()->sole();
         $this->delete(route('seller.payout-requests.destroy', $payout))->assertRedirect(route('seller.payout-requests.index'));
-        $this->get(route('seller.payout-requests.index'))->assertSee('₱616.55')->assertSee('Cancelled');
+        $this->get(route('seller.payout-requests.index'))->assertSee('₱584.10')->assertSee('Cancelled');
     }
 
     public function test_admin_sees_what_platform_funded_vouchers_cost_against_commission(): void
     {
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
-        $settlement->forceFill(['marketplace_funded_discount_minor' => 10000])->save();
+        $settlement->forceFill(['marketplace_funded_discount_minor' => 15000])->save();
         $this->earnings($seller)->forceFill(['marketplace_funded_discount_minor' => 0])->save();
 
         $summary = app(SellerSettlementService::class)->subsidySummary();
 
-        $this->assertSame(10000, $summary['all']['subsidyMinor']);
-        $this->assertSame(10000, $summary['all']['pendingSubsidyMinor']);
+        $this->assertSame(15000, $summary['all']['subsidyMinor']);
+        $this->assertSame(15000, $summary['all']['pendingSubsidyMinor']);
         $this->assertSame(0, $summary['all']['paidSubsidyMinor']);
         $this->assertSame(1, $summary['all']['orders']);
-        $this->assertSame(6490, $summary['all']['commissionMinor']);
-        $this->assertSame(-3510, $summary['all']['netMinor']);
+        $this->assertSame(12980, $summary['all']['commissionMinor']);
+        $this->assertSame(-2020, $summary['all']['netMinor']);
         $this->assertSame($summary['all'], $summary['month']);
 
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
             ->get(route('admin.logistics-remittances.index'))
-            ->assertOk()->assertSee('Platform voucher cost')->assertSee('₱100.00')->assertSee('₱35.10 short');
+            ->assertOk()->assertSee('Platform voucher cost')->assertSee('₱150.00')->assertSee('₱20.20 short');
     }
 
     private function paidThenReturned(Seller $seller): SellerSettlement
     {
         $settlement = $this->earnings($seller);
         $service = app(SellerPayoutRequestService::class);
-        $payout = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $payout = $service->request($seller, '584.10', (string) Str::uuid(), 'GCash 09171234567');
         $service->pay($payout, Admin::factory()->create(['role' => 'admin']), 'FIRST-PAYOUT');
         $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
 
@@ -620,27 +620,27 @@ class SellerPayoutRequestTest extends TestCase
         $service = app(SellerPayoutRequestService::class);
 
         $debt = SellerDebt::sole();
-        $this->assertSame(61655, $debt->amount_minor);
+        $this->assertSame(58410, $debt->amount_minor);
         $this->assertSame($settlement->seller_order_id, $debt->seller_order_id);
         $this->assertSame(SellerSettlement::PAID, $settlement->status, 'the paid settlement stays as the record');
 
         app(SellerSettlementService::class)->releasePendingForReturn($settlement->sellerOrder);
         $this->assertSame(1, SellerDebt::query()->count(), 'a repeat call does not add a second debt');
-        $this->assertSame(61655, $service->outstandingDebtMinor($seller));
+        $this->assertSame(58410, $service->outstandingDebtMinor($seller));
 
         $this->earnings($seller);
-        $request = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
-        $this->assertSame(61655, $request->debt_deducted_minor);
-        $this->assertSame(61655, $service->outstandingDebtMinor($seller), 'nothing is repaid until Admin records the payout');
+        $request = $service->request($seller, '584.10', (string) Str::uuid(), 'GCash 09171234567');
+        $this->assertSame(58410, $request->debt_deducted_minor);
+        $this->assertSame(58410, $service->outstandingDebtMinor($seller), 'nothing is repaid until Admin records the payout');
 
         $service->cancel($seller, $request->id);
-        $this->assertSame(61655, $service->outstandingDebtMinor($seller));
+        $this->assertSame(58410, $service->outstandingDebtMinor($seller));
 
-        $request = $service->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $request = $service->request($seller, '584.10', (string) Str::uuid(), 'GCash 09171234567');
         $service->pay($request, Admin::factory()->create(['role' => 'admin']), 'REPAY-1');
 
         $this->assertSame(0, $service->outstandingDebtMinor($seller));
-        $this->assertSame(61655, $debt->fresh()->settled_minor);
+        $this->assertSame(58410, $debt->fresh()->settled_minor);
         $this->assertSame(0, $request->fresh()->amount_minor - $request->fresh()->debt_deducted_minor);
     }
 
@@ -655,10 +655,10 @@ class SellerPayoutRequestTest extends TestCase
         $request = $service->request($seller, '1000', (string) Str::uuid(), 'GCash 09171234567');
 
         $this->assertSame(100000, $request->amount_minor);
-        $this->assertSame(61655, $request->debt_deducted_minor);
+        $this->assertSame(58410, $request->debt_deducted_minor);
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
             ->get(route('admin.seller-payouts.index'))
-            ->assertOk()->assertSee('Send only the amount above')->assertSee('383.45');
+            ->assertOk()->assertSee('Send only the amount above')->assertSee('415.90');
     }
 
     public function test_a_direct_payout_is_refused_while_the_seller_has_a_debt(): void
@@ -668,7 +668,7 @@ class SellerPayoutRequestTest extends TestCase
         $settlement = $this->earnings($seller);
 
         $this->actingAs(Admin::factory()->create(['role' => 'super_admin']), 'admin')
-            ->postJson(route('admin.settlements.confirm', $settlement), ['amount_minor' => 61655, 'reference' => 'DIRECT-1', 'reason' => 'Seller asked for a direct transfer'])
+            ->postJson(route('admin.settlements.confirm', $settlement), ['amount_minor' => 58410, 'reference' => 'DIRECT-1', 'reason' => 'Seller asked for a direct transfer'])
             ->assertUnprocessable()->assertJsonValidationErrors('settlement');
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
     }
@@ -677,7 +677,7 @@ class SellerPayoutRequestTest extends TestCase
     {
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
-        $input = ['amount_minor' => 61655, 'reference' => 'DIRECT-2'];
+        $input = ['amount_minor' => 58410, 'reference' => 'DIRECT-2'];
 
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
             ->postJson(route('admin.settlements.confirm', $settlement), $input + ['reason' => 'Seller asked for a direct transfer'])
@@ -700,7 +700,7 @@ class SellerPayoutRequestTest extends TestCase
 
     private function earnings(Seller $seller): SellerSettlement
     {
-        // Official A9 example: (69900 - 5000) * 5% = 3245; Seller net = 61655.
+        // A9 example at 10%: (69900 - 5000) * 10% = 6490; Seller net = 69900 - 6490 - 5000 = 58410.
         $parent = Order::factory()->create(['discount_minor' => 5000]);
         $order = SellerOrder::factory()->status(OrderStatus::Completed)->create([
             'seller_id' => $seller->id, 'order_id' => $parent->id, 'subtotal_minor' => 69900,
@@ -728,11 +728,11 @@ class SellerPayoutRequestTest extends TestCase
         $this->paidThenReturned($seller);
 
         $summary = app(SellerEarningsService::class)->summary($seller);
-        $this->assertSame(61655, $summary['debtMinor']);
-        $this->assertSame(61655, $summary['paidWithdrawalsMinor']);
-        $this->assertSame(61655, app(PlatformFinanceService::class)->position()['sellerDebtMinor']);
+        $this->assertSame(58410, $summary['debtMinor']);
+        $this->assertSame(58410, $summary['paidWithdrawalsMinor']);
+        $this->assertSame(58410, app(PlatformFinanceService::class)->position()['sellerDebtMinor']);
 
         $this->actingAs($seller, 'seller')->get(route('seller.earnings.index'))
-            ->assertOk()->assertSee('Debt to Zefanya')->assertSee('Paid withdrawals')->assertSee('−₱616.55');
+            ->assertOk()->assertSee('Debt to Zefanya')->assertSee('Paid withdrawals')->assertSee('−₱584.10');
     }
 }

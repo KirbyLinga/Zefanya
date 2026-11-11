@@ -8,6 +8,9 @@
    <file>tests/MySql/SellerVacationConcurrencyTest.php</file>
    <file>tests/MySql/InventoryOversellingConcurrencyTest.php</file>
    <file>tests/MySql/LowStockAlertConcurrencyTest.php</file>
+   <file>tests/MySql/DemoNetworkSeedersTest.php</file>
+   <file>tests/MySql/DemoMarketplaceTest.php</file>
+   <file>tests/MySql/DeliveryScenarioSeederTest.php</file>
   </testsuite>
  </testsuites>
  <php>

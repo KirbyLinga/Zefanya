@@ -60,6 +60,29 @@ class ReturnController extends Controller
         return back()->with('return_verification', ['id' => $return->id, 'token' => $token, 'condition' => $data['condition']])->with('success', 'Physical handover verified. Confirm receipt after checking the parcel.');
     }
 
+    public function disputeReceipt(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $this->authorizeForUser($request->user('seller'), 'view', $return->sellerOrder);
+        $data = $request->validate([
+            'issue' => ['required', Rule::in(array_keys(ParcelReturn::RECEIPT_DISPUTE_ISSUES))],
+            'note' => ['required', 'string', 'min:10', 'max:1000'],
+            'photos' => ['nullable', 'array', 'max:5'],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ], [
+            'issue.required' => 'Choose what is wrong with the returned parcel.',
+            'note.required' => 'Describe the problem in 10 to 1000 characters.',
+            'note.min' => 'Describe the problem in 10 to 1000 characters.',
+            'note.max' => 'Describe the problem in 10 to 1000 characters.',
+            'photos.max' => 'Add up to 5 photos.',
+            'photos.*.image' => 'Photos must be JPG or PNG files.',
+            'photos.*.mimes' => 'Photos must be JPG or PNG files.',
+            'photos.*.max' => 'Each photo may not be larger than 5 MB.',
+        ]);
+        $service->disputeReceiptBySeller($return, $request->user('seller'), $data['issue'], $data['note'], $request->file('photos', []));
+
+        return back()->with('success', 'Problem reported. Receipt is not recorded; the parcel stays with Logistics until an admin decides.');
+    }
+
     public function receive(Request $request, ParcelReturn $return, ParcelReturnService $service)
     {
         $this->authorizeForUser($request->user('seller'), 'view', $return->sellerOrder);

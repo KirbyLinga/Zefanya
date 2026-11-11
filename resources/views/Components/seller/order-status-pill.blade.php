@@ -10,6 +10,8 @@
         \App\Enums\OrderStatus::PickedUp => 'bg-indigo-100 text-indigo-900 ring-indigo-300',
         \App\Enums\OrderStatus::AtSortingCenter => 'bg-violet-100 text-violet-900 ring-violet-300',
         \App\Enums\OrderStatus::Sorted => 'bg-fuchsia-100 text-fuchsia-900 ring-fuchsia-300',
+        \App\Enums\OrderStatus::InTransit => 'bg-purple-100 text-purple-900 ring-purple-300',
+        \App\Enums\OrderStatus::ArrivedAtHub => 'bg-violet-100 text-violet-900 ring-violet-300',
         \App\Enums\OrderStatus::AssignedToRider => 'bg-cyan-100 text-cyan-900 ring-cyan-300',
         \App\Enums\OrderStatus::OutForDelivery => 'bg-blue-100 text-blue-900 ring-blue-300',
         \App\Enums\OrderStatus::Delivered => 'bg-teal-100 text-teal-900 ring-teal-300',
@@ -17,6 +19,7 @@
         \App\Enums\OrderStatus::DeliveryFailed => 'bg-orange-100 text-orange-900 ring-orange-300',
         \App\Enums\OrderStatus::Returned => 'bg-stone-200 text-stone-900 ring-stone-400',
         \App\Enums\OrderStatus::Cancelled => 'bg-red-100 text-red-900 ring-red-300',
+        \App\Enums\OrderStatus::Lost => 'bg-rose-200 text-rose-950 ring-rose-400',
     };
 @endphp
 

@@ -13,6 +13,7 @@ use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelLegService;
+use App\Services\Logistics\ParcelSortingService;
 use App\Services\Logistics\PickupPolicy;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
@@ -187,7 +188,7 @@ class IncomingParcelsController extends Controller
             'courier_id.required' => 'Select an eligible Rider for this pickup.',
         ]);
 
-        if (($limit = $this->assignment->manualRiderBlockReason($request->integer('courier_id') ?: null, $provider->id)) !== null) {
+        if (($limit = $this->assignment->manualRiderBlockReason($request->integer('courier_id') ?: null, $provider->id, $sellerOrder)) !== null) {
             return back()->with('error', $limit);
         }
 
@@ -256,7 +257,8 @@ class IncomingParcelsController extends Controller
 
     /**
      * Hand the parcel to the sorting center: advance to AtSortingCenter
-     * and release the pickup courier back to available.
+     * and release the pickup courier back to available. When this hub is the
+     * parcel's final sorting hub, the same verified scan also sorts it.
      */
     public function toSortingCenter(
         Request $request,
@@ -271,7 +273,10 @@ class IncomingParcelsController extends Controller
 
         $sellerOrder->loadMissing(['courier.provider', 'seller']);
         $fresh = $sellerOrder->fresh() ?? $sellerOrder;
-        $alreadyAtHub = $fresh->status === OrderStatus::AtSortingCenter;
+        // Sorted counts as received: a retried receipt after the automatic sort
+        // must be a no-op, not a "scan blocked" error.
+        $alreadySorted = $fresh->status === OrderStatus::Sorted;
+        $alreadyAtHub = $alreadySorted || $fresh->status === OrderStatus::AtSortingCenter;
         $token = $request->input('verification_token');
 
         if (! $alreadyAtHub && $fresh->status !== OrderStatus::PickedUp) {
@@ -320,13 +325,25 @@ class IncomingParcelsController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        $pickupCourier = $sellerOrder->fresh()?->courier;
+        // Release the pickup rider before sorting, never after: sorting can
+        // dispatch that same rider for delivery, and releasing then would mark
+        // a busy rider available. Once sorted, a retry must not release at all.
+        $pickupCourier = $alreadySorted ? null : $sellerOrder->fresh()?->courier;
         if ($pickupCourier) {
             $this->assignment->release($pickupCourier);
         }
 
-        return back()->with('success', $alreadyAtHub
-            ? 'Parcel already received at the hub. No status change was made.'
-            : 'Parcel received at the hub. Pickup rider released.');
+        // At its final sorting hub, the receipt scan also sorts: no custody
+        // changes between the two, so a second scan would prove nothing new.
+        // Parcels that still need a transfer stay here for that step.
+        $sorted = $alreadyAtHub ? null
+            : app(ParcelSortingService::class)->sortAfterStationReceipt($fresh, $provider, $stationHubId, $method);
+
+        return back()->with('success', match (true) {
+            $alreadyAtHub => 'Parcel already received at the hub. No status change was made.',
+            $sorted === null => 'Parcel received at the hub. Pickup rider released.',
+            $sorted['area'] !== null => "Parcel received and sorted for {$sorted['area']->name}. Pickup rider released.",
+            default => 'Parcel received and sorted. Pickup rider released. New assignment is blocked: verify the original shipping-address barangay and configure validated coverage in an approved active Station Hub.',
+        });
     }
 }

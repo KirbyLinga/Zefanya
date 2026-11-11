@@ -31,8 +31,10 @@ use App\Services\Logistics\ParcelReturnService;
 use App\Services\Logistics\PickupPolicy;
 use App\Services\Logistics\PickupSessionService;
 use App\Services\Logistics\PickupWindowService;
+use App\Services\Logistics\ProviderAllocationService;
 use App\Services\Rider\RiderEarningService;
 use App\Services\Shared\CommissionFinalizationService;
+use App\Support\RuntimeSchema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -97,8 +99,10 @@ class SellerOrderStatusService
         OrderStatus::Preparing->value => [OrderStatus::ReadyForPickup, OrderStatus::Cancelled],
         OrderStatus::ReadyForPickup->value => [OrderStatus::PickedUp, OrderStatus::Cancelled],
         OrderStatus::PickedUp->value => [OrderStatus::AtSortingCenter],
-        OrderStatus::AtSortingCenter->value => [OrderStatus::Sorted],
-        OrderStatus::Sorted->value => [OrderStatus::AssignedToRider],
+        OrderStatus::AtSortingCenter->value => [OrderStatus::Sorted, OrderStatus::InTransit],
+        OrderStatus::Sorted->value => [OrderStatus::AssignedToRider, OrderStatus::InTransit],
+        OrderStatus::InTransit->value => [OrderStatus::ArrivedAtHub],
+        OrderStatus::ArrivedAtHub->value => [OrderStatus::Sorted, OrderStatus::InTransit],
         OrderStatus::AssignedToRider->value => [OrderStatus::OutForDelivery],
         OrderStatus::OutForDelivery->value => [OrderStatus::Delivered, OrderStatus::DeliveryFailed],
         OrderStatus::Delivered->value => [OrderStatus::Completed, OrderStatus::Returned],
@@ -106,6 +110,7 @@ class SellerOrderStatusService
         OrderStatus::Returned->value => [],
         OrderStatus::Completed->value => [],
         OrderStatus::Cancelled->value => [],
+        OrderStatus::Lost->value => [],
     ];
 
     /**
@@ -154,6 +159,11 @@ class SellerOrderStatusService
             return $sellerOrder;
         }
 
+        // Transfer movement comes only from a verified hub scan (recordTransferMovement).
+        if (in_array($to, [OrderStatus::InTransit, OrderStatus::ArrivedAtHub], true)) {
+            throw new \InvalidArgumentException('Hub-to-hub movement is recorded only by a verified transfer scan.');
+        }
+
         // True only when this call performed the hop under the lock. Idempotent
         // replays (already at $to) must not re-notify or re-release couriers.
         $didTransition = false;
@@ -183,8 +193,10 @@ class SellerOrderStatusService
                     throw new \InvalidArgumentException('Only verified physical Seller receipt can finalize a return.');
                 }
             }
-            if ($to === OrderStatus::Completed && $current->hasActiveReturn()) {
-                throw ValidationException::withMessages(['shipment' => 'An open return request must be resolved before confirming receipt.']);
+            if ($to === OrderStatus::Completed && $current->parcelReturn?->blocksCompletion()) {
+                throw ValidationException::withMessages(['shipment' => $current->hasActiveReturn()
+                    ? 'An open return request must be resolved before confirming receipt.'
+                    : 'This shipment left the buyer on a return that did not reach the Seller, so it cannot be completed.']);
             }
             if ($current->hasActiveReturn() && in_array($to, [OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::Delivered], true)) {
                 throw new \InvalidArgumentException('This parcel is in the physical return workflow.');
@@ -253,6 +265,12 @@ class SellerOrderStatusService
             }
 
             $update = ['status' => $to->value];
+            if ($to === OrderStatus::Confirmed
+                && RuntimeSchema::hasColumn('seller_orders', 'preparation_due_at')
+                && $current->preparation_due_at === null) {
+                $hours = max(1, (int) config('orders.preparation_deadline_hours', 48));
+                $update['preparation_due_at'] = now()->addHours($hours);
+            }
             if ($to === OrderStatus::PickedUp && $current->pickup_address_snapshot === null) {
                 $update['pickup_address_snapshot'] = ['full' => $current->pickupAddress(), 'barangay_code' => $current->sellerBarangayCode(), 'province_code' => $current->seller?->province_code];
             }
@@ -297,6 +315,11 @@ class SellerOrderStatusService
             // Automatic receipt completion never collects or settles a payment.
             if ($to === OrderStatus::Delivered || ($to === OrderStatus::Completed && $actor !== OrderActor::System)) {
                 $this->settleCodPayment($current);
+            }
+
+            if ($to === OrderStatus::Delivered) {
+                // 3+ provider chains get audit records only; amounts need an approved policy.
+                app(ProviderAllocationService::class)->prepare($current);
             }
 
             if ($to === OrderStatus::Completed) {
@@ -415,6 +438,71 @@ class SellerOrderStatusService
      *
      * @param  'return'|'cancel'  $reason
      */
+    /**
+     * Record a hub-to-hub movement (into or out of IN_TRANSIT / ARRIVED_AT_HUB)
+     * on a parcel the caller already locked, inside the caller's transaction.
+     *
+     * The caller has just verified a single-use scan token, so the movement
+     * itself is the proof; it is recorded even while a transfer exception is
+     * open (a recovery or reviewed-hold receipt). The status graph and the
+     * Logistics role map still apply. No money, stock, notification or rider
+     * pay side effect belongs to these movements.
+     */
+    public function recordTransferMovement(SellerOrder $locked, OrderStatus $to, int $providerId, string $note, string $source): bool
+    {
+        $movement = [OrderStatus::InTransit, OrderStatus::ArrivedAtHub];
+        // Into a movement status, or ARRIVED_AT_HUB → SORTED for a parcel that was already sorted.
+        if (! in_array($to, $movement, true) && ! ($locked->status === OrderStatus::ArrivedAtHub && $to === OrderStatus::Sorted)) {
+            throw new \InvalidArgumentException('Only hub-to-hub movements are recorded here.');
+        }
+
+        $from = $locked->status;
+        if ($from === $to) {
+            return false; // A repeated scan records nothing.
+        }
+        if (! OrderActor::Logistics->canTransition($from, $to) || ! in_array($to, self::ALLOWED[$from->value] ?? [], true)) {
+            throw new StaleStateException(self::staleMessage($locked->id, $from, $to, $from));
+        }
+
+        $locked->forceFill(['status' => $to->value])->save();
+        StatusHistory::record($locked, $from, $to, 'logistics', $note, OrderActor::Logistics, $providerId, $source);
+        $this->rollUpParentOrder($locked);
+
+        return true;
+    }
+
+    /**
+     * Admin-confirmed loss. Closes only this parcel: the order's other parcels
+     * are untouched. A lost parcel restores no stock, collects no COD, earns
+     * no commission and creates no Seller earnings. Caller holds the parcel
+     * row lock inside its transaction. Idempotent.
+     */
+    public function recordLoss(SellerOrder $locked, Admin $admin, string $reason): bool
+    {
+        $from = $locked->status;
+        if ($from === OrderStatus::Lost) {
+            return false;
+        }
+        $open = [
+            OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::InTransit,
+            OrderStatus::ArrivedAtHub, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed,
+        ];
+        if (! in_array($from, $open, true)) {
+            throw ValidationException::withMessages(['parcel' => 'Only a parcel that was collected and is still moving can be confirmed lost. This one is ['.$from->value.'].']);
+        }
+
+        $locked->forceFill(['status' => OrderStatus::Lost->value])->save();
+        StatusHistory::record($locked, $from, OrderStatus::Lost, 'admin', 'Confirmed lost: '.$reason, null, $admin->id, 'admin_lost');
+        $this->rollUpParentOrder($locked);
+        // Nothing will be collected at a door, so the COD payment is closed. No refund exists to make.
+        $this->cancelPendingPayment($locked);
+        foreach ([$locked->courier, $locked->deliveryCourier] as $courier) {
+            $courier?->forceFill(['is_available' => true])->save();
+        }
+
+        return true;
+    }
+
     public function releaseVerifiedReturnStock(SellerOrder $parcel, Admin $admin): void
     {
         app(ParcelReturnService::class)->admin($admin);

@@ -20,7 +20,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-/** SEL-EARN-001 to 003: Pending and Available, with net after seller sales, seller vouchers, and 5% commission. */
+/** SEL-EARN-001 to 003: Pending and Available, with net after seller sales, seller vouchers, and 10% commission. */
 class SellerEarningsPageTest extends TestCase
 {
     use LazilyRefreshDatabase;
@@ -41,23 +41,24 @@ class SellerEarningsPageTest extends TestCase
             ->assertOk()
             ->assertSee('Pending')
             ->assertSee('Available')
-            ->assertSee('₱237.50')
-            ->assertSee('₱616.55')
+            ->assertSee('₱225.00')
+            ->assertSee('₱584.10')
             ->assertSee('Seller sales')
             ->assertSee('Seller vouchers')
-            ->assertSee('Commission (5%)')
+            ->assertSee('Commission')
+            ->assertSee('10% commission. Each order keeps the rate in effect when it was completed.')
             ->assertSee('Platform vouchers (₱10.00) are funded by the marketplace and are not deducted.')
             ->assertSee('Shipping (₱73.00) is not deducted.')
             ->assertSee('Earnings')
             ->assertDontSee('OTHER-SELLER-EARN');
 
-        $this->assertSame(23750, $response->viewData('pendingMinor'));
-        $this->assertSame(61655, $response->viewData('availableMinor'));
+        $this->assertSame(22500, $response->viewData('pendingMinor'));
+        $this->assertSame(58410, $response->viewData('availableMinor'));
         $this->assertSame(99900, $response->viewData('grossMinor'));
         $this->assertSame(5000, $response->viewData('salesMinor'));
         $this->assertSame(5000, $response->viewData('sellerVoucherMinor'));
-        $this->assertSame(4495, $response->viewData('commissionMinor'));
-        $this->assertSame(85405, $response->viewData('netMinor'));
+        $this->assertSame(8990, $response->viewData('commissionMinor'));
+        $this->assertSame(80910, $response->viewData('netMinor'));
         $this->assertSame(1000, $response->viewData('platformVoucherMinor'));
         $this->assertSame(7300, $response->viewData('shippingMinor'));
         $this->assertSame(
@@ -69,8 +70,8 @@ class SellerEarningsPageTest extends TestCase
 
         $this->actingAs($seller, 'seller')->get(route('seller.earnings.index'))
             ->assertOk()
-            ->assertViewHas('pendingMinor', 23750)
-            ->assertViewHas('availableMinor', 51655)
+            ->assertViewHas('pendingMinor', 22500)
+            ->assertViewHas('availableMinor', 48410)
             ->assertViewHas('reservedMinor', 10000)
             ->assertSee('₱100.00 is reserved by a payout request.');
     }
@@ -117,9 +118,9 @@ class SellerEarningsPageTest extends TestCase
         ]);
         $order->forceFill([
             'shipping_fee_minor' => 0,
-            'commission_bps' => 500,
-            'commission_minor' => 750,
-            'seller_net_minor' => 14250,
+            'commission_bps' => 1000,
+            'commission_minor' => 1500,
+            'seller_net_minor' => 13500,
             'commission_finalized_at' => now(),
             'seller_funded_discount_minor' => 0,
             'marketplace_funded_discount_minor' => 0,
@@ -150,9 +151,9 @@ class SellerEarningsPageTest extends TestCase
             'seller_funded_discount_minor' => 0,
             'voucher_discount_minor' => 1000,
             'voucher_funding_source' => Voucher::FUNDING_MARKETPLACE,
-            'commission_bps' => 500,
-            'commission_minor' => 500,
-            'seller_net_minor' => 9500,
+            'commission_bps' => 1000,
+            'commission_minor' => 1000,
+            'seller_net_minor' => 9000,
             'commission_finalized_at' => now(),
         ])->save();
         OrderItem::query()->create([

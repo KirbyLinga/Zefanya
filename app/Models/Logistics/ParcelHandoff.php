@@ -24,7 +24,27 @@ class ParcelHandoff extends Model
             'rejected_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'received_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'recovered_at' => 'datetime',
+            'overdue_notified_at' => 'datetime',
+            'transport_required' => 'boolean',
+            'transport_assigned_at' => 'datetime',
         ];
+    }
+
+    /** Cancelled after it left the sending hub, and not yet verified anywhere. */
+    public function awaitsRecovery(): bool
+    {
+        return $this->status === ParcelHandoffStatus::Cancelled
+            && $this->dispatched_at !== null
+            && $this->recovered_at === null
+            && $this->cancelled_by_type !== 'admin';
+    }
+
+    /** The sending company's Courier who carries this handoff. */
+    public function transferCourier(): BelongsTo
+    {
+        return $this->belongsTo(TransferCourier::class, 'transfer_courier_id');
     }
 
     protected static function booted(): void
@@ -77,6 +97,7 @@ class ParcelHandoff extends Model
             ParcelHandoffStatus::InTransit => 'In transit',
             ParcelHandoffStatus::Rejected => 'Rejected',
             ParcelHandoffStatus::Received => 'Received',
+            ParcelHandoffStatus::Cancelled => $this->awaitsRecovery() ? 'Cancelled — awaiting recovery scan' : 'Cancelled',
         };
     }
 

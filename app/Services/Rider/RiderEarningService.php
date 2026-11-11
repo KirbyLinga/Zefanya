@@ -21,8 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Rider pay. Pickup is paid per seller visit (a pickup session): the first parcel
- * collected earns the first rate (₱30 by default) and each further parcel in the
- * same session the additional rate (₱5). Delivery earns ₱50 per parcel. Rates come
+ * collected earns the first rate (₱10 by default) and each further parcel in the
+ * same session the additional rate (₱10). Delivery earns ₱30 per parcel. Rates come
  * from Platform Settings and are saved on each earning, so a later change never
  * alters a past one. A failed pickup or delivery attempt earns nothing. The
  * Logistics company pays its own riders and records each payment here.

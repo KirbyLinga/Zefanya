@@ -170,7 +170,7 @@
                                             </div>
                                         @endforeach
                                         @include('Buyer.Orders._shipment-next-steps', ['shipment' => $sellerOrder])
-                                        @if ($sellerOrder->status === OrderStatus::Delivered && ! $sellerOrder->hasActiveReturn())
+                                        @if ($sellerOrder->canBuyerConfirmReceipt())
                                             <div class="mt-3 rounded-lg border border-[var(--border-faint)] p-3">
                                                 <p class="text-xs leading-relaxed text-[var(--text-muted)]">Confirm only after receiving and checking this parcel. Eligible shipments complete automatically 7 days after delivery if no return or delivery issue remains open.</p>
                                                 <form method="POST" action="{{ route('buyer.orders.confirmReceived', $order) }}" class="mt-3">

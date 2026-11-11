@@ -19,6 +19,7 @@ use App\Models\Rider\Courier;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerSettlement;
+use App\Services\Logistics\ParcelLossService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -70,6 +71,8 @@ class SellerOrder extends Model
             'pickup_address_snapshot' => 'array',
             'status' => OrderStatus::class,
             'handover_at' => 'datetime',
+            'preparation_due_at' => 'datetime',
+            'preparation_overdue_notified_at' => 'datetime',
             'pickup_window_starts_at' => 'datetime',
             'pickup_window_ends_at' => 'datetime',
             'pickup_missed_windows' => 'integer',
@@ -173,6 +176,14 @@ class SellerOrder extends Model
             : ($this->carrier_provider_id !== null ? (int) $this->carrier_provider_id : null);
     }
 
+    /** Accepted/packing orders keep their recorded promise to the buyer. */
+    public function preparationOverdue(): bool
+    {
+        return $this->preparation_due_at !== null
+            && in_array($this->status, [OrderStatus::Confirmed, OrderStatus::Preparing], true)
+            && $this->preparation_due_at->isPast();
+    }
+
     /** Current operations follow custody; fleet inference is for legacy parcels only. */
     public function scopeHeldBy(Builder $query, int $providerId): Builder
     {
@@ -213,6 +224,7 @@ class SellerOrder extends Model
             OrderStatus::Completed,
             OrderStatus::Returned,
             OrderStatus::Cancelled,
+            OrderStatus::Lost,
         ], true);
     }
 
@@ -463,6 +475,12 @@ class SellerOrder extends Model
         return $this->parcelReturn?->isActive() ?? false;
     }
 
+    /** The buyer may confirm a delivered shipment only when no return holds it (open, lost, damaged or closed in dispute). */
+    public function canBuyerConfirmReceipt(): bool
+    {
+        return $this->status === OrderStatus::Delivered && ! ($this->parcelReturn?->blocksCompletion() ?? false);
+    }
+
     public function parcelHandoffs(): HasMany
     {
         return $this->hasMany(ParcelHandoff::class)->orderBy('created_at')->orderBy('id');
@@ -545,6 +563,12 @@ class SellerOrder extends Model
         ]];
         $failedAttempt = 0;
         foreach ($this->statusHistories as $history) {
+            // Transfer departures and arrivals already appear as hub movement
+            // events with their hubs; only a recovery arrival is shown here.
+            if (in_array($history->to_status, [OrderStatus::InTransit, OrderStatus::ArrivedAtHub], true)
+                && in_array($history->source, ['manifest', 'handoff'], true)) {
+                continue;
+            }
             $events[] = [
                 'key' => 'status:'.$history->id,
                 'type' => 'status',
@@ -559,6 +583,8 @@ class SellerOrder extends Model
                     $history->to_status === OrderStatus::Cancelled && $history->actor_type === 'buyer' => Str::after((string) $history->note, 'Buyer cancelled: '),
                     $history->to_status === OrderStatus::AtSortingCenter && $this->originStation !== null => 'Arrived at '.$this->originStation->name.'.',
                     $history->to_status === OrderStatus::Sorted && $this->custodyHub !== null => ($buyerFacing ? 'Preparing the next delivery leg at ' : 'Sorted at ').$this->custodyHub->name.'.',
+                    $history->to_status === OrderStatus::ArrivedAtHub => $buyerFacing ? 'Located at a hub after a transfer delay.' : $history->note,
+                    $history->to_status === OrderStatus::Lost => $buyerFacing ? 'Confirmed lost in transit. You were not charged.' : $history->note,
                     default => null,
                 },
                 'at' => $history->created_at,
@@ -625,6 +651,16 @@ class SellerOrder extends Model
                     'at' => $item->received_at, 'sequence' => 2,
                 ];
             }
+        }
+
+        // A parcel found after it was confirmed lost: shown, but the order stays closed.
+        if ($this->status === OrderStatus::Lost && ($lossCase = app(ParcelLossService::class)->caseFor($this))?->recovered_at !== null) {
+            $foundHub = LogisticsHub::query()->whereKey($lossCase->recovered_hub_id)->value('name');
+            $events[] = [
+                'key' => 'loss-recovered', 'type' => 'status', 'title' => 'Parcel found',
+                'detail' => $buyerFacing ? 'Found at a hub. The order stays closed while next steps are decided.' : 'Found at '.($foundHub ?? 'a hub').'. The order stays closed.',
+                'at' => $lossCase->recovered_at, 'sequence' => 6,
+            ];
         }
 
         // The schema stores seconds. Equal timestamps follow lifecycle order,

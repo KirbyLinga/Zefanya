@@ -191,7 +191,7 @@ class SellerSettlementService
                 || $locked->shipping_allocation_minor !== $order->shipping_fee_minor
                 || $locked->seller_funded_discount_minor !== $allocation['seller_minor']
                 || $locked->marketplace_funded_discount_minor !== $allocation['marketplace_minor']
-                || $locked->commission_bps !== CommissionFinalizationService::COMMISSION_BPS
+                || $locked->commission_bps < 0 || $locked->commission_bps > 10000
                 || $locked->commission_minor < 0 || $locked->seller_payout_minor < 0
                 || $locked->commission_bps !== $order->commission_bps
                 || $locked->commission_minor !== $order->commission_minor
@@ -301,6 +301,67 @@ class SellerSettlementService
     }
 
     /**
+     * A return cancelled before collection (buyer withdrew it, or Admin closed a
+     * no-show) leaves the item with the buyer, so the earnings an approval held
+     * come back. The order's commission is cleared again so completion finalizes
+     * it at the normal rate, and a held settlement goes back to waiting for that.
+     * A charge the Seller already repaid is never reversed, and a settlement that
+     * money already left needs Admin reconciliation instead. Runs once.
+     *
+     * Caller holds the return lock.
+     */
+    public function restoreAfterCancelledReturn(SellerOrder $sellerOrder): void
+    {
+        DB::transaction(function () use ($sellerOrder): void {
+            // Shared lock order: SellerOrder -> Payment -> CodRemittance -> SellerSettlement.
+            $order = SellerOrder::query()->whereKey($sellerOrder->getKey())->lockForUpdate()->firstOrFail();
+            $order->load('parcelReturn');
+            $return = $order->parcelReturn;
+            if ($return === null || ! $return->isCancelled() || $return->refunded_at !== null || $return->earnings_restored_at !== null) {
+                return;
+            }
+
+            $payment = $order->payment()->lockForUpdate()->first();
+            $settlement = null;
+            if ($payment !== null) {
+                $remittance = CodRemittance::query()->where('seller_order_id', $order->getKey())
+                    ->where('payment_id', $payment->getKey())->lockForUpdate()->first();
+                if ($remittance !== null) {
+                    $settlement = SellerSettlement::query()->where('seller_order_id', $order->getKey())
+                        ->where('cod_remittance_id', $remittance->getKey())->lockForUpdate()->first();
+                }
+            }
+
+            // The approval set a zero commission on this still-delivered order. Completion
+            // finalizes it again from scratch, at the rate that applies then.
+            if ($order->status === OrderStatus::Delivered && $order->commission_finalized_at !== null) {
+                $order->forceFill(['commission_bps' => null, 'commission_minor' => null, 'seller_net_minor' => null, 'commission_finalized_at' => null])->save();
+            }
+
+            $alreadyPaid = $settlement !== null && ($settlement->status === SellerSettlement::PAID || (int) $settlement->paid_amount_minor > 0);
+            if ($settlement !== null && ! $alreadyPaid && in_array($settlement->status, [SellerSettlement::PENDING_PAYOUT, SellerSettlement::RELEASED], true)) {
+                $settlement->forceFill([
+                    'status' => SellerSettlement::PENDING_PAYOUT,
+                    'commission_bps' => null,
+                    'commission_minor' => null,
+                    'seller_payout_minor' => null,
+                    'financials_finalized_at' => null,
+                    'pending_reason' => SellerSettlement::COMMISSION_FINALIZATION_MISSING,
+                ])->save();
+            }
+
+            // Charges raised for this return are dropped, never below what the Seller already repaid.
+            $debt = SellerDebt::query()->where('seller_order_id', $order->getKey())
+                ->whereIn('reason', [SellerDebt::AFTER_PAYOUT_RETURN, SellerDebt::RETURN_CHARGES])->lockForUpdate()->first();
+            if ($debt !== null && (int) $debt->amount_minor !== (int) $debt->settled_minor) {
+                $debt->forceFill(['amount_minor' => (int) $debt->settled_minor])->save();
+            }
+
+            $return->forceFill(['earnings_restored_at' => now()])->save();
+        }, 3);
+    }
+
+    /**
      * What the Seller keeps from an order with an approved return. Until a refund is
      * recorded the full amount is assumed refunded, so nothing is kept. A recorded
      * refund comes off the item amount first. The Seller keeps the rest, less the
@@ -360,8 +421,12 @@ class SellerSettlementService
         $logisticsFault = $return?->isLogisticsFault() === true;
         $returnShipping = $logisticsFault ? 0 : (int) ($return?->return_shipping_fee_minor ?? 0);
 
+        // The order keeps the rate it was finalized at, even while it earns nothing,
+        // so a later partial refund is charged at that rate and not today's.
+        $bps = $this->rateFor($order);
+
         if (! $logisticsFault && $return?->refunded_at === null) {
-            return $this->withPosition(['refunded_items_minor' => 0, 'commission_bps' => 0, 'commission_minor' => 0, 'kept_net_minor' => 0, 'refunded_shipping_minor' => 0, 'return_shipping_minor' => $returnShipping]);
+            return $this->withPosition(['refunded_items_minor' => 0, 'commission_bps' => $bps, 'commission_minor' => 0, 'kept_net_minor' => 0, 'refunded_shipping_minor' => 0, 'return_shipping_minor' => $returnShipping]);
         }
 
         $allocation = $this->funding->allocationFor($order);
@@ -373,16 +438,26 @@ class SellerSettlementService
         $refund = $logisticsFault ? 0 : (int) $return->refund_amount_minor;
         $refundedItems = min($itemAmount, $refund);
         $keptItems = $itemAmount - $refundedItems;
-        $commission = $keptItems > 0 ? Money::percentage($keptItems, CommissionFinalizationService::COMMISSION_BPS, 10000) : 0;
+        $commission = $keptItems > 0 ? Money::percentage($keptItems, $bps, 10000) : 0;
 
         return $this->withPosition([
             'refunded_items_minor' => $refundedItems,
-            'commission_bps' => $keptItems > 0 ? CommissionFinalizationService::COMMISSION_BPS : 0,
+            'commission_bps' => $bps,
             'commission_minor' => $commission,
             'kept_net_minor' => $keptItems - $commission,
             'refunded_shipping_minor' => $refund - $refundedItems,
             'return_shipping_minor' => $returnShipping,
         ]);
+    }
+
+    /**
+     * The order's saved rate. Orders not finalized yet use today's rate. A 0
+     * comes only from returns recorded before rates were kept; those fall back
+     * to today's rate too, because the original rate was not stored.
+     */
+    private function rateFor(SellerOrder $order): int
+    {
+        return (int) ($order->commission_bps ?: CommissionFinalizationService::COMMISSION_BPS);
     }
 
     private function withPosition(array $breakdown): array

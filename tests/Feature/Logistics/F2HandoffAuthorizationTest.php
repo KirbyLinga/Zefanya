@@ -104,7 +104,8 @@ class F2HandoffAuthorizationTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
     }
 
     public function test_wrong_station_hub_token_is_rejected(): void
@@ -165,7 +166,8 @@ class F2HandoffAuthorizationTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
     }
 
     public function test_unauthorized_rider_retry_of_completed_pickup_is_rejected(): void
@@ -251,19 +253,25 @@ class F2HandoffAuthorizationTest extends TestCase
             )
             ->assertSessionHas('success');
 
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
-        $this->assertSame(
-            1,
-            StatusHistory::query()
-                ->where('seller_order_id', $parcel->id)
-                ->where('to_status', OrderStatus::AtSortingCenter->value)
-                ->count(),
-        );
+        // A retry after the automatic sort changes nothing: no second receipt or sort.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        foreach ([OrderStatus::AtSortingCenter, OrderStatus::Sorted] as $status) {
+            $this->assertSame(
+                1,
+                StatusHistory::query()
+                    ->where('seller_order_id', $parcel->id)
+                    ->where('to_status', $status->value)
+                    ->count(),
+            );
+        }
     }
 
     public function test_scan_required_sort_still_works_with_authoritative_station(): void

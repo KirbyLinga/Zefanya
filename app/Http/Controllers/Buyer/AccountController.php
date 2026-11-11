@@ -9,6 +9,7 @@ use App\Models\Buyer\BuyerAddress;
 use App\Models\Shared\Order;
 use App\Services\Buyer\BuyerAddressBook;
 use App\Support\BirthDate;
+use App\Support\BuyerAddressRules;
 use App\Support\PersonName;
 use App\Support\PhilippineMobile;
 use Carbon\Carbon;
@@ -36,6 +37,8 @@ class AccountController extends Controller
         OrderStatus::PickedUp,
         OrderStatus::AtSortingCenter,
         OrderStatus::Sorted,
+        OrderStatus::InTransit,
+        OrderStatus::ArrivedAtHub,
         OrderStatus::OutForDelivery,
         OrderStatus::Delivered,
     ];
@@ -115,23 +118,7 @@ class AccountController extends Controller
      */
     private function addressRules(Request $request): array
     {
-        $isManual = $request->input('address_mode') === 'manual';
-
-        return [
-            'address_mode' => ['required', Rule::in(['api', 'manual'])],
-            'province' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'province_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'municipality' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            // Required in BOTH modes — see StoreBuyerRegistrationRequest: a
-            // missing municipality breaks service-area matching at fulfillment.
-            'municipality_name' => ['required', 'string'],
-            'barangay' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'barangay_name' => [Rule::requiredIf(! $isManual), 'nullable', 'string'],
-            'street' => ['required', 'string', 'max:255'],
-            'house_number' => ['nullable', 'string', 'max:50'],
-            'address_detail' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:10'],
-        ];
+        return BuyerAddressRules::rules($request->input('address_mode'));
     }
 
     /**

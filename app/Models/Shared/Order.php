@@ -58,7 +58,7 @@ class Order extends Model
         if ($statuses->isEmpty()) {
             return null;
         }
-        $resolved = [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled];
+        $resolved = [OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled, OrderStatus::Lost];
         $unresolved = $statuses->reject(fn (OrderStatus $status): bool => in_array($status, $resolved, true));
         if ($unresolved->isEmpty()) {
             if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Returned)) {
@@ -66,6 +66,9 @@ class Order extends Model
             }
             if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Cancelled)) {
                 return OrderStatus::Cancelled;
+            }
+            if ($statuses->every(fn (OrderStatus $status): bool => $status === OrderStatus::Lost)) {
+                return OrderStatus::Lost;
             }
 
             return OrderStatus::Completed;
@@ -97,7 +100,7 @@ class Order extends Model
     /** Any delivered shipment may be confirmed independently of its siblings. */
     public function canBeConfirmed(): bool
     {
-        return $this->sellerOrders->contains(fn (SellerOrder $shipment) => $shipment->status === OrderStatus::Delivered && ! $shipment->hasActiveReturn());
+        return $this->sellerOrders->contains(fn (SellerOrder $shipment) => $shipment->canBuyerConfirmReceipt());
     }
 
     // ── Reference generation ─────────────────────────────────────────────────

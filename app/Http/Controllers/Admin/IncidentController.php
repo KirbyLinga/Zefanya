@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ParcelRouteRereoute;
 use App\Models\Shared\Incidents;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelLegService;
+use App\Services\Logistics\ParcelLossService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +35,13 @@ class IncidentController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        return view('Admin.Incidents.index', ['incidents' => $incidents]);
+        return view('Admin.Incidents.index', [
+            'incidents' => $incidents,
+            'lossAvailable' => ParcelLossService::available(),
+            'liableProviders' => ParcelLossService::available()
+                ? LogisticsProvider::query()->where('status', 'approved')->whereNull('archived_at')->orderBy('business_name')->get(['id', 'business_name'])
+                : collect(),
+        ]);
     }
 
     public function show(Request $request, Incidents $incident): View
@@ -49,6 +57,10 @@ class IncidentController extends Controller
         ]);
 
         return view('Admin.Incidents.detail', [
+            'lossAvailable' => ParcelLossService::available(),
+            'liableProviders' => ParcelLossService::available()
+                ? LogisticsProvider::query()->where('status', 'approved')->whereNull('archived_at')->orderBy('business_name')->get(['id', 'business_name'])
+                : collect(),
             'incident' => $incident,
             'eventCounts' => $incident->eventCounts(),
             'lastVerifiedHub' => app(ParcelLegService::class)
@@ -70,6 +82,30 @@ class IncidentController extends Controller
         ]);
 
         return back()->with('success', 'Incident resolution recorded.');
+    }
+
+    /** Confirm several parcels lost together. Each is resolved on its own, so one failure never blocks the rest. */
+    public function confirmLost(Request $request): RedirectResponse
+    {
+        abort_unless(ParcelLossService::available(), 404);
+        $admin = $request->user('admin');
+        $this->authorizeForUser($admin, 'viewAny', Incidents::class);
+        $data = $request->validate([
+            'incident_ids' => ['required', 'array', 'min:1', 'max:'.ParcelLossService::MAX_BULK],
+            'incident_ids.*' => ['integer'],
+            'reason' => ['required', 'string', 'max:1000'],
+            'liable_provider_id' => ['nullable', 'integer'],
+        ]);
+
+        $result = app(ParcelLossService::class)->confirmMany(
+            $data['incident_ids'], $admin, $data['reason'], isset($data['liable_provider_id']) ? (int) $data['liable_provider_id'] : null,
+        );
+        $message = count($result['confirmed']).' '.str('parcel')->plural(count($result['confirmed'])).' confirmed lost.';
+        foreach ($result['failed'] as $parcelId => $why) {
+            $message .= " Parcel #{$parcelId} not confirmed: {$why}";
+        }
+
+        return back()->with($result['failed'] === [] ? 'success' : 'warning', $message);
     }
 
     public function reject(Request $request, Incidents $incident): RedirectResponse

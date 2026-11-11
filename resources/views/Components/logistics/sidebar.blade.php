@@ -2,40 +2,30 @@
 
 @php
     $provider = $provider ?? auth('logistics')->user();
-    $unreadNotifications = $provider && \Illuminate\Support\Facades\Schema::hasTable('notifications')
-        ? $provider->unreadNotifications()->count() : 0;
+    // Nine items. Pages that belong to one job share an item and switch with
+    // tabs (x-logistics.tabs); `active` keeps the item lit on every tab.
+    // Notifications live in the bell shown at the top of every page.
     $sections ??= [
         ['label' => null, 'items' => [
+            ['route' => 'logistics.scan.index', 'icon' => 'scan-line', 'label' => 'Scan parcel', 'primary' => true],
             ['route' => 'logistics.dashboard', 'icon' => 'layout-dashboard', 'label' => 'Dashboard'],
-            ['route' => 'logistics.notifications.index', 'icon' => 'bell', 'label' => 'Notifications', 'badge' => $unreadNotifications],
-            ['route' => 'logistics.scan.index', 'icon' => 'scan-line', 'label' => 'Scan parcel'],
         ]],
         ['label' => 'Parcel flow', 'items' => [
-            ['route' => 'logistics.incoming-parcels.index', 'icon' => 'inbox', 'label' => 'Incoming parcels'],
-            ['route' => 'logistics.parcel-sorting.index', 'icon' => 'archive', 'label' => 'Parcel sorting'],
-            ['route' => 'logistics.delivery-assignments.index', 'icon' => 'map-pin', 'label' => 'Assign deliveries'],
-            ['route' => 'logistics.delivery-monitoring.index', 'icon' => 'activity', 'label' => 'Delivery tracking'],
-            ['route' => 'logistics.exceptions.index', 'icon' => 'alert-triangle', 'label' => 'Parcel exceptions'],
+            ['route' => 'logistics.incoming-parcels.index', 'icon' => 'inbox', 'label' => 'Incoming & sorting', 'active' => ['logistics.parcel-sorting.*']],
+            ['route' => 'logistics.delivery-assignments.index', 'icon' => 'map-pin', 'label' => 'Deliveries', 'active' => ['logistics.delivery-monitoring.*']],
+            ['route' => 'logistics.exceptions.index', 'icon' => 'alert-triangle', 'label' => 'Exceptions'],
         ]],
-        ['label' => 'Transfers & returns', 'items' => [
-            ['route' => 'logistics.handoffs.index', 'icon' => 'repeat-2', 'label' => 'Provider handoffs'],
-            ['route' => 'logistics.manifests.index', 'icon' => 'truck', 'label' => 'Transfer Batches'],
-            ['route' => 'logistics.returns.index', 'icon' => 'undo-2', 'label' => 'Physical returns'],
+        ['label' => 'Network', 'items' => [
+            ['route' => 'logistics.handoffs.index', 'icon' => 'repeat-2', 'label' => 'Transfers', 'active' => ['logistics.manifests.*', 'logistics.transfer-couriers.*']],
+            ['route' => 'logistics.returns.index', 'icon' => 'undo-2', 'label' => 'Returns'],
+            ['route' => 'logistics.riders.index', 'icon' => 'users', 'label' => 'Riders'],
         ]],
         ['label' => 'Money', 'items' => [
-            ['route' => 'logistics.earnings.index', 'icon' => 'wallet', 'label' => 'Earnings'],
-            ['route' => 'logistics.cod-remittances.index', 'icon' => 'banknote', 'label' => 'COD remittances'],
-        ]],
-        // Set-up pages are rarely visited, so they stay folded to keep the list short.
-        ['label' => 'Team & setup', 'icon' => 'settings-2', 'collapsible' => true, 'items' => [
-            ['route' => 'logistics.riders.index', 'icon' => 'users', 'label' => 'Riders'],
-            ['route' => 'logistics.hubs.index', 'icon' => 'network', 'label' => 'Hubs & stations'],
-            ['route' => 'logistics.transport-connections.index', 'icon' => 'route', 'label' => 'Transport connections'],
-            ['route' => 'logistics.partnerships.index', 'icon' => 'handshake', 'label' => 'Provider partnerships'],
-            ['route' => 'logistics.areas.index', 'icon' => 'map', 'label' => 'Delivery areas'],
-            ['route' => 'logistics.audit-logs.index', 'icon' => 'scroll-text', 'label' => 'Activity log'],
+            ['route' => 'logistics.earnings.index', 'icon' => 'wallet', 'label' => 'Money', 'active' => ['logistics.cod-remittances.*']],
         ]],
     ];
+    $setup = ['route' => 'logistics.hubs.index', 'icon' => 'settings-2', 'label' => 'Setup',
+        'active' => ['logistics.transport-connections.*', 'logistics.partnerships.*', 'logistics.areas.*', 'logistics.audit-logs.*', 'logistics.shipping-rates.*']];
 @endphp
 
 <div class="w-16 shrink-0 md:w-auto">
@@ -46,6 +36,10 @@
         <nav class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-3 py-4 [.is-collapsed_&]:px-2" id="logisticsNav" aria-label="Logistics navigation">
             <x-logistics.sidebar-nav :sections="$sections" />
         </nav>
+
+        <div class="shrink-0 border-t border-[var(--sidebar-border)] px-3 py-2 [.is-collapsed_&]:px-2">
+            <x-logistics.sidebar-nav-item :route="$setup['route']" :icon="$setup['icon']" :label="$setup['label']" :active="$setup['active']" />
+        </div>
 
         <div class="shrink-0 border-t border-[var(--sidebar-border)] px-3 py-3 [.is-collapsed_&]:px-2">
             <x-logistics.sidebar-user-panel :provider="$provider" />

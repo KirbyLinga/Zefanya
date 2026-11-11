@@ -33,5 +33,11 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Older transfer tests predate the carrier rule; tests that cover it turn it on. -->
+        <env name="TRANSFER_TRANSPORT_REQUIRED" value="false"/>
+        <!-- Keep the live .env (production URL, trusted proxy, secure cookies) out of tests. -->
+        <env name="APP_URL" value="http://localhost" force="true"/>
+        <env name="TRUSTED_PROXIES" value="" force="true"/>
+        <env name="SESSION_SECURE_COOKIE" value="false" force="true"/>
     </php>
 </phpunit>

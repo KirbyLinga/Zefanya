@@ -64,7 +64,7 @@
             <button type="button"
                     data-category-scroll-left
                     aria-label="Scroll categories left"
-                    class="absolute -left-12 top-1/2 -translate-y-1/2 hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full border border-buyer-line bg-white text-buyer-ink-soft hover:text-buyer-ink hover:bg-primary-50 transition-colors shadow-sm z-10"
+                    class="absolute left-0 lg:-left-12 top-1/2 -translate-y-1/2 hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full border border-buyer-line bg-white text-buyer-ink-soft hover:text-buyer-ink hover:bg-primary-50 transition-colors shadow-sm z-10"
                     style="display: none;">
                 <i data-lucide="chevron-left" width="18" height="18"></i>
             </button>
@@ -93,7 +93,7 @@
             <button type="button"
                     data-category-scroll-right
                     aria-label="Scroll categories right"
-                    class="absolute -right-12 top-1/2 -translate-y-1/2 hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full border border-buyer-line bg-white text-buyer-ink-soft hover:text-buyer-ink hover:bg-primary-50 transition-colors shadow-sm z-10">
+                    class="absolute right-0 lg:-right-12 top-1/2 -translate-y-1/2 hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full border border-buyer-line bg-white text-buyer-ink-soft hover:text-buyer-ink hover:bg-primary-50 transition-colors shadow-sm z-10">
                 <i data-lucide="chevron-right" width="18" height="18"></i>
             </button>
 

@@ -108,6 +108,9 @@ COMPLETED         -> (terminal)
 - `Order::computeRollupStatus()` (`app/Models/Shared/Order.php:65-83`): all slices `Completed` → `Completed`; otherwise the **minimum-rank** status among non-`Completed` slices (rank = declaration order above).
 - Persisted by `Order::rollUpStatus()` and re-run inside the transition transaction by `SellerOrderStatusService::rollUpParentOrder()` (`:306-323`, locks the parent row).
 - `Order::canBeConfirmed()`: true when at least one shipment is Delivered. Delivered shipments can be confirmed independently of in-transit, Completed or Returned siblings; BuyerShipmentConfirmation validates and locks the selected shipment(s).
+- `LOST` is terminal. `recordLoss()` writes it for an Admin-confirmed lost parcel. It is not in the forward graph. Rollup treats it as resolved: an order whose parcels are all `LOST` is `LOST`; a mix of completed, returned, cancelled and lost parcels is `Completed`. The buyer Cancelled tab includes it, and `buyerLabel()` is `Lost — Shipment issue`.
+
+`parcel_loss_cases` (one row per parcel, unique `seller_order_id`) stores the liable provider, the basis (`custody_before_receipt`, `custody_after_receipt`, `admin_assigned`, `review_required`), the saved merchandise amount in minor units, the manual payment confirmation, and any later recovery. `parcel_loss_adjustments` stores signed corrections after payment. `manifests.overdue_escalated_at` and `parcel_handoffs.overdue_escalated_at` record the one-time Admin escalation. Migration `2026_11_10_090000_create_parcel_loss_cases` is additive.
 
 ---
 
@@ -193,7 +196,7 @@ All tables below are derived from `database/migrations/`. Notation: `NN` = NOT N
 
 **`origin_share_payouts`** — one payment from Zefanya to an origin carrier for its 40% of cross-provider fees: logistics_provider_id **FK**, `parcel_count`, `amount_minor`, `reference` *(unique per provider)*, `paid_on` date, `status` (`PAID`), paid_by_admin_id **FK**. `cod_remittances` gained `kept_shipping_minor` and `origin_share_minor` (split frozen at delivery) and `origin_share_payout_id` (set once).
 
-**`logistics_shipping_rates`** — id, logistics_provider_id **FK (cascade)**, `zone` (`same_municipality`, `same_province`, `cross_province`), `first_kg_minor` intU nullable, `additional_kg_minor` intU nullable. **Unique `(logistics_provider_id, zone)`**. Null means the company uses the marketplace rate from `config/buyer.php`. Shown on Earnings → Shipping Rates (`/logistics/earnings?tab=shipping-rates`); `/logistics/shipping-rates` redirects there. Placed orders keep `seller_orders.shipping_fee_minor`.
+**`logistics_shipping_rates`** — id, logistics_provider_id **FK (cascade)**, `zone` (`same_municipality`, `same_province`, `cross_province`), `first_kg_minor` intU nullable, `additional_kg_minor` intU nullable. **Unique `(logistics_provider_id, zone)`**. Since 2026-11-08 these saved rates no longer price checkout: every route uses the marketplace fee `config('buyer.shipping_fee')` (₱50 for the first 2 kg, ₱20 per extra kilo). The table and its save route remain. Shown on Earnings → Shipping Rates (`/logistics/earnings?tab=shipping-rates`); `/logistics/shipping-rates` redirects there. Placed orders keep `seller_orders.shipping_fee_minor`.
 
 > Two parallel coverage models exist: the legacy `couriers.service_area` JSON and the newer `areas` table. The `areas` table supersedes it but `service_area` is still NOT NULL.
 

@@ -109,7 +109,7 @@ class ProviderHandoffDatabaseTest extends TestCase
     public function test_handoff_status_enum_covers_the_required_lifecycle(): void
     {
         $this->assertSame(
-            ['REQUESTED', 'ACCEPTED', 'REJECTED', 'IN_TRANSIT', 'RECEIVED'],
+            ['REQUESTED', 'ACCEPTED', 'REJECTED', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED'],
             array_map(fn (ParcelHandoffStatus $status): string => $status->value, ParcelHandoffStatus::cases()),
         );
     }

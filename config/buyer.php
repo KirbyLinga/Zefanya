@@ -13,7 +13,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Shipping Rate Table
+    | Shipping Fee (applies to every order)
+    |--------------------------------------------------------------------------
+    |
+    | One marketplace-wide rule, the same for every zone and every Logistics
+    | company: base_minor covers the first base_kg kilos of a store's parcel,
+    | and each kilo after that adds additional_kg_minor. Weight rounds up to
+    | whole kilos. Centavos. The zone tables below and company rate cards no
+    | longer change the price.
+    |
+    */
+    'shipping_fee' => [
+        'base_minor' => (int) env('BUYER_SHIPPING_BASE_MINOR', 5000),
+        'base_kg' => (int) env('BUYER_SHIPPING_BASE_KG', 2),
+        'additional_kg_minor' => (int) env('BUYER_SHIPPING_ADDITIONAL_KG_MINOR', 2000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shipping Rate Table (no longer used for pricing)
     |--------------------------------------------------------------------------
     |
     | Per-store fee by the shop's total parcel weight, rounded up to whole

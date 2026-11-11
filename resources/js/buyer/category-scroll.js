@@ -40,12 +40,13 @@ export function initCategoryScroll() {
 
         // Update arrow buttons
         if (leftBtn) {
-            leftBtn.style.display = hasScrolled ? 'inline-flex' : 'none';
+            // '' hands visibility back to the classes, which hide the arrows on phones.
+            leftBtn.style.display = hasScrolled ? '' : 'none';
             leftBtn.disabled = !hasScrolled;
         }
 
         if (rightBtn) {
-            rightBtn.style.display = hasMoreToRight ? 'inline-flex' : 'none';
+            rightBtn.style.display = hasMoreToRight ? '' : 'none';
             rightBtn.disabled = !hasMoreToRight;
         }
     };

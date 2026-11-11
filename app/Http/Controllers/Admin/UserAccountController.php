@@ -57,7 +57,22 @@ class UserAccountController extends Controller
             default => $this->queryAccounts(Seller::query(), $search, $status, withBusinessName: true),
         };
 
-        $paginator = $accounts->paginate(25)->withQueryString();
+        $perPage = (int) $request->query('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50], true)) {
+            $perPage = 25;
+        }
+
+        $summaryQuery = match ($type) {
+            'buyer' => Buyer::query(),
+            'logistics' => LogisticsProvider::query(),
+            default => Seller::query(),
+        };
+        $accountSummary = $summaryQuery->whereIn('status', array_keys(self::ACCOUNT_STATUSES))
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $paginator = $accounts->paginate($perPage)->withQueryString();
 
         $provinceBlockers = [];
         $outForDelivery = [];
@@ -80,6 +95,8 @@ class UserAccountController extends Controller
 
         return view('Admin.Users.index', [
             'accounts' => $paginator,
+            'accountSummary' => $accountSummary,
+            'perPage' => $perPage,
             'type' => $type,
             'search' => $search,
             'status' => $status,

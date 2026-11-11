@@ -12,7 +12,7 @@ use App\Models\Catalog\ProductVariant;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
-use App\Models\Logistics\LogisticsShippingRate;
+use App\Models\Logistics\TransportConnection;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
@@ -46,11 +46,9 @@ class CheckoutShippingTest extends TestCase
         $this->seller = Seller::factory()->create(['status' => 'approved']);
         $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller]);
 
-        // After the bootstrap, which zeroes the per-kilo rates for money tests.
-        config(['buyer.shipping_rates' => [
-            'same_municipality' => ['first_kg_minor' => 4900, 'additional_kg_minor' => 1500],
-            'same_province' => ['first_kg_minor' => 6900, 'additional_kg_minor' => 2000],
-        ]]);
+        // After the bootstrap, which zeroes the per-kilo fee for money tests:
+        // ₱50 covers the first 2 kg, then ₱20 for each further kilo.
+        config(['buyer.shipping_fee' => ['base_minor' => 5000, 'base_kg' => 2, 'additional_kg_minor' => 2000]]);
 
         $this->actingAs($this->buyer, 'buyer');
     }
@@ -102,13 +100,13 @@ class CheckoutShippingTest extends TestCase
     public static function weights(): array
     {
         return [
-            'no weight recorded' => [0, 1, 4900],
-            'light parcel' => [250, 1, 4900],
-            'exactly one kilo' => [1000, 1, 4900],
-            'one gram over' => [1001, 1, 6400],
-            'exactly two kilos' => [2000, 1, 6400],
-            'quantity pushes it over' => [600, 2, 6400],
-            'heavy parcel' => [4500, 1, 10900],
+            'no weight recorded' => [0, 1, 5000],
+            'light parcel' => [250, 1, 5000],
+            'exactly one kilo' => [1000, 1, 5000],
+            'exactly two kilos' => [2000, 1, 5000],
+            'one gram over two kilos' => [2001, 1, 7000],
+            'quantity pushes it over' => [1100, 2, 7000],
+            'heavy parcel' => [4500, 1, 11000],
         ];
     }
 
@@ -122,14 +120,15 @@ class CheckoutShippingTest extends TestCase
         $this->assertSame($fee, $options[0]['carriers'][0]['fee_minor']);
     }
 
-    public function test_chk_a_different_municipality_uses_its_own_rates(): void
+    public function test_chk_a_different_municipality_pays_the_same_fixed_fee(): void
     {
         $this->buyer->forceFill(['municipality_code' => '030540200'])->save();
         [, $line] = $this->line(2500);
 
         $options = $this->openCheckout([$line])->viewData('carrierOptions');
 
-        $this->assertSame(6900 + 2 * 2000, $options[0]['carriers'][0]['fee_minor']);
+        // One fee for every route: ₱50 for the first 2 kg plus ₱20 for the 3rd kilo.
+        $this->assertSame(5000 + 2000, $options[0]['carriers'][0]['fee_minor']);
         $this->assertSame(3, $options[0]['chargeable_kg']);
     }
 
@@ -137,15 +136,15 @@ class CheckoutShippingTest extends TestCase
     {
         $other = Seller::factory()->create(['status' => 'approved']);
         $carrier = $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller, $other]);
-        config(['buyer.shipping_rates.same_municipality.additional_kg_minor' => 1500]);
+        config(['buyer.shipping_fee.additional_kg_minor' => 2000]);
         [, $light] = $this->line(500);
         [, $heavy] = $this->line(3000, seller: $other);
 
         $page = $this->openCheckout([$light, $heavy]);
         $fees = collect($page->viewData('carrierOptions'))->mapWithKeys(fn (array $row) => [$row['seller_id'] => $row['carriers'][0]['fee_minor']]);
 
-        $this->assertSame(4900, $fees[$this->seller->id]);
-        $this->assertSame(4900 + 2 * 1500, $fees[$other->id]);
+        $this->assertSame(5000, $fees[$this->seller->id]);
+        $this->assertSame(5000 + 2000, $fees[$other->id]);
         $page->assertSee('Charged for 3 kg');
 
         $this->post(route('buyer.checkout.store'), [
@@ -153,8 +152,8 @@ class CheckoutShippingTest extends TestCase
             'carriers' => [$this->seller->id => $carrier->id, $other->id => $carrier->id],
         ])->assertRedirect();
 
-        $this->assertSame(4900, SellerOrder::query()->where('seller_id', $this->seller->id)->sole()->shipping_fee_minor);
-        $this->assertSame(7900, SellerOrder::query()->where('seller_id', $other->id)->sole()->shipping_fee_minor);
+        $this->assertSame(5000, SellerOrder::query()->where('seller_id', $this->seller->id)->sole()->shipping_fee_minor);
+        $this->assertSame(7000, SellerOrder::query()->where('seller_id', $other->id)->sole()->shipping_fee_minor);
     }
 
     public function test_chk_the_order_records_the_fee_and_weight_it_was_quoted_on(): void
@@ -165,34 +164,32 @@ class CheckoutShippingTest extends TestCase
         $this->post(route('buyer.checkout.store'), $this->formFields($page))->assertRedirect();
 
         $parcel = SellerOrder::query()->sole();
-        $this->assertSame(4900 + 2 * 1500, $parcel->shipping_fee_minor);
+        $this->assertSame(5000 + 2000, $parcel->shipping_fee_minor);
         $this->assertSame(3000, $parcel->parcel_weight_grams);
-        $this->assertSame(20000 + 7900, Order::query()->sole()->total_minor);
+        $this->assertSame(20000 + 7000, Order::query()->sole()->total_minor);
     }
 
     public function test_chk_a_large_subtotal_does_not_beat_the_rate_table(): void
     {
         [, $line] = $this->line(9000, 1, 200.00);
 
-        // 9 kg: first kilo plus 8 additional. Free shipping is a voucher subsidy, never a ₱0 carrier fee.
-        $this->assertSame(4900 + 8 * 1500, $this->openCheckout([$line])->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
+        // 9 kg: the first 2 kg plus 7 additional. Free shipping is a voucher subsidy, never a ₱0 carrier fee.
+        $this->assertSame(5000 + 7 * 2000, $this->openCheckout([$line])->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
     }
 
-    public function test_chk_cross_province_adds_its_per_kilo_rate_only_when_configured(): void
+    public function test_chk_cross_province_uses_the_same_fixed_fee(): void
     {
         $service = new CheckoutCarrierService;
         $fee = new \ReflectionMethod($service, 'crossProvinceFeeMinor');
         $carrier = LogisticsProvider::factory()->create();
 
+        // The old cross-province settings no longer change the price.
         config(['buyer.cross_province' => ['fee_minor' => 12000, 'additional_kg_minor' => 3000]]);
-        $this->assertSame(12000, $fee->invoke($service, $carrier, 10000, 1000));
-        $this->assertSame(12000 + 2 * 3000, $fee->invoke($service, $carrier, 10000, 2100));
+        $this->assertSame(5000, $fee->invoke($service, $carrier, 10000, 1000));
+        $this->assertSame(5000 + 2000, $fee->invoke($service, $carrier, 10000, 2100));
 
-        config(['buyer.cross_province' => ['fee_minor' => 12000, 'additional_kg_minor' => 0]]);
-        $this->assertSame(12000, $fee->invoke($service, $carrier, 10000, 2100));
-
-        config(['buyer.cross_province' => ['fee_minor' => null, 'additional_kg_minor' => 3000]]);
-        $this->assertNull($fee->invoke($service, $carrier, 10000, 2100));
+        config(['buyer.cross_province' => ['fee_minor' => null, 'additional_kg_minor' => 0]]);
+        $this->assertSame(5000 + 2000, $fee->invoke($service, $carrier, 10000, 2100));
     }
 
     public function test_chk_an_unserviceable_address_disables_place_order_and_the_server_agrees(): void
@@ -348,10 +345,10 @@ class CheckoutShippingTest extends TestCase
         $this->assertSame(0, Order::query()->count());
         $this->assertFalse(CheckoutToken::query()->where('token', $fields['checkout_token'])->sole()->used);
 
-        $confirmed = $this->get($return)->assertOk()->assertSee('A product price changed')->assertSee('₱299.00');
+        $confirmed = $this->get($return)->assertOk()->assertSee('A product price changed')->assertSee('₱300.00');
         $this->post(route('buyer.checkout.store'), $this->formFields($confirmed))->assertRedirect();
 
-        $this->assertSame(29900, Order::query()->sole()->total_minor);
+        $this->assertSame(30000, Order::query()->sole()->total_minor);
     }
 
     public function test_chk_a_shipping_rate_change_preserves_the_rate_of_an_open_checkout(): void
@@ -359,14 +356,14 @@ class CheckoutShippingTest extends TestCase
         [, $line] = $this->line(500);
         $fields = $this->formFields($this->openCheckout([$line]));
 
-        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 7500]);
+        config(['buyer.shipping_fee.base_minor' => 7500]);
 
         $this->post(route('buyer.checkout.store'), $fields)
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
         $this->assertSame(1, Order::query()->count());
-        $this->assertSame(4900, SellerOrder::query()->sole()->shipping_fee_minor);
+        $this->assertSame(5000, SellerOrder::query()->sole()->shipping_fee_minor);
     }
 
     public function test_chk_a_voucher_that_expires_during_checkout_is_caught_at_place_order(): void
@@ -388,12 +385,12 @@ class CheckoutShippingTest extends TestCase
         $this->assertSame(0, $voucher->fresh()->times_used);
 
         // The page now shows the full price, and that is what gets ordered.
-        $confirmed = $this->get($return)->assertOk()->assertSee('₱149.00');
+        $confirmed = $this->get($return)->assertOk()->assertSee('₱150.00');
         $this->post(route('buyer.checkout.store'), $this->formFields($confirmed))->assertRedirect();
 
         $order = Order::query()->sole();
         $this->assertSame(0, $order->discount_minor);
-        $this->assertSame(14900, $order->total_minor);
+        $this->assertSame(15000, $order->total_minor);
     }
 
     public function test_chk_a_voucher_used_up_by_someone_else_is_caught_at_place_order(): void
@@ -515,21 +512,27 @@ class CheckoutShippingTest extends TestCase
             'barangay_name' => 'TestBarangay',
         ])->save();
 
-        // Add coverage for this new barangay
-        $station = LogisticsHub::where('logistics_provider_id', $this->checkoutCarrier->id)
+        // Coverage must sit in its Station Hub's own municipality, so Angeles gets its own station.
+        $sanFernando = LogisticsHub::where('logistics_provider_id', $this->checkoutCarrier->id)
             ->where('hub_type', LogisticsHub::STATION)->firstOrFail();
+        $station = $sanFernando->replicate()->fill([
+            'name' => 'Angeles Station',
+            'city_municipality_code' => '030540200',
+            'municipality' => 'Angeles',
+        ]);
+        $station->save();
+        TransportConnection::create([
+            'origin_hub_id' => $sanFernando->id,
+            'destination_hub_id' => $station->id,
+            'transport_mode' => TransportConnection::ROAD,
+            'is_active' => true,
+        ]);
         $this->actingAs($this->checkoutCarrier, 'logistics')
             ->post(route('logistics.areas.store'), [
                 'station_hub_id' => $station->id,
                 'city_municipality_code' => '030540200',
                 'barangay_codes' => ['0305402001'],
             ])->assertSessionHasNoErrors();
-
-        // Ensure SAME_PROVINCE rates exist for this provider
-        LogisticsShippingRate::query()->updateOrCreate(
-            ['logistics_provider_id' => $this->checkoutCarrier->id, 'zone' => 'same_province'],
-            ['first_kg_minor' => 6900, 'additional_kg_minor' => 2000]
-        );
 
         $this->actingAs($this->buyer->fresh(), 'buyer');
         $page = $this->openCheckout([$line]);

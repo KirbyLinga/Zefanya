@@ -194,9 +194,9 @@ class AutomaticBuyerReceiptTest extends TestCase
         $this->assertTrue($result);
         $this->assertSame(OrderStatus::Completed, $this->sellerOrder->fresh()->status);
         $this->assertNotNull($this->sellerOrder->fresh()->commission_finalized_at);
-        $this->assertSame(500, $this->sellerOrder->fresh()->commission_bps);
-        $this->assertSame(400, $this->sellerOrder->fresh()->commission_minor);
-        $this->assertSame(7600, $this->sellerOrder->fresh()->seller_net_minor);
+        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_bps);
+        $this->assertSame(800, $this->sellerOrder->fresh()->commission_minor);
+        $this->assertSame(7200, $this->sellerOrder->fresh()->seller_net_minor);
     }
 
     /** @test */
@@ -360,9 +360,9 @@ class AutomaticBuyerReceiptTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $this->sellerOrder->fresh()->status);
 
         // No duplicate commission records.
-        $this->assertSame(500, $this->sellerOrder->fresh()->commission_bps);
-        $this->assertSame(400, $this->sellerOrder->fresh()->commission_minor);
-        $this->assertSame(7600, $this->sellerOrder->fresh()->seller_net_minor);
+        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_bps);
+        $this->assertSame(800, $this->sellerOrder->fresh()->commission_minor);
+        $this->assertSame(7200, $this->sellerOrder->fresh()->seller_net_minor);
         $this->assertNotNull($this->sellerOrder->fresh()->commission_finalized_at);
     }
 
@@ -422,9 +422,9 @@ class AutomaticBuyerReceiptTest extends TestCase
 
         // Settlement should now have finalized commission.
         $settlement->refresh();
-        $this->assertSame(500, $settlement->commission_bps);
-        $this->assertSame(400, $settlement->commission_minor);
-        $this->assertSame(7600, $settlement->seller_payout_minor);
+        $this->assertSame(1000, $settlement->commission_bps);
+        $this->assertSame(800, $settlement->commission_minor);
+        $this->assertSame(7200, $settlement->seller_payout_minor);
         $this->assertNotNull($settlement->financials_finalized_at);
         $this->assertNull($settlement->pending_reason);
     }

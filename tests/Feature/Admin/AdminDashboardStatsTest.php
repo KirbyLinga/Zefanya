@@ -281,20 +281,16 @@ class AdminDashboardStatsTest extends TestCase
             ->assertDontSee(route('admin.users.index'), false);
     }
 
-    public function test_the_top_bar_shows_the_signed_in_admin_and_no_dead_controls(): void
+    public function test_admin_pages_omit_the_top_bar_and_keep_sidebar_account_controls(): void
     {
         $admin = Admin::factory()->create(['role' => 'moderator', 'name' => 'Rhea Santos']);
 
         $content = $this->actingAs($admin, 'admin')->get(route('admin.users.index'))->assertOk()->getContent();
-        $this->assertSame(1, preg_match('/<header data-admin-topbar.*?<\/header>/s', $content, $bar));
-
-        $this->assertStringContainsString('Rhea Santos', $bar[0]);
-        $this->assertStringContainsString('Moderator', $bar[0]);
-        $this->assertStringContainsString(route('admin.two-factor.show'), $bar[0]);
-        $this->assertStringContainsString(route('admin.logout'), $bar[0]);
-        $this->assertStringNotContainsString('Super Admin', $bar[0]);
-        $this->assertStringNotContainsString('Search accounts', $bar[0]);
-        $this->assertStringNotContainsString('data-lucide="bell"', $bar[0]);
-        $this->assertStringNotContainsString('data-lucide="help-circle"', $bar[0]);
+        $this->assertStringNotContainsString('data-admin-topbar', $content);
+        $this->assertSame(1, preg_match('/<aside id="adminSidebar".*?<\/aside>/s', $content, $sidebar));
+        $this->assertStringContainsString('Rhea Santos', $sidebar[0]);
+        $this->assertStringContainsString('Moderator', $sidebar[0]);
+        $this->assertStringContainsString(route('admin.logout'), $sidebar[0]);
+        $this->assertStringContainsString('id="adminMain"', $content);
     }
 }

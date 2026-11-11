@@ -69,6 +69,25 @@
                 <button type="submit" class="self-end rounded-sm bg-primary-700 px-4 py-2 text-xs text-white">Verify physical handover</button>
             </form>
         @endif
+        @if (\App\Models\Logistics\ParcelReturn::recoveryAvailable())
+            <details class="mt-4 text-xs">
+                <summary class="cursor-pointer font-semibold text-red-800">Wrong item, damaged, or you refuse the parcel?</summary>
+                <form method="POST" action="{{ route('seller.returns.dispute-receipt', $record) }}" enctype="multipart/form-data" class="mt-2 space-y-2" onsubmit="return confirm('Report this problem instead of confirming receipt? An admin will decide; the parcel stays with Logistics.')">@csrf
+                    <label class="block">What is wrong<select name="issue" required class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2">@foreach (\App\Models\Logistics\ParcelReturn::RECEIPT_DISPUTE_ISSUES as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></label>
+                    <label class="block" for="receipt-dispute-{{ $record->id }}">Describe the problem (10–1000 characters)</label>
+                    <textarea id="receipt-dispute-{{ $record->id }}" name="note" required minlength="10" maxlength="1000" rows="2" class="block w-full rounded-sm border border-[var(--border-strong)] p-2"></textarea>
+                    <label class="block">Photos (optional, up to 5 JPG or PNG)<input type="file" name="photos[]" multiple accept=".jpg,.jpeg,.png" class="upload-input"></label>
+                    <button type="submit" class="rounded-sm border border-red-700 px-4 py-2 font-semibold text-red-800">Report problem</button>
+                </form>
+            </details>
+        @endif
+    @elseif ($record->receiptDisputed())
+        <p class="mt-3 text-xs font-semibold text-[var(--text-ink)]">You reported: {{ \App\Models\Logistics\ParcelReturn::RECEIPT_DISPUTE_ISSUES[$record->receipt_dispute_issue] ?? 'a problem' }}. An admin is reviewing it; receipt is not recorded and the parcel stays with Logistics.</p>
+    @elseif ($record->isCancelled())
+        <p class="mt-3 text-xs text-[var(--text-ink)]">{{ $record->closed_by_type === 'buyer' ? 'The buyer cancelled this return before it was collected.' : 'An admin closed this return before it was collected: '.$record->closed_reason }} The buyer keeps the item; your earnings for this order are no longer held by the return.</p>
+    @elseif (in_array($record->status, [\App\Enums\ParcelReturnStatus::Lost, \App\Enums\ParcelReturnStatus::Damaged, \App\Enums\ParcelReturnStatus::Closed], true))
+        <p class="mt-3 text-xs text-[var(--text-ink)]">{{ $record->status->label() }}. {{ $record->closed_reason }}</p>
+        <p class="mt-1 text-xs text-[var(--text-muted)]">Nothing is restocked. An admin decides the refund, who pays and any compensation for the goods.</p>
     @elseif ($record->seller_received_at)
         <p class="mt-3 text-xs text-[var(--text-muted)]">Condition: {{ $record->stock_condition }}. {{ $record->stock_restored_at ? 'Approved stock restoration recorded.' : 'Inventory held for policy or condition review; no automatic restock.' }}</p>
     @elseif ($record->dispute_outcome === \App\Models\Logistics\ParcelReturn::DISPUTE_OVERTURNED)

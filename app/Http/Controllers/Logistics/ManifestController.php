@@ -11,6 +11,8 @@ use App\Models\Logistics\ManifestItem;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelLossService;
+use App\Services\Logistics\TransferCourierService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -135,12 +137,24 @@ class ManifestController extends Controller
 
         $items = $this->visibleItems($manifest);
         $counts = $this->manifests->counts($manifest);
+        $needsRecovery = $manifest->status === ManifestStatus::Cancelled && $manifest->dispatched_at !== null;
+        $recoveryHubs = $needsRecovery ? $this->manifests->recoveryHubs($manifest) : collect();
+        $recoveryHub = $recoveryHubs->firstWhere('id', $request->integer('hub')) ?? $recoveryHubs->first();
 
         return view('Logistics.Manifests.show', [
             'provider' => $provider,
             'manifest' => $manifest,
             'items' => $items,
             'counts' => $counts,
+            'recoveryHubs' => $recoveryHubs,
+            'recoveryHub' => $recoveryHub,
+            'awaitingRecovery' => $needsRecovery ? $items->filter->awaitsRecovery()->count() : 0,
+            'transportAvailable' => TransferCourierService::available(),
+            'transportCourier' => TransferCourierService::available() ? $manifest->transferCourier()->first() : null,
+            'transportCandidates' => $manifest->status === ManifestStatus::Draft
+                ? app(TransferCourierService::class)->couriersFor($provider, activeOnly: true)
+                : collect(),
+            'transportHistory' => app(TransferCourierService::class)->historyFor($manifest),
             'eligibleParcels' => $manifest->status === ManifestStatus::Draft
                 ? $this->manifests->eligibleParcels($manifest)
                 : collect(),
@@ -202,16 +216,19 @@ class ManifestController extends Controller
 
         $data = $request->validate([
             'tracking_number' => ['required', 'string', 'max:64'],
-            'phase' => ['nullable', Rule::in([ManifestService::PHASE_DISPATCH, ManifestService::PHASE_RECEIVE])],
+            'phase' => ['nullable', Rule::in([ManifestService::PHASE_DISPATCH, ManifestService::PHASE_RECEIVE, ManifestService::PHASE_RECOVER])],
+            'hub' => ['nullable', 'integer'],
             'method' => ['nullable', Rule::in([
                 ParcelHandoffVerification::METHOD_CAMERA,
                 ParcelHandoffVerification::METHOD_MANUAL,
             ])],
         ]);
 
-        $phase = $data['phase'] ?? ($manifest->status === ManifestStatus::Dispatched
-            ? ManifestService::PHASE_RECEIVE
-            : ManifestService::PHASE_DISPATCH);
+        $phase = $data['phase'] ?? match ($manifest->status) {
+            ManifestStatus::Dispatched => ManifestService::PHASE_RECEIVE,
+            ManifestStatus::Cancelled => ManifestService::PHASE_RECOVER,
+            default => ManifestService::PHASE_DISPATCH,
+        };
 
         try {
             return response()->json($this->manifests->verifyScan(
@@ -220,6 +237,7 @@ class ManifestController extends Controller
                 (string) $data['tracking_number'],
                 (string) $phase,
                 (string) ($data['method'] ?? ParcelHandoffVerification::METHOD_MANUAL),
+                isset($data['hub']) ? (int) $data['hub'] : null,
             ));
         } catch (ValidationException $e) {
             return response()->json([
@@ -315,7 +333,7 @@ class ManifestController extends Controller
 
         return redirect()
             ->route('logistics.manifests.index')
-            ->with('success', 'Draft manifest deleted. All parcels have been released.');
+            ->with('success', 'Draft batch #'.$manifest->id.' deleted. It never left the hub, so its parcels are back in the sending hub\'s queue.');
     }
 
     public function cancel(Request $request, Manifest $manifest): RedirectResponse
@@ -331,7 +349,72 @@ class ManifestController extends Controller
 
         return redirect()
             ->route('logistics.manifests.show', $manifest)
-            ->with('success', 'Manifest cancelled. All parcels have been released and custody remains at the origin hub.');
+            ->with('success', 'Batch cancelled. Its parcels had already left the hub, so each one stays held as an exception until it is scanned at a hub below.');
+    }
+
+    /** A verified recovery scan for one parcel of a batch cancelled after dispatch. */
+    public function recover(Request $request, Manifest $manifest, ManifestItem $item): RedirectResponse|JsonResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+        abort_unless((int) $item->manifest_id === (int) $manifest->id, 404);
+
+        $data = $request->validate([
+            'verification_token' => ['required', 'string', 'max:128'],
+            'hub' => ['required', 'integer'],
+        ]);
+
+        $recovered = $this->manifests->recoverItem($manifest, $item, $provider, (string) $data['verification_token'], (int) $data['hub'], $request);
+        $message = $recovered->tracking_number.' recorded at '.($recovered->recoveredHub?->name ?? 'the hub').'. Resolve its exception to resume or reroute it.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'redirect' => route('logistics.manifests.show', $manifest)]);
+        }
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success', $message);
+    }
+
+    /**
+     * The sending company reports several parcels of a dispatched batch missing
+     * together. Each becomes its own exception, all or none. Custody does not change.
+     */
+    public function reportMissing(Request $request, Manifest $manifest): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+        $data = $request->validate([
+            'seller_order_ids' => ['required', 'array', 'min:1', 'max:'.ParcelLossService::MAX_BULK],
+            'seller_order_ids.*' => ['integer'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $incidents = app(ParcelLossService::class)->reportMissingTogether('manifest', (int) $manifest->id, $provider, $data['seller_order_ids'], $data['reason']);
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success',
+            $incidents->count().' '.str('parcel')->plural($incidents->count()).' reported missing together. Admin reviews each one. They stay in your custody until a verified scan or an Admin decision.');
+    }
+
+    /** The sending company names which of its Couriers carries this draft batch. */
+    public function assignTransport(Request $request, Manifest $manifest): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+
+        $data = $request->validate([
+            'transfer_courier_id' => ['required', 'integer'],
+            'transport_vehicle_type' => ['nullable', 'string', 'max:20'],
+            'transport_plate_number' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        $updated = app(TransferCourierService::class)->assignToManifest(
+            $manifest, $provider, (int) $data['transfer_courier_id'],
+            $data['transport_vehicle_type'] ?? null, $data['transport_plate_number'] ?? null, $request,
+        );
+        $name = $updated->transferCourier?->name ?? 'The Courier';
+
+        return redirect()
+            ->route('logistics.manifests.show', $manifest)
+            ->with('success', $name.' will carry this batch. Custody still moves only when the receiving hub scans each parcel.');
     }
 
     private function provider(Request $request): LogisticsProvider
@@ -349,11 +432,17 @@ class ManifestController extends Controller
      */
     private function visibleItems(Manifest $manifest)
     {
+        // A batch cancelled after dispatch keeps showing every parcel that left
+        // with it, because each one still needs a recovery scan.
+        $leftTheHub = $manifest->status === ManifestStatus::Cancelled && $manifest->dispatched_at !== null;
+
         return $manifest->items()
-            ->where(function ($q): void {
+            ->unless($leftTheHub, fn ($items) => $items->where(function ($q): void {
                 $q->whereNotNull('received_at')->orWhereNull('released_at');
-            })
+            }))
             ->with([
+                'manifest',
+                'recoveredHub',
                 'sellerOrder.order.buyer',
                 'sellerOrder.seller',
                 'sellerOrder.orderItems',

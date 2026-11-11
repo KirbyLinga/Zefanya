@@ -25,7 +25,7 @@ class VoucherController extends Controller
         return $this->listing(openCreateVoucher: true);
     }
 
-    private function listing(bool $openCreateVoucher = false): View
+    private function listing(bool $openCreateVoucher = false, ?Voucher $editVoucher = null): View
     {
         $vouchers = Voucher::query()
             ->whereIn('scope', [VoucherScope::Platform->value, VoucherScope::Shipping->value])
@@ -33,10 +33,11 @@ class VoucherController extends Controller
             ->latest('id')
             ->paginate(20);
 
-        return view($openCreateVoucher ? 'Admin.Vouchers.create' : 'Admin.Vouchers.index', [
+        return view($editVoucher ? 'Admin.Vouchers.edit' : ($openCreateVoucher ? 'Admin.Vouchers.create' : 'Admin.Vouchers.index'), [
             'vouchers' => $vouchers,
             'products' => $this->products()->load('images:id,product_id,path,thumbnail_path,is_primary,sort_order'),
             'openCreateVoucher' => $openCreateVoucher,
+            'editVoucher' => $editVoucher,
         ]);
     }
 
@@ -70,10 +71,7 @@ class VoucherController extends Controller
             return to_route('admin.vouchers.index')->withErrors(['voucher' => 'This voucher has ended and can no longer be edited.']);
         }
 
-        return view('Admin.Vouchers.edit', [
-            'voucher' => $voucher->load('products:id'),
-            'products' => $this->products(),
-        ]);
+        return $this->listing(editVoucher: $voucher->load('products:id'));
     }
 
     public function update(AdminVoucherRequest $request, Voucher $voucher, AdminVoucherService $vouchers): RedirectResponse

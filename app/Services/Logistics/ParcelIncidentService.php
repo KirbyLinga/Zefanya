@@ -11,6 +11,7 @@ use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ManifestItem;
 use App\Models\Logistics\ParcelHandoff;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Logistics\ParcelRouteRereoute;
 use App\Models\Rider\Rider;
 use App\Models\Shared\IncidentEvents;
@@ -78,6 +79,7 @@ class ParcelIncidentService
                 if ($parcel->handover_at === null || $pickup === null
                     || ! in_array($parcel->status, [
                         OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted,
+                        OrderStatus::InTransit, OrderStatus::ArrivedAtHub,
                         OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed,
                     ], true)) {
                     throw ValidationException::withMessages([
@@ -400,7 +402,8 @@ class ParcelIncidentService
                 abort(403, 'Only Admin can close or return a lost/damaged parcel.');
             }
 
-            if (($action === 'CLOSE_LOST' && strtolower($locked->type) !== 'lost')
+            $lossTypes = ParcelLossService::available() ? ['lost', 'missing', 'failed_transfer'] : ['lost'];
+            if (($action === 'CLOSE_LOST' && ! in_array(strtolower($locked->type), $lossTypes, true))
                 || ($action === 'CLOSE_DAMAGED' && strtolower($locked->type) !== 'damaged')) {
                 throw ValidationException::withMessages(['resolution' => 'The closure must match the reported incident type.']);
             }
@@ -434,6 +437,15 @@ class ParcelIncidentService
                 }
 
                 throw ValidationException::withMessages(['resolution' => 'This exception has already been resolved.']);
+            }
+
+            // A parcel from a transfer cancelled after it left its hub has no
+            // verified location. Its route cannot resume until a hub scans it.
+            if (in_array($action, ['RESUME', self::RESUME, self::REROUTE], true)
+                && (app(ManifestService::class)->awaitingRecovery($parcel) || app(ParcelHandoffService::class)->awaitingRecovery($parcel))) {
+                throw ValidationException::withMessages([
+                    'resolution' => 'Scan this parcel at a hub from its cancelled transfer first. Its location must be verified before its route can resume or change.',
+                ]);
             }
 
             if (in_array($action, ['RESUME', self::RESUME], true)
@@ -490,6 +502,26 @@ class ParcelIncidentService
                 ParcelIncidentStatus::Resolved->value,
                 ['reason' => $validated['reason'], 'context' => $context],
             );
+
+            // A parcel lost or damaged on its way back closes its return, not the
+            // delivered order. It rolls back with this resolution on any refusal.
+            if (in_array($action, ['CLOSE_LOST', 'CLOSE_DAMAGED'], true) && $actor instanceof Admin && $parcel->hasActiveReturn()) {
+                if (! ParcelLossService::available() || ! ParcelReturn::recoveryAvailable()) {
+                    throw ValidationException::withMessages(['resolution' => 'Closing a return as lost or damaged needs the pending database update.']);
+                }
+                app(ParcelLossService::class)->finalizeReturnLoss($parcel, $locked, $actor, $action === 'CLOSE_LOST' ? 'lost' : 'damaged',
+                    $validated['reason'], isset($context['liable_provider_id']) ? (int) $context['liable_provider_id'] : null);
+                $this->closeSiblingIncidents($locked, $parcel, $actor, $validated['reason'], $action);
+            } elseif ($action === 'CLOSE_LOST' && $actor instanceof Admin && ParcelLossService::available()) {
+                // Confirming a loss closes the parcel, fixes liability and the Seller
+                // compensation, and notifies Buyer, Seller and Logistics. It rolls
+                // back with this resolution if the parcel cannot be closed as lost.
+                app(ParcelLossService::class)->finalize($parcel, $locked, $actor, $validated['reason'],
+                    isset($context['liable_provider_id']) ? (int) $context['liable_provider_id'] : null);
+                $this->closeSiblingIncidents($locked, $parcel, $actor, $validated['reason'], $action);
+
+                return;
+            }
 
             if (in_array($action, ['RESUME', self::RESUME], true) && ! self::movementBlockers($parcel)->exists()
                 && app(ParcelLegService::class)->isReadyForNextLeg($parcel)) {
@@ -604,6 +636,73 @@ class ParcelIncidentService
         }
 
         return true;
+    }
+
+    /**
+     * A verified recovery scan after a cancelled transfer. The exception stays
+     * open: recovering proves where the parcel is, and an authorized resume or
+     * reroute decision still decides where it goes next.
+     */
+    public function recordCancelledTransferRecovery(SellerOrder $parcel, ManifestItem $item, LogisticsHub $hub, int $providerId): void
+    {
+        $incidents = Incidents::query()
+            ->where('incident_seller_order_id', $parcel->id)
+            ->where('type', ParcelIncidentType::FailedTransfer->value)
+            ->whereIn('status', [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value])
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($incidents as $incident) {
+            if ($incident->events()->where('event', 'recovery_received')->where('metadata->manifest_item_id', $item->id)->exists()) {
+                continue;
+            }
+            $this->event($incident, 'recovery_received', 'Recovered at '.$hub->name,
+                'A verified scan recorded the parcel at '.$hub->name.' after its transfer batch was cancelled. It stays held for an authorized route decision.',
+                'logistics_provider', $providerId, $incident->status->value, $incident->status->value,
+                ['manifest_id' => $item->manifest_id, 'manifest_item_id' => $item->id, 'hub_id' => $hub->id]);
+        }
+    }
+
+    /** A parcel confirmed lost or damaged has no other open exception: close them with the same decision. */
+    private function closeSiblingIncidents(Incidents $resolved, SellerOrder $parcel, Admin $admin, string $reason, string $resolution): void
+    {
+        $resolution = in_array($resolution, ['CLOSE_LOST', 'CLOSE_DAMAGED'], true) ? $resolution : 'CLOSE_LOST';
+        // Find the ids with a plain read, then lock exactly those rows by key (no secondary-index range locks).
+        $ids = Incidents::query()
+            ->where('incident_seller_order_id', $parcel->id)
+            ->whereKeyNot($resolved->id)
+            ->whereIn('status', [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value])
+            ->pluck('id');
+        Incidents::query()->whereKey($ids->all())->orderBy('id')->lockForUpdate()->get()
+            ->each(function (Incidents $other) use ($resolved, $admin, $reason, $resolution): void {
+                $from = $other->status->value;
+                $other->forceFill([
+                    'status' => ParcelIncidentStatus::Resolved, 'resolution' => $resolution,
+                    'resolved_at' => now(), 'resolved_by_type' => 'admin', 'resolved_by_id' => $admin->id,
+                ])->save();
+                $this->event($other, 'resolved', 'Exception resolved: '.$resolution, $resolution, 'admin', $admin->id,
+                    $from, ParcelIncidentStatus::Resolved->value, ['reason' => $reason, 'context' => ['closed_with_incident' => $resolved->id]]);
+            });
+    }
+
+    public function recordCancelledHandoffRecovery(SellerOrder $parcel, ParcelHandoff $handoff, LogisticsHub $hub, int $providerId): void
+    {
+        $incidents = Incidents::query()
+            ->where('incident_seller_order_id', $parcel->id)
+            ->where('type', ParcelIncidentType::FailedTransfer->value)
+            ->whereIn('status', [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value])
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($incidents as $incident) {
+            if ($incident->events()->where('event', 'recovery_received')->where('metadata->parcel_handoff_id', $handoff->id)->exists()) {
+                continue;
+            }
+            $this->event($incident, 'recovery_received', 'Recovered at '.$hub->name,
+                'A verified scan recorded the parcel back at '.$hub->name.' after its handoff was cancelled. It stays held for an authorized route decision.',
+                'logistics_provider', $providerId, $incident->status->value, $incident->status->value,
+                ['parcel_handoff_id' => $handoff->id, 'hub_id' => $hub->id]);
+        }
     }
 
     public function hasOpenIncident(SellerOrder $parcel): bool

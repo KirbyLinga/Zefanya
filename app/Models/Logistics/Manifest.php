@@ -41,7 +41,15 @@ class Manifest extends Model
             'dispatched_at' => 'datetime',
             'received_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'transport_required' => 'boolean',
+            'transport_assigned_at' => 'datetime',
         ];
+    }
+
+    /** The sending company's Courier who carries this batch. */
+    public function transferCourier(): BelongsTo
+    {
+        return $this->belongsTo(TransferCourier::class, 'transfer_courier_id');
     }
 
     public function provider(): BelongsTo

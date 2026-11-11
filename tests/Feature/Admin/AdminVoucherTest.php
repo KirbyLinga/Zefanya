@@ -161,14 +161,14 @@ class AdminVoucherTest extends TestCase
         $this->getJson(route('admin.vouchers.code-availability'))->assertUnprocessable()->assertJsonValidationErrors('code');
     }
 
-    public function test_admin_code_availability_requires_admin_authentication_and_two_factor_enrolment_when_enforced(): void
+    public function test_admin_code_availability_requires_admin_authentication_without_two_factor_enforcement(): void
     {
         $url = route('admin.vouchers.code-availability', ['code' => 'TEST123']);
         $this->getJson($url)->assertUnauthorized();
         $this->actingAs(Seller::factory()->create(['status' => 'approved']), 'seller')->getJson($url)->assertUnauthorized();
         $this->actingAs(Buyer::factory()->create(), 'buyer')->getJson($url)->assertUnauthorized();
         config(['admin.require_two_factor' => true]);
-        $this->actingAs($this->admin(), 'admin')->getJson($url)->assertRedirect(route('admin.two-factor.show'));
+        $this->actingAs($this->admin(), 'admin')->getJson($url)->assertOk()->assertExactJson(['available' => true]);
 
         $enrolled = Admin::factory()->superAdmin()->create(['two_factor_secret' => 'TESTENROLLEDSECRET', 'two_factor_confirmed_at' => now()]);
         $this->actingAs($enrolled, 'admin')->getJson($url)->assertOk()->assertExactJson(['available' => true]);
@@ -253,6 +253,34 @@ class AdminVoucherTest extends TestCase
         $this->assertSame(Voucher::FUNDING_SELLER, $shop->fresh()->funding_source);
     }
 
+    public function test_edit_opens_over_the_directory_and_retains_a_rejected_draft(): void
+    {
+        $product = Product::factory()->create(['name' => 'Selected edit product']);
+        $voucher = Voucher::factory()->shipping()->create([
+            'code' => 'EDITSHIP', 'type' => VoucherType::Fixed, 'value' => 4999,
+            'applies_to_all_products' => false, 'starts_at' => now()->addDay(), 'expires_at' => now()->addDays(5),
+        ]);
+        $voucher->products()->attach($product);
+        $url = route('admin.vouchers.edit', $voucher);
+        $page = $this->actingAs($this->admin(), 'admin')->get($url)->assertOk()
+            ->assertSee('id="edit-voucher-dialog"', false)->assertSee('Voucher directory')
+            ->assertSee('id="edit-voucher-fixed"', false)->assertSee('value="49.99"', false)
+            ->assertSee('dialog.showModal()', false)->assertSee(route('admin.vouchers.update', $voucher), false);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML($page->getContent());
+        $xpath = new \DOMXPath($dom);
+        $this->assertSame((string) $product->id, $xpath->evaluate('string(//form[@id="edit-voucher-form"]//input[@name="product_ids[]"][@checked]/@value)'));
+
+        $this->from($url)->put(route('admin.vouchers.update', $voucher), $this->payload([
+            '_modal' => 'admin-voucher-edit', 'code' => 'RETRYEDIT', 'percent' => 100,
+        ]))->assertRedirect($url)->assertSessionHasErrors('percent');
+        $this->withCookie(config('session.cookie'), session()->getId())->get($url)->assertOk()
+            ->assertSee('value="RETRYEDIT"', false)->assertSee('id="edit-error-percent"', false)
+            ->assertSee('aria-describedby="edit-error-percent"', false)
+            ->assertSee('data-open="false"', false);
+        $this->assertSame('EDITSHIP', $voucher->fresh()->code);
+    }
+
     public function test_an_unused_voucher_can_be_edited_and_deleted(): void
     {
         $this->actingAs($this->admin(), 'admin')
@@ -291,11 +319,19 @@ class AdminVoucherTest extends TestCase
         $shipment = SellerOrder::factory()->create();
         $shipment->forceFill(['platform_voucher_id' => $voucher->id])->save();
 
-        $this->actingAs($this->admin(), 'admin')
+        $page = $this->actingAs($this->admin(), 'admin')
             ->get(route('admin.vouchers.edit', $voucher))
             ->assertOk()
-            ->assertDontSee('name="code"', false)
+            ->assertDontSee('id="edit-voucher-code"', false)
             ->assertSee('Platform voucher');
+        $dom = new \DOMDocument;
+        @$dom->loadHTML($page->getContent());
+        $xpath = new \DOMXPath($dom);
+        $editable = [];
+        foreach ($xpath->query('//form[@id="edit-voucher-form"]//input[not(@type="hidden")]') as $input) {
+            $editable[] = $input->getAttribute('name');
+        }
+        $this->assertSame(['usage_limit', 'per_buyer_limit', 'expires_at'], $editable);
 
         $this->put(route('admin.vouchers.update', $voucher), $this->payload([
             'code' => 'HACKED',

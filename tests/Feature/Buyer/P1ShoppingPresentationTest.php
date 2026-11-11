@@ -64,7 +64,7 @@ class P1ShoppingPresentationTest extends TestCase
         $buyer = Buyer::factory()->create(['street' => '1 Test Street']);
         $seller = Seller::factory()->create();
         $this->bootstrapCheckoutCarriers($buyer, [$seller]);
-        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 4900]);
+        config(['buyer.shipping_fee.base_minor' => 5000]);
         $product = Product::factory()->create(['seller_id' => $seller->id, 'status' => 'active', 'price' => 100, 'weight_grams' => 500]);
         $variant = $product->variants()->firstOrFail();
         $variant->forceFill(['price' => 100, 'weight_grams' => null])->save();
@@ -75,9 +75,9 @@ class P1ShoppingPresentationTest extends TestCase
         $document = new \DOMDocument;
         @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
         $xpath = new \DOMXPath($document);
-        $this->assertSame("\u{20b1}49.00", trim($xpath->query('//*[@data-checkout-shipping-total]')->item(0)->textContent));
+        $this->assertSame("\u{20b1}50.00", trim($xpath->query('//*[@data-checkout-shipping-total]')->item(0)->textContent));
         $this->assertSame("-\u{20b1}10.00", trim($xpath->query('//*[@data-checkout-shipping-discount]')->item(0)->textContent));
         $this->assertSame("\u{20b1}10.00", trim($xpath->query('//*[@data-checkout-savings]')->item(0)->textContent));
-        $this->assertSame("\u{20b1}139.00", trim($xpath->query('//*[@data-checkout-payable-total]')->item(0)->textContent));
+        $this->assertSame("\u{20b1}140.00", trim($xpath->query('//*[@data-checkout-payable-total]')->item(0)->textContent));
     }
 }

@@ -12,6 +12,7 @@ use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelLegService;
 use App\Services\Logistics\RouteExecutionService;
+use App\Services\Logistics\StuckTransferService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -70,6 +71,8 @@ class ExceptionsController extends Controller
             'exceptions' => $exceptions,
             'status' => $status,
             'types' => ParcelIncidentType::labels(),
+            'overdueTransfers' => app(StuckTransferService::class)->overdueFor((int) $provider->id, 10),
+            'overdueTransferCount' => app(StuckTransferService::class)->countFor((int) $provider->id),
         ]);
     }
 

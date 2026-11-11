@@ -415,6 +415,39 @@ class CheckoutCarrierService
         ];
     }
 
+    /**
+     * Fees for the initial checkout total: the buyer's chosen carrier per
+     * seller when it is offered, otherwise the first offered carrier. Display
+     * only — the order re-validates the real selection (moved from
+     * CheckoutController::defaultShippingFees).
+     *
+     * @param  list<array<string, mixed>>  $carrierOptions
+     * @param  array<int|string, mixed>  $chosen  seller id => provider id
+     * @return array<int, int>
+     */
+    public function defaultFees(array $carrierOptions, array $chosen = []): array
+    {
+        $fees = [];
+
+        foreach ($carrierOptions as $row) {
+            if (! ($row['available'] ?? false)) {
+                continue;
+            }
+
+            $sellerId = (int) $row['seller_id'];
+            $raw = $chosen[$sellerId] ?? $chosen[(string) $sellerId] ?? null;
+            $choice = is_int($raw) || (is_string($raw) && ctype_digit($raw)) ? (int) $raw : 0;
+            $match = collect($row['carriers'])->firstWhere('id', $choice)
+                ?? ($row['carriers'][0] ?? null);
+
+            if ($match !== null) {
+                $fees[$sellerId] = (int) $match['fee_minor'];
+            }
+        }
+
+        return $fees;
+    }
+
     public function allRoutesAvailable(array $options): bool
     {
         foreach ($options as $row) {
@@ -452,7 +485,7 @@ class CheckoutCarrierService
             return null;
         }
 
-        return $rate['first_kg_minor'] + $this->additionalKgFee($rate['additional_kg_minor'], $groupWeightGrams);
+        return self::feeForRate($rate, $groupWeightGrams);
     }
 
     /**
@@ -466,12 +499,21 @@ class CheckoutCarrierService
             && (string) $seller->municipality_code === (string) $buyer->municipality_code;
         $rate = $this->quotedRate($provider, $sameMunicipality ? LogisticsShippingRate::SAME_MUNICIPALITY : LogisticsShippingRate::SAME_PROVINCE, $rateSnapshot);
 
-        return $rate['first_kg_minor'] + $this->additionalKgFee($rate['additional_kg_minor'], $groupWeightGrams);
+        return self::feeForRate($rate, $groupWeightGrams);
     }
 
-    private function additionalKgFee(int $additionalKgMinor, int $groupWeightGrams): int
+    /**
+     * Base fee covers the first included_kg kilos (1 for rate snapshots taken
+     * before the fixed fee), then each further whole kilo is added.
+     * With the defaults: 1-2 kg = ₱50, 3 kg = ₱70, 4 kg = ₱90.
+     *
+     * @param  array{first_kg_minor: int, additional_kg_minor: int, included_kg?: int}  $rate
+     */
+    public static function feeForRate(array $rate, int $groupWeightGrams): int
     {
-        return (self::chargeableKg($groupWeightGrams) - 1) * $additionalKgMinor;
+        $extraKg = max(0, self::chargeableKg($groupWeightGrams) - (int) ($rate['included_kg'] ?? 1));
+
+        return (int) $rate['first_kg_minor'] + $extraKg * (int) $rate['additional_kg_minor'];
     }
 
     /** Capture rates while the caller creates the checkout token in the same transaction. */

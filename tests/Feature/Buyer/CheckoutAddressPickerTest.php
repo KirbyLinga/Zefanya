@@ -130,11 +130,12 @@ class CheckoutAddressPickerTest extends TestCase
 
     public function test_choosing_an_address_shows_it_and_quotes_shipping_for_it(): void
     {
-        $this->assertSame(4900, $this->openCheckout()->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
+        $this->assertSame(5000, $this->openCheckout()->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
 
         $page = $this->openCheckout($this->office);
 
-        $this->assertSame(6900, $page->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
+        // A different municipality pays the same fixed fee.
+        $this->assertSame(5000, $page->viewData('carrierOptions')[0]['carriers'][0]['fee_minor']);
         $this->assertSame('Office Avenue', $page->viewData('deliverTo')->street);
         $this->assertSame((string) $this->office->id, $this->formFields($page)['address_id']);
     }
@@ -159,7 +160,7 @@ class CheckoutAddressPickerTest extends TestCase
         $this->assertSame('030540200', $order->shipping_address['municipality_code']);
         $this->assertStringContainsString('Office Avenue', $order->shipping_address['full']);
         $this->assertSame($this->buyer->fullName(), $order->shipping_address['name']);
-        $this->assertSame(6900, SellerOrder::query()->where('order_id', $order->id)->sole()->shipping_fee_minor);
+        $this->assertSame(5000, SellerOrder::query()->where('order_id', $order->id)->sole()->shipping_fee_minor);
     }
 
     public function test_choosing_an_address_does_not_change_the_profile_or_the_default(): void

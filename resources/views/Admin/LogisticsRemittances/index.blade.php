@@ -21,6 +21,9 @@
 <div class="space-y-6">
     <div>
         <h1 class="font-serif text-3xl text-neutral-950">Settlements</h1>
+        @if ($paymentDetailsMissing ?? false)
+            <p role="alert" data-payment-details-missing class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Logistics companies cannot see where to send payments yet. <a href="{{ route('admin.settings.index') }}#setting-remittance_payment_details" class="font-semibold underline">Add the payment instructions in Platform Settings</a>.</p>
+        @endif
         <p class="mt-2 text-sm text-neutral-600">Logistics companies keep each parcel's shipping fee and send Zefanya the rest of the cash. Confirm each payment only after the money has arrived. Sellers on those parcels can't be paid until you do.</p>
         @if ($originShares['parcels'] > 0)
             <p class="mt-2 text-sm text-neutral-600">On {{ $originShares['parcels'] }} cross-provider {{ \Illuminate\Support\Str::plural('parcel', $originShares['parcels']) }}, the delivering company keeps 60% of the shipping fee and sends the origin carrier's 40% to Zefanya. Of {{ $peso($originShares['shareMinor']) }} in origin shares, Zefanya has received {{ $peso($originShares['receivedMinor']) }} and paid out {{ $peso($originShares['paidMinor']) }}.</p>
@@ -29,7 +32,7 @@
 
     <section aria-labelledby="subsidy-heading" class="space-y-3">
         <h2 id="subsidy-heading" class="font-serif text-xl text-neutral-950">Platform voucher cost</h2>
-        <p class="text-[13px] text-neutral-600">A platform-funded voucher is paid by Zefanya: the seller still gets the full price while the buyer paid less. Compare it with the 5% commission Zefanya earns. Returned orders are left out.</p>
+        <p class="text-[13px] text-neutral-600">A platform-funded voucher is paid by Zefanya: the seller still gets the full price while the buyer paid less. Compare it with the {{ \App\Services\Shared\CommissionFinalizationService::percentLabel() }} commission Zefanya earns. Returned orders are left out.</p>
         <div class="grid gap-4 sm:grid-cols-2">
             @foreach (['This month' => $subsidy['month'], 'All time' => $subsidy['all']] as $label => $figures)
                 <div class="{{ $panel }} p-4">

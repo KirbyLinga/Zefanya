@@ -22,6 +22,21 @@
                 <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request open</p>
                 <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ $returnRecord->sellerDecisionOverdue() ? 'The seller response deadline has passed. Automatic approval is pending.' : 'Waiting for the seller to review your request.' }} Deadline: {{ $returnRecord->seller_response_due_at->copy()->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, Y g:i A') }} Philippine time.</p>
                 <p class="text-xs leading-relaxed text-[var(--text-muted)]">Requests without a decision are approved automatically after 3 days. Your parcel is not on its way back yet.</p>
+            @elseif ($returnRecord->status === \App\Enums\ParcelReturnStatus::Cancelled)
+                <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return cancelled</p>
+                <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ $returnRecord->closed_by_type === 'buyer' ? 'You cancelled this return before it was collected.' : 'An admin closed this return before it was collected.' }} You keep the item, so no refund is due. You can confirm receipt of this shipment.</p>
+                @if ($returnRecord->closed_by_type === 'admin' && $returnRecord->closed_reason)
+                    <p class="text-xs text-[var(--text-muted)]"><span class="font-semibold text-[var(--text-ink)]">Reason:</span> {{ $returnRecord->closed_reason }}</p>
+                @endif
+            @elseif (in_array($returnRecord->status, [\App\Enums\ParcelReturnStatus::Lost, \App\Enums\ParcelReturnStatus::Damaged], true))
+                <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">{{ $returnRecord->status->label() }}</p>
+                <p class="text-xs leading-relaxed text-[var(--text-muted)]">Your returned parcel was {{ $returnRecord->status === \App\Enums\ParcelReturnStatus::Lost ? 'lost' : 'damaged' }} after it was collected from you. You are not responsible for it. Zefanya handles your refund.</p>
+            @elseif ($returnRecord->status === \App\Enums\ParcelReturnStatus::Closed)
+                <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return closed by an admin</p>
+                <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ $returnRecord->closed_reason }}</p>
+            @elseif ($returnRecord->receiptDisputed())
+                <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return under review</p>
+                <p class="text-xs leading-relaxed text-[var(--text-muted)]">The seller reported a problem when the returned parcel was handed over. An admin is reviewing it; the parcel stays with Logistics meanwhile.</p>
             @elseif ($returnRecord->status === \App\Enums\ParcelReturnStatus::Completed)
                 <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return completed</p>
                 <p class="text-xs text-[var(--text-muted)]">The seller has received the parcel. This is a returned shipment, not a completed delivery.</p>
@@ -31,6 +46,9 @@
             @elseif ($returnRecord->awaitingBuyerCollection())
                 <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return request approved</p>
                 <p class="text-xs leading-relaxed text-[var(--text-muted)]">{{ $returnRecord->collection_courier_id ? 'A rider has been assigned to collect the parcel from you.' : 'Awaiting collection arrangements from Logistics. A rider will be assigned to collect the parcel from you; please keep it ready.' }} Your parcel is not on its way back yet.</p>
+                @if ((int) $returnRecord->collection_failed_attempts > 0)
+                    <p class="text-xs leading-relaxed text-[var(--status-warning)]">{{ $returnRecord->collectionEscalated() ? 'The parcel could not be collected after '.$returnRecord->collection_failed_attempts.' tries. An admin will contact you about what happens next.' : 'A rider could not collect the parcel ('.$returnRecord->collection_failed_attempts.' missed '.\Illuminate\Support\Str::plural('try', (int) $returnRecord->collection_failed_attempts).'). Please keep it ready for the next visit.' }}</p>
+                @endif
             @elseif ($returnRecord->status === \App\Enums\ParcelReturnStatus::InTransit || $returnRecord->collectedFromBuyer())
                 <p role="status" class="text-sm font-semibold text-[var(--text-ink)]">Return in progress</p>
                 <p class="text-xs text-[var(--text-muted)]">This parcel is on its way back to the seller.</p>
@@ -43,10 +61,11 @@
             @elseif ($returnRecord->seller_decision === \App\Models\Logistics\ParcelReturn::AUTO_APPROVED)
                 <p class="text-xs text-[var(--text-muted)]">The seller did not answer in time, so your request was approved automatically.</p>
             @endif
-            @if ($returnRecord->isBuyerRequest() && $returnRecord->releasesPendingEarnings() && $returnRecord->status !== \App\Enums\ParcelReturnStatus::Rejected)
+            @if (! $returnRecord->isCancelled() && $returnRecord->isBuyerRequest() && $returnRecord->releasesPendingEarnings() && $returnRecord->status !== \App\Enums\ParcelReturnStatus::Rejected)
                 <p class="text-xs text-[var(--text-muted)]">Your refund covers the item and the original shipping fee. You do not pay for return shipping.</p>
             @endif
-            @if ($returnRecord->refunded_at)
+            @if ($returnRecord->isCancelled())
+            @elseif ($returnRecord->refunded_at)
                 <p class="text-xs font-semibold text-[var(--text-ink)]">Refund recorded.@if ($returnRecord->refund_amount_minor !== null) Amount: &#8369;{{ number_format($returnRecord->refund_amount_minor / 100, 2) }}.@endif @if ($returnRecord->refund_reference) Reference: {{ $returnRecord->refund_reference }}@endif</p>
                 @if ($returnRecord->refund_reason)
                     <p class="text-xs text-[var(--text-muted)]">Why the refund is less than you paid: {{ $returnRecord->refund_reason }}</p>

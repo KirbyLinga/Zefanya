@@ -67,10 +67,10 @@ class OrderController extends Controller
     private function firstComeFirstServed(Builder $query): void
     {
         $prepare = [OrderStatus::Placed->value, OrderStatus::Confirmed->value, OrderStatus::Preparing->value];
-        $finished = [OrderStatus::Delivered->value, OrderStatus::Completed->value, OrderStatus::Returned->value, OrderStatus::Cancelled->value];
+        $finished = [OrderStatus::Delivered->value, OrderStatus::Completed->value, OrderStatus::Returned->value, OrderStatus::Cancelled->value, OrderStatus::Lost->value];
 
         $query->orderByRaw(
-            'CASE WHEN status IN (?, ?, ?) THEN 0 WHEN status IN (?, ?, ?, ?) THEN 2 ELSE 1 END',
+            'CASE WHEN status IN (?, ?, ?) THEN 0 WHEN status IN (?, ?, ?, ?, ?) THEN 2 ELSE 1 END',
             [...$prepare, ...$finished],
         )->orderBy('created_at')->orderBy('id');
     }

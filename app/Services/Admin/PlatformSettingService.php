@@ -19,7 +19,7 @@ class PlatformSettingService
         'platform_name' => ['label' => 'Platform name', 'type' => 'text', 'rules' => ['required', 'string', 'max:100']],
         'contact_email' => ['label' => 'Public contact email', 'type' => 'email', 'rules' => ['required', 'string', 'email', 'max:254']],
         // Display text only: shown to Logistics companies on their Earnings page.
-        'remittance_payment_details' => ['label' => 'Where Logistics companies send payments', 'type' => 'textarea', 'rules' => ['required', 'string', 'max:1000']],
+        'remittance_payment_details' => ['label' => 'Where Logistics companies send payments', 'type' => 'textarea', 'hint' => 'Shown to every Logistics company when it sends Zefanya its cash share. Include the account name, bank or e-wallet, account number, and what to write as the payment reference.', 'rules' => ['required', 'string', 'max:1000']],
         // Pickup windows: 24-hour start-end in Philippine time. Used for parcels marked ready after the change.
         PickupPolicy::SETTING_MORNING => ['label' => 'Morning pickup window', 'type' => 'text', 'hint' => '24-hour, Philippine time, like 08:00-12:00', 'rules' => ['required', 'string', 'regex:/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/']],
         PickupPolicy::SETTING_AFTERNOON => ['label' => 'Afternoon pickup window', 'type' => 'text', 'hint' => '24-hour, Philippine time, like 13:00-17:00', 'rules' => ['required', 'string', 'regex:/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/']],

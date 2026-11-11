@@ -249,8 +249,8 @@ class BuyerVariantFlowTest extends TestCase
         $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $this->storePayload(CheckoutToken::issue($this->buyer->id)->token))->assertSessionMissing('error');
         $this->assertSame($variant->id, OrderItem::query()->sole()->variant_id);
         $this->assertSame(2550, OrderItem::query()->sole()->price_minor);
-        $this->assertSame(10000, Order::query()->sole()->total_minor);
-        $this->assertSame(10000, Payment::query()->sole()->amount_minor);
+        $this->assertSame(10100, Order::query()->sole()->total_minor);
+        $this->assertSame(10100, Payment::query()->sole()->amount_minor);
         $this->assertSame(3, $variant->fresh()->stock_quantity);
         $this->assertSame(3, $product->fresh()->stock_quantity);
     }

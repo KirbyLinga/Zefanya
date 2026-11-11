@@ -73,6 +73,16 @@ class RegistrationController extends Controller
         $approvedCount = $this->countRegistrations(status: 'approved');
         $rejectedCount = $this->countRegistrations(status: 'rejected');
 
+        $suspendedCount = $this->countRegistrations(status: 'suspended');
+        $reviewedStatuses = ['pending', 'approved', 'rejected', 'suspended'];
+        $roleCounts = [
+            'buyer' => Buyer::whereIn('status', $reviewedStatuses)->count(),
+            'seller' => Seller::whereIn('status', $reviewedStatuses)->count(),
+            'logistics' => Schema::hasTable('logistics_providers')
+                ? LogisticsProvider::whereIn('status', $reviewedStatuses)->count()
+                : 0,
+        ];
+
         $pendingTrend = $this->calculateTrend(status: 'pending');
         $approvedTrend = $this->calculateTrend(status: 'approved');
         $rejectedTrend = $this->calculateTrend(status: 'rejected');
@@ -92,6 +102,8 @@ class RegistrationController extends Controller
             'pendingCount' => $pendingCount,
             'approvedCount' => $approvedCount,
             'rejectedCount' => $rejectedCount,
+            'suspendedCount' => $suspendedCount,
+            'roleCounts' => $roleCounts,
             'pendingTrend' => $pendingTrend,
             'approvedTrend' => $approvedTrend,
             'rejectedTrend' => $rejectedTrend,

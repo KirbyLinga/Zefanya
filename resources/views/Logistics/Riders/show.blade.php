@@ -14,6 +14,7 @@
     ])->filter()->implode(', ');
 @endphp
 
+<div data-rider-details>
 <div class="mb-6 flex items-center justify-between gap-4">
     <div>
         <h1 class="font-serif text-2xl text-[var(--text-ink)]">{{ $rider->first_name }} {{ $rider->last_name }}</h1>
@@ -163,5 +164,6 @@
             </section>
         @endif
     </aside>
+</div>
 </div>
 @endsection

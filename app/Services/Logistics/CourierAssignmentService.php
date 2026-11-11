@@ -294,7 +294,7 @@ class CourierAssignmentService
                 return null;
             }
             if ($reserveOnly && $isDestinationProvider
-                && ! in_array($order->status, [OrderStatus::AtSortingCenter, OrderStatus::Sorted], true)) {
+                && ! in_array($order->status, OrderStatus::AT_HUB, true)) {
                 return null;
             }
             if ($rescheduled && (! SellerOrderStatusService::canRetryDelivery($order)
@@ -745,7 +745,7 @@ class CourierAssignmentService
      * blocks them. Coverage, station and weight are still checked by the
      * assignment itself.
      */
-    public function manualRiderBlockReason(?int $courierId, ?int $providerId = null): ?string
+    public function manualRiderBlockReason(?int $courierId, ?int $providerId = null, ?SellerOrder $parcel = null): ?string
     {
         if ($courierId === null) {
             return null;
@@ -761,7 +761,7 @@ class CourierAssignmentService
         return match (true) {
             ! $courier->isEligibleForAssignment() => $name.' cannot take new jobs: the Rider account is suspended, inactive or not yet approved.',
             ! $courier->rider->isOnline() => $name.' is offline and cannot take new jobs. Choose an online Rider.',
-            $courier->isAtJobLimit() => $name.' already has '.Courier::ACTIVE_CAPACITY
+            $courier->isAtJobLimit($parcel) => $name.' already has '.Courier::ACTIVE_CAPACITY
                 .' active jobs, the limit per Rider. Choose another Rider or wait until one is finished.',
             default => null,
         };
@@ -923,12 +923,16 @@ class CourierAssignmentService
                 ->orderByRaw('(active_pickups_count + active_deliveries_count) asc')->orderBy('couriers.rider_id')->orderBy('couriers.id')
                 ->lockForUpdate()->get();
             foreach ($candidates as $courier) {
-                if ($courier->isAtJobLimit()) {
+                // A parcel already reserved for this Rider is part of their
+                // workload and weight; it must not be counted a second time.
+                $alreadyHeld = $courier->holdsActiveJob($sellerOrder);
+                if ($courier->isAtJobLimit($sellerOrder)) {
                     continue;
                 }
                 // Eligibility is cumulative: everything the Rider is already
                 // carrying plus this parcel must fit within their weight limit.
-                if ((int) $courier->active_parcel_weight_grams + $parcelWeight > (int) $courier->max_weight_grams) {
+                $carried = (int) $courier->active_parcel_weight_grams - ($alreadyHeld ? (int) $sellerOrder->parcel_weight_grams : 0);
+                if ($carried + $parcelWeight > (int) $courier->max_weight_grams) {
                     continue;
                 }
                 $rider = Rider::query()->whereKey($courier->rider_id)->lockForUpdate()->first();

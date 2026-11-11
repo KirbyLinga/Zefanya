@@ -50,6 +50,7 @@ class EarningsController extends Controller
                 ->latest('id')->paginate(25, ['*'], 'parcels_page')->withQueryString(),
             'payments' => LogisticsRemittance::query()->where('logistics_provider_id', $provider->getKey())
                 ->latest('id')->paginate(25, ['*'], 'payments_page')->withQueryString(),
+            'parcelBalances' => $remittances->parcelBalances($provider),
         ]);
     }
 

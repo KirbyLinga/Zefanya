@@ -95,7 +95,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $payment = Payment::query()->sole();
         $this->assertSame($discount, $order->discount_minor);
         $this->assertSame($discount, $sellerOrder->voucher_discount_minor);
-        $this->assertSame($summary->totalCentavos + 4900, $order->total_minor);
+        $this->assertSame($summary->totalCentavos + 5000, $order->total_minor);
         $this->assertSame($order->total_minor, $payment->amount_minor);
         $this->assertSame(PaymentMethod::Cod, $payment->method);
         $this->assertSame(PaymentStatus::Pending, $payment->status);
@@ -116,8 +116,8 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $this->assertSame(15, $order->subtotal_minor);
         $this->assertSame(2, $order->discount_minor);
         $this->assertSame(2, (int) $order->sellerOrders()->sum('voucher_discount_minor'));
-        $this->assertSame(9813, $order->total_minor);
-        $this->assertSame(9813, (int) Payment::query()->sum('amount_minor'));
+        $this->assertSame(10013, $order->total_minor);
+        $this->assertSame(10013, (int) Payment::query()->sum('amount_minor'));
     }
 
     public function test_checkout_only_displays_cash_on_delivery(): void
@@ -217,7 +217,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $discount = $price === '125.99' ? 1000 : 0;
         $this->assertSame($minor, $order->subtotal_minor);
         $this->assertSame($discount, $order->discount_minor);
-        $this->assertSame($minor - $discount + 4900, $order->total_minor);
+        $this->assertSame($minor - $discount + 5000, $order->total_minor);
         $this->assertSame($minor, OrderItem::query()->sole()->price_minor);
         $this->assertSame($order->total_minor, Payment::query()->sole()->amount_minor);
     }
@@ -236,10 +236,10 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $order = Order::query()->sole();
         $this->assertSame(5, $order->subtotal_minor);
         $this->assertSame(1, $order->discount_minor);
-        $this->assertSame(9804, $order->total_minor);
+        $this->assertSame(10004, $order->total_minor);
         $this->assertSame(5, (int) $order->sellerOrders()->sum('subtotal_minor'));
         $this->assertSame([3, 2], OrderItem::query()->orderBy('id')->pluck('price_minor')->all());
-        $this->assertSame([4902, 4902], Payment::query()->orderBy('id')->pluck('amount_minor')->all());
+        $this->assertSame([5002, 5002], Payment::query()->orderBy('id')->pluck('amount_minor')->all());
         $this->assertTrue(Payment::query()->get()->every(fn ($payment) => $payment->method === PaymentMethod::Cod));
         $this->assertSame(2, InventoryTransaction::query()->where('reason', 'checkout')->count());
     }

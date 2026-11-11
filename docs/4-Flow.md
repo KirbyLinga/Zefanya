@@ -94,7 +94,7 @@
 
 **Payment:** `payment_method` defaults to `Cod` when absent (`CheckoutController.php:188-189`); only COD is integrated (`PaymentMethod::isIntegrated()`). **Address:** a saved-address confirmation card replaces the old free-text fields; the snapshot includes `postal_code` (`addressSnapshot()` `:514-538`).
 
-**Checkout shipping and re-confirmation:** each carrier's fee comes from its own zone rate in `logistics_shipping_rates`, or `config('buyer.shipping_rates')` (cross-province: `buyer.cross_province`) if it set none, by the shop's total parcel weight rounded up to whole kilos, minimum one. Order value does not waive the fee. A shipping voucher is the only shipping discount, recorded as `shipping_discount_minor` without zeroing the carrier fee. The checkout page submits fingerprints of unit prices, shipping fees and vouchers. If any differ at Place Order, or a voucher stopped applying, `store` places nothing and returns to the checkout page with the new total; the token stays unused, so the buyer confirms once more. `placeOrder` re-checks prices, vouchers and fees under lock and stops the same way. Each shop can receive a note up to 200 characters (`seller_orders.buyer_note`).
+**Checkout shipping and re-confirmation:** every carrier and route charges the marketplace fee `config('buyer.shipping_fee')`: ₱50 covers the first 2 kg of the shop's total parcel weight, then ₱20 per extra kilo, weight rounded up to whole kilos. Company rate cards in `logistics_shipping_rates` no longer change the fee. The fee is captured when checkout opens, so a later change applies only to new checkouts. Order value does not waive the fee. A shipping voucher is the only shipping discount, recorded as `shipping_discount_minor` without zeroing the carrier fee. The checkout page submits fingerprints of unit prices, shipping fees and vouchers. If any differ at Place Order, or a voucher stopped applying, `store` places nothing and returns to the checkout page with the new total; the token stays unused, so the buyer confirms once more. `placeOrder` re-checks prices, vouchers and fees under lock and stops the same way. Each shop can receive a note up to 200 characters (`seller_orders.buyer_note`).
 
 **Checkout address picker:** checkout quotes fees and coverage for the address chosen from `buyer_addresses` (default first; `?address=` reloads the page so the server re-quotes). `BuyerAddressBook::deliveringTo()` lays that address over an unsaved copy of the buyer, so choosing never changes the profile or the default. Place Order refuses an id the buyer does not own, re-reads the row under the buyer lock, and stops if the address changed since the page loaded. `orders.shipping_address` is the only destination an order reads afterwards, so later edits or deletes leave orders and waybills alone. A buyer with no saved rows checks out with the profile address.
 
@@ -181,7 +181,7 @@
 - **Who pays.** Approval (by the Seller, by auto-approval, by an overturned dispute, or at refund time) sets `parcel_returns.fault_party = seller` and freezes `return_shipping_fee_minor` at the original `shipping_fee_minor`. Admin can switch the fault to `logistics` (damaged in transit) with a note until the refund is recorded. A buyer reason of "Other" blocks the refund until Admin decides.
 - **Refund.** Admin records it on `/admin/returns`. A refund smaller than what the buyer paid needs a reason (`refund_reason`), which the buyer and the Seller see.
 - **Voiding a refund.** A failed transfer is voided (`ParcelReturnService::voidRefund`). The original stays in the return events as `refund_voided[_n]` and in the operations audit log. The refund reopens, and the buyer sees that it is being sent again.
-- **Seller money.** `SellerSettlementService::returnBreakdown()` works it out. The refund comes off the item amount first, and the Seller keeps the rest less 5% commission. Refunded original shipping and the return trip are charged on top. A shortfall becomes a `seller_debts` row (`return_charges`, or `return_after_payout` if already paid). With a Logistics fault, the Seller keeps everything.
+- **Seller money.** `SellerSettlementService::returnBreakdown()` works it out. The refund comes off the item amount first, and the Seller keeps the rest less commission at the order's saved rate (10%, or 5% for orders finalized before 2026-11-08). Refunded original shipping and the return trip are charged on top. A shortfall becomes a `seller_debts` row (`return_charges`, or `return_after_payout` if already paid). With a Logistics fault, the Seller keeps everything.
 - **Logistics money.** `ReturnChargeService::sync()` writes `logistics_return_charges`:
   - `transit_damage_refund`: the delivering company repays the refund to Zefanya.
   - `return_trip`: when a Seller-fault return completes, Zefanya pays the company whose rider collected it.
@@ -219,7 +219,7 @@ Stat cards (pending/approved/rejected) are **unfiltered**; trends compare the la
 | User accounts | **Implemented (minimal)** | `UserAccountController` — list approved/suspended; suspend / reactivate (mail notice) |
 | Seller compliance | **Placeholder** | sidebar "Soon" label (no `#` link) |
 | Complaints & disputes | **Placeholder** | sidebar "Soon" |
-| Commissions | Implemented (5%) | `CommissionFinalizationService`; Admin dashboard + Seller Earnings show it |
+| Commissions | Implemented (10%; earlier orders keep 5%) | `CommissionFinalizationService`; Admin dashboard + Seller Earnings show it |
 | Reports | **Placeholder** | sidebar "Soon" |
 | Platform settings | **Placeholder** | sidebar "Soon" |
 | Chat/messaging | **Placeholder** | sidebar "Soon" |
@@ -292,8 +292,20 @@ Participating guards: `['admin','seller','logistics','buyer']`. The unused `web`
 13. **Registration is gated on `approved`.** `EnsureSellerApproved` / `EnsureLogisticsApproved` log out and bounce non-approved users; admin queue only acts on `pending` rows.
 14. **Checkout is single-submit.** A one-time `checkout_tokens` row is claimed inside the transaction (`CheckoutDoubleSubmitTest`).
 15. **Uploaded documents are private.** Stored on the `local` disk and streamed only through the admin-guarded controller with `nosniff`.
+16. **A lost parcel creates one obligation and no ordinary money movement.** Compensation is `seller_orders.subtotal_minor` (merchandise before vouchers, shipping excluded). Confirming it again does not add a case. Stock, COD refunds, commission and Seller earnings stay unchanged.
 
 ---
+
+## 13b. Lost parcels (2026-11-09)
+
+Admin confirms a collected, still-moving parcel lost from an open missing-parcel incident (`ParcelIncidentService` → `ParcelLossService::finalize()`). Only Admin can do that. The parcel becomes `LOST` through `SellerOrderStatusService::recordLoss()`, which is terminal: later scans do not reopen it, and handoff, manifest, delivery, collection and buyer confirmation are refused.
+
+- **Compensation.** One `parcel_loss_cases` row per parcel (unique `seller_order_id`). The amount is the saved `seller_orders.subtotal_minor`: merchandise at checkout, before vouchers, with shipping excluded. It is not the current catalog price, not commission, and not a Zefanya wallet or ZiPay movement. Admin records an off-platform payment once; a later correction is a signed `parcel_loss_adjustments` row. The paid amount itself is never edited.
+- **Custody.** Before the receiver's scan, the sender is liable. After that scan, the receiver is liable. If custody is unclear, Admin names an approved company before anyone can record the payment. A repeated confirmation does not create a second case, history row or notice.
+- **Partial loss.** Confirming one parcel in a batch or a multi-seller order closes only that parcel. The others keep moving.
+- **Money left untouched.** No stock is restored. The pending COD payment is marked cancelled, and no COD refund, remittance, commission or Seller earning is created. Platform position, Seller balance and Logistics statements do not move.
+- **Buyer list.** `LOST` is included in the Buyer's Cancelled tab for now. The badge says "Lost — Shipment issue". A buyer cancellation still says "Cancelled by Buyer"; a lost parcel does not.
+- **Overdue is not lost.** `transfers:flag-overdue` (every 15 minutes) warns the sending company once, then Admin once. SEA is 72 hours, AIR is 48, and ROAD uses `TRANSFER_OVERDUE_AFTER_HOURS` (default 24). Admin is told 24 hours after the transfer is already overdue (`TRANSFER_ESCALATE_AFTER_HOURS`). Nothing is marked lost.
 
 ## 13a. Saved routes, sorting and returns (2026-11-02)
 
@@ -451,7 +463,7 @@ Rider-facing events are database notifications (`App\Notifications\Rider\*`) ren
 
 Additive migrations only: `2026_10_20_190000_create_delivery_proofs_table` and `2026_10_20_190001_add_cod_collection_to_payments_table`. A successful COD delivery also creates a `cod_remittances` row (`PENDING_REMITTANCE`) owed by the Courier to its Logistics company; commission and payout happen later (`CommissionFinalizationService`, `SellerSettlementService`). Coverage: `tests/Feature/Rider` (auth, dashboard, pickups, deliveries, POD/COD and `RiderNotificationsTest`) plus the Rider registration suite.
 
-Rider pay: pickup is paid per seller visit (pickup session): the first parcel collected earns the pickup Courier ₱30 and each other parcel in the same session ₱5; each successful delivery earns the delivery Courier ₱50 (`rider_earnings`, written in `transition()`); failed attempts earn nothing. See "Pickup windows and sessions" for how sessions form. Rates are Platform Settings and are saved on every earning. The company records each payment on Logistics Earnings (`POST /logistics/earnings/riders/{courier}/pay`: reference, date paid, amount checked against the page). It covers every unpaid earning up to the newest one shown, and an earning is never paid twice. The Rider dashboard shows Pending and Paid separately.
+Rider pay: pickup is paid per seller visit (pickup session): the first parcel collected earns the pickup Courier ₱10 and each other parcel in the same session ₱10; each successful delivery earns the delivery Courier ₱30 (defaults since 2026-11-08) (`rider_earnings`, written in `transition()`); failed attempts earn nothing. See "Pickup windows and sessions" for how sessions form. Rates are Platform Settings and are saved on every earning. The company records each payment on Logistics Earnings (`POST /logistics/earnings/riders/{courier}/pay`: reference, date paid, amount checked against the page). It covers every unpaid earning up to the newest one shown, and an earning is never paid twice. The Rider dashboard shows Pending and Paid separately.
 
 Money corrections: when a return is approved or refunded and the Seller was already paid, `SellerSettlementService::releasePendingForReturn` records a `seller_debts` row and leaves the paid settlement as it was. The Seller's next payout requests carry `debt_deducted_minor` until it is repaid; on `Admin > Seller Payouts` the amount to send is the request minus that deduction. The JSON `admin/settlements/*` routes are super-admin only, need a reason, and refuse a Seller who has a debt.
 

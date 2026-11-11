@@ -45,6 +45,30 @@
                         </label>
                         <button type="submit" class="h-9 rounded-sm bg-primary-700 px-4 font-sans text-[11.5px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-primary-800">Confirm collected</button>
                     </form>
+
+                    @if (\App\Models\Logistics\ParcelReturn::recoveryAvailable())
+                        @if ((int) $record->collection_failed_attempts > 0)
+                            <p class="mt-3 font-sans text-[11.5px] text-[var(--status-warning)]">Previous missed {{ \Illuminate\Support\Str::plural('try', (int) $record->collection_failed_attempts) }}: {{ $record->collection_failed_attempts }} of {{ \App\Models\Logistics\ParcelReturn::MAX_COLLECTION_ATTEMPTS }}.</p>
+                        @endif
+                        <details class="mt-3 font-sans text-[11.5px]">
+                            <summary class="cursor-pointer font-semibold text-[var(--text-ink)]">Could not collect it?</summary>
+                            <form method="POST" action="{{ route('rider.return-pickups.failed', $record) }}" class="mt-2 space-y-2">
+                                @csrf
+                                <label class="block text-[var(--text-ink)]">What happened
+                                    <select name="reason" required class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2 text-[12px]">
+                                        <option value="">Choose a reason</option>
+                                        @foreach (\App\Models\Logistics\ParcelReturn::COLLECTION_FAILURE_REASONS as $key => $label)
+                                            <option value="{{ $key }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-[var(--text-ink)]">Notes (required for Other)
+                                    <textarea name="notes" maxlength="500" rows="2" class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] p-2 text-[12px]"></textarea>
+                                </label>
+                                <button type="submit" class="h-9 rounded-sm border border-primary-700 px-4 font-semibold uppercase tracking-[0.5px] text-[var(--link)]">Report missed collection</button>
+                            </form>
+                        </details>
+                    @endif
                 </section>
             @endforeach
         </div>

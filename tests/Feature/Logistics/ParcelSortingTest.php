@@ -11,6 +11,7 @@ use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\CreatesAssignableFleet;
@@ -399,6 +400,37 @@ class ParcelSortingTest extends TestCase
         $so->refresh();
         $this->assertSame(OrderStatus::Sorted, $so->status);
         $this->assertNull($so->delivery_courier_id);
+    }
+
+    public function test_a_parcel_already_reserved_for_the_rider_is_not_counted_twice_against_the_job_limit(): void
+    {
+        $rider = $this->assignableCourier($this->provider, ['service_area' => ['Quezon City'], 'max_weight_grams' => 100000]);
+        for ($i = 0; $i < Courier::ACTIVE_CAPACITY - 1; $i++) {
+            $this->order(OrderStatus::AssignedToRider, null, $rider);
+        }
+        // Auto-reserved for this Rider at SORTED: it is their third counted job.
+        $reserved = $this->sortedParcelAt($rider);
+        $reserved->forceFill(['delivery_courier_id' => $rider->id])->save();
+        $assignment = app(CourierAssignmentService::class);
+        $loaded = Courier::query()->withWorkload()->findOrFail($rider->id);
+
+        $this->assertSame(Courier::ACTIVE_CAPACITY, $loaded->activeWorkload());
+        $this->assertTrue($loaded->holdsActiveJob($reserved->fresh()));
+        $this->assertFalse($loaded->isAtJobLimit($reserved->fresh()));
+        $this->assertNull($assignment->manualRiderBlockReason($rider->id, $this->provider->id, $reserved->fresh()));
+
+        // A genuinely new parcel would be a fourth job and is still refused.
+        $other = $this->sortedParcelAt($rider);
+        $this->assertTrue($loaded->isAtJobLimit($other));
+        $this->assertStringContainsString(Courier::ACTIVE_CAPACITY.' active jobs, the limit per Rider',
+            (string) $assignment->manualRiderBlockReason($rider->id, $this->provider->id, $other));
+
+        // The real assignment confirms the reserved Rider without tripping the limit.
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.parcel-sorting.assignDelivery', $reserved), ['courier_id' => $rider->id])
+            ->assertRedirect()->assertSessionMissing('error');
+        $this->assertSame($rider->id, (int) $reserved->fresh()->delivery_courier_id);
+        $this->assertSame(OrderStatus::AssignedToRider, $reserved->fresh()->status);
     }
 
     // LOG-DISP-007

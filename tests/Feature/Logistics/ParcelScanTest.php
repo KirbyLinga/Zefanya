@@ -165,13 +165,23 @@ class ParcelScanTest extends TestCase
             ])
             ->assertRedirect();
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
         $history = StatusHistory::query()
             ->where('seller_order_id', $parcel->id)
             ->where('to_status', OrderStatus::AtSortingCenter->value)
             ->first();
         $this->assertNotNull($history);
         $this->assertStringContainsString('Verified via camera QR', (string) $history->note);
+
+        // The automatic sort is audited and carries the receipt scan's proof.
+        $sorted = StatusHistory::query()
+            ->where('seller_order_id', $parcel->id)
+            ->where('to_status', OrderStatus::Sorted->value)
+            ->first();
+        $this->assertNotNull($sorted);
+        $this->assertStringContainsString('Sorted automatically on Station Hub receipt.', (string) $sorted->note);
+        $this->assertStringContainsString('Verified via camera QR', (string) $sorted->note);
     }
 
     public function test_station_receipt_without_verification_token_is_rejected(): void
@@ -203,7 +213,7 @@ class ParcelScanTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
 
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), [
@@ -211,13 +221,16 @@ class ParcelScanTest extends TestCase
             ])
             ->assertRedirect();
 
-        $this->assertSame(
-            1,
-            StatusHistory::query()
-                ->where('seller_order_id', $parcel->id)
-                ->where('to_status', OrderStatus::AtSortingCenter->value)
-                ->count(),
-        );
+        // The replayed token neither receives nor sorts a second time.
+        foreach ([OrderStatus::AtSortingCenter, OrderStatus::Sorted] as $status) {
+            $this->assertSame(
+                1,
+                StatusHistory::query()
+                    ->where('seller_order_id', $parcel->id)
+                    ->where('to_status', $status->value)
+                    ->count(),
+            );
+        }
     }
 
     public function test_sort_confirm_after_verify_records_manual_method(): void
@@ -309,15 +322,16 @@ class ParcelScanTest extends TestCase
             ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
             ->assertOk()->json('actions.0.verification_token');
         $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
-            ->assertSessionHas('success', 'Parcel received at the hub. Pickup rider released.');
+            ->assertSessionHas('success', 'Parcel received and sorted for Quezon City. Pickup rider released.');
         $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        // The receipt scan already sorted it, so a rescan points to rider assignment.
         $this->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
             ->assertOk()
-            ->assertJsonPath('message', 'Parcel already received at the hub. You may proceed with sorting.')
-            ->assertJsonPath('actions.0.key', 'sort_parcel');
+            ->assertJsonPath('message', 'Parcel already received and sorted. Assign its delivery rider in Assign deliveries.')
+            ->assertJsonPath('actions.0.key', 'open_assignments');
         $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
             ->assertSessionHas('success', 'Parcel already received at the hub. No status change was made.');
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
         $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
     }
 

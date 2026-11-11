@@ -1,19 +1,14 @@
 @extends('Layouts.logistics')
 
 @section('title', 'Hubs and Stations')
+@section('logistics-toolbar')<span hidden data-logistics-hosted-bell></span>@endsection
 
 @section('content')
+<x-logistics.tabs group="setup" />
 <div data-hubs-page>
-    <header class="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-strong)] pb-6">
-        <div>
-            <p class="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-700">Logistics network</p>
-            <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Hubs and Stations</h1>
-            <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">{{ $provider->business_name }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-            <a href="{{ route('logistics.areas.index') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm border border-[var(--border-strong)] px-3 font-sans text-[11px] font-semibold text-[var(--text-ink)] transition hover:bg-[var(--bg-surface)] focus-visible:outline-2 focus-visible:outline-primary-700"><i data-lucide="map" class="size-3.5"></i>Delivery areas</a>
-        </div>
-    </header>
+    <x-logistics.setup-header title="Hubs and Stations" description="Your Province Hub and the Station Hubs under it, with each station's coverage, riders and parcel inventory.">
+        <a href="{{ route('logistics.areas.index') }}" class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[7px] border border-[var(--border-btn-outline)] bg-[var(--bg-surface)] px-4 font-sans text-xs font-semibold text-[var(--text-ink)] shadow-sm transition hover:bg-[var(--bg-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700"><i data-lucide="map" class="size-4" aria-hidden="true"></i>Delivery areas</a>
+    </x-logistics.setup-header>
 
     <x-logistics-flash :messages="['success', 'warning', 'error']" />
     @if($errors->any())

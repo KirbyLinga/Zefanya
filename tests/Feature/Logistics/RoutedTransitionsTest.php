@@ -18,6 +18,7 @@ use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
 use App\Services\Buyer\CheckoutCarrierService;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffService;
@@ -75,12 +76,62 @@ class RoutedTransitionsTest extends TestCase
         $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
     }
 
-    public function test_local_parcel_can_still_be_sorted_at_its_only_hub(): void
+    public function test_local_parcel_is_sorted_by_its_station_receipt_scan(): void
     {
         $provider = $this->provider('logistics-laguna');
-        $parcel = $this->parcelAtOriginStation('seller-pila', 'buyer-pila', $provider, 'rider-pila');
+        $parcel = $this->parcelAtOriginStation('seller-pila', 'buyer-pila', $provider, 'rider-pila', local: true);
 
-        $this->assertSame(['sort_parcel', 'open_details'], array_column($this->scan($provider, $parcel)['actions'], 'key'));
+        // No second sort scan: a rescan goes straight to rider assignment.
+        $this->assertSame(['open_assignments', 'open_details'], array_column($this->scan($provider, $parcel)['actions'], 'key'));
+    }
+
+    public function test_receipt_sort_never_frees_the_rider_it_dispatched_even_on_retry(): void
+    {
+        $provider = $this->provider('logistics-laguna');
+        $rider = $this->courier('rider-pila');
+        $parcel = $this->parcelAtOriginStation('seller-pila', 'buyer-pila', $provider, 'rider-pila', local: true);
+
+        // The Pila rider collected the parcel and the sort dispatched the same rider to deliver it.
+        $this->assertSame($rider->id, (int) $parcel->fresh()->delivery_courier_id);
+        $this->assertFalse((bool) $rider->fresh()->is_available);
+
+        $this->actingAs($provider, 'logistics')->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
+            ->assertSessionHas('success', 'Parcel already received at the hub. No status change was made.');
+
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertSame($rider->id, (int) $parcel->fresh()->delivery_courier_id);
+        $this->assertFalse((bool) $rider->fresh()->is_available);
+        $this->assertSame(1, StatusHistory::query()->where('seller_order_id', $parcel->id)->where('to_status', OrderStatus::Sorted->value)->count());
+    }
+
+    public function test_parcel_that_still_needs_a_transfer_is_not_sorted_by_its_receipt(): void
+    {
+        $provider = $this->provider('logistics-laguna');
+        $parcel = $this->parcelAtOriginStation('seller-lumban', 'buyer-pila', $provider, 'rider-lumban');
+
+        $this->assertSame(0, StatusHistory::query()->where('seller_order_id', $parcel->id)->where('to_status', OrderStatus::Sorted->value)->count());
+        $scan = $this->scan($provider, $parcel);
+        $this->assertSame('transfer', $scan['context']);
+        $this->assertStringContainsString('Pila Station Hub', $scan['message']);
+    }
+
+    public function test_receipt_without_a_valid_scan_neither_receives_nor_sorts(): void
+    {
+        $provider = $this->provider('logistics-laguna');
+        $parcel = $this->placeOrder('seller-pila', 'buyer-pila', $provider);
+        $this->actingAs($this->account(Seller::class, 'seller-pila'), 'seller')->post(route('seller.orders.accept', $parcel));
+        $this->post(route('seller.orders.pack', $parcel));
+        $this->post(route('seller.orders.markReady', $parcel));
+        $this->post(route('rider.pickups.confirm', $parcel), ['verification_token' => $this->riderToken($this->courier('rider-pila'), $parcel)])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => 'forged'])
+            ->assertSessionHasErrors('verification_token');
+
+        $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
+        $this->assertSame(0, StatusHistory::query()->where('seller_order_id', $parcel->id)
+            ->whereIn('to_status', [OrderStatus::AtSortingCenter->value, OrderStatus::Sorted->value])->count());
     }
 
     public function test_parcel_travels_through_an_intermediate_provider_with_no_direct_partnership(): void
@@ -211,9 +262,7 @@ class RoutedTransitionsTest extends TestCase
     public function test_admin_cannot_authorize_a_reverse_route_for_a_parcel_that_never_changed_provider(): void
     {
         $provider = $this->provider('logistics-laguna');
-        $parcel = $this->parcelAtOriginStation('seller-pila', 'buyer-pila', $provider, 'rider-pila');
-        $scan = $this->scan($provider, $parcel);
-        $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $scan['actions'][0]['verification_token']]);
+        $parcel = $this->parcelAtOriginStation('seller-pila', 'buyer-pila', $provider, 'rider-pila', local: true);
         $return = $this->failTwice($provider, $parcel, 'rider-pila');
 
         $this->expectException(ValidationException::class);
@@ -242,7 +291,7 @@ class RoutedTransitionsTest extends TestCase
         $parcel = $this->placeOrder('seller-pila', 'buyer-pila', $provider);
 
         $this->actingAs($this->account(Buyer::class, 'buyer-pila'), 'buyer')->get(route('buyer.orders.show', $parcel->order))->assertOk()
-            ->assertSeeInOrder(['Subtotal', '₱500.00', 'Shipping', '₱49.00', 'Total', '₱549.00']);
+            ->assertSeeInOrder(['Subtotal', '₱500.00', 'Shipping', '₱50.00', 'Total', '₱550.00']);
     }
 
     public function test_checkout_has_no_developer_wording(): void
@@ -344,7 +393,11 @@ class RoutedTransitionsTest extends TestCase
         return SellerOrder::query()->sole();
     }
 
-    private function parcelAtOriginStation(string $sellerSlug, string $buyerSlug, LogisticsProvider $origin, string $riderSlug): SellerOrder
+    /**
+     * A local parcel's receipt scan also sorts it at its only hub; a routed
+     * parcel stays at the origin hub until its transfer.
+     */
+    private function parcelAtOriginStation(string $sellerSlug, string $buyerSlug, LogisticsProvider $origin, string $riderSlug, bool $local = false): SellerOrder
     {
         $parcel = $this->placeOrder($sellerSlug, $buyerSlug, $origin);
         $pickup = $this->courier($riderSlug);
@@ -354,7 +407,7 @@ class RoutedTransitionsTest extends TestCase
         $this->post(route('rider.pickups.confirm', $parcel), ['verification_token' => $this->riderToken($pickup, $parcel)])->assertSessionHasNoErrors();
         $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $this->scan($origin, $parcel)['actions'][0]['verification_token']])
             ->assertSessionHasNoErrors();
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        $this->assertSame($local ? OrderStatus::Sorted : OrderStatus::AtSortingCenter, $parcel->fresh()->status);
 
         return $parcel->fresh();
     }
@@ -405,7 +458,7 @@ class RoutedTransitionsTest extends TestCase
     {
         $courier = $this->courier($riderSlug);
 
-        if ($parcel->fresh()->status === OrderStatus::AtSortingCenter) {
+        if (in_array($parcel->fresh()->status, [OrderStatus::AtSortingCenter, OrderStatus::ArrivedAtHub], true)) {
             $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $this->scan($provider, $parcel)['actions'][0]['verification_token']])
                 ->assertSessionDoesntHaveErrors();
         }

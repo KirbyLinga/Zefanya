@@ -55,6 +55,14 @@ enum OrderActor: string
                 [OrderStatus::PickedUp, OrderStatus::AtSortingCenter],
                 [OrderStatus::AtSortingCenter, OrderStatus::Sorted],
                 [OrderStatus::Sorted, OrderStatus::AssignedToRider],
+                // Hub-to-hub transfers: a verified dispatch scan sends the parcel
+                // out; only the receiving hub's verified scan (or a recovery
+                // scan) records its arrival. A hub then sorts it or sends it on.
+                [OrderStatus::AtSortingCenter, OrderStatus::InTransit],
+                [OrderStatus::Sorted, OrderStatus::InTransit],
+                [OrderStatus::ArrivedAtHub, OrderStatus::InTransit],
+                [OrderStatus::InTransit, OrderStatus::ArrivedAtHub],
+                [OrderStatus::ArrivedAtHub, OrderStatus::Sorted],
                 [OrderStatus::DeliveryFailed, OrderStatus::AssignedToRider],
                 [OrderStatus::DeliveryFailed, OrderStatus::Returned],
             ],

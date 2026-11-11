@@ -4,9 +4,9 @@
 
 @php
     $tone = match ($status) {
-        OrderStatus::Cancelled, OrderStatus::Returned => 'border-red-200 bg-red-50 text-red-800',
+        OrderStatus::Cancelled, OrderStatus::Returned, OrderStatus::Lost => 'border-red-200 bg-red-50 text-red-800',
         OrderStatus::DeliveryFailed, OrderStatus::ReadyForPickup => 'border-amber-200 bg-amber-50 text-amber-900',
-        OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted,
+        OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::InTransit, OrderStatus::ArrivedAtHub,
         OrderStatus::AssignedToRider, OrderStatus::OutForDelivery => 'border-blue-200 bg-blue-50 text-blue-800',
         OrderStatus::Delivered, OrderStatus::Completed => 'border-emerald-200 bg-emerald-50 text-emerald-800',
         default => 'border-secondary-200 bg-secondary-100 text-primary-900',

@@ -3,6 +3,11 @@
 @section('title', 'Incident #'.$incident->id)
 
 @section('content')
+<x-admin.tabs :tabs="[
+    ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
+    ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
+    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
+]" />
     @if (session('success'))
         <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
             {{ session('success') }}
@@ -81,7 +86,7 @@
                                 <option value="KEEP_ON_HOLD" @selected(old('resolution') === 'KEEP_ON_HOLD')>KEEP_ON_HOLD — resolve the review but keep movement blocked</option>
                             @endif
                             <option value="RETURN" @selected(old('resolution') === 'RETURN')>RETURN — authorize the existing return workflow</option>
-                            <option value="CLOSE_LOST" @selected(old('resolution') === 'CLOSE_LOST') @disabled(strtolower($incident->type) !== 'lost')>CLOSE_LOST — permanently close a lost parcel</option>
+                            <option value="CLOSE_LOST" @selected(old('resolution') === 'CLOSE_LOST') @disabled(! in_array(strtolower($incident->type), $lossAvailable ? ['lost', 'missing', 'failed_transfer'] : ['lost'], true))>CLOSE_LOST — confirm the parcel lost and close it</option>
                             <option value="CLOSE_DAMAGED" @selected(old('resolution') === 'CLOSE_DAMAGED') @disabled(strtolower($incident->type) !== 'damaged')>CLOSE_DAMAGED — permanently close a damaged parcel</option>
                         </select>
                     </div>
@@ -89,6 +94,16 @@
                         <label for="resolution_note" class="block text-xs font-semibold text-neutral-600 mb-2">Resolution reason</label>
                         <textarea id="resolution_note" name="resolution_note" rows="3" required maxlength="1000" class="w-full border border-neutral-300 rounded-lg p-3 text-sm">{{ old('resolution_note') }}</textarea>
                     </div>
+                    @if ($lossAvailable)
+                        <div class="mb-3">
+                            <label for="liable_provider_id" class="block text-xs font-semibold text-neutral-600 mb-2">If you confirm it lost: liable company</label>
+                            <select id="liable_provider_id" name="resolution_context[liable_provider_id]" class="w-full border border-neutral-300 rounded-lg p-3 text-sm">
+                                <option value="">Decide from verified custody (sender before the receiving scan, receiver after it)</option>
+                                @foreach ($liableProviders as $p)<option value="{{ $p->id }}">{{ $p->business_name }}</option>@endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-neutral-500">Confirming a loss closes this parcel only, restores no stock, and records what the liable company owes the Seller: the saved merchandise value, without shipping or commission.</p>
+                        </div>
+                    @endif
                     <p class="mb-3 text-xs text-neutral-500">Resolutions never create scans, custody transfers, deliveries, refunds or restocks. Rerouting requires a verified physical hub receipt and an active alternative path; KEEP_ON_HOLD leaves movement blocked. RETURN requires an eligible failed delivery.</p>
                     <button type="submit" class="h-10 px-4 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors" onclick="return confirm('Record this resolution? Permanent closures cannot be undone here.')">Record resolution</button>
                 </form>

@@ -38,7 +38,9 @@ class PlatformFinanceService
                 $start = $from?->copy() ?? Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc();
 
                 return $query->where('commission_finalized_at', '>=', $start)
-                    ->when($from !== null, fn ($inner) => $inner->where('commission_finalized_at', '<', $start->copy()->addMonth()));
+                    // Add the month in Manila time: in UTC a month starts on the previous
+                    // day, and adding a month to Sep 30 lands on Oct 30, dropping Oct 31.
+                    ->when($from !== null, fn ($inner) => $inner->where('commission_finalized_at', '<', $start->copy()->timezone(StoreSale::TIMEZONE)->addMonthNoOverflow()->utc()));
             })
             ->whereNotNull('commission_finalized_at');
         $commission = (int) $finalized()->sum('commission_minor');
@@ -96,7 +98,8 @@ class PlatformFinanceService
         $debts = (int) SellerDebt::query()->whereColumn('settled_minor', '<', 'amount_minor')
             ->sum(DB::raw('amount_minor - settled_minor'));
 
-        $withRiders = (int) CodRemittance::query()->where('status', CodRemittance::PENDING_REMITTANCE)->sum('amount_minor');
+        $withRiders = (int) CodRemittance::query()->where('status', CodRemittance::PENDING_REMITTANCE)->sum('amount_minor')
+            + (int) CodRemittance::query()->where('status', CodRemittance::PARTIALLY_REMITTED)->sum(DB::raw('shortage_minor - shortage_recovered_minor'));
         $atCompanies = (int) $this->remittances->unsentByProvider()->sum('dueMinor');
         $sent = (int) LogisticsRemittance::query()->where('status', LogisticsRemittance::SUBMITTED)->sum('amount_minor');
 

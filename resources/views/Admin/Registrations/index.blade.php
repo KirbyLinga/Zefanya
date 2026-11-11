@@ -1,32 +1,26 @@
 @extends('Admin.Layouts.app')
 
 @section('title', 'Registration Management')
+@section('content-width', 'max-w-none')
 
 @section('content')
 @php
-    $registrationFilters = request()->only(['search', 'status', 'date_range', 'per_page']);
     $canViewIdentityDocuments = in_array(auth('admin')->user()?->role, ['super_admin', 'admin'], true);
 @endphp
-<x-admin.tabs :tabs="[
-    ['label' => 'Buyers', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'buyer'], 'active' => request('type') === 'buyer'],
-    ['label' => 'Sellers', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'seller'], 'active' => request('type') === 'seller'],
-    ['label' => 'Logistics', 'route' => 'admin.registrations.index', 'params' => $registrationFilters + ['type' => 'logistics'], 'active' => request('type') === 'logistics'],
-]" />
-
 @php
     // Status colors and labels (updated for new status values)
     $statusColors = [
-        'pending' => ['bg' => 'bg-orange-50', 'text' => 'text-orange-700', 'label' => 'Pending'],
-        'approved' => ['bg' => 'bg-green-50', 'text' => 'text-green-700', 'label' => 'Approved'],
-        'rejected' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'label' => 'Rejected'],
+        'pending' => ['bg' => 'registration-status-pending', 'text' => '', 'label' => 'Pending Review'],
+        'approved' => ['bg' => 'registration-status-approved', 'text' => '', 'label' => 'Approved'],
+        'rejected' => ['bg' => 'registration-status-rejected', 'text' => '', 'label' => 'Rejected'],
         'suspended' => ['bg' => 'bg-neutral-100', 'text' => 'text-neutral-700', 'label' => 'Suspended'],
     ];
 
     // Account type badge colors
     $typeColors = [
-        'buyer' => ['bg' => 'bg-blue-50', 'text' => 'text-blue-700', 'label' => 'Buyer'],
-        'seller' => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'label' => 'Seller'],
-        'logistics' => ['bg' => 'bg-green-50', 'text' => 'text-green-700', 'label' => 'Logistics'],
+        'buyer' => ['bg' => 'bg-primary-50', 'text' => 'text-primary-800', 'label' => 'Buyer'],
+        'seller' => ['bg' => 'bg-secondary-100', 'text' => 'text-secondary-900', 'label' => 'Seller'],
+        'logistics' => ['bg' => 'bg-tertiary-100', 'text' => 'text-tertiary-800', 'label' => 'Logistics'],
     ];
 
     // Prefer controller-passed values (defaults: status=pending, date_range=0 all-time).
@@ -44,167 +38,111 @@
     </div>
 @endif
 
-{{-- Page Header --}}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-neutral-950 mb-1">Registration Management</h1>
-    <p class="text-base text-neutral-600">Review and manage new user registrations based on your verification process.</p>
-</div>
-
-{{-- Stat Cards Grid (2x2 on tablet, 1 row on desktop) --}}
-<div class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-    {{-- Pending Stat Card --}}
-    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-start gap-4 mb-4">
-            <div class="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <i data-lucide="clock" class="w-6 h-6 text-orange-600"></i>
-            </div>
-            <div class="flex-1">
-                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Pending Review</p>
-                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ $pendingCount ?? 0 }}</p>
-            </div>
+@php
+    $totalCount = ($pendingCount ?? 0) + ($approvedCount ?? 0) + ($rejectedCount ?? 0) + ($suspendedCount ?? 0);
+    $roleOptions = [
+        '' => ['label' => 'All Registrations', 'icon' => 'layers'],
+        'buyer' => ['label' => 'Buyers', 'icon' => 'users'],
+        'seller' => ['label' => 'Sellers', 'icon' => 'store'],
+        'logistics' => ['label' => 'Logistics', 'icon' => 'truck'],
+    ];
+    $metrics = [
+        ['label' => 'Pending Review', 'count' => $pendingCount, 'icon' => 'clock', 'tone' => 'pending', 'trend' => $pendingTrend ?? null],
+        ['label' => 'Approved', 'count' => $approvedCount, 'icon' => 'circle-check', 'tone' => 'approved', 'trend' => $approvedTrend ?? null],
+        ['label' => 'Rejected', 'count' => $rejectedCount, 'icon' => 'circle-x', 'tone' => 'rejected', 'trend' => $rejectedTrend ?? null],
+        ['label' => 'Total Registrations', 'count' => $totalCount, 'icon' => 'users', 'tone' => 'total', 'trend' => null],
+    ];
+@endphp
+<div class="registration-workspace">
+    @if ($errors->any())
+        <div role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p class="font-semibold">The registration could not be updated.</p>
+            <ul class="mt-2 list-disc pl-5">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
-        @if (isset($pendingTrend))
-            <p class="text-[13px] {{ $pendingTrend >= 0 ? 'text-orange-600' : 'text-green-600' }}">
-                {{ $pendingTrend >= 0 ? '↑' : '↓' }} {{ abs($pendingTrend) }}% vs. last 7 days
-            </p>
-        @endif
-    </div>
-
-    {{-- Approved Stat Card --}}
-    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-start gap-4 mb-4">
-            <div class="flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <i data-lucide="check-circle" class="w-6 h-6 text-green-600"></i>
-            </div>
-            <div class="flex-1">
-                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Approved</p>
-                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ $approvedCount ?? 0 }}</p>
-            </div>
+    @endif
+    <header class="registration-header">
+        <div class="registration-heading-icon" aria-hidden="true"><i data-lucide="users" class="w-7 h-7"></i></div>
+        <div>
+            <h1>Registration Management</h1>
+            <p>Review and manage new user registrations based on your verification process.</p>
         </div>
-        @if (isset($approvedTrend))
-            <p class="text-[13px] {{ $approvedTrend >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                {{ $approvedTrend >= 0 ? '↑' : '↓' }} {{ abs($approvedTrend) }}% vs. last 7 days
-            </p>
-        @endif
-    </div>
+        <a href="#date_range" class="registration-date-link"><i data-lucide="calendar-days" class="w-4 h-4"></i>{{ (int) $dateRange === 0 ? 'All Time' : 'Last '.$dateRange.' days' }}<i data-lucide="chevron-down" class="w-4 h-4"></i></a>
+    </header>
 
-    {{-- Rejected Stat Card --}}
-    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-start gap-4 mb-4">
-            <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <i data-lucide="x-circle" class="w-6 h-6 text-red-600"></i>
+    <section class="registration-overview" aria-label="Registration overview">
+        <div class="registration-overview-main">
+            <div class="registration-summary">
+                <div><strong>{{ number_format($totalCount) }}</strong> Total registrations</div>
+                @foreach (array_slice($metrics, 0, 3) as $metric)
+                    <div><i data-lucide="{{ $metric['icon'] }}" class="registration-tone-{{ $metric['tone'] }} w-4 h-4"></i><strong>{{ number_format($metric['count']) }}</strong> {{ $metric['tone'] === 'pending' ? 'Pending' : $metric['label'] }} <span>({{ $totalCount ? number_format($metric['count'] / $totalCount * 100, 1) : '0' }}%)</span></div>
+                @endforeach
+                @if (($suspendedCount ?? 0) > 0)
+                    <div><strong>{{ $suspendedCount }}</strong> Suspended</div>
+                @endif
             </div>
-            <div class="flex-1">
-                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Rejected</p>
-                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ $rejectedCount ?? 0 }}</p>
-            </div>
-        </div>
-        @if (isset($rejectedTrend))
-            <p class="text-[13px] {{ $rejectedTrend >= 0 ? 'text-red-600' : 'text-green-600' }}">
-                {{ $rejectedTrend >= 0 ? '↑' : '↓' }} {{ abs($rejectedTrend) }}% vs. last 7 days
-            </p>
-        @endif
-    </div>
-
-    {{-- Total Stat Card --}}
-    <div class="bg-white border border-neutral-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-start gap-4 mb-4">
-            <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <i data-lucide="users" class="w-6 h-6 text-purple-600"></i>
-            </div>
-            <div class="flex-1">
-                <p class="text-[13px] font-medium text-neutral-600 uppercase tracking-[0.5px]">Total Registrations</p>
-                <p class="text-[32px] font-bold text-neutral-950 mt-1">{{ ($pendingCount ?? 0) + ($approvedCount ?? 0) + ($rejectedCount ?? 0) }}</p>
+            <div class="registration-metrics">
+                @foreach ($metrics as $metric)
+                    <article class="registration-metric registration-metric-{{ $metric['tone'] }}">
+                        <div class="registration-metric-top">
+                            <span class="registration-metric-icon"><i data-lucide="{{ $metric['icon'] }}" class="w-5 h-5"></i></span>
+                            <div><h2>{{ $metric['label'] }}</h2><strong>{{ number_format($metric['count']) }}</strong></div>
+                        </div>
+                        @if ($metric['trend'] !== null)
+                            <p class="registration-metric-caption"><i data-lucide="{{ $metric['trend'] > 0 ? 'trending-up' : ($metric['trend'] < 0 ? 'trending-down' : 'minus') }}" class="w-3.5 h-3.5"></i>{{ $metric['trend'] > 0 ? '+' : '' }}{{ $metric['trend'] }}% vs. previous 7 days</p>
+                        @else
+                            <p class="registration-metric-caption">All time / all account types</p>
+                        @endif
+                    </article>
+                @endforeach
             </div>
         </div>
-        <p class="text-[13px] text-neutral-500">All time</p>
-    </div>
-</div>
+        <aside class="registration-insights" aria-labelledby="registration-insights-title">
+            <h2 id="registration-insights-title"><i data-lucide="chart-no-axes-column" class="w-5 h-5"></i>Registration Insights</h2>
+            <p class="registration-insights-caption">All time / all reviewed statuses</p>
+            @foreach ($roleOptions as $role => $option)
+                @continue($role === '')
+                <div class="registration-insight-row">
+                    <span class="registration-insight-icon"><i data-lucide="{{ $option['icon'] }}" class="w-5 h-5"></i></span>
+                    <div><h3>{{ $option['label'] }}</h3><p>{{ number_format($roleCounts[$role] ?? 0) }} registrations</p></div>
+                    <span class="registration-insight-share">{{ $totalCount ? number_format(($roleCounts[$role] ?? 0) / $totalCount * 100, 1) : '0' }}%</span>
+                </div>
+            @endforeach
+        </aside>
+    </section>
 
-{{-- Compact Filter Bar --}}
-<div class="mb-6 bg-white border border-neutral-200 rounded-lg p-5">
-    <form method="GET" action="{{ route('admin.registrations.index') }}" class="flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-3">
-        {{-- Search input (takes remaining width on desktop) --}}
-        <div class="flex-1 lg:flex-1">
-            <label for="search" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Search</label>
-            <input type="text" name="search" id="search" value="{{ $searchQuery }}" placeholder="Name, email, contact…"
-                   class="w-full h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent" />
-        </div>
-
-        {{-- Account Type filter --}}
-        <div class="lg:flex-0">
-            <label for="type" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Account Type</label>
-            <select name="type" id="type" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent">
-                <option value="">All Types</option>
-                <option value="buyer" {{ $accountType === 'buyer' ? 'selected' : '' }}>Buyer</option>
-                <option value="seller" {{ $accountType === 'seller' ? 'selected' : '' }}>Seller</option>
-                <option value="logistics" {{ $accountType === 'logistics' ? 'selected' : '' }}>Logistics</option>
-            </select>
-        </div>
-
-        {{-- Status filter --}}
-        <div class="lg:flex-0">
-            <label for="status" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Status</label>
-            <select name="status" id="status" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent">
-                <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>Pending</option>
-                <option value="approved" {{ $status === 'approved' ? 'selected' : '' }}>Approved</option>
-                <option value="rejected" {{ $status === 'rejected' ? 'selected' : '' }}>Rejected</option>
-                <option value="suspended" {{ $status === 'suspended' ? 'selected' : '' }}>Suspended</option>
-            </select>
-        </div>
-
-        {{-- Date Range filter (default All Time so pending older than 7 days stays visible) --}}
-        <div class="lg:flex-0">
-            <label for="date_range" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Date Range</label>
-            <select name="date_range" id="date_range" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent">
-                <option value="0" {{ (int) $dateRange === 0 ? 'selected' : '' }}>All Time</option>
-                <option value="7" {{ (int) $dateRange === 7 ? 'selected' : '' }}>Last 7 days</option>
-                <option value="30" {{ (int) $dateRange === 30 ? 'selected' : '' }}>Last 30 days</option>
-                <option value="90" {{ (int) $dateRange === 90 ? 'selected' : '' }}>Last 90 days</option>
-            </select>
-        </div>
-
-        {{-- Filter button --}}
-        <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors flex items-center justify-center gap-2 lg:mt-0">
-            <i data-lucide="filter" class="w-4 h-4"></i>
-            Filter
-        </button>
-    </form>
-</div>
-
-{{-- Role Tabs --}}
-<div class="mb-6 flex flex-wrap gap-2 items-center justify-between">
-    <div class="flex flex-wrap gap-2">
-        @php
-            $types = ['' => 'All', 'buyer' => 'Buyer', 'seller' => 'Seller', 'logistics' => 'Logistics'];
-        @endphp
-        @foreach ($types as $typeVal => $typeLabel)
-            @php
-                $isActive = ($accountType === $typeVal);
-            @endphp
-            <a href="{{ route('admin.registrations.index', array_merge(request()->query(), ['type' => $typeVal, 'page' => 1])) }}"
-               class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {{ $isActive ? 'bg-primary-800 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200' }}">
-                {{ $typeLabel }}
+    <nav data-admin-tabs class="registration-role-tabs" aria-label="Registration account types">
+        @foreach ($roleOptions as $typeVal => $option)
+            <a href="{{ route('admin.registrations.index', request()->except(['type', 'page']) + ($typeVal !== '' ? ['type' => $typeVal] : [])) }}" @if ($accountType === $typeVal) aria-current="page" @endif class="registration-role-tab {{ $accountType === $typeVal ? 'is-active' : '' }}">
+                <i data-lucide="{{ $option['icon'] }}" class="w-5 h-5"></i>{{ $option['label'] }}<span>{{ number_format($typeVal === '' ? $totalCount : ($roleCounts[$typeVal] ?? 0)) }}</span>
             </a>
         @endforeach
-    </div>
-    <div class="text-sm text-neutral-600">
-        Showing <span class="font-semibold">{{ $pendingCount }}</span> {{ $status === 'pending' ? 'pending' : ($status === 'approved' ? 'approved' : 'rejected') }} registrations
-    </div>
-</div>
+    </nav>
+
+    <form data-admin-auto-filter method="GET" action="{{ route('admin.registrations.index') }}" class="registration-filters">
+        <input type="hidden" name="per_page" value="{{ $perPage }}">
+        <div class="registration-search">
+            <label for="search">Search registrations</label>
+            <div><i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i><input type="search" name="search" id="search" value="{{ $searchQuery }}" placeholder="Name, email, contact..."></div>
+        </div>
+        <div><label for="type">Account Type</label><select name="type" id="type"><option value="">All Types</option>@foreach (['buyer' => 'Buyer', 'seller' => 'Seller', 'logistics' => 'Logistics'] as $value => $label)<option value="{{ $value }}" @selected($accountType === $value)>{{ $label }}</option>@endforeach</select></div>
+        <div><label for="status">Status</label><select name="status" id="status">@foreach (['pending' => 'Pending Review', 'approved' => 'Approved', 'rejected' => 'Rejected', 'suspended' => 'Suspended'] as $value => $label)<option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>@endforeach</select></div>
+        <div><label for="date_range">Date Range</label><select name="date_range" id="date_range">@foreach ([0 => 'All Time', 7 => 'Last 7 days', 30 => 'Last 30 days', 90 => 'Last 90 days'] as $value => $label)<option value="{{ $value }}" @selected((int) $dateRange === $value)>{{ $label }}</option>@endforeach</select></div>
+        <a href="{{ route('admin.registrations.index') }}" class="registration-filter-reset"><i data-lucide="rotate-ccw" class="w-4 h-4"></i>Reset</a>
+    </form>
 
 {{-- Data table --}}
-<div class="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+<section class="registration-table-panel" aria-label="Registration results">
+    <div class="registration-table-toolbar"><p>Showing <strong>{{ $registrations->firstItem() ?? 0 }} to {{ $registrations->lastItem() ?? 0 }}</strong> of <strong>{{ number_format($registrations->total()) }}</strong> registrations</p><p class="registration-order"><i data-lucide="arrow-down-wide-narrow" class="w-4 h-4"></i>Registration date / newest first</p></div>
     @if ($registrations && $registrations->count() > 0)
-        <table class="w-full text-base">
-            <thead class="bg-neutral-50 border-b border-neutral-200">
+        <div class="registration-table-scroll" role="region" aria-label="Registration records" tabindex="0"><table class="w-full"><caption class="sr-only">Registration applications matching your filters, newest first</caption>
+            <thead class="border-b border-neutral-200">
                 <tr>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Name</th>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Email</th>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Account Type</th>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Registration Date</th>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700 text-base">Status</th>
-                    <th class="px-6 py-4 text-center font-semibold text-neutral-700 text-base">Actions</th>
+                    <th class="text-left">Name</th>
+                    <th class="text-left">Email</th>
+                    <th class="text-left">Account Type</th>
+                    <th class="text-left">Registration Date</th>
+                    <th class="text-left">Status</th>
+                    <th class="text-left">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-neutral-200">
@@ -218,7 +156,7 @@
                     @endphp
                     <tr class="hover:bg-neutral-50 transition-colors">
                         {{-- Applicant name with initials --}}
-                        <td class="px-6 py-4">
+                        <td>
                             <div class="flex items-center gap-3">
                                 <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-800 flex items-center justify-center font-semibold text-sm">
                                     {{ strtoupper(substr($model->first_name ?? 'U', 0, 1)) }}{{ strtoupper(substr($model->last_name ?? '', 0, 1)) }}
@@ -231,31 +169,31 @@
                         </td>
 
                         {{-- Email --}}
-                        <td class="px-6 py-4 text-neutral-700">
+                        <td class="text-neutral-700">
                             {{ $model->email }}
                         </td>
 
                         {{-- Account type badge --}}
-                        <td class="px-6 py-4">
+                        <td>
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $typeInfo['bg'] }} {{ $typeInfo['text'] }}">
                                 {{ $typeInfo['label'] }}
                             </span>
                         </td>
 
                         {{-- Registration date --}}
-                        <td class="px-6 py-4 text-neutral-700">
+                        <td class="text-neutral-700">
                             {{ $model->created_at?->format('d M Y, g:i A') ?? 'N/A' }}
                         </td>
 
                         {{-- Status badge --}}
-                        <td class="px-6 py-4">
+                        <td>
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $statusInfo['bg'] }} {{ $statusInfo['text'] }}">
                                 {{ $statusInfo['label'] }}
                             </span>
                         </td>
 
                         {{-- Actions --}}
-                        <td class="px-6 py-4">
+                        <td>
                             <div class="flex items-center justify-center gap-2">
                                 {{-- Approve button (only for pending) --}}
                                 @if ($statusValue === 'pending')
@@ -269,25 +207,25 @@
                                           onsubmit="return confirm('Approve this registration?');">
                                         @csrf
                                         <button type="submit" 
-                                                class="inline-flex items-center justify-center w-8 h-8 rounded-md text-green-600 hover:bg-green-50 transition-colors"
-                                                title="Approve">
-                                            <i data-lucide="check" class="w-4 h-4"></i>
+                                                class="registration-action registration-action-approve"
+                                                title="Approve" aria-label="Approve registration">
+                                            <i data-lucide="check" class="w-4 h-4"></i><span class="registration-action-label">Approve</span>
                                         </button>
                                     </form>
 
                                     {{-- Reject button (only for pending) --}}
                                     <button type="button" 
-                                            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-red-600 hover:bg-red-50 transition-colors"
-                                            title="Reject"
+                                            class="registration-action registration-action-reject"
+                                            title="Reject" aria-label="Reject registration"
                                             onclick="openRejectModal({{ $model->id }}, '{{ $type }}', '{{ $model->first_name }} {{ $model->last_name }}')">
-                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                        <i data-lucide="x" class="w-4 h-4"></i><span class="registration-action-label">Reject</span>
                                     </button>
                                 @endif
 
                                 {{-- View details (wired modal — C22) --}}
                                 <button type="button"
                                         class="inline-flex items-center justify-center w-8 h-8 rounded-md text-neutral-600 hover:bg-neutral-100 transition-colors"
-                                        title="View details"
+                                        title="View details" aria-label="View registration details"
                                         data-detail-name="{{ e($model->first_name.' '.$model->last_name) }}"
                                         data-detail-email="{{ e($model->email) }}"
                                         data-detail-type="{{ e($typeInfo['label']) }}"
@@ -308,12 +246,12 @@
                     </tr>
                 @endforeach
             </tbody>
-        </table>
+        </table></div>
 
         {{-- Pagination --}}
-        <div class="px-6 py-4 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="text-base text-neutral-600">
-                Show <select name="per_page" id="footer_per_page" onchange="window.location.href = '{{ route('admin.registrations.index') }}?' + Object.keys({...new URLSearchParams(window.location.search), per_page: this.value}).map(k => k + '=' + (k === 'per_page' ? this.value : new URLSearchParams(window.location.search).get(k) || '')).join('&')"
+                Show <select name="per_page" id="footer_per_page" onchange="changeRegistrationPageSize(this.value)" aria-label="Rows per page"
                         class="px-2 py-1 border border-neutral-300 rounded text-base">
                     <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
                     <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
@@ -353,6 +291,8 @@
             <p class="text-neutral-500 text-base">Try adjusting your filters or search terms</p>
         </div>
     @endif
+</section>
+
 </div>
 
 {{-- Detail Modal (C22) --}}
@@ -411,6 +351,13 @@
 </div>
 
 <script>
+    function changeRegistrationPageSize(value) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', value);
+        url.searchParams.delete('page');
+        window.location.assign(url.toString());
+    }
+
     function openDetailModal(btn) {
         document.getElementById('detailName').textContent = btn.dataset.detailName || '';
         document.getElementById('detailEmail').textContent = btn.dataset.detailEmail || '';

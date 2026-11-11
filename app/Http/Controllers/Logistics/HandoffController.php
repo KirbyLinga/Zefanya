@@ -10,6 +10,9 @@ use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\ParcelLossService;
+use App\Services\Logistics\TransferCourierService;
+use App\Support\RuntimeSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,8 +35,19 @@ class HandoffController extends Controller
     {
         $provider = $this->provider($request);
 
+        // Summary-card filter: each card narrows the lists to exactly what it counts.
+        $filters = [
+            'requested' => ['status' => 'REQUESTED', 'incoming' => true, 'outgoing' => false],
+            'accepted' => ['status' => 'ACCEPTED', 'incoming' => false, 'outgoing' => true],
+            'in_transit' => ['status' => 'IN_TRANSIT', 'incoming' => true, 'outgoing' => true],
+            'received' => ['status' => 'RECEIVED', 'incoming' => true, 'outgoing' => true],
+        ];
+        $filter = $filters[(string) $request->query('status')] ?? null;
+        $statusFilter = $filter !== null ? (string) $request->query('status') : null;
+
         $outgoing = ParcelHandoff::query()
             ->where('origin_provider_id', $provider->id)
+            ->when($filter, fn ($query) => $query->where('status', $filter['status']))
             ->with(['sellerOrder.order', 'sellerOrder.custodyProvider', 'sellerOrder.carrierProvider', 'destinationProvider', 'sendingHub', 'receivingHub'])
             ->latest('id')
             ->paginate(10, ['*'], 'outgoing_page')
@@ -41,6 +55,7 @@ class HandoffController extends Controller
 
         $incoming = ParcelHandoff::query()
             ->where('destination_provider_id', $provider->id)
+            ->when($filter, fn ($query) => $query->where('status', $filter['status']))
             ->with(['sellerOrder.order', 'sellerOrder.custodyProvider', 'sellerOrder.carrierProvider', 'originProvider', 'sendingHub', 'receivingHub'])
             ->latest('id')
             ->paginate(10, ['*'], 'incoming_page')
@@ -66,6 +81,9 @@ class HandoffController extends Controller
             'eligibleParcels' => $eligibleParcels,
             'eligibleLinks' => $eligibleLinks,
             'exceptions' => $exceptions,
+            'statusFilter' => $statusFilter,
+            'showIncoming' => $filter['incoming'] ?? true,
+            'showOutgoing' => $filter['outgoing'] ?? true,
             'counts' => [
                 'requested' => ParcelHandoff::query()->where('destination_provider_id', $provider->id)->where('status', 'REQUESTED')->count(),
                 'accepted' => ParcelHandoff::query()->where('origin_provider_id', $provider->id)->where('status', 'ACCEPTED')->count(),
@@ -122,12 +140,85 @@ class HandoffController extends Controller
             'receivingHub',
         ]);
 
+        $isOrigin = (int) $handoff->origin_provider_id === (int) $provider->id;
+        $couriers = app(TransferCourierService::class);
+
         return view('Logistics.Handoffs.show', [
             'provider' => $provider,
             'handoff' => $handoff,
-            'isOrigin' => (int) $handoff->origin_provider_id === (int) $provider->id,
+            'isOrigin' => $isOrigin,
             'isDestination' => (int) $handoff->destination_provider_id === (int) $provider->id,
+            'transportAvailable' => TransferCourierService::available(),
+            'transportCourier' => TransferCourierService::available() ? $handoff->transferCourier()->first() : null,
+            'transportCandidates' => $isOrigin ? $couriers->couriersFor($provider, activeOnly: true) : collect(),
+            'transportHistory' => $isOrigin ? $couriers->historyFor($handoff) : collect(),
+            'cancellationAvailable' => RuntimeSchema::hasColumn('parcel_handoffs', 'cancelled_at'),
         ]);
+    }
+
+    /** The sending company reports the parcel of an in-transit handoff missing. */
+    public function reportMissing(Request $request, ParcelHandoff $handoff): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->participant($provider, $handoff);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        app(ParcelLossService::class)->reportMissingTogether('handoff', (int) $handoff->id, $provider, [(int) $handoff->seller_order_id], $data['reason']);
+
+        return redirect()->route('logistics.handoffs.show', $handoff)->with('success',
+            'Parcel reported missing. Admin will review it. It stays in your custody until a verified scan or an Admin decision.');
+    }
+
+    /** The sending company cancels a handoff it has not seen received, with a reason. */
+    public function cancel(Request $request, ParcelHandoff $handoff): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->participant($provider, $handoff);
+        $data = $request->validate(['cancellation_reason' => ['required', 'string', 'max:1000']]);
+        $leftTheHub = $handoff->fresh()->dispatched_at !== null;
+
+        $this->handoffs->cancel($handoff, $provider, (string) $data['cancellation_reason']);
+
+        return redirect()->route('logistics.handoffs.show', $handoff)->with('success', $leftTheHub
+            ? 'Handoff cancelled. The parcel had already left your hub, so it stays held as an exception until you scan it back at the sending hub.'
+            : 'Handoff cancelled. The parcel never left your hub and is back in your handoff queue.');
+    }
+
+    /** Verified scan of a cancelled in-transit handoff's parcel back at the sending hub. */
+    public function recover(Request $request, ParcelHandoff $handoff): RedirectResponse|JsonResponse
+    {
+        $provider = $this->provider($request);
+        $this->participant($provider, $handoff);
+        $data = $request->validate(['verification_token' => ['required', 'string', 'max:128']]);
+
+        $recovered = $this->handoffs->recover($handoff, $provider, (string) $data['verification_token']);
+        $message = 'Parcel recorded back at '.($recovered->sendingHub?->name ?? 'the sending hub').'. Resolve its exception to resume or reroute it.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'redirect' => route('logistics.handoffs.show', $handoff)]);
+        }
+
+        return redirect()->route('logistics.handoffs.show', $handoff)->with('success', $message);
+    }
+
+    /** The sending company names which of its Couriers carries this handoff. */
+    public function assignCourier(Request $request, ParcelHandoff $handoff): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->participant($provider, $handoff);
+
+        $data = $request->validate([
+            'transfer_courier_id' => ['required', 'integer'],
+            'transport_vehicle_type' => ['nullable', 'string', 'max:20'],
+            'transport_plate_number' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        $updated = app(TransferCourierService::class)->assignToHandoff(
+            $handoff, $provider, (int) $data['transfer_courier_id'],
+            $data['transport_vehicle_type'] ?? null, $data['transport_plate_number'] ?? null,
+        );
+
+        return back()->with('success', ($updated->transferCourier?->name ?? 'The Courier').' will carry this handoff. Custody moves only when the receiving company scans it.');
     }
 
     public function accept(Request $request, ParcelHandoff $handoff): RedirectResponse
@@ -178,16 +269,18 @@ class HandoffController extends Controller
 
         $data = $request->validate([
             'tracking_number' => ['required', 'string', 'max:64'],
-            'phase' => ['nullable', Rule::in([ParcelHandoffService::PHASE_DISPATCH, ParcelHandoffService::PHASE_RECEIVE])],
+            'phase' => ['nullable', Rule::in([ParcelHandoffService::PHASE_DISPATCH, ParcelHandoffService::PHASE_RECEIVE, ParcelHandoffService::PHASE_RECOVER])],
             'method' => ['nullable', Rule::in([
                 ParcelHandoffVerification::METHOD_CAMERA,
                 ParcelHandoffVerification::METHOD_MANUAL,
             ])],
         ]);
 
-        $phase = $data['phase'] ?? ((int) $handoff->destination_provider_id === (int) $provider->id
-            ? ParcelHandoffService::PHASE_RECEIVE
-            : ParcelHandoffService::PHASE_DISPATCH);
+        $phase = $data['phase'] ?? match (true) {
+            (int) $handoff->destination_provider_id === (int) $provider->id => ParcelHandoffService::PHASE_RECEIVE,
+            $handoff->awaitsRecovery() => ParcelHandoffService::PHASE_RECOVER,
+            default => ParcelHandoffService::PHASE_DISPATCH,
+        };
 
         try {
             return response()->json($this->handoffs->verifyScan(

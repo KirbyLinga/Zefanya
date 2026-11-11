@@ -25,8 +25,8 @@ class AutomaticBuyerReceiptService
     {
         return SellerOrder::query()
             ->where('status', OrderStatus::Delivered)
-            // A rejected return request no longer holds the order back.
-            ->whereDoesntHave('parcelReturn', fn (Builder $return) => $return->where('status', '!=', ParcelReturnStatus::Rejected->value))
+            // A rejected or cancelled return request no longer holds the order back: the buyer kept the item.
+            ->whereDoesntHave('parcelReturn', fn (Builder $return) => $return->whereNotIn('status', [ParcelReturnStatus::Rejected->value, ParcelReturnStatus::Cancelled->value]))
             ->whereDoesntHave('incidentSet', function (Builder $incidents): void {
                 $incidents->where('status', ParcelIncidentStatus::Open->value)
                     ->orWhereHas('events', fn (Builder $events) => $events

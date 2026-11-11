@@ -76,7 +76,7 @@ class Rule05CompletionAndReturnWindowTest extends TestCase
         $this->assertSame($due ? 1 : 0, StatusHistory::where('seller_order_id', $parcel->id)->where('to_status', OrderStatus::Completed)->count());
     }
 
-    public function test_repeated_scheduler_execution_finalizes_five_percent_once_without_collecting_cod_again(): void
+    public function test_repeated_scheduler_execution_finalizes_ten_percent_once_without_collecting_cod_again(): void
     {
         $parcel = $this->deliveredAt('2026-10-20 16:00:00');
         $this->travelTo(Carbon::parse('2026-10-27 16:00:00', 'UTC'));
@@ -88,9 +88,9 @@ class Rule05CompletionAndReturnWindowTest extends TestCase
         $this->travelTo(Carbon::parse('2026-10-28 16:00:00', 'UTC'));
         $this->artisan('orders:auto-complete-receipts')->assertSuccessful();
 
-        $this->assertSame(500, $parcel->fresh()->commission_bps);
-        $this->assertSame(501, $parcel->fresh()->commission_minor);
-        $this->assertSame(9509, $parcel->fresh()->seller_net_minor);
+        $this->assertSame(1000, $parcel->fresh()->commission_bps);
+        $this->assertSame(1001, $parcel->fresh()->commission_minor);
+        $this->assertSame(9009, $parcel->fresh()->seller_net_minor);
         $this->assertSame($snapshot, $parcel->fresh()->getRawOriginal());
         $this->assertSame($paymentBefore, $parcel->payment->fresh()->getRawOriginal());
         $this->assertSame('system', $completion->actor_type);
@@ -115,7 +115,7 @@ class Rule05CompletionAndReturnWindowTest extends TestCase
 
         $this->assertSame(OrderStatus::Completed, $second->fresh()->status);
         $this->assertSame(OrderStatus::Completed, $first->order->fresh()->status);
-        $this->assertSame(501, $second->fresh()->commission_minor);
+        $this->assertSame(1001, $second->fresh()->commission_minor);
         $this->post(route('buyer.orders.confirmReceived', $first->order), ['seller_order_id' => $second->id])->assertRedirect();
         $this->assertSame(1, StatusHistory::where('seller_order_id', $second->id)->where('to_status', OrderStatus::Completed)->count());
     }
@@ -241,7 +241,7 @@ class Rule05CompletionAndReturnWindowTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $second->fresh()->status);
         $this->assertSame(OrderStatus::Delivered, $first->order->fresh()->status);
         $this->assertNull($first->fresh()->commission_finalized_at);
-        $this->assertSame(501, $second->fresh()->commission_minor);
+        $this->assertSame(1001, $second->fresh()->commission_minor);
         $this->postJson(route('buyer.orders.confirmReceived', $first->order), ['seller_order_id' => $first->id])
             ->assertUnprocessable()->assertJsonValidationErrors('shipment');
         $this->assertSame(OrderStatus::Delivered, $first->fresh()->status);

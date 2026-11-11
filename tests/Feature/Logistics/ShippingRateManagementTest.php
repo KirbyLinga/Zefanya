@@ -42,10 +42,12 @@ class ShippingRateManagementTest extends TestCase
         $this->seller = Seller::factory()->create(['status' => 'approved']);
         $this->carrier = $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller]);
 
-        config(['buyer.shipping_rates' => [
-            'same_municipality' => ['first_kg_minor' => 4900, 'additional_kg_minor' => 1500],
-            'same_province' => ['first_kg_minor' => 6900, 'additional_kg_minor' => 2000],
-        ], 'buyer.cross_province.fee_minor' => null]);
+        // One marketplace fee for every company and route: ₱50 for the first
+        // 2 kg, then ₱20 per kilo. Saved company rate cards no longer price checkout.
+        config([
+            'buyer.shipping_fee' => ['base_minor' => 5000, 'base_kg' => 2, 'additional_kg_minor' => 2000],
+            'buyer.cross_province.fee_minor' => null,
+        ]);
     }
 
     private function save(array $rates, array $extra = []): TestResponse
@@ -62,7 +64,7 @@ class ShippingRateManagementTest extends TestCase
         return $options['carriers'][0]['fee_minor'];
     }
 
-    public function test_the_page_shows_each_zone_with_the_marketplace_rate_it_falls_back_to(): void
+    public function test_the_page_shows_the_one_fixed_rate_for_every_delivery(): void
     {
         $this->actingAs($this->carrier, 'logistics')
             ->get(route('logistics.shipping-rates.index'))
@@ -75,27 +77,28 @@ class ShippingRateManagementTest extends TestCase
             ->assertSee('Shipping Rates', false)
             ->assertSee('Manage Delivery Areas', false)
             ->assertDontSee('>Shipping rates<', false)
-            ->assertSeeInOrder(['Same city or municipality', '₱49.00', 'Same province', '₱69.00', 'Another province', 'Not offered: no marketplace rate is set for this route'], false);
+            ->assertSeeInOrder(['All deliveries', 'First 2 kg', '₱50.00', 'Each extra kg', '+ ₱20.00', '3 kg parcel', '₱70.00'], false);
     }
 
-    public function test_a_carrier_with_no_rates_still_charges_the_marketplace_rate(): void
+    public function test_a_carrier_with_no_rates_charges_the_fixed_fee(): void
     {
-        $this->assertSame(4900 + 2 * 1500, $this->feeFor(2500));
+        $this->assertSame(5000, $this->feeFor(2000));
+        $this->assertSame(5000 + 2000, $this->feeFor(2500));
     }
 
-    public function test_a_saved_rate_prices_checkout_by_zone_and_weight(): void
+    public function test_a_saved_company_rate_does_not_change_the_checkout_fee(): void
     {
         $this->save(['same_municipality' => ['first_kg' => '60', 'additional_kg' => '12.50']])
             ->assertRedirect(route('logistics.earnings.index', ['tab' => 'shipping-rates']))
             ->assertSessionHasNoErrors()
             ->assertSessionHas('success');
 
-        $this->assertSame(6000, $this->feeFor(1000));
-        $this->assertSame(6000 + 2 * 1250, $this->feeFor(2500));
+        $this->assertSame(5000, $this->feeFor(1000));
+        $this->assertSame(5000 + 2000, $this->feeFor(2500));
 
-        // Other zones keep the marketplace rate.
+        // Other municipalities pay the same fee.
         $this->buyer->forceFill(['municipality_code' => '030540200'])->save();
-        $this->assertSame(6900, $this->feeFor(1000));
+        $this->assertSame(5000, $this->feeFor(1000));
     }
 
     public function test_order_value_does_not_waive_the_carrier_fee(): void
@@ -104,7 +107,7 @@ class ShippingRateManagementTest extends TestCase
 
         $options = app(CheckoutCarrierService::class)->optionsForSellerGroup($this->buyer->fresh(), $this->seller->fresh(), 150000, 1000);
 
-        $this->assertSame(6000, $options['carriers'][0]['fee_minor']);
+        $this->assertSame(5000, $options['carriers'][0]['fee_minor']);
     }
 
     public function test_one_company_rates_do_not_touch_another(): void
@@ -114,15 +117,15 @@ class ShippingRateManagementTest extends TestCase
             ->put(route('logistics.shipping-rates.update'), ['rates' => ['same_municipality' => ['first_kg' => '999', 'additional_kg' => '99']]])
             ->assertSessionHasNoErrors();
 
-        $this->assertSame(4900, $this->feeFor(1000));
+        $this->assertSame(5000, $this->feeFor(1000));
     }
 
-    public function test_clearing_a_zone_returns_to_the_marketplace_rate(): void
+    public function test_clearing_a_saved_rate_keeps_the_fixed_fee(): void
     {
         $this->save(['same_municipality' => ['first_kg' => '60', 'additional_kg' => '10']]);
         $this->save(['same_municipality' => ['first_kg' => '', 'additional_kg' => '']])->assertSessionHasNoErrors();
 
-        $this->assertSame(4900, $this->feeFor(1000));
+        $this->assertSame(5000, $this->feeFor(1000));
     }
 
     /** @return array<string, array{0: array<string, string>, 1: string}> */
@@ -152,8 +155,9 @@ class ShippingRateManagementTest extends TestCase
     public function test_both_rates_accept_the_one_centavo_minimum(): void
     {
         $this->save(['same_municipality' => ['first_kg' => '0.01', 'additional_kg' => '0.01']])->assertSessionHasNoErrors();
-        $this->assertSame(1, $this->feeFor(1000));
-        $this->assertSame(4, $this->feeFor(4000));
+        $this->assertSame(1, LogisticsShippingRate::query()->value('first_kg_minor'));
+        $this->assertSame(5000, $this->feeFor(1000));
+        $this->assertSame(5000 + 2 * 2000, $this->feeFor(4000));
     }
 
     public function test_a_rate_change_is_written_to_the_audit_log_once(): void
@@ -172,17 +176,23 @@ class ShippingRateManagementTest extends TestCase
         $this->get(route('logistics.audit-logs.index'))->assertOk()->assertSee('Shipping rate changed');
     }
 
-    public function test_a_cross_province_rate_saves_even_when_the_marketplace_has_not_priced_that_zone(): void
+    public function test_a_cross_province_rate_saves_but_checkout_still_uses_the_fixed_fee(): void
     {
         $this->save(['cross_province' => ['first_kg' => '150', 'additional_kg' => '30']])->assertSessionHasNoErrors();
 
+        $this->assertDatabaseHas('logistics_shipping_rates', [
+            'logistics_provider_id' => $this->carrier->id,
+            'zone' => LogisticsShippingRate::CROSS_PROVINCE,
+            'first_kg_minor' => 15000,
+            'additional_kg_minor' => 3000,
+        ]);
         $this->assertSame(
-            ['first_kg_minor' => 15000, 'additional_kg_minor' => 3000],
+            ShippingRateService::fixedRate(),
             app(ShippingRateService::class)->rateFor($this->carrier, LogisticsShippingRate::CROSS_PROVINCE),
         );
     }
 
-    public function test_only_checkouts_started_after_a_rate_change_use_the_new_rate(): void
+    public function test_only_checkouts_started_after_a_fee_change_use_the_new_fee(): void
     {
         $product = Product::factory()->create(['seller_id' => $this->seller->id, 'price' => 100, 'stock_quantity' => 50, 'status' => 'active', 'weight_grams' => 500]);
         $variant = ProductVariant::query()->where('product_id', $product->id)->firstOrFail();
@@ -202,20 +212,21 @@ class ShippingRateManagementTest extends TestCase
 
         $fields = $fieldsOf($this->actingAs($this->buyer, 'buyer')->get($checkout)->assertOk());
 
-        $this->save(['same_municipality' => ['first_kg' => '75', 'additional_kg' => '0.01']])->assertSessionHasNoErrors();
+        // The marketplace raises its fee while this checkout is open.
+        config(['buyer.shipping_fee.base_minor' => 7500]);
         $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), $fields)
             ->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame(4900, SellerOrder::query()->sole()->shipping_fee_minor);
+        $this->assertSame(5000, SellerOrder::query()->sole()->shipping_fee_minor);
 
         $newLine = CartItem::factory()->create(['buyer_id' => $this->buyer->id, 'product_id' => $product->id, 'variant_id' => $variant->id, 'quantity' => 1]);
         $newCheckout = route('buyer.checkout.index', ['items' => [$newLine->id]]);
         $newFields = $fieldsOf($this->get($newCheckout)->assertOk());
         $this->assertNotSame($fields['shipping_fingerprint'], $newFields['shipping_fingerprint']);
         $this->post(route('buyer.checkout.store'), $newFields)->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame([4900, 7500], SellerOrder::orderBy('id')->pluck('shipping_fee_minor')->all());
+        $this->assertSame([5000, 7500], SellerOrder::orderBy('id')->pluck('shipping_fee_minor')->all());
 
-        $this->save(['same_municipality' => ['first_kg' => '200', 'additional_kg' => '0.01']])->assertSessionHasNoErrors();
-        $this->assertSame([4900, 7500], SellerOrder::orderBy('id')->pluck('shipping_fee_minor')->all());
+        config(['buyer.shipping_fee.base_minor' => 20000]);
+        $this->assertSame([5000, 7500], SellerOrder::orderBy('id')->pluck('shipping_fee_minor')->all());
     }
 
     public function test_rate_service_also_rejects_values_below_one_centavo_without_audit_changes(): void
@@ -250,7 +261,8 @@ class ShippingRateManagementTest extends TestCase
         } finally {
             Event::forget('eloquent.creating: '.OperationsAuditLog::class);
         }
-        $this->assertSame(6000, $this->feeFor(1000));
+        $this->assertSame(6000, LogisticsShippingRate::query()->where('zone', LogisticsShippingRate::SAME_MUNICIPALITY)->value('first_kg_minor'));
+        $this->assertSame(5000, $this->feeFor(1000));
         $this->assertSame(1, OperationsAuditLog::where('action', 'rate_changed')->count());
     }
 }

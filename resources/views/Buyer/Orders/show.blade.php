@@ -197,7 +197,15 @@
                                             <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Escalate</button>
                                         </form>
                                 @endif
-                                @if ($sellerOrder->status === OrderStatus::Delivered && ! $sellerOrder->hasActiveReturn())
+                                @if (\App\Models\Logistics\ParcelReturn::recoveryAvailable() && $sellerOrder->parcelReturn?->canBuyerCancel())
+                                    <form method="POST" action="{{ route('buyer.orders.cancelReturn', [$order, $sellerOrder]) }}" class="space-y-2" onsubmit="return confirm('Cancel this return? You keep the item and no refund will be made.')">
+                                        @csrf
+                                        <label for="cancel-return-reason-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Changed your mind? Cancel the return before it is collected (optional reason)</label>
+                                        <textarea id="cancel-return-reason-{{ $sellerOrder->id }}" name="reason" maxlength="500" rows="2" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]"></textarea>
+                                        <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Cancel return</button>
+                                    </form>
+                                @endif
+                                @if ($sellerOrder->canBuyerConfirmReceipt())
                                     <div class="rounded-xl border border-[var(--border)] p-4">
                                         <h3 class="mb-1 text-sm font-semibold text-[var(--text-ink)]">Order Received</h3>
                                         <p class="text-xs leading-relaxed text-[var(--text-muted)]">Confirm only after receiving and checking this parcel. Order completion is still pending. Eligible shipments complete automatically 7 days after delivery if no return or delivery issue remains open.</p>
@@ -289,7 +297,9 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        window.location.href = `/buyer/messages/${data.conversation_id}`;
+                        if (!window.zfOpenBuyerConversation?.(data.conversation_id)) {
+                            window.location.href = `/buyer/messages/${data.conversation_id}`;
+                        }
                     } else {
                         alert('Failed to start conversation');
                     }

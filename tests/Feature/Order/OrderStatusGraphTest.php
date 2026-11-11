@@ -10,6 +10,7 @@ use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -34,6 +35,10 @@ class OrderStatusGraphTest extends TestCase
         'PICKED_UP' => ['AT_SORTING_CENTER'],
         'AT_SORTING_CENTER' => ['SORTED'],
         'SORTED' => ['ASSIGNED_TO_RIDER'],
+        // Moving into IN_TRANSIT / ARRIVED_AT_HUB needs a verified transfer scan
+        // (SellerOrderStatusService::recordTransferMovement), never transition().
+        'IN_TRANSIT' => [],
+        'ARRIVED_AT_HUB' => ['SORTED'],
         'ASSIGNED_TO_RIDER' => ['OUT_FOR_DELIVERY'],
         'OUT_FOR_DELIVERY' => ['DELIVERED', 'DELIVERY_FAILED'],
         'DELIVERED' => ['COMPLETED', 'RETURNED'],
@@ -41,6 +46,9 @@ class OrderStatusGraphTest extends TestCase
         'RETURNED' => [],
         'COMPLETED' => [],
         'CANCELLED' => [],
+        // Only an Admin confirmation (SellerOrderStatusService::recordLoss) closes a parcel as lost, and
+        // nothing leaves LOST.
+        'LOST' => [],
     ];
 
     private SellerOrderStatusService $service;
@@ -87,9 +95,10 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 18 legal edges (canonical pipeline + seller decline from packing
-        // states + rider cancellation after a second failed pickup).
-        $this->assertSame(18, $checked);
+        // 19 legal edges (canonical pipeline + seller decline from packing
+        // states + rider cancellation after a second failed pickup + sorting
+        // a parcel that arrived on a transfer).
+        $this->assertSame(19, $checked);
     }
 
     public function test_every_illegal_pair_is_rejected_with_no_writes(): void
@@ -114,8 +123,8 @@ class OrderStatusGraphTest extends TestCase
                 try {
                     $this->service->transition($so, $to);
                     $this->fail("Illegal hop {$from->value} → {$to->value} was accepted.");
-                } catch (\InvalidArgumentException) {
-                    // Expected: graph gate rejected the pair.
+                } catch (\InvalidArgumentException|ValidationException) {
+                    // Expected: the graph gate rejected the pair; a parcel already LOST is blocked outright.
                 }
 
                 $this->assertSame(
@@ -132,8 +141,8 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 14×14 = 196 pairs − 14 self-transitions − 18 legal edges = 164.
-        $this->assertSame(164, $rejected);
+        // 17×17 = 289 pairs − 17 self-transitions − 19 legal edges = 253.
+        $this->assertSame(253, $rejected);
     }
 
     /** The specific skips called out in review must all be rejected. */

@@ -67,7 +67,8 @@ class AreaController extends Controller
 
         $couriers = Courier::query()
             ->where('logistics_provider_id', $provider->id)
-            ->with(['areas', 'rider.station'])
+            // rider.provider: the rider list checks each rider's eligibility, which reads its company.
+            ->with(['areas', 'rider.station', 'rider.provider'])
             ->withWorkload()
             ->orderBy('name')
             ->get();
@@ -222,6 +223,14 @@ class AreaController extends Controller
             && (string) $station->province_code !== (string) $provider->province_code) {
             throw ValidationException::withMessages([
                 'station_hub_id' => 'Coverage must use a Station Hub inside your verified province.',
+            ]);
+        }
+
+        // A Station Hub only covers barangays in its own municipality.
+        if (filled($station->city_municipality_code)
+            && (string) $validated['city_municipality_code'] !== (string) $station->city_municipality_code) {
+            throw ValidationException::withMessages([
+                'city_municipality_code' => 'Coverage must be in '.($station->municipality ?: 'the Station Hub\'s municipality').', where this Station Hub is located.',
             ]);
         }
 

@@ -37,6 +37,7 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
 
         Route::get('/return-pickups', [ReturnPickupController::class, 'index'])->name('return-pickups.index');
         Route::post('/return-pickups/{return}/collect', [ReturnPickupController::class, 'collect'])->name('return-pickups.collect');
+        Route::post('/return-pickups/{return}/failed', [ReturnPickupController::class, 'failed'])->name('return-pickups.failed');
 
         Route::get('/scan', [ParcelScanController::class, 'index'])->name('scan.index');
         Route::post('/scan/verify', [ParcelScanController::class, 'verify'])->name('scan.verify');

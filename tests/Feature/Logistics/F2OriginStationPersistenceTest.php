@@ -160,7 +160,8 @@ class F2OriginStationPersistenceTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
     }
 
     public function test_stale_parcel_cannot_overwrite_a_station_persisted_by_another_caller(): void

@@ -226,7 +226,9 @@
                     <p class="font-sans text-[12.5px] text-[var(--text-muted)]">
                         @if($sellerOrder->status === OrderStatus::ReadyForPickup)
                             Waiting for a rider to pick up this parcel.
-                        @elseif(in_array($sellerOrder->status, [OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery]))
+                        @elseif($sellerOrder->status === OrderStatus::InTransit)
+                            On a transfer between hubs.
+                        @elseif(in_array($sellerOrder->status, [OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::ArrivedAtHub, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery]))
                             In transit to delivery.
                         @elseif($sellerOrder->status === OrderStatus::Cancelled)
                             This shipment was cancelled. Stock was restored.

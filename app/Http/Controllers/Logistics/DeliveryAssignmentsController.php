@@ -155,7 +155,7 @@ class DeliveryAssignmentsController extends Controller
             'reason' => ['required', 'string', 'max:500'],
             'expected_courier_id' => ['required', 'integer'],
         ]);
-        if (($limit = $this->assignment->manualRiderBlockReason(filled($data['courier_id'] ?? null) ? (int) $data['courier_id'] : null, $provider->id)) !== null) {
+        if (($limit = $this->assignment->manualRiderBlockReason(filled($data['courier_id'] ?? null) ? (int) $data['courier_id'] : null, $provider->id, $sellerOrder)) !== null) {
             return back()->withInput()->with('error', $limit);
         }
         $courier = $this->assignment->reassign(

@@ -147,7 +147,13 @@ class RiderPickupTest extends RiderTestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // At its only hub the same scan also sorts, but always after the receipt.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertSame(
+            [OrderStatus::PickedUp->value, OrderStatus::AtSortingCenter->value, OrderStatus::Sorted->value],
+            StatusHistory::query()->where('seller_order_id', $parcel->id)->orderBy('id')->pluck('to_status')
+                ->map(fn ($status) => $status instanceof OrderStatus ? $status->value : (string) $status)->all(),
+        );
     }
 
     public function test_logistics_can_reserve_a_pickup_rider_without_advancing_the_parcel(): void

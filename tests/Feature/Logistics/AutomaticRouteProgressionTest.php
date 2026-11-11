@@ -135,7 +135,9 @@ class AutomaticRouteProgressionTest extends TestCase
         $this->assertSame($f['destination']->id, $execution->nextDestination($f['route'])->id);
         $this->assertSame('SEA', $execution->currentTransportMode($f['route']));
         $this->assertFalse(app(CourierAssignmentService::class)->deliveryReadyAtStation($f['parcel']->fresh(), $f['a']['provider']->id));
-        $this->assertSame(1, $f['parcel']->statusHistories()->count());
+        // The receipt adds only the transfer's IN_TRANSIT and ARRIVED_AT_HUB rows.
+        $this->assertSame(3, $f['parcel']->statusHistories()->count());
+        $this->assertSame(OrderStatus::ArrivedAtHub, $f['parcel']->fresh()->status);
         $this->assertDatabaseCount('manifests', 1);
         $this->assertDatabaseCount('parcel_handoffs', 0);
     }
@@ -322,7 +324,8 @@ class AutomaticRouteProgressionTest extends TestCase
         $this->assertNull($execution->nextDestination($f['route']));
         $this->assertNull($execution->currentTransportMode($f['route']));
         $this->assertTrue($execution->isAtFinalDestination($f['route']));
-        $this->assertSame(OrderStatus::AtSortingCenter, $f['parcel']->fresh()->status);
+        // Arrived but never sorted: it waits for sorting at the final hub.
+        $this->assertSame(OrderStatus::ArrivedAtHub, $f['parcel']->fresh()->status);
         $this->assertSame('not_eligible', app(CourierAssignmentService::class)->dispatch($f['parcel']->fresh(), 'delivery')['status']);
     }
 
@@ -471,7 +474,7 @@ class AutomaticRouteProgressionTest extends TestCase
         $this->receive($f, $manifest, $item);
 
         $this->assertSame($f['middle']->id, $f['parcel']->fresh()->custody_hub_id);
-        $this->assertSame(OrderStatus::AtSortingCenter, $f['parcel']->fresh()->status);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $f['parcel']->fresh()->status);
         $this->assertDatabaseCount('parcel_routes', 0);
     }
 }

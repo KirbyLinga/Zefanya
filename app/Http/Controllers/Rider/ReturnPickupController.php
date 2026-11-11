@@ -8,6 +8,7 @@ use App\Models\Logistics\ParcelReturn;
 use App\Services\Logistics\ParcelReturnService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ReturnPickupController extends Controller
@@ -32,5 +33,22 @@ class ReturnPickupController extends Controller
         $service->confirmBuyerCollection($return, $request->user('rider'), $data['tracking_number']);
 
         return back()->with('success', 'Parcel collected. Bring it to your Station Hub.');
+    }
+
+    public function failed(Request $request, ParcelReturn $return, ParcelReturnService $service): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', Rule::in(array_keys(ParcelReturn::COLLECTION_FAILURE_REASONS))],
+            'notes' => ['nullable', 'string', 'max:500', 'required_if:reason,other'],
+        ], [
+            'reason.required' => 'Choose why the parcel could not be collected.',
+            'reason.in' => 'Choose why the parcel could not be collected.',
+            'notes.required_if' => 'Describe what happened.',
+            'notes.max' => 'Keep the notes to 500 characters or fewer.',
+        ]);
+
+        $service->reportCollectionFailure($return, $request->user('rider'), $data['reason'], $data['notes'] ?? null);
+
+        return back()->with('success', 'Missed collection recorded. Logistics will arrange the next step; the parcel stays with the buyer.');
     }
 }

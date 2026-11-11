@@ -122,7 +122,8 @@ class RouteExecutionService
         $location = match (true) {
             $return?->status === ParcelReturnStatus::Completed => 'Returned to seller',
             $return?->awaitingSellerDecision(), $return?->awaitingBuyerCollection() => 'With buyer while return is arranged',
-            in_array($return?->status, [ParcelReturnStatus::AtOrigin, ParcelReturnStatus::AwaitingSeller], true) => $lastHub?->name ?? 'At origin hub awaiting seller receipt',
+            in_array($return?->status, [ParcelReturnStatus::Lost, ParcelReturnStatus::Damaged], true) => 'Closed during return: '.strtolower($return->status->label()),
+            in_array($return?->status, [ParcelReturnStatus::AtOrigin, ParcelReturnStatus::AwaitingSeller, ParcelReturnStatus::ReceiptDisputed, ParcelReturnStatus::Closed], true) => $lastHub?->name ?? 'At origin hub awaiting seller receipt',
             $return?->status === ParcelReturnStatus::InTransit => $inTransit ? 'Return in transit between hubs' : ($lastHub?->name ?? 'Return custody awaiting verification'),
             in_array($status, ['DELIVERED', 'COMPLETED'], true) => 'Delivered to buyer',
             $status === 'OUT_FOR_DELIVERY' => 'With delivery rider',
@@ -194,9 +195,10 @@ class RouteExecutionService
             return 'Logistics is resolving a delivery exception before the parcel can move.';
         }
         $return = $order->parcelReturn;
-        if ($return !== null && $return->status !== ParcelReturnStatus::Rejected) {
+        if ($return !== null && ! in_array($return->status, [ParcelReturnStatus::Rejected, ParcelReturnStatus::Cancelled], true)) {
             return match ($return->status) {
-                ParcelReturnStatus::InDispute => 'Awaiting Admin review of the return.',
+                ParcelReturnStatus::InDispute, ParcelReturnStatus::ReceiptDisputed => 'Awaiting Admin review of the return.',
+                ParcelReturnStatus::Lost, ParcelReturnStatus::Damaged, ParcelReturnStatus::Closed => 'The return is closed. An admin handles any refund.',
                 ParcelReturnStatus::Completed => 'The seller has received the returned parcel.',
                 ParcelReturnStatus::AtOrigin, ParcelReturnStatus::AwaitingSeller => 'Awaiting the seller to confirm physical receipt.',
                 ParcelReturnStatus::InTransit => 'The returned parcel is travelling back to the seller.',

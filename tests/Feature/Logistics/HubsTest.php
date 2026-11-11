@@ -306,7 +306,9 @@ class HubsTest extends TestCase
     {
         $province = $this->province($this->provider);
         $station = $this->station($this->provider, $province);
-        $otherStation = $this->station($this->provider, $province, 'Angeles');
+        // A second station in the same municipality, so only the rider rule can block the move.
+        $otherStation = $this->station($this->provider, $province, 'San Fernando', null, '0305401002');
+        $otherStation->forceFill(['name' => 'San Fernando East Station'])->save();
         $area = Area::query()->create([
             'logistics_provider_id' => $this->provider->id,
             'station_hub_id' => $station->id,

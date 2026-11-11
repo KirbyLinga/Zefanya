@@ -257,7 +257,7 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
     }
 
     /** @test */
-    public function test_completed_order_finalizes_five_percent_after_seller_discount_commission(): void
+    public function test_completed_order_finalizes_ten_percent_after_seller_discount_commission(): void
     {
         $operations = app(RiderOperationsService::class);
 
@@ -279,17 +279,17 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $order = $this->sellerOrder->fresh();
 
-        $this->assertSame(500, $order->commission_bps);
-        $this->assertSame(400, $order->commission_minor);
+        $this->assertSame(1000, $order->commission_bps);
+        $this->assertSame(800, $order->commission_minor);
         $this->assertNotNull($order->commission_finalized_at);
 
-        $this->assertSame(7600, $order->seller_net_minor);
+        $this->assertSame(7200, $order->seller_net_minor);
 
         $settlement = SellerSettlement::where('seller_order_id', $order->id)->first();
         $this->assertNotNull($settlement);
-        $this->assertSame(500, $settlement->commission_bps);
-        $this->assertSame(400, $settlement->commission_minor);
-        $this->assertSame(7600, $settlement->seller_payout_minor);
+        $this->assertSame(1000, $settlement->commission_bps);
+        $this->assertSame(800, $settlement->commission_minor);
+        $this->assertSame(7200, $settlement->seller_payout_minor);
         $this->assertNotNull($settlement->financials_finalized_at);
         $this->assertNull($settlement->pending_reason);
     }

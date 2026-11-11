@@ -9,6 +9,7 @@ use App\Services\Logistics\LogisticsRemittanceService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Cash a rider collects from buyers at the door. The rider holds it until the
@@ -20,13 +21,13 @@ class RiderCashService
     public function summaryFor(Courier $courier): array
     {
         $holding = CodRemittance::query()->where('courier_id', $courier->getKey())
-            ->where('status', CodRemittance::PENDING_REMITTANCE);
+            ->whereIn('status', [CodRemittance::PENDING_REMITTANCE, CodRemittance::PARTIALLY_REMITTED]);
         $handedOver = CodRemittance::query()->where('courier_id', $courier->getKey())
-            ->where('status', CodRemittance::REMITTED_TO_LOGISTICS);
+            ->whereIn('status', [CodRemittance::REMITTED_TO_LOGISTICS, CodRemittance::PARTIALLY_REMITTED]);
         $oldest = (clone $holding)->min('created_at');
 
         return [
-            'holdingMinor' => (int) (clone $holding)->sum('amount_minor'),
+            'holdingMinor' => (int) (clone $holding)->sum(DB::raw('CASE WHEN status = \''.CodRemittance::PARTIALLY_REMITTED.'\' THEN shortage_minor - shortage_recovered_minor ELSE amount_minor END')),
             'holdingCount' => (clone $holding)->count(),
             'overdueCount' => (clone $holding)->where('created_at', '<', $this->overdueCutoff())->count(),
             'oldestAt' => $oldest === null ? null : Carbon::parse($oldest),
@@ -41,7 +42,7 @@ class RiderCashService
     public function holdingFor(Courier $courier): Collection
     {
         return CodRemittance::query()->where('courier_id', $courier->getKey())
-            ->where('status', CodRemittance::PENDING_REMITTANCE)
+            ->whereIn('status', [CodRemittance::PENDING_REMITTANCE, CodRemittance::PARTIALLY_REMITTED])
             ->with('sellerOrder:id,tracking_number')
             ->orderBy('id')->get();
     }
@@ -49,7 +50,7 @@ class RiderCashService
     public function handedOverFor(Courier $courier, int $perPage = 10): LengthAwarePaginator
     {
         return CodRemittance::query()->where('courier_id', $courier->getKey())
-            ->where('status', CodRemittance::REMITTED_TO_LOGISTICS)
+            ->whereIn('status', [CodRemittance::REMITTED_TO_LOGISTICS, CodRemittance::PARTIALLY_REMITTED])
             ->with('sellerOrder:id,tracking_number')
             ->latest('confirmed_at')->latest('id')
             ->paginate($perPage, ['*'], 'handed_page')->withQueryString();

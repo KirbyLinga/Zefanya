@@ -208,7 +208,8 @@ class ParcelTrackingVerificationService
 
         /** @var RouteExecutionService $execution */
         $execution = app(RouteExecutionService::class);
-        $sortingBlocked = $order->status === OrderStatus::AtSortingCenter ? $execution->sortingBlockedReason($order) : null;
+        $awaitingSort = in_array($order->status, [OrderStatus::AtSortingCenter, OrderStatus::ArrivedAtHub], true);
+        $sortingBlocked = $awaitingSort ? $execution->sortingBlockedReason($order) : null;
 
         if ($sortingBlocked !== null) {
             $context = 'transfer';
@@ -224,7 +225,7 @@ class ParcelTrackingVerificationService
                     'confirm_message' => null,
                 ];
             }
-        } elseif ($order->status === OrderStatus::AtSortingCenter && $stationHubId !== null) {
+        } elseif ($awaitingSort && $stationHubId !== null) {
             $context = 'sorting';
             $token = $this->parcelVerify->issueForLogistics(
                 $provider,

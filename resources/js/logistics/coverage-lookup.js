@@ -8,6 +8,8 @@
         const search = root.querySelector('[data-barangay-search]');
         const selectAll = root.querySelector('[data-barangay-select-all]');
         const status = root.querySelector('[data-barangay-status]');
+        const hint = root.querySelector('[data-coverage-municipality-hint]');
+        const hintDefault = hint ? hint.textContent : '';
         const claims = JSON.parse(root.dataset.claims || '[]');
         const selected = new Set(JSON.parse(list.dataset.selected || '[]').map(String));
         const single = list.dataset.single === '1';
@@ -98,10 +100,21 @@
                 if (!response.ok) throw new Error();
                 const data = await response.json();
                 if (version !== cityVersion) return;
-                city.replaceChildren(new Option('Select municipality/city', ''));
-                data.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => city.add(new Option(item.name, item.code)));
+                // A Station Hub only covers its own municipality (enforced server side),
+                // so offer just that one. Older hubs with no municipality keep the full list.
+                const own = option.dataset.municipalityCode || '';
+                const locked = own && data.some(item => String(item.code) === own);
+                const choices = locked ? data.filter(item => String(item.code) === own) : data;
+                city.replaceChildren(...(locked ? [] : [new Option('Select municipality/city', '')]));
+                choices.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => city.add(new Option(item.name, item.code)));
                 city.disabled = false;
-                if (initial && data.some(item => String(item.code) === initial)) city.value = initial;
+                city.classList.toggle('pointer-events-none', !!locked);
+                city.classList.toggle('bg-[var(--bg-page)]', !!locked);
+                city.tabIndex = locked ? -1 : 0;
+                city.setAttribute('aria-readonly', locked ? 'true' : 'false');
+                if (hint) hint.textContent = locked ? 'Set by the Station Hub location. Choose another Station Hub to cover a different municipality.' : hintDefault;
+                if (locked) city.value = own;
+                else if (initial && data.some(item => String(item.code) === initial)) city.value = initial;
                 syncCityName();
                 await loadBarangays();
             } catch {

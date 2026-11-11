@@ -31,11 +31,12 @@ trait BootstrapsCheckoutCarriers
     {
         Http::preventStrayRequests();
 
-        // Factory weights are random, so tests about money keep a fixed fee here.
-        // CheckoutShippingTest covers pricing by weight and sets its own rates.
+        // Factory weights are random, so tests about money keep a flat ₱50 fee here.
+        // CheckoutShippingTest covers pricing by weight and sets its own fee.
         config([
-            'buyer.shipping_rates.same_municipality.additional_kg_minor' => 0,
-            'buyer.shipping_rates.same_province.additional_kg_minor' => 0,
+            'buyer.shipping_fee.base_minor' => 5000,
+            'buyer.shipping_fee.base_kg' => 2,
+            'buyer.shipping_fee.additional_kg_minor' => 0,
         ]);
 
         Cache::put('psgc:cities:030540000:030000000', [

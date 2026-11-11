@@ -34,6 +34,12 @@ class OperationsAuditLog extends Model
         'origin_share_reversed' => 'Origin shipping share reversed',
         'seller_payout_paid' => 'Seller payout paid',
         'seller_payout_rejected' => 'Seller payout rejected',
+        'parcel_lost_confirmed' => 'Parcel confirmed lost',
+        'lost_compensation_assigned' => 'Lost-parcel liability assigned',
+        'lost_compensation_paid' => 'Lost-parcel compensation recorded as paid',
+        'lost_compensation_adjusted' => 'Lost-parcel compensation adjusted',
+        'lost_parcel_recovered' => 'Lost parcel found at a hub',
+        'lost_parcel_disposition' => 'Found lost parcel: disposition decided',
     ];
 
     protected $guarded = ['*'];

@@ -33,25 +33,34 @@
     });
     $firstStage = collect(array_keys($stages))->first(fn ($key) => $grouped->has($key)) ?? 'rider';
 
-    $buttonBase = 'inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 font-sans text-[12.5px] font-semibold no-underline transition-colors';
+    $buttonBase = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 font-sans text-[12.5px] font-semibold no-underline transition-colors';
     $primaryButton = $buttonBase.' ip-primary';
     $quietButton = $buttonBase.' border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-ink)] hover:bg-[var(--bg-page)]';
-    $fieldClass = 'ip-field h-9 w-full min-w-0 rounded-lg border border-[var(--border-strong)] px-2.5 font-sans text-[12.5px] text-[var(--text-ink)]';
+    $fieldClass = 'ip-field h-11 w-full min-w-0 rounded-lg border border-[var(--border-strong)] px-2.5 font-sans text-[12.5px] text-[var(--text-ink)]';
     $labelClass = 'font-sans text-[12px] text-[var(--text-muted)]';
 @endphp
 
-<div class="ip-canvas -m-4 min-h-screen sm:-m-6 xl:-m-8">
-<x-logistics.page-header title="Incoming Parcels">
-    <a href="{{ route('logistics.scan.index') }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3.5 font-sans text-[12.5px] font-semibold text-[var(--text-ink)] no-underline hover:bg-[var(--bg-page)]">
-        <i data-lucide="barcode" class="h-4 w-4 text-[var(--text-muted)]" aria-hidden="true"></i>
-        Scan parcel
-    </a>
-</x-logistics.page-header>
+<div class="ip-canvas [background-color:var(--bg-page)] [&_:is(a,button,select,input):focus-visible]:outline-2 [&_:is(a,button,select,input):focus-visible]:outline-offset-4 [&_:is(a,button,select,input):focus-visible]:outline-[var(--link)]">
+<x-logistics.tabs group="parcels" />
+<header class="mb-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-5">
+    <div class="min-w-0">
+        <p class="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--link)]">Seller to station</p>
+        <h1 class="font-serif text-[30px] leading-tight font-semibold text-[var(--text-ink)] sm:text-[34px]">Incoming Parcels</h1>
+        <p class="mt-2 max-w-xl font-sans text-[13px] leading-6 text-[var(--text-muted-2)]">Manage seller pickups and receive parcels at your station.</p>
+    </div>
+    <div class="flex shrink-0 items-center gap-3">
+        <a href="{{ route('logistics.scan.index') }}" class="ip-primary inline-flex min-h-11 items-center justify-center gap-2.5 rounded-lg px-5 font-sans text-[13px] font-semibold no-underline transition-colors">
+            <i data-lucide="scan-line" class="h-[18px] w-[18px]" aria-hidden="true"></i>
+            Scan parcel
+        </a>
+        <x-logistics.notification-bell />
+    </div>
+</header>
 
-<div class="p-4 sm:p-6 xl:px-8">
+<div>
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 @if ($errors->any())
-    <div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>
+    <div role="alert" class="mb-4 rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] p-4 font-sans text-[13px] text-[var(--status-danger)]">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>
 @endif
 
 @if ($highlightedId)
@@ -62,17 +71,63 @@
 @endif
 
 @if ($shipments->isEmpty())
-    <section class="flex flex-col items-center rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-6 py-14 text-center shadow-sm">
-        <i data-lucide="inbox" class="mb-3 h-8 w-8 text-[var(--icon-soft)]" aria-hidden="true"></i>
-        <p class="mb-1 font-sans text-[13px] font-semibold text-[var(--text-ink)]">No parcels awaiting pickup</p>
-        <p class="max-w-[360px] font-sans text-[12.5px] leading-5 text-[var(--text-muted)]">
-            Parcels marked ready for pickup by sellers will appear here for you to collect and deliver to the sorting center.
-        </p>
+    <section aria-labelledby="incoming-empty-title" class="overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[0_2px_8px_rgb(0_0_0/0.025)]">
+        <div class="flex items-center justify-between gap-4 border-b border-[var(--border-strong)] px-5 py-4 sm:px-7">
+            <h2 class="flex items-center gap-2.5 font-sans text-[13px] font-semibold text-[var(--text-ink)]">
+                <i data-lucide="inbox" class="h-4 w-4 text-[var(--link)]" aria-hidden="true"></i>
+                Pickup queue
+            </h2>
+            <span class="font-sans text-[11px] text-[var(--text-muted-2)]">Awaiting seller parcels</span>
+        </div>
+        <div class="flex flex-col items-center px-5 py-12 text-center sm:py-14">
+            <span class="ip-tile mb-6 flex h-[72px] w-[72px] items-center justify-center rounded-2xl">
+                <i data-lucide="package-check" class="h-8 w-8" stroke-width="1.4" aria-hidden="true"></i>
+            </span>
+            <h3 id="incoming-empty-title" class="font-serif text-[26px] leading-snug font-semibold text-[var(--text-ink)] sm:text-[28px]">No parcels awaiting pickup</h3>
+            <p class="mt-3 max-w-[430px] font-sans text-[13px] leading-[1.8] text-[var(--text-muted-2)]">
+                When sellers mark parcels ready for pickup, they will appear here for rider assignment and collection.
+            </p>
+            <a href="{{ route('logistics.parcel-sorting.index') }}" class="mt-7 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-btn-outline)] px-4 font-sans text-[12px] font-semibold text-[var(--text-ink)] no-underline transition-colors hover:bg-[var(--bg-raised)]">
+                Go to parcel sorting
+                <i data-lucide="arrow-right" class="h-4 w-4 text-[var(--link)]" aria-hidden="true"></i>
+            </a>
+            <p class="mt-2 font-sans text-[11px] leading-5 text-[var(--text-muted-2)]">For parcels already received at your station.</p>
+        </div>
+        <div class="border-t border-[var(--border-strong)] bg-[var(--bg-raised)] px-5 py-6 sm:px-7">
+            <p class="mb-5 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted-2)]">How incoming parcels work</p>
+            <ol class="grid gap-6 lg:grid-cols-3 lg:gap-8">
+                <li class="flex items-start gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] font-sans text-[11px] font-semibold text-[var(--link)]">01</span>
+                    <div>
+                        <p class="font-sans text-[12px] font-semibold text-[var(--text-ink)]">Seller marks ready</p>
+                        <p class="mt-1 font-sans text-[11.5px] leading-5 text-[var(--text-muted-2)]">The parcel joins your pickup queue.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] font-sans text-[11px] font-semibold text-[var(--link)]">02</span>
+                    <div>
+                        <p class="font-sans text-[12px] font-semibold text-[var(--text-ink)]">Rider collects</p>
+                        <p class="mt-1 font-sans text-[11.5px] leading-5 text-[var(--text-muted-2)]">An assigned rider picks up from the seller.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] font-sans text-[11px] font-semibold text-[var(--link)]">03</span>
+                    <div>
+                        <p class="font-sans text-[12px] font-semibold text-[var(--text-ink)]">Scan at station</p>
+                        <p class="mt-1 font-sans text-[11.5px] leading-5 text-[var(--text-muted-2)]">Receive the parcel, then move to sorting.</p>
+                    </div>
+                </li>
+            </ol>
+        </div>
     </section>
 @else
-    <div role="tablist" aria-label="Parcel stages" class="mb-5 flex flex-wrap gap-x-6 border-b border-[var(--border-strong)]">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="font-sans text-[14px] font-semibold text-[var(--text-ink)]">Pickup queue</h2>
+        <p class="font-sans text-[11.5px] text-[var(--text-muted-2)]">Stage counts show parcels on this page</p>
+    </div>
+    <div role="tablist" aria-label="Parcel stages on this page" class="mb-5 flex gap-x-6 overflow-x-auto border-b border-[var(--border-strong)]">
         @foreach ($stages as $key => $stage)
-            <a role="tab" href="#stage-{{ $key }}" data-ip-tab="{{ $key }}" aria-selected="{{ $key === $firstStage ? 'true' : 'false' }}" class="ip-tab -mb-px inline-flex min-h-11 items-center gap-2 font-sans text-[13px] font-medium no-underline">
+            <a role="tab" href="#stage-{{ $key }}" data-ip-tab="{{ $key }}" aria-selected="{{ $key === $firstStage ? 'true' : 'false' }}" class="ip-tab -mb-px inline-flex min-h-11 shrink-0 whitespace-nowrap items-center gap-2 font-sans text-[13px] font-medium no-underline">
                 {{ $stage['title'] }}
                 <span class="ip-count rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums">{{ $grouped->get($key, collect())->count() }}</span>
             </a>
@@ -107,7 +162,7 @@
                             $isHighlighted = (int) ($highlightedId ?? 0) === (int) $shipment->id;
                         @endphp
                         <li id="parcel-{{ $shipment->id }}" class="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm {{ $isHighlighted ? 'ip-highlight' : '' }}">
-                            <div class="grid grid-cols-[minmax(0,1fr)_28px] items-center gap-x-4 gap-y-3 p-4 lg:grid-cols-[minmax(0,1fr)_120px_minmax(260px,300px)_28px]">
+                            <div class="grid grid-cols-[minmax(0,1fr)_44px] items-center gap-x-4 gap-y-3 p-4 lg:grid-cols-[minmax(0,1fr)_120px_minmax(260px,300px)_44px]">
                                 <div class="flex min-w-0 items-center gap-3">
                                     <span class="ip-tile flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
                                         <i data-lucide="package-open" class="h-5 w-5"></i>
@@ -142,7 +197,7 @@
                                     </div>
                                 </div>
 
-                                <button type="button" data-ip-toggle aria-expanded="{{ $isThisReassignment ? 'true' : 'false' }}" aria-controls="parcel-{{ $shipment->id }}-details" aria-label="Details for parcel #{{ $shipment->id }}" title="Details" class="col-start-2 row-start-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-page)] lg:col-start-4">
+                                <button type="button" data-ip-toggle aria-expanded="{{ $isThisReassignment ? 'true' : 'false' }}" aria-controls="parcel-{{ $shipment->id }}-details" aria-label="Details for parcel #{{ $shipment->id }}" title="Details" class="col-start-2 row-start-1 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-page)] lg:col-start-4">
                                     <i data-lucide="chevron-down" class="h-4 w-4"></i>
                                 </button>
 
@@ -285,7 +340,9 @@
         </section>
     @endforeach
 @endif
-<div class="mt-4">{{ $shipments->links() }}</div>
+@if ($shipments->hasPages())
+    <div class="mt-6">{{ $shipments->links() }}</div>
+@endif
 </div>
 </div>
 @endsection

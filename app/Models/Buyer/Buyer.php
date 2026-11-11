@@ -94,6 +94,17 @@ class Buyer extends Authenticatable
         return trim("{$this->first_name}{$middle} {$this->last_name}");
     }
 
+    /**
+     * The private-disk path of the buyer's profile photo, kept in the existing
+     * `settings` JSON under `profile_photo` (see AccountPhotoController), or null.
+     */
+    public function profilePhotoPath(): ?string
+    {
+        $path = is_array($this->settings) ? ($this->settings['profile_photo'] ?? null) : null;
+
+        return is_string($path) && str_starts_with($path, 'buyer-photos/'.$this->id.'/') ? $path : null;
+    }
+
     /** Public review byline. Keeps the first and last character of each name part. */
     public function maskedName(): string
     {

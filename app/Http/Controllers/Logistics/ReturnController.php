@@ -75,6 +75,19 @@ class ReturnController extends Controller
         return to_route('logistics.manifests.show', $manifest);
     }
 
+    public function reportProblem(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['missing', 'damaged'])],
+            'reason' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'photo' => ['required_if:type,damaged', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], ['photo.required_if' => 'Attach a photo when reporting a damaged parcel.']);
+        $service->reportTransitProblem($return, $request->user('logistics'), $data + ['photo' => $request->file('photo')]);
+
+        return back()->with('success', 'Reported to Admin. The parcel is on hold and stays in your custody until Admin decides.');
+    }
+
     public function handoff(Request $request, ParcelReturn $return, ParcelReturnService $service)
     {
         $handoff = $service->reverseHandoff($return, $request->user('logistics'));

@@ -118,7 +118,8 @@ class CrossProviderHandoffQrTest extends TestCase
         $this->assertSame($this->origin->id, (int) $dispatched->dispatched_by_id);
         $this->assertNull($parcel->custody_provider_id);
         $this->assertSame($this->origin->id, (int) $parcel->carrier_provider_id);
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        // On the road; custody stays with the origin until the destination's scan.
+        $this->assertSame(OrderStatus::InTransit, $parcel->status);
         $this->assertSame('TRK-PHASE54-0001', $parcel->tracking_number);
     }
 
@@ -202,7 +203,7 @@ class CrossProviderHandoffQrTest extends TestCase
         $this->assertSame($this->destination->id, (int) $parcel->custody_provider_id);
         $this->assertSame($this->origin->id, (int) $parcel->carrier_provider_id);
         $this->assertSame((int) $received->receiving_hub_id, (int) $parcel->custody_hub_id);
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->status);
         $this->assertSame('TRK-PHASE54-0001', $parcel->tracking_number);
     }
 

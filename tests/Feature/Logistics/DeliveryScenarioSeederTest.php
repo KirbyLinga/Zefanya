@@ -15,6 +15,7 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
 use App\Models\Logistics\Manifest;
 use App\Models\Logistics\ParcelHandoff;
+use App\Models\Logistics\TransferCourier;
 use App\Models\Logistics\TransportConnection;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
@@ -120,9 +121,16 @@ class DeliveryScenarioSeederTest extends TestCase
 
         // Destination Hub -> Delivery Rider -> Buyer -> completion and money.
         $destination = $delivery->provider;
-        $this->actingAs($destination, 'logistics')
-            ->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $this->logisticsScan($destination, $parcel)])
-            ->assertSessionHasNoErrors();
+        if ($modes === []) {
+            // Received at its only hub, so the origin receipt scan already sorted it.
+            $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+            $this->actingAs($destination, 'logistics');
+        } else {
+            // A parcel that travelled is sorted by its destination hub's own scan.
+            $this->actingAs($destination, 'logistics')
+                ->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $this->logisticsScan($destination, $parcel)])
+                ->assertSessionHasNoErrors();
+        }
         $this->post(route('logistics.parcel-sorting.assignDelivery', $parcel), ['courier_id' => $delivery->id, 'reason' => 'Destination delivery'])
             ->assertSessionHasNoErrors();
         $this->assertSame(OrderStatus::AssignedToRider, $parcel->fresh()->status, (string) session('error'));
@@ -265,6 +273,20 @@ class DeliveryScenarioSeederTest extends TestCase
         $this->assertSame(0, LogisticsProviderLink::query()->count());
     }
 
+    public function test_partnerships_are_approved_by_the_platform_admin_never_a_demo_admin(): void
+    {
+        $this->withoutVite();
+        $demo = Admin::factory()->create(['email' => DeliveryScenarioSeeder::SLUG_PREFIX.'admin@zefanya.test']);
+        $this->seed(DeliveryScenarioSeeder::class);
+        $this->assertDatabaseCount('logistics_providers', 0); // A demo Admin alone is not enough.
+
+        $platform = Admin::factory()->create(['email' => 'admin@zefanya.shop']);
+        $this->seed(DeliveryScenarioSeeder::class);
+        $approvers = LogisticsProviderLink::query()->pluck('approved_by')->unique()->values()->all();
+        $this->assertSame([(int) $platform->id], array_map('intval', $approvers));
+        $this->assertNotContains((int) $demo->id, array_map('intval', $approvers));
+    }
+
     /**
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -311,8 +333,19 @@ class DeliveryScenarioSeederTest extends TestCase
         $manifest = Manifest::query()->latest('id')->firstOrFail();
         $this->post(route('logistics.manifests.items.store', $manifest), ['seller_order_id' => $parcel->id])->assertSessionHasNoErrors();
         $item = $manifest->items()->sole();
+
+        // New batches need the sending company's Courier before dispatch.
+        if ($manifest->fresh()->transport_required) {
+            $this->post(route('logistics.manifests.transport', $manifest), ['transfer_courier_id' => $this->seededCourier($owner)->id])
+                ->assertSessionHasNoErrors();
+        }
+
         $scan = $this->actingAs($owner, 'logistics')->postJson(route('logistics.manifests.scan.verify', $manifest), ['tracking_number' => $parcel->tracking_number, 'phase' => 'dispatch'])->assertOk()->json();
         $this->post(route('logistics.manifests.dispatch', $manifest), ['tokens' => [$item->id => $scan['verification_token']]])->assertSessionHasNoErrors();
+        $this->assertSame(OrderStatus::InTransit, $parcel->fresh()->status);
+
+        $this->assertSame($from, (int) $parcel->fresh()->custody_hub_id, 'Custody stays with the origin until the receiving scan.');
+
         $scan = $this->actingAs($owner, 'logistics')->postJson(route('logistics.manifests.scan.verify', $manifest), ['tracking_number' => $parcel->tracking_number, 'phase' => 'receive'])->assertOk()->json();
         $this->post(route('logistics.manifests.receive.store', [$manifest, $item]), ['verification_token' => $scan['verification_token']])->assertSessionHasNoErrors();
     }
@@ -323,10 +356,19 @@ class DeliveryScenarioSeederTest extends TestCase
         $handoff = ParcelHandoff::query()->latest('id')->firstOrFail();
         $this->assertSame($destination->id, (int) $handoff->destination_provider_id);
         $this->actingAs($destination, 'logistics')->post(route('logistics.handoffs.accept', $handoff))->assertSessionHasNoErrors();
+        if ($handoff->fresh()->transport_required) {
+            $this->actingAs($owner, 'logistics')->post(route('logistics.handoffs.courier', $handoff), ['transfer_courier_id' => $this->seededCourier($owner)->id])
+                ->assertSessionHasNoErrors();
+        }
         $scan = $this->actingAs($owner, 'logistics')->postJson(route('logistics.handoffs.scan.verify', $handoff), ['tracking_number' => $parcel->tracking_number, 'phase' => 'dispatch'])->assertOk()->json();
         $this->actingAs($owner, 'logistics')->post(route('logistics.handoffs.dispatch', $handoff), ['verification_token' => $scan['verification_token']])->assertSessionHasNoErrors();
         $scan = $this->actingAs($destination, 'logistics')->postJson(route('logistics.handoffs.scan.verify', $handoff), ['tracking_number' => $parcel->tracking_number, 'phase' => 'receive'])->assertOk()->json();
         $this->actingAs($destination, 'logistics')->post(route('logistics.handoffs.receive', $handoff), ['verification_token' => $scan['verification_token']])->assertSessionHasNoErrors();
+    }
+
+    private function seededCourier(LogisticsProvider $provider): TransferCourier
+    {
+        return TransferCourier::query()->where('logistics_provider_id', $provider->id)->active()->firstOrFail();
     }
 
     private function riderScan(Courier $courier, SellerOrder $parcel): string

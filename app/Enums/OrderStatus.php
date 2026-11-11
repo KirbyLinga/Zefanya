@@ -6,9 +6,9 @@ namespace App\Enums;
  * The order-fulfillment pipeline status. Shared by `orders`, `seller_orders`,
  * and `delivery_events` (the append-only shipment log).
  *
- * Stored as a native MySQL ENUM column per the Milestone 4 schema spec — a
- * deliberate deviation from the project's usual VARCHAR-only status rule,
- * with the permitted values mirrored here in application code.
+ * Stored as VARCHAR(20); the permitted values live here in application code.
+ * Case order is the pipeline order: the parent order rolls up to its least
+ * advanced parcel by this order.
  */
 enum OrderStatus: string
 {
@@ -26,6 +26,12 @@ enum OrderStatus: string
 
     case Sorted = 'SORTED';
 
+    /** On a hub-to-hub transfer after a verified dispatch scan. */
+    case InTransit = 'IN_TRANSIT';
+
+    /** Verified by the receiving hub's scan (or a recovery scan); waits to be sorted or sent on. */
+    case ArrivedAtHub = 'ARRIVED_AT_HUB';
+
     case AssignedToRider = 'ASSIGNED_TO_RIDER';
 
     case OutForDelivery = 'OUT_FOR_DELIVERY';
@@ -41,6 +47,12 @@ enum OrderStatus: string
     /** Seller declined their slice before handover (terminal; stock restored). */
     case Cancelled = 'CANCELLED';
 
+    /** Confirmed lost by Admin (terminal). Never reopened by a later scan; stock is not restored. */
+    case Lost = 'LOST';
+
+    /** Statuses a parcel can hold while it waits at a hub for sorting or its next transfer. */
+    public const AT_HUB = [self::AtSortingCenter, self::Sorted, self::ArrivedAtHub];
+
     public function label(): string
     {
         return match ($this) {
@@ -51,6 +63,8 @@ enum OrderStatus: string
             self::PickedUp => 'Picked up',
             self::AtSortingCenter => 'At sorting center',
             self::Sorted => 'Sorted',
+            self::InTransit => 'In transit',
+            self::ArrivedAtHub => 'Arrived at hub',
             self::AssignedToRider => 'Courier assigned',
             self::OutForDelivery => 'Out for delivery',
             self::Delivered => 'Delivered',
@@ -58,17 +72,21 @@ enum OrderStatus: string
             self::DeliveryFailed => 'Delivery failed',
             self::Returned => 'Returned',
             self::Cancelled => 'Cancelled',
+            self::Lost => 'Lost',
         };
     }
 
     /**
      * Customer-facing stage without changing operational status labels.
+     * Lost stays on the Cancelled tab for now, under its own shipment label.
      */
     public function buyerLabel(): string
     {
         return match ($this) {
             self::Placed, self::Confirmed, self::Preparing, self::ReadyForPickup => 'Preparing',
-            self::PickedUp, self::AtSortingCenter, self::Sorted, self::AssignedToRider => 'Shipped',
+            self::PickedUp, self::AtSortingCenter, self::Sorted, self::ArrivedAtHub, self::AssignedToRider => 'Shipped',
+            self::InTransit => 'In transit',
+            self::Lost => 'Lost — Shipment issue',
             default => $this->label(),
         };
     }
@@ -78,12 +96,12 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Placed, self::Confirmed, self::Preparing, self::ReadyForPickup => 'to_ship',
-            self::PickedUp, self::AtSortingCenter, self::Sorted, self::AssignedToRider,
-            self::OutForDelivery, self::Delivered => 'to_receive',
+            self::PickedUp, self::AtSortingCenter, self::Sorted, self::InTransit, self::ArrivedAtHub,
+            self::AssignedToRider, self::OutForDelivery, self::Delivered => 'to_receive',
             self::Completed => 'completed',
             self::DeliveryFailed => 'delivery_failed',
             self::Returned => 'returned',
-            self::Cancelled => 'cancelled',
+            self::Cancelled, self::Lost => 'cancelled',
         };
     }
 
@@ -94,10 +112,10 @@ enum OrderStatus: string
             self::Placed, self::Confirmed, self::Preparing => 'to_ship',
             self::ReadyForPickup => 'ready',
             self::AssignedToRider, self::PickedUp, self::AtSortingCenter,
-            self::Sorted, self::OutForDelivery => 'shipped',
+            self::Sorted, self::InTransit, self::ArrivedAtHub, self::OutForDelivery => 'shipped',
             self::Delivered, self::Completed,
             self::DeliveryFailed, self::Returned => 'delivered',
-            self::Cancelled => 'cancelled',
+            self::Cancelled, self::Lost => 'cancelled',
         };
     }
 }

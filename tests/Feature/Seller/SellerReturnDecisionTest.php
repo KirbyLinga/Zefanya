@@ -654,9 +654,9 @@ class SellerReturnDecisionTest extends TestCase
         $this->parcel->forceFill([
             'subtotal_minor' => 10000,
             'shipping_fee_minor' => 0,
-            'commission_bps' => 500,
-            'commission_minor' => 500,
-            'seller_net_minor' => 9500,
+            'commission_bps' => 1000,
+            'commission_minor' => 1000,
+            'seller_net_minor' => 9000,
         ])->save();
 
         return $settlement;
@@ -676,7 +676,8 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertSame(0, $settlement->commission_minor);
         $this->assertSame(0, $settlement->seller_payout_minor);
         $this->assertNull($settlement->pending_reason);
-        $this->assertSame(0, $this->parcel->commission_bps);
+        // The rate stays on the order; only the amount drops to nothing.
+        $this->assertSame(1000, $this->parcel->commission_bps);
         $this->assertSame(0, $this->parcel->commission_minor);
         $this->assertSame(0, $this->parcel->seller_net_minor);
 
@@ -693,13 +694,13 @@ class SellerReturnDecisionTest extends TestCase
         $record = $this->record();
 
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(500, $this->parcel->fresh()->commission_minor);
-        $this->assertSame(9500, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(1000, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(9000, $this->parcel->fresh()->seller_net_minor);
 
         $this->reject($record);
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
         $this->assertSame(SellerSettlement::COMMISSION_FINALIZATION_MISSING, $settlement->fresh()->pending_reason);
-        $this->assertSame(500, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(1000, $this->parcel->fresh()->commission_minor);
     }
 
     public function test_sel_ret_007_a_recorded_refund_releases_pending_earnings_once(): void
@@ -722,18 +723,18 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertSame(now('Asia/Manila')->toDateString(), $record->fresh()->refund_paid_on->toDateString());
         $this->assertNull($record->fresh()->refund_proof_path);
         $this->assertNotNull($record->fresh()->refunded_at);
-        // ₱50.25 of ₱100.00 refunded: the Seller keeps ₱49.75 of items, less 5% commission (₱2.49).
+        // ₱50.25 of ₱100.00 refunded: the Seller keeps ₱49.75 of items, less 10% commission (₱4.98).
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
         $this->assertNull($settlement->fresh()->pending_reason);
-        $this->assertSame(249, $settlement->fresh()->commission_minor);
-        $this->assertSame(4726, $settlement->fresh()->seller_payout_minor);
-        $this->assertSame(249, $this->parcel->fresh()->commission_minor);
-        $this->assertSame(4726, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(498, $settlement->fresh()->commission_minor);
+        $this->assertSame(4477, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(498, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(4477, $this->parcel->fresh()->seller_net_minor);
 
         $this->post(route('admin.returns.refund', $record), ['reference' => 'COD-REF-1002'] + $refund)
             ->assertSessionHasErrors('refund');
         $this->assertSame('COD-REF-1001', $record->fresh()->refund_reference);
-        $this->assertSame(4726, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(4477, $settlement->fresh()->seller_payout_minor);
     }
 
     private function refund(ParcelReturn $record, string $amount): void
@@ -753,6 +754,29 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertSame(0, $this->parcel->fresh()->seller_net_minor);
     }
 
+    public function test_an_order_finalized_at_five_percent_keeps_that_rate_through_a_return(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $this->parcel->forceFill(['commission_bps' => 500, 'commission_minor' => 500, 'seller_net_minor' => 9500])->save();
+        $record = $this->record();
+        $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+        $this->assertSame(0, $this->parcel->fresh()->commission_minor);
+
+        $this->refund($record, '20.00');
+
+        // ₱80.00 of items kept, less 5% (₱4.00), not today's 10%.
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+        $this->assertSame(400, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(7600, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(400, $settlement->fresh()->commission_minor);
+        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+
+        $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        app(CommissionFinalizationService::class)->finalize($this->parcel->fresh());
+        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+    }
+
     public function test_a_partial_refund_after_approval_gives_the_seller_back_the_unrefunded_part(): void
     {
         $settlement = $this->pendingSettlement();
@@ -762,30 +786,30 @@ class SellerReturnDecisionTest extends TestCase
 
         $this->refund($record, '20.00');
 
-        // ₱80.00 of items kept, less ₱4.00 commission.
+        // ₱80.00 of items kept, less ₱8.00 commission.
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(400, $settlement->fresh()->commission_minor);
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(800, $settlement->fresh()->commission_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
 
         // Completing the order later keeps the same split.
         $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
         app(CommissionFinalizationService::class)->finalize($this->parcel->fresh());
-        $this->assertSame(7600, $this->parcel->fresh()->seller_net_minor);
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(7200, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
     }
 
     public function test_a_partial_refund_after_payout_charges_the_seller_only_what_was_refunded(): void
     {
         $settlement = $this->pendingSettlement();
-        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9500, 'paid_amount_minor' => 9500, 'pending_reason' => null])->save();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000, 'pending_reason' => null])->save();
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
-        $this->assertSame(9500, SellerDebt::sole()->amount_minor);
+        $this->assertSame(9000, SellerDebt::sole()->amount_minor);
 
         $this->refund($record, '20.00');
 
-        // Paid ₱95.00, keeps ₱76.00, so owes back ₱19.00 (₱20.00 refunded less the ₱1.00 commission on it).
-        $this->assertSame(1900, SellerDebt::sole()->amount_minor);
+        // Paid ₱90.00, keeps ₱72.00, so owes back ₱18.00 (₱20.00 refunded less the ₱2.00 commission on it).
+        $this->assertSame(1800, SellerDebt::sole()->amount_minor);
         $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
     }
 
@@ -825,12 +849,12 @@ class SellerReturnDecisionTest extends TestCase
         $this->refund($record, '100.00');
 
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
-        $this->assertSame(500, $settlement->fresh()->commission_minor);
+        $this->assertSame(9000, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(1000, $settlement->fresh()->commission_minor);
         $this->assertDatabaseHas('operations_audit_logs', ['action' => 'return_fault_set']);
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
             ->assertSee('You are not charged for this return.')
-            ->assertSee('You keep ₱95.00 from this order after ₱5.00 commission.');
+            ->assertSee('You keep ₱90.00 from this order after ₱10.00 commission.');
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')->get(route('admin.returns.index'))
             ->assertSee('Logistics (damaged in transit) · set by an admin')
             ->assertSee('Courier crushed the box in transit.')
@@ -840,10 +864,10 @@ class SellerReturnDecisionTest extends TestCase
     public function test_a_logistics_fault_after_payout_cancels_the_sellers_debt(): void
     {
         $settlement = $this->pendingSettlement();
-        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9500, 'paid_amount_minor' => 9500, 'pending_reason' => null])->save();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000, 'pending_reason' => null])->save();
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
-        $this->assertSame(9500, SellerDebt::sole()->amount_minor);
+        $this->assertSame(9000, SellerDebt::sole()->amount_minor);
 
         $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasNoErrors();
 
@@ -895,7 +919,7 @@ class SellerReturnDecisionTest extends TestCase
 
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))->assertOk()
             ->assertSee('Buyer refunded ₱20.00 (partial refund).')
-            ->assertSee('You keep ₱76.00 from this order after ₱4.00 commission.');
+            ->assertSee('You keep ₱72.00 from this order after ₱8.00 commission.');
     }
 
     /** ₱100.00 of items plus ₱50.00 shipping; the buyer paid ₱150.00. */
@@ -953,12 +977,12 @@ class SellerReturnDecisionTest extends TestCase
 
         $this->refund($record, '20.00');
 
-        // ₱80.00 kept less ₱4.00 commission = ₱76.00, less the ₱50.00 return trip = ₱26.00.
+        // ₱80.00 kept less ₱8.00 commission = ₱72.00, less the ₱50.00 return trip = ₱22.00.
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(2600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(2200, $settlement->fresh()->seller_payout_minor);
         $this->assertSame(0, SellerDebt::sole()->outstandingMinor());
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
-            ->assertSee('You keep ₱26.00 from this order after ₱4.00 commission and ₱50.00 return charges.');
+            ->assertSee('You keep ₱22.00 from this order after ₱8.00 commission and ₱50.00 return charges.');
     }
 
     public function test_a_logistics_fault_charges_the_seller_no_shipping(): void
@@ -969,11 +993,11 @@ class SellerReturnDecisionTest extends TestCase
         $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasNoErrors();
         $this->refund($record, '150.00');
 
-        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(9000, $settlement->fresh()->seller_payout_minor);
         $this->assertSame(0, SellerDebt::sole()->outstandingMinor());
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
             ->assertDontSee('Return shipping charged to you')
-            ->assertSee('You keep ₱95.00 from this order after ₱5.00 commission.');
+            ->assertSee('You keep ₱90.00 from this order after ₱10.00 commission.');
     }
 
     public function test_a_partial_refund_needs_a_reason_that_the_buyer_sees(): void
@@ -1013,7 +1037,7 @@ class SellerReturnDecisionTest extends TestCase
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
         $this->refund($record, '20.00');
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
         $admin = Admin::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin, 'admin')->post(route('admin.returns.refund.void', $record), ['void_reason' => 'short'])->assertSessionHasErrors('void_reason');
@@ -1039,7 +1063,7 @@ class SellerReturnDecisionTest extends TestCase
         $this->refund($record, '20.00');
         $this->assertNotNull($record->fresh()->refunded_at);
         $this->assertTrue($record->events()->where('event_key', 'refund_recorded_2')->exists());
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
         $this->post(route('admin.returns.refund.void', $record->fresh()), ['void_reason' => 'Second transfer bounced as well.'])->assertSessionHasNoErrors();
         $this->assertTrue($record->events()->where('event_key', 'refund_voided_2')->exists());
     }
@@ -1068,7 +1092,7 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertNotNull($charge->fresh()->settled_at);
         $this->assertSame('BANK-1', $charge->fresh()->settlement_reference);
         $this->post(route('admin.return-charges.settle', $charge), ['reference' => 'BANK-2'])->assertSessionHasErrors('reference');
-        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(9000, $settlement->fresh()->seller_payout_minor);
     }
 
     public function test_voiding_removes_an_unsettled_transit_charge(): void
@@ -1088,7 +1112,7 @@ class SellerReturnDecisionTest extends TestCase
     public function test_a_lower_debt_never_drops_below_what_the_seller_already_repaid(): void
     {
         $settlement = $this->pendingSettlement();
-        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9500, 'paid_amount_minor' => 9500, 'pending_reason' => null])->save();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000, 'pending_reason' => null])->save();
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
         SellerDebt::sole()->forceFill(['settled_minor' => 5000])->save();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin\PlatformSetting;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsRemittance;
@@ -10,6 +11,7 @@ use App\Models\Logistics\OriginSharePayout;
 use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\StoreSale;
 use App\Services\Logistics\LogisticsRemittanceService;
+use App\Services\Logistics\ProviderAllocationService;
 use App\Services\Seller\SellerSettlementService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +23,7 @@ class LogisticsRemittanceController extends Controller
     public function index(LogisticsRemittanceService $remittances, SellerSettlementService $settlements): View
     {
         return view('Admin.LogisticsRemittances.index', [
+            'paymentDetailsMissing' => blank(PlatformSetting::query()->where('key', 'remittance_payment_details')->value('value')),
             'waiting' => LogisticsRemittance::query()->where('status', LogisticsRemittance::SUBMITTED)
                 ->with(['provider:id,business_name', 'codRemittances.sellerOrder:id,tracking_number,shipping_fee_minor,carrier_provider_id', 'codRemittances.sellerOrder.parcelReturn'])
                 ->orderBy('id')->get(),
@@ -90,6 +93,14 @@ class LogisticsRemittanceController extends Controller
         $remittances->payDestinationShare($request->user('admin'), $parcel, $data['reference'], $data['paid_on']);
 
         return redirect()->route('admin.logistics-remittances.index')->with('success', 'Payment to the delivering company recorded.');
+    }
+
+    public function approveAllocationPolicy(Request $request, ProviderAllocationService $allocations): RedirectResponse
+    {
+        $data = $request->validate(['policy_note' => ['required', 'string', 'min:20', 'max:2000']]);
+        $allocations->approvePolicy($request->user('admin'), $data['policy_note']);
+
+        return back()->with('success', 'Allocation policy approved. Allocation records for 3+ provider parcels may now be paid.');
     }
 
     public function payOrigin(Request $request, LogisticsProvider $provider, LogisticsRemittanceService $remittances): RedirectResponse

@@ -169,7 +169,10 @@ class LogisticsHubService
 
     private function assertCoverageRemovable(Area $area): void
     {
-        if ($area->couriers()->exists() || ($area->station && $this->deactivationBlockReason($area->station) !== null)) {
+        // Legacy rows (no barangay code) never route a parcel, so work in progress
+        // at the station does not depend on them; only linked riders block removal.
+        $legacy = blank($area->barangay_code);
+        if ($area->couriers()->exists() || (! $legacy && $area->station && $this->deactivationBlockReason($area->station) !== null)) {
             throw ValidationException::withMessages(['coverage' => 'Unlink riders and finish parcels before changing this coverage.']);
         }
         if ($area->is_active && $area->station?->is_active
@@ -348,7 +351,7 @@ class LogisticsHubService
     private function assertLegacyVerificationAllowed(LogisticsProvider $provider, SellerOrder $parcel): void
     {
         Gate::forUser($provider)->authorize('remediate-shipment-address', $parcel);
-        if (! in_array($parcel->status, [OrderStatus::AtSortingCenter, OrderStatus::Sorted], true)
+        if (! in_array($parcel->status, OrderStatus::AT_HUB, true)
             || $parcel->delivery_courier_id !== null || filled($parcel->order?->shipping_address['barangay_code'] ?? null)) {
             throw ValidationException::withMessages(['address' => 'Only an unassigned delivery at sorting with a missing snapshot barangay code can be verified.']);
         }

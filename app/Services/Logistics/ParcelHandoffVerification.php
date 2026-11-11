@@ -50,9 +50,18 @@ class ParcelHandoffVerification
 
     public const ACTION_MANIFEST_RECEIVE = 'manifest_receive';
 
+    /** A cancelled transfer's parcel verified at the hub where it now physically is. */
+    public const ACTION_MANIFEST_RECOVER = 'manifest_recover';
+
     public const ACTION_HANDOFF_DISPATCH = 'handoff_dispatch';
 
     public const ACTION_HANDOFF_RECEIVE = 'handoff_receive';
+
+    /** A cancelled in-transit handoff's parcel verified back at the sending hub. */
+    public const ACTION_HANDOFF_RECOVER = 'handoff_recover';
+
+    /** A hub's scan of a parcel Admin had already confirmed lost: it records where the parcel is found. */
+    public const ACTION_LOSS_RECOVER = 'loss_recover';
 
     public const ACTION_RETURN_ORIGIN = 'return_origin_receipt';
 

@@ -20,6 +20,13 @@
         recorded and sessions already open keep the rate they were created with. Every change is recorded below.</span>
     </div>
 
+    @if (blank($settings->firstWhere('key', 'remittance_payment_details')?->value))
+        <div role="alert" data-payment-details-missing class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p class="font-semibold">Payment instructions for Logistics companies are empty.</p>
+            <p class="mt-1">Companies cannot see where to send Zefanya its cash share. <a href="#setting-remittance_payment_details" class="font-semibold underline">Add them below</a>.</p>
+        </div>
+    @endif
+
     @if (session('success'))
         <div role="status" class="mb-6 rounded-lg border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
     @endif

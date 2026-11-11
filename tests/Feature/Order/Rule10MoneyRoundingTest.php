@@ -52,11 +52,11 @@ class Rule10MoneyRoundingTest extends TestCase
 
     public static function commissionBoundaries(): array
     {
-        return [[109, 5, 104], [110, 6, 104], [111, 6, 105], [1, 0, 1], [10, 1, 9], [69900, 3495, 66405]];
+        return [[104, 10, 94], [105, 11, 94], [106, 11, 95], [4, 0, 4], [5, 1, 4], [69900, 6990, 62910]];
     }
 
     #[DataProvider('commissionBoundaries')]
-    public function test_commission_uses_five_percent_and_half_up_centavo_rounding(int $subtotal, int $commission, int $net): void
+    public function test_commission_uses_ten_percent_and_half_up_centavo_rounding(int $subtotal, int $commission, int $net): void
     {
         $parent = Order::factory()->create(['discount_minor' => 0]);
         $order = SellerOrder::factory()->create([
@@ -66,7 +66,7 @@ class Rule10MoneyRoundingTest extends TestCase
 
         $finalized = app(CommissionFinalizationService::class)->finalize($order);
 
-        $this->assertSame(500, $finalized->commission_bps);
+        $this->assertSame(1000, $finalized->commission_bps);
         $this->assertSame($commission, $finalized->commission_minor);
         $this->assertSame($net, $finalized->seller_net_minor);
         $this->assertSame($subtotal, $finalized->commission_minor + $finalized->seller_net_minor);

@@ -16,6 +16,7 @@ use App\Models\Seller\StoreSale;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
 use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\StuckTransferService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -55,10 +56,11 @@ class DashboardController extends Controller
         $courierIds = (clone $courierQuery)->pluck('id');
 
         $parcelQuery = fn () => $this->parcelQuery($provider->id, $facility === null, $areaIds, $courierIds);
-        $hubQuery = $parcelQuery()->where('status', OrderStatus::AtSortingCenter->value);
+        $hubQuery = $parcelQuery()->whereIn('status', [OrderStatus::AtSortingCenter->value, OrderStatus::ArrivedAtHub->value]);
         $transitQuery = $parcelQuery()->whereIn('status', [
             OrderStatus::PickedUp->value,
             OrderStatus::Sorted->value,
+            OrderStatus::InTransit->value,
             OrderStatus::AssignedToRider->value,
             OrderStatus::OutForDelivery->value,
         ]);
@@ -81,7 +83,8 @@ class DashboardController extends Controller
         $dateFilter($riderQuery, 'couriers.updated_at');
         $stalledQuery = $parcelQuery()->whereIn('status', [
             OrderStatus::ReadyForPickup->value, OrderStatus::PickedUp->value, OrderStatus::AtSortingCenter->value,
-            OrderStatus::Sorted->value, OrderStatus::AssignedToRider->value, OrderStatus::OutForDelivery->value, OrderStatus::DeliveryFailed->value,
+            OrderStatus::Sorted->value, OrderStatus::InTransit->value, OrderStatus::ArrivedAtHub->value,
+            OrderStatus::AssignedToRider->value, OrderStatus::OutForDelivery->value, OrderStatus::DeliveryFailed->value,
         ])->where('seller_orders.updated_at', '<=', now()->subHours(24));
         $dateFilter($stalledQuery, 'seller_orders.updated_at');
         $queries = ['hub' => $hubQuery, 'transit' => $transitQuery, 'delivered' => $deliveredQuery, 'riders' => $riderQuery, 'stalled' => $stalledQuery];
@@ -150,6 +153,8 @@ class DashboardController extends Controller
             'activeRiders' => $activeRiders,
             'recentParcels' => $recentParcels,
             'operationsReady' => $checklist['complete'],
+            'overdueTransfers' => app(StuckTransferService::class)->overdueFor((int) $provider->id, 5),
+            'overdueTransferCount' => app(StuckTransferService::class)->countFor((int) $provider->id),
         ]);
     }
 

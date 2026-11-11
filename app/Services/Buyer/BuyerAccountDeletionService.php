@@ -65,7 +65,8 @@ class BuyerAccountDeletionService
     /** @throws ValidationException when the buyer still has unfinished business */
     public function delete(Buyer $buyer): void
     {
-        $identityDocument = DB::transaction(function () use ($buyer): ?string {
+        $profilePhoto = null;
+        $identityDocument = DB::transaction(function () use ($buyer, &$profilePhoto): ?string {
             $current = Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
 
             $reason = $this->blockingReason($current);
@@ -74,6 +75,8 @@ class BuyerAccountDeletionService
             }
 
             $identityDocument = $current->upload_id_path ?: null;
+            // `settings` (which holds the photo path) is cleared by anonymize().
+            $profilePhoto = $current->profilePhotoPath();
             $this->eraseSavedData($current);
             $this->eraseOrderContactDetails($current);
             $this->anonymize($current);
@@ -84,6 +87,7 @@ class BuyerAccountDeletionService
         // Sessions and the file can't be rolled back, so they go only once the erasure has committed.
         $this->sessions->revoke(AuthRole::Buyer->value, $buyer->id);
         $this->deleteIdentityDocument($identityDocument, $buyer->id);
+        $this->deleteIdentityDocument($profilePhoto, $buyer->id);
 
         Log::info('Buyer account anonymized.', ['buyer_id' => $buyer->id]);
     }

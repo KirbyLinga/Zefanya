@@ -2,18 +2,16 @@
 
 namespace App\Http\Controllers\Logistics;
 
-use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\Area;
-use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Courier;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\ParcelHandoffVerification;
-use App\Services\Logistics\ParcelIncidentService;
+use App\Services\Logistics\ParcelSortingService;
 use App\Services\Logistics\RouteExecutionService;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\RedirectResponse;
@@ -56,7 +54,7 @@ class ParcelSortingController extends Controller
 
         // Tab counts for the UI
         $sortingCount = (clone $baseQuery)
-            ->whereIn('status', [OrderStatus::AtSortingCenter, OrderStatus::Sorted])
+            ->whereIn('status', OrderStatus::AT_HUB)
             ->count();
 
         $assignedCount = (clone $baseQuery)
@@ -65,7 +63,7 @@ class ParcelSortingController extends Controller
 
         $statuses = $tab === 'assigned'
             ? [OrderStatus::AssignedToRider]
-            : [OrderStatus::AtSortingCenter, OrderStatus::Sorted];
+            : OrderStatus::AT_HUB;
 
         // The immutable destination snapshot is authoritative; never use the buyer's live address.
         $grammar = DB::connection()->getQueryGrammar();
@@ -96,7 +94,7 @@ class ParcelSortingController extends Controller
         return view('Logistics.ParcelSorting.index', [
             'shipments' => $shipments,
             'sortingBlocked' => $shipments->getCollection()
-                ->filter(fn (SellerOrder $parcel): bool => $parcel->status === OrderStatus::AtSortingCenter)
+                ->filter(fn (SellerOrder $parcel): bool => in_array($parcel->status, [OrderStatus::AtSortingCenter, OrderStatus::ArrivedAtHub], true))
                 ->mapWithKeys(fn (SellerOrder $parcel): array => [$parcel->id => app(RouteExecutionService::class)->sortingBlockedReason($parcel)]),
             'tab' => $tab,
             'sortingCount' => $sortingCount,
@@ -160,7 +158,7 @@ class ParcelSortingController extends Controller
         $alreadySorted = $fresh->status === OrderStatus::Sorted;
         $token = $request->input('verification_token');
 
-        if (! $alreadySorted && $fresh->status !== OrderStatus::AtSortingCenter) {
+        if (! $alreadySorted && ! in_array($fresh->status, [OrderStatus::AtSortingCenter, OrderStatus::ArrivedAtHub], true)) {
             return back()->with('error', 'This parcel has already been sorted.');
         }
 
@@ -168,7 +166,8 @@ class ParcelSortingController extends Controller
             return back()->with('error', $blocked);
         }
 
-        $area = $this->destinationAreaFor($provider, $fresh);
+        $sorting = app(ParcelSortingService::class);
+        $area = $sorting->destinationArea($provider, $fresh);
 
         try {
             // Authoritative origin Station Hub — required even for authorized retries.
@@ -189,35 +188,7 @@ class ParcelSortingController extends Controller
                 $method = $payload['method'] ?? null;
             }
 
-            DB::transaction(function () use ($fresh, $provider, $area, $method, $alreadySorted): void {
-                $fresh = SellerOrder::query()->whereKey($fresh->id)->lockForUpdate()->firstOrFail();
-                ParcelIncidentService::assertOperationsAllowed($fresh);
-                if ($alreadySorted) {
-                    return;
-                }
-
-                if (($blocked = app(RouteExecutionService::class)->sortingBlockedReason($fresh)) !== null) {
-                    throw new \InvalidArgumentException($blocked);
-                }
-
-                if ($area !== null && $fresh->destination_area_id !== $area->id) {
-                    $fresh->forceFill(['destination_area_id' => $area->id])->save();
-                }
-
-                $base = $area !== null
-                    ? "Parcel sorted and routed to {$area->name}."
-                    : 'Parcel sorted and routed for delivery.';
-
-                $this->status->transition(
-                    $fresh,
-                    OrderStatus::Sorted,
-                    note: $base.ParcelHandoffVerification::noteSuffix($method),
-                    changedBy: $provider->fullName(),
-                    actor: OrderActor::Logistics,
-                    actorId: $provider->id,
-                    source: 'web',
-                );
-            });
+            $sorting->sort($fresh, $provider, $area, $method, $alreadySorted);
 
             if (! $alreadySorted) {
                 $handoffVerify->consumeAfterSuccess(fn () => $handoffVerify->consumeForLogistics(
@@ -261,7 +232,7 @@ class ParcelSortingController extends Controller
         $preferredCourierId = $request->integer('courier_id') ?: null;
         $request->validate(['courier_id' => ['nullable', 'integer']]);
 
-        if (($limit = $this->assignment->manualRiderBlockReason($preferredCourierId, $provider->id)) !== null) {
+        if (($limit = $this->assignment->manualRiderBlockReason($preferredCourierId, $provider->id, $sellerOrder)) !== null) {
             return back()->with('error', $limit);
         }
 
@@ -330,7 +301,7 @@ class ParcelSortingController extends Controller
 
                 continue;
             }
-            if (Courier::query()->withWorkload()->findOrFail($courierId)->isAtJobLimit()) {
+            if (Courier::query()->withWorkload()->findOrFail($courierId)->isAtJobLimit($parcel)) {
                 $skippedLimit++;
 
                 continue;
@@ -356,14 +327,5 @@ class ParcelSortingController extends Controller
         }
 
         return back()->with($assigned > 0 ? 'success' : 'error', implode(' ', $parts));
-    }
-
-    /**
-     * Find this provider's active area covering the parcel's destination
-     * municipality (case-insensitive). Null when nothing matches.
-     */
-    private function destinationAreaFor(LogisticsProvider $provider, SellerOrder $sellerOrder): ?Area
-    {
-        return (new LogisticsHubService)->areaForBarangay($provider->id, $sellerOrder->buyerBarangayCode());
     }
 }

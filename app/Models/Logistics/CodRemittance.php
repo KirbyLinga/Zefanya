@@ -3,6 +3,7 @@
 namespace App\Models\Logistics;
 
 use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Support\Money;
@@ -14,6 +15,9 @@ class CodRemittance extends Model
     public const PENDING_REMITTANCE = 'PENDING_REMITTANCE';
 
     public const REMITTED_TO_LOGISTICS = 'REMITTED_TO_LOGISTICS';
+
+    /** Part of the parcel cash was received; the shortage is still outstanding. */
+    public const PARTIALLY_REMITTED = 'PARTIALLY_REMITTED';
 
     /** Cross-provider fee split: the origin carrier picks up, sorts and dispatches. */
     public const ORIGIN_SHARE_PERCENT = 40;
@@ -44,7 +48,10 @@ class CodRemittance extends Model
             'kept_shipping_minor' => 'integer',
             'origin_share_minor' => 'integer',
             'received_amount_minor' => 'integer',
+            'shortage_minor' => 'integer',
+            'shortage_recovered_minor' => 'integer',
             'confirmed_at' => 'datetime',
+            'shortage_recovered_at' => 'datetime',
             'zefanya_received_at' => 'datetime',
             'reconciled_at' => 'datetime',
             'destination_share_minor' => 'integer',
@@ -103,6 +110,22 @@ class CodRemittance extends Model
     public function dueToZefanyaMinor(): int
     {
         return $this->amount_minor - $this->keptShippingMinor();
+    }
+
+    /** Money the rider collected but the company has not physically received. */
+    public function outstandingShortageMinor(): int
+    {
+        return max(0, (int) $this->shortage_minor - (int) $this->shortage_recovered_minor);
+    }
+
+    public function hasOutstandingShortage(): bool
+    {
+        return $this->outstandingShortageMinor() > 0;
+    }
+
+    public function shortageRider(): BelongsTo
+    {
+        return $this->belongsTo(Rider::class, 'shortage_rider_id');
     }
 
     public function payment(): BelongsTo

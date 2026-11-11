@@ -7,7 +7,10 @@ use App\Models\Admin\Admin;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\LogisticsRemittance;
+use App\Models\Logistics\Manifest;
 use App\Models\Logistics\OriginSharePayout;
+use App\Models\Logistics\ParcelHandoff;
+use App\Models\Logistics\TransferCourierAssignment;
 use App\Models\Rider\RiderEarning;
 use App\Models\Rider\RiderPayout;
 use App\Models\Seller\SellerPayoutRequest;
@@ -17,8 +20,10 @@ use App\Notifications\Logistics\OriginSharePaymentRecorded;
 use App\Notifications\Rider\RiderPayoutRecorded;
 use App\Services\Admin\PlatformFinanceService;
 use App\Services\Logistics\LogisticsFinanceService;
+use App\Services\Logistics\LogisticsRemittanceService;
 use App\Services\Rider\RiderEarningService;
 use App\Services\Seller\SellerPayoutRequestService;
+use App\Services\Seller\SellerTransactionService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -34,6 +39,8 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
     {
         parent::setUp();
         Carbon::setTestNow(Carbon::parse('2026-11-04 09:00:00', 'Asia/Manila'));
+        // The live rule set: every new batch and handoff needs a Courier before dispatch.
+        config(['transfers.require_transport' => true]);
     }
 
     protected function tearDown(): void
@@ -70,8 +77,8 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
             $parcel = SellerOrder::query()->sole();
             $this->assertSame(OrderStatus::Completed, $parcel->status);
             $this->assertSame(50000, $parcel->subtotal_minor);
-            $this->assertSame(2500, $parcel->commission_minor);
-            $this->assertSame(47500, $parcel->seller_net_minor);
+            $this->assertSame(5000, $parcel->commission_minor);
+            $this->assertSame(45000, $parcel->seller_net_minor);
             $this->assertSame(0, (int) $parcel->seller_funded_discount_minor);
             $this->assertSame(0, (int) $parcel->marketplace_funded_discount_minor);
             $cod = CodRemittance::query()->where('seller_order_id', $parcel->id)->sole();
@@ -80,9 +87,10 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
             $seller = $parcel->seller;
             $admin = Admin::query()->firstOrFail();
             $shipping = $parcel->shipping_fee_minor;
-            $this->assertSame($expectedHandoffs ? 19900 : ($sellerSlug === 'seller-lumban' ? 6900 : 4900), $shipping);
+            // One fixed fee for every route: ₱50 for the first 2 kg.
+            $this->assertSame(5000, $shipping);
             $this->assertSame(50000 + $shipping, $cod->amount_minor);
-            $originShare = $expectedHandoffs ? 7960 : 0;
+            $originShare = $expectedHandoffs ? 2000 : 0;
             $retained = $shipping - $originShare;
             $due = $cod->amount_minor - $retained;
             $this->assertSame($originShare, $cod->originShareMinor());
@@ -116,7 +124,7 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
                 ->assertRedirect()->assertSessionHasNoErrors();
             $this->assertNotNull($cod->fresh()->zefanya_received_at);
             $this->assertSame($due, $remittance->fresh()->received_amount_minor);
-            $this->assertSame(47500, app(SellerPayoutRequestService::class)->availableBalance($seller));
+            $this->assertSame(45000, app(SellerPayoutRequestService::class)->availableBalance($seller));
 
             if ($expectedHandoffs) {
                 $this->post(route('admin.logistics-remittances.pay-origin', $origin), [
@@ -132,10 +140,14 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
             }
 
             // One batch per rider, including both jobs when the local rider did both.
+            // Couriers who carried the transfers earn nothing through Zefanya.
             $earnings = RiderEarning::query()->where('seller_order_id', $parcel->id)->get();
             $this->assertSame(2, $earnings->count());
+            $this->assertSame(2, RiderEarning::query()->count());
             $this->assertSame(3000, $earnings->firstWhere('job', RiderEarning::PICKUP)->amount_minor);
             $this->assertSame(5000, $earnings->firstWhere('job', RiderEarning::DELIVERY)->amount_minor);
+            $this->assertSame(Manifest::query()->count() + ParcelHandoff::query()->count(),
+                TransferCourierAssignment::query()->count(), 'Every transfer recorded its Courier.');
             foreach ($earnings->groupBy('courier_id') as $jobs) {
                 $courier = $jobs->first()->courier;
                 $amount = (int) $jobs->sum('amount_minor');
@@ -152,7 +164,7 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
 
             $this->actingAs($seller, 'seller')->get(route('seller.payout-requests.index'))->assertOk()->assertSee('Request payout');
             $this->post(route('seller.payout-requests.store'), [
-                'amount' => '475.00', 'idempotency_key' => (string) Str::uuid(), 'destination' => 'Isolated retest payment destination',
+                'amount' => '450.00', 'idempotency_key' => (string) Str::uuid(), 'destination' => 'Isolated retest payment destination',
             ])->assertRedirect()->assertSessionHasNoErrors();
             $sellerPayout = SellerPayoutRequest::query()->sole();
             $this->assertSame(0, $sellerPayout->debt_deducted_minor);
@@ -163,12 +175,12 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
             $this->assertSame('RETEST-SELLER-'.$sellerSlug, $sellerPayout->fresh()->payout_reference);
             $settlement = SellerSettlement::query()->sole();
             $this->assertSame(SellerSettlement::PAID, $settlement->status);
-            $this->assertSame(47500, $settlement->paid_amount_minor);
+            $this->assertSame(45000, $settlement->paid_amount_minor);
             $this->assertSame(0, app(SellerPayoutRequestService::class)->availableBalance($seller));
             $this->assertSame($snapshot, [$cod->fresh()->kept_shipping_minor, $cod->fresh()->origin_share_minor]);
-            $this->assertSame(2500, $due - $originShare - $sellerPayout->amount_minor);
+            $this->assertSame(5000, $due - $originShare - $sellerPayout->amount_minor);
             $platform = app(PlatformFinanceService::class);
-            $this->assertSame(2500, $platform->earnings(false)['netMinor']);
+            $this->assertSame(5000, $platform->earnings(false)['netMinor']);
             $position = $platform->position();
             $this->assertSame(0, $position['totalLiabilitiesMinor']);
             $this->assertSame(0, $position['outstandingCashMinor']);
@@ -178,13 +190,34 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
                 $statement = app(LogisticsFinanceService::class)->statement($company);
                 $this->assertSame(0, $statement['riderUnpaidMinor']);
                 $this->assertSame($statement['grossMinor'] - $statement['riderExpenseMinor'], $statement['netMinor']);
+                // Trip pay is a rider expense too, and every rider was paid in full.
+                $this->assertSame((int) RiderEarning::query()->where('logistics_provider_id', $company->id)->sum('amount_minor'), $statement['riderExpenseMinor']);
+                $this->assertSame($statement['riderExpenseMinor'], $statement['riderPaidMinor']);
                 $statements[$company->business_name] = $statement;
+
+                // Shipping fees table: + cash from the rider, − Zefanya's part once sent; the company keeps its fee.
+                $balances = app(LogisticsRemittanceService::class)->parcelBalances($company);
+                if ((int) $company->id === (int) $destination->id) {
+                    $this->assertSame([$cod->id => ['cashIn' => true, 'sentOut' => true, 'balanceMinor' => $retained]], $balances);
+                    $this->actingAs($company, 'logistics')->get(route('logistics.earnings.index'))->assertOk()
+                        ->assertSee('Balance')->assertSee('+₱'.number_format($cod->amount_minor / 100, 2))->assertSee('−₱'.number_format($due / 100, 2));
+                } else {
+                    $this->assertSame([], $balances, 'The origin company collected no parcel cash.');
+                }
             }
+
+            // Seller: + the order's net, − the paid withdrawal, ending at zero.
+            $sellerLedger = app(SellerTransactionService::class)->for($seller);
+            $this->assertSame(['Withdrawal', 'Order earnings'], $sellerLedger->pluck('type')->all());
+            $this->assertSame([-45000, 45000], $sellerLedger->pluck('amountMinor')->all());
+            $this->assertSame(0, $sellerLedger->first()['balanceAfterMinor']);
+            $this->actingAs($seller, 'seller')->get(route('seller.earnings.index'))->assertOk()
+                ->assertSee('Transactions')->assertSee('Order earnings')->assertSee('Withdrawal');
             $evidence += [
                 'subtotal_minor' => 50000, 'voucher_minor' => 0, 'buyer_cod_minor' => $cod->amount_minor,
                 'shipping_minor' => $shipping, 'destination_retained_minor' => $retained, 'origin_paid_minor' => $originShare,
-                'zefanya_received_minor' => $due, 'commission_minor' => 2500, 'seller_paid_minor' => 47500,
-                'rider_paid_minor' => 8000, 'platform_retained_minor' => 2500,
+                'zefanya_received_minor' => $due, 'commission_minor' => 5000, 'seller_paid_minor' => 45000,
+                'rider_paid_minor' => 8000, 'platform_retained_minor' => 5000,
                 'logistics_statements' => $statements, 'final_position' => $position,
                 'references' => ['cash' => $remittance->reference, 'seller' => $sellerPayout->fresh()->payout_reference],
                 'audit_actions' => OperationsAuditLog::query()->pluck('action')->all(),

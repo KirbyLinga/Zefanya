@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\Buyer\AccountController;
 use App\Http\Controllers\Buyer\AccountEmailController;
 use App\Http\Controllers\Buyer\AccountPasswordController;
+use App\Http\Controllers\Buyer\AccountPhotoController;
 use App\Http\Controllers\Buyer\CartController;
 use App\Http\Controllers\Buyer\CategoryController;
 use App\Http\Controllers\Buyer\ChatController;
@@ -87,11 +88,14 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::post('/checkout/buy-now', [CartController::class, 'buyNow'])->name('checkout.buy-now');
 
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{order}/review', [OrderController::class, 'review'])->name('orders.review');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/return', [OrderController::class, 'requestReturn'])
             ->name('orders.requestReturn');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/escalate', [OrderController::class, 'escalateReturn'])
             ->name('orders.escalateReturn');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/cancel', [OrderController::class, 'cancelReturn'])
+            ->name('orders.cancelReturn');
         Route::post('/orders/{order}/confirm-received', [OrderController::class, 'confirmReceived'])->name('orders.confirmReceived');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/cancel', [OrderController::class, 'cancelSellerOrder'])
             ->name('orders.cancelSellerOrder');
@@ -101,6 +105,9 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
 
         Route::get('/account', [AccountController::class, 'index'])->name('account.index');
         Route::patch('/account', [AccountController::class, 'update'])->name('account.update');
+        Route::get('/account/photo', [AccountPhotoController::class, 'show'])->name('account.photo.show');
+        Route::post('/account/photo', [AccountPhotoController::class, 'update'])->name('account.photo.update')->middleware('throttle:10,1');
+        Route::delete('/account/photo', [AccountPhotoController::class, 'destroy'])->name('account.photo.destroy');
 
         Route::post('/account/email', [AccountEmailController::class, 'request'])->name('account.email.request')->middleware('throttle:otp-verify');
         Route::post('/account/email/verify', [AccountEmailController::class, 'verify'])->name('account.email.verify')->middleware('throttle:otp-verify');

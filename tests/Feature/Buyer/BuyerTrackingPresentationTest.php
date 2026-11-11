@@ -30,7 +30,13 @@ class BuyerTrackingPresentationTest extends TestCase
 
         $response->assertOk()->assertSee('data-shipment-status="'.$status->value.'"', false)
             ->assertSeeText($status->buyerLabel())->assertDontSeeText('To Receive /')->assertDontSeeText('Cancelled / Returned');
-        if (in_array($status, [OrderStatus::Cancelled, OrderStatus::Returned, OrderStatus::DeliveryFailed], true)) {
+        if ($status === OrderStatus::Lost) {
+            $this->actingAs($buyer, 'buyer')->get(route('buyer.orders.index', ['tab' => 'cancelled']))
+                ->assertOk()
+                ->assertSeeText('Lost — Shipment issue')
+                ->assertDontSeeText('Cancelled by Buyer');
+        }
+        if (in_array($status, [OrderStatus::Cancelled, OrderStatus::Returned, OrderStatus::DeliveryFailed, OrderStatus::Lost], true)) {
             $response->assertDontSee('aria-label="Delivery milestones"', false);
         } else {
             $response->assertSee('aria-label="Delivery milestones"', false)

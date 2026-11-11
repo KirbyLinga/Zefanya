@@ -32,14 +32,14 @@ class ShipmentController extends Controller
     {
         $seller = Auth::guard('seller')->user();
         $statuses = collect(OrderStatus::cases())
-            ->reject(fn (OrderStatus $status) => in_array($status, [OrderStatus::Returned, OrderStatus::Cancelled], true));
+            ->reject(fn (OrderStatus $status) => in_array($status, [OrderStatus::Returned, OrderStatus::Cancelled, OrderStatus::Lost], true));
         $selectedStatus = $statuses->first(
             fn (OrderStatus $status) => $status->value === $request->query('status')
         );
 
         $shipments = SellerOrder::query()
             ->where('seller_id', $seller->id)
-            ->whereNotIn('status', [OrderStatus::Returned, OrderStatus::Cancelled])
+            ->whereNotIn('status', [OrderStatus::Returned, OrderStatus::Cancelled, OrderStatus::Lost])
             ->when($selectedStatus, fn ($query) => $query->where('status', $selectedStatus))
             ->with([
                 'order' => fn ($q) => $q->with('buyer'),
