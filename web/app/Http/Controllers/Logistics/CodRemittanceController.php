@@ -60,6 +60,10 @@ class CodRemittanceController extends Controller
 
         $data = $request->validate([
             'received_amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
+            'record_discrepancy' => ['nullable', 'in:1'],
+            'staff' => ['required_if:record_discrepancy,1', 'nullable', 'string', 'max:120'],
+            'reason' => ['required_if:record_discrepancy,1', 'nullable', 'string', 'max:500'],
+            'reference' => ['required_if:record_discrepancy,1', 'nullable', 'string', 'max:255'],
         ], [
             'received_amount.required' => 'Enter the cash amount physically received.',
             'received_amount.regex' => 'Enter a non-negative peso amount with at most two decimal places.',
@@ -69,7 +73,13 @@ class CodRemittanceController extends Controller
         [$pesos, $centavos] = array_pad(explode('.', $data['received_amount'], 2), 2, '0');
         $receivedAmountMinor = ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0');
 
-        $confirmed = $service->confirmReceipt($remittance, $provider, $receivedAmountMinor);
+        if ($request->boolean('record_discrepancy')) {
+            $service->recordDiscrepancy($remittance, $provider, $receivedAmountMinor, $data['staff'], $data['reason'], $data['reference']);
+
+            return back()->with('success', 'Cash discrepancy recorded for Admin review. The COD obligation is still outstanding.');
+        }
+
+        $confirmed = $service->confirmReceipt($remittance, $provider, $receivedAmountMinor, $data['reference'] ?? null);
 
         return redirect()->route('logistics.cod-remittances.index')->with(
             'success',

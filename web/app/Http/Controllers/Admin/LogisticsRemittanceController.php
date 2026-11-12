@@ -9,8 +9,10 @@ use App\Models\Logistics\LogisticsRemittance;
 use App\Models\Logistics\OriginSharePayout;
 use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\StoreSale;
+use App\Services\Logistics\CodRemittanceService;
 use App\Services\Logistics\LogisticsRemittanceService;
 use App\Services\Seller\SellerSettlementService;
+use App\Support\RuntimeSchema;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +23,14 @@ class LogisticsRemittanceController extends Controller
     public function index(LogisticsRemittanceService $remittances, SellerSettlementService $settlements): View
     {
         return view('Admin.LogisticsRemittances.index', [
+            'codDiscrepancies' => CodRemittance::query()->when(
+                RuntimeSchema::hasColumn('cod_remittances', 'discrepancy'),
+                fn ($query) => $query->whereNotNull('discrepancy'),
+                fn ($query) => $query->whereRaw('1 = 0'),
+            )
+                ->where('status', CodRemittance::PENDING_REMITTANCE)
+                ->with('sellerOrder:id,tracking_number')->latest('id')
+                ->paginate(20, ['*'], 'cod_discrepancies_page')->withQueryString(),
             'waiting' => LogisticsRemittance::query()->where('status', LogisticsRemittance::SUBMITTED)
                 ->with(['provider:id,business_name', 'codRemittances.sellerOrder:id,tracking_number,shipping_fee_minor,carrier_provider_id', 'codRemittances.sellerOrder.parcelReturn'])
                 ->orderBy('id')->get(),
@@ -38,6 +48,17 @@ class LogisticsRemittanceController extends Controller
                 ->with(['provider:id,business_name', 'decidedBy:id,name'])
                 ->latest('id')->paginate(25),
         ]);
+    }
+
+    public function reviewCodDiscrepancy(Request $request, CodRemittance $remittance, CodRemittanceService $service): RedirectResponse
+    {
+        $data = $request->validate([
+            'decision' => ['required', 'in:keep_open,authorize_recovery'],
+            'note' => ['required', 'string', 'max:500'],
+        ]);
+        $service->review($remittance, $request->user('admin'), $data['decision'], $data['note']);
+
+        return back()->with('success', 'COD discrepancy review recorded.');
     }
 
     public function confirm(Request $request, LogisticsRemittance $remittance, LogisticsRemittanceService $remittances): RedirectResponse

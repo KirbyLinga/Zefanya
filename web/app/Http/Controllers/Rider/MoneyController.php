@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
+use App\Models\Logistics\CodRemittance;
 use App\Models\Rider\RiderEarning;
 use App\Models\Rider\RiderPayout;
+use App\Services\Logistics\CodRemittanceService;
 use App\Services\Logistics\LogisticsRemittanceService;
 use App\Services\Rider\RiderCashService;
 use App\Services\Rider\RiderEarningService;
 use App\Services\Rider\RiderOperationsService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-/** Read-only money page: cash the rider holds, cash handed over, and pay earned. */
+/** Cash obligations, Rider explanations, and pay earned. */
 class MoneyController extends Controller
 {
     public function index(Request $request, RiderOperationsService $operations, RiderCashService $cash, RiderEarningService $pay): View
@@ -35,5 +38,14 @@ class MoneyController extends Controller
             'payouts' => RiderPayout::query()->where('courier_id', $courier->getKey())
                 ->with('reversal')->latest('id')->limit(10)->get(),
         ]);
+    }
+
+    public function explainDiscrepancy(Request $request, CodRemittance $remittance, RiderOperationsService $operations, CodRemittanceService $service): RedirectResponse
+    {
+        $courier = $operations->operationalCourier($request->user('rider'), allowWindDown: true);
+        $data = $request->validate(['explanation' => ['required', 'string', 'max:500']]);
+        $service->explain($remittance, $courier, $data['explanation']);
+
+        return back()->with('success', 'Your explanation was saved for review.');
     }
 }

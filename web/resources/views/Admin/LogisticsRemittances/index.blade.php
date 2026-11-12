@@ -27,6 +27,34 @@
         @endif
     </div>
 
+    @if ($codDiscrepancies->isNotEmpty())
+        <section class="space-y-3" aria-labelledby="cod-discrepancies">
+            <h2 id="cod-discrepancies" class="font-serif text-xl">Rider cash discrepancies</h2>
+            @foreach ($codDiscrepancies as $remittance)
+                @php($case = $remittance->discrepancy)
+                <article class="{{ $panel }} space-y-2 p-4 text-sm">
+                    <h3 class="font-semibold">Parcel #{{ $remittance->seller_order_id }} · {{ $remittance->sellerOrder?->tracking_number }}</h3>
+                    <p>Due {{ $peso($remittance->amount_minor) }} · Counted {{ $peso($case['counted_minor']) }} · {{ $case['difference_minor'] < 0 ? 'Short' : 'Excess' }} {{ $peso(abs($case['difference_minor'])) }}</p>
+                    <p>{{ $case['staff'] }} · {{ $case['recorded_at'] }} · {{ $case['reference'] }}</p>
+                    <p>{{ $case['reason'] }}</p>
+                    <p>Rider explanation: {{ $case['rider_explanation'] ?? 'Awaiting explanation' }}</p>
+                    @if (isset($case['review_note']))<p>Review: {{ $case['review_note'] }}</p>@endif
+                    @if ($case['status'] === 'awaiting_review')
+                        <form method="POST" action="{{ route('admin.cod-discrepancies.review', $remittance) }}" class="grid gap-2">
+                            @csrf
+                            <label>Decision <select class="{{ $field }}" name="decision"><option value="keep_open">Keep outstanding</option><option value="authorize_recovery">Authorize verified cash recovery or excess return</option></select></label>
+                            <label>Review note <textarea class="block w-full rounded border p-2" name="note" required maxlength="500"></textarea></label>
+                            <button class="min-h-10 rounded bg-primary-800 px-4 text-white">Record decision</button>
+                        </form>
+                    @else
+                        <p>Recovery authorized. Waiting for Logistics to confirm exact cash.</p>
+                    @endif
+                </article>
+            @endforeach
+            {{ $codDiscrepancies->links() }}
+        </section>
+    @endif
+
     <section aria-labelledby="subsidy-heading" class="space-y-3">
         <h2 id="subsidy-heading" class="font-serif text-xl text-neutral-950">Platform voucher cost</h2>
         <p class="text-[13px] text-neutral-600">A platform-funded voucher is paid by Zefanya: the seller still gets the full price while the buyer paid less. Compare it with the 5% commission Zefanya earns. Returned orders are left out.</p>

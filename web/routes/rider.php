@@ -53,6 +53,7 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
 
         Route::get('/history', [DeliveryHistoryController::class, 'index'])->name('history.index');
         Route::get('/money', [MoneyController::class, 'index'])->name('money.index');
+        Route::post('/money/cod/{remittance}/explain', [MoneyController::class, 'explainDiscrepancy'])->middleware('throttle:10,1')->name('money.cod.explain');
         // Private evidence is streamed only to the rider who submitted it.
         Route::get('/proofs/{deliveryProof}', [DeliveryProofController::class, 'show'])->name('proofs.show');
         Route::get('/account', [AccountController::class, 'show'])->name('account.show');

@@ -100,14 +100,38 @@
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">&#8369;{{ intdiv($remittance->amount_minor, 100) }}.{{ str_pad((string) ($remittance->amount_minor % 100), 2, '0', STR_PAD_LEFT) }}</td>
                             <td class="px-4 py-4">
+                                @php($case = $remittance->discrepancy)
+                                @if ($case)
+                                    <p class="mb-2 text-sm">Counted ₱{{ number_format($case['counted_minor'] / 100, 2) }}. {{ $case['difference_minor'] < 0 ? 'Short' : 'Excess' }} ₱{{ number_format(abs($case['difference_minor']) / 100, 2) }}.</p>
+                                    <p class="mb-2 text-sm">{{ $case['status'] === 'recovery_authorized' ? 'Recovery authorized. Confirm only after the full amount is physically accounted for.' : 'Awaiting Admin review. The COD obligation remains outstanding.' }}</p>
+                                @endif
+                                @if (! $case || $case['status'] === 'recovery_authorized')
                                 <form method="POST" action="{{ route('logistics.cod-remittances.confirm', $remittance) }}" class="flex flex-wrap items-end gap-3">
                                     @csrf
                                     <div>
                                         <label for="received-amount-{{ $remittance->id }}" class="mb-1 block text-xs text-[var(--text-muted)]">Cash received (PHP)</label>
                                         <input id="received-amount-{{ $remittance->id }}" name="received_amount" type="text" inputmode="decimal" required pattern="[0-9]{1,9}(\.[0-9]{1,2})?" maxlength="12" placeholder="0.00" class="h-10 w-36 rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-[var(--text-ink)] focus-visible:outline-2 focus-visible:outline-primary-700">
                                     </div>
+                                    @if ($case)
+                                        <label class="text-xs">Recovery or excess-return reference <input class="block rounded border p-2" name="reference" required maxlength="255"></label>
+                                    @endif
                                     <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-sm bg-primary-800 px-4 text-xs font-semibold text-white hover:bg-primary-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">Confirm cash received</button>
                                 </form>
+                                @endif
+                                @unless ($case)
+                                    <details class="mt-3">
+                                        <summary class="cursor-pointer text-sm">Record a cash discrepancy</summary>
+                                        <form method="POST" action="{{ route('logistics.cod-remittances.confirm', $remittance) }}" class="mt-2 grid gap-2 text-xs">
+                                            @csrf
+                                            <input type="hidden" name="record_discrepancy" value="1">
+                                            <label>Physical cash counted (PHP) <input class="block rounded border p-2" name="received_amount" inputmode="decimal" required maxlength="12"></label>
+                                            <label>Staff member who counted <input class="block rounded border p-2" name="staff" required maxlength="120"></label>
+                                            <label>Reason <textarea class="block rounded border p-2" name="reason" required maxlength="500"></textarea></label>
+                                            <label>Evidence reference <input class="block rounded border p-2" name="reference" required maxlength="255"></label>
+                                            <button class="min-h-10 rounded bg-primary-800 px-4 font-semibold text-white">Record for Admin review</button>
+                                        </form>
+                                    </details>
+                                @endunless
                             </td>
                         </tr>
                     @empty

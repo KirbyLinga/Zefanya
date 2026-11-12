@@ -80,6 +80,18 @@
                                 <td class="px-4 py-2.5">
                                     <p class="text-[12.5px] font-semibold text-[var(--text-ink)]">#{{ $item->seller_order_id }}</p>
                                     <p class="font-mono text-[10.5px] text-[var(--text-muted)]">{{ $item->sellerOrder?->tracking_number ?? '—' }}</p>
+                                    @if ($case = $item->discrepancy)
+                                        <p class="mt-2 text-xs">Cash counted {{ $peso($case['counted_minor']) }}. COD due {{ $peso($item->amount_minor) }}.</p>
+                                        @if (isset($case['rider_explanation']))
+                                            <p class="mt-2 text-xs">Your explanation was recorded.</p>
+                                        @elseif (in_array($case['status'], ['awaiting_review', 'recovery_authorized'], true))
+                                            <form method="POST" action="{{ route('rider.money.cod.explain', $item) }}" class="mt-2 space-y-2 text-xs">
+                                                @csrf
+                                                <label>Explain or dispute this cash count <textarea class="block rounded border p-2" name="explanation" required maxlength="500"></textarea></label>
+                                                <button class="min-h-10 rounded bg-primary-800 px-3 text-white">Send explanation</button>
+                                            </form>
+                                        @endif
+                                    @endif
                                 </td>
                                 <td class="px-4 py-2.5 text-[12px] text-[var(--text-muted)]">
                                     {{ $item->created_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}

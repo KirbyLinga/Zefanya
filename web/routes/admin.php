@@ -51,6 +51,7 @@ Route::middleware('auth:admin')->group(function () {
         Route::get('/audit-logs', [OperationsAuditLogController::class, 'index'])->name('audit-logs.index');
 
         Route::get('/logistics-remittances', [LogisticsRemittanceController::class, 'index'])->name('logistics-remittances.index');
+        Route::post('/cod-discrepancies/{remittance}/review', [LogisticsRemittanceController::class, 'reviewCodDiscrepancy'])->middleware('throttle:20,1')->name('cod-discrepancies.review');
         Route::post('/logistics-remittances/{remittance}/confirm', [LogisticsRemittanceController::class, 'confirm'])->name('logistics-remittances.confirm');
         Route::post('/logistics-remittances/{remittance}/reject', [LogisticsRemittanceController::class, 'reject'])->name('logistics-remittances.reject');
         Route::post('/logistics-remittances/origin/{provider}/pay', [LogisticsRemittanceController::class, 'payOrigin'])->name('logistics-remittances.pay-origin');

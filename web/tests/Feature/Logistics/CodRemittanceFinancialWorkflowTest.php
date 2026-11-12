@@ -37,6 +37,76 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
     use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
+    public function test_cash_discrepancy_keeps_the_obligation_open_until_audited_recovery(): void
+    {
+        app(RiderOperationsService::class)->completeDelivery($this->rider, $this->sellerOrder, [
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
+            'cod_amount_minor' => 8500,
+        ]);
+        $remittance = CodRemittance::sole();
+        $service = app(CodRemittanceService::class);
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $count = ['received_amount' => '0', 'record_discrepancy' => '1', 'staff' => 'Cashier A', 'reason' => 'No cash was present.', 'reference' => 'COUNT-1'];
+        $receipt = route('logistics.cod-remittances.confirm', $remittance);
+        $this->actingAs($this->provider, 'logistics')->post($receipt, $count)->assertSessionHasNoErrors();
+        $this->post($receipt, $count)->assertSessionHasNoErrors();
+        $this->post($receipt, ['received_amount' => '85.00'])->assertSessionHasErrors('received_amount');
+        $this->assertSame(8500, $remittance->fresh()->amount_minor);
+        $this->assertSame(-8500, $remittance->fresh()->discrepancy['difference_minor']);
+        $this->assertNull($remittance->fresh()->confirmed_at);
+        $this->assertDatabaseCount('seller_settlements', 0);
+
+        $this->actingAs(LogisticsProvider::factory()->create(['status' => 'approved']), 'logistics')
+            ->post($receipt, $count)->assertForbidden();
+        $this->actingAs(Admin::factory()->create(['role' => 'moderator']), 'admin')
+            ->post(route('admin.cod-discrepancies.review', $remittance), [
+                'decision' => 'authorize_recovery', 'note' => 'Attempt without finance authority.',
+            ])->assertForbidden();
+
+        $decision = ['decision' => 'authorize_recovery', 'note' => 'Cashier should recount the envelope in person.'];
+        $review = route('admin.cod-discrepancies.review', $remittance);
+        $this->actingAs($admin, 'admin')->post($review, $decision)->assertSessionHasNoErrors();
+        $this->actingAs($this->rider, 'rider')->post(route('rider.money.cod.explain', $remittance), [
+            'explanation' => 'I located the sealed cash envelope.',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('awaiting_review', $remittance->fresh()->discrepancy['status']);
+        $this->actingAs($admin, 'admin')->post($review, $decision)->assertSessionHasNoErrors();
+        $this->assertSame('I located the sealed cash envelope.', $remittance->fresh()->discrepancy['rider_explanation']);
+        $this->actingAs($this->provider, 'logistics')->post($receipt, ['received_amount' => '85.00'])->assertSessionHasErrors('received_amount');
+        $this->post($receipt, ['received_amount' => '85.00', 'reference' => 'RECOUNT-1'])->assertSessionHasNoErrors();
+        $this->assertFalse($service->confirmReceipt($remittance, $this->provider, 8500, 'RECOUNT-1'));
+        $this->assertSame('resolved', $remittance->fresh()->discrepancy['status']);
+        $this->assertSame(0, $remittance->fresh()->discrepancy['counted_minor']);
+        $this->assertSame('COUNT-1', $remittance->fresh()->discrepancy['reference']);
+        $this->assertSame(1, OperationsAuditLog::where('action', 'cod_discrepancy_recorded')->count());
+        $this->assertSame(1, OperationsAuditLog::where('action', 'cod_discrepancy_resolved')->count());
+        $this->assertDatabaseCount('seller_settlements', 1);
+        $this->assertDatabaseCount('rider_payouts', 0);
+    }
+
+    public function test_excess_and_short_counts_cannot_replace_each_other(): void
+    {
+        app(RiderOperationsService::class)->completeDelivery($this->rider, $this->sellerOrder, [
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
+            'cod_amount_minor' => 8500,
+        ]);
+        $remittance = CodRemittance::sole();
+        $service = app(CodRemittanceService::class);
+        $service->recordDiscrepancy($remittance, $this->provider, 9000, 'Cashier A', 'Envelope included excess.', 'COUNT-2');
+        $this->assertSame(500, $remittance->fresh()->discrepancy['difference_minor']);
+        $this->assertDatabaseCount('seller_settlements', 0);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('The original cash count is already recorded.');
+        $service->recordDiscrepancy($remittance, $this->provider, 8000, 'Cashier B', 'Different count.', 'COUNT-3');
+    }
+
     private LogisticsProvider $provider;
 
     private Courier $courier;

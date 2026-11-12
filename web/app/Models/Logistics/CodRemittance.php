@@ -44,6 +44,7 @@ class CodRemittance extends Model
             'kept_shipping_minor' => 'integer',
             'origin_share_minor' => 'integer',
             'received_amount_minor' => 'integer',
+            'discrepancy' => 'array',
             'confirmed_at' => 'datetime',
             'zefanya_received_at' => 'datetime',
             'reconciled_at' => 'datetime',
