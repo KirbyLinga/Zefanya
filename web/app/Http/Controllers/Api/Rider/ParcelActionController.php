@@ -20,6 +20,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
@@ -176,14 +177,19 @@ class ParcelActionController extends Controller
     public function completionStatus(Request $request, SellerOrder $sellerOrder): JsonResponse
     {
         $rider = $request->user();
-        $this->operations->assertDeliveryAssigned($rider, $sellerOrder);
-        $completed = in_array($sellerOrder->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
-            && $sellerOrder->deliveryProof()->where('rider_id', $rider->id)
-                ->where('courier_id', $sellerOrder->delivery_courier_id)->exists();
+        $state = DB::transaction(function () use ($rider, $sellerOrder): string {
+            $parcel = SellerOrder::query()->whereKey($sellerOrder->id)->sharedLock()->firstOrFail();
+            $this->operations->assertDeliveryAssigned($rider, $parcel);
+            if (in_array($parcel->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
+                && $parcel->deliveryProof()->where('rider_id', $rider->id)
+                    ->where('courier_id', $parcel->delivery_courier_id)->exists()) {
+                return 'completed';
+            }
 
-        return $this->success('Delivery outcome retrieved.', [
-            'state' => $completed ? 'completed' : ($sellerOrder->status === OrderStatus::OutForDelivery ? 'open' : 'unconfirmed'),
-        ])->header('Cache-Control', 'no-store, private');
+            return $parcel->status === OrderStatus::OutForDelivery ? 'open' : 'unconfirmed';
+        }, 3);
+
+        return $this->success('Delivery outcome retrieved.', ['state' => $state])->header('Cache-Control', 'no-store, private');
     }
 
     private function token(Request $request): ?string
