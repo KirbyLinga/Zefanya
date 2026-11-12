@@ -66,7 +66,10 @@
                 <button type="submit" class="rounded-sm border border-primary-700 px-3 py-2 text-xs font-semibold text-primary-800">Save who pays</button>
             </form>
         @endif
-        @php $paidMinor = (int) ($record->sellerOrder->payment?->amount_minor ?? 0); @endphp
+        @php
+            $refunds = app(\App\Services\Logistics\ParcelReturnService::class);
+            $paidMinor = $refunds->refundableFunds($record->sellerOrder->payment);
+        @endphp
         @if ($record->refunded_at)
             <p class="mt-3 text-xs text-[var(--text-ink)]">Refund recorded {{ $record->refunded_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reference: {{ $record->refund_reference }}.
                 @if ($record->refund_amount_minor !== null)₱{{ number_format($record->refund_amount_minor / 100, 2) }} to {{ $record->refund_recipient }}, paid {{ $record->refund_paid_on?->format('M j, Y') }}.@endif
@@ -80,10 +83,12 @@
                     <button type="submit" class="rounded-sm border border-red-700 px-3 py-2 text-xs font-semibold text-red-800">Void refund</button>
                 </form>
             </details>
-        @elseif ($record->isFailedDeliveryReturn() && ! \App\Models\Logistics\CodRemittance::query()->where('seller_order_id', $record->seller_order_id)->exists())
-            <p class="mt-3 text-xs text-[var(--text-muted)]">No money was collected from the buyer for this failed delivery, so there is nothing to refund.</p>
+        @elseif ($paidMinor === 0)
+            <p class="mt-3 text-xs text-[var(--text-muted)]">No confirmed payment funds are available to refund.</p>
         @elseif ($record->needsAdminFaultDecision())
             <p class="mt-3 text-xs text-amber-800">Recording the refund is available after you decide who pays.</p>
+        @elseif (! $refunds->hasRefundApproval($record))
+            <p class="mt-3 text-xs text-amber-800">Resolve and approve the return before recording a refund.</p>
         @else
             <form method="POST" action="{{ route('admin.returns.refund', $record) }}" enctype="multipart/form-data" class="mt-3 grid gap-2 sm:grid-cols-2">@csrf
                 <input name="reference" required maxlength="255" placeholder="COD refund reference" aria-label="COD refund reference" class="min-w-0 rounded-sm border border-[var(--border-strong)] p-2 text-xs">

@@ -758,6 +758,15 @@ class PhysicalReturnTest extends TestCase
         $this->actingAs($f['admin'], 'admin')->get(route('admin.returns.index'))->assertOk()
             ->assertSee('Failed delivery attempt and trip back to the Seller')
             ->assertDontSee(route('admin.returns.refund', $return), false);
+        $this->post(route('admin.returns.refund', $return), [
+            'reference' => 'UNPAID-COD',
+            'amount' => '1.00',
+            'recipient' => 'Buyer',
+            'paid_on' => now('Asia/Manila')->toDateString(),
+        ])->assertSessionHasErrors('refund');
+        $this->assertNull($return->fresh()->refunded_at);
+        $this->assertDatabaseCount('logistics_return_charges', 1);
+        $this->assertDatabaseCount('seller_debts', 1);
     }
 
     public function test_a_completed_buyer_return_pays_the_collecting_company_the_return_trip(): void

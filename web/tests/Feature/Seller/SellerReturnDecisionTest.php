@@ -66,7 +66,12 @@ class SellerReturnDecisionTest extends TestCase
             'to_status' => OrderStatus::Delivered, 'actor_type' => 'rider', 'source' => 'web',
         ]);
         $payment = Payment::factory()->create(['seller_order_id' => $this->parcel->id, 'amount_minor' => 10000]);
-        $payment->forceFill(['status' => PaymentStatus::Paid, 'paid_at' => now()])->save();
+        $payment->forceFill([
+            'status' => PaymentStatus::Paid,
+            'paid_at' => now(),
+            'collected_at' => now(),
+            'collected_amount_minor' => 10000,
+        ])->save();
     }
 
     protected function tearDown(): void
@@ -706,6 +711,7 @@ class SellerReturnDecisionTest extends TestCase
     {
         $settlement = $this->pendingSettlement();
         $record = $this->record();
+        $this->approveForRefund($record);
         $admin = Admin::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin, 'admin')->get(route('admin.returns.index'))
@@ -738,9 +744,19 @@ class SellerReturnDecisionTest extends TestCase
 
     private function refund(ParcelReturn $record, string $amount): void
     {
+        if ($record->fresh()->awaitingSellerDecision()) {
+            $this->approveForRefund($record);
+        }
+
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
             ->post(route('admin.returns.refund', $record), ['reference' => 'COD-REF-'.$record->id, 'amount' => $amount, 'recipient' => 'Juana Cruz', 'paid_on' => now('Asia/Manila')->toDateString(), 'refund_reason' => 'Only part of the order was faulty.'])
             ->assertRedirect()->assertSessionHasNoErrors();
+    }
+
+    private function approveForRefund(ParcelReturn $record): void
+    {
+        $this->actingAs($this->seller, 'seller')
+            ->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
     }
 
     public function test_a_full_refund_leaves_the_seller_nothing(): void
@@ -903,7 +919,7 @@ class SellerReturnDecisionTest extends TestCase
     {
         $settlement = $this->pendingSettlement();
         $this->parcel->forceFill(['shipping_fee_minor' => 5000])->save();
-        $this->parcel->payment->forceFill(['amount_minor' => 15000])->save();
+        $this->parcel->payment->forceFill(['amount_minor' => 15000, 'collected_amount_minor' => 15000])->save();
         $settlement->forceFill(['collected_amount_minor' => 15000, 'shipping_allocation_minor' => 5000])->save();
 
         return $settlement;
@@ -980,6 +996,7 @@ class SellerReturnDecisionTest extends TestCase
     {
         $this->pendingSettlement();
         $record = $this->record();
+        $this->approveForRefund($record);
         $admin = Admin::factory()->create(['role' => 'admin']);
         $base = ['reference' => 'R-1', 'amount' => '20.00', 'recipient' => 'Juana', 'paid_on' => now('Asia/Manila')->toDateString()];
 
@@ -1103,6 +1120,7 @@ class SellerReturnDecisionTest extends TestCase
     {
         $this->pendingSettlement();
         $record = $this->record();
+        $this->approveForRefund($record);
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin');
         $paid = $this->parcel->payment->amount_minor;
         $base = ['reference' => 'COD-REF-2001', 'amount' => '10.00', 'recipient' => 'Juana Cruz', 'paid_on' => now('Asia/Manila')->toDateString()];
@@ -1121,6 +1139,7 @@ class SellerReturnDecisionTest extends TestCase
         Storage::fake('local');
         $this->pendingSettlement();
         $record = $this->record();
+        $this->approveForRefund($record);
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin');
 
         $this->post(route('admin.returns.refund', $record), [
@@ -1133,6 +1152,51 @@ class SellerReturnDecisionTest extends TestCase
         Storage::disk('local')->assertExists($path);
         $this->get(route('admin.returns.refund-proof', $record))->assertOk();
         $this->get(route('admin.returns.index'))->assertSee('View proof');
+    }
+
+    public function test_refund_requires_both_a_decision_and_confirmed_collection(): void
+    {
+        $record = $this->record();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $url = route('admin.returns.refund', $record);
+        $payload = ['reference' => 'REF-1', 'amount' => '100.00', 'recipient' => 'Juana', 'paid_on' => now('Asia/Manila')->toDateString()];
+
+        $this->actingAs($admin, 'admin')->post($url, $payload)->assertSessionHasErrors('refund');
+        $this->approveForRefund($record);
+        $this->parcel->payment->forceFill(['collected_at' => null, 'collected_amount_minor' => null])->save();
+        $this->actingAs($admin, 'admin')->post($url, $payload)->assertSessionHasErrors('refund');
+
+        $this->assertNull($record->fresh()->refunded_at);
+        $this->assertDatabaseCount('seller_debts', 0);
+    }
+
+    public function test_a_rejected_return_cannot_be_refunded_even_when_payment_was_collected(): void
+    {
+        $record = $this->record();
+        $this->reject($record)->assertSessionHasNoErrors();
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->post(route('admin.returns.refund', $record), [
+                'reference' => 'REF-1', 'amount' => '100.00', 'recipient' => 'Juana',
+                'paid_on' => now('Asia/Manila')->toDateString(),
+            ])->assertSessionHasErrors('refund');
+
+        $this->assertNull($record->fresh()->refunded_at);
+        $this->assertDatabaseCount('seller_debts', 0);
+    }
+
+    public function test_refund_amount_is_capped_by_collected_funds_even_when_the_order_amount_is_higher(): void
+    {
+        $record = $this->record();
+        $this->approveForRefund($record);
+        $this->parcel->payment->forceFill(['amount_minor' => 15000])->save();
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->post(route('admin.returns.refund', $record), [
+                'reference' => 'REF-1', 'amount' => '100.01', 'recipient' => 'Juana',
+                'paid_on' => now('Asia/Manila')->toDateString(),
+            ])->assertSessionHasErrors('amount');
+
+        $this->assertNull($record->fresh()->refunded_at);
     }
 
     public function test_sel_ret_007_remittance_after_approval_does_not_reopen_pending_earnings(): void

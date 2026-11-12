@@ -5,12 +5,15 @@ namespace App\Services\Logistics;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus as State;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Buyer\Buyer;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductVariant;
+use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\InventoryException;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
@@ -23,6 +26,8 @@ use App\Models\Logistics\ParcelReturnEvent;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Payment;
+use App\Models\Shared\PaymentCancellationRefund;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Buyer\ReturnDisputeResolved;
 use App\Notifications\Buyer\ReturnRequestDecided;
@@ -216,7 +221,10 @@ class ParcelReturnService
             $this->require($record->financial_review_required, 'refund', 'This return has no payment to refund.');
             $this->conflict($record->refunded_at === null, 'refund', 'This return already has a recorded refund.');
             $this->require(! $record->needsAdminFaultDecision(), 'refund', 'The buyer gave "Other" as the reason. Decide who pays (Seller or Logistics) before recording the refund.');
-            $collected = (int) $record->sellerOrder->payment()->value('amount_minor');
+            $payment = $record->sellerOrder->payment()->lockForUpdate()->first();
+            $collected = $this->refundableFunds($payment);
+            $this->require($collected > 0, 'refund', 'No confirmed payment funds are available to refund.');
+            $this->require($this->hasRefundApproval($record), 'refund', 'Resolve and approve the return before recording a refund.');
             $this->require($amountMinor <= $collected, 'amount', 'The refund cannot be more than the buyer paid (₱'.number_format($collected / 100, 2).').');
             $this->require($amountMinor === $collected || (mb_strlen($reason) >= 10 && mb_strlen($reason) <= 1000), 'refund_reason',
                 'This refund is less than the buyer paid (₱'.number_format($collected / 100, 2).'). Explain why in 10 to 1000 characters.');
@@ -233,6 +241,48 @@ class ParcelReturnService
             app(SellerSettlementService::class)->releasePendingForReturn($record->sellerOrder);
             app(ReturnChargeService::class)->sync($record);
         }, 3);
+    }
+
+    public function hasRefundApproval(ParcelReturn $record): bool
+    {
+        if (in_array($record->status, [State::Rejected, State::InDispute], true)) {
+            return false;
+        }
+
+        return $record->isBuyerRequest()
+            ? (in_array($record->seller_decision, [ParcelReturn::APPROVED, ParcelReturn::AUTO_APPROVED], true)
+                || $record->dispute_outcome === ParcelReturn::DISPUTE_OVERTURNED)
+            : $record->status === State::Completed;
+    }
+
+    public function refundableFunds(?Payment $payment): int
+    {
+        if ($payment?->status !== PaymentStatus::Paid || $payment->paid_at === null || $payment->method === null) {
+            return 0;
+        }
+
+        if (PaymentCancellationRefund::query()->where('payment_id', $payment->id)->exists()) {
+            // Cancellation owns this payment's refund liability.
+            return 0;
+        }
+
+        if ($payment->method !== PaymentMethod::Cod) {
+            return max(0, $payment->amount_minor);
+        }
+
+        $collected = $payment->collected_at !== null ? $payment->collected_amount_minor : null;
+        if ($collected === null) {
+            // Legacy cash receipts can prove collection when the payment snapshot is absent.
+            $collected = CodRemittance::query()
+                ->where('payment_id', $payment->id)
+                ->where('seller_order_id', $payment->seller_order_id)
+                ->where('status', CodRemittance::REMITTED_TO_LOGISTICS)
+                ->whereNotNull('confirmed_at')
+                ->whereColumn('received_amount_minor', 'amount_minor')
+                ->value('received_amount_minor');
+        }
+
+        return max(0, min($payment->amount_minor, (int) $collected));
     }
 
     /**
