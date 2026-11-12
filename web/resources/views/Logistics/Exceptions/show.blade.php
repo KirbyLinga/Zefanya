@@ -10,6 +10,8 @@
     $actionable = $statusValue !== 'resolved' || $incident->isHeld();
     $canReroute = $canResolve && in_array($typeValue, $routingTypes, true) && $actionable;
     $legs = is_array($route?->legs) ? $route->legs : ($route?->legs ? json_decode($route->legs, true) : []);
+    $workerReceipt = session('worker_receipt_token');
+    $workerRecoveryReceived = $incident->events->contains('event', 'worker_station_received');
 @endphp
 
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -35,6 +37,48 @@
             <p>{{ $error }}</p>
         @endforeach
     </div>
+@endif
+
+@if ($typeValue === 'worker_unavailable' && $canResolve && $actionable)
+    <section class="mb-4 space-y-3 rounded-lg border p-4 text-sm">
+        <h2 class="font-semibold">Worker custody recovery</h2>
+        <p>Recorded custodian: {{ $incident->custody_snapshot['worker_kind'] ?? 'Worker' }} #{{ $incident->custody_snapshot['worker_id'] ?? '—' }}. Recovery owner: {{ $incident->events->firstWhere('event', 'recovery_owner')?->detail ?? '—' }}.</p>
+        <form method="POST" action="{{ route('logistics.exceptions.worker-recovery', $incident) }}" class="grid gap-2">
+            @csrf
+            <label>Contact attempt or escalation reason <textarea name="note" required maxlength="1000" class="block w-full rounded border p-2"></textarea></label>
+            <div class="flex flex-wrap gap-2">
+                <button name="action" value="contact" class="min-h-10 rounded border px-4">Log contact attempt</button>
+                <button name="action" value="escalate" class="min-h-10 rounded border px-4">Escalate to Admin</button>
+            </div>
+        </form>
+        @if (($incident->custody_snapshot['worker_kind'] ?? null) === 'rider')
+            @if ($workerRecoveryReceived)
+                <form method="POST" action="{{ route('logistics.exceptions.worker-recovery', $incident) }}">
+                    @csrf
+                    <p class="mb-2">Physical station receipt is recorded. An in-transit delivery still needs an eligible replacement Rider before the case can close.</p>
+                    <button name="action" value="finish" class="min-h-10 rounded bg-primary-800 px-4 text-white">Finish verified recovery</button>
+                </form>
+            @elseif (($workerReceipt['case'] ?? null) === $incident->id)
+                <form method="POST" action="{{ route('logistics.exceptions.worker-recovery', $incident) }}" class="grid gap-2">
+                    @csrf
+                    <input type="hidden" name="verification_token" value="{{ $workerReceipt['token'] }}">
+                    <label><input type="checkbox" name="physically_received" value="1" required> I physically received this parcel at {{ $workerReceipt['station'] }}.</label>
+                    <button name="action" value="receive" class="min-h-10 rounded bg-primary-800 px-4 text-white">Record station receipt</button>
+                </form>
+            @else
+                <form method="POST" action="{{ route('logistics.exceptions.worker-recovery', $incident) }}" class="grid gap-2">
+                    @csrf
+                    <label>Tracking number on the recovered parcel <input name="tracking_number" required maxlength="100" class="block rounded border p-2"></label>
+                    <button name="action" value="verify" class="min-h-10 rounded border px-4">Verify parcel for station receipt</button>
+                </form>
+            @endif
+        @else
+            <p>Move this case under review, then use the existing manifest receiving scan for each parcel physically recovered at the authorized hub.</p>
+            @if (isset($incident->custody_snapshot['manifest_id']))
+                <p><a class="font-semibold underline" href="{{ route('logistics.manifests.receive.index', $incident->custody_snapshot['manifest_id']) }}">Open manifest #{{ $incident->custody_snapshot['manifest_id'] }} receiving</a></p>
+            @endif
+        @endif
+    </section>
 @endif
 
 <div class="grid gap-4 lg:grid-cols-3">
@@ -114,7 +158,9 @@
                 <label for="resolution" class="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Resolution</label>
                 <select id="resolution" name="resolution" required class="min-h-10 w-full rounded-lg border border-[var(--border-strong)] px-3 text-sm">
                     <option value="">Select a resolution</option>
-                    <option value="{{ \App\Services\Logistics\ParcelIncidentService::RESUME }}">Resume original route</option>
+                    @if ($typeValue !== 'worker_unavailable' || $incident->events->contains('event', 'recovery_received'))
+                        <option value="{{ \App\Services\Logistics\ParcelIncidentService::RESUME }}">Resume original route</option>
+                    @endif
                     @if (in_array($typeValue, $routingTypes, true))
                         <option value="{{ \App\Services\Logistics\ParcelIncidentService::REROUTE }}">Authorize reroute</option>
                     @endif
@@ -188,7 +234,7 @@
                     @if ($event->actor_type) · {{ $event->actor_type }} #{{ $event->actor_id ?? '—' }} @endif
                     @if ($event->from_status || $event->to_status) · {{ $event->from_status ?? '—' }} → {{ $event->to_status ?? '—' }} @endif
                 </p>
-                @if ($event->detail)<p class="mt-1 text-xs text-[var(--text-muted)]">{{ $event->detail }}</p>@endif
+                @if ($event->detail)<p class="mt-1 text-xs text-[var(--text-muted)]">{{ $event->metadata['note'] ?? $event->detail }}</p>@endif
             </div>
         @empty
             <p class="text-sm text-[var(--text-muted)]">No events recorded.</p>

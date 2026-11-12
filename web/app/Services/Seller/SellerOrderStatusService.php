@@ -12,6 +12,7 @@ use App\Models\Admin\Admin;
 use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductVariant;
+use App\Models\Shared\Incidents;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
@@ -145,6 +146,7 @@ class SellerOrderStatusService
         ?int $actorId = null,
         ?string $source = null,
         ?OrderStatus $expectedFrom = null,
+        ?Incidents $workerRecovery = null,
     ): SellerOrder {
         ParcelIncidentService::assertOperationsAllowed($sellerOrder);
 
@@ -158,7 +160,7 @@ class SellerOrderStatusService
         // replays (already at $to) must not re-notify or re-release couriers.
         $didTransition = false;
 
-        $sellerOrder = DB::transaction(function () use ($sellerOrder, $from, $to, $note, $changedBy, $actor, $actorId, $source, &$didTransition): SellerOrder {
+        $sellerOrder = DB::transaction(function () use ($sellerOrder, $from, $to, $note, $changedBy, $actor, $actorId, $source, $workerRecovery, &$didTransition): SellerOrder {
             // Compare-and-swap reference: the CURRENT status under the row lock.
             $current = SellerOrder::query()
                 ->whereKey($sellerOrder->id)
@@ -215,7 +217,17 @@ class SellerOrderStatusService
             }
 
             // Role gate — against the TRUE current status, not the caller's view.
-            if ($actor !== null && ! $actor->canTransition($currentStatus, $to)) {
+            $recoveredDelivery = $workerRecovery !== null
+                && $currentStatus === OrderStatus::OutForDelivery && $to === OrderStatus::AssignedToRider
+                && $actor === OrderActor::Logistics && (int) $actorId === (int) $current->custody_provider_id
+                && $current->custody_hub_id !== null
+                && $current->incidentSet()->whereKey($workerRecovery->id)
+                    ->where('type', 'worker_unavailable')->where('resolution', 'WORKER_RECOVERED')
+                    ->whereHas('events', fn ($query) => $query->where('event', 'worker_station_received')
+                        ->where('actor_id', $actorId)->where('metadata->hub_id', (int) $current->custody_hub_id)
+                        ->where('metadata->courier_id', (int) $current->delivery_courier_id))
+                    ->exists();
+            if (! $recoveredDelivery && $actor !== null && ! $actor->canTransition($currentStatus, $to)) {
                 $roleMessage = sprintf(
                     'The %s role cannot move an order from [%s] to [%s].',
                     $actor->value,
@@ -236,7 +248,7 @@ class SellerOrderStatusService
             // stale can only proceed when its intended hop is STILL legal.
             $allowed = self::ALLOWED[$currentStatus->value] ?? [];
 
-            if (! in_array($to, $allowed, true)) {
+            if (! $recoveredDelivery && ! in_array($to, $allowed, true)) {
                 throw new StaleStateException(self::staleMessage($sellerOrder->id, $currentStatus, $to, $from));
             }
 

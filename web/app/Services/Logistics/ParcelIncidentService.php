@@ -2,11 +2,13 @@
 
 namespace App\Services\Logistics;
 
+use App\Enums\ManifestStatus;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelIncidentStatus;
 use App\Enums\ParcelIncidentType;
 use App\Models\Admin\Admin;
+use App\Models\Logistics\LinehaulAssignment;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ManifestItem;
@@ -20,6 +22,7 @@ use App\Models\Shared\StatusHistory;
 use App\Notifications\Incident\IncidentReported;
 use App\Notifications\Incident\IncidentResolved;
 use App\Services\Rider\RiderOperationsService;
+use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +51,7 @@ class ParcelIncidentService
     public const HOLD = 'KEEP_ON_HOLD';
 
     public const ACTIVE_TYPES = [
-        'lost', 'damaged', 'missing', 'wrong_hub', 'inactive_connection', 'failed_transfer',
+        'lost', 'damaged', 'missing', 'wrong_hub', 'inactive_connection', 'failed_transfer', 'worker_unavailable',
     ];
 
     /**
@@ -172,7 +175,6 @@ class ParcelIncidentService
 
             $validated = $this->assertValidOperationalReport($payload);
             $type = ParcelIncidentType::from($validated['type']);
-
             $existing = Incidents::query()
                 ->where('incident_seller_order_id', $parcel->id)
                 ->where('type', $type->value)
@@ -184,6 +186,7 @@ class ParcelIncidentService
                 return $existing;
             }
 
+            $worker = $type === ParcelIncidentType::WorkerUnavailable ? $this->workerCustodian($parcel, $provider) : [];
             $photoPath = null;
             if (($photo = $validated['photo'] ?? null) !== null) {
                 $photoPath = $photo->store('incidents', ['disk' => 'local', 'visibility' => 'private']);
@@ -209,13 +212,16 @@ class ParcelIncidentService
                 'reason' => $validated['reason'],
                 'description' => $validated['description'] ?? null,
                 'happened_at' => $validated['happened_at'] ?? now(),
-                'custody_snapshot' => $this->currentCustodySnapshot($parcel),
+                'custody_snapshot' => $this->currentCustodySnapshot($parcel) + $worker,
                 'blocked_leg_index' => $validated['blocked_leg_index'] ?? $parcel->parcelRoute()->value('current_leg_index'),
                 'photo_disk' => $photoPath !== null ? 'local' : null,
                 'photo_path' => $photoPath,
             ]);
 
             $this->event($incident, 'reported', 'Operational exception reported', $type->value, 'logistics_provider', $provider->id, null, ParcelIncidentStatus::Open->value);
+            if ($type === ParcelIncidentType::WorkerUnavailable) {
+                $this->event($incident, 'recovery_owner', 'Recovery owner assigned', $validated['recovery_owner'], 'logistics_provider', $provider->id);
+            }
             $created = true;
 
             return $incident;
@@ -396,6 +402,12 @@ class ParcelIncidentService
             $validated = $this->assertValidResolve($payload);
             $action = $validated['event'];
 
+            if ($locked->type === ParcelIncidentType::WorkerUnavailable->value && $action !== self::HOLD) {
+                if ($action !== self::RESUME || ! $locked->events()->where('event', 'recovery_received')->exists()) {
+                    throw ValidationException::withMessages(['resolution' => 'Worker recovery requires verified physical receipt before the route can resume.']);
+                }
+            }
+
             if ($actor instanceof LogisticsProvider && in_array($action, ['RETURN', 'CLOSE_LOST', 'CLOSE_DAMAGED'], true)) {
                 abort(403, 'Only Admin can close or return a lost/damaged parcel.');
             }
@@ -574,7 +586,7 @@ class ParcelIncidentService
             self::assertOperationsAllowed($parcel);
         }
         $blockers = self::movementBlockers($parcel)->lockForUpdate()->get();
-        if ($blockers->isNotEmpty() && $blockers->every(fn (Incidents $incident) => in_array($incident->type, ['missing', 'wrong_hub', 'inactive_connection', 'failed_transfer', 'damaged'], true)
+        if ($blockers->isNotEmpty() && $blockers->every(fn (Incidents $incident) => in_array($incident->type, ['missing', 'wrong_hub', 'inactive_connection', 'failed_transfer', 'damaged', 'worker_unavailable'], true)
             && $incident->status === ParcelIncidentStatus::UnderReview && $incident->reviewed_at !== null
             && ($incident->type !== 'damaged' || $incident->reviewed_by_type === 'admin'))) {
             return;
@@ -643,13 +655,160 @@ class ParcelIncidentService
                 ParcelIncidentType::WrongHub->value,
                 ParcelIncidentType::InactiveConnection->value,
                 ParcelIncidentType::FailedTransfer->value,
+                ParcelIncidentType::WorkerUnavailable->value,
             ])],
+            'recovery_owner' => ['required_if:type,worker_unavailable', 'nullable', 'string', 'max:120'],
             'reason' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'happened_at' => ['nullable', 'date', 'before_or_equal:now'],
             'blocked_leg_index' => ['nullable', 'integer', 'min:0'],
             'photo' => ['required_if:type,damaged', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
+    }
+
+    private function workerCustodian(SellerOrder $parcel, LogisticsProvider $provider): array
+    {
+        $courier = match ($parcel->status) {
+            OrderStatus::PickedUp => $parcel->handover_at !== null ? $parcel->courier : null,
+            OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed => $parcel->deliveryCourier,
+            default => null,
+        };
+        if ($courier !== null && (int) $courier->logistics_provider_id === (int) $provider->id
+            && ($parcel->status !== OrderStatus::DeliveryFailed || ! $parcel->isBackAtStationAfterFailure())) {
+            return ['worker_kind' => 'rider', 'worker_id' => $courier->id, 'rider_id' => $courier->rider_id];
+        }
+        $item = $parcel->manifestItems()->whereNull('received_at')->whereNull('released_at')
+            ->whereHas('manifest', fn ($query) => $query->where('dispatched_by_type', 'linehaul')
+                ->where('logistics_provider_id', $provider->id)
+                ->where('status', ManifestStatus::Dispatched->value))->with('manifest')->first();
+        if ($item?->manifest?->dispatched_by_id === null) {
+            throw ValidationException::withMessages(['type' => 'Open worker recovery only when an assigned worker still holds the parcel.']);
+        }
+
+        $assignment = LinehaulAssignment::query()->where('manifest_id', $item->manifest_id)->first();
+        $custodian = $assignment?->takeover_resumed_at !== null ? $assignment->linehaul_driver_id : $item->manifest->dispatched_by_id;
+
+        return ['worker_kind' => 'linehaul', 'worker_id' => $custodian, 'manifest_id' => $item->manifest_id];
+    }
+
+    public function recordWorkerContact(Incidents $incident, LogisticsProvider $provider, string $note, bool $escalate = false): void
+    {
+        $note = trim($note);
+        if ($note === '' || mb_strlen($note) > 1000) {
+            throw ValidationException::withMessages(['note' => 'Enter a note of 1–1000 characters.']);
+        }
+        DB::transaction(function () use ($incident, $provider, $note, $escalate): void {
+            $parcel = SellerOrder::query()->whereKey($incident->incident_seller_order_id)->lockForUpdate()->firstOrFail();
+            $locked = Incidents::query()->whereKey($incident->id)->lockForUpdate()->firstOrFail();
+            $this->authorizeActor($locked, $parcel, $provider, false);
+            if ($locked->type !== ParcelIncidentType::WorkerUnavailable->value || ! $locked->isActive()) {
+                throw ValidationException::withMessages(['note' => 'A contact note requires an active worker recovery case.']);
+            }
+            $this->event($locked, $escalate ? 'recovery_escalated' : 'recovery_contact',
+                $escalate ? 'Worker recovery escalated to Admin' : 'Worker contact attempt', mb_substr($note, 0, 191),
+                'logistics_provider', $provider->id, metadata: ['note' => $note]);
+        }, 3);
+    }
+
+    public function verifyWorkerStationReceipt(Incidents $incident, LogisticsProvider $provider, string $tracking): array
+    {
+        $parcel = $incident->sellerOrder;
+        $station = $this->workerStation($incident, $parcel, $provider);
+        if (blank($parcel->tracking_number) || strcasecmp(trim($tracking), $parcel->tracking_number) !== 0) {
+            throw ValidationException::withMessages(['tracking_number' => 'Scan or enter the tracking number on the recovered parcel.']);
+        }
+
+        return [
+            'token' => app(ParcelHandoffVerification::class)->issueForLogistics($provider, $parcel, 'worker_receipt_'.$incident->id, stationHubId: $station),
+            'station' => LogisticsHub::query()->whereKey($station)->value('name'),
+        ];
+    }
+
+    public function receiveWorkerParcel(Incidents $incident, LogisticsProvider $provider, string $token): void
+    {
+        $verify = app(ParcelHandoffVerification::class);
+        DB::transaction(function () use ($incident, $provider, $token, $verify): void {
+            $parcel = SellerOrder::query()->whereKey($incident->incident_seller_order_id)->lockForUpdate()->firstOrFail();
+            $locked = Incidents::query()->whereKey($incident->id)->lockForUpdate()->firstOrFail();
+            $station = $this->workerStation($locked, $parcel, $provider);
+            if ($locked->events()->where('event', 'worker_station_received')->exists()) {
+                return;
+            }
+            $action = 'worker_receipt_'.$locked->id;
+            $verify->assertValidForLogistics($provider, $parcel, $action, $token, $station);
+            $parcel->forceFill(['custody_provider_id' => $provider->id, 'custody_hub_id' => $station])->save();
+            if ($parcel->status === OrderStatus::DeliveryFailed) {
+                $parcel->forceFill(['returned_to_station_at' => now()])->save();
+            }
+            $this->event($locked, 'worker_station_received', 'Recovered parcel physically received at station',
+                'Station #'.$station, 'logistics_provider', $provider->id, metadata: [
+                    'hub_id' => $station, 'shipment_status' => $parcel->status->value,
+                    'courier_id' => $parcel->status === OrderStatus::PickedUp ? $parcel->courier_id : $parcel->delivery_courier_id,
+                ]);
+            DB::afterCommit(fn () => $verify->consumeAfterSuccess(fn () => $verify->consumeForLogistics($provider, $parcel, $action, $token, $station)));
+        }, 3);
+    }
+
+    public function finishWorkerRecovery(Incidents $incident, LogisticsProvider $provider): void
+    {
+        DB::transaction(function () use ($incident, $provider): void {
+            app(LogisticsHubService::class)->lockProvider($provider->id);
+            $parcel = SellerOrder::query()->whereKey($incident->incident_seller_order_id)->lockForUpdate()->firstOrFail();
+            $locked = Incidents::query()->whereKey($incident->id)->lockForUpdate()->firstOrFail();
+            $this->authorizeActor($locked, $parcel, $provider, true);
+            if ($locked->resolution === 'WORKER_RECOVERED') {
+                return;
+            }
+            $station = $this->workerStation($locked, $parcel, $provider);
+            $receipt = $locked->events()->where('event', 'worker_station_received')->latest('id')->first();
+            $courier = $parcel->status === OrderStatus::PickedUp ? $parcel->courier_id : $parcel->delivery_courier_id;
+            if ($receipt === null || (int) ($receipt->metadata['hub_id'] ?? 0) !== $station
+                || (int) $parcel->custody_hub_id !== $station || (int) ($receipt->metadata['courier_id'] ?? 0) !== (int) $courier
+                || ($receipt->metadata['shipment_status'] ?? null) !== $parcel->status->value) {
+                throw ValidationException::withMessages(['receipt' => 'Verify physical station receipt before releasing this parcel.']);
+            }
+            $from = $locked->status->value;
+            $locked->forceFill([
+                'status' => ParcelIncidentStatus::Resolved, 'resolution' => 'WORKER_RECOVERED',
+                'resolved_at' => now(), 'resolved_by_type' => 'logistics_provider', 'resolved_by_id' => $provider->id,
+            ])->save();
+            $this->event($locked, 'resolved', 'Worker recovery verified', 'WORKER_RECOVERED', 'logistics_provider', $provider->id, $from,
+                ParcelIncidentStatus::Resolved->value, ['receipt_id' => $receipt->id, 'hub_id' => $station]);
+            self::assertOperationsAllowed($parcel);
+            $statuses = app(SellerOrderStatusService::class);
+            if ($parcel->status === OrderStatus::PickedUp) {
+                $statuses->transition($parcel, OrderStatus::AtSortingCenter, 'Recovered parcel physically received at origin station.',
+                    $provider->fullName(), OrderActor::Logistics, $provider->id, 'web');
+                app(ParcelLegService::class)->receiveAtOrigin($parcel, $provider->id, $station);
+            } elseif ($parcel->status === OrderStatus::OutForDelivery) {
+                $statuses->transition($parcel, OrderStatus::AssignedToRider, 'Recovered at station before a replacement assignment.',
+                    $provider->fullName(), OrderActor::Logistics, $provider->id, 'web', workerRecovery: $locked);
+                if (app(CourierAssignmentService::class)->reassign($parcel->fresh(), $provider, 'delivery',
+                    reason: 'Verified recovery case #'.$locked->id, expectedCourierId: (int) $courier) === null) {
+                    throw ValidationException::withMessages(['receipt' => 'The receipt is saved. Keep the parcel at the station until an eligible replacement Rider is available.']);
+                }
+            }
+        }, 3);
+    }
+
+    private function workerStation(Incidents $case, SellerOrder $parcel, LogisticsProvider $provider): int
+    {
+        $this->authorizeActor($case, $parcel, $provider, false);
+        if ($case->type !== ParcelIncidentType::WorkerUnavailable->value || ! $case->isActive()
+            || ! in_array($parcel->status, [OrderStatus::PickedUp, OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed], true)
+            || ($case->custody_snapshot['worker_kind'] ?? null) !== 'rider'
+            || (int) ($case->custody_snapshot['worker_id'] ?? 0) !== (int) ($parcel->status === OrderStatus::PickedUp ? $parcel->courier_id : $parcel->delivery_courier_id)
+            || $parcel->manifestItems()->whereNull('received_at')->whereNull('released_at')->exists()) {
+            throw ValidationException::withMessages(['receipt' => 'Rider recovery requires an active case. For a Courier manifest, use its existing per-parcel receiving flow.']);
+        }
+        $hub = $parcel->status === OrderStatus::PickedUp
+            ? app(LogisticsHubService::class)->requireOriginStationHubId($provider->id, $parcel)
+            : app(CourierAssignmentService::class)->failedReturnStationId($parcel);
+        if ($hub === null || ! LogisticsHub::query()->operational()->whereKey($hub)->where('logistics_provider_id', $provider->id)->exists()) {
+            throw ValidationException::withMessages(['receipt' => 'No authorized operating station is recorded for this parcel.']);
+        }
+
+        return $hub;
     }
 
     private function authorizeReporter(SellerOrder $parcel, Rider|LogisticsProvider $reporter): void

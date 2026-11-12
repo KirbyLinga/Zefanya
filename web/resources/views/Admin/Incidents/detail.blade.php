@@ -118,7 +118,7 @@
                             <p class="text-xs text-neutral-500">
                                 {{ $event->occurred_at ? $event->occurred_at->setTimezone('UTC')->format('Y-m-d\TH:i:s.vP') : '—' }}
                                 @if ($event->detail)
-                                    <span class="block text-xs text-neutral-400">{{ $event->detail }}</span>
+                                    <span class="block text-xs text-neutral-400">{{ $event->metadata['note'] ?? $event->detail }}</span>
                                 @endif
                                 @if (isset($eventCounts[$event->event]))
                                     <p class="text-xs text-neutral-400">Total {{ $event->event }} events: {{ $eventCounts[$event->event] }}</p>

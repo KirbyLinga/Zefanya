@@ -14,6 +14,7 @@ enum ParcelIncidentType: string implements Arrayable
     case WrongHub = 'wrong_hub';
     case InactiveConnection = 'inactive_connection';
     case FailedTransfer = 'failed_transfer';
+    case WorkerUnavailable = 'worker_unavailable';
     case Transported = 'transported';
     case Locked = 'locked';
     case Tampered = 'tampered';
@@ -28,6 +29,7 @@ enum ParcelIncidentType: string implements Arrayable
             self::WrongHub => 'Wrong hub',
             self::InactiveConnection => 'Inactive connection',
             self::FailedTransfer => 'Failed transfer',
+            self::WorkerUnavailable => 'Worker unavailable',
             self::Transported => 'Transported',
             self::Locked => 'Locked',
             self::Tampered => 'Tampered',

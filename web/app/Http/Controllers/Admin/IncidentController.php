@@ -29,6 +29,8 @@ class IncidentController extends Controller
             ])
             ->whereIn('type', ParcelIncidentService::ACTIVE_TYPES)
             ->with(['sellerOrder.seller', 'sellerOrder.order.buyer', 'events', 'sellerOrder.parcelRoute.destinationHub'])
+            ->withExists(['events as recovery_escalated' => fn ($query) => $query->where('event', 'recovery_escalated')])
+            ->orderByDesc('recovery_escalated')
             ->latest('id')
             ->paginate(30)
             ->withQueryString();

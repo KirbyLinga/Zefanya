@@ -145,6 +145,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/exceptions/parcels/{seller_order}', [ExceptionsController::class, 'store'])->name('exceptions.store');
         Route::get('/exceptions/{incident}', [ExceptionsController::class, 'show'])->name('exceptions.show');
         Route::post('/exceptions/{incident}/review', [ExceptionsController::class, 'review'])->name('exceptions.review');
+        Route::post('/exceptions/{incident}/worker-recovery', [ExceptionsController::class, 'workerRecovery'])->middleware('throttle:25,1')->name('exceptions.worker-recovery');
         Route::post('/exceptions/{incident}/preview', [ExceptionsController::class, 'preview'])->name('exceptions.preview');
         Route::post('/exceptions/{incident}/resolve', [ExceptionsController::class, 'resolve'])->name('exceptions.resolve');
 

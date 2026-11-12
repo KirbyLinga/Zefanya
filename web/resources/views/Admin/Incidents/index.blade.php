@@ -1,6 +1,6 @@
 @extends('Admin.Layouts.app')
 
-@section('title', 'Lost/Damaged Incidents')
+@section('title', 'Parcel Incidents')
 
 @section('content')
 <x-admin.tabs :tabs="[
@@ -20,8 +20,8 @@
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 class="text-[28px] font-bold text-neutral-950 mb-1">Lost/Damaged Incidents</h1>
-            <p class="text-base text-neutral-600">Unresolved lost and damaged incidents awaiting Admin resolution.</p>
+            <h1 class="text-[28px] font-bold text-neutral-950 mb-1">Parcel Incidents</h1>
+            <p class="text-base text-neutral-600">Open parcel exceptions, with escalated worker recovery cases shown first.</p>
         </div>
     </div>
 
@@ -52,7 +52,12 @@
                                     <span class="ml-2 text-xs text-neutral-500">{{ $incident->sellerOrder->tracking_number }}</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-neutral-700">{{ $incident->type }}</td>
+                            <td class="px-6 py-4 text-neutral-700">
+                                {{ $incident->type }}
+                                @if ($incident->recovery_escalated)
+                                    <span class="ml-2 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">Escalated</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-neutral-700">{{ $incident->reporter_type ?? '—' }} #{{ $incident->reporter_id ?? '—' }}</td>
                             <td class="px-6 py-4">
                                 @if ($incident->isOpen())

@@ -134,6 +134,52 @@ class ExceptionsController extends Controller
         return back()->with('success', 'Exception moved under review. The parcel remains blocked.');
     }
 
+    public function workerRecovery(Request $request, Incidents $incident): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->assertVisible($incident, (int) $provider->id);
+        $data = $request->validate([
+            'action' => ['required', 'in:contact,escalate,verify,receive,finish'],
+            'note' => ['required_if:action,contact,escalate', 'nullable', 'string', 'max:1000'],
+            'tracking_number' => ['required_if:action,verify', 'nullable', 'string', 'max:100'],
+            'verification_token' => ['required_if:action,receive', 'nullable', 'string', 'max:128'],
+            'physically_received' => ['exclude_unless:action,receive', 'required', 'accepted'],
+        ]);
+        if ($data['action'] === 'verify') {
+            return back()->with('worker_receipt_token', [
+                'case' => $incident->id,
+            ] + $this->incidents->verifyWorkerStationReceipt($incident, $provider, $data['tracking_number']));
+        }
+        $message = match ($data['action']) {
+            'contact', 'escalate' => $this->logWorkerContact($incident, $provider, $data['note'], $data['action'] === 'escalate'),
+            'receive' => $this->recordWorkerReceipt($incident, $provider, $data['verification_token']),
+            'finish' => $this->releaseWorkerParcel($incident, $provider),
+        };
+
+        return back()->with('success', $message);
+    }
+
+    private function logWorkerContact(Incidents $incident, LogisticsProvider $provider, string $note, bool $escalate): string
+    {
+        $this->incidents->recordWorkerContact($incident, $provider, $note, $escalate);
+
+        return $escalate ? 'Escalation recorded for Admin review.' : 'Contact attempt recorded.';
+    }
+
+    private function recordWorkerReceipt(Incidents $incident, LogisticsProvider $provider, string $token): string
+    {
+        $this->incidents->receiveWorkerParcel($incident, $provider, $token);
+
+        return 'Station receipt recorded. The parcel remains on hold until recovery is finished.';
+    }
+
+    private function releaseWorkerParcel(Incidents $incident, LogisticsProvider $provider): string
+    {
+        $this->incidents->finishWorkerRecovery($incident, $provider);
+
+        return 'Worker recovery finished. The shipment shows its current station or Rider assignment.';
+    }
+
     public function resolve(Request $request, Incidents $incident): RedirectResponse
     {
         $provider = $this->provider($request);

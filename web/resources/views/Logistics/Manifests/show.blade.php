@@ -396,6 +396,9 @@
                                 <p class="font-mono text-[11px] font-semibold text-[var(--text-ink)]">{{ $item->tracking_number }}</p>
                                 <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">{{ $item->sellerOrder?->order?->reference }} · {{ $item->sellerOrder?->seller?->business_name }}</p>
                                 <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">Delivery status: {{ $item->sellerOrder?->status?->label() }}</p>
+                                @if ($isDispatched && $manifest->dispatched_by_type === 'linehaul' && ! $item->received_at && ! $item->released_at)
+                                    <a href="{{ route('logistics.delivery-monitoring.show', $item->seller_order_id) }}#operational-exception" class="mt-2 inline-block text-xs font-semibold text-primary-700 underline">Report parcel exception</a>
+                                @endif
                                 @if ($isDraft && ! $item->received_at)
                                     <form method="POST" action="{{ route('logistics.manifests.items.destroy', [$manifest, $item]) }}" class="mt-2 inline">
                                         @csrf

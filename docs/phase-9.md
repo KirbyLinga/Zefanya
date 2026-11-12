@@ -18,7 +18,7 @@ Verification included 123 passing Laravel tests across COD, returns, settlement,
 
 ## Remaining sequence
 
-- **9D–9F** — Worker custody recovery, hub delay escalation, and final hardening.
+- **9E–9F** — Hub delay escalation and final hardening.
 
 ## 9B — Non-receipt disputes
 
@@ -31,3 +31,9 @@ Isolated Laravel regression run: 155 passed, 1,090 assertions. Focused Flutter L
 Wrong, defective, damaged or incomplete goods can use the existing return workflow after order completion. The ordinary online window starts at the recorded delivery transition. Admin can record a support-reviewed claim outside that window with a reason and an audit event. Verified Seller receipt closes the return case and preserves the original completed shipment. Refund recording remains separate and existing payment safeguards still apply.
 
 Verification included 115 Laravel tests and 37 focused Flutter Live API tests. This phase requires no additional schema change. The online window copy directs Buyers to support for other available remedies, consistent with the [DTI guidance on defective goods](https://fairtrade.dti.gov.ph/faq/is-no-return-no-exchange-policy-allowed/).
+
+## 9D — Unavailable worker custody
+
+Logistics can record a named recovery owner, contact attempts and Admin escalation in the existing parcel exception. For Rider custody, tracking verification and an explicit physical receipt record the receiving station. An out-for-delivery assignment can only change after that receipt and with an eligible replacement. A failed delivery resumes through the existing reschedule or return flow. Courier recovery uses the existing seal and per-parcel manifest receiving flow. Unrecovered items stay unresolved, even when another parcel from the same trip is received.
+
+Five isolated feature tests passed with 62 assertions. Coverage includes suspension before and after pickup, mismatched tracking, unauthorized receipt, duplicate receipt, no available replacement, and partial Courier recovery. This phase adds no migration. Concurrent recovery and reassignment on MySQL remain unverified.

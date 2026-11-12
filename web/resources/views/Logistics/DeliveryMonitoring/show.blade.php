@@ -140,9 +140,9 @@
 @endif
 
 @if (! $openIncident && ! in_array($sellerOrder->status, [OrderStatus::Delivered, OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled], true))
-    <div class="mt-6 bg-white border border-[var(--border-strong)] rounded-lg p-5">
+    <div id="operational-exception" class="mt-6 bg-white border border-[var(--border-strong)] rounded-lg p-5">
         <h2 class="text-base font-semibold text-[var(--text-ink)] mb-3">Report operational exception</h2>
-        <p class="text-sm text-[var(--text-muted)] mb-4">Use this for a missing parcel, wrong-hub receipt, or failed transfer. The parcel stays blocked until the exception is reviewed and resolved in <a href="{{ route('logistics.exceptions.index') }}" class="font-semibold text-primary-700 hover:text-primary-900">Parcel exceptions</a>.</p>
+        <p class="text-sm text-[var(--text-muted)] mb-4">Report a missing parcel, wrong-hub receipt, failed transfer, or unavailable worker. Track the hold and recovery in <a href="{{ route('logistics.exceptions.index') }}" class="font-semibold text-primary-700 hover:text-primary-900">Parcel exceptions</a>.</p>
         <form method="POST" enctype="multipart/form-data" action="{{ route('logistics.exceptions.store', $sellerOrder) }}" class="space-y-4">
             @csrf
             <div class="grid gap-4 sm:grid-cols-2">
@@ -153,6 +153,7 @@
                         <option value="wrong_hub" @selected(old('type') === 'wrong_hub')>Wrong hub</option>
                         <option value="inactive_connection" @selected(old('type') === 'inactive_connection')>Inactive connection</option>
                         <option value="failed_transfer" @selected(old('type') === 'failed_transfer')>Failed transfer</option>
+                        <option value="worker_unavailable" @selected(old('type') === 'worker_unavailable')>Worker unavailable</option>
                         <option value="damaged" @selected(old('type') === 'damaged')>Damaged</option>
                     </select>
                 </div>
@@ -161,6 +162,9 @@
                     <input id="exception_blocked_leg" name="blocked_leg_index" type="number" min="0" value="{{ old('blocked_leg_index') }}" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
                 </div>
             </div>
+            <label class="block text-sm">Recovery owner (required for an unavailable worker)
+                <input name="recovery_owner" value="{{ old('recovery_owner') }}" maxlength="120" class="block w-full rounded-lg border p-2">
+            </label>
             <div>
                 <label for="exception_reason" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Reason</label>
                 <input id="exception_reason" name="reason" value="{{ old('reason') }}" maxlength="255" required class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
