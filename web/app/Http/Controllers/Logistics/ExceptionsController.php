@@ -9,6 +9,7 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ParcelRouteRereoute;
 use App\Models\Shared\Incidents;
 use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\HubDelayService;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelLegService;
 use App\Services\Logistics\RouteExecutionService;
@@ -37,7 +38,7 @@ class ExceptionsController extends Controller
         $provider = $this->provider($request);
         $request->validate([
             'status' => ['nullable', Rule::in(['active', 'open', 'under_review', 'resolved', 'all'])],
-            'type' => ['nullable', Rule::in(ParcelIncidentService::ACTIVE_TYPES)],
+            'type' => ['nullable', Rule::in(ParcelIncidentService::QUEUE_TYPES)],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -45,7 +46,7 @@ class ExceptionsController extends Controller
         $search = trim((string) $request->query('search', ''));
 
         $exceptions = Incidents::query()
-            ->whereIn('type', ParcelIncidentService::ACTIVE_TYPES)
+            ->whereIn('type', ParcelIncidentService::QUEUE_TYPES)
             ->whereHas('sellerOrder', fn ($parcels) => $parcels->visibleToProvider((int) $provider->id))
             ->when($status === 'active', fn ($query) => $query->where(function ($active): void {
                 $active->whereIn('status', [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value])
@@ -125,6 +126,15 @@ class ExceptionsController extends Controller
     {
         $provider = $this->provider($request);
         $this->assertVisible($incident, (int) $provider->id);
+        if ($incident->type === ParcelIncidentType::HubDelay->value) {
+            $data = $request->validate([
+                'action_owner' => ['required', 'string', 'max:120'],
+                'review_note' => ['required', 'string', 'max:1000'],
+            ]);
+            app(HubDelayService::class)->recordReview($incident, $provider, $data['action_owner'], $data['review_note']);
+
+            return back()->with('success', 'Hub delay review and action owner recorded.');
+        }
         $data = $request->validate([
             'review_note' => ['required', 'string', 'max:1000'],
         ]);

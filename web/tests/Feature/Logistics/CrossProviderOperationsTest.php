@@ -10,9 +10,8 @@ use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Shared\Payment;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\CourierAssignmentService;
-use App\Services\Logistics\DeliveryOtpService;
+use App\Services\Logistics\HubDelayService;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Rider\RiderOperationsService;
@@ -106,10 +105,10 @@ class CrossProviderOperationsTest extends TestCase
         $operations->startDelivery($courier->rider, $parcel->fresh());
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
         $this->assertSame(PaymentStatus::Pending, $payment->fresh()->status);
-        app(DeliveryOtpService::class)->send($courier->rider, $parcel->fresh());
-        $code = Notification::sent($f['buyer'], DeliveryOtpCode::class)->sole()->code;
         $operations->completeDelivery($courier->rider, $parcel->fresh(), [
-            'delivery_otp' => $code,
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer', 'cod_amount_minor' => 44900,
         ]);
@@ -137,6 +136,21 @@ class CrossProviderOperationsTest extends TestCase
             $this->actingAs($f['b']['provider'], 'logistics')->post(route('logistics.parcel-sorting.sort', $f['parcel']))->assertForbidden();
             $this->assertNull($f['parcel']->fresh()->custody_provider_id);
         }
+    }
+
+    public function test_cross_province_hub_delay_belongs_to_the_receiving_provider_only_after_receipt(): void
+    {
+        $f = $this->routeFixture();
+        $delays = app(HubDelayService::class);
+        $this->assertSame(0, $delays->sweep());
+        $this->receive($f);
+        $this->travel(48)->hours();
+        $this->assertSame(1, $delays->sweep());
+        $case = $f['parcel']->incidentSet()->where('type', 'hub_delay')->sole();
+        $this->assertSame($f['b']['provider']->id, $case->custody_snapshot['provider_id']);
+        $this->assertSame($f['handoff']->fresh()->receiving_hub_id, $case->custody_snapshot['hub_id']);
+        $this->assertSame(0, $f['a']['provider']->notifications()->where('data->type', 'hub_delay')->count());
+        $this->assertSame(1, $f['b']['provider']->notifications()->where('data->type', 'hub_delay')->count());
     }
 
     public function test_origin_loses_backend_control_but_keeps_handoff_history_after_receipt(): void

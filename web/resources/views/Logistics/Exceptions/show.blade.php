@@ -6,6 +6,7 @@
 @php
     $statusValue = $incident->status?->value ?? $incident->status;
     $typeValue = strtolower((string) $incident->type);
+    $isHubDelay = $typeValue === 'hub_delay';
     $routingTypes = ['missing', 'wrong_hub', 'inactive_connection', 'failed_transfer'];
     $actionable = $statusValue !== 'resolved' || $incident->isHeld();
     $canReroute = $canResolve && in_array($typeValue, $routingTypes, true) && $actionable;
@@ -24,7 +25,11 @@
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 <div role="status" class="mb-4 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-ink)]">
-    {{ $incident->isActive() || $incident->isHeld() ? 'On hold - parcel movement is blocked.' : 'Exception resolved. Other active exceptions may still block movement.' }}
+    @if ($isHubDelay)
+        {{ $incident->isActive() ? 'Hub delay is being tracked. Standard dispatch and custody checks apply.' : 'This verified hub wait has ended.' }}
+    @else
+        {{ $incident->isActive() || $incident->isHeld() ? 'On hold - parcel movement is blocked.' : 'Exception resolved. Other active exceptions may still block movement.' }}
+    @endif
     @if (in_array($typeValue, ['lost', 'damaged'], true)) Admin review is required for this exception. @endif
     @if ($typeValue === 'wrong_hub' && $statusValue === 'under_review')
         <p class="mt-2">Use the existing manifest or handoff receiving scan to record the physical recovery. The parcel stays held until an authorized route decision.</p>
@@ -37,6 +42,10 @@
             <p>{{ $error }}</p>
         @endforeach
     </div>
+@endif
+
+@if ($isHubDelay)
+    @include('Components.hub-delay-review', ['incident' => $incident, 'action' => $canResolve ? route('logistics.exceptions.review', $incident) : null])
 @endif
 
 @if ($typeValue === 'worker_unavailable' && $canResolve && $actionable)
@@ -132,7 +141,7 @@
 </section>
 @endif
 
-@if ($actionable && $canResolve)
+@if ($actionable && $canResolve && ! $isHubDelay)
 <div class="mt-4 grid gap-4 lg:grid-cols-2">
     @if ($statusValue === 'open' || $incident->reviewed_at === null)
     <section class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">

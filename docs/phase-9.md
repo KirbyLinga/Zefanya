@@ -18,7 +18,7 @@ Verification included 123 passing Laravel tests across COD, returns, settlement,
 
 ## Remaining sequence
 
-- **9E–9F** — Hub delay escalation and final hardening.
+- **9F** — Remaining operational loopholes and final hardening.
 
 ## 9B — Non-receipt disputes
 
@@ -36,4 +36,10 @@ Verification included 115 Laravel tests and 37 focused Flutter Live API tests. T
 
 Logistics can record a named recovery owner, contact attempts and Admin escalation in the existing parcel exception. For Rider custody, tracking verification and an explicit physical receipt record the receiving station. An out-for-delivery assignment can only change after that receipt and with an eligible replacement. A failed delivery resumes through the existing reschedule or return flow. Courier recovery uses the existing seal and per-parcel manifest receiving flow. Unrecovered items stay unresolved, even when another parcel from the same trip is received.
 
-Five isolated feature tests passed with 62 assertions. Coverage includes suspension before and after pickup, mismatched tracking, unauthorized receipt, duplicate receipt, no available replacement, and partial Courier recovery. This phase adds no migration. Concurrent recovery and reassignment on MySQL remain unverified.
+Five isolated feature tests passed with 62 assertions. Coverage includes suspension before and after pickup, mismatched tracking, unauthorized receipt, duplicate receipt, no available replacement, and partial Courier recovery. The wider Rider, Logistics and Courier regression run passed 1,018 tests with 7,333 assertions. This phase adds no migration. Concurrent recovery and reassignment on MySQL remain unverified.
+
+## 9E — Hub delays
+
+The scheduled check uses the last verified receipt at the parcel's recorded hub and provider. It records warning, Logistics escalation, mandatory review and Admin assessment at 24 hours, 48 hours, five days and seven days. The Buyer receives one delay notice per hub wait. Logistics and Admin record a decision and an action owner in the existing exception pages. Review does not restart the clock. A verified departure ends a wait, and a new receipt starts a new wait only for that parcel.
+
+The 95-test Laravel regression run passed with 779 assertions, including exact thresholds, repeat runs, partial manifest receipts, cross-province accountability and Buyer notification access. Pint and the Web build passed. The phase adds no schema change. Live scheduler execution and MySQL concurrency were not exercised.

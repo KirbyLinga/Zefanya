@@ -12,6 +12,7 @@ final class BuyerNotificationTitle
     public static function for(array $data): string
     {
         return match ($data['type'] ?? 'notification') {
+            'hub_delay' => 'Parcel delayed at a hub',
             'courier_assigned' => 'Courier Assigned',
             'out_for_delivery', 'order_out_for_delivery' => 'Order Out for Delivery',
             'delivery_code' => 'Delivery Code Ready',

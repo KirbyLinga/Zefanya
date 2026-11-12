@@ -44,6 +44,8 @@ use Throwable;
  */
 class ParcelIncidentService
 {
+    public const QUEUE_TYPES = [...self::ACTIVE_TYPES, ParcelIncidentType::HubDelay->value];
+
     public const RESUME = 'RESUME_ORIGINAL_ROUTE';
 
     public const REROUTE = 'AUTHORIZE_REROUTE';
@@ -398,6 +400,9 @@ class ParcelIncidentService
             $parcel = SellerOrder::query()->whereKey($incident->incident_seller_order_id)->lockForUpdate()->firstOrFail();
             $locked = Incidents::query()->whereKey($incident->id)->lockForUpdate()->firstOrFail();
             $this->authorizeActor($locked, $parcel, $actor, true);
+            if ($locked->type === ParcelIncidentType::HubDelay->value) {
+                throw ValidationException::withMessages(['resolution' => 'Use the hub delay review to record the next action.']);
+            }
 
             $validated = $this->assertValidResolve($payload);
             $action = $validated['event'];
@@ -622,6 +627,7 @@ class ParcelIncidentService
     {
         return (bool) Incidents::query()
             ->where('incident_seller_order_id', $parcel->id)
+            ->where('type', '!=', ParcelIncidentType::HubDelay->value)
             ->whereIn('status', [ParcelIncidentStatus::Open->value, ParcelIncidentStatus::UnderReview->value])
             ->exists();
     }

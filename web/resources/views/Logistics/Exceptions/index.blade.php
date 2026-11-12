@@ -6,7 +6,7 @@
 <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
     <div>
         <h1 class="font-serif text-2xl text-[var(--text-ink)]">Parcel exceptions</h1>
-        <p class="mt-1 text-sm text-[var(--text-muted)]">Missing, damaged, wrong-hub, inactive-connection and failed-transfer cases for parcels held by your company.</p>
+        <p class="mt-1 text-sm text-[var(--text-muted)]">Review parcel incidents, custody recovery and hub delays for your company.</p>
     </div>
 </div>
 
@@ -26,7 +26,7 @@
         <select id="type" name="type" class="min-h-10 w-full rounded-lg border border-[var(--border-strong)] px-3 text-sm">
             <option value="">All types</option>
             @foreach ($types as $value => $label)
-                @if (in_array($value, \App\Services\Logistics\ParcelIncidentService::ACTIVE_TYPES, true))
+                @if (in_array($value, \App\Services\Logistics\ParcelIncidentService::QUEUE_TYPES, true))
                     <option value="{{ $value }}" @selected(request('type') === $value)>{{ $label }}</option>
                 @endif
             @endforeach
@@ -65,7 +65,12 @@
                                 <span class="ml-1 font-mono text-xs text-[var(--text-muted)]">{{ $incident->sellerOrder->tracking_number }}</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">{{ $incident->typeLabel() }}</td>
+                        <td class="px-4 py-3">
+                            {{ $incident->typeLabel() }}
+                            @if ($incident->type === 'hub_delay')
+                                <p class="text-xs text-[var(--text-muted)]">{{ \App\Services\Logistics\HubDelayService::LEVELS[$incident->custody_snapshot['level']] }}</p>
+                            @endif
+                        </td>
                         <td class="px-4 py-3">
                             @php($statusValue = $incident->status?->value ?? $incident->status)
                             <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $statusValue === 'resolved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }}">
@@ -78,7 +83,7 @@
                             · Hub {{ $incident->sellerOrder?->custody_hub_id ?? '—' }}
                         </td>
                         <td class="px-4 py-3 text-xs">{{ $incident->blocked_leg_index ?? '—' }}</td>
-                        <td class="px-4 py-3 text-xs text-[var(--text-muted)]">{{ $incident->created_at?->diffForHumans() ?? '—' }}</td>
+                        <td class="px-4 py-3 text-xs text-[var(--text-muted)]">{{ ($incident->type === 'hub_delay' ? $incident->happened_at : $incident->created_at)?->diffForHumans() ?? '—' }}</td>
                         <td class="px-4 py-3 text-right">
                             <a href="{{ route('logistics.exceptions.show', $incident) }}" class="text-xs font-semibold text-primary-700 hover:text-primary-900">Open</a>
                         </td>

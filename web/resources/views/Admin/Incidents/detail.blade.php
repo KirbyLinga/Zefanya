@@ -67,7 +67,9 @@
         </div>
 
         <div class="w-full sm:max-w-lg">
-            @can('resolve', $incident)
+            @if ($incident->type === 'hub_delay')
+                @include('Components.hub-delay-review', ['incident' => $incident, 'action' => auth('admin')->user()->can('resolve', $incident) ? route('admin.incidents.resolve', $incident) : null])
+            @elsecan('resolve', $incident)
                 <form method="POST" action="{{ route('admin.incidents.resolve', $incident) }}">
                     @csrf
                     <div class="mb-3">
@@ -94,7 +96,7 @@
                 </form>
             @else
                 <p class="text-sm text-neutral-600">This incident has been resolved. Its audit history is preserved below.</p>
-            @endcan
+            @endif
         </div>
     </div>
 

@@ -2,6 +2,7 @@
 
 use App\Console\Commands\AutoApproveOverdueReturnsCommand;
 use App\Console\Commands\AutoCompleteBuyerReceiptsCommand;
+use App\Console\Commands\CheckHubDelaysCommand;
 use App\Console\Commands\RollMissedPickupWindowsCommand;
 use App\Support\ScheduledTaskAlert;
 use Illuminate\Foundation\Inspiring;
@@ -25,6 +26,10 @@ $alert->apply(
 $alert->apply(
     Schedule::command(RollMissedPickupWindowsCommand::class)->everyFiveMinutes()->withoutOverlapping(),
     'pickups:roll-missed-windows',
+);
+$alert->apply(
+    Schedule::command(CheckHubDelaysCommand::class)->everyFifteenMinutes()->timezone(config('app.schedule_timezone'))->withoutOverlapping(),
+    'parcels:check-hub-delays',
 );
 $alert->apply(
     Schedule::command('sanctum:prune-expired --hours=24')->daily(),

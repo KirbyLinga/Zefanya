@@ -21,7 +21,7 @@
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-[28px] font-bold text-neutral-950 mb-1">Parcel Incidents</h1>
-            <p class="text-base text-neutral-600">Open parcel exceptions, with escalated worker recovery cases shown first.</p>
+            <p class="text-base text-neutral-600">Review open parcel exceptions, escalated worker recovery, and hub delays requiring assessment.</p>
         </div>
     </div>
 
@@ -56,6 +56,9 @@
                                 {{ $incident->type }}
                                 @if ($incident->recovery_escalated)
                                     <span class="ml-2 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">Escalated</span>
+                                @endif
+                                @if ($incident->sla_assessment_due && ($incident->resolution_context['level'] ?? 0) < 168)
+                                    <span class="ml-2 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">Assessment due</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-neutral-700">{{ $incident->reporter_type ?? '—' }} #{{ $incident->reporter_id ?? '—' }}</td>
