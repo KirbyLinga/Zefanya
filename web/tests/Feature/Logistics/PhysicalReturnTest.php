@@ -752,6 +752,7 @@ class PhysicalReturnTest extends TestCase
 
     public function test_a_failed_delivery_back_at_the_seller_charges_the_seller_and_pays_the_carrier_for_both_trips(): void
     {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-12 17:00:00', 'UTC'));
         $f = $this->fixture();
         $f['parcel']->forceFill(['shipping_fee_minor' => 5000])->save();
         $return = $this->twice($f);
@@ -783,6 +784,12 @@ class PhysicalReturnTest extends TestCase
             'recipient' => 'Buyer',
             'paid_on' => now('Asia/Manila')->toDateString(),
         ])->assertSessionHasErrors('refund');
+        $this->post(route('admin.returns.refund', $return), [
+            'reference' => 'FUTURE-DATE',
+            'amount' => '1.00',
+            'recipient' => 'Buyer',
+            'paid_on' => now('Asia/Manila')->addDay()->toDateString(),
+        ])->assertSessionHasErrors('paid_on');
         $this->assertNull($return->fresh()->refunded_at);
         $this->assertDatabaseCount('logistics_return_charges', 1);
         $this->assertDatabaseCount('seller_debts', 1);

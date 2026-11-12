@@ -230,7 +230,7 @@ class ParcelReturnService
         $this->require($reference !== '' && mb_strlen($reference) <= 255, 'reference', 'A refund reference of at most 255 characters is required.');
         $this->require($recipient !== '' && mb_strlen($recipient) <= 255, 'recipient', 'Say who received the refund, in at most 255 characters.');
         $this->require($amountMinor > 0, 'amount', 'Enter the amount that was refunded.');
-        $this->require(! Carbon::parse($paidOn)->isFuture(), 'paid_on', 'The refund date cannot be in the future.');
+        $this->require(! Carbon::parse($paidOn, 'Asia/Manila')->isFuture(), 'paid_on', 'The refund date cannot be in the future.');
 
         DB::transaction(function () use ($record, $admin, $reference, $amountMinor, $recipient, $paidOn, $proofPath, $reason): void {
             $record = $this->locked($record, investigation: true);

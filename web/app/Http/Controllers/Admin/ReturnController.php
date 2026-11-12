@@ -115,7 +115,7 @@ class ReturnController extends Controller
             'reference' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
             'recipient' => ['required', 'string', 'max:255'],
-            'paid_on' => ['required', 'date', 'before_or_equal:today'],
+            'paid_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.now('Asia/Manila')->toDateString()],
             'proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'refund_reason' => ['nullable', 'string', 'max:1000'],
         ], [
