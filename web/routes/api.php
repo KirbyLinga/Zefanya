@@ -181,6 +181,7 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
             Route::get('/payouts', [RiderPayoutController::class, 'index'])->name('payouts');
             Route::get('/waybills/{sellerOrder}', [RiderWaybillController::class, 'show'])->name('waybills.show');
             Route::get('/proofs/{deliveryProof}', [RiderProofController::class, 'show'])->name('proofs.show');
+            Route::get('/deliveries/{sellerOrder}/completion-status', [RiderParcelActionController::class, 'completionStatus'])->name('deliveries.completion-status');
             Route::get('/notifications', [RiderNotificationController::class, 'index'])->name('notifications.index');
             Route::post('/notifications/read-all', [RiderNotificationController::class, 'markAllRead'])->name('notifications.readAll');
             Route::post('/notifications/{notification}/read', [RiderNotificationController::class, 'markRead'])->name('notifications.read');

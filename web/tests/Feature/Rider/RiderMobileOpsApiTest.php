@@ -91,6 +91,8 @@ class RiderMobileOpsApiTest extends RiderTestCase
             'verification_token' => 'irrelevant',
         ])->assertForbidden();
         $this->api($login)->getJson('/api/rider/history')->assertForbidden();
+        $this->api($login)->getJson("/api/rider/deliveries/{$out->id}/completion-status")
+            ->assertOk()->assertJsonPath('data.state', 'open');
 
         // Finishing the parcel already out for delivery works.
         $payload = $this->withHandoff($out, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
@@ -99,7 +101,17 @@ class RiderMobileOpsApiTest extends RiderTestCase
         ]);
         $this->api($login)->post("/api/rider/deliveries/{$out->id}/deliver", $payload)
             ->assertOk()->assertJsonPath('data.status', OrderStatus::Delivered->value);
+        $this->api($login)->getJson("/api/rider/deliveries/{$out->id}/completion-status")
+            ->assertOk()->assertJsonPath('data', ['state' => 'completed']);
         $this->assertSame(OrderStatus::ReadyForPickup, $waiting->fresh()->status);
+    }
+
+    public function test_rider_cannot_reconcile_another_riders_delivery(): void
+    {
+        $out = $this->outForDelivery();
+        $other = $this->assignableCourier($this->provider)->rider;
+        $this->api($this->token($other))->getJson("/api/rider/deliveries/{$out->id}/completion-status")
+            ->assertForbidden();
     }
 
     public function test_a_suspended_rider_without_a_wind_down_is_still_refused(): void

@@ -173,6 +173,19 @@ class ParcelActionController extends Controller
         });
     }
 
+    public function completionStatus(Request $request, SellerOrder $sellerOrder): JsonResponse
+    {
+        $rider = $request->user();
+        $this->operations->assertDeliveryAssigned($rider, $sellerOrder);
+        $completed = in_array($sellerOrder->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
+            && $sellerOrder->deliveryProof()->where('rider_id', $rider->id)
+                ->where('courier_id', $sellerOrder->delivery_courier_id)->exists();
+
+        return $this->success('Delivery outcome retrieved.', [
+            'state' => $completed ? 'completed' : ($sellerOrder->status === OrderStatus::OutForDelivery ? 'open' : 'unconfirmed'),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
     private function token(Request $request): ?string
     {
         $token = $request->input('verification_token');
