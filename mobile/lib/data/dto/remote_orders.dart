@@ -179,9 +179,13 @@ Order orderFromShipmentJson(Map<String, Object?> json) {
         json['can_cancel'] as bool? ??
         wire == 'PLACED',
     completedAt: DateTime.tryParse(_text(json['completed_at'])),
-    deliveredAt: status == OrderStatus.toRate
-        ? DateTime.tryParse(_text(json['updated_at']))
-        : null,
+    deliveredAt: DateTime.tryParse(
+      _text(
+        json.containsKey('delivered_at')
+            ? json['delivered_at']
+            : (status == OrderStatus.toRate ? json['updated_at'] : null),
+      ),
+    ),
     serverOrderId: _text(json['order_id']).isEmpty
         ? null
         : _text(json['order_id']),

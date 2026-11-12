@@ -65,6 +65,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
   bool _submitting = false;
   bool _submitted = false;
   String? _error;
+  String? _defectReason;
 
   @override
   void dispose() {
@@ -101,6 +102,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
             order: widget.order,
             description: _description.text,
             photoPaths: List.of(_photos),
+        defectReason: _defectReason,
             deliveredAt: widget.deliveredAt,
           );
     } on ApiException catch (failure) {
@@ -141,11 +143,27 @@ class _ReturnScreenState extends State<ReturnScreen> {
         const SizedBox(height: 8),
         Text(
           'Tell the seller what went wrong and attach photos of the item. '
-          'Requests can be made for 7 days after delivery.',
+          'Online reports are available for seven days after delivery. '
+          'Contact support for help with other available remedies.',
           style: theme.textTheme.bodyMedium
               ?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 22),
+        if (widget.order.buyerConfirmed)
+          DropdownButtonFormField<String>(
+            initialValue: _defectReason,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'What is wrong with the item?',
+            ),
+            items: [
+              for (final reason in defectReturnReasons)
+                DropdownMenuItem(value: reason, child: Text(reason)),
+            ],
+            onChanged: _submitting
+                ? null
+                : (value) => setState(() => _defectReason = value),
+          ),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(

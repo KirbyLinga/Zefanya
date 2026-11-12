@@ -535,10 +535,10 @@ class PhysicalReturnTest extends TestCase
     }
 
     /** A delivered parcel whose buyer has asked to return it, not yet decided by the Seller. */
-    private function buyerReturn(array $f): ParcelReturn
+    private function buyerReturn(array $f, OrderStatus $status = OrderStatus::Delivered): ParcelReturn
     {
         $parcel = $f['parcel'];
-        $parcel->forceFill(['status' => OrderStatus::Delivered->value])->save();
+        $parcel->forceFill(['status' => $status->value])->save();
         StatusHistory::query()->create([
             'seller_order_id' => $parcel->id, 'from_status' => OrderStatus::OutForDelivery,
             'to_status' => OrderStatus::Delivered, 'actor_type' => 'rider', 'source' => 'web',
@@ -729,6 +729,25 @@ class PhysicalReturnTest extends TestCase
         $this->assertSame(5, $f['variant']->fresh()->stock_quantity);
         $this->assertSame(1, InventoryTransaction::query()->where('reason', 'return')->count());
         $this->assertSame(['requested', 'seller_approved', 'collection_assigned', 'collected_from_buyer', 'in_transit', 'at_origin', 'awaiting_seller', 'completed'], $return->events()->pluck('event_key')->all());
+    }
+
+    public function test_post_completion_defect_reuses_reverse_custody_and_preserves_completion(): void
+    {
+        $f = $this->fixture();
+        $return = $this->buyerReturn($f, OrderStatus::Completed);
+        $returns = app(ParcelReturnService::class);
+        $returns->approveBySeller($return, $f['seller']);
+        $returns->assignBuyerCollection($return, $f['b']['provider'], $f['courier']->id);
+        $returns->confirmBuyerCollection($return, $f['rider'], $f['parcel']->tracking_number);
+        $this->moveHome($f, $return->fresh());
+
+        $this->assertDatabaseCount('inventory_transactions', 0);
+        $token = $this->receiptToken($f, $return->fresh(), 'resellable');
+        $returns->receiveBySeller($return->fresh(), $f['seller'], 'resellable', $token);
+        $this->assertSame(OrderStatus::Completed, $f['parcel']->fresh()->status);
+        $this->assertSame(ParcelReturnStatus::Completed, $return->fresh()->status);
+        $this->assertSame(1, InventoryTransaction::query()->where('reason', 'return')->count());
+        $this->assertNull($return->fresh()->refunded_at);
     }
 
     public function test_a_failed_delivery_back_at_the_seller_charges_the_seller_and_pays_the_carrier_for_both_trips(): void

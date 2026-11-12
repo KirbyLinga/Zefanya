@@ -20,6 +20,8 @@ import 'package:zefanya/data/api/token_store.dart';
 import 'package:zefanya/data/dto/remote_orders.dart';
 import 'package:zefanya/data/mock_data.dart';
 import 'package:zefanya/data/repositories/order_repository.dart';
+import 'package:zefanya/state/return_state.dart';
+import 'package:zefanya/data/repositories/return_repository.dart';
 
 /// A fake transport: records what was sent, answers from a script.
 class _FakeServer {
@@ -106,6 +108,38 @@ class _Live {
 }
 
 void main() {
+  test(
+    'completed shipment defect window uses delivery instead of update time',
+    () {
+      final order = orderFromShipmentJson({
+        'id': 12,
+        'order_id': 5,
+        'status': 'COMPLETED',
+        'delivered_at': '2026-11-01T10:00:00+08:00',
+        'updated_at': '2026-11-06T10:00:00+08:00',
+      });
+      final returns = ReturnState(
+        repository: LiveReturnRepository(_Live([]).client),
+      );
+      addTearDown(returns.dispose);
+      expect(order.buyerConfirmed, isTrue);
+      expect(
+        returns.returnRefusal(
+          order,
+          now: DateTime.parse('2026-11-07T10:00:00+08:00'),
+        ),
+        isNull,
+      );
+      expect(
+        returns.returnRefusal(
+          order,
+          now: DateTime.parse('2026-11-08T10:00:00+08:00'),
+        ),
+        contains('Contact support'),
+      );
+    },
+  );
+
   test(
     'delivery dispute status and submission are scoped to one shipment',
     () async {

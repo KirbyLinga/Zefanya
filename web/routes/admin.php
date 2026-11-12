@@ -117,6 +117,7 @@ Route::middleware('auth:admin')->group(function () {
 
         // Cross-provider partnership approvals (Phase 5.2)
         Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
+        Route::post('/returns/defect-intake', [ReturnController::class, 'intakeDefect'])->middleware('throttle:10,1')->name('returns.defect-intake');
         Route::post('/returns/{return}/origin', [ReturnController::class, 'verifyOrigin'])->name('returns.origin');
         Route::post('/returns/{return}/resolve', [ReturnController::class, 'resolve'])->name('returns.resolve');
         Route::post('/returns/{return}/reverse-route', [ReturnController::class, 'authorizeReverseRoute'])->name('returns.reverse-route');

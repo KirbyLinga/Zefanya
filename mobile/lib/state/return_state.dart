@@ -39,6 +39,12 @@ const int returnDescriptionMinLength = 10;
 
 /// The buyer's window, counted from the delivery timestamp.
 const int returnWindowDays = 7;
+const defectReturnReasons = [
+  'Item arrived damaged',
+  'Wrong item received',
+  'Item is defective',
+  'Missing items or parts',
+];
 
 enum ReturnStatus {
   /// The request has been submitted and is waiting for the seller.
@@ -242,25 +248,31 @@ class ReturnState extends ChangeNotifier {
   /// timestamp may live in `CourierState`, not on the order row yet. [now] is
   /// injectable so the day-7 boundary is testable without changing the device
   /// clock.
-  String? returnRefusal(
-    Order order, {
-    DateTime? deliveredAt,
-    DateTime? now,
-  }) {
+  String? returnRefusal(Order order, {DateTime? deliveredAt, DateTime? now}) {
     if (order.cancelled) return 'This order was cancelled.';
     if (order.status != OrderStatus.toRate) {
       return 'Returns are available only after delivery.';
     }
-    if (order.buyerConfirmed) return 'This order has already been completed.';
+    if (order.buyerConfirmed && _repository is! LiveReturnRepository) {
+      return 'This order has already been completed.';
+    }
     if (latestForOrder(order.id) != null) {
       return 'A return request already exists for this order.';
     }
 
-    final delivered = deliveredAt ?? order.deliveredAt;
+    final delivered = _repository is LiveReturnRepository
+        ? order.deliveredAt
+        : deliveredAt ?? order.deliveredAt;
     if (delivered != null) {
       final deadline = delivered.add(const Duration(days: returnWindowDays));
-      if ((now ?? DateTime.now()).isAfter(deadline)) {
-        return 'The 7-day return window has closed.';
+      final checkedAt = now ?? DateTime.now();
+      final expired = _repository is LiveReturnRepository
+          ? !checkedAt.isBefore(deadline)
+          : checkedAt.isAfter(deadline);
+      if (expired) {
+        return _repository is LiveReturnRepository
+            ? 'The seven-day online reporting window has closed. Contact support for available remedies.'
+            : 'The 7-day return window has closed.';
       }
     }
     return null;
@@ -276,6 +288,7 @@ class ReturnState extends ChangeNotifier {
     required Order order,
     required String description,
     required List<String> photoPaths,
+    String? defectReason,
     DateTime? deliveredAt,
     DateTime? now,
   }) async {
@@ -285,6 +298,9 @@ class ReturnState extends ChangeNotifier {
 
     final refusal = returnRefusal(order, deliveredAt: deliveredAt, now: now);
     if (refusal != null) return refusal;
+    if (order.buyerConfirmed && !defectReturnReasons.contains(defectReason)) {
+      return 'Choose a wrong, defective, damaged or incomplete item.';
+    }
 
     final text = description.trim();
     if (text.length < returnDescriptionMinLength) {
@@ -304,12 +320,23 @@ class ReturnState extends ChangeNotifier {
 
     _submitting.add(order.id);
     try {
-      await _repository.submit(
-        orderId: order.id,
-        description: text,
-        photoPaths: List.unmodifiable(photos),
-        submittedAt: now ?? DateTime.now(),
-      );
+      final repository = _repository;
+      if (repository is LiveReturnRepository && defectReason != null) {
+        await repository.submit(
+          orderId: order.id,
+          description: text,
+          photoPaths: List.unmodifiable(photos),
+          submittedAt: now ?? DateTime.now(),
+          reason: defectReason,
+        );
+      } else {
+        await repository.submit(
+          orderId: order.id,
+          description: text,
+          photoPaths: List.unmodifiable(photos),
+          submittedAt: now ?? DateTime.now(),
+        );
+      }
       _requests = await _repository.all();
       _loadFailure = null;
       notifyListeners();

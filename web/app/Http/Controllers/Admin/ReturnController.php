@@ -7,12 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsReturnCharge;
 use App\Models\Logistics\ParcelReturn;
+use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Logistics\ParcelReturnService;
 use App\Services\Logistics\ReturnChargeService;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReturnController extends Controller
@@ -23,6 +25,23 @@ class ReturnController extends Controller
         $hubs = LogisticsHub::query()->operational()->with('provider')->orderBy('name')->get();
 
         return view('Admin.Returns.index', compact('returns', 'hubs'));
+    }
+
+    public function intakeDefect(Request $request, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'shipment_id' => ['required', 'integer', 'min:1'],
+            'reason' => ['required', Rule::in(ParcelReturnService::DEFECT_REASONS)],
+            'description' => ['required', 'string', 'min:10', 'max:500'],
+            'support_reason' => ['required', 'string', 'max:1000'],
+            'photos' => ['nullable', 'array', 'max:5'],
+            'photos.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ]);
+        $shipment = SellerOrder::query()->with('order.buyer')->findOrFail($data['shipment_id']);
+        $service->requestByBuyer($shipment, $shipment->order->buyer, $data['reason'], $data['description'], $request->file('photos', []),
+            $request->user('admin'), $data['support_reason']);
+
+        return back()->with('success', 'Defect claim recorded for Seller review.');
     }
 
     public function verifyOrigin(Request $request, ParcelReturn $return, ParcelReturnService $service)

@@ -436,8 +436,10 @@ class _ActionCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (returnOpen) ...[
             Text(
-              'This order has an open return request. Order Received is '
-              'unavailable until it is resolved.',
+              order.buyerConfirmed
+                  ? 'The Seller is reviewing the return request for this completed order.'
+                  : 'This order has an open return request. Order Received is unavailable until it is resolved.',
+
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
@@ -470,7 +472,11 @@ class _ActionCard extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => _startReturn(context),
               icon: const Icon(Icons.assignment_return_outlined, size: 16),
-              label: const Text('Return / Refund'),
+              label: Text(
+                order.buyerConfirmed
+                    ? 'Report an item defect'
+                    : 'Return / Refund',
+              ),
             ),
             const SizedBox(height: 8),
           ],

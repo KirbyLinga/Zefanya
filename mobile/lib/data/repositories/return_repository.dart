@@ -189,13 +189,14 @@ class LiveReturnRepository extends LiveRepository implements ReturnRepository {
     required String description,
     required List<String> photoPaths,
     required DateTime submittedAt,
+    String reason = _otherReason,
   }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
     final parent = await _parentOrderId(orderId);
     await client.postMultipart(
       '/buyer/orders/$parent/shipments/$orderId/return',
-      fields: {'reason': _otherReason, 'description': description.trim()},
+      fields: {'reason': reason, 'description': description.trim()},
       files: {for (var i = 0; i < photoPaths.length; i++) 'photos[$i]': photoPaths[i]},
     );
 

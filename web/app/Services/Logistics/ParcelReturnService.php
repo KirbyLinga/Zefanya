@@ -50,7 +50,9 @@ use Illuminate\Validation\ValidationException;
 
 class ParcelReturnService
 {
-    public const BUYER_REASONS = ['Item arrived damaged', 'Wrong item received', 'Item is defective', 'Missing items or parts', 'Item does not match the description', 'Other'];
+    public const DEFECT_REASONS = ['Item arrived damaged', 'Wrong item received', 'Item is defective', 'Missing items or parts'];
+
+    public const BUYER_REASONS = [...self::DEFECT_REASONS, 'Item does not match the description', 'Other'];
 
     public const REVERSE_ROUTE_AUTHORIZED = 'reverse_route_authorized';
 
@@ -59,7 +61,7 @@ class ParcelReturnService
     /** The same persisted delivery clock used by automatic receipt completion. */
     public function buyerReturnDeadline(SellerOrder $parcel): ?CarbonInterface
     {
-        if ($parcel->status !== OrderStatus::Delivered) {
+        if (! in_array($parcel->status, [OrderStatus::Delivered, OrderStatus::Completed], true)) {
             return null;
         }
         $parcel->loadMissing('statusHistories');
@@ -87,20 +89,29 @@ class ParcelReturnService
      *
      * @param  list<UploadedFile>  $photos
      */
-    public function requestByBuyer(SellerOrder $parcel, Buyer $buyer, string $reason, ?string $description = null, array $photos = []): ParcelReturn
+    public function requestByBuyer(SellerOrder $parcel, Buyer $buyer, string $reason, ?string $description = null, array $photos = [], ?Admin $support = null, ?string $supportReason = null): ParcelReturn
     {
-        return DB::transaction(function () use ($parcel, $buyer, $reason, $description, $photos): ParcelReturn {
+        if ($support !== null) {
+            $this->admin($support);
+            $this->require(filled(trim((string) $supportReason)), 'return', 'Record why this support exception was accepted.');
+        }
+
+        return DB::transaction(function () use ($parcel, $buyer, $reason, $description, $photos, $support, $supportReason): ParcelReturn {
             // Completion and return intake must acquire this same shipment lock.
             $parcel = SellerOrder::query()->whereKey($parcel->id)->lockForUpdate()->firstOrFail();
             abort_unless((int) $parcel->order->buyer_id === (int) $buyer->id, 404);
             ParcelIncidentService::assertOperationsAllowed($parcel);
             $this->require(filled(trim($reason)) && mb_strlen($reason) <= 1000, 'reason', 'Provide a return reason of 1000 characters or fewer.');
-            $this->conflict($parcel->status === OrderStatus::Delivered, 'return', 'Only a delivered, uncompleted shipment can be returned.');
+            $this->conflict(in_array($parcel->status, [OrderStatus::Delivered, OrderStatus::Completed], true), 'return', 'Only a delivered shipment can be returned.');
             $existing = $parcel->parcelReturn;
             if ($existing !== null) {
                 return $existing;
             }
-            $this->require($this->canBuyerRequest($parcel), 'return', 'The seven-day return window has closed or the delivery timestamp requires verification.');
+            if ($parcel->status === OrderStatus::Completed || $support !== null) {
+                $this->require(in_array(trim($reason), self::DEFECT_REASONS, true), 'reason', 'Choose a wrong, defective, damaged or incomplete item for this claim.');
+            }
+            $this->require($support === null ? $this->canBuyerRequest($parcel) : $this->buyerReturnDeadline($parcel) !== null,
+                'return', 'The seven-day online reporting window has closed or delivery needs verification. Contact support for review of available remedies.');
             $origin = $parcel->originStation;
             $record = new ParcelReturn;
             $record->forceFill([
@@ -116,6 +127,11 @@ class ParcelReturnService
                 'financial_review_required' => $parcel->payment !== null && $parcel->payment->status->value !== 'cancelled',
             ])->save();
             $this->event($record, 'requested', 'buyer', (int) $buyer->id);
+            if ($support !== null) {
+                $this->event($record, 'support_exception_accepted', 'admin', (int) $support->id, ['note' => $supportReason]);
+                OperationsAuditLog::record($support, 'return_support_exception_accepted', $record, 'Return #'.$record->id, null,
+                    ['seller_order_id' => $parcel->id], $supportReason);
+            }
             if ($record->origin_provider_id === null || $record->origin_hub_id === null
                 || (int) $origin?->logistics_provider_id !== (int) $record->origin_provider_id
                 || blank($record->seller_address['full'] ?? null)) {
@@ -780,8 +796,10 @@ class ParcelReturnService
                 $record->forceFill(['stock_restored_at' => now()])->save();
             }
 
-            app(SellerOrderStatusService::class)->transition($record->sellerOrder, OrderStatus::Returned,
-                note: 'Physical return received and inspected by the owning Seller.', actor: OrderActor::Seller, actorId: $seller->id, source: 'web');
+            if ($record->sellerOrder->status !== OrderStatus::Completed) {
+                app(SellerOrderStatusService::class)->transition($record->sellerOrder, OrderStatus::Returned,
+                    note: 'Physical return received and inspected by the owning Seller.', actor: OrderActor::Seller, actorId: $seller->id, source: 'web');
+            }
             // The trip back is done: settle who pays Logistics for it.
             app(ReturnChargeService::class)->sync($record->fresh('sellerOrder'));
             $this->verification->consumeAfterSuccess(fn () => $this->verification->assertForSellerReturn($seller, $record, $condition, $token, true));

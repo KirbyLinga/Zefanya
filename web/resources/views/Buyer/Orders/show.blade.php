@@ -180,7 +180,7 @@
                                         <label for="return-reason-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Return reason</label>
                                         <select id="return-reason-{{ $sellerOrder->id }}" name="reason" required class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">
                                             <option value="">Choose a reason</option>
-                                            @foreach (\App\Services\Logistics\ParcelReturnService::BUYER_REASONS as $reason)
+                                            @foreach ($sellerOrder->status === OrderStatus::Completed ? \App\Services\Logistics\ParcelReturnService::DEFECT_REASONS : \App\Services\Logistics\ParcelReturnService::BUYER_REASONS as $reason)
                                                 <option value="{{ $reason }}" @selected(old('reason') === $reason)>{{ $reason }}</option>
                                             @endforeach
                                         </select>
@@ -197,6 +197,9 @@
                                             <textarea id="escalate-reason-{{ $sellerOrder->id }}" name="reason" required minlength="10" maxlength="1000" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]">{{ old('reason') }}</textarea>
                                             <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Escalate</button>
                                         </form>
+                                @endif
+                                @if (in_array($sellerOrder->status, [OrderStatus::Delivered, OrderStatus::Completed], true))
+                                    <p class="text-xs text-[var(--text-muted)]">Online defect reports are available for seven days after delivery. Contact support for help with other available consumer remedies.</p>
                                 @endif
                                 @if ($sellerOrder->status === OrderStatus::Delivered && ! $sellerOrder->hasActiveReturn())
                                     <div class="rounded-xl border border-[var(--border)] p-4">

@@ -8,6 +8,24 @@
 <h1 class="mb-6 font-serif text-2xl text-[var(--text-ink)]">Return Exceptions and Custody</h1>
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
 @if ($errors->any())<div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
+<details class="mb-4 rounded-lg border p-4">
+    <summary class="cursor-pointer text-sm font-semibold">Record a support-reviewed defect claim</summary>
+    <form method="POST" action="{{ route('admin.returns.defect-intake') }}" enctype="multipart/form-data" class="mt-2 grid gap-2 text-sm">
+        @csrf
+        <label>Shipment ID <input class="block rounded border p-2" name="shipment_id" type="number" min="1" required></label>
+        <label>Defect reason
+            <select class="block rounded border p-2" name="reason" required>
+                @foreach (\App\Services\Logistics\ParcelReturnService::DEFECT_REASONS as $reason)
+                    <option value="{{ $reason }}">{{ $reason }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label>Buyer’s description <textarea class="block w-full rounded border p-2" name="description" required minlength="10" maxlength="500"></textarea></label>
+        <label>Why support accepted this claim <textarea class="block w-full rounded border p-2" name="support_reason" required maxlength="1000"></textarea></label>
+        <label>Supporting photos <input class="block" name="photos[]" type="file" multiple accept="image/jpeg,image/png"></label>
+        <button class="min-h-10 rounded bg-primary-800 px-4 text-white">Record for Seller review</button>
+    </form>
+</details>
 
 <div class="space-y-5">@forelse ($returns as $record)
 <article class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">

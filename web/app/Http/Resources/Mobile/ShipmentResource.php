@@ -36,6 +36,9 @@ class ShipmentResource extends JsonResource
             'status' => $shipment->status->value,
             'can_cancel' => $shipment->status->canBuyerCancel(),
             'completed_at' => $shipment->completionTime()?->toIso8601String(),
+            'delivered_at' => in_array($shipment->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
+                ? $shipment->statusHistories()->where('to_status', OrderStatus::Delivered->value)->latest('id')->first()?->created_at?->toIso8601String()
+                : null,
             'status_label' => $shipment->status->label(),
             'seller' => [
                 'id' => $shipment->seller_id,

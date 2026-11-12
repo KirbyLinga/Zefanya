@@ -118,6 +118,33 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertTrue($record->awaitingSellerDecision());
     }
 
+    public function test_completed_shipment_accepts_only_eligible_defect_reasons_within_the_window(): void
+    {
+        $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        $this->requestReturn(['reason' => 'Other'])->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->requestReturn(['reason' => 'Missing items or parts'])->assertCreated();
+        $this->requestReturn(['reason' => 'Missing items or parts'])->assertOk();
+        $this->assertSame(OrderStatus::Completed, $this->parcel->fresh()->status);
+        $this->assertDatabaseCount('parcel_returns', 1);
+        $this->assertNull(ParcelReturn::sole()->refunded_at);
+    }
+
+    public function test_admin_can_record_an_authorized_defect_claim_after_the_online_window(): void
+    {
+        $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        $this->travel(8)->days();
+        $this->requestReturn()->assertUnprocessable();
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->post(route('admin.returns.defect-intake'), [
+                'shipment_id' => $this->parcel->id,
+                'reason' => 'Item is defective',
+                'description' => 'The item failed on first use.',
+                'support_reason' => 'Support verified the Buyer’s warranty report.',
+            ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('parcel_return_events', ['event_key' => 'support_exception_accepted']);
+        $this->assertSame(OrderStatus::Completed, $this->parcel->fresh()->status);
+    }
+
     public function test_buyer_photo_rules(): void
     {
         foreach ([
