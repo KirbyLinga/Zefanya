@@ -45,6 +45,7 @@ class HubDelayTest extends TestCase
 
         $this->travelTo($receivedAt->copy()->addHours(48));
         $this->assertSame(1, $delays->sweep());
+        $case->refresh()->forceFill(['custody_snapshot' => array_reverse($case->custody_snapshot, true)])->save();
         $this->assertSame(0, $delays->sweep());
         $this->assertSame(48, $case->fresh()->custody_snapshot['level']);
         $this->assertSame(1, $provider->notifications()->count());

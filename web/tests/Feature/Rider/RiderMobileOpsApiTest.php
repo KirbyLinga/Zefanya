@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Rider;
 
+use App\Enums\DeliveryFailureReason;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Models\Admin\Admin;
@@ -13,10 +14,13 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
 use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Rider\RiderOperationsService;
+use App\Services\Rider\RiderRegistrationService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Rider mobile API, second pass: wind-down parity with the web panel, token
@@ -112,6 +116,29 @@ class RiderMobileOpsApiTest extends RiderTestCase
         $other = $this->assignableCourier($this->provider)->rider;
         $this->api($this->token($other))->getJson("/api/rider/deliveries/{$out->id}/completion-status")
             ->assertForbidden();
+    }
+
+    public function test_delivery_actions_recheck_a_stale_rider_after_suspension(): void
+    {
+        $out = $this->outForDelivery();
+        $delivered = $this->parcel(OrderStatus::Delivered, ['delivery_courier_id' => $this->courier->id]);
+        $staleRider = $this->rider->load(['provider', 'station', 'courier']);
+        app(RiderRegistrationService::class)->suspend($staleRider, $this->provider, 'Temporary suspension during an active route.');
+
+        $operations = app(RiderOperationsService::class);
+        foreach ([
+            fn () => $operations->completeDelivery($staleRider, $delivered, []),
+            fn () => $operations->failDelivery($staleRider, $out, DeliveryFailureReason::RecipientUnavailable),
+        ] as $action) {
+            try {
+                $action();
+                $this->fail('Cached approval must not authorize a delivery action.');
+            } catch (HttpException $error) {
+                $this->assertSame(403, $error->getStatusCode());
+            }
+        }
+        $this->assertSame(OrderStatus::OutForDelivery, $out->fresh()->status);
+        $this->assertSame(0, $out->fresh()->delivery_attempts);
     }
 
     public function test_a_suspended_rider_without_a_wind_down_is_still_refused(): void

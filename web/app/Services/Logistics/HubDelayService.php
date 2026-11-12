@@ -106,7 +106,11 @@ class HubDelayService
                 'delay_reason' => $delayReason,
             ];
             if ($level <= $previous) {
-                if ($snapshot !== $case->custody_snapshot) {
+                // MySQL JSON objects can return their keys in a different order.
+                $previousSnapshot = $case->custody_snapshot;
+                ksort($previousSnapshot);
+                ksort($snapshot);
+                if ($snapshot !== $previousSnapshot) {
                     $case->forceFill(['custody_snapshot' => $snapshot])->save();
 
                     return true;

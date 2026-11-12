@@ -8,6 +8,7 @@ use App\Enums\OrderStatus;
 use App\Exceptions\StaleStateException;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\DeliveryProof;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Rider\RiderEarning;
@@ -309,7 +310,8 @@ class RiderOperationsService
         $storedPath = null;
 
         try {
-            [$order, $changed] = DB::transaction(function () use ($rider, $courier, $sellerOrder, $data, $verifiedOtp, &$storedPath): array {
+            [$order, $changed] = DB::transaction(function () use ($rider, $sellerOrder, $data, $verifiedOtp, &$storedPath): array {
+                $courier = $this->lockDeliveryAuthorization($rider);
                 $order = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
                 ParcelIncidentService::assertOperationsAllowed($order);
 
@@ -411,7 +413,8 @@ class RiderOperationsService
     ): SellerOrder {
         $courier = $this->operationalCourier($rider, allowWindDown: true);
 
-        [$order, $changed] = DB::transaction(function () use ($rider, $courier, $sellerOrder, $reason, $notes, $verificationMethod): array {
+        [$order, $changed] = DB::transaction(function () use ($rider, $sellerOrder, $reason, $notes, $verificationMethod): array {
+            $courier = $this->lockDeliveryAuthorization($rider);
             $order = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
             ParcelIncidentService::assertOperationsAllowed($order);
 
@@ -459,6 +462,19 @@ class RiderOperationsService
         }
 
         return $order;
+    }
+
+    private function lockDeliveryAuthorization(Rider $rider): Courier
+    {
+        // Suspension and reassignment lock the company before the Rider or parcel.
+        // Shared locks keep authorization stable while allowing unrelated deliveries.
+        $provider = LogisticsProvider::query()->whereKey($rider->logistics_provider_id)->sharedLock()->first();
+        $current = Rider::query()->whereKey($rider->id)->where('logistics_provider_id', $rider->logistics_provider_id)
+            ->sharedLock()->first();
+        abort_unless($provider !== null && $current !== null, 403, 'Your rider account is not allowed to perform this action.');
+        $current->setRelation('provider', $provider);
+
+        return $this->operationalCourier($current, allowWindDown: true);
     }
 
     // ── Queries ─────────────────────────────────────────────────────────────

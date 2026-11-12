@@ -76,6 +76,7 @@ class Incidents extends Model
     public function eventCounts(): array
     {
         return $this->events()
+            ->reorder()
             ->selectRaw('event, count(*) as total')
             ->groupBy('event')
             ->pluck('total', 'event')
