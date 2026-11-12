@@ -8,6 +8,9 @@
 @section('content')
 <div class="flex items-center justify-between mb-6">
     <h1 class="font-serif text-2xl text-[var(--text-ink)]">Delivery Tracking</h1>
+    @if (\App\Services\Buyer\DeliveryDisputeService::installed())
+        <a class="text-sm underline" href="{{ route('logistics.delivery-disputes.index') }}">Non-receipt disputes</a>
+    @endif
 </div>
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />

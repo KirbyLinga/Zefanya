@@ -28,6 +28,9 @@ class BuyerShipmentConfirmation
             $delivered = $shipments->where('status', OrderStatus::Delivered);
             foreach ($delivered as $shipment) {
                 ParcelIncidentService::assertOperationsAllowed($shipment);
+                if (DeliveryDisputeService::holdsSettlement($shipment, lock: true)) {
+                    throw ValidationException::withMessages(['shipment' => 'A delivery dispute is under review for this shipment.']);
+                }
             }
             if ($delivered->isEmpty()) {
                 if ($shipments->isNotEmpty() && $shipments->every(fn ($shipment) => $shipment->status === OrderStatus::Completed)) {

@@ -25,6 +25,9 @@ class AutomaticBuyerReceiptService
     {
         return SellerOrder::query()
             ->where('status', OrderStatus::Delivered)
+            ->when(DeliveryDisputeService::installed(), fn (Builder $query) => $query->whereDoesntHave('deliveryDispute',
+                fn (Builder $case) => $case->where(fn (Builder $hold) => $hold->where('status', '!=', 'resolved')
+                    ->orWhere(fn (Builder $upheld) => $upheld->where('outcome', 'upheld')->whereNull('financial_reviewed_at')))))
             // A rejected return request no longer holds the order back.
             ->whereDoesntHave('parcelReturn', fn (Builder $return) => $return->where('status', '!=', ParcelReturnStatus::Rejected->value))
             ->whereDoesntHave('incidentSet', function (Builder $incidents): void {

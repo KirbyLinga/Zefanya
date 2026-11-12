@@ -106,6 +106,41 @@ class _Live {
 }
 
 void main() {
+  test(
+    'delivery dispute status and submission are scoped to one shipment',
+    () async {
+      final live = _Live([
+        http.Response(
+          jsonEncode({
+            'data': {'can_report': true, 'case': null},
+          }),
+          200,
+        ),
+        http.Response(
+          jsonEncode({
+            'data': {
+              'can_report': false,
+              'case': {'id': 4, 'status': 'open'},
+            },
+          }),
+          200,
+        ),
+      ]);
+      await live.tokens.write('1|buyer');
+
+      expect((await live.orders.deliveryDispute('12'))['can_report'], isTrue);
+      final result = await live.orders.deliveryDispute(
+        '12',
+        explanation: 'Parcel missing.',
+      );
+      expect(result['case'], {'id': 4, 'status': 'open'});
+      expect(live.server.paths, [
+        '/buyer/shipments/12/delivery-dispute',
+        '/buyer/shipments/12/delivery-dispute',
+      ]);
+    },
+  );
+
   group('the mapping', () {
     test("the server's pipeline becomes the app's four stages", () {
       const expected = {

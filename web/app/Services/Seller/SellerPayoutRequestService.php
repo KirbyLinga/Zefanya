@@ -14,7 +14,9 @@ use App\Models\Seller\Seller;
 use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\SellerSettlement;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Seller\PayoutRequestDecided;
+use App\Services\Buyer\DeliveryDisputeService;
 use App\Services\Shared\VoucherFundingService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -172,6 +174,13 @@ class SellerPayoutRequestService
             }
 
             $allocations = $locked->allocations()->orderBy('seller_settlement_id')->get();
+            $orderIds = SellerSettlement::query()->whereKey($allocations->pluck('seller_settlement_id'))->pluck('seller_order_id');
+            $orders = SellerOrder::query()->whereKey($orderIds)->orderBy('id')->lockForUpdate()->get();
+            foreach ($orders as $order) {
+                if (DeliveryDisputeService::holdsSettlement($order, lock: true)) {
+                    throw ValidationException::withMessages(['payout' => 'A delivery dispute is holding part of this payout.']);
+                }
+            }
             $settlements = SellerSettlement::query()->whereKey($allocations->pluck('seller_settlement_id'))
                 ->with(['sellerOrder', 'payment', 'codRemittance'])->lockForUpdate()->get()->keyBy('id');
 
@@ -291,6 +300,8 @@ class SellerPayoutRequestService
         }
 
         return $query->get()->filter(fn (SellerSettlement $settlement): bool => $settlement->remainingPayoutMinor() > 0
+            && $settlement->sellerOrder !== null
+            && ! DeliveryDisputeService::holdsSettlement($settlement->sellerOrder)
             && $this->isReconciled($settlement));
     }
 

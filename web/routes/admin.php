@@ -51,6 +51,11 @@ Route::middleware('auth:admin')->group(function () {
         Route::get('/audit-logs', [OperationsAuditLogController::class, 'index'])->name('audit-logs.index');
 
         Route::get('/logistics-remittances', [LogisticsRemittanceController::class, 'index'])->name('logistics-remittances.index');
+        Route::get('/delivery-disputes', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'index'])->middleware('throttle:60,1')->name('delivery-disputes.index');
+        Route::post('/delivery-disputes/exception', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'openException'])->middleware('throttle:10,1')->name('delivery-disputes.exception');
+        Route::post('/delivery-disputes/{dispute}/review', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'review'])->middleware('throttle:20,1')->name('delivery-disputes.review');
+        Route::get('/delivery-disputes/{dispute}/proof', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'proof'])->middleware('throttle:30,1')->name('delivery-disputes.proof');
+        Route::get('/delivery-disputes/{dispute}/evidence', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'evidence'])->middleware('throttle:30,1')->name('delivery-disputes.evidence');
         Route::post('/cod-discrepancies/{remittance}/review', [LogisticsRemittanceController::class, 'reviewCodDiscrepancy'])->middleware('throttle:20,1')->name('cod-discrepancies.review');
         Route::post('/logistics-remittances/{remittance}/confirm', [LogisticsRemittanceController::class, 'confirm'])->name('logistics-remittances.confirm');
         Route::post('/logistics-remittances/{remittance}/reject', [LogisticsRemittanceController::class, 'reject'])->name('logistics-remittances.reject');

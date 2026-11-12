@@ -21,6 +21,9 @@
 <div class="space-y-6">
     <div>
         <h1 class="font-serif text-3xl text-neutral-950">Settlements</h1>
+        @if (\App\Services\Buyer\DeliveryDisputeService::installed())
+            <a class="text-sm underline" href="{{ route('admin.delivery-disputes.index') }}">Non-receipt disputes</a>
+        @endif
         <p class="mt-2 text-sm text-neutral-600">Logistics companies keep each parcel's shipping fee and send Zefanya the rest of the cash. Confirm each payment only after the money has arrived. Sellers on those parcels can't be paid until you do.</p>
         @if ($originShares['parcels'] > 0)
             <p class="mt-2 text-sm text-neutral-600">On {{ $originShares['parcels'] }} cross-provider {{ \Illuminate\Support\Str::plural('parcel', $originShares['parcels']) }}, the delivering company keeps 60% of the shipping fee and sends the origin carrier's 40% to Zefanya. Of {{ $peso($originShares['shareMinor']) }} in origin shares, Zefanya has received {{ $peso($originShares['receivedMinor']) }} and paid out {{ $peso($originShares['paidMinor']) }}.</p>
@@ -31,7 +34,9 @@
         <section class="space-y-3" aria-labelledby="cod-discrepancies">
             <h2 id="cod-discrepancies" class="font-serif text-xl">Rider cash discrepancies</h2>
             @foreach ($codDiscrepancies as $remittance)
-                @php($case = $remittance->discrepancy)
+                @php
+                    $case = $remittance->discrepancy;
+                @endphp
                 <article class="{{ $panel }} space-y-2 p-4 text-sm">
                     <h3 class="font-semibold">Parcel #{{ $remittance->seller_order_id }} · {{ $remittance->sellerOrder?->tracking_number }}</h3>
                     <p>Due {{ $peso($remittance->amount_minor) }} · Counted {{ $peso($case['counted_minor']) }} · {{ $case['difference_minor'] < 0 ? 'Short' : 'Excess' }} {{ $peso(abs($case['difference_minor'])) }}</p>

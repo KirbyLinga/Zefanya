@@ -18,4 +18,10 @@ Verification included 123 passing Laravel tests across COD, returns, settlement,
 
 ## Remaining sequence
 
-- **9B–9F** — Non-receipt disputes, post-completion defect claims, worker custody recovery, hub delay escalation, and final hardening.
+- **9C–9F** — Post-completion defect claims, worker custody recovery, hub delay escalation, and final hardening.
+
+## 9B — Non-receipt disputes
+
+Buyers can report a missing parcel from the shipment detail on Web or Flutter within seven days of the recorded delivery, including after completion. Logistics reviews the case, with private evidence access and audited escalation to Admin. An upheld claim has a recorded finance follow-up and holds unsettled payouts until authorized review. The case never issues a refund or rewrites a paid payout. Admin can record an authorized late report. This checkout already auto-completes after seven days. That schedule was retained.
+
+Isolated Laravel regression run: 155 passed, 1,090 assertions. Focused Flutter Live API: 36 passed. Flutter analysis, Web build, and scoped formatting passed. The delivery-disputes migration is required for activation. MySQL races, deployed schema and a physical mobile rehearsal remain unverified.

@@ -34,6 +34,7 @@ import '../shared/chat_screen.dart';
 import 'cart_screen.dart';
 import 'courier_tracker_screen.dart';
 import 'return_screen.dart';
+import 'widgets/delivery_dispute_button.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   const OrderDetailScreen({super.key, required this.order});
@@ -90,6 +91,10 @@ class OrderDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (orderState.supportsDeliveryDisputes &&
+                order.serverOrderId != null &&
+                (order.status == OrderStatus.toRate || order.buyerConfirmed))
+              DeliveryDisputeButton(shipmentId: order.id),
             // ---- Receipt card ------------------------------------
             ClipRRect(
               borderRadius: editorialRadius(0, ShapeTier.card),

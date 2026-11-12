@@ -16,6 +16,7 @@ use App\Models\Seller\SellerPayoutRequest;
 use App\Models\Seller\SellerSettlement;
 use App\Models\Seller\StoreSale;
 use App\Models\Shared\SellerOrder;
+use App\Services\Buyer\DeliveryDisputeService;
 use App\Services\Shared\CommissionFinalizationService;
 use App\Services\Shared\VoucherFundingService;
 use App\Support\Money;
@@ -134,6 +135,9 @@ class SellerSettlementService
             $sellerId = SellerSettlement::query()->whereKey($settlement->getKey())->value('seller_id');
             Seller::query()->whereKey($sellerId)->lockForUpdate()->firstOrFail();
             [$remittance, $order] = $this->lockEligibleRemittance((int) $settlement->cod_remittance_id);
+            if (DeliveryDisputeService::holdsSettlement($order, lock: true)) {
+                throw ValidationException::withMessages(['settlement' => 'A delivery dispute is holding this payout.']);
+            }
             $locked = SellerSettlement::query()->whereKey($settlement->getKey())->lockForUpdate()->firstOrFail();
 
             if ($remittance->zefanya_received_at === null) {

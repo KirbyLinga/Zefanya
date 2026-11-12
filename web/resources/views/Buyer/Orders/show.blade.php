@@ -118,6 +118,7 @@
                                 </div>
                             @endif
                             <x-shipment-tracking :shipment="$sellerOrder" buyer-facing />
+                            @include('Buyer.Orders.delivery-dispute', ['dispute' => app(\App\Services\Buyer\DeliveryDisputeService::class)->buyerView($sellerOrder)])
                             <details class="group mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
                                 <summary class="flex min-h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-1 text-xs font-semibold text-[var(--link)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--link)]">
                                     <span class="text-[var(--link)]">Detailed delivery updates</span>

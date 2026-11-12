@@ -5,6 +5,7 @@ namespace App\Models\Shared;
 use App\Enums\OrderStatus;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\DeliveryAssignment;
+use App\Models\Logistics\DeliveryDispute;
 use App\Models\Logistics\DeliveryProof;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class SellerOrder extends Model
@@ -245,7 +247,7 @@ class SellerOrder extends Model
     }
 
     /** Completion comes from the trusted transition audit, never updated_at. */
-    public function completionTime(): ?\Illuminate\Support\Carbon
+    public function completionTime(): ?Carbon
     {
         return $this->statusHistories()
             ->where('to_status', OrderStatus::Completed->value)
@@ -420,6 +422,11 @@ class SellerOrder extends Model
     public function deliveryProof(): HasOne
     {
         return $this->hasOne(DeliveryProof::class);
+    }
+
+    public function deliveryDispute(): HasOne
+    {
+        return $this->hasOne(DeliveryDispute::class);
     }
 
     /**

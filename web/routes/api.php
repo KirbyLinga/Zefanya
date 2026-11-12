@@ -87,6 +87,8 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
         // Per-seller shipments (tracking) and receipt confirmation via BuyerShipmentConfirmation.
         Route::get('/shipments', [OrderController::class, 'index'])->middleware('throttle:60,1')->name('shipments.index');
         Route::get('/shipments/{shipment}', [OrderController::class, 'show'])->middleware('throttle:60,1')->name('shipments.show');
+        Route::get('/shipments/{shipment}/delivery-dispute', [\App\Http\Controllers\Buyer\DeliveryDisputeController::class, 'show'])->middleware('throttle:60,1')->name('shipments.dispute.show');
+        Route::post('/shipments/{shipment}/delivery-dispute', [\App\Http\Controllers\Buyer\DeliveryDisputeController::class, 'store'])->middleware('throttle:10,1')->name('shipments.dispute.store');
         Route::post('/orders/{order}/shipments/{shipment}/confirm-received', [OrderController::class, 'confirm'])
             ->middleware('throttle:20,1')->name('shipments.confirm');
 

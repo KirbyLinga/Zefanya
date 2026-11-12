@@ -307,6 +307,27 @@ class LiveOrderRepository extends LiveRepository
     implements OrderRepository, QuotesCheckout {
   LiveOrderRepository(super.client);
 
+  Future<Map<String, Object?>> deliveryDispute(
+    String shipmentId, {
+    String? explanation,
+    ({List<int> bytes, String filename})? evidence,
+  }) async {
+    final path = '/buyer/shipments/$shipmentId/delivery-dispute';
+    if (explanation == null) return unwrapMap(await client.getJson(path));
+    if (evidence == null) {
+      return unwrapMap(
+        await client.postJson(path, body: {'explanation': explanation}),
+      );
+    }
+    return unwrapMap(
+      await client.postMultipart(
+        path,
+        fields: {'explanation': explanation},
+        byteFiles: {'evidence': evidence},
+      ),
+    );
+  }
+
   @override
   Future<void> load() async {
     // Live orders are read from the server on demand; nothing to restore.

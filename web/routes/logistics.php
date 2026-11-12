@@ -151,6 +151,10 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         // ── Read-only overview of claimed parcels + failure reasons ─────────
         Route::post('/delivery-monitoring/{sellerOrder}/status-override', [DeliveryMonitoringController::class, 'overrideStatus'])->name('delivery-monitoring.override');
         Route::get('/delivery-monitoring', [DeliveryMonitoringController::class, 'index'])->name('delivery-monitoring.index');
+        Route::get('/delivery-disputes', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'index'])->middleware('throttle:60,1')->name('delivery-disputes.index');
+        Route::post('/delivery-disputes/{dispute}/review', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'review'])->middleware('throttle:20,1')->name('delivery-disputes.review');
+        Route::get('/delivery-disputes/{dispute}/proof', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'proof'])->middleware('throttle:30,1')->name('delivery-disputes.proof');
+        Route::get('/delivery-disputes/{dispute}/evidence', [\App\Http\Controllers\Logistics\DeliveryDisputeController::class, 'evidence'])->middleware('throttle:30,1')->name('delivery-disputes.evidence');
 
         Route::post('/delivery-monitoring/{seller_order}/incidents', [DeliveryAssignmentsController::class, 'reportIncident'])
             ->name('parcels.incidents.store');

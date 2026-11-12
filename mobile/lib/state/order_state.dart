@@ -57,6 +57,18 @@ class OrderState extends ChangeNotifier {
 
   final OrderRepository _repository;
 
+  bool get supportsDeliveryDisputes => _repository is LiveOrderRepository;
+
+  Future<Map<String, Object?>> deliveryDispute(
+    String shipmentId, {
+    String? explanation,
+    ({List<int> bytes, String filename})? evidence,
+  }) => (_repository as LiveOrderRepository).deliveryDispute(
+    shipmentId,
+    explanation: explanation,
+    evidence: evidence,
+  );
+
   /// The buyer's return/refund requests. Exposed so order screens can overlay
   /// the request status without adding another provider to every test.
   final ReturnState returns;

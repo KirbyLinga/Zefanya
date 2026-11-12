@@ -9,6 +9,7 @@ use App\Models\Admin\Admin;
 use App\Models\Admin\OperationsAuditLog;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\CodRemittance;
+use App\Models\Logistics\DeliveryDispute;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ParcelReturn;
 use App\Models\Rider\Courier;
@@ -23,6 +24,7 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\Voucher;
 use App\Services\Admin\PlatformFinanceService;
+use App\Services\Buyer\DeliveryDisputeService;
 use App\Services\Seller\SellerEarningsService;
 use App\Services\Seller\SellerPayoutRequestService;
 use App\Services\Seller\SellerSettlementService;
@@ -331,6 +333,32 @@ class SellerPayoutRequestTest extends TestCase
             ->assertOk()->assertJsonPath('status', SellerSettlement::PAID);
 
         $this->assertSame(0, app(SellerPayoutRequestService::class)->availableBalance($seller));
+    }
+
+    public function test_a_delivery_dispute_blocks_a_reserved_payout_until_the_claim_is_denied(): void
+    {
+        $seller = Seller::factory()->create();
+        $settlement = $this->earnings($seller);
+        $service = app(SellerPayoutRequestService::class);
+        $payout = $service->request($seller, '100', (string) Str::uuid());
+        $shipment = $settlement->sellerOrder;
+        $provider = $settlement->codRemittance->provider ?? LogisticsProvider::findOrFail($settlement->codRemittance->logistics_provider_id);
+        $case = new DeliveryDispute;
+        $case->forceFill([
+            'seller_order_id' => $shipment->id, 'buyer_id' => $shipment->order->buyer_id,
+            'logistics_provider_id' => $provider->id, 'status' => 'open',
+            'delivered_at' => now(), 'explanation' => 'Parcel missing.',
+        ])->save();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        try {
+            $service->pay($payout, $admin, 'PAY-1');
+            $this->fail('A disputed shipment must hold the payout.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('payout', $exception->errors());
+        }
+        $this->assertSame(0, (int) $settlement->fresh()->paid_amount_minor);
+        app(DeliveryDisputeService::class)->review($case, $provider, 'denied', 'The Buyer confirmed receipt.', 'Reviewer A');
+        $this->assertTrue($service->pay($payout, $admin, 'PAY-1'));
     }
 
     public function test_a_payout_request_needs_somewhere_to_send_the_money(): void

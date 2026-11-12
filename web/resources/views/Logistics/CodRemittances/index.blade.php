@@ -55,7 +55,9 @@
                 </thead>
                 <tbody class="divide-y divide-[var(--border-strong)]">
                     @forelse ($riderReconciliation as $row)
-                        @php($balance = (int) $row->difference_minor)
+                        @php
+                            $balance = (int) $row->difference_minor;
+                        @endphp
                         <tr data-cod-rider="{{ $row->courier_id }}" class="{{ $balance > 0 ? 'bg-[var(--pill-danger-bg)]' : '' }}">
                             <td class="px-4 py-4 font-semibold text-[var(--text-ink)]">{{ $row->courier?->rider?->fullName() ?: ($row->courier?->name ?: 'Rider #'.$row->courier_id) }}</td>
                             <td class="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[var(--text-ink)]">{{ $money((int) $row->collected_minor) }}</td>
@@ -100,7 +102,9 @@
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 font-semibold tabular-nums">&#8369;{{ intdiv($remittance->amount_minor, 100) }}.{{ str_pad((string) ($remittance->amount_minor % 100), 2, '0', STR_PAD_LEFT) }}</td>
                             <td class="px-4 py-4">
-                                @php($case = $remittance->discrepancy)
+                                @php
+                                    $case = $remittance->discrepancy;
+                                @endphp
                                 @if ($case)
                                     <p class="mb-2 text-sm">Counted ₱{{ number_format($case['counted_minor'] / 100, 2) }}. {{ $case['difference_minor'] < 0 ? 'Short' : 'Excess' }} ₱{{ number_format(abs($case['difference_minor']) / 100, 2) }}.</p>
                                     <p class="mb-2 text-sm">{{ $case['status'] === 'recovery_authorized' ? 'Recovery authorized. Confirm only after the full amount is physically accounted for.' : 'Awaiting Admin review. The COD obligation remains outstanding.' }}</p>
