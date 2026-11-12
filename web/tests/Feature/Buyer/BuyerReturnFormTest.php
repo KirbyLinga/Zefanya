@@ -99,14 +99,26 @@ class BuyerReturnFormTest extends TestCase
         }
     }
 
-    public function test_before_delivery_and_after_completion_the_form_and_request_are_blocked(): void
+    public function test_before_delivery_the_form_and_request_are_blocked(): void
     {
-        foreach ([OrderStatus::OutForDelivery, OrderStatus::Completed] as $status) {
-            $parcel = $this->parcel();
-            $parcel->forceFill(['status' => $status])->save();
-            $url = route('buyer.orders.requestReturn', [$parcel->order, $parcel]);
-            $this->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertDontSee('action="'.$url.'"', false);
-            $this->postJson($url, $this->payload())->assertStatus(409)->assertJsonValidationErrors('return');
-        }
+        $parcel = $this->parcel();
+        $parcel->forceFill(['status' => OrderStatus::OutForDelivery])->save();
+        $url = route('buyer.orders.requestReturn', [$parcel->order, $parcel]);
+        $this->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertDontSee('action="'.$url.'"', false);
+        $this->postJson($url, $this->payload())->assertStatus(409)->assertJsonValidationErrors('return');
+        $this->assertDatabaseCount('parcel_returns', 0);
+    }
+
+    public function test_completed_shipment_shows_the_defect_form_until_the_delivery_window_closes(): void
+    {
+        $parcel = $this->parcel();
+        $parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        $url = route('buyer.orders.requestReturn', [$parcel->order, $parcel]);
+        $show = route('buyer.orders.show', $parcel->order);
+        $this->get($show)->assertOk()->assertSee('action="'.$url.'"', false);
+        $this->travel(7)->days();
+        $this->get($show)->assertOk()->assertDontSee('action="'.$url.'"', false);
+        $this->postJson($url, $this->payload())->assertUnprocessable()->assertJsonValidationErrors('return');
+        $this->assertDatabaseCount('parcel_returns', 0);
     }
 }
