@@ -6,6 +6,8 @@ use App\Enums\ManifestStatus;
 use App\Enums\OrderStatus;
 use App\Models\Logistics\LinehaulDriver;
 use App\Models\Logistics\LinehaulProfile;
+use App\Models\Logistics\LinehaulTripPayout;
+use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\LinehaulPayService;
 use App\Services\Logistics\LinehaulService;
@@ -306,6 +308,28 @@ class LinehaulPayTest extends TestCase
         $this->assertSame('BANK-REPLACEMENT', $f['assignment']->payout()->sole()->reference);
         $this->assertDatabaseCount('linehaul_trip_payouts', 2);
         $this->assertDatabaseHas('linehaul_trip_payouts', ['id' => $payout->id, 'reference' => 'BANK-ORIGINAL', 'amount_minor' => 100000]);
+
+        $secondParcel = $f['parcel']->replicate()->forceFill([
+            'order_id' => Order::factory()->create()->id, 'tracking_number' => 'PAY-SECOND',
+            'custody_hub_id' => $f['station']->id, 'custody_provider_id' => $f['provider']->id,
+        ]);
+        $secondParcel->save();
+        $manifests = app(ManifestService::class);
+        $second = $manifests->create($f['provider'], $f['station']->id, $f['province']->id);
+        $item = $manifests->addParcel($second, $secondParcel);
+        $linehaul = app(LinehaulService::class);
+        $linehaul->assign($f['provider'], $second, $f['driver']);
+        $linehaul->act($f['driver'], $second, 'accept', [], request());
+        $linehaul->act($f['driver'], $second, 'scan', ['tracking_number' => $secondParcel->tracking_number, 'method' => 'manual'], request());
+        $this->depart([...$f, 'manifest' => $second]);
+        $scan = $manifests->verifyScan($second, $f['provider'], $secondParcel->tracking_number, ManifestService::PHASE_RECEIVE);
+        $this->post(route('logistics.manifests.receive.store', [$second, $item]), [
+            'verification_token' => $scan['verification_token'], 'observed_seal' => 'BH-0000771',
+        ])->assertSessionHasNoErrors();
+        $this->postJson(route('logistics.manifests.courier.payout', $second), [
+            ...$payment, 'reference' => 'BANK-REPLACEMENT',
+        ])->assertCreated();
+        $this->assertSame(2, LinehaulTripPayout::query()->where('reference', 'BANK-REPLACEMENT')->count());
     }
 
     public function test_trip_shows_shipping_ceiling_without_changing_dispatch_or_earnings(): void
@@ -323,6 +347,13 @@ class LinehaulPayTest extends TestCase
         $f['parcel']->forceFill(['shipping_fee_minor' => 30000])->save();
         $this->get($show)->assertOk()->assertSee('Whole-shipment shipping allocation')
             ->assertSee('₱300.00')->assertSee('Potential shortfall');
+        $extra = $f['parcel']->replicate()->forceFill([
+            'order_id' => Order::factory()->create()->id, 'tracking_number' => 'PAY-EXTRA', 'shipping_fee_minor' => 10000,
+        ]);
+        $extra->save();
+        app(ManifestService::class)->addParcel($manifest, $extra);
+        app(LinehaulService::class)->act($f['driver'], $manifest, 'scan', ['tracking_number' => $extra->tracking_number, 'method' => 'manual'], request());
+        $this->get($show)->assertOk()->assertSee('₱400.00')->assertSee('Potential shortfall');
         $this->depart($f);
         $this->get($show)->assertOk()->assertSee('Recorded Courier rate, awaiting handover')
             ->assertSee('Potential shortfall');
