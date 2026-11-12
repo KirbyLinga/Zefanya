@@ -116,6 +116,8 @@ class ManifestAuditLog extends Model
             'courier_delay' => 'Courier reported a delay',
             'courier_schedule' => 'Planned departure changed',
             'courier_payout_recorded' => 'Courier payment recorded',
+            'courier_payout_reference_corrected' => 'Courier payment reference corrected',
+            'courier_payout_reversed' => 'Failed Courier payment reversed',
             'cancelled' => 'Manifest Cancelled',
             'deleted' => 'Manifest Deleted',
             default => ucfirst($this->action),

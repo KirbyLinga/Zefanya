@@ -107,6 +107,7 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         Route::post('/manifests/{manifest}/courier', [ManifestController::class, 'assignCourier'])->middleware('throttle:20,1')->name('manifests.courier');
         Route::post('/manifests/{manifest}/courier/reassign', [ManifestController::class, 'reassignCourier'])->middleware('throttle:20,1')->name('manifests.courier.reassign');
         Route::post('/manifests/{manifest}/courier/payout', [ManifestController::class, 'recordCourierPayout'])->middleware('throttle:20,1')->name('manifests.courier.payout');
+        Route::post('/manifests/{manifest}/courier/payout/correction', [ManifestController::class, 'correctCourierPayout'])->middleware('throttle:20,1')->name('manifests.courier.payout.correction');
         Route::post('/manifests/{manifest}/schedule', [ManifestController::class, 'schedule'])->middleware('throttle:20,1')->name('manifests.schedule');
         Route::post('/manifests/{manifest}/items', [ManifestController::class, 'addItem'])->name('manifests.items.store');
         Route::delete('/manifests/{manifest}/items/{item}', [ManifestController::class, 'removeItem'])->name('manifests.items.destroy');

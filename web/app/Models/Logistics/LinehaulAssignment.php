@@ -34,7 +34,17 @@ class LinehaulAssignment extends Model
 
     public function payout(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
-        return $this->hasOne(LinehaulTripPayout::class);
+        $payout = $this->hasOne(LinehaulTripPayout::class);
+        if (\App\Support\RuntimeSchema::hasTable('linehaul_trip_payout_corrections')) {
+            $payout->whereDoesntHave('reversal');
+        }
+
+        return $payout;
+    }
+
+    public function payouts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LinehaulTripPayout::class);
     }
 
     public function latestDelay(): \Illuminate\Database\Eloquent\Relations\HasOne

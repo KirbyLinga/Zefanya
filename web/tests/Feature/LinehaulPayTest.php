@@ -254,4 +254,79 @@ class LinehaulPayTest extends TestCase
             ->assertJsonPath('data.earned_minor', 100000)
             ->assertJsonPath('data.trips.0.paid_on', $date)->assertJsonMissingPath('data.trips.0.reference');
     }
+
+    public function test_audited_correction_and_reversal_preserve_frozen_pay_and_original_payment(): void
+    {
+        $f = $this->fixture();
+        $manifest = $f['manifest'];
+        $this->actingAs($f['provider'], 'logistics');
+        $this->depart($f);
+        $scan = $this->postJson(route('logistics.manifests.scan.verify', $manifest), [
+            'tracking_number' => $f['parcel']->tracking_number, 'phase' => 'receive', 'method' => 'manual',
+        ])->assertOk()->json('verification_token');
+        $this->post(route('logistics.manifests.receive.store', [$manifest, $manifest->items()->sole()]), [
+            'verification_token' => $scan, 'observed_seal' => 'BH-0000771',
+        ])->assertSessionHasNoErrors();
+
+        $date = now('Asia/Manila')->toDateString();
+        $pay = route('logistics.manifests.courier.payout', $manifest);
+        $correct = route('logistics.manifests.courier.payout.correction', $manifest);
+        $payment = ['expected_amount_minor' => 100000, 'reference' => 'BANK-ORIGINAL', 'paid_on' => $date];
+        $this->postJson($pay, $payment)->assertCreated();
+        $payout = $f['assignment']->payout()->sole();
+        $data = [
+            'payout_id' => $payout->id, 'action' => 'reference', 'expected_reference' => 'BANK-ORIGINAL',
+            'reference' => 'BANK-CORRECTED', 'staff_name' => 'Finance lead', 'reason' => 'Bank statement confirms the reference.',
+        ];
+        $this->actingAs($this->handoffProvider('Other Pay Company'), 'logistics')->postJson($correct, $data)->assertForbidden();
+        $this->actingAs($f['provider'], 'logistics')->post($correct, $data)->assertSessionHas('success');
+        $this->postJson($correct, $data)->assertUnprocessable();
+        $this->assertSame('BANK-ORIGINAL', $payout->fresh()->reference);
+        $this->assertSame('BANK-CORRECTED', $payout->fresh()->recordedReference());
+        $this->assertSame($payout->id, $f['assignment']->payout()->sole()->id);
+        $this->get(route('logistics.manifests.show', $manifest))->assertOk()
+            ->assertSee('BANK-CORRECTED')->assertSee('BANK-ORIGINAL')->assertSee('Finance lead');
+
+        $failed = [...$data, 'action' => 'failed', 'expected_reference' => 'BANK-CORRECTED',
+            'reference' => 'BANK-FAIL-91', 'reason' => 'Bank confirmed the transfer was bounced.'];
+        $this->postJson($correct, $failed)->assertUnprocessable()->assertJsonValidationErrors('external_failure_confirmed');
+        $failed['external_failure_confirmed'] = '1';
+        $this->post($correct, $failed)->assertSessionHas('success');
+        $this->postJson($correct, $failed)->assertUnprocessable();
+        $this->assertNull($f['assignment']->payout()->first());
+        $this->assertSame(100000, $f['assignment']->fresh()->trip_pay_minor);
+        $this->assertSame($f['provider']->id, $payout->reversal()->sole()->logistics_provider_id);
+        $this->assertDatabaseCount('linehaul_trip_payouts', 1);
+        $this->assertDatabaseCount('linehaul_trip_payout_corrections', 2);
+
+        $this->postJson($pay, $payment)->assertUnprocessable();
+        $replacement = [...$payment, 'replaces_payout_id' => $payout->id, 'reference' => 'BANK-REPLACEMENT'];
+        $this->postJson($pay, $replacement)->assertCreated();
+        $this->postJson($pay, $replacement)->assertOk();
+        $this->assertSame('BANK-REPLACEMENT', $f['assignment']->payout()->sole()->reference);
+        $this->assertDatabaseCount('linehaul_trip_payouts', 2);
+        $this->assertDatabaseHas('linehaul_trip_payouts', ['id' => $payout->id, 'reference' => 'BANK-ORIGINAL', 'amount_minor' => 100000]);
+    }
+
+    public function test_trip_shows_shipping_ceiling_without_changing_dispatch_or_earnings(): void
+    {
+        $f = $this->fixture();
+        $manifest = $f['manifest'];
+        $f['parcel']->forceFill(['shipping_fee_minor' => 0])->save();
+        $show = route('logistics.manifests.show', $manifest);
+        $this->actingAs($f['provider'], 'logistics')->get($show)->assertOk()
+            ->assertSee('Estimated Courier rate')->assertSee('Shipping allocation is unavailable')
+            ->assertDontSee('Potential shortfall');
+        $f['parcel']->forceFill(['shipping_fee_minor' => 125000])->save();
+        $this->get($show)->assertOk()->assertSee('₱1,250.00')
+            ->assertSee('The share for this trip is unavailable')->assertDontSee('Potential shortfall');
+        $f['parcel']->forceFill(['shipping_fee_minor' => 30000])->save();
+        $this->get($show)->assertOk()->assertSee('Whole-shipment shipping allocation')
+            ->assertSee('₱300.00')->assertSee('Potential shortfall');
+        $this->depart($f);
+        $this->get($show)->assertOk()->assertSee('Recorded Courier rate, awaiting handover')
+            ->assertSee('Potential shortfall');
+        $this->assertSame(ManifestStatus::Dispatched, $manifest->fresh()->status);
+        $this->assertSame(100000, $f['assignment']->fresh()->trip_pay_minor);
+    }
 }

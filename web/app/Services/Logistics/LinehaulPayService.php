@@ -5,7 +5,9 @@ namespace App\Services\Logistics;
 use App\Enums\ManifestStatus;
 use App\Models\Logistics\LinehaulAssignment;
 use App\Models\Logistics\LinehaulDriver;
+use App\Models\Logistics\Manifest;
 use App\Support\RuntimeSchema;
+use Illuminate\Database\Eloquent\Collection;
 
 class LinehaulPayService
 {
@@ -78,5 +80,37 @@ class LinehaulPayService
         }
 
         return ['status' => 'not_configured', 'amount_minor' => null];
+    }
+
+    public static function shippingCoverage(Manifest $manifest, Collection $items, array $pay): ?array
+    {
+        if ($manifest->direction !== 'forward' || ! in_array($pay['status'], ['quote', 'pending', 'earned'], true)
+            || $pay['amount_minor'] === null || $items->isEmpty()) {
+            return null;
+        }
+        if (RuntimeSchema::hasTable('seller_settlements')) {
+            $items->loadMissing('sellerOrder.settlement');
+        }
+        $fees = $items->unique('seller_order_id')->map(function ($item): ?int {
+            $order = $item->sellerOrder;
+            if ($order === null) {
+                return null;
+            }
+            $settlement = $order->relationLoaded('settlement') ? $order->settlement : null;
+
+            return $settlement?->shipping_allocation_minor ?? ($order->shipping_fee_minor > 0 ? $order->shipping_fee_minor : null);
+        });
+        $ceiling = $fees->containsStrict(null) ? null : $fees->sum();
+
+        return [
+            'cost_minor' => $pay['amount_minor'],
+            'cost_status' => match ($pay['status']) {
+                'quote' => 'Estimated Courier rate',
+                'pending' => 'Recorded Courier rate, awaiting handover',
+                'earned' => 'Confirmed Courier earnings',
+            },
+            'shipping_ceiling_minor' => $ceiling,
+            'potential_shortfall' => $ceiling !== null && $ceiling < $pay['amount_minor'],
+        ];
     }
 }

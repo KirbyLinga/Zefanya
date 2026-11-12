@@ -22,7 +22,7 @@ class SendLinehaulTripPush implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public int $driverId, public int $companyId, public int $expiresAt)
+    public function __construct(public int $driverId, public int $companyId, public int $expiresAt, public bool $earningsChanged = false)
     {
         $this->onConnection('database')->onQueue('courier-push');
     }
@@ -71,7 +71,9 @@ class SendLinehaulTripPush implements ShouldQueue
                     ->post("https://fcm.googleapis.com/v1/projects/{$project}/messages:send", [
                         'message' => [
                             'token' => Crypt::decryptString($registration->encrypted_token),
-                            'notification' => ['title' => 'Zefanya Courier', 'body' => 'Open Zefanya to view your Courier trips.'],
+                            'notification' => ['title' => 'Zefanya Courier', 'body' => ($this->earningsChanged ?? false)
+                                ? 'A Courier payment record was updated. Open Earnings for its current status.'
+                                : 'Open Zefanya to view your Courier trips.'],
                             'android' => ['ttl' => "{$remaining}s"],
                         ],
                     ]);

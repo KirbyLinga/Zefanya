@@ -174,13 +174,19 @@ class ManifestController extends Controller
             ? \App\Models\Logistics\LinehaulAssignment::currentOffer()->with('driver')
                 ->where('manifest_id', $manifest->id)->first() : null;
         $payout = null;
+        $payoutHistory = collect();
         $earnedPay = null;
-        if ($courierAssignment !== null && \App\Services\Logistics\LinehaulPayoutService::installed()) {
+        $shippingCoverage = null;
+        if ($courierAssignment !== null) {
             $courierAssignment->setRelation('manifest', $manifest);
             $pay = \App\Services\Logistics\LinehaulPayService::details($courierAssignment);
-            if ($pay['status'] === 'earned') {
+            $shippingCoverage = \App\Services\Logistics\LinehaulPayService::shippingCoverage($manifest, $items, $pay);
+            if ($pay['status'] === 'earned' && \App\Services\Logistics\LinehaulPayoutService::installed()) {
                 $earnedPay = $pay['amount_minor'];
                 $payout = $courierAssignment->payout;
+                if (\App\Services\Logistics\LinehaulPayoutService::correctionsInstalled()) {
+                    $payoutHistory = $courierAssignment->payouts()->with('corrections')->latest('id')->get();
+                }
             }
         }
         $breakdownOffer = $courierAssignment !== null
@@ -203,6 +209,8 @@ class ManifestController extends Controller
             'courierAssignment' => $courierAssignment,
             'courierEarnedPay' => $earnedPay,
             'courierPayout' => $payout,
+            'courierPayoutHistory' => $payoutHistory,
+            'courierShippingCoverage' => $shippingCoverage,
             'courierTripLocation' => \App\Services\Logistics\LinehaulDutyService::tripLocation($manifest, $courierAssignment),
             'breakdownOffer' => $breakdownOffer,
             'replacementDrivers' => $replacementDrivers,
@@ -255,6 +263,16 @@ class ManifestController extends Controller
         }
 
         return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier payment recorded.');
+    }
+
+    public function correctCourierPayout(
+        \App\Http\Requests\Logistics\LinehaulPayoutCorrectionRequest $request,
+        Manifest $manifest,
+        \App\Services\Logistics\LinehaulPayoutService $service,
+    ): RedirectResponse {
+        $service->correct($this->provider($request), $manifest, $request->validated(), $request);
+
+        return redirect()->route('logistics.manifests.show', $manifest)->with('success', 'Courier payment correction recorded.');
     }
 
     public function addItem(Request $request, Manifest $manifest): RedirectResponse

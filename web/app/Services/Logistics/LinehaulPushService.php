@@ -63,14 +63,14 @@ class LinehaulPushService
         return $enabled;
     }
 
-    public static function queue(int $driverId, int $companyId): void
+    public static function queue(int $driverId, int $companyId, bool $earningsChanged = false): void
     {
-        DB::afterCommit(function () use ($driverId, $companyId): void {
+        DB::afterCommit(function () use ($driverId, $companyId, $earningsChanged): void {
             try {
                 if (! self::available()) {
                     return;
                 }
-                Bus::dispatch(new SendLinehaulTripPush($driverId, $companyId, now()->addMinutes(5)->timestamp));
+                Bus::dispatch(new SendLinehaulTripPush($driverId, $companyId, now()->addMinutes(5)->timestamp, $earningsChanged));
             } catch (Throwable) {
                 Log::warning('Could not queue a Courier trip notification.');
             }

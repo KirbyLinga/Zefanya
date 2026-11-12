@@ -82,16 +82,64 @@
             @if ($courierAssignment->arrived_at) · Courier reported arrival @endif
         </p>
         <p>Logistics confirms parcel receipt using the existing receiving screen.</p>
+        @if ($courierShippingCoverage !== null)
+            <section class="mt-3 space-y-1 border-t pt-3">
+                <h3 class="font-semibold">Shipping coverage for this trip</h3>
+                <p>{{ $courierShippingCoverage['cost_status'] }} · ₱{{ number_format($courierShippingCoverage['cost_minor'] / 100, 2) }}</p>
+                @if ($courierShippingCoverage['shipping_ceiling_minor'] !== null)
+                    <p>Whole-shipment shipping allocation · ₱{{ number_format($courierShippingCoverage['shipping_ceiling_minor'] / 100, 2) }}</p>
+                    <p>The shipping allocation covers all legs. The share for this trip is unavailable.</p>
+                    @if ($courierShippingCoverage['potential_shortfall'])
+                        <p class="font-semibold text-amber-800">Potential shortfall. Even the full shipping allocation for these parcels is below the Courier rate.</p>
+                    @endif
+                @else
+                    <p>Shipping allocation is unavailable for one or more parcels.</p>
+                @endif
+            </section>
+        @endif
         @if ($courierEarnedPay !== null)
             <div class="mt-3 border-t pt-3">
                 <h3 class="font-semibold">Courier pay · ₱{{ number_format($courierEarnedPay / 100, 2) }}</h3>
                 @if ($courierPayout)
-                    <p>Paid on {{ $courierPayout->paid_on->toDateString() }} · Reference {{ $courierPayout->reference }}</p>
+                    <p>Paid on {{ $courierPayout->paid_on->toDateString() }} · Reference {{ $courierPayout->recordedReference() }}</p>
+                    @if ($courierPayoutHistory->isNotEmpty())
+                        <details class="mt-3" @if(old('payout_id')) open @endif>
+                            <summary class="cursor-pointer font-semibold">Correct payment record</summary>
+                            <form method="POST" action="{{ route('logistics.manifests.courier.payout.correction', $manifest) }}" class="mt-2 space-y-2">
+                                @csrf
+                                <input type="hidden" name="payout_id" value="{{ $courierPayout->id }}">
+                                <input type="hidden" name="expected_reference" value="{{ $courierPayout->recordedReference() }}">
+                                <label class="block">Correction type
+                                    <select name="action" class="block rounded border p-2" required>
+                                        <option value="reference">Correct reference for a completed payment</option>
+                                        <option value="failed" @selected(old('action') === 'failed')>Reverse a verified failed external payment</option>
+                                    </select>
+                                </label>
+                                <label class="block">Corrected payment or bank failure reference
+                                    <input name="reference" class="block rounded border p-2" maxlength="100" value="{{ old('reference') }}" required>
+                                </label>
+                                <label class="block">Authorizing staff name
+                                    <input name="staff_name" class="block rounded border p-2" maxlength="120" value="{{ old('staff_name') }}" required>
+                                </label>
+                                <label class="block">Reason
+                                    <textarea name="reason" class="block w-full rounded border p-2" minlength="10" maxlength="500" required>{{ old('reason') }}</textarea>
+                                </label>
+                                <label class="block"><input type="checkbox" name="external_failure_confirmed" value="1"> For a reversal, I verified the external payment failed.</label>
+                                <button type="submit" class="min-h-10 rounded-md border px-4">Record correction</button>
+                                @foreach (['payout_id', 'action', 'expected_reference', 'reference', 'staff_name', 'reason', 'external_failure_confirmed', 'payout'] as $field)
+                                    @error($field) <p role="alert">{{ $message }}</p> @enderror
+                                @endforeach
+                            </form>
+                        </details>
+                    @endif
                 @else
                     <p>Record a payment already made to this Courier.</p>
                     <form method="POST" action="{{ route('logistics.manifests.courier.payout', $manifest) }}" class="mt-2 space-y-2">
                         @csrf
                         <input type="hidden" name="expected_amount_minor" value="{{ $courierEarnedPay }}">
+                        @if ($courierPayoutHistory->isNotEmpty())
+                            <input type="hidden" name="replaces_payout_id" value="{{ $courierPayoutHistory->first()->id }}">
+                        @endif
                         <label for="courier-paid-on" class="block">Payment date (Philippine time)</label>
                         <input id="courier-paid-on" type="date" name="paid_on" class="rounded-md border p-2" required
                             min="{{ $manifest->received_at->copy()->timezone('Asia/Manila')->toDateString() }}"
@@ -99,10 +147,24 @@
                         <label for="courier-payout-reference" class="block">Payment reference</label>
                         <input id="courier-payout-reference" name="reference" class="rounded-md border p-2" required maxlength="100" value="{{ old('reference') }}">
                         <button type="submit" class="rounded-md border px-4 py-2">Record Courier payment</button>
-                        @foreach (['expected_amount_minor', 'paid_on', 'reference', 'payout'] as $field)
+                        @foreach (['expected_amount_minor', 'paid_on', 'reference', 'replaces_payout_id', 'payout'] as $field)
                             @error($field) <p role="alert">{{ $message }}</p> @enderror
                         @endforeach
                     </form>
+                @endif
+                @if ($courierPayoutHistory->contains(fn ($payment) => $payment->corrections->isNotEmpty()))
+                    <details class="mt-3">
+                        <summary class="cursor-pointer font-semibold">Payment history</summary>
+                        @foreach ($courierPayoutHistory as $payment)
+                            <div class="mt-2 rounded border p-2">
+                                <p>{{ $payment->paid_on->toDateString() }} · Original reference {{ $payment->reference }}</p>
+                                @foreach ($payment->corrections as $correction)
+                                    <p>{{ $correction->created_at->format('M j, Y H:i') }} · {{ $correction->staff_name }} · {{ $correction->reversed_payout_id ? 'Failed payment reversed' : 'Reference corrected' }}</p>
+                                    <p>{{ $correction->reference }} · {{ $correction->reason }}</p>
+                                @endforeach
+                            </div>
+                        @endforeach
+                    </details>
                 @endif
             </div>
         @endif
