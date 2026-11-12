@@ -31,6 +31,24 @@
         <div role="alert" class="rounded-md border border-error bg-white p-4 text-sm text-error">{{ $errors->first() }}</div>
     @endif
 
+    @if ($sellerDebts !== null)
+        <section aria-labelledby="seller-debts-heading" class="{{ $panel }} p-4">
+            <h2 id="seller-debts-heading" class="font-serif text-xl text-neutral-950">Outstanding Seller debt</h2>
+            <p class="mt-1 text-sm text-neutral-600">Unpaid balances, including suspended Sellers. Confirmed payout offsets reduce these balances.</p>
+            <ul class="mt-3 divide-y divide-neutral-200 text-sm">
+                @forelse ($sellerDebts as $debt)
+                    <li class="flex flex-wrap justify-between gap-2 py-2">
+                        <span>{{ $debt->seller?->business_name ?? 'Seller #'.$debt->seller_id }} · {{ ucfirst($debt->seller?->status ?? 'Unavailable') }}</span>
+                        <span class="font-semibold tabular-nums">{{ $peso((int) $debt->unpaid_minor) }} outstanding</span>
+                    </li>
+                @empty
+                    <li class="py-2 text-neutral-600">No unpaid Seller balances.</li>
+                @endforelse
+            </ul>
+            {{ $sellerDebts->links() }}
+        </section>
+    @endif
+
     <section aria-labelledby="payouts-waiting-heading" class="space-y-3">
         <h2 id="payouts-waiting-heading" class="font-serif text-xl text-neutral-950">Waiting to be paid ({{ $waiting->count() }})</h2>
         @forelse ($waiting as $payout)

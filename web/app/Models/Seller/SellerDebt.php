@@ -3,6 +3,7 @@
 namespace App\Models\Seller;
 
 use App\Models\Shared\SellerOrder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -27,6 +28,11 @@ class SellerDebt extends Model
     public function outstandingMinor(): int
     {
         return max(0, (int) $this->amount_minor - (int) $this->settled_minor);
+    }
+
+    public function scopeOutstanding(Builder $query): Builder
+    {
+        return $query->whereColumn('settled_minor', '<', 'amount_minor');
     }
 
     public function seller(): BelongsTo

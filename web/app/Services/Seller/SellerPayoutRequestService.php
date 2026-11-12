@@ -47,7 +47,7 @@ class SellerPayoutRequestService
     /** What the Seller still owes from orders returned after they were paid. */
     public function outstandingDebtMinor(Seller $seller, bool $lock = false): int
     {
-        $query = SellerDebt::query()->where('seller_id', $seller->id)->whereColumn('settled_minor', '<', 'amount_minor');
+        $query = SellerDebt::query()->where('seller_id', $seller->id)->outstanding();
         if ($lock) {
             $query->lockForUpdate();
         }

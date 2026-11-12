@@ -6,6 +6,8 @@ use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerDebt;
+use App\Models\Shared\SellerOrder;
 use App\Notifications\Admin\AccountStatusChanged;
 use App\Notifications\Buyer\BuyerRegistrationDecision;
 use App\Notifications\Seller\SellerRegistrationDecision;
@@ -169,6 +171,28 @@ class AdminUserAccountTest extends TestCase
         Notification::assertSentTo($seller, AccountStatusChanged::class, function (AccountStatusChanged $n, array $channels): bool {
             return $n->status === 'approved' && $channels === ['mail'];
         });
+    }
+
+    public function test_suspended_seller_debt_remains_visible_after_reactivation(): void
+    {
+        Notification::fake();
+        $this->withoutVite();
+        $seller = Seller::factory()->create(['status' => 'suspended', 'business_name' => 'Suspended Shop with Debt']);
+        $parcel = SellerOrder::factory()->create(['seller_id' => $seller->id]);
+        $debt = new SellerDebt;
+        $debt->forceFill([
+            'seller_id' => $seller->id, 'seller_order_id' => $parcel->id,
+            'amount_minor' => 45000, 'settled_minor' => 11000, 'reason' => SellerDebt::FAILED_DELIVERY,
+        ])->save();
+        $this->actingAs($this->admin(), 'admin')->get(route('admin.users.index', ['type' => 'seller', 'status' => 'suspended']))
+            ->assertOk()->assertSee('Outstanding debt')->assertSee('340.00');
+        $finance = route('admin.seller-payouts.index');
+        $this->get($finance)->assertOk()->assertSee('Suspended Shop with Debt · Suspended')->assertSee('₱340.00 outstanding');
+        $this->post(route('admin.users.seller.reactivate', $seller), ['reason' => 'Account status reviewed by Admin.'])
+            ->assertRedirect();
+        $this->get($finance)->assertOk()->assertSee('Suspended Shop with Debt · Approved')->assertSee('₱340.00 outstanding');
+        $this->assertSame(11000, $debt->fresh()->settled_minor);
+        $this->assertSame(1, SellerDebt::query()->where('seller_order_id', $parcel->id)->count());
     }
 
     public function test_registration_decision_notifications_use_mail(): void

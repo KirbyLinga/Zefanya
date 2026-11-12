@@ -84,6 +84,9 @@
                             @if (! empty($account->business_name))
                                 <p class="text-xs text-neutral-500 font-normal">{{ $account->business_name }}</p>
                             @endif
+                            @if ($type === 'seller' && $sellerDebt->has($account->id))
+                                <p class="mt-1 text-xs font-semibold text-amber-800">Outstanding debt · ₱{{ number_format($sellerDebt[$account->id] / 100, 2) }}</p>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-neutral-700">{{ $account->email }}</td>
                         @if ($type === 'logistics')

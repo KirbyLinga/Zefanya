@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerPayoutRequest;
 use App\Services\Seller\SellerPayoutRequestService;
+use App\Support\RuntimeSchema;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,6 +22,11 @@ class SellerPayoutController extends Controller
             'history' => SellerPayoutRequest::query()->whereIn('status', [SellerPayoutRequest::PAID, SellerPayoutRequest::REJECTED])
                 ->with(['seller:id,business_name', 'decidedBy:id,name'])
                 ->latest('id')->paginate(25),
+            'sellerDebts' => RuntimeSchema::hasTable('seller_debts')
+                ? SellerDebt::query()->outstanding()->with('seller:id,business_name,status')
+                    ->selectRaw('seller_id, SUM(amount_minor - settled_minor) AS unpaid_minor')->groupBy('seller_id')
+                    ->orderByDesc('unpaid_minor')->orderBy('seller_id')->paginate(25, pageName: 'debts_page')->withQueryString()
+                : null,
         ]);
     }
 

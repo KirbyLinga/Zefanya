@@ -7,11 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerDebt;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Admin\AccountStatusChanged;
 use App\Services\Admin\AccountStatusService;
 use App\Services\Logistics\ProviderProvinceService;
 use App\Services\Shared\AccountSessionService;
+use App\Support\RuntimeSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,6 +61,11 @@ class UserAccountController extends Controller
 
         $paginator = $accounts->paginate(25)->withQueryString();
 
+        $sellerDebt = $type === 'seller' && RuntimeSchema::hasTable('seller_debts')
+            ? SellerDebt::query()->outstanding()->whereIn('seller_id', $paginator->getCollection()->modelKeys())
+                ->groupBy('seller_id')->selectRaw('seller_id, SUM(amount_minor - settled_minor) AS unpaid_minor')
+                ->pluck('unpaid_minor', 'seller_id')
+            : collect();
         $provinceBlockers = [];
         $outForDelivery = [];
         if ($type === 'logistics') {
@@ -86,6 +93,7 @@ class UserAccountController extends Controller
             'statuses' => self::ACCOUNT_STATUSES,
             'provinceBlockers' => $provinceBlockers,
             'outForDelivery' => $outForDelivery,
+            'sellerDebt' => $sellerDebt,
             'maxWindDownHours' => AccountStatusService::MAX_RIDER_WIND_DOWN_HOURS,
         ]);
     }
