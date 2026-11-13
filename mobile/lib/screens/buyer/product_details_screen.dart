@@ -23,6 +23,10 @@ import '../../state/recently_viewed_state.dart';
 import '../../state/review_state.dart';
 import '../../theme/app_theme.dart';
 import '../shared/chat_screen.dart';
+import '../../state/chat_state.dart';
+import '../../data/api/api_exception.dart';
+import '../../state/catalog_state.dart';
+import '../../widgets/inline_error_notice.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
 import 'review_screen.dart';
@@ -85,7 +89,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   /// the price and actions off the screen.
   bool _descriptionExpanded = false;
 
-  Product get _product => widget.product;
+  Product? _liveProduct;
+  bool _loadingDetails = false;
+  bool _usesLiveDetails = false;
+  String? _detailsError;
+  Product get _product => _liveProduct ?? widget.product;
 
   List<VariationType> get _groups => _product.optionGroups;
 
@@ -203,6 +211,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       _selectedOptions[groups.first.name] = groups.first.values.first;
     }
     _quantity = _currentStock == 0 ? 0 : 1;
+    _loadDetails();
     // Deferred to post-frame: this notifies RecentlyViewedState, and
     // calling that during this screen's own initial build (rather than
     // after it) would trigger a rebuild of whatever's listening — Home,
@@ -210,6 +219,35 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<RecentlyViewedState>().recordView(_product.id);
     });
+  }
+
+  Future<void> _loadDetails() async {
+    if (_loadingDetails) return;
+    final request = context.read<CatalogState?>()?.fetchLiveProduct(
+      widget.product.id,
+    );
+    if (request == null) return;
+    setState(() {
+      _usesLiveDetails = true;
+      _loadingDetails = true;
+      _detailsError = null;
+    });
+    try {
+      final product = await request;
+      if (!mounted) return;
+      setState(() {
+        _liveProduct = product;
+        _detailsError = product == null
+            ? 'This product is no longer available.'
+            : null;
+        _selectedOptions.clear();
+        _quantity = _currentStock == 0 ? 0 : 1;
+      });
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _detailsError = error.message);
+    } finally {
+      if (mounted) setState(() => _loadingDetails = false);
+    }
   }
 
   @override
@@ -684,7 +722,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       // The Hero wraps the cover *only*. Two pages carrying the same tag
       // at once is a duplicate-tag error, and the shared-element flight
       // always starts from the cover, so the other pages don't need one.
-      return index == 0 && widget.heroTag != null
+      return index == 0 && widget.heroTag != null && !reduceMotion(context)
           ? Hero(tag: widget.heroTag!, child: image)
           : image;
     }
@@ -809,29 +847,27 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_product.name, style: theme.textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.s12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        Text(
+          _product.name,
+          style: AppType.sectionDisplay.copyWith(fontSize: 29, height: 1.12),
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        Wrap(
+          spacing: AppSpacing.s12,
+          runSpacing: AppSpacing.s4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            // The one dramatically oversized element on this screen.
-            // Was headlineSmall (24pt) — close enough to the product
-            // name above it that neither won, so the page had no focal
-            // point at all.
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  formatPeso(_currentPrice),
-                  style: AppType.priceNumeral(52),
-                ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                formatPeso(_currentPrice),
+                style: AppType.priceNumeral(40),
               ),
             ),
-            if (_product.compareAtPrice != null) ...[
-              const SizedBox(width: AppSpacing.s12),
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+            if ((_product.compareAtPrice ?? 0) > _currentPrice)
+              FittedBox(
+                fit: BoxFit.scaleDown,
                 child: Text(
                   formatPeso(_product.compareAtPrice!),
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -840,7 +876,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   ),
                 ),
               ),
-            ],
           ],
         ),
       ],
@@ -848,6 +883,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildShippingAndVoucher(ThemeData theme) {
+    if (_usesLiveDetails) {
+      return Text(
+        'Shipping is calculated at checkout. Browse shop vouchers in Cart or Checkout.',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      );
+    }
     final shipping = shippingFeeFor(_currentPrice);
     final isFree = shipping == 0;
 
@@ -859,7 +902,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             Icon(
               isFree ? Icons.local_shipping_outlined : Icons.attach_money,
               size: 14,
-              color: isFree ? AppColors.tertiary : AppColors.textSecondary,
+              color: isFree ? AppColors.successText : AppColors.textSecondary,
             ),
             const SizedBox(width: AppSpacing.s4),
             Expanded(
@@ -868,7 +911,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ? 'Free shipping on orders over \u20b11,000'
                     : 'Shipping \u20b160',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isFree ? AppColors.tertiary : AppColors.textSecondary,
+                  color: isFree
+                      ? AppColors.successText
+                      : AppColors.textSecondary,
                   fontWeight: isFree ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
@@ -876,7 +921,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ],
         ),
         const SizedBox(height: AppSpacing.s12),
-        Row(
+        Wrap(
+          spacing: AppSpacing.s8,
+          runSpacing: AppSpacing.s4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(
@@ -909,7 +957,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.s8),
             OutlinedButton(
               onPressed: () => Navigator.of(
                 context,
@@ -920,7 +967,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   vertical: AppSpacing.s4,
                 ),
                 minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: BorderSide(color: AppColors.divider),
               ),
               child: Text(
@@ -1444,29 +1490,33 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   style: AppType.priceNumeral(34),
                 ),
                 const SizedBox(width: AppSpacing.s12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
-                      style: AppType.eyebrow,
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.star_rounded,
-                          size: 16,
-                          color: AppColors.ratingStar,
-                        ),
-                        const SizedBox(width: AppSpacing.s4),
-                        Text(
-                          '${_product.rating.toStringAsFixed(1)} average',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ],
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _product.ratingCount == 1 ? 'REVIEW' : 'REVIEWS',
+                        style: AppType.eyebrow,
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            size: 16,
+                            color: AppColors.ratingStar,
+                          ),
+                          const SizedBox(width: AppSpacing.s4),
+                          Flexible(
+                            child: Text(
+                              '${_product.rating.toStringAsFixed(1)} average',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1671,7 +1721,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   Widget _buildBottomActionBar(BuildContext context, ThemeData theme) {
     final isOutOfStock = _isOutOfStock;
     final onVacation = _product.sellerOnVacation;
-    final actionsDisabled = isOutOfStock || onVacation;
+    final actionsDisabled =
+        isOutOfStock || onVacation || _loadingDetails || _detailsError != null;
+    final productId = int.tryParse(_product.id);
+    final sellerId = _product.sellerId;
+    final canChatLive =
+        productId != null &&
+        sellerId != null &&
+        context.read<ChatState?>()?.liveRepository != null;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(
@@ -1700,6 +1757,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_selectedVariant.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                child: Text(
+                  'Selected: $_selectedVariant',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             if (onVacation || isOutOfStock)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.s8),
@@ -1732,9 +1798,17 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   ),
                 ),
               ),
+            if (_loadingDetails)
+              const LinearProgressIndicator(
+                semanticsLabel: 'Loading product details',
+              ),
+            if (_detailsError case final error?) ...[
+              InlineErrorNotice(error),
+              TextButton(onPressed: _loadDetails, child: const Text('Retry')),
+            ],
             Row(
               children: [
-                if (FeatureFlags.chatLive) ...[
+                if (FeatureFlags.chatLive || canChatLive) ...[
                   _circleIconButton(
                     Icons.chat_bubble_outline,
                     () => Navigator.of(context).push(
@@ -1742,6 +1816,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         builder: (_) => ChatScreen(
                           contactName: _product.sellerName,
                           contactRole: 'Seller',
+                          sellerId: canChatLive ? sellerId : null,
+                          productId: canChatLive ? productId : null,
                         ),
                       ),
                     ),

@@ -74,6 +74,7 @@ Future<void> _mount(
   Map<String, Object?> trip,
   List<String> posts, {
   void Function(http.Request)? onAction,
+  http.Response? Function(http.Request)? actionResponse,
   CourierLocationSource? locationSource,
   CourierTripLocationSource? tripLocationSource,
 }) async {
@@ -88,6 +89,8 @@ Future<void> _mount(
       if (request.method == 'POST') {
         posts.add(request.url.path);
         onAction?.call(request);
+        final response = actionResponse?.call(request);
+        if (response != null) return response;
       }
       return http.Response(
         jsonEncode({
@@ -139,6 +142,105 @@ Future<void> _mount(
 }
 
 void main() {
+  testWidgets(
+    'five parcels stay in one scanner session with server-confirmed counts',
+    (tester) async {
+      final posts = <String>[];
+      var failFirstScan = true;
+      final items = List.generate(
+        5,
+        (i) => <String, Object?>{
+          'id': i + 1,
+          'tracking_number': 'TRK-$i',
+          'loaded': false,
+          'received': false,
+        },
+      );
+      final trip = {..._trip(status: 'Loading'), 'items': items};
+      await _mount(
+        tester,
+        _Directions(),
+        trip,
+        posts,
+        actionResponse: (request) {
+          final code = (jsonDecode(request.body) as Map)['tracking_number'];
+          if (code == 'TRK-0' && failFirstScan) {
+            failFirstScan = false;
+            return http.Response('{"message":"Temporarily unavailable"}', 503);
+          }
+          final matches = items.where(
+            (item) => item['tracking_number'] == code,
+          );
+          if (matches.isEmpty) {
+            return http.Response(
+              '{"message":"Parcel is not in this trip."}',
+              422,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          matches.single['loaded'] = true;
+          return http.Response(
+            jsonEncode({'data': trip}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        },
+      );
+      final scan = find.text('Scan or enter parcel');
+      expect(scan.hitTestable(), findsOneWidget);
+      expect(find.text('Depart'), findsNothing);
+      await tester.tap(scan);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      Future<void> enter(String code) async {
+        await tester.enterText(
+          find.byKey(const ValueKey('qr-manual-entry')),
+          code,
+        );
+        await tester.tap(find.byKey(const ValueKey('qr-manual-confirm')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      await enter('');
+      expect(posts, isEmpty);
+      expect(
+        find.textContaining('Enter a valid parcel tracking number.'),
+        findsOneWidget,
+      );
+      await enter('WRONG');
+      expect(
+        find.textContaining('Parcel is not in this trip.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('0 of 5 parcels confirmed'), findsOneWidget);
+      await enter('TRK-0');
+      expect(find.textContaining('0 of 5 parcels confirmed'), findsOneWidget);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.tap(find.text('Retry scan'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.textContaining('1 of 5 parcels confirmed'), findsOneWidget);
+      expect(find.text('Retry scan'), findsNothing);
+      for (var i = 1; i < 5; i++) {
+        await enter('TRK-$i');
+        expect(
+          find.textContaining('${i + 1} of 5 parcels confirmed'),
+          findsOneWidget,
+        );
+      }
+      await enter('TRK-4');
+      expect(find.textContaining('Parcel already scanned.'), findsOneWidget);
+      expect(posts, hasLength(7));
+      await tester.tap(find.byKey(const ValueKey('qr-close')));
+      await tester.pumpAndSettle();
+      expect(find.text('Depart').hitTestable(), findsOneWidget);
+    },
+  );
+
   testWidgets('explicit trip sharing sends a scoped fix while paused', (
     tester,
   ) async {
@@ -206,13 +308,7 @@ void main() {
         },
       );
       final button = find.text('Report arrival');
-      await tester.scrollUntilVisible(
-        button,
-        150,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.drag(find.byType(ListView).first, const Offset(0, -120));
-      await tester.pumpAndSettle();
+      expect(button.hitTestable(), findsOneWidget);
       await tester.tap(button);
       await tester.pumpAndSettle();
       expect(location.reads, 1);
@@ -264,7 +360,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      await scrollTo('Continue trip');
+      expect(find.text('Rescan parcel').hitTestable(), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(
@@ -274,7 +370,6 @@ void main() {
         isNull,
       );
       expect(find.text('Report arrival'), findsNothing);
-      await tester.ensureVisible(find.text('Rescan parcel'));
       await tester.tap(find.text('Rescan parcel'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
@@ -283,10 +378,12 @@ void main() {
         'TRK-001',
       );
       await tester.tap(find.byKey(const ValueKey('qr-manual-confirm')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.textContaining('1 of 1 parcels confirmed'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('qr-close')));
       await tester.pumpAndSettle();
       await scrollTo('Continue trip');
-      await tester.drag(find.byType(ListView).first, const Offset(0, -140));
-      await tester.pumpAndSettle();
       await tester.tap(find.text('Continue trip'));
       await tester.pumpAndSettle();
       await scrollTo('Report arrival');
@@ -322,6 +419,8 @@ void main() {
     expect(find.text('Continue trip'), findsNothing);
     await tester.tap(find.text('View trip history'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Reassigned'));
+    await tester.pumpAndSettle();
     expect(
       find.text('Reassigned by Logistics: Engine failure'),
       findsOneWidget,
@@ -354,12 +453,15 @@ void main() {
     expect(find.text('Trip #12 was reassigned'), findsNothing);
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
+    expect(find.text('Reassigned'), findsOneWidget);
+    await tester.tap(find.text('Reassigned'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Reassigned by Logistics: Engine failure'),
       160,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Reassigned'), findsOneWidget);
+    expect(find.text('Reassigned'), findsWidgets);
     expect(find.text('Report arrival'), findsNothing);
     expect(find.text('Continue trip'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -414,6 +516,9 @@ void main() {
         'trip_pay': {'status': 'earned', 'amount_minor': 100000},
       }, posts);
       await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      expect(find.text('Completed'), findsOneWidget);
+      await tester.tap(find.text('Trip #12').hitTestable());
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Earned trip pay: ₱1,000.00'),
@@ -471,6 +576,18 @@ void main() {
         'departed_at': '2026-11-08T04:00:00Z',
         'scheduled_departure_at': '2026-11-08T03:30:00Z',
       }, posts);
+      final details = find.text('Trip details');
+      await tester.scrollUntilVisible(
+        details,
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Recorded parcel weight: 3.6 kg'), findsNothing);
+      await Scrollable.ensureVisible(tester.element(details), alignment: .55);
+      await tester.pumpAndSettle();
+      expect(details.hitTestable(), findsOneWidget);
+      await tester.tap(details.hitTestable());
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Recorded parcel weight: 3.6 kg'),
         120,
@@ -608,12 +725,15 @@ void main() {
       await _mount(tester, directions, _trip(status: 'Completed'), []);
       await tester.tap(find.text('History'));
       await tester.pumpAndSettle();
+      expect(find.text('Completed'), findsOneWidget);
+      await tester.tap(find.text('Trip #12').hitTestable());
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Rizal Avenue, Calamba, Laguna'),
         160,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('Completed'), findsWidgets);
       expect(find.text('Directions to destination'), findsNothing);
       expect(directions.requests, isEmpty);
       expect(tester.takeException(), isNull);

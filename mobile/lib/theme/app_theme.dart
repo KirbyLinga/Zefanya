@@ -78,22 +78,22 @@ class AppPalette {
   Brightness get brightness => isDark ? Brightness.dark : Brightness.light;
 
   // ── Brand hues ───────────────────────────────────────────────────────
-  final Color primary;      // soft blush — glow, subtle accent
-  final Color primaryDark;  // brand fills, buttons, selected states
-  final Color secondary;    // light blush — delicate fills
-  final Color tertiary;     // sage — success, secondary accent
-  final Color neutral;      // muted slate
-  final Color accent;       // terracotta — price numerals, primary CTAs
+  final Color primary; // soft blush — glow, subtle accent
+  final Color primaryDark; // brand fills, buttons, selected states
+  final Color secondary; // light blush — delicate fills
+  final Color tertiary; // sage — success, secondary accent
+  final Color neutral; // muted slate
+  final Color accent; // terracotta — price numerals, primary CTAs
 
   // ── Surfaces ─────────────────────────────────────────────────────────
-  final Color background;    // the page the whole app sits on
-  final Color surface;       // cards and bands
-  final Color surfaceMuted;  // inset panels, one step in from surface
+  final Color background; // the page the whole app sits on
+  final Color surface; // cards and bands
+  final Color surfaceMuted; // inset panels, one step in from surface
 
   // ── Text ─────────────────────────────────────────────────────────────
   final Color textPrimary;
   final Color textSecondary;
-  final Color textOnDark;    // text/icons on a *dark* fill (heroes, buttons)
+  final Color textOnDark; // text/icons on a *dark* fill (heroes, buttons)
 
   /// Ink for a *light* fill — the mode-invariant pastels ([secondary],
   /// [tertiary], [primary]) that are the same pale value in both modes.
@@ -131,7 +131,7 @@ class AppPalette {
   final Color tintInk;
 
   // ── Atmosphere ───────────────────────────────────────────────────────
-  final Gradient groundGradient;   // app-wide background base
+  final Gradient groundGradient; // app-wide background base
   final Color glowCenter;
   final Color glowBlush;
   final Color glowSage;
@@ -229,8 +229,8 @@ class AppPalette {
     // (28–34% vs the old 35–55%) because a more saturated color needs
     // less opacity to register — this was never a "turn it up" problem.
     glowCenter: Color(0x52DA627A), // rich rose @ 32%
-    glowBlush: Color(0x47E29081),  // rich coral-blush @ 28%
-    glowSage: Color(0x576BB76B),   // rich sage-green @ 34%
+    glowBlush: Color(0x47E29081), // rich coral-blush @ 28%
+    glowSage: Color(0x576BB76B), // rich sage-green @ 34%
     shimmerBase: Color(0xFFE6DAD8),
     shimmerHighlight: Color(0xFFFFFFFF),
     // Stronger than before (18%→24% alpha) — the old value made cards
@@ -238,7 +238,7 @@ class AppPalette {
     // lift from luminance contrast alone; light mode needs the shadow
     // to do more of that work since surface (white) and background
     // (warm cream) are close in lightness to begin with.
-    navShadow: Color(0x3D7C7676),  // neutral @ 24%
+    navShadow: Color(0x3D7C7676), // neutral @ 24%
     navSelectedFill: Color(0xFFF7D6D0),
     cardElevation: 4,
     cardShadow: Color(0x407C7676), // neutral @ 25%
@@ -302,11 +302,11 @@ class AppPalette {
       colors: [Color(0xFF221810), Color(0xFF1A1410)],
     ),
     glowCenter: Color(0x38B06070), // primaryDark @ 22%
-    glowBlush: Color(0x4DE2B4BD),  // primary @ 30%
-    glowSage: Color(0x33ADC7AD),   // tertiary @ 20%
+    glowBlush: Color(0x4DE2B4BD), // primary @ 30%
+    glowSage: Color(0x33ADC7AD), // tertiary @ 20%
     shimmerBase: Color(0xFF2C2018),
     shimmerHighlight: Color(0xFF382A1E),
-    navShadow: Color(0x59000000),  // black @ 35% — ink casts no visible shadow
+    navShadow: Color(0x59000000), // black @ 35% — ink casts no visible shadow
     navSelectedFill: Color(0x47B06070),
     // Flat editorial: depth comes from the surface step, not shadows.
     cardElevation: 0,
@@ -389,7 +389,7 @@ class AppColors {
 
   static bool get isDark => _active.isDark;
 
-/// Switches the palette every [AppColors] getter resolves against.
+  /// Switches the palette every [AppColors] getter resolves against.
   /// Called from the root build; see the class note above.
   static void apply(Brightness brightness) {
     _active = AppPalette.of(brightness);
@@ -585,10 +585,16 @@ class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
   AppThemeExtension lerp(ThemeExtension<AppThemeExtension>? other, double t) {
     if (other is! AppThemeExtension) return this;
     return AppThemeExtension(
-      invertedButtonColor:
-          Color.lerp(invertedButtonColor, other.invertedButtonColor, t)!,
+      invertedButtonColor: Color.lerp(
+        invertedButtonColor,
+        other.invertedButtonColor,
+        t,
+      )!,
       invertedButtonTextColor: Color.lerp(
-          invertedButtonTextColor, other.invertedButtonTextColor, t)!,
+        invertedButtonTextColor,
+        other.invertedButtonTextColor,
+        t,
+      )!,
       heroRadius: heroRadius,
       cardRadius: cardRadius,
       utilityRadius: utilityRadius,
@@ -652,36 +658,36 @@ class AppType {
   /// `.copyWith(fontSize: 64)` for the same reason — see the comment at
   /// that call site.
   static TextStyle get masthead => TextStyle(
-        fontFamily: kDisplayFontFamily,
-        fontFamilyFallback: const [kBodyFontFamily],
-        fontSize: 54,
-        height: 0.92,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -1.8,
-        color: AppColors.textPrimary,
-      );
+    fontFamily: kDisplayFontFamily,
+    fontFamilyFallback: const [kBodyFontFamily],
+    fontSize: 54,
+    height: 0.92,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -1.8,
+    color: AppColors.textPrimary,
+  );
 
   /// Section headings on Home — roughly double the old titleLarge.
   static TextStyle get sectionDisplay => TextStyle(
-        fontFamily: kDisplayFontFamily,
-        fontFamilyFallback: const [kBodyFontFamily],
-        fontSize: 34,
-        height: 1.0,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.9,
-        color: AppColors.textPrimary,
-      );
+    fontFamily: kDisplayFontFamily,
+    fontFamilyFallback: const [kBodyFontFamily],
+    fontSize: 34,
+    height: 1.0,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.9,
+    color: AppColors.textPrimary,
+  );
 
   /// Pull-quote scale, for seller voice / editorial copy.
   static TextStyle get pullQuote => TextStyle(
-        fontFamily: kDisplayFontFamily,
-        fontFamilyFallback: const [kBodyFontFamily],
-        fontSize: 27,
-        height: 1.28,
-        fontWeight: FontWeight.w400,
-        fontStyle: FontStyle.italic,
-        color: AppColors.textPrimary,
-      );
+    fontFamily: kDisplayFontFamily,
+    fontFamilyFallback: const [kBodyFontFamily],
+    fontSize: 27,
+    height: 1.28,
+    fontWeight: FontWeight.w400,
+    fontStyle: FontStyle.italic,
+    color: AppColors.textPrimary,
+  );
 
   /// Oversized price numeral. Tabular figures so a column of prices
   /// doesn't wobble, and tight tracking because Playfair's default
@@ -694,28 +700,28 @@ class AppType {
   /// [color] is nullable rather than defaulted because the palette
   /// resolves at runtime now, and a default argument has to be const.
   static TextStyle priceNumeral(double size, {Color? color}) => TextStyle(
-        fontFamily: kDisplayFontFamily,
-        fontFamilyFallback: const [kBodyFontFamily],
-        fontSize: size,
-        height: 1.0,
-        fontWeight: FontWeight.w600,
-        letterSpacing: size * -0.02,
-        color: color ?? AppColors.accent,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      );
+    fontFamily: kDisplayFontFamily,
+    fontFamilyFallback: const [kBodyFontFamily],
+    fontSize: size,
+    height: 1.0,
+    fontWeight: FontWeight.w600,
+    letterSpacing: size * -0.02,
+    color: color ?? AppColors.accent,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
 
   /// Tiny all-caps kicker. The small end of the contrast — always
   /// pairs with one of the display sizes above, never used alone.
   static TextStyle get eyebrow => TextStyle(
-        fontFamily: kBodyFontFamily,
-        // 12sp is the floor for labels, including this all-caps kicker.
-        // It used to be 11, which made the smallest copy in the app
-        // materially harder to read than every 12sp body label beside it.
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.2,
-        color: AppColors.textSecondary,
-      );
+    fontFamily: kBodyFontFamily,
+    // 12sp is the floor for labels, including this all-caps kicker.
+    // It used to be 11, which made the smallest copy in the app
+    // materially harder to read than every 12sp body label beside it.
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 1.2,
+    color: AppColors.textSecondary,
+  );
 }
 
 /// The app's shape tiers — one vocabulary for every corner in the app.
@@ -815,6 +821,9 @@ class AppTheme {
     );
 
     final textTheme = _buildTextTheme(base.textTheme, p);
+    final actionFill = p.brightness == Brightness.dark
+        ? p.roseGround
+        : p.primaryDark;
 
     return base.copyWith(
       colorScheme: colorScheme,
@@ -834,16 +843,16 @@ class AppTheme {
       // color, not the deep-rose primaryDark used as the actual brand
       // accent everywhere else. Same mismatch class as the segmented
       // button fix earlier, closed here for anything added later.
-      progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: p.primaryDark,
-      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: p.primaryDark),
 
       // ----- AppBar -----
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent, // stop Material 3's default scroll-tint overlay from breaking the seamless gradient
+        surfaceTintColor: Colors
+            .transparent, // stop Material 3's default scroll-tint overlay from breaking the seamless gradient
         elevation: 0,
-        scrolledUnderElevation: 0, // stop Material 3 from drawing a scroll shadow over the new transparent/gradient background
+        scrolledUnderElevation:
+            0, // stop Material 3 from drawing a scroll shadow over the new transparent/gradient background
         foregroundColor: p.textPrimary,
         centerTitle: true,
         titleTextStyle: textTheme.titleLarge?.copyWith(
@@ -872,8 +881,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: p.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         hintStyle: textTheme.bodyMedium?.copyWith(color: p.textSecondary),
         prefixIconColor: p.textSecondary,
         border: OutlineInputBorder(
@@ -897,15 +908,24 @@ class AppTheme {
       // ----- Buttons -----
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: p.primaryDark,
+          backgroundColor: actionFill,
           foregroundColor: p.textOnDark,
           disabledBackgroundColor: p.divider,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ShapeTier.control.symmetric),
           ),
           elevation: 0,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: actionFill,
+          foregroundColor: p.textOnDark,
+          minimumSize: const Size(48, 48),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -913,7 +933,9 @@ class AppTheme {
           foregroundColor: p.textPrimary,
           side: BorderSide(color: p.divider),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ShapeTier.control.symmetric),
           ),
@@ -922,7 +944,9 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: p.primaryDark,
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
@@ -941,7 +965,9 @@ class AppTheme {
           selectedBackgroundColor: p.primaryDark,
           selectedForegroundColor: p.textOnDark,
           side: BorderSide(color: p.divider),
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
@@ -950,8 +976,9 @@ class AppTheme {
         backgroundColor: p.surface,
         selectedColor: p.primaryDark,
         labelStyle: textTheme.labelMedium?.copyWith(color: p.textPrimary),
-        secondaryLabelStyle:
-            textTheme.labelMedium?.copyWith(color: p.textOnDark),
+        secondaryLabelStyle: textTheme.labelMedium?.copyWith(
+          color: p.textOnDark,
+        ),
         shape: StadiumBorder(side: BorderSide(color: p.divider)),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       ),
@@ -966,11 +993,7 @@ class AppTheme {
         showUnselectedLabels: true,
       ),
 
-      dividerTheme: DividerThemeData(
-        color: p.divider,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: p.divider, thickness: 1, space: 1),
 
       iconTheme: IconThemeData(color: p.textPrimary),
 

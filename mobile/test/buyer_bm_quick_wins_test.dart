@@ -13,6 +13,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -291,8 +292,14 @@ void main() {
         ChangeNotifierProvider<CartState>.value(value: cart),
       ]);
 
-      expect(find.text('Saved ₱50'), findsOneWidget);
-      expect(find.text('₱360'), findsWidgets);
+      if (kUseLiveApi) {
+        expect(find.text('Saved ₱50'), findsNothing);
+        expect(find.text('Voucher & Promo Code'), findsNothing);
+        expect(find.text('₱410'), findsOneWidget);
+      } else {
+        expect(find.text('Saved ₱50'), findsOneWidget);
+        expect(find.text('₱360'), findsWidgets);
+      }
     });
   });
 
@@ -486,7 +493,9 @@ void main() {
       expect(chat.messagesFor('Test Shop').length, before);
 
       await tester.enterText(find.byType(TextField), 'a' * 1001);
-      await tester.tap(find.byIcon(Icons.send_rounded));
+      final send = find.byIcon(Icons.send_rounded).hitTestable();
+      expect(send, findsOneWidget);
+      await tester.tap(send);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -494,6 +503,7 @@ void main() {
         find.text('Messages can be up to 1000 characters.'),
         findsOneWidget,
       );
+      expect(find.text('Attachments must be JPG, PNG, or PDF.'), findsNothing);
       expect(chat.messagesFor('Test Shop').length, before);
     });
   });

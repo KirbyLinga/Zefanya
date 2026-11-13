@@ -31,9 +31,12 @@ class CartButton extends StatelessWidget {
     final theme = Theme.of(context);
     final cartCount = _getCartCount(context);
     final productLabel = cartCount == 1 ? 'product' : 'products';
-    void openCart() => Navigator.of(
-      context,
-    ).push(AppPageRoute(builder: (_) => const CartScreen()));
+    void openCart() {
+      if (ModalRoute.isCurrentOf(context) == false) return;
+      Navigator.of(
+        context,
+      ).push(AppPageRoute(builder: (_) => const CartScreen()));
+    }
 
     return Semantics(
       container: true,

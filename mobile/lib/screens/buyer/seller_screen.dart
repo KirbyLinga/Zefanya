@@ -112,34 +112,26 @@ class SellerScreen extends StatelessWidget {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.68,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final product = products[i];
-                      return StaggeredReveal(
+                  gridDelegate: ProductCard.gridDelegate(context),
+                  delegate: SliverChildBuilderDelegate((context, i) {
+                    final product = products[i];
+                    return StaggeredReveal(
+                      index: i,
+                      child: ProductCard(
+                        product: product,
                         index: i,
-                        child: ProductCard(
-                          product: product,
-                          index: i,
-                          heroTag: 'seller-${product.id}',
-                          onTap: () => Navigator.of(context).push(
-                            AppPageRoute(
-                              builder: (_) => ProductDetailsScreen(
-                                product: product,
-                                heroTag: 'seller-${product.id}',
-                              ),
+                        heroTag: 'seller-${product.id}',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => ProductDetailsScreen(
+                              product: product,
+                              heroTag: 'seller-${product.id}',
                             ),
                           ),
                         ),
-                      );
-                    },
-                    childCount: products.length,
-                  ),
+                      ),
+                    );
+                  }, childCount: products.length),
                 ),
               ),
             ],
@@ -209,9 +201,7 @@ class _SellerHero extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   'FROM THE MAKER',
-                  style: AppType.eyebrow.copyWith(
-                    color: AppColors.secondary,
-                  ),
+                  style: AppType.eyebrow.copyWith(color: AppColors.secondary),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -227,11 +217,17 @@ class _SellerHero extends StatelessWidget {
                 Row(
                   children: [
                     _stat(context, '$productCount', 'PIECES'),
-                    const SizedBox(width: 1, height: 40,
-                        child: ColoredBox(color: Color(0x30F9FAFB))),
+                    const SizedBox(
+                      width: 1,
+                      height: 40,
+                      child: ColoredBox(color: Color(0x30F9FAFB)),
+                    ),
                     _stat(context, avgRating.toStringAsFixed(1), 'AVG RATING'),
-                    const SizedBox(width: 1, height: 40,
-                        child: ColoredBox(color: Color(0x30F9FAFB))),
+                    const SizedBox(
+                      width: 1,
+                      height: 40,
+                      child: ColoredBox(color: Color(0x30F9FAFB)),
+                    ),
                     _stat(context, _formatSold(totalSold), 'TOTAL SOLD'),
                   ],
                 ),
@@ -242,13 +238,20 @@ class _SellerHero extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: onChat,
-                          icon: Icon(Icons.chat_bubble_outline, size: 16,
-                              color: AppColors.textOnDark),
-                          label: Text('Chat',
-                              style: TextStyle(color: AppColors.textOnDark)),
+                          icon: Icon(
+                            Icons.chat_bubble_outline,
+                            size: 16,
+                            color: AppColors.textOnDark,
+                          ),
+                          label: Text(
+                            'Chat',
+                            style: TextStyle(color: AppColors.textOnDark),
+                          ),
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
-                              color: AppColors.textOnDark.withValues(alpha: 0.45),
+                              color: AppColors.textOnDark.withValues(
+                                alpha: 0.45,
+                              ),
                             ),
                           ),
                         ),

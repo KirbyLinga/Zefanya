@@ -9,7 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../config/pricing.dart' show CartQuote;
+import '../../config/pricing.dart' show CartQuote, quoteCart;
 import '../../config/dev_flags.dart' show kUseLiveApi;
 import '../../state/cart_state.dart';
 import '../../theme/app_theme.dart';
@@ -20,12 +20,15 @@ import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/voucher_ui_visibility.dart';
 import 'checkout_screen.dart';
 import 'vouchers_screen.dart';
+import 'widgets/shop_voucher_picker.dart';
+import '../../state/order_state.dart';
 import 'widgets/product_card.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/zefanya_mark.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/money_format.dart';
+import '../../utils/motion.dart';
 import '../../utils/timed_snackbar.dart';
 
 class CartScreen extends StatefulWidget {
@@ -38,6 +41,7 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final _voucherController = TextEditingController();
   bool _isApplyingVoucher = false;
+  String? _shopVoucherCode;
 
   @override
   void dispose() {
@@ -58,10 +62,7 @@ class _CartScreenState extends State<CartScreen> {
 
     final cart = context.read<CartState>();
     final result = cart.applyVoucher(code);
-    showTimedSnackBar(
-      context,
-      SnackBar(content: Text(result.message)),
-    );
+    showTimedSnackBar(context, SnackBar(content: Text(result.message)));
   }
 
   void _removeVoucher(String code) {
@@ -133,7 +134,11 @@ class _CartScreenState extends State<CartScreen> {
     // The quote is re-derived from the current lines on every build; nothing
     // about a voucher's value is frozen at apply time.
     _checkVoucherValidity(cart);
-    final quote = cart.quote;
+    // Match checkout's estimate until Laravel reviews any voucher codes.
+    final quote = kUseLiveApi ? quoteCart(items, const []) : cart.quote;
+    final serverShipping =
+        kUseLiveApi &&
+        context.read<OrderState?>()?.usesServerCheckoutAddress == true;
 
     return Scaffold(
       backgroundColor: Colors
@@ -200,7 +205,10 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                         ),
                       const SizedBox(height: 8),
-                      FreeShippingMeter(subtotal: cart.subtotal),
+                      if (serverShipping)
+                        const Text('Shipping is calculated at checkout.')
+                      else
+                        FreeShippingMeter(subtotal: cart.subtotal),
                       const SizedBox(height: 12),
                       // Voucher entry is a mock-only feature: the server
                       // computes discounts in live mode and the client must
@@ -209,6 +217,36 @@ class _CartScreenState extends State<CartScreen> {
                         show: !kUseLiveApi,
                         child: _buildVoucherBanner(theme, ext, cart),
                       ),
+                      if (kUseLiveApi &&
+                          context
+                                  .read<OrderState?>()
+                                  ?.usesServerCheckoutAddress ==
+                              true &&
+                          cart.selectedItems.any(
+                            (item) => item.product.sellerId != null,
+                          )) ...[
+                        TextButton(
+                          onPressed: () async {
+                            final code = await pickShopVoucher(
+                              context,
+                              cart.selectedItems,
+                            );
+                            if (mounted && code != null) {
+                              setState(() => _shopVoucherCode = code);
+                            }
+                          },
+                          child: const Text('Browse shop vouchers'),
+                        ),
+                        if (_shopVoucherCode case final code?)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: InputChip(
+                              label: Text('$code · checked at checkout'),
+                              onDeleted: () =>
+                                  setState(() => _shopVoucherCode = null),
+                            ),
+                          ),
+                      ],
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -223,6 +261,7 @@ class _CartScreenState extends State<CartScreen> {
               selectedCount,
               cart.selectedProductCount,
               quote,
+              serverShipping,
             ),
     );
   }
@@ -455,7 +494,10 @@ class _CartScreenState extends State<CartScreen> {
           SizedBox(
             width: 24,
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
+              duration: reduceMotion(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 150),
+              layoutBuilder: (current, _) => current ?? const SizedBox.shrink(),
               transitionBuilder: (child, animation) => ScaleTransition(
                 scale: animation,
                 child: FadeTransition(opacity: animation, child: child),
@@ -589,7 +631,9 @@ class _CartScreenState extends State<CartScreen> {
     int selectedCount,
     int selectedProducts,
     CartQuote quote,
+    bool serverShipping,
   ) {
+    final displayTotal = serverShipping ? quote.merchandise : quote.total;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       decoration: BoxDecoration(
@@ -617,7 +661,7 @@ class _CartScreenState extends State<CartScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Total ($selectedProducts '
+                    '${serverShipping ? 'Subtotal' : 'Total'} ($selectedProducts '
                     'product${selectedProducts == 1 ? '' : 's'})',
                     style: theme.textTheme.bodySmall,
                   ),
@@ -630,12 +674,16 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ),
                   AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
+                    duration: reduceMotion(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 150),
+                    layoutBuilder: (current, _) =>
+                        current ?? const SizedBox.shrink(),
                     transitionBuilder: (child, animation) =>
                         FadeTransition(opacity: animation, child: child),
                     child: Text(
-                      formatPeso(quote.total),
-                      key: ValueKey(quote.total),
+                      formatPeso(displayTotal),
+                      key: ValueKey(displayTotal),
                       style: AppType.priceNumeral(26),
                     ),
                   ),
@@ -645,9 +693,15 @@ class _CartScreenState extends State<CartScreen> {
             ElevatedButton(
               onPressed: selectedCount == 0
                   ? null
-                  : () => Navigator.of(context).push(
-                      AppPageRoute(builder: (_) => const CheckoutScreen()),
-                    ),
+                  : () {
+                      if (ModalRoute.isCurrentOf(context) == false) return;
+                      Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) =>
+                              CheckoutScreen(voucherCode: _shopVoucherCode),
+                        ),
+                      );
+                    },
               child: const Text('Proceed to Checkout'),
             ),
           ],

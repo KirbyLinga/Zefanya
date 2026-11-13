@@ -28,8 +28,13 @@ import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.initialRole = UserRole.buyer});
+  const LoginScreen({
+    super.key,
+    this.initialRole = UserRole.buyer,
+    this.showDemoRoles = false,
+  });
   final UserRole initialRole;
+  final bool showDemoRoles;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -74,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isBusy || !_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
@@ -132,15 +137,19 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
-    // AuthGate routes to the shell matching the actual role.
-    await CloudTransition.run(
-      context,
-      swap: () {
-        if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      },
-    );
+    await _finishSignIn();
+  }
+
+  Future<void> _finishSignIn() async {
+    void unwind() {
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+
+    if (kUseLiveApi) {
+      unwind();
+    } else {
+      await CloudTransition.run(context, swap: unwind);
+    }
   }
 
   Future<void> _continueWithGoogle() async {
@@ -166,14 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         TextInput.finishAutofillContext();
-        await CloudTransition.run(
-          context,
-          swap: () {
-            if (mounted) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            }
-          },
-        );
+        await _finishSignIn();
         return;
       }
 
@@ -275,7 +277,8 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
           child: Form(
             key: _formKey,
             autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -295,14 +298,38 @@ class _LoginScreenState extends State<LoginScreen> {
                   _isLinehaulMode
                       ? 'Sign in to move parcels between hubs'
                       : isRider
-                      ? 'Sign in to accept jobs and deliver parcels'
+                      ? 'Sign in to view assigned jobs and deliver parcels'
                       : 'Sign in to browse, shop, and track your orders',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
 
+                if (!kUseLiveApi && widget.showDemoRoles)
+                  PopupMenuButton<UserRole>(
+                    enabled: !_isBusy,
+                    tooltip: 'Choose a demo role',
+                    onSelected: context.read<AuthState>().startDemo,
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: UserRole.buyer,
+                        child: Text('Buyer demo'),
+                      ),
+                      PopupMenuItem(
+                        value: UserRole.courier,
+                        child: Text('Rider demo'),
+                      ),
+                      PopupMenuItem(
+                        value: UserRole.linehaul,
+                        child: Text('Transport Courier demo'),
+                      ),
+                    ],
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('Choose a demo role ▾'),
+                    ),
+                  ),
                 if (kUseLiveApi && !_isLinehaulMode)
                   Align(
                     alignment: Alignment.centerLeft,
@@ -370,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: isRider
                                 ? (AppColors.isDark
                                       ? AppColors.tertiary
-                                      : AppColors.sageIcon)
+                                      : AppColors.successText)
                                 : AppColors.primaryDark,
                             fontWeight: FontWeight.w700,
                             decoration: TextDecoration.underline,
@@ -483,7 +510,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     backgroundColor: AppColors.isDark
                                         ? AppColors.tertiary
                                         : AppColors.sageIcon,
-                                    foregroundColor: AppColors.textOnDark,
+                                    foregroundColor: AppColors.textOnLight,
                                   )
                                 : null,
                             onPressed: _isSubmitting ? null : _login,
@@ -506,7 +533,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                if (_googleAvailable && !_isLinehaulMode) ...[
+                if (_googleAvailable &&
+                    context.read<AuthState>().supportsGoogleSignIn &&
+                    !_isLinehaulMode) ...[
                   const SizedBox(height: 14),
                   StaggeredReveal(
                     index: 2,
@@ -561,7 +590,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             backgroundColor: AppColors.isDark
                                 ? AppColors.tertiary
                                 : AppColors.sageIcon,
-                            foregroundColor: AppColors.textOnDark,
+                            foregroundColor: AppColors.textOnLight,
                           ),
                           onPressed: () => Navigator.of(context).push(
                             AppPageRoute(
@@ -619,7 +648,9 @@ class _LoginMasthead extends StatelessWidget {
                     : isRiderMode
                     ? 'Zefanya Rider'
                     : 'Zefanya',
-                style: AppType.masthead,
+                style: AppType.masthead.copyWith(
+                  fontSize: isRiderMode || isLinehaulMode ? 39 : 48,
+                ),
               ),
             ),
             const SizedBox(width: 10),

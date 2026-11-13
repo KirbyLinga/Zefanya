@@ -12,6 +12,12 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
+import 'package:zefanya/data/api/api_client.dart';
+import 'package:zefanya/data/api/token_store.dart';
+import 'package:zefanya/data/repositories/order_repository.dart';
+import 'package:zefanya/screens/buyer/cart_screen.dart';
+import 'package:zefanya/widgets/free_shipping_meter.dart';
 import 'package:zefanya/screens/buyer/product_details_screen.dart';
 import 'package:zefanya/state/cart_state.dart';
 import 'package:zefanya/state/catalog_state.dart';
@@ -84,6 +90,36 @@ void main() {
     AppColors.apply(Brightness.light);
   });
 
+  testWidgets(
+    'live Cart shows merchandise and defers shipping to Laravel',
+    (tester) async {
+      final cart = CartState()..addItem(_product('live'));
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: cart),
+            ChangeNotifierProvider(
+              create: (_) => OrderState(
+                repository: LiveOrderRepository(
+                  ApiClient(
+                    baseUrl: 'https://example.test',
+                    tokenStore: InMemoryTokenStore(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          child: MaterialApp(theme: AppTheme.light, home: const CartScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(FreeShippingMeter), findsNothing);
+      expect(find.text('Shipping is calculated at checkout.'), findsOneWidget);
+      expect(find.text('Subtotal (1 product)'), findsOneWidget);
+    },
+    skip: !kUseLiveApi,
+  );
+
   group('distinct product count', () {
     test('a repeated add and a second variant stay one product', () {
       final cart = CartState();
@@ -96,10 +132,7 @@ void main() {
       expect(cart.productCount, 1);
       expect(cart.items.single.quantity, 2);
 
-      expect(
-        cart.addItem(shirt, variant: 'Red'),
-        CartAddOutcome.added,
-      );
+      expect(cart.addItem(shirt, variant: 'Red'), CartAddOutcome.added);
       expect(cart.items, hasLength(2));
       expect(cart.productCount, 1);
     });
@@ -219,9 +252,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.tap(
-        find.widgetWithText(OutlinedButton, 'Add to Cart'),
-      );
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Add to Cart'));
       await tester.pump(const Duration(milliseconds: 800));
 
       expect(cart.productCount, 1);
@@ -231,9 +262,7 @@ void main() {
       // Let the first confirmation go before the second tap, so the button is
       // not behind a SnackBar and the 700ms add cooldown has elapsed.
       await tester.pump(const Duration(seconds: 5));
-      await tester.tap(
-        find.widgetWithText(OutlinedButton, 'Add to Cart'),
-      );
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Add to Cart'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
 

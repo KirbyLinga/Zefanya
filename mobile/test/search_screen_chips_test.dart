@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/data/api/api_exception.dart';
+import 'package:zefanya/data/repositories/catalog_repository.dart';
 import 'package:zefanya/screens/buyer/search_screen.dart';
 import 'package:zefanya/screens/buyer/widgets/product_card.dart';
 import 'package:zefanya/screens/buyer/widgets/try_looking_for.dart';
@@ -20,7 +22,7 @@ import 'package:zefanya/theme/app_theme.dart';
 
 void _noop() {}
 
-Future<void> _pumpSearch(WidgetTester tester) async {
+Future<void> _pumpSearch(WidgetTester tester, {CatalogState? state}) async {
   // Prefs first: the screen reads history in initState, and without
   // the mock getInstance() awaits a channel that never answers
   // (the cart swipe deadlock — same trap).
@@ -31,7 +33,7 @@ Future<void> _pumpSearch(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
-  final catalog = CatalogState();
+  final catalog = state ?? CatalogState();
   await catalog.load();
 
   await tester.pumpWidget(
@@ -43,19 +45,46 @@ Future<void> _pumpSearch(WidgetTester tester) async {
           // ProductCard's HeartButton reads this on the results grid.
           ChangeNotifierProvider(create: (_) => WishlistState()),
         ],
-        child: MaterialApp(
-          theme: AppTheme.light,
-          home: const SearchScreen(),
-        ),
+        child: MaterialApp(theme: AppTheme.light, home: const SearchScreen()),
       ),
     ),
   );
   await tester.pump(const Duration(milliseconds: 100));
 }
 
+class _RecoveringCatalogue extends MockCatalogRepository {
+  bool fail = true;
+
+  @override
+  Future<List<Product>> products({CatalogQuery? query}) {
+    if (fail) throw const NetworkException();
+    return super.products(query: query);
+  }
+}
+
 void main() {
-  testWidgets('idle chips render in authored order, fully opaque',
-      (tester) async {
+  testWidgets('a catalogue error keeps the query and can retry', (
+    tester,
+  ) async {
+    final repo = _RecoveringCatalogue();
+    await _pumpSearch(tester, state: CatalogState(repository: repo));
+    await tester.enterText(find.byType(TextField), 'Linen');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Catalogue unavailable.'), findsOneWidget);
+    repo.fail = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'Linen',
+    );
+    expect(find.text('Catalogue unavailable.'), findsNothing);
+    expect(find.byType(ProductCard), findsWidgets);
+  });
+  testWidgets('idle chips render in authored order, fully opaque', (
+    tester,
+  ) async {
     await _pumpSearch(tester);
 
     // Entrance end state under disabled animations: visible,
@@ -65,10 +94,12 @@ void main() {
       expect(find.text(term), findsWidgets);
     }
     final opacities = tester
-        .widgetList<AnimatedOpacity>(find.descendant(
-          of: find.byType(TryLookingFor),
-          matching: find.byType(AnimatedOpacity),
-        ))
+        .widgetList<AnimatedOpacity>(
+          find.descendant(
+            of: find.byType(TryLookingFor),
+            matching: find.byType(AnimatedOpacity),
+          ),
+        )
         .map((w) => w.opacity);
     expect(opacities, everyElement(1.0));
     expect(tester.takeException(), isNull);
@@ -89,8 +120,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('typing to a dead end crossfades, both branches mounted',
-      (tester) async {
+  testWidgets('typing to a dead end crossfades, both branches mounted', (
+    tester,
+  ) async {
     // AnimatedSwitcher keeps the outgoing branch mounted for the
     // 220ms fade: mid-transition both the suggestions list and the
     // dead-end view are in the tree. This needs animations ENABLED
@@ -113,10 +145,7 @@ void main() {
             ChangeNotifierProvider.value(value: catalog),
             ChangeNotifierProvider(create: (_) => WishlistState()),
           ],
-          child: MaterialApp(
-            theme: AppTheme.light,
-            home: const SearchScreen(),
-          ),
+          child: MaterialApp(theme: AppTheme.light, home: const SearchScreen()),
         ),
       ),
     );
@@ -164,8 +193,9 @@ void main() {
     expect(opacities, everyElement(0.6));
   });
 
-  testWidgets('rating row never overflows a 150dp tile at 1.5x scale',
-      (tester) async {
+  testWidgets('rating row never overflows a 150dp tile at 1.5x scale', (
+    tester,
+  ) async {
     // Narrow tile + large text: the sold-count text flexes with
     // ellipsis instead of striping (product_card rating row).
     AppColors.apply(Brightness.light);
@@ -181,9 +211,7 @@ void main() {
           textScaler: TextScaler.linear(1.5),
         ),
         child: MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => WishlistState()),
-          ],
+          providers: [ChangeNotifierProvider(create: (_) => WishlistState())],
           child: MaterialApp(
             theme: AppTheme.light,
             home: Scaffold(

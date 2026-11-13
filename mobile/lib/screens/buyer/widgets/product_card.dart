@@ -115,7 +115,9 @@ class ProductImage extends StatelessWidget {
   /// a product whose cover has not been uploaded yet.
   String? get _url {
     final override = imageUrl;
-    if (override != null && override.trim().isNotEmpty) return _absolute(override);
+    if (override != null && override.trim().isNotEmpty) {
+      return _absolute(override);
+    }
     final photos = product.photos;
     if (photos.isEmpty) return null;
     // Out-of-range falls back to the *cover*, in both directions. The
@@ -576,7 +578,13 @@ class WideProductTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
-          height: 128,
+          height:
+              128 +
+              (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(
+                    0.0,
+                    35.0,
+                  ) *
+                  6,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -599,9 +607,14 @@ class WideProductTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        formatPeso(product.price),
-                        style: AppType.priceNumeral(22),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatPeso(product.price),
+                          maxLines: 1,
+                          style: AppType.priceNumeral(22),
+                        ),
                       ),
                     ],
                   ),
@@ -658,6 +671,7 @@ class ProductCard extends StatelessWidget {
     required this.heroTag,
     required this.onTap,
     this.index = 0,
+    this.promotional = false,
   });
 
   final Product product;
@@ -667,6 +681,7 @@ class ProductCard extends StatelessWidget {
   /// the grid reads as a set of shapes rather than a wall of identical
   /// rounded boxes, without any one tile looking like a mistake.
   final int index;
+  final bool promotional;
 
   /// Must be unique across every simultaneously-mounted screen — see
   /// the file-level note above. Pass the same string into
@@ -675,204 +690,270 @@ class ProductCard extends StatelessWidget {
 
   final VoidCallback onTap;
 
+  static double cardExtent(BuildContext context) =>
+      264 + (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(0, 35) * 12;
+
+  static SliverGridDelegate gridDelegate(BuildContext context) =>
+      SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.textScalerOf(context).scale(14) >= 23
+            ? 1
+            : 2,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 12,
+        mainAxisExtent: cardExtent(context),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final previous = product.compareAtPrice;
+    final onSale = previous != null && previous > product.price;
+    final largeText = MediaQuery.textScalerOf(context).scale(14) >= 23;
+    final savings = onSale
+        ? ((previous - product.price) * 100 / previous).floor()
+        : 0;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: editorialShape(index, ShapeTier.card),
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  Hero(
-                    tag: heroTag,
-                    child: ProductImage(product: product),
-                  ),
-                  if (product.soldCount >= 500)
-                    Positioned(
-                      left: 6,
-                      top: 10,
-                      // Slight rotation — a stamped/hand-placed tag rather
-                      // than a dead-straight pill. Cheap, vector-only
-                      // asymmetry that doesn't depend on photo quality,
-                      // unlike a floating product cutout would.
-                      child: Transform.rotate(
-                        angle: -0.09,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            // roseGround, not primaryDark: this tag carries
-                            // 12sp text, and dark mode's lifted rose caps out
-                            // at 4.42:1 for *any* ink. roseGround is the rose
-                            // surface that text is allowed to sit on.
-                            color: AppColors.roseGround,
-                            borderRadius: radiusOf(ShapeTier.pill),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
+    return LayoutBuilder(
+      builder: (context, bounds) => Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: promotional
+              ? editorialRadius(index, ShapeTier.card)
+              : BorderRadius.circular(10),
+          side: BorderSide(color: AppColors.divider),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: SizedBox(
+                  height: bounds.maxHeight * (largeText ? .37 : .42),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Hero(
+                        tag: heroTag,
+                        child: ProductImage(product: product),
+                      ),
+                      if (promotional &&
+                          savings > 0 &&
+                          product.stock > 0 &&
+                          !product.sellerOnVacation)
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          // Slight rotation — a stamped/hand-placed tag rather
+                          // than a dead-straight pill. Cheap, vector-only
+                          // asymmetry that doesn't depend on photo quality,
+                          // unlike a floating product cutout would.
+                          child: Transform.rotate(
+                            angle: -0.09,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
                               ),
-                            ],
-                          ),
-                          child: Text(
-                            'Bestseller',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: AppColors.textOnDark,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  // Sits in the image's top-right corner, where a thumb
-                  // lands; the bestseller tag is top-left, so they never
-                  // collide.
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: HeartButton(product: product, compact: true),
-                  ),
-                  if (product.sellerOnVacation)
-                    Positioned(
-                      left: 6,
-                      bottom: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface.withValues(alpha: 0.94),
-                          borderRadius: radiusOf(ShapeTier.pill),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: Text(
-                          'On vacation',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: AppColors.danger,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (product.stock == 0 && !product.sellerOnVacation)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        alignment: Alignment.center,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface.withValues(alpha: 0.94),
-                            borderRadius: radiusOf(ShapeTier.pill),
-                            border: Border.all(color: AppColors.divider),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 4,
+                              decoration: BoxDecoration(
+                                // roseGround, not primaryDark: this tag carries
+                                // 12sp text, and dark mode's lifted rose caps out
+                                // at 4.42:1 for *any* ink. roseGround is the rose
+                                // surface that text is allowed to sit on.
+                                color: AppColors.roseGround,
+                                borderRadius: radiusOf(ShapeTier.pill),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Text(
-                            'Sold out',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: AppColors.danger,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
+                              child: Text(
+                                '$savings% off',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textOnDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  // Price is now the loudest thing on the tile, not a
-                  // slightly-bolder sibling of the product name.
-                  Text(
-                    formatPeso(product.price),
-                    style: AppType.priceNumeral(22),
-                  ),
-                  // Trust signal row — but only claims that exist. A
-                  // product with no reviews must not render "★ 0.0": an
-                  // average over zero ratings is not a fact about the
-                  // product. The sold count is still true on its own, so
-                  // it stays without a star.
-                  if (product.ratingCount > 0 || product.soldCount > 0) ...[
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        if (product.ratingCount > 0) ...[
-                          Icon(
-                            Icons.star_rounded,
-                            size: 13,
-                            color: AppColors.sageIcon,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            product.rating.toStringAsFixed(1),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textSecondary,
+                      if (product.sellerOnVacation)
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
                             ),
-                          ),
-                        ],
-                        // One flexible tail (Claude Round A follow-up): the
-                        // rating row must survive a 150dp tile at 1.5x
-                        // text scale. The sold count alone flexing is not
-                        // enough — the ' · ' separator also measures wide
-                        // under fallback fonts (85px in-test), so the
-                        // whole tail shares one Flexible and ellipsizes
-                        // as a unit. On device this never pressures (real
-                        // metrics fit with room); in-test it degrades to
-                        // an ellipsis instead of a stripe.
-                        if (product.soldCount > 0)
-                          Flexible(
+                            decoration: BoxDecoration(
+                              color: AppColors.surface.withValues(alpha: 0.94),
+                              borderRadius: radiusOf(ShapeTier.pill),
+                              border: Border.all(color: AppColors.divider),
+                            ),
                             child: Text(
-                              '${product.ratingCount > 0 ? '  ·  ' : ''}'
-                              '${_formatSoldCount(product.soldCount)} sold',
+                              'On vacation',
                               style: theme.textTheme.labelSmall?.copyWith(
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (product.stock == 0 && !product.sellerOnVacation)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            alignment: Alignment.center,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(
+                                  alpha: 0.94,
+                                ),
+                                borderRadius: radiusOf(ShapeTier.pill),
+                                border: Border.all(color: AppColors.divider),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'Sold out',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.danger,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: HeartButton(product: product, compact: true),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      product.sellerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatPeso(product.price),
+                        maxLines: 1,
+                        style: AppType.priceNumeral(
+                          22,
+                          color: onSale
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (onSale)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatPeso(previous),
+                          maxLines: 1,
+                          semanticsLabel:
+                              'Original price ${formatPeso(previous)}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ),
+                    // Trust signal row — but only claims that exist. A
+                    // product with no reviews must not render "★ 0.0": an
+                    // average over zero ratings is not a fact about the
+                    // product. The sold count is still true on its own, so
+                    // it stays without a star.
+                    if (product.ratingCount > 0 || product.soldCount > 0) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (product.ratingCount > 0) ...[
+                            Icon(
+                              Icons.star_rounded,
+                              size: 13,
+                              color: AppColors.sageIcon,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              product.rating.toStringAsFixed(1),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textSecondary,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                      ],
-                    ),
+                          ],
+                          // One flexible tail (Claude Round A follow-up): the
+                          // rating row must survive a 150dp tile at 1.5x
+                          // text scale. The sold count alone flexing is not
+                          // enough — the ' · ' separator also measures wide
+                          // under fallback fonts (85px in-test), so the
+                          // whole tail shares one Flexible and ellipsizes
+                          // as a unit. On device this never pressures (real
+                          // metrics fit with room); in-test it degrades to
+                          // an ellipsis instead of a stripe.
+                          if (product.soldCount > 0)
+                            Flexible(
+                              child: Text(
+                                '${product.ratingCount > 0 ? '  ·  ' : ''}'
+                                '${_formatSoldCount(product.soldCount)} sold',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -480,3 +480,102 @@ See `docs/MOBILE_API_INTEGRATION_AUDIT.md` for the full audit.
 ## Phase 9.1 regression verification
 
 - The hub delay test now reorders a saved JSON snapshot before a repeat sweep to verify database key order cannot cause another update. The Rider mobile operations test exercises completion and failed delivery with cached approval after suspension and requires both operations to return 403.
+- The existing OTP-free acknowledgement regression compares the same JSON keys and values after sorting, so MySQL key order cannot cause a false failure. This assertion stays with the earlier uncommitted OTP-free test.
+
+## Flutter mobile usability pass
+
+- Live checkout now shows Laravel's actual shipping address in the same review as the authoritative total. The read-only quote adds the shipping snapshot and address fingerprint. Placement refuses an address change after review, even when the price stays the same. Tests cover the quote contract, live review without a local address, and refusal before final submission. The device-only address book keeps its existing behavior.
+
+- The physical delivery rehearsal needed an app restart to see a newly dispatched Rider job. Selecting either queue now refreshes live assignments, and populated Deliveries supports pull-to-refresh. Added a regression that displays an assignment dispatched after Rider entry.
+
+- The physical COD rehearsal saved delivery and proof in Laravel, then hit a Flutter assertion as the handover sheet closed. Keep the OTP and cash controllers alive until the sheet route removes its overlay. Add a focused-COD-field regression for the exit animation.
+
+- Physical QR rehearsal exposed a sub-pixel detection window. Compute the scanner's logical-pixel window from the preview bounds and size the visible guide to match. Add a geometry regression without changing trip scan validation.
+
+- Physical Android revealed that an expired-session logout cleared local auth but left Settings above the signed-out route when server revocation failed. Settings now returns to the signed-out route and retains the revocation error message. Added a regression for the expired-token path.
+
+- Final stabilization regressions exercise double confirmation taps and Android-style Back while checkout is pending, plus explicit scan retry after a server failure. A retry reuses the same trip/code/input method and only updates progress from the server response.
+- The scanner now pauses and restarts its externally managed camera controller with app lifecycle events. The widget test keeps pending retry state across simulated lifecycle changes. Camera hardware and OS permission prompts require Android acceptance.
+- The Rider delivery-pass test now waits for the actual proof-photo attachment after real file I/O. This replaces a fixed 150 ms delay that intermittently expired under parallel load. Attachment, delivery code and handover assertions are preserved.
+
+- P0 test changes cover five server-confirmed parcels in one trip scanner session, duplicate/invalid/wrong-trip entries, editable seal rejection, unknown checkout outcomes, server-reviewed totals, truthful sale pricing, COD unavailable versus confirmed zero, and empty Orders routing to Home. Existing Courier assertions now open the relevant details or exit the continuous scanner before checking the trip screen.
+- P1 test changes cover compact expandable trip history with addresses and date pagination, Rider availability and job-card contrast, Buyer search recovery and stale tracking, and all three requested viewport sizes in both themes at 1.3× text scale. Checkout recovery uses Orders because the existing API has no lookup keyed by the consumed checkout token. Tracking uses the existing shipment details endpoint.
+- P2 tests replace the two timed landing beats with immediate sign-in/registration, reduced-motion and restored-session assertions. Login and Search captures settle before comparison. Reviewed 28 updated snapshots for Landing, Login, Buyer Home, Search, Rider Home (legacy `courier_home` filenames), dark Cart, dark delivery completion and dark order confirmation. No screenshot tolerances changed.
+- Phase 4 Transport Courier tests render trip states, scanner, departure and breakdown dialogs, and all four tabs in both themes. Cover compact layouts, larger text, safe areas, keyboard insets, pending Logistics receipt, and unavailable or stale earnings. The recorded trip details test opens the new expandable section before checking the original schedule and weight assertions. The handover test scrolls the outcome into reach before opening it. The report retry test requires a stale label alongside the last loaded amount and checks that a successful retry replaces both.
+- The mock-mode routing test opens Buyer, Rider, and Transport Courier through the demo picker. It checks the persistent demo label, sample Courier records, disabled writes, and that demo sign-in leaves saved authentication intact.
+- Phase 6 Live API tests cover independent landing motion, looping, route visibility and reduced motion, immediate tab switching without a blank frame, reuse of the mounted Orders tab, repeat cart taps and Back, shared product image identity, and Rider code request pending, failure and retry. The settings assertion follows the selected build mode. The animated landing previews are separate from the existing golden files.
+- Phase 6.1 tests retain the default-build chat and voucher assertions and verify Live API contact visibility and pre-quote estimates separately. The chat test requires Send to stay tappable after attachment validation. Use separate Live API snapshots for Buyer Home and hero states, Login, Cart, Product Detail, and Rider job details. Login captures use the suite's test-only Google client ID. The Live Cart capture advances the staggered row animations before comparison.
+- The Rider earnings workbook test fixes the order of its completed jobs and scrolls to each transaction before checking the original result, tracking, and pay expectations.
+- Phase 5 presentation checks cover shared badge contrast, the cancellation reason and confirmation, and the inline error and retry action with keyboard insets. Run at 360×640, 360×740, and 411×890 in both themes with 2× text and reduced motion.
+
+## Buyer delivery acknowledgement (2026-11-12)
+
+Replaced delivery-code generation, pass rendering, lockout and expiry assertions with coverage for physical handover, recipient acceptance and representative details. Updated downstream fixtures to supply the new evidence while preserving assignment, custody-token, failed-delivery, COD and duplicate-write assertions. Flutter additionally checks an uncertain response through the server queue and private history.
+
+### Delivery acknowledgement change set
+
+Laravel application and routes
+
+- web/app/Http/Controllers/Api/Buyer/NotificationController.php
+- web/app/Http/Controllers/Api/Rider/ParcelActionController.php
+- web/app/Http/Controllers/Buyer/NotificationController.php
+- web/app/Http/Controllers/Buyer/OrderController.php
+- web/app/Http/Controllers/Rider/DeliveryAssignmentsController.php
+- web/app/Http/Requests/Api/Rider/CompleteDeliveryApiRequest.php
+- web/app/Http/Requests/Rider/CompleteDeliveryRequest.php
+- web/app/Http/Resources/Mobile/RiderParcelResource.php
+- web/app/Http/Resources/Mobile/ShipmentResource.php
+- web/app/Models/Logistics/DeliveryProof.php
+- web/app/Notifications/Buyer/DeliveryOtpCode.php (removed)
+- web/app/Services/Logistics/DeliveryOtpService.php (removed)
+- web/app/Services/Rider/RiderOperationsService.php
+- web/app/Support/BuyerNotificationTitle.php
+- web/database/migrations/2026_11_12_000002_add_recipient_acknowledgement_to_delivery_proofs.php
+- web/resources/views/Buyer/Orders/show.blade.php
+- web/resources/views/Logistics/DeliveryMonitoring/show.blade.php
+- web/resources/views/Rider/Deliveries/proof.blade.php
+- web/routes/api.php
+- web/routes/rider.php
+
+Laravel test fixtures and assertions
+
+- web/tests/Feature/Buyer/BuyerShipmentApiTest.php
+- web/tests/Feature/Logistics/AutomaticBuyerReceiptTest.php
+- web/tests/Feature/Logistics/CodRemittanceCreationTest.php
+- web/tests/Feature/Logistics/CodRemittanceFinancialWorkflowTest.php
+- web/tests/Feature/Logistics/CrossProviderOperationsTest.php
+- web/tests/Feature/Logistics/DeliveryScenarioSeederTest.php
+- web/tests/Feature/Logistics/EndToEndLogisticsStabilizationTest.php
+- web/tests/Feature/Logistics/F2HandoffAuthorizationTest.php
+- web/tests/Feature/Logistics/F2ScanEnforcedLifecycleTest.php
+- web/tests/Feature/Rider/DeliveryAcknowledgementTest.php (added)
+- web/tests/Feature/Rider/DeliveryOtpTest.php (replaced by acknowledgement coverage)
+- web/tests/Feature/Rider/RiderMobileApiTest.php
+- web/tests/Feature/Rider/RiderProofOfDeliveryTest.php
+- web/tests/Feature/Rider/RiderTestCase.php
+- web/tests/Support/ProvidesDeliveryOtp.php (removed)
+
+Flutter application
+
+- mobile/lib/data/dto/remote_courier.dart
+- mobile/lib/data/mock_data.dart
+- mobile/lib/data/repositories/courier_repository.dart
+- mobile/lib/screens/buyer/courier_tracker_screen.dart
+- mobile/lib/screens/buyer/widgets/delivery_pass_card.dart (removed)
+- mobile/lib/screens/courier/courier_qr_scanner.dart
+- mobile/lib/screens/courier/delivery_tracker_screen.dart
+- mobile/lib/screens/shared/settings_screen.dart
+- mobile/lib/state/courier_state.dart
+- mobile/lib/utils/delivery_pass.dart (removed)
+
+Flutter tests and reviewed screenshot baselines
+
+- mobile/test/courier_handover_wiring_test.dart
+- mobile/test/courier_tracker_dark.png
+- mobile/test/courier_tracker_light.png
+- mobile/test/delivery_pass_flow_test.dart
+- mobile/test/delivery_pass_handover_test.dart
+- mobile/test/delivery_pass_test.dart (retired codec coverage)
+- mobile/test/live_courier_test.dart
+- mobile/test/repository_wiring_test.dart
+- mobile/test/workbook_rider_phase4_test.dart

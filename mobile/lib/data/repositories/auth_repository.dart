@@ -203,7 +203,11 @@ class MockAuthRepository implements AuthRepository {
     final resolvedRole = lower.contains('courier') || lower.contains('rider')
         ? UserRole.courier
         : (lower.contains('buyer') ? UserRole.buyer : role);
-    return AuthResult(role: resolvedRole, status: AccountStatus.active, email: email);
+    return AuthResult(
+      role: resolvedRole,
+      status: AccountStatus.active,
+      email: email,
+    );
   }
 
   /// [password] is ignored here for the same reason the login one is: the mock
@@ -217,17 +221,16 @@ class MockAuthRepository implements AuthRepository {
     required String email,
     required String password,
     required RegistrationProfile profile,
-  }) async =>
-      AuthResult(
-        role: role,
-        status: AccountStatus.pendingApproval,
-        email: email,
-        // Mock registrations land on the *admin* gate, because there is no mail
-        // to send an OTP from. Claiming `pending_verification` would make the
-        // pending screen tell the person to check an inbox that will never
-        // receive anything.
-        registrationStatus: RemoteRegistrationStatus.pendingApproval,
-      );
+  }) async => AuthResult(
+    role: role,
+    status: AccountStatus.pendingApproval,
+    email: email,
+    // Mock registrations land on the *admin* gate, because there is no mail
+    // to send an OTP from. Claiming `pending_verification` would make the
+    // pending screen tell the person to check an inbox that will never
+    // receive anything.
+    registrationStatus: RemoteRegistrationStatus.pendingApproval,
+  );
 
   /// Accepts [kMockOtpCode] and rejects everything else the way the server does.
   ///
@@ -325,7 +328,9 @@ class LiveAuthRepository extends LiveRepository
     } on UnauthorizedException {
       // On the login route a 401 means wrong credentials (WebZefanya does not
       // say which field), not an expired session.
-      throw const UnauthorizedException(message: 'Incorrect email or password.');
+      throw const UnauthorizedException(
+        message: 'Incorrect email or password.',
+      );
     }
 
     // Kept before the result is read: every `200` from this route carries a
@@ -346,7 +351,8 @@ class LiveAuthRepository extends LiveRepository
       token,
       // A token minted this instant: when the answer omits `expires_at`, the
       // server's default lifetime (`sanctum.expiration`, 60 minutes) applies.
-      expiresAt: DateTime.tryParse('${payload['expires_at']}')?.toLocal() ??
+      expiresAt:
+          DateTime.tryParse('${payload['expires_at']}')?.toLocal() ??
           DateTime.now().add(const Duration(minutes: 60)),
     );
     client.renewPath = _renewPath(role);
@@ -361,7 +367,10 @@ class LiveAuthRepository extends LiveRepository
     //
     // WebZefanya's login body carries the token only, not the account, so the
     // account (name, status) is read from the role's profile endpoint.
-    return _resultFrom(await client.getJson('${_prefix(role)}/profile'), role: role);
+    return _resultFrom(
+      await client.getJson('${_prefix(role)}/profile'),
+      role: role,
+    );
   }
 
   /// Posts to one of the rider's signed URLs.
@@ -400,10 +409,14 @@ class LiveAuthRepository extends LiveRepository
       authenticated: false,
       body: {'email': email.trim(), 'password': password},
     );
-    final handle = riderRegistrationResultFrom(body, email: email).verificationId;
+    final handle = riderRegistrationResultFrom(
+      body,
+      email: email,
+    ).verificationId;
     if (handle == null) {
       throw const MalformedResponseException(
-        message: 'The server resumed the registration but sent no verification link.',
+        message:
+            'The server resumed the registration but sent no verification link.',
       );
     }
     return handle;
@@ -436,14 +449,21 @@ class LiveAuthRepository extends LiveRepository
       final license = profile.riderLicensePath?.trim() ?? '';
       final orCr = profile.riderOrCrPath?.trim() ?? '';
       if (license.isEmpty || orCr.isEmpty) {
-        throw ValidationException(fieldErrors: {
-          if (license.isEmpty) 'drivers_license': "Upload a photo or PDF of your driver's license.",
-          if (orCr.isEmpty) 'or_cr': 'Upload a photo or PDF of your vehicle OR/CR.',
-        });
+        throw ValidationException(
+          fieldErrors: {
+            if (license.isEmpty)
+              'drivers_license':
+                  "Upload a photo or PDF of your driver's license.",
+            if (orCr.isEmpty)
+              'or_cr': 'Upload a photo or PDF of your vehicle OR/CR.',
+          },
+        );
       }
       if (profile.riderProviderId == null) {
         throw const ValidationException(
-          fieldErrors: {'logistics_provider_id': 'Select a logistics provider.'},
+          fieldErrors: {
+            'logistics_provider_id': 'Select a logistics provider.',
+          },
         );
       }
 
@@ -504,8 +524,8 @@ class LiveAuthRepository extends LiveRepository
   /// is mounted so far.
   static String verifyOtpPath(UserRole role, String verificationId) =>
       role == UserRole.buyer
-          ? '/register/buyer/verify-otp/$verificationId'
-          : '/register/logistics/verify-otp/$verificationId';
+      ? '/register/buyer/verify-otp/$verificationId'
+      : '/register/logistics/verify-otp/$verificationId';
 
   @override
   Future<AuthResult> verifyOtp({
@@ -516,7 +536,11 @@ class LiveAuthRepository extends LiveRepository
     if (role == UserRole.courier) {
       final handle = RiderVerificationHandle.parse(verificationId);
       if (handle == null) return notWired(verifyOtpPath(role, verificationId));
-      final body = await _signed(handle, handle.verifyUrl, body: {'otp': code.trim()});
+      final body = await _signed(
+        handle,
+        handle.verifyUrl,
+        body: {'otp': code.trim()},
+      );
       return _resultFrom(body, role: role);
     }
     if (role != UserRole.buyer) {
@@ -596,6 +620,22 @@ class LiveAuthRepository extends LiveRepository
     }
   }
 
+  Future<bool> verifySavedSession(UserRole role) async {
+    try {
+      await client.getJson('${_prefix(role)}/profile');
+      client.renewPath = _renewPath(role);
+      return true;
+    } on ApiException catch (error) {
+      if (error is! UnauthorizedException &&
+          error is! ForbiddenException &&
+          error is! PendingApprovalException) {
+        rethrow;
+      }
+      await client.forgetToken();
+      return false;
+    }
+  }
+
   @override
   Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
@@ -645,15 +685,13 @@ class LiveAuthRepository extends LiveRepository
 /// Public because the Google repository reads the same answer shape. The role
 /// is still an argument: the email/password paths know it from the route, and
 /// the Google path parses it from the server before calling here.
-AuthResult authResultFrom(
-  Map<String, Object?> body, {
-  required UserRole role,
-}) {
+AuthResult authResultFrom(Map<String, Object?> body, {required UserRole role}) {
   final payload = unwrapMap(body);
   final remote = RemoteRegistrationStatus.parse(
     payload['registration_status'] ?? _webZefanyaStatus(payload['status']),
   );
-  final name = payload['name']?.toString() ??
+  final name =
+      payload['name']?.toString() ??
       [payload['first_name'], payload['last_name']]
           .whereType<Object>()
           .map((part) => part.toString().trim())
@@ -679,11 +717,11 @@ AuthResult authResultFrom(
 /// login gate, where `approved` (buyers) and `active` (riders) both mean
 /// usable. Anything else stays unrecognised and so fails safe to pending.
 String? _webZefanyaStatus(Object? status) => switch (status?.toString()) {
-      'approved' || 'active' => 'approved',
-      'pending' => 'pending_approval',
-      'rejected' => 'rejected',
-      _ => null,
-    };
+  'approved' || 'active' => 'approved',
+  'pending' => 'pending_approval',
+  'rejected' => 'rejected',
+  _ => null,
+};
 
 /// The two signed URLs WebZefanya returns after a rider registers, carried
 /// through the app as one opaque [AuthResult.verificationId].
@@ -702,7 +740,8 @@ class RiderVerificationHandle {
   /// When the links stop working: the signed URLs' own `expires` parameter
   /// (Unix seconds), read without altering the URL. Null if absent.
   DateTime? get expiresAt {
-    final raw = Uri.tryParse(resendUrl)?.queryParameters['expires'] ??
+    final raw =
+        Uri.tryParse(resendUrl)?.queryParameters['expires'] ??
         Uri.tryParse(verifyUrl)?.queryParameters['expires'];
     final seconds = raw == null ? null : int.tryParse(raw);
     return seconds == null
@@ -718,7 +757,9 @@ class RiderVerificationHandle {
 
   static RiderVerificationHandle? parse(String handle) {
     final parts = handle.split('\n');
-    if (parts.length != 2 || parts.any((p) => !p.startsWith('http'))) return null;
+    if (parts.length != 2 || parts.any((p) => !p.startsWith('http'))) {
+      return null;
+    }
     return RiderVerificationHandle(parts[0], parts[1]);
   }
 }
@@ -733,8 +774,10 @@ AuthResult riderRegistrationResultFrom(
 }) {
   final data = unwrapMap(body);
   final handle = switch ((data['verify_url'], data['resend_url'])) {
-    (final String verify, final String resend) =>
-      RiderVerificationHandle(verify, resend).encode(),
+    (final String verify, final String resend) => RiderVerificationHandle(
+      verify,
+      resend,
+    ).encode(),
     _ => null,
   };
   final remote = handle != null

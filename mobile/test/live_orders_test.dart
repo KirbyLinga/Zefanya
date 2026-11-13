@@ -14,14 +14,16 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/api/api_client.dart';
 import 'package:zefanya/data/api/api_exception.dart';
 import 'package:zefanya/data/api/token_store.dart';
 import 'package:zefanya/data/dto/remote_orders.dart';
 import 'package:zefanya/data/mock_data.dart';
 import 'package:zefanya/data/repositories/order_repository.dart';
-import 'package:zefanya/state/return_state.dart';
 import 'package:zefanya/data/repositories/return_repository.dart';
+import 'package:zefanya/state/return_state.dart';
+import 'package:zefanya/state/order_state.dart';
 
 /// A fake transport: records what was sent, answers from a script.
 class _FakeServer {
@@ -35,8 +37,10 @@ class _FakeServer {
   final List<String> bodies = [];
   final List<Map<String, String>> headers = [];
 
-  late final http.Client client =
-      MockClient.streaming((request, bodyStream) async {
+  late final http.Client client = MockClient.streaming((
+    request,
+    bodyStream,
+  ) async {
     paths.add(request.url.path);
     methods.add(request.method);
     // The body is recorded too, not just the path: what a write *sends* is half of
@@ -45,7 +49,8 @@ class _FakeServer {
     bodies.add(await bodyStream.bytesToString());
     headers.add(request.headers);
 
-    final response = _script[_served < _script.length ? _served++ : _script.length - 1];
+    final response =
+        _script[_served < _script.length ? _served++ : _script.length - 1];
 
     return http.StreamedResponse(
       Stream.value(utf8.encode(response.body)),
@@ -58,14 +63,12 @@ class _FakeServer {
   String header(String name) => headers.isEmpty
       ? ''
       : headers.first.entries
-          .firstWhere(
-            (entry) => entry.key.toLowerCase() == name.toLowerCase(),
-            orElse: () => const MapEntry('', ''),
-          )
-          .value;
+            .firstWhere(
+              (entry) => entry.key.toLowerCase() == name.toLowerCase(),
+              orElse: () => const MapEntry('', ''),
+            )
+            .value;
 }
-
-http.Response _list(List<Object?> rows) => http.Response(jsonEncode({'data': rows}), 200);
 
 /// One seller order as the server sends it, with the fields the app reads.
 Map<String, Object?> _orderJson({
@@ -73,26 +76,35 @@ Map<String, Object?> _orderJson({
   Object? status = 'PLACED',
   Object? shop = 'Loom & Larder',
   List<Object?>? items = const [
-    {'name': 'Handwoven Rattan Tote', 'quantity': 2, 'price_minor': 125075, 'product_id': '2'},
-    {'name': 'Kamagong Stool', 'quantity': 1, 'price_minor': 380000, 'product_id': '4'},
+    {
+      'name': 'Handwoven Rattan Tote',
+      'quantity': 2,
+      'price_minor': 125075,
+      'product_id': '2',
+    },
+    {
+      'name': 'Kamagong Stool',
+      'quantity': 1,
+      'price_minor': 380000,
+      'product_id': '4',
+    },
   ],
   List<Object?>? productIds = const ['2', '4'],
-}) =>
-    {
-      'id': id,
-      'reference': 'ORD-20261004-4F8K2Q',
-      'status': status,
-      'shop': shop,
-      'subtotal_minor': 630150,
-      'items': items,
-      'product_ids': productIds,
-    };
+}) => {
+  'id': id,
+  'reference': 'ORD-20261004-4F8K2Q',
+  'status': status,
+  'shop': shop,
+  'subtotal_minor': 630150,
+  'items': items,
+  'product_ids': productIds,
+};
 
 /// The live repository, its token store, and the transport behind them.
 class _Live {
   _Live(List<http.Response> script)
-      : server = _FakeServer(script),
-        tokens = InMemoryTokenStore() {
+    : server = _FakeServer(script),
+      tokens = InMemoryTokenStore() {
     client = ApiClient(
       baseUrl: 'https://api.zefanya.test',
       tokenStore: tokens,
@@ -108,38 +120,6 @@ class _Live {
 }
 
 void main() {
-  test(
-    'completed shipment defect window uses delivery instead of update time',
-    () {
-      final order = orderFromShipmentJson({
-        'id': 12,
-        'order_id': 5,
-        'status': 'COMPLETED',
-        'delivered_at': '2026-11-01T10:00:00+08:00',
-        'updated_at': '2026-11-06T10:00:00+08:00',
-      });
-      final returns = ReturnState(
-        repository: LiveReturnRepository(_Live([]).client),
-      );
-      addTearDown(returns.dispose);
-      expect(order.buyerConfirmed, isTrue);
-      expect(
-        returns.returnRefusal(
-          order,
-          now: DateTime.parse('2026-11-07T10:00:00+08:00'),
-        ),
-        isNull,
-      );
-      expect(
-        returns.returnRefusal(
-          order,
-          now: DateTime.parse('2026-11-08T10:00:00+08:00'),
-        ),
-        contains('Contact support'),
-      );
-    },
-  );
-
   test(
     'delivery dispute status and submission are scoped to one shipment',
     () async {
@@ -175,6 +155,107 @@ void main() {
     },
   );
 
+  test(
+    'older shipments and returns load on demand, dedupe and reset on refresh',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final requests = <String>[];
+      final client = ApiClient(
+        baseUrl: 'https://example.test',
+        tokenStore: InMemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          final second = request.url.queryParameters['page'] == '2';
+          final shipments = request.url.path.endsWith('/shipments');
+          requests.add('${request.url.path}:${second ? 2 : 1}');
+          final rows = [
+            {'id': 12, 'status': 'PLACED', 'items': []},
+            if (second)
+              {
+                'id': 11,
+                'status': 'DELIVERED',
+                'items': [],
+                'return_status': 'RETURNED_TO_SELLER',
+                'refund_recorded': true,
+              },
+          ];
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'data': shipments
+                    ? rows
+                    : [
+                        {'shipments': rows},
+                      ],
+                'meta': shipments ? {'last_page': 2} : {'has_more': !second},
+              },
+            }),
+            200,
+          );
+        }),
+      );
+      final state = OrderState(
+        repository: LiveOrderRepository(client),
+        returns: ReturnState(repository: LiveReturnRepository(client)),
+      );
+      addTearDown(state.dispose);
+      await state.load();
+      expect(requests.where((path) => path.endsWith(':2')), isEmpty);
+      expect(state.orders.map((order) => order.id), ['12']);
+      await state.loadOlder();
+      expect(state.orders.map((order) => order.id), ['12', '11']);
+      expect(state.returns.latestForOrder('11')?.status, ReturnStatus.refunded);
+      expect(state.hasOlder, isFalse);
+      await state.refresh();
+      expect(state.orders.map((order) => order.id), ['12']);
+      expect(state.returns.latestForOrder('11'), isNull);
+      expect(state.hasOlder, isTrue);
+    },
+  );
+
+  test(
+    'a physical return only displays refunded with API confirmation',
+    () async {
+      final live = _Live([
+        http.Response(
+          jsonEncode({
+            'data': {
+              'data': [
+                {
+                  'shipments': [
+                    {'id': 9, 'return_status': 'RETURNED_TO_SELLER'},
+                    {
+                      'id': 10,
+                      'return_status': 'RETURNED_TO_SELLER',
+                      'refund_recorded': false,
+                    },
+                    {
+                      'id': 11,
+                      'return_status': 'RETURNED_TO_SELLER',
+                      'refund_recorded': true,
+                    },
+                    {
+                      'id': 12,
+                      'return_status': 'RETURN_IN_TRANSIT',
+                      'refund_recorded': true,
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+          200,
+        ),
+      ]);
+      final returns = await LiveReturnRepository(live.client).all();
+      expect(returns.map((request) => request.status), [
+        ReturnStatus.returned,
+        ReturnStatus.returned,
+        ReturnStatus.refunded,
+        ReturnStatus.submitted,
+      ]);
+    },
+  );
+
   group('the mapping', () {
     test("the server's pipeline becomes the app's four stages", () {
       const expected = {
@@ -196,7 +277,11 @@ void main() {
       };
 
       for (final entry in expected.entries) {
-        expect(orderStatusFromServer(entry.key), entry.value, reason: entry.key);
+        expect(
+          orderStatusFromServer(entry.key),
+          entry.value,
+          reason: entry.key,
+        );
       }
     });
 
@@ -216,17 +301,27 @@ void main() {
       expect(order.eta, isNotEmpty);
     });
 
-    test('a line whose product is gone keeps its name and contributes no id', () {
-      final order = orderFromJson(_orderJson(
-        items: const [
-          {'name': 'Capiz Shell Wind Chime', 'quantity': 1, 'price_minor': 68000, 'product_id': null},
-        ],
-        productIds: const [],
-      ));
+    test(
+      'a line whose product is gone keeps its name and contributes no id',
+      () {
+        final order = orderFromJson(
+          _orderJson(
+            items: const [
+              {
+                'name': 'Capiz Shell Wind Chime',
+                'quantity': 1,
+                'price_minor': 68000,
+                'product_id': null,
+              },
+            ],
+            productIds: const [],
+          ),
+        );
 
-      expect(order.itemSummary, 'Capiz Shell Wind Chime');
-      expect(order.productIds, isEmpty);
-    });
+        expect(order.itemSummary, 'Capiz Shell Wind Chime');
+        expect(order.productIds, isEmpty);
+      },
+    );
 
     test('an unreadable body answers empty rather than throwing', () {
       // The tolerant-reader rule `remote_catalog.dart` states: one field that left
@@ -241,17 +336,31 @@ void main() {
   });
 
   group('WebZefanya shipments', () {
-    Map<String, Object?> shipment({String id = '12', String status = 'PLACED', String orderId = '5'}) => {
-          'id': int.parse(id),
-          'order_id': int.parse(orderId),
-          'status': status,
-          'seller': {'id': 3, 'name': 'Loom & Larder'},
-          'items': [
-            {'product_id': 2, 'product_name': 'Handwoven Rattan Tote', 'quantity': 2, 'price_minor': 125075},
-            {'product_id': 4, 'product_name': 'Kamagong Stool', 'quantity': 1, 'price_minor': 380000},
-          ],
-          'updated_at': '2026-11-06T10:00:00+08:00',
-        };
+    Map<String, Object?> shipment({
+      String id = '12',
+      String status = 'PLACED',
+      String orderId = '5',
+    }) => {
+      'id': int.parse(id),
+      'order_id': int.parse(orderId),
+      'status': status,
+      'seller': {'id': 3, 'name': 'Loom & Larder'},
+      'items': [
+        {
+          'product_id': 2,
+          'product_name': 'Handwoven Rattan Tote',
+          'quantity': 2,
+          'price_minor': 125075,
+        },
+        {
+          'product_id': 4,
+          'product_name': 'Kamagong Stool',
+          'quantity': 1,
+          'price_minor': 380000,
+        },
+      ],
+      'updated_at': '2026-11-06T10:00:00+08:00',
+    };
 
     test('a shipment becomes one order card with its parent order id', () {
       final order = orderFromShipmentJson(shipment());
@@ -266,12 +375,50 @@ void main() {
       expect(order.cancelled, isFalse);
     });
 
+    test(
+      'completed shipment defect window uses delivery instead of update time',
+      () {
+        final order = orderFromShipmentJson({
+          'id': 12,
+          'order_id': 5,
+          'status': 'COMPLETED',
+          'delivered_at': '2026-11-01T10:00:00+08:00',
+          'updated_at': '2026-11-06T10:00:00+08:00',
+        });
+        final returns = ReturnState(
+          repository: LiveReturnRepository(_Live([]).client),
+        );
+        addTearDown(returns.dispose);
+        expect(order.buyerConfirmed, isTrue);
+        expect(
+          returns.returnRefusal(
+            order,
+            now: DateTime.parse('2026-11-07T10:00:00+08:00'),
+          ),
+          isNull,
+        );
+        expect(
+          returns.returnRefusal(
+            order,
+            now: DateTime.parse('2026-11-08T10:00:00+08:00'),
+          ),
+          contains('Contact support'),
+        );
+      },
+    );
+
     test('cancellation and receipt are read from the server status', () {
-      expect(orderFromShipmentJson(shipment(status: 'CANCELLED')).cancelled, isTrue);
+      expect(
+        orderFromShipmentJson(shipment(status: 'CANCELLED')).cancelled,
+        isTrue,
+      );
       final completed = orderFromShipmentJson(shipment(status: 'COMPLETED'));
       expect(completed.buyerConfirmed, isTrue);
       expect(completed.deliveredAt, isNotNull);
-      expect(orderFromShipmentJson(shipment(status: 'PLACED')).deliveredAt, isNull);
+      expect(
+        orderFromShipmentJson(shipment(status: 'PLACED')).deliveredAt,
+        isNull,
+      );
     });
   });
 
@@ -283,7 +430,13 @@ void main() {
       final live = _Live([
         ok({
           'data': [
-            {'id': 12, 'order_id': 5, 'status': 'PLACED', 'seller': {'name': 'Loom & Larder'}, 'items': []},
+            {
+              'id': 12,
+              'order_id': 5,
+              'status': 'PLACED',
+              'seller': {'name': 'Loom & Larder'},
+              'items': [],
+            },
           ],
         }),
       ]);
@@ -296,93 +449,369 @@ void main() {
       expect(orders.single.id, '12');
     });
 
-    test('a 401 says the token is no good, rather than looking like an empty history', () async {
-      final live = _Live([http.Response(jsonEncode({'message': 'Unauthenticated.'}), 401)]);
-      await expectLater(live.orders.orders(), throwsA(isA<UnauthorizedException>()));
-    });
+    test(
+      'a 401 says the token is no good, rather than looking like an empty history',
+      () async {
+        final live = _Live([
+          http.Response(jsonEncode({'message': 'Unauthenticated.'}), 401),
+        ]);
+        await expectLater(
+          live.orders.orders(),
+          throwsA(isA<UnauthorizedException>()),
+        );
+      },
+    );
 
-    test('cancel and confirm go to the shipment routes under the parent order', () async {
-      final live = _Live([ok(null)]);
-      const base = Order(id: '12', shopName: 'Loom & Larder', status: OrderStatus.toShip, eta: '', itemSummary: '', serverOrderId: '5');
+    test(
+      'cancel and confirm go to the shipment routes under the parent order',
+      () async {
+        final live = _Live([ok(null)]);
+        const base = Order(
+          id: '12',
+          shopName: 'Loom & Larder',
+          status: OrderStatus.toShip,
+          eta: '',
+          itemSummary: '',
+          serverOrderId: '5',
+        );
 
-      await live.orders.saveBuyerState(base.copyWith(cancelled: true, cancellationReason: 'Changed my mind'));
-      await live.orders.saveBuyerState(base.copyWith(buyerConfirmed: true));
+        await live.orders.saveBuyerState(
+          base.copyWith(cancelled: true, cancellationReason: 'Changed my mind'),
+        );
+        await live.orders.saveBuyerState(base.copyWith(buyerConfirmed: true));
 
-      expect(live.server.paths, ['/buyer/orders/5/shipments/12/cancel', '/buyer/orders/5/shipments/12/confirm-received']);
-      expect(jsonDecode(live.server.bodies.first), {'reason': 'Changed my mind'});
-    });
+        expect(live.server.paths, [
+          '/buyer/orders/5/shipments/12/cancel',
+          '/buyer/orders/5/shipments/12/confirm-received',
+        ]);
+        expect(jsonDecode(live.server.bodies.first), {
+          'reason': 'Changed my mind',
+        });
+      },
+    );
 
     test('a stale cancel surfaces the 409 conflict', () async {
-      final live = _Live([http.Response(jsonEncode({'message': 'This order can no longer be cancelled because the seller has already accepted it.'}), 409)]);
-      const base = Order(id: '12', shopName: '', status: OrderStatus.toShip, eta: '', itemSummary: '', serverOrderId: '5');
+      final live = _Live([
+        http.Response(
+          jsonEncode({
+            'message':
+                'This order can no longer be cancelled because the seller has already accepted it.',
+          }),
+          409,
+        ),
+      ]);
+      const base = Order(
+        id: '12',
+        shopName: '',
+        status: OrderStatus.toShip,
+        eta: '',
+        itemSummary: '',
+        serverOrderId: '5',
+      );
 
       await expectLater(
-        live.orders.saveBuyerState(base.copyWith(cancelled: true, cancellationReason: 'x')),
-        throwsA(isA<RequestRejectedException>().having((e) => e.isConflict, 'conflict', isTrue)),
+        live.orders.saveBuyerState(
+          base.copyWith(cancelled: true, cancellationReason: 'x'),
+        ),
+        throwsA(
+          isA<RequestRejectedException>().having(
+            (e) => e.isConflict,
+            'conflict',
+            isTrue,
+          ),
+        ),
       );
     });
 
-    final cartLine = {'id': 31, 'product_id': 2, 'variant_id': 9, 'quantity': 2};
+    final cartLine = {
+      'id': 31,
+      'product_id': 2,
+      'variant_id': 9,
+      'quantity': 2,
+    };
     final quote = {
       'checkout_token': 'tok',
       'item_ids': [31],
       'shipping': {
         'all_routes_available': true,
         'options': [
-          {'seller_id': 3, 'carriers': [{'id': 8, 'fee_minor': 4900}]},
+          {
+            'seller_id': 3,
+            'carriers': [
+              {'id': 8, 'fee_minor': 4900},
+            ],
+          },
         ],
       },
       'totals': {'payable_total_minor': 255050},
       'vouchers_state': <String, Object?>{},
-      'fingerprints': {'price': 'p', 'address': 'a', 'shipping': 's', 'voucher': 'v'},
+      'fingerprints': {
+        'price': 'p',
+        'address': 'a',
+        'shipping': 's',
+        'voucher': 'v',
+      },
     };
-    const line = OrderLineRequest(productId: '2', productName: 'Handwoven Rattan Tote', sellerName: 'Loom & Larder', quantity: 2, unitPrice: 1250.75, variantId: '9');
+    const line = OrderLineRequest(
+      productId: '2',
+      productName: 'Handwoven Rattan Tote',
+      sellerName: 'Loom & Larder',
+      quantity: 2,
+      unitPrice: 1250.75,
+      variantId: '9',
+    );
 
-    test('placing syncs the server cart, quotes, and submits only ids and fingerprints', () async {
-      final live = _Live([
-        ok({'items': <Object?>[]}),          // GET cart
-        ok({'items': [cartLine]}, 201),      // POST cart item
-        ok(quote),                           // quote (default carriers)
-        ok(quote),                           // quote (explicit carriers)
-        ok({'id': 5, 'shipments': [{'id': 12, 'status': 'PLACED', 'seller': {'name': 'Loom & Larder'}, 'items': []}]}, 201),
-      ]);
+    test(
+      'an uncertain checkout survives recreation and is scoped to its Buyer',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final original = _Live([
+          ok({
+            'items': [cartLine],
+          }),
+          ok({
+            'items': [cartLine],
+          }),
+          ok(quote),
+          ok(quote),
+          http.Response('{"message":"Gateway timeout"}', 504),
+        ]);
+        original.orders.setCheckoutOwner('buyer-a');
+        await expectLater(
+          original.orders.place([line]),
+          throwsA(isA<CheckoutOutcomeUnknown>()),
+        );
+        final reopened = _Live([
+          ok({
+            'status': 'placed',
+            'order': {'id': 5},
+          }),
+        ]);
+        reopened.orders.setCheckoutOwner('buyer-b');
+        expect(await reopened.orders.hasPendingCheckout(), isFalse);
+        reopened.orders.setCheckoutOwner('buyer-a');
+        expect(await reopened.orders.hasPendingCheckout(), isTrue);
+        await expectLater(
+          reopened.orders.place([line]),
+          throwsA(isA<CheckoutOutcomeUnknown>()),
+        );
+        expect(reopened.server.paths, isEmpty);
+        expect((await reopened.orders.reconcileCheckout()).status, 'placed');
+        expect(reopened.server.paths, ['/buyer/checkout/reconcile']);
+        expect(jsonDecode(reopened.server.bodies.single), {
+          'checkout_token': 'tok',
+        });
+        expect(await reopened.orders.hasPendingCheckout(), isFalse);
+      },
+    );
 
-      final placed = await live.orders.place(const [line], expectedTotal: 2550.50);
+    test(
+      'placing syncs the server cart, quotes, and submits only ids and fingerprints',
+      () async {
+        final live = _Live([
+          ok({'items': <Object?>[]}), // GET cart
+          ok({
+            'items': [cartLine],
+          }, 201), // POST cart item
+          ok(quote), // quote (default carriers)
+          ok(quote), // quote (explicit carriers)
+          ok({
+            'id': 5,
+            'shipments': [
+              {
+                'id': 12,
+                'status': 'PLACED',
+                'seller': {'name': 'Loom & Larder'},
+                'items': [],
+              },
+            ],
+          }, 201),
+        ]);
 
-      expect(live.server.paths, ['/buyer/cart', '/buyer/cart/items', '/buyer/checkout/quote', '/buyer/checkout/quote', '/buyer/checkout']);
-      expect(jsonDecode(live.server.bodies[1]), {'product_id': 2, 'variant_id': 9, 'quantity': 2});
-      final submitted = jsonDecode(live.server.bodies.last) as Map;
-      expect(submitted['checkout_token'], 'tok');
-      expect(submitted['carriers'], {'3': 8});
-      // The reviewed total is a guard; the server calculates every amount.
-      expect(submitted['expected_total'], '2550.50');
-      expect(submitted.keys, isNot(contains('unit_price')));
-      expect(submitted.keys, isNot(contains('total_minor')));
-      expect(placed.single.id, '12');
-      expect(placed.single.serverOrderId, '5');
-    });
+        final placed = await live.orders.place(const [
+          line,
+        ], expectedTotal: 2550.50);
 
-    test('a server total that differs from the one the buyer saw stops the order', () async {
-      final live = _Live([ok({'items': [cartLine]}), ok({'items': [cartLine]}), ok(quote), ok(quote)]);
+        expect(live.server.paths, [
+          '/buyer/cart',
+          '/buyer/cart/items',
+          '/buyer/checkout/quote',
+          '/buyer/checkout/quote',
+          '/buyer/checkout',
+        ]);
+        expect(jsonDecode(live.server.bodies[1]), {
+          'product_id': 2,
+          'variant_id': 9,
+          'quantity': 2,
+        });
+        final submitted = jsonDecode(live.server.bodies.last) as Map;
+        expect(submitted['checkout_token'], 'tok');
+        expect(submitted['carriers'], {'3': 8});
+        // The reviewed total is a guard; the server calculates every amount.
+        expect(submitted['expected_total'], '2550.50');
+        expect(submitted.keys, isNot(contains('unit_price')));
+        expect(submitted.keys, isNot(contains('total_minor')));
+        expect(placed.single.id, '12');
+        expect(placed.single.serverOrderId, '5');
+      },
+    );
 
-      await expectLater(
-        live.orders.place(const [line], expectedTotal: 2000),
-        throwsA(isA<RequestRejectedException>().having((e) => e.isConflict, 'conflict', isTrue)),
-      );
-      expect(live.server.paths, isNot(contains('/buyer/checkout')));
-    });
+    test(
+      'a server total that differs from the one the buyer saw stops the order',
+      () async {
+        final live = _Live([
+          ok({
+            'items': [cartLine],
+          }),
+          ok({
+            'items': [cartLine],
+          }),
+          ok(quote),
+          ok(quote),
+        ]);
 
-    test('quoteTotal reads server pesos without cart or checkout-token writes', () async {
-      final live = _Live([ok(quote)]);
+        await expectLater(
+          live.orders.place(const [line], expectedTotal: 2000),
+          throwsA(
+            isA<RequestRejectedException>().having(
+              (e) => e.isConflict,
+              'conflict',
+              isTrue,
+            ),
+          ),
+        );
+        expect(live.server.paths, isNot(contains('/buyer/checkout')));
+      },
+    );
 
-      expect(await live.orders.quoteTotal(const [line], voucherCodes: ['MCH50']), 2550.50);
-      expect(live.server.paths, ['/v1/buyer/checkout/quote']);
-      expect(live.server.methods, ['POST']);
-      expect(jsonDecode(live.server.bodies.single), {
-        'lines': [{'product_id': '2', 'variant_id': '9', 'quantity': 2}],
-        'voucher_codes': ['MCH50'],
-      });
-    });
+    test(
+      'failure after final submission is unknown and does not repost',
+      () async {
+        final live = _Live([
+          ok({
+            'items': [cartLine],
+          }),
+          ok({
+            'items': [cartLine],
+          }),
+          ok(quote),
+          ok(quote),
+          http.Response('{"message":"Gateway timeout"}', 504),
+        ]);
+        await expectLater(
+          live.orders.place(const [line], expectedTotal: 2550.50),
+          throwsA(isA<CheckoutOutcomeUnknown>()),
+        );
+        expect(
+          live.server.paths.where((path) => path == '/buyer/checkout'),
+          hasLength(1),
+        );
+      },
+    );
+
+    test(
+      'checkout review reads the server address without writing the cart',
+      () async {
+        final live = _Live([
+          ok({
+            ...quote,
+            'deliver_to': {'full': '25 Demo Street, Pila'},
+            'address_fingerprint': 'reviewed-address',
+          }),
+        ]);
+
+        expect(await live.orders.reviewCheckout(const [line], const []), (
+          total: 2550.50,
+          address: '25 Demo Street, Pila',
+          addressFingerprint: 'reviewed-address',
+        ));
+        expect(live.server.paths, ['/v1/buyer/checkout/quote']);
+      },
+    );
+
+    test(
+      'voucher review returns server centavos and rejects discarded codes',
+      () async {
+        final live = _Live([
+          ok({
+            ...quote,
+            'vouchers_state': {'platform': 'VALID'},
+          }),
+          ok({
+            ...quote,
+            'vouchers_state': {},
+            'voucher_notice': 'Expired voucher.',
+          }),
+        ]);
+        expect(
+          await live.orders.reviewVouchers(const [line], ['VALID']),
+          255050,
+        );
+        await expectLater(
+          live.orders.reviewVouchers(const [line], ['EXPIRED']),
+          throwsA(
+            isA<RequestRejectedException>().having(
+              (error) => error.message,
+              'message',
+              'Expired voucher.',
+            ),
+          ),
+        );
+        expect(live.server.paths, List.filled(2, '/v1/buyer/checkout/quote'));
+      },
+    );
+
+    test(
+      'an address change blocks checkout even at the reviewed total',
+      () async {
+        final live = _Live([
+          ok({
+            'items': [cartLine],
+          }),
+          ok({
+            'items': [cartLine],
+          }),
+          ok(quote),
+          ok(quote),
+        ]);
+
+        await expectLater(
+          live.orders.place(
+            const [line],
+            expectedTotal: 2550.50,
+            expectedAddressFingerprint: 'previous-address',
+          ),
+          throwsA(
+            isA<RequestRejectedException>().having(
+              (error) => error.isConflict,
+              'conflict',
+              isTrue,
+            ),
+          ),
+        );
+        expect(live.server.paths, isNot(contains('/buyer/checkout')));
+      },
+    );
+
+    test(
+      'quoteTotal reads server pesos without cart or checkout-token writes',
+      () async {
+        final live = _Live([ok(quote)]);
+
+        expect(
+          await live.orders.quoteTotal(const [line], voucherCodes: ['MCH50']),
+          2550.50,
+        );
+        expect(live.server.paths, ['/v1/buyer/checkout/quote']);
+        expect(live.server.methods, ['POST']);
+        expect(jsonDecode(live.server.bodies.single), {
+          'lines': [
+            {'product_id': '2', 'variant_id': '9', 'quantity': 2},
+          ],
+          'voucher_codes': ['MCH50'],
+        });
+      },
+    );
 
     test('nothing to place is answered locally, without a request', () async {
       final live = _Live([ok(null)]);
@@ -390,9 +819,17 @@ void main() {
       expect(live.server.paths, isEmpty);
     });
 
-    test('a live build with no base URL says so instead of placing anyway', () async {
-      final orders = LiveOrderRepository(ApiClient(baseUrl: '', tokenStore: InMemoryTokenStore()));
-      await expectLater(orders.place(const [line]), throwsA(isA<ApiNotConfiguredException>()));
-    });
+    test(
+      'a live build with no base URL says so instead of placing anyway',
+      () async {
+        final orders = LiveOrderRepository(
+          ApiClient(baseUrl: '', tokenStore: InMemoryTokenStore()),
+        );
+        await expectLater(
+          orders.place(const [line]),
+          throwsA(isA<ApiNotConfiguredException>()),
+        );
+      },
+    );
   });
 }

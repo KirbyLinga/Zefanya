@@ -4,6 +4,7 @@ import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/linehaul_earnings.dart';
 import '../../widgets/editorial_header.dart';
+import '../../widgets/inline_error_notice.dart';
 
 class LinehaulEarningsScreen extends StatefulWidget {
   const LinehaulEarningsScreen({
@@ -24,7 +25,7 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
   String? _error;
   int _requestedPage = 1;
   Future<void> refresh() =>
-      _busy ? Future.value() : _load(page: _requestedPage);
+      _busy ? Future.value() : _load(page: _requestedPage, retain: true);
   static DateTime _today() {
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
     return DateTime(now.year, now.month, now.day);
@@ -37,22 +38,19 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
     _load();
   }
 
-  Future<void> _load({int page = 1}) async {
+  Future<void> _load({int page = 1, bool retain = false}) async {
     setState(() {
       _requestedPage = page;
       _busy = true;
       _error = null;
-      _report = null;
+      if (!retain) _report = null;
     });
     try {
-      final response = await widget.repository.client.getJson(
-        '/courier/earnings',
-        query: {
-          'from': DateFormat('yyyy-MM-dd').format(_from),
-          'to': DateFormat('yyyy-MM-dd').format(_to),
-          'page': '$page',
-        },
-      );
+      final response = await widget.repository.earnings({
+        'from': DateFormat('yyyy-MM-dd').format(_from),
+        'to': DateFormat('yyyy-MM-dd').format(_to),
+        'page': '$page',
+      });
       final raw = response['data'];
       if (raw is! Map) throw const MalformedResponseException();
       final report = LinehaulEarnings(raw.cast<String, Object?>());
@@ -114,13 +112,9 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
               title: 'Your earnings',
               padding: EdgeInsets.only(bottom: 12),
             ),
-            const SizedBox(height: 8),
             Text(
-              report?.payoutRecordingAvailable == true
-                  ? 'Completed handovers by Philippine date. Logistics records payments after they are made.'
-                  : 'Completed handovers by Philippine date.',
+              '${DateFormat.yMMMd().format(_from)} – ${DateFormat.yMMMd().format(_to)} · Philippine time',
             ),
-            const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               children: [
@@ -138,13 +132,15 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
                 ),
               ],
             ),
-            Text(
-              '${DateFormat.yMMMd().format(_from)} – ${DateFormat.yMMMd().format(_to)} · Philippine time',
-            ),
-            const SizedBox(height: 20),
-            if (_busy) const Center(child: CircularProgressIndicator()),
+            const SizedBox(height: 8),
+            if (_busy)
+              const LinearProgressIndicator(
+                semanticsLabel: 'Loading trip earnings',
+              ),
             if (_error != null) ...[
-              Text(_error!),
+              InlineErrorNotice(_error!),
+              if (report != null)
+                const Text('Showing the last loaded earnings for these dates.'),
               TextButton(
                 onPressed: _busy ? null : refresh,
                 child: const Text('Retry'),
@@ -152,29 +148,42 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
             ],
             if (report != null) ...[
               Card(
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 8),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Confirmed earned pay',
+                        widget.repository.isDemo
+                            ? 'Sample earned pay'
+                            : 'Confirmed earned pay',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        money(report.earnedMinor),
-                        style: Theme.of(context).textTheme.headlineMedium,
+                        report.earnedTrips == 0 && report.unconfirmedTrips > 0
+                            ? 'Awaiting confirmation'
+                            : money(report.earnedMinor),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       Text(
                         '${report.earnedTrips} confirmed of ${report.completedTrips} completed handovers',
                       ),
                       if (report.unconfirmedTrips > 0)
                         Text(
-                          '${report.unconfirmedTrips} trips have unconfigured or unconfirmed pay and are excluded from this amount.',
+                          '${report.unconfirmedTrips} unconfirmed ${report.unconfirmedTrips == 1 ? 'trip excluded' : 'trips excluded'} from this amount.',
                         ),
-                      const Text(
-                        'Earned pay is separate from money paid to you.',
+                      Text(
+                        widget.repository.isDemo
+                            ? 'Example amounts only. No payments are made.'
+                            : 'Earned pay is separate from money paid to you.',
                       ),
+                      if (!report.payoutRecordingAvailable)
+                        const Text('Payout information is unavailable.'),
                     ],
                   ),
                 ),
@@ -186,6 +195,8 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
                 ),
               for (final trip in report.trips)
                 Card(
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
                     title: Text('Trip #${trip.tripId} · ${trip.result}'),
                     subtitle: Text(
@@ -209,14 +220,14 @@ class LinehaulEarningsScreenState extends State<LinehaulEarningsScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   TextButton(
-                    onPressed: report.page > 1
+                    onPressed: !_busy && report.page > 1
                         ? () => _load(page: report.page - 1)
                         : null,
                     child: const Text('Previous'),
                   ),
                   Text('Page ${report.page} of ${report.lastPage}'),
                   TextButton(
-                    onPressed: report.page < report.lastPage
+                    onPressed: !_busy && report.page < report.lastPage
                         ? () => _load(page: report.page + 1)
                         : null,
                     child: const Text('Next'),

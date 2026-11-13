@@ -1,11 +1,7 @@
 // lib/widgets/chat_inbox_button.dart
 //
-// The mock-mode Messages entry in the Home masthead, beside the cart. It
-// counts unread messages across every thread and hides its badge at zero.
-//
-// Live builds never construct it (see FeatureFlags.chatLive): the server has
-// no conversation endpoints, so a badge there could only count messages the
-// app invented.
+// Messages entry in the Buyer Home masthead. Live unread counts appear on
+// the conversation rows after the inbox fetches them from Laravel.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -19,19 +15,13 @@ import 'editorial_shapes.dart';
 class ChatInboxButton extends StatelessWidget {
   const ChatInboxButton({super.key});
 
-  int _unread(BuildContext context) {
-    try {
-      return Provider.of<ChatState>(context).totalUnread;
-    } on ProviderNotFoundException {
-      return 0;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final unread = _unread(context);
+    final chat = context.watch<ChatState?>();
+    final live = chat?.liveRepository != null;
+    final unread = live ? 0 : chat?.totalUnread ?? 0;
     void openInbox() => Navigator.of(
       context,
     ).push(AppPageRoute(builder: (_) => const ChatInboxScreen()));
@@ -39,7 +29,7 @@ class ChatInboxButton extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: 'Messages, $unread unread',
+      label: live ? 'Messages' : 'Messages, $unread unread',
       onTap: openInbox,
       // The badge repeats the number already in the label.
       excludeSemantics: true,

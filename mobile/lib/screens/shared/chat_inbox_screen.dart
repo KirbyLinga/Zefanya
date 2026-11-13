@@ -19,8 +19,28 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import 'chat_screen.dart';
 
-class ChatInboxScreen extends StatelessWidget {
+class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({super.key});
+
+  @override
+  State<ChatInboxScreen> createState() => _ChatInboxScreenState();
+}
+
+class _ChatInboxScreenState extends State<ChatInboxScreen> {
+  Future<List<ChatConversation>>? _inbox;
+
+  @override
+  void initState() {
+    super.initState();
+    _inbox = context.read<ChatState>().liveRepository?.buyerConversations();
+  }
+
+  void _reload() {
+    final repository = context.read<ChatState>().liveRepository;
+    if (repository != null) {
+      setState(() => _inbox = repository.buyerConversations());
+    }
+  }
 
   static List<Color> get _avatarPalette => [
     AppColors.tertiary,
@@ -36,65 +56,96 @@ class ChatInboxScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final conversations = context.watch<ChatState>().conversations;
+    final inbox = _inbox;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(),
-      body: conversations.isEmpty
-          ? Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: EditorialHeader(
-                    eyebrow: 'MESSAGES',
-                    title: 'Conversations',
-                    padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
-                  ),
-                ),
-                const Expanded(
-                  child: EmptyState(
-                    icon: Icons.forum_outlined,
-                    title: 'No messages yet.',
-                    subtitle: 'Chat with sellers from a product page.',
-                  ),
-                ),
-              ],
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-              children: [
-                const EditorialHeader(
-                  eyebrow: 'MESSAGES',
-                  title: 'Conversations',
-                  padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
-                ),
-                for (var i = 0; i < conversations.length; i++)
-                  EaseInFrame(
-                    index: i.clamp(0, 6),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _ConversationTile(
-                        conversation: conversations[i],
-                        avatarColor: _avatarColorFor(
-                          conversations[i].contactName,
-                        ),
-                        theme: theme,
-                      ),
+      appBar: AppBar(
+        actions: [
+          if (inbox != null)
+            IconButton(
+              tooltip: 'Refresh conversations',
+              onPressed: _reload,
+              icon: const Icon(Icons.refresh),
+            ),
+        ],
+      ),
+      body: inbox == null
+          ? _body(context.watch<ChatState>().conversations, theme)
+          : FutureBuilder<List<ChatConversation>>(
+              future: inbox,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: TextButton(
+                      onPressed: _reload,
+                      child: const Text('Could not load messages. Retry'),
                     ),
-                  ),
-              ],
+                  );
+                }
+                return _body(snapshot.requireData, theme);
+              },
             ),
     );
   }
+
+  Widget _body(List<ChatConversation> conversations, ThemeData theme) =>
+      conversations.isEmpty
+      ? Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: EditorialHeader(
+                eyebrow: 'MESSAGES',
+                title: 'Conversations',
+                padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
+              ),
+            ),
+            const Expanded(
+              child: EmptyState(
+                icon: Icons.forum_outlined,
+                title: 'No messages yet.',
+                subtitle: 'Chat with sellers from a product page.',
+              ),
+            ),
+          ],
+        )
+      : ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+          children: [
+            const EditorialHeader(
+              eyebrow: 'MESSAGES',
+              title: 'Conversations',
+              padding: EdgeInsets.fromLTRB(0, 0, 0, 20),
+            ),
+            for (var i = 0; i < conversations.length; i++)
+              EaseInFrame(
+                index: i.clamp(0, 6),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ConversationTile(
+                    conversation: conversations[i],
+                    avatarColor: _avatarColorFor(conversations[i].contactName),
+                    theme: theme,
+                    onReturn: _reload,
+                  ),
+                ),
+              ),
+          ],
+        );
 }
 
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.conversation,
+    required this.onReturn,
     required this.avatarColor,
     required this.theme,
   });
+  final VoidCallback onReturn;
 
   final ChatConversation conversation;
   final Color avatarColor;
@@ -117,14 +168,18 @@ class _ConversationTile extends StatelessWidget {
       ),
       child: InkWell(
         key: ValueKey('chat-conversation-${conversation.contactName}'),
-        onTap: () => Navigator.of(context).push(
-          AppPageRoute(
-            builder: (_) => ChatScreen(
-              contactName: conversation.contactName,
-              contactRole: conversation.contactRole,
+        onTap: () async {
+          await Navigator.of(context).push(
+            AppPageRoute(
+              builder: (_) => ChatScreen(
+                contactName: conversation.contactName,
+                contactRole: conversation.contactRole,
+                conversationId: conversation.id,
+              ),
             ),
-          ),
-        ),
+          );
+          if (context.mounted && conversation.id != null) onReturn();
+        },
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
           child: Row(
@@ -194,9 +249,7 @@ class _ConversationTile extends StatelessWidget {
                   const SizedBox(height: 7),
                   if (conversation.unreadCount > 0)
                     Container(
-                      key: ValueKey(
-                        'chat-unread-${conversation.contactName}',
-                      ),
+                      key: ValueKey('chat-unread-${conversation.contactName}'),
                       width: 9,
                       height: 9,
                       decoration: BoxDecoration(

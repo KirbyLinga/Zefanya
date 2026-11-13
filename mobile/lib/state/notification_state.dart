@@ -69,15 +69,57 @@ class NotificationState extends ChangeNotifier {
 
   /// Whose WebZefanya inbox is read in live mode: `/buyer` or `/rider`.
   String _prefix = '/buyer';
+  bool _hasSession = true;
+  Object? _account;
+  int _generation = 0;
+  int _page = 0;
+  int _serverUnread = 0;
+  bool hasMore = false;
+  bool loading = false;
+  bool updating = false;
+  String? error;
+
+  bool get isLive => _client != null;
+
+  Future<void> setSession({
+    required Object? account,
+    required bool rider,
+  }) async {
+    if (!isLive) return;
+    final prefix = rider ? '/rider' : '/buyer';
+    if (_account == account &&
+        _prefix == prefix &&
+        _hasSession == (account != null)) {
+      return;
+    }
+    _account = account;
+    _hasSession = account != null;
+    _prefix = prefix;
+    _resetLiveInbox();
+    if (_hasSession) await load();
+  }
+
+  void _resetLiveInbox() {
+    _generation++;
+    _items.clear();
+    _readIds.clear();
+    _page = 0;
+    _serverUnread = 0;
+    hasMore = false;
+    loading = false;
+    updating = false;
+    error = null;
+    notifyListeners();
+  }
 
   /// Points the live inbox at the signed-in role's notifications and reloads
   /// when that changes. The rider shell calls this; mock mode ignores it.
   Future<void> useInbox({required bool rider}) async {
     final next = rider ? '/rider' : '/buyer';
-    if (next == _prefix) return;
+    if (!isLive || next == _prefix || !_hasSession) return;
     _prefix = next;
-    final client = _client;
-    if (client != null) await _loadLive(client);
+    _resetLiveInbox();
+    await load();
   }
 
   static const _storageKey = 'notification_read_ids';
@@ -87,13 +129,14 @@ class NotificationState extends ChangeNotifier {
 
   List<AppNotification> get notifications => List.unmodifiable(_items);
 
-  int get unreadCount => _items.where((item) => !isRead(item.id)).length;
+  int get unreadCount =>
+      isLive ? _serverUnread : _items.where((item) => !isRead(item.id)).length;
 
   bool isRead(String id) => _readIds.contains(id);
 
   Future<void> load() async {
     final client = _client;
-    if (client != null) return _loadLive(client);
+    if (client != null) return _loadLive(client, 1);
 
     final prefs = await SharedPreferences.getInstance();
     _readIds
@@ -104,63 +147,120 @@ class NotificationState extends ChangeNotifier {
 
   Future<void> markRead(String id) async {
     if (!_items.any((item) => item.id == id)) return;
-    if (!_readIds.add(id)) return;
-    notifyListeners();
-    final client = _client;
-    if (client != null) {
-      try {
-        await client.postJson('$_prefix/notifications/$id/read');
-      } on ApiException {
-        _readIds.remove(id);
-        notifyListeners();
-      }
+    if (isRead(id)) return;
+    if (isLive) {
+      await _markLive('${Uri.encodeComponent(id)}/read', id: id);
       return;
     }
+    if (!_readIds.add(id)) return;
+    notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_storageKey, _readIds.toList()..sort());
   }
 
   Future<void> markAllRead() async {
+    if (isLive) {
+      if (unreadCount > 0) await _markLive('read-all');
+      return;
+    }
     final before = _readIds.length;
     _readIds.addAll(_items.map((item) => item.id));
     if (_readIds.length == before) return;
     notifyListeners();
-    final client = _client;
-    if (client != null) {
-      try {
-        await client.postJson('$_prefix/notifications/read-all');
-      } on ApiException {
-        await _loadLive(client);
-      }
-      return;
-    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_storageKey, _readIds.toList()..sort());
   }
 
-  /// Signed out, offline or refused: an empty inbox, never fixture data.
-  Future<void> _loadLive(ApiClient client) async {
+  Future<void> loadMore() async {
+    final client = _client;
+    if (client != null && hasMore) await _loadLive(client, _page + 1);
+  }
+
+  Future<void> _markLive(String path, {String? id}) async {
+    if (!_hasSession || updating || loading) return;
+    final generation = _generation;
+    updating = true;
+    error = null;
+    notifyListeners();
     try {
-      final data = unwrapMap(await client.getJson('$_prefix/notifications'));
-      _items.clear();
-      _readIds.clear();
-      for (final row in (data['data'] as List?) ?? const []) {
+      final data = unwrapMap(
+        await _client!.postJson('$_prefix/notifications/$path'),
+      );
+      if (generation != _generation) return;
+      _serverUnread = _unread(data);
+      if (id == null) {
+        _readIds.addAll(_items.map((item) => item.id));
+      } else {
+        _readIds.add(id);
+      }
+    } on ApiException catch (problem) {
+      if (generation == _generation) error = problem.message;
+    } finally {
+      if (generation == _generation) {
+        updating = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  static int _unread(Map data) {
+    final count = data['unread_count'];
+    if (count is! int || count < 0) throw const MalformedResponseException();
+    return count;
+  }
+
+  Future<void> _loadLive(ApiClient client, int page) async {
+    if (!_hasSession || loading || updating) return;
+    final generation = _generation;
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final data = unwrapMap(
+        await client.getJson(
+          '$_prefix/notifications',
+          query: {'page': '$page'},
+        ),
+      );
+      if (generation != _generation) return;
+      final rows = data['data'];
+      final meta = data['meta'];
+      if (rows is! List || meta is! Map || meta['has_more'] is! bool) {
+        throw const MalformedResponseException();
+      }
+      final unread = _unread(meta);
+      if (page == 1) {
+        _items.clear();
+        _readIds.clear();
+      }
+      for (final row in rows) {
         if (row is! Map) continue;
         final id = row['id']?.toString() ?? '';
-        if (id.isEmpty) continue;
-        _items.add(AppNotification(
-          id: id,
-          title: row['title']?.toString() ?? 'Notification',
-          body: row['message']?.toString() ?? '',
-          timeLabel: _timeLabel(DateTime.tryParse(row['created_at']?.toString() ?? '')),
-          orderId: row['order_id']?.toString(),
-        ));
+        if (id.isEmpty || _items.any((item) => item.id == id)) continue;
+        _items.add(
+          AppNotification(
+            id: id,
+            title: row['title']?.toString() ?? 'Notification',
+            body: row['message']?.toString() ?? '',
+            timeLabel: _timeLabel(
+              DateTime.tryParse(row['created_at']?.toString() ?? ''),
+            ),
+            orderId: row['order_id']?.toString(),
+          ),
+        );
         if (row['read'] == true) _readIds.add(id);
       }
-    } on ApiException {
-      _items.clear();
+      _page = page;
+      hasMore = meta['has_more'] as bool;
+      _serverUnread = unread;
+    } on ApiException catch (problem) {
+      if (generation == _generation) error = problem.message;
+    } finally {
+      if (generation == _generation) {
+        loading = false;
+        notifyListeners();
+      }
     }
-    notifyListeners();
   }
 
   static String _timeLabel(DateTime? at) {

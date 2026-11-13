@@ -28,13 +28,14 @@
 // Persisted via shared_preferences, so nothing resets on an app restart.
 
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/api/api_exception.dart';
+import '../data/api/token_store.dart';
 import '../data/dto/remote_courier.dart';
 import '../data/repositories/courier_repository.dart';
-import '../data/mock_data.dart'
-    show DeliveryJob, Order, kMockDeliveryOtp;
+import '../data/mock_data.dart' show DeliveryJob, Order;
 import '../utils/money_format.dart';
 
 // Courier-side delivery lifecycle. The full sequence per the ERP spec:
@@ -108,7 +109,8 @@ class CompletedJob {
   /// history has to say which one happened (RID-EARN-001).
   final bool returned;
 
-  String get resultLabel => resultOverride ?? (returned ? 'Returned' : 'Delivered');
+  String get resultLabel =>
+      resultOverride ?? (returned ? 'Returned' : 'Delivered');
 
   /// The waybill/reference the workbook's history column shows.
   String get trackingNumber => job.trackingNumber ?? job.id;
@@ -216,16 +218,14 @@ class CodRemittance {
 
   bool get isPending => status == RemittanceStatus.pending;
 
-  CodRemittance copyWith({
-    RemittanceStatus? status,
-    DateTime? confirmedAt,
-  }) => CodRemittance(
-    id: id,
-    amount: amount,
-    requestedAt: requestedAt,
-    status: status ?? this.status,
-    confirmedAt: confirmedAt ?? this.confirmedAt,
-  );
+  CodRemittance copyWith({RemittanceStatus? status, DateTime? confirmedAt}) =>
+      CodRemittance(
+        id: id,
+        amount: amount,
+        requestedAt: requestedAt,
+        status: status ?? this.status,
+        confirmedAt: confirmedAt ?? this.confirmedAt,
+      );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -267,9 +267,12 @@ class CourierState extends ChangeNotifier {
   ///
   /// Only the *jobs* come from here — see courier_repository.dart for why the
   /// milestone machine, the payouts and the ratings deliberately stay local.
-  CourierState({CourierRepository? repository, DateTime Function()? clock})
-    : _repository = repository ?? const MockCourierRepository(),
-      _clock = clock ?? DateTime.now;
+  CourierState({
+    CourierRepository? repository,
+    DateTime Function()? clock,
+    this._deliveryCompletionStore,
+  }) : _repository = repository ?? const MockCourierRepository(),
+       _clock = clock ?? DateTime.now;
 
   final CourierRepository _repository;
 
@@ -295,12 +298,6 @@ class CourierState extends ChangeNotifier {
   final Map<String, String> _failureReasons = {};
   final Map<String, bool> _returned = {};
 
-  /// Delivery OTP failure count and lock expiry, per job. In memory: the same
-  /// server that issued the code owns the durable attempt count. The lock is
-  /// 15 minutes and starts on the fifth wrong code (RID-DLV-004).
-  final Map<String, int> _otpFailures = {};
-  final Map<String, DateTime> _otpLockedUntil = {};
-
   /// Cash collected at the door, keyed by job id, and remittances requested
   /// against it. Confirmed remittances reduce [codOutstanding]; pending ones
   /// do not — the rider still holds the cash until Logistics confirms.
@@ -313,6 +310,65 @@ class CourierState extends ChangeNotifier {
   /// `build()`. Filled by [load] rather than fetched lazily, so the dashboards'
   /// first frame is the real list rather than an empty one that fills in.
   List<DeliveryJob> _assigned = const [];
+  int _riderGeneration = 0;
+  Object? _riderAccount;
+  bool loadingJobs = false;
+
+  void setRiderSession(Object? account) {
+    if (!isServerAuthoritative || account == _riderAccount) return;
+    final discardPrevious = _riderAccount != null;
+    _riderAccount = account;
+    _riderGeneration++;
+    final repository = _repository;
+    if (repository is LiveCourierRepository) repository.resetRiderSession();
+    _assigned = const [];
+    _stops = const [];
+    _pickupFailureReasons = const [];
+    _returnPickups = const [];
+    _history = null;
+    _serverEarnings = null;
+    _serverCash = null;
+    _serverPayouts = null;
+    _coverage = null;
+    _coverageRequested = false;
+    _loadFailure = null;
+    _syncFailure = null;
+    _earningsFailure = null;
+    _cashFailure = null;
+    _payoutsFailure = null;
+    _historyFailure = null;
+    _returnsFailure = null;
+    _online = false;
+    loadingJobs = false;
+    _workStatus = RiderWorkStatus.active;
+    _suspensionReason = null;
+    _maxPickupAttempts = 2;
+    _availabilityBusy = false;
+    _windingDown = false;
+    _windingDownMessage = null;
+    _milestones.clear();
+    _attempts.clear();
+    _failureReasons.clear();
+    _completedAt.clear();
+    _dispatched.clear();
+    _payouts.clear();
+    _ratings.clear();
+    _codCollected.clear();
+    _remittances.clear();
+    _startingDeliveries.clear();
+    _unconfirmedStarts.clear();
+    _pendingParcelActions.clear();
+    _unconfirmedParcelActions.clear();
+    _unconfirmedCompletions.clear();
+    _pendingCompletions.clear();
+    _savedCompletions.clear();
+    _completionRestored = _restoreDeliveryCompletions(
+      _riderGeneration,
+      discardPrevious: discardPrevious,
+    );
+    notifyListeners();
+    if (account != null) refreshJobs().ignore();
+  }
 
   final Map<String, DeliveryMilestone> _milestones = {};
   final Map<String, DateTime> _completedAt = {};
@@ -398,6 +454,8 @@ class CourierState extends ChangeNotifier {
 
   /// Why the last earnings read failed (live mode), or null.
   ApiException? get earningsFailure => _earningsFailure;
+  bool get hasConfirmedEarnings =>
+      !isServerAuthoritative || _serverEarnings != null;
 
   /// Server-only rider calls, when the repository has a server behind it.
   RiderServerData? get _server {
@@ -409,16 +467,20 @@ class CourierState extends ChangeNotifier {
   Future<void> refreshEarnings() async {
     final server = _server;
     if (server == null) return;
+    final generation = _riderGeneration;
     try {
-      _serverEarnings = await server.earnings();
+      final value = await server.earnings();
+      if (generation != _riderGeneration) return;
+      _serverEarnings = value;
       _earningsFailure = null;
     } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
       _earningsFailure = error;
     } finally {
       notifyListeners();
     }
-    await refreshCash();
-    await refreshPayouts();
+    if (generation == _riderGeneration) await refreshCash();
+    if (generation == _riderGeneration) await refreshPayouts();
   }
 
   /// Reports a lost or damaged parcel (live mode). The server blocks the
@@ -432,15 +494,19 @@ class CourierState extends ChangeNotifier {
   }) async {
     final server = _server;
     if (server == null) {
-      throw const ApiNotImplementedException('POST /api/rider/jobs/{id}/incidents');
+      throw const ApiNotImplementedException(
+        'POST /api/rider/jobs/{id}/incidents',
+      );
     }
-    await _guardedServerCall(() => server.reportIncident(
-          jobId,
-          type: type,
-          reason: reason,
-          description: description,
-          photoPath: photoPath,
-        ));
+    await _guardedServerCall(
+      () => server.reportIncident(
+        jobId,
+        type: type,
+        reason: reason,
+        description: description,
+        photoPath: photoPath,
+      ),
+    );
     try {
       await refreshJobs();
     } on ApiException {
@@ -533,10 +599,14 @@ class CourierState extends ChangeNotifier {
   Future<void> refreshCash() async {
     final server = _server;
     if (server == null) return;
+    final generation = _riderGeneration;
     try {
-      _serverCash = await server.cash();
+      final value = await server.cash();
+      if (generation != _riderGeneration) return;
+      _serverCash = value;
       _cashFailure = null;
     } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
       _cashFailure = error;
     } finally {
       notifyListeners();
@@ -553,7 +623,8 @@ class CourierState extends ChangeNotifier {
 
   /// My finished deliveries from the server, or null before the first read
   /// (and always in mock mode, where [completedJobs] is the history).
-  List<RiderHistoryEntry>? get history => _history == null ? null : List.unmodifiable(_history!);
+  List<RiderHistoryEntry>? get history =>
+      _history == null ? null : List.unmodifiable(_history!);
   ApiException? get historyFailure => _historyFailure;
 
   /// What Logistics paid me (server data), or null.
@@ -571,10 +642,14 @@ class CourierState extends ChangeNotifier {
   Future<void> refreshHistory() async {
     final server = _server;
     if (server == null || _windingDown) return;
+    final generation = _riderGeneration;
     try {
-      _history = List.unmodifiable(await server.history());
+      final value = await server.history();
+      if (generation != _riderGeneration) return;
+      _history = List.unmodifiable(value);
       _historyFailure = null;
     } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
       _historyFailure = error;
     } finally {
       notifyListeners();
@@ -585,10 +660,14 @@ class CourierState extends ChangeNotifier {
   Future<void> refreshPayouts() async {
     final server = _server;
     if (server == null) return;
+    final generation = _riderGeneration;
     try {
-      _serverPayouts = await server.payouts();
+      final value = await server.payouts();
+      if (generation != _riderGeneration) return;
+      _serverPayouts = value;
       _payoutsFailure = null;
     } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
       _payoutsFailure = error;
     } finally {
       notifyListeners();
@@ -609,8 +688,11 @@ class CourierState extends ChangeNotifier {
   Future<void> refreshCoverage() async {
     final server = _server;
     if (server == null) return;
+    final generation = _riderGeneration;
     try {
-      _coverage = await server.coverage();
+      final value = await server.coverage();
+      if (generation != _riderGeneration) return;
+      _coverage = value;
       notifyListeners();
     } on ApiException {
       // The profile still shows the rest; coverage appears on the next read.
@@ -642,7 +724,8 @@ class CourierState extends ChangeNotifier {
   ApiException? _returnsFailure;
 
   /// Approved buyer returns assigned to this rider (server data).
-  List<RiderReturnPickup> get returnPickups => List.unmodifiable(_returnPickups);
+  List<RiderReturnPickup> get returnPickups =>
+      List.unmodifiable(_returnPickups);
 
   /// Why the last returns read failed, or null.
   ApiException? get returnsFailure => _returnsFailure;
@@ -661,10 +744,14 @@ class CourierState extends ChangeNotifier {
       }
       return;
     }
+    final generation = _riderGeneration;
     try {
-      _returnPickups = List.unmodifiable(await server.returnPickups());
+      final value = await server.returnPickups();
+      if (generation != _riderGeneration) return;
+      _returnPickups = List.unmodifiable(value);
       _returnsFailure = null;
     } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
       _returnsFailure = error;
     } finally {
       notifyListeners();
@@ -674,10 +761,15 @@ class CourierState extends ChangeNotifier {
   /// Confirms collecting a return from the buyer. The server verifies the
   /// tracking number, refuses a second collection and moves custody. Returns
   /// false when a collection for this return is already in flight.
-  Future<bool> collectReturn(String returnId, {required String trackingNumber}) async {
+  Future<bool> collectReturn(
+    String returnId, {
+    required String trackingNumber,
+  }) async {
     final server = _server;
     if (server == null) {
-      throw const ApiNotImplementedException('POST /api/rider/return-pickups/{id}/collect');
+      throw const ApiNotImplementedException(
+        'POST /api/rider/return-pickups/{id}/collect',
+      );
     }
     final key = 'return:$returnId';
     if (!_pickupActionsInFlight.add(key)) return false;
@@ -686,7 +778,8 @@ class CourierState extends ChangeNotifier {
       try {
         await server.collectReturn(returnId, trackingNumber: trackingNumber);
       } on ApiException catch (error) {
-        final stale = (error is RequestRejectedException && error.isConflict) ||
+        final stale =
+            (error is RequestRejectedException && error.isConflict) ||
             error is NotFoundException ||
             error is ForbiddenException;
         if (stale) await refreshReturns();
@@ -714,7 +807,9 @@ class CourierState extends ChangeNotifier {
   }) async {
     final server = _server;
     if (server == null) {
-      throw const ApiNotImplementedException('POST /api/rider/pickups/{id}/failed');
+      throw const ApiNotImplementedException(
+        'POST /api/rider/pickups/{id}/failed',
+      );
     }
     final key = 'job:$jobId';
     if (!_pickupActionsInFlight.add(key)) return null;
@@ -748,7 +843,9 @@ class CourierState extends ChangeNotifier {
   Future<PickupStop?> finishPickupStop(String stopId) async {
     final server = _server;
     if (server == null) {
-      throw const ApiNotImplementedException('POST /api/rider/pickups/stops/{id}/finish');
+      throw const ApiNotImplementedException(
+        'POST /api/rider/pickups/stops/{id}/finish',
+      );
     }
     final key = 'stop:$stopId';
     if (!_pickupActionsInFlight.add(key)) return null;
@@ -869,22 +966,37 @@ class CourierState extends ChangeNotifier {
   /// dashboards' Retry calls. A failure still propagates — the interface promises
   /// it throws — *and* is kept in [loadFailure] for the reader that cannot catch.
   Future<void> refreshJobs() async {
+    final generation = _riderGeneration;
+    final actionRevision = _parcelActionRevision;
+    loadingJobs = true;
+    notifyListeners();
     try {
-      _assigned = List.of(await _repository.assignedJobs());
+      final jobs = await _repository.assignedJobs();
+      if (generation != _riderGeneration ||
+          actionRevision != _parcelActionRevision) {
+        return;
+      }
+      _assigned = List.of(jobs);
+      _unconfirmedStarts.clear();
+      _unconfirmedParcelActions.clear();
       _loadFailure = null;
       _adoptServerMilestones();
       _adoptJobsMeta();
     } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
       _loadFailure = error;
       rethrow;
     } finally {
-      notifyListeners();
+      if (generation == _riderGeneration) {
+        loadingJobs = false;
+        notifyListeners();
+      }
     }
     // Earnings move when jobs do (a delivery or pickup is credited on the
     // server), so a successful job read also re-reads them. Live mode only;
     // a failure is kept in [earningsFailure], never thrown at the job list.
     await refreshEarnings();
-    await refreshReturns();
+    if (generation == _riderGeneration) await refreshReturns();
   }
 
   /// How many of this courier's deliveries have been rated.
@@ -985,14 +1097,19 @@ class CourierState extends ChangeNotifier {
     if (online == _online) return null;
 
     _availabilityBusy = true;
+    final generation = _riderGeneration;
     notifyListeners();
     try {
-      _online = await server.setAvailability(online: online);
+      final confirmed = await server.setAvailability(online: online);
+      if (generation != _riderGeneration) return null;
+      _online = confirmed;
     } on ApiException catch (error) {
       return error.message;
     } finally {
-      _availabilityBusy = false;
-      notifyListeners();
+      if (generation == _riderGeneration) {
+        _availabilityBusy = false;
+        notifyListeners();
+      }
     }
     try {
       await refreshJobs();
@@ -1011,79 +1128,6 @@ class CourierState extends ChangeNotifier {
     _suspensionReason = suspended ? reason : null;
     if (suspended) _online = false;
     notifyListeners();
-  }
-
-  // ── Delivery OTP ─────────────────────────────────────────────────────────
-
-  static const int maxOtpAttempts = 5;
-  static const Duration otpLockout = Duration(minutes: 15);
-
-  /// Remaining lockout, or null when entry is open.
-  Duration? otpLockRemaining(String jobId) {
-    final until = _otpLockedUntil[jobId];
-    if (until == null) return null;
-    final remaining = until.difference(_clock());
-    // Exactly 15 minutes is *expired*, not still locked. RID-DLV-004's
-    // boundary is "try again after 15 minutes", and a zero-length remaining
-    // duration would keep the field disabled forever at that instant.
-    if (remaining <= Duration.zero) {
-      _otpLockedUntil.remove(jobId);
-      return null;
-    }
-    return remaining;
-  }
-
-  bool isOtpLocked(String jobId) => otpLockRemaining(jobId) != null;
-
-  int otpFailuresFor(String jobId) => _otpFailures[jobId] ?? 0;
-
-  /// Checks the code the buyer read out. Returns null when it is accepted.
-  ///
-  /// A five-digit entry is a format error and does not count toward the five
-  /// wrong-code attempts: the workbook distinguishes "5 digits is rejected"
-  /// from "each wrong OTP is rejected", and counting a mistyped length would
-  /// lock a rider out for tapping one key short.
-  String? validateDeliveryOtp(String jobId, String input) {
-    final job = jobById(jobId);
-    if (job == null) return 'This job is no longer available.';
-
-    final locked = otpLockRemaining(jobId);
-    if (locked != null) {
-      final minutes = (locked.inSeconds / 60).ceil();
-      return 'Too many wrong codes. Try again in $minutes '
-          '${minutes == 1 ? 'minute' : 'minutes'}.';
-    }
-    // A lock that has just expired starts a fresh set of attempts.
-    _otpLockedUntil.remove(jobId);
-    if (otpFailuresFor(jobId) >= maxOtpAttempts) _otpFailures.remove(jobId);
-
-    final code = input.trim();
-    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
-      return 'Enter the 6-digit code shown by the buyer.';
-    }
-    // A live job arrives without the code by design: the server keeps the
-    // hash and verifies it with the milestone write. Accept the shape here
-    // and let the server's five-attempt/15-minute lock be the authority.
-    // Counting a failure locally would lock the rider out of a code this
-    // device was never given.
-    if (job.deliveryOtp.isEmpty) return null;
-
-    if (code == job.deliveryOtp) {
-      _otpFailures.remove(jobId);
-      _otpLockedUntil.remove(jobId);
-      return null;
-    }
-
-    final failures = otpFailuresFor(jobId) + 1;
-    _otpFailures[jobId] = failures;
-    if (failures >= maxOtpAttempts) {
-      _otpLockedUntil[jobId] = _clock().add(otpLockout);
-      notifyListeners();
-      return 'Too many wrong codes. Entry is locked for 15 minutes.';
-    }
-    notifyListeners();
-    return 'That code is incorrect. ${maxOtpAttempts - failures} '
-        '${maxOtpAttempts - failures == 1 ? 'attempt' : 'attempts'} left.';
   }
 
   // ── COD ──────────────────────────────────────────────────────────────────
@@ -1247,8 +1291,6 @@ class CourierState extends ChangeNotifier {
               parcelCount: (m['parcelCount'] as num?)?.toInt() ?? 1,
               codAmount: (m['codAmount'] as num?)?.toDouble() ?? 0,
               prepaid: m['prepaid'] as bool? ?? false,
-              deliveryOtp:
-                  m['deliveryOtp'] as String? ?? kMockDeliveryOtp,
             ),
           );
         }
@@ -1363,10 +1405,143 @@ class CourierState extends ChangeNotifier {
   ApiException? _syncFailure;
   ApiException? get syncFailure => _syncFailure;
 
+  final Set<String> _startingDeliveries = {};
+  bool isStartingDelivery(String jobId) => _startingDeliveries.contains(jobId);
+  final Set<String> _unconfirmedStarts = {};
+  bool isDeliveryStartUnconfirmed(String jobId) =>
+      _unconfirmedStarts.contains(jobId);
+
+  Future<void> startDelivery(String jobId, {String? trackingNumber}) async {
+    if (milestoneFor(jobId) != DeliveryMilestone.assignedToRider ||
+        _unconfirmedStarts.contains(jobId) ||
+        !_startingDeliveries.add(jobId)) {
+      return;
+    }
+    _syncFailure = null;
+    final generation = _riderGeneration;
+    notifyListeners();
+    try {
+      await _repository.advanceMilestone(
+        jobId,
+        'OUT_FOR_DELIVERY',
+        trackingNumber: trackingNumber ?? jobById(jobId)?.trackingNumber,
+      );
+      if (generation == _riderGeneration) {
+        _milestones[jobId] = DeliveryMilestone.inTransit;
+      }
+    } on ApiException catch (error) {
+      if (generation != _riderGeneration) return;
+      _syncFailure = error;
+      if (error.isRetryable || error is MalformedResponseException) {
+        _unconfirmedStarts.add(jobId);
+      }
+      try {
+        await refreshJobs();
+      } on ApiException {
+        // Keep the original refusal and the retry lock if state is unknown.
+      }
+    } finally {
+      if (generation == _riderGeneration) {
+        _startingDeliveries.remove(jobId);
+        notifyListeners();
+      }
+    }
+  }
+
   void clearSyncFailure() {
     if (_syncFailure == null) return;
     _syncFailure = null;
     notifyListeners();
+  }
+
+  final Set<String> _pendingParcelActions = {};
+  final Set<String> _unconfirmedParcelActions = {};
+  int _parcelActionRevision = 0;
+
+  bool isParcelActionPending(String id) => _pendingParcelActions.contains(id);
+
+  bool isParcelActionUnconfirmed(String id) =>
+      _unconfirmedParcelActions.contains(id);
+
+  Future<bool> confirmParcelAction(
+    String id, {
+    required bool pickup,
+    String? trackingNumber,
+    String? failureReason,
+    String? failureNotes,
+  }) async {
+    final repository = _repository;
+    if (repository is! LiveCourierRepository ||
+        jobById(id) == null ||
+        (pickup
+            ? !const {
+                DeliveryMilestone.accepted,
+                DeliveryMilestone.arrivedAtSeller,
+              }.contains(milestoneFor(id))
+            : milestoneFor(id) != DeliveryMilestone.inTransit) ||
+        isDeliveryCompleting(id) ||
+        isDeliveryCompletionUnconfirmed(id) ||
+        isParcelActionUnconfirmed(id) ||
+        !_pendingParcelActions.add(id)) {
+      return false;
+    }
+    final generation = _riderGeneration;
+    final target = pickup
+        ? DeliveryMilestone.pickedUp
+        : DeliveryMilestone.failedDelivery;
+    ++_parcelActionRevision;
+    notifyListeners();
+    try {
+      final job = await repository.confirmParcelAction(
+        id,
+        pickup: pickup,
+        trackingNumber: trackingNumber,
+        failureReason: failureReason,
+        failureNotes: failureNotes,
+      );
+      if (generation != _riderGeneration) return false;
+      ++_parcelActionRevision;
+      _assigned = [
+        for (final current in _assigned) current.id == id ? job : current,
+      ];
+      _milestones[id] = target;
+      if (!pickup && failureReason != null) _failureReasons[id] = failureReason;
+      refreshEarnings().ignore();
+      return true;
+    } on ApiException catch (error) {
+      if (generation != _riderGeneration) return false;
+      final uncertain =
+          error is NetworkException ||
+          error is ServerException ||
+          error is MalformedResponseException;
+      if (uncertain) {
+        ++_parcelActionRevision;
+        _unconfirmedParcelActions.add(id);
+      }
+      if (uncertain ||
+          error is ForbiddenException ||
+          error is NotFoundException ||
+          (error is RequestRejectedException && error.isConflict)) {
+        try {
+          await refreshJobs();
+        } on ApiException {
+          // Keep the original error and the retry lock while status is unknown.
+        }
+      }
+      if (generation != _riderGeneration) return false;
+      if (uncertain && jobById(id) != null && milestoneFor(id) == target) {
+        if (!pickup && failureReason != null) {
+          _failureReasons[id] = failureReason;
+        }
+        return true;
+      }
+      rethrow;
+    } finally {
+      if (generation == _riderGeneration) {
+        _pendingParcelActions.remove(id);
+        notifyListeners();
+      }
+    }
   }
 
   /// Replaces device-recorded milestones with the server's status for every
@@ -1382,8 +1557,10 @@ class CourierState extends ChangeNotifier {
   /// status has no rider-facing step.
   static DeliveryMilestone? milestoneForServerStatus(String? status) =>
       switch (status) {
-        'PLACED' || 'CONFIRMED' || 'PREPARING' || 'READY_FOR_PICKUP' =>
-          DeliveryMilestone.accepted,
+        'PLACED' ||
+        'CONFIRMED' ||
+        'PREPARING' ||
+        'READY_FOR_PICKUP' => DeliveryMilestone.accepted,
         'PICKED_UP' => DeliveryMilestone.pickedUp,
         'AT_SORTING_CENTER' => DeliveryMilestone.atSortingCenter,
         'SORTED' => DeliveryMilestone.sorted,
@@ -1393,27 +1570,239 @@ class CourierState extends ChangeNotifier {
         _ => null,
       };
 
-  /// Asks the server to send the buyer a fresh delivery code.
-  Future<void> requestDeliveryCode(String jobId) =>
-      _guardedServerCall(() => _repository.requestDeliveryCode(jobId));
+  final Set<String> _unconfirmedCompletions = {};
+  final Set<String> _pendingCompletions = {};
+  final Set<String> _savedCompletions = {};
+  final TokenStore? _deliveryCompletionStore;
+  Future<void> _completionStorageTail = Future.value();
+  Future<bool>? _completionRestored;
 
-  /// Submits proof of delivery and waits for the server's answer. Throws the
-  /// server's refusal (wrong code, wrong cash, stale parcel) so the tracker
-  /// can keep the sheet open; nothing is completed locally on failure.
+  bool isDeliveryCompleting(String id) => _pendingCompletions.contains(id);
+
+  bool isDeliveryCompletionUnconfirmed(String id) =>
+      _unconfirmedCompletions.contains(id);
+
+  Iterable<String> get unconfirmedDeliveryIds =>
+      List.unmodifiable(_unconfirmedCompletions);
+
+  Future<T> _withCompletionStorage<T>(Future<T> Function(TokenStore) action) {
+    final next = _completionStorageTail.then(
+      (_) => action(_deliveryCompletionStore!),
+    );
+    _completionStorageTail = next.then<void>((_) {}, onError: (Object _) {});
+    return next;
+  }
+
+  Future<bool> _restoreDeliveryCompletions(
+    int generation, {
+    bool discardPrevious = false,
+  }) async {
+    if (_deliveryCompletionStore == null) return true;
+    final account = _riderAccount;
+    try {
+      await _withCompletionStorage((store) async {
+        if (discardPrevious) await store.clear();
+        if (generation != _riderGeneration) return;
+        if (account == null) {
+          await store.clear();
+          return;
+        }
+        final value = await store.read();
+        if (value == null || generation != _riderGeneration) return;
+        final data = jsonDecode(value);
+        if (data is! Map || data['account'] != account) {
+          await store.clear();
+          return;
+        }
+        final ids = data['parcels'];
+        if (ids is List) {
+          _savedCompletions.addAll(
+            ids.whereType<String>().where(
+              (id) => RegExp(r'^\d+$').hasMatch(id),
+            ),
+          );
+          _unconfirmedCompletions.addAll(_savedCompletions);
+        }
+      });
+      if (generation == _riderGeneration) notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _storeDeliveryCompletion(
+    String id,
+    int generation, {
+    required bool unresolved,
+  }) async {
+    if (_deliveryCompletionStore == null) return;
+    await _withCompletionStorage((store) async {
+      if (generation != _riderGeneration) return;
+      final account = _riderAccount;
+      if (account is! String || account.isEmpty) {
+        throw const ValidationException(
+          fieldErrors: {
+            'parcel': 'Sign in again before submitting delivery proof.',
+          },
+        );
+      }
+      final ids = {..._savedCompletions};
+      if (unresolved) {
+        ids.add(id);
+      } else {
+        ids.remove(id);
+      }
+      if (ids.isEmpty) {
+        await store.clear();
+      } else {
+        await store.write(
+          jsonEncode({'account': account, 'parcels': ids.toList()}),
+        );
+      }
+      if (generation == _riderGeneration) {
+        _savedCompletions
+          ..clear()
+          ..addAll(ids);
+      }
+    });
+  }
+
   Future<void> submitDelivery(
     String jobId, {
     required String proofPhotoPath,
-    required String deliveryOtp,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
     double? codAmount,
-  }) =>
-      _guardedServerCall(
+  }) async {
+    if (isParcelActionPending(jobId) ||
+        isParcelActionUnconfirmed(jobId) ||
+        isDeliveryCompletionUnconfirmed(jobId) ||
+        !_pendingCompletions.add(jobId)) {
+      throw const ValidationException(
+        fieldErrors: {
+          'parcel':
+              'Check the current delivery status before submitting again.',
+        },
+      );
+    }
+    final generation = _riderGeneration;
+    notifyListeners();
+    var persisted = false;
+    try {
+      var restored = await (_completionRestored ?? Future.value(true));
+      if (!restored && generation == _riderGeneration) {
+        restored = await (_completionRestored = _restoreDeliveryCompletions(
+          generation,
+        ));
+      }
+      if (generation != _riderGeneration) throw const UnauthorizedException();
+      if (!restored || isDeliveryCompletionUnconfirmed(jobId)) {
+        throw const ValidationException(
+          fieldErrors: {
+            'parcel':
+                'Check the current delivery status before submitting again.',
+          },
+        );
+      }
+      try {
+        await _storeDeliveryCompletion(jobId, generation, unresolved: true);
+        persisted = true;
+      } catch (_) {
+        throw const ValidationException(
+          fieldErrors: {
+            'parcel':
+                'Delivery proof could not be queued securely. Try again before handing over.',
+          },
+        );
+      }
+      if (generation != _riderGeneration) throw const UnauthorizedException();
+      await _guardedServerCall(
         () => _repository.completeDelivery(
           jobId,
           proofPhotoPath: proofPhotoPath,
-          deliveryOtp: deliveryOtp,
+          recipientCategory: recipientCategory,
+          receivedBy: receivedBy,
+          recipientRelationship: recipientRelationship,
           codAmount: codAmount,
         ),
       );
+      if (generation != _riderGeneration) throw const UnauthorizedException();
+      await _storeDeliveryCompletion(
+        jobId,
+        generation,
+        unresolved: false,
+      ).catchError((Object _) {});
+    } on ApiException catch (error) {
+      if (generation == _riderGeneration &&
+          (error is NetworkException ||
+              error is ServerException ||
+              error is MalformedResponseException)) {
+        _unconfirmedCompletions.add(jobId);
+      } else if (persisted &&
+          generation == _riderGeneration &&
+          !isDeliveryCompletionUnconfirmed(jobId)) {
+        await _storeDeliveryCompletion(
+          jobId,
+          generation,
+          unresolved: false,
+        ).catchError((Object _) {});
+      }
+      rethrow;
+    } finally {
+      if (generation == _riderGeneration) {
+        _pendingCompletions.remove(jobId);
+        notifyListeners();
+      }
+    }
+  }
+
+  /// True for a recorded delivery, false for a parcel still open, and null
+  /// when neither authorized server read can confirm the outcome.
+  Future<bool?> reconcileDeliveryCompletion(String id) async {
+    if (isDeliveryCompleting(id)) return null;
+    final server = _server;
+    final repository = _repository;
+    final generation = _riderGeneration;
+    if (repository is LiveCourierRepository &&
+        _deliveryCompletionStore != null) {
+      final result = await repository.deliveryCompletionStatus(id);
+      if (generation != _riderGeneration || result == null) return null;
+      await _storeDeliveryCompletion(
+        id,
+        generation,
+        unresolved: false,
+      ).catchError((Object _) {});
+      if (generation != _riderGeneration) return null;
+      _unconfirmedCompletions.remove(id);
+      notifyListeners();
+      refreshJobs().ignore();
+      return result;
+    }
+    await refreshJobs();
+    if (generation != _riderGeneration) return null;
+    if (jobById(id) != null &&
+        milestoneFor(id) == DeliveryMilestone.inTransit) {
+      _unconfirmedCompletions.remove(id);
+      notifyListeners();
+      return false;
+    }
+    if (server == null) return null;
+    final history = await server.history();
+    if (generation != _riderGeneration) return null;
+    if (history.any(
+      (entry) =>
+          entry.sellerOrderId == id &&
+          entry.proofId != null &&
+          (entry.status == 'DELIVERED' || entry.status == 'COMPLETED'),
+    )) {
+      _unconfirmedCompletions.remove(id);
+      notifyListeners();
+      return true;
+    }
+    return null;
+  }
 
   /// Runs a server handoff; on a state conflict or lost access the jobs are
   /// re-read (so the screen shows the server's truth) before rethrowing.
@@ -1421,7 +1810,8 @@ class CourierState extends ChangeNotifier {
     try {
       await call();
     } on ApiException catch (error) {
-      final stale = (error is RequestRejectedException && error.isConflict) ||
+      final stale =
+          (error is RequestRejectedException && error.isConflict) ||
           error is NotFoundException ||
           error is ForbiddenException;
       if (stale) {
@@ -1436,6 +1826,7 @@ class CourierState extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    if (isServerAuthoritative) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
       _milestonesKey,
@@ -1475,7 +1866,6 @@ class CourierState extends ChangeNotifier {
             'parcelCount': j.parcelCount,
             'codAmount': j.codAmount,
             'prepaid': j.prepaid,
-            'deliveryOtp': j.deliveryOtp,
           },
       ]),
     );
@@ -1549,7 +1939,6 @@ class CourierState extends ChangeNotifier {
     String? trackingNumber,
     double codAmount = 0,
     bool prepaid = false,
-    String? deliveryOtp,
   }) {
     final sameShop = _assigned.where((j) => j.shopName == order.shopName);
     _dispatched.add(
@@ -1571,7 +1960,6 @@ class CourierState extends ChangeNotifier {
         trackingNumber: trackingNumber ?? order.id,
         codAmount: prepaid ? 0 : codAmount,
         prepaid: prepaid,
-        deliveryOtp: deliveryOtp ?? kMockDeliveryOtp,
       ),
     );
     notifyListeners();
@@ -1603,10 +1991,25 @@ class CourierState extends ChangeNotifier {
     String? courierName,
     String? courierPhotoPath,
     String? failureReason,
-    String? deliveryOtp,
     double? codAmount,
     String? trackingNumber,
   }) {
+    if (isServerAuthoritative &&
+        (next == DeliveryMilestone.pickedUp ||
+            next == DeliveryMilestone.failedDelivery ||
+            next == DeliveryMilestone.returnToSender)) {
+      return;
+    }
+    if (isServerAuthoritative &&
+        (next == DeliveryMilestone.atSortingCenter ||
+            next == DeliveryMilestone.sorted ||
+            next == DeliveryMilestone.assignedToRider)) {
+      return;
+    }
+    if (isServerAuthoritative && next == DeliveryMilestone.inTransit) {
+      unawaited(startDelivery(jobId, trackingNumber: trackingNumber));
+      return;
+    }
     // A return is terminal. The UI only offers "Return Complete", but this
     // guard is what makes a fourth delivery attempt impossible even if a
     // caller (or a stale screen) asks for one (RID-FAIL-005).
@@ -1649,20 +2052,23 @@ class CourierState extends ChangeNotifier {
     // own screen is always authoritative.
     final serverValue = _milestoneToServerString(target);
     if (serverValue != null) {
+      final generation = _riderGeneration;
       _repository
           .advanceMilestone(
             jobId,
             serverValue,
             trackingNumber: trackingNumber,
             failureReason: reason,
-            deliveryOtp: deliveryOtp,
             codAmount: codAmount,
           )
           .then<void>(
             (_) {
-              if (_syncFailure != null) clearSyncFailure();
+              if (generation == _riderGeneration && _syncFailure != null) {
+                clearSyncFailure();
+              }
             },
             onError: (Object error) async {
+              if (generation != _riderGeneration) return;
               // Not swallowed any more: the server's refusal is kept for the
               // screen, and the jobs are re-read so the optimistic milestone
               // is replaced by the server's status.

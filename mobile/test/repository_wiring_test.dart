@@ -39,13 +39,12 @@ class _OneJobCourierRepository implements CourierRepository {
   bool get isServerAuthoritative => false;
 
   @override
-  Future<void> requestDeliveryCode(String jobId) async {}
-
-  @override
   Future<void> completeDelivery(
     String jobId, {
     required String proofPhotoPath,
-    required String deliveryOtp,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
     double? codAmount,
   }) async {}
 
@@ -58,7 +57,6 @@ class _OneJobCourierRepository implements CourierRepository {
     String milestoneValue, {
     String? trackingNumber,
     String? failureReason,
-    String? deliveryOtp,
     double? codAmount,
   }) async {}
 }

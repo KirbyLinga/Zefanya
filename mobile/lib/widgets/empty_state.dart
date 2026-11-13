@@ -67,14 +67,19 @@ class EmptyState extends StatelessWidget {
                   // tintInk on the arch fill: the fill is a pale wash in
                   // light mode and a dark lean in dark mode, so the glyph
                   // has to invert with it to stay visible.
-                  child: Icon(icon, size: 40, color: AppColors.tintInk),
+                  child: ExcludeSemantics(
+                    child: Icon(icon, size: 40, color: AppColors.tintInk),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                title,
-                style: theme.textTheme.titleSmall,
-                textAlign: TextAlign.center,
+              Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall,
+                  textAlign: TextAlign.center,
+                ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 6),

@@ -145,6 +145,28 @@ void main() {
     },
   );
 
+  test('the live catalogue includes products beyond the first page', () async {
+    final live = _Live([
+      _ok({
+        'data': [_productJson()],
+        'meta': {'page': 1, 'has_more': true},
+      }),
+      _ok({
+        'data': [_productJson(id: 8)],
+        'meta': {'page': 2, 'has_more': false},
+      }),
+    ]);
+    final products = await live.catalog.products(
+      query: CatalogQuery(search: 'tote'),
+    );
+    expect(products.map((product) => product.id), ['7', '8']);
+    expect(products.last.sellerId, 3);
+    expect(live.server.queries, [
+      {'q': 'tote'},
+      {'q': 'tote', 'page': '2'},
+    ]);
+  });
+
   test('the category chip is sent as the server id behind its label', () async {
     final live = _Live([
       _ok([

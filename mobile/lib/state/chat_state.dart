@@ -22,6 +22,7 @@ class ChatMessage {
     required this.isMe,
     required this.time,
     this.attachment,
+    this.imageId,
   });
 
   final String text;
@@ -31,6 +32,7 @@ class ChatMessage {
   /// A locally chosen file, if this message carries one. Null on every old
   /// saved message, which is why the JSON reader stays null-safe.
   final ChatAttachment? attachment;
+  final int? imageId;
 
   Map<String, dynamic> toJson() => {
     'text': text,
@@ -60,12 +62,14 @@ class ChatConversation {
     required this.contactRole,
     required this.messages,
     required this.unreadCount,
+    this.id,
   });
 
   final String contactName;
   final String contactRole;
   final List<ChatMessage> messages;
   final int unreadCount;
+  final int? id;
 
   ChatMessage? get lastMessage => messages.isEmpty ? null : messages.last;
 }
@@ -81,6 +85,11 @@ class ChatState extends ChangeNotifier {
     : _repository = repository ?? MockChatRepository();
 
   final ChatRepository _repository;
+
+  LiveChatRepository? get liveRepository => switch (_repository) {
+    final LiveChatRepository repository => repository,
+    _ => null,
+  };
 
   /// What the thread screen may offer, asked of the data source rather than of
   /// the global mock/live flag.
@@ -172,7 +181,9 @@ class ChatState extends ChangeNotifier {
     _readCounts
       ..clear()
       ..addEntries(
-        _threads.entries.map((entry) => MapEntry(entry.key, entry.value.length)),
+        _threads.entries.map(
+          (entry) => MapEntry(entry.key, entry.value.length),
+        ),
       );
     _recent
       ..clear()

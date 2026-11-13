@@ -20,6 +20,7 @@ class NavBarItem {
     this.activeIcon,
     this.glyph,
     required this.label,
+    this.shortLabel,
     this.badgeCount = 0,
   }) : assert(
          glyph != null || (icon != null && activeIcon != null),
@@ -30,6 +31,7 @@ class NavBarItem {
   final IconData? icon;
   final IconData? activeIcon;
   final String label;
+  final String? shortLabel;
 
   /// When > 0 a small dot badge is shown on the icon. Pass 0 for none.
   final int badgeCount;
@@ -53,7 +55,7 @@ class FloatingNavBar extends StatelessWidget {
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
-        height: 68,
+        height: 44 + 2 * MediaQuery.textScalerOf(context).scale(12),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -71,6 +73,7 @@ class FloatingNavBar extends StatelessWidget {
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: List.generate(items.length, (index) {
             final selected = index == currentIndex;
             final item = items[index];
@@ -105,6 +108,7 @@ class _NavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
+    final largeLabels = MediaQuery.textScalerOf(context).scale(12) > 14;
     final duration = reduceMotion(context)
         ? Duration.zero
         : const Duration(milliseconds: 200);
@@ -135,7 +139,10 @@ class _NavIcon extends StatelessWidget {
             return AnimatedContainer(
               duration: duration,
               curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: largeLabels ? 0 : 3,
+                vertical: 5,
+              ),
               decoration: BoxDecoration(
                 // A tint, not a fill: enough to read as "selected" on the
                 // nav surface without overwhelming the icon. The value is
@@ -208,14 +215,19 @@ class _NavIcon extends StatelessWidget {
                           ),
                   ),
                   const SizedBox(height: 2),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      item.label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: color,
-                        fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w400,
+                  Text(
+                    item.shortLabel ?? item.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Color.lerp(
+                        AppColors.textSecondary,
+                        AppColors.textPrimary,
+                        t,
                       ),
+                      height: 1.15,
+                      letterSpacing: largeLabels ? 0 : null,
+                      fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ],

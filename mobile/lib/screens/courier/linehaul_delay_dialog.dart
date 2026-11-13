@@ -5,6 +5,7 @@ import '../../data/repositories/linehaul_repository.dart';
 import '../../widgets/dirty_guard.dart';
 import '../../services/courier_document_picker.dart';
 import '../../data/repositories/linehaul_vehicle_repository.dart';
+import '../../widgets/inline_error_notice.dart';
 
 class LinehaulDelayDialog extends StatefulWidget {
   const LinehaulDelayDialog({
@@ -220,11 +221,14 @@ class _LinehaulDelayDialogState extends State<LinehaulDelayDialog> {
                 'Tell Logistics what happened and when you now expect to reach the destination hub. Your trip stays In Transit.',
               ),
               const SizedBox(height: 16),
-              if (_busy) const LinearProgressIndicator(),
+              if (_busy)
+                const LinearProgressIndicator(
+                  semanticsLabel: 'Preparing or sending report',
+                ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(_error!),
+                  child: InlineErrorNotice(_error!),
                 ),
               if (!widget.breakdown)
                 DropdownButtonFormField<String>(

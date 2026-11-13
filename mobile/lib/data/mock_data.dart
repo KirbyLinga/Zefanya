@@ -67,6 +67,7 @@ class Product {
     required this.category,
     required this.price,
     required this.sellerName,
+    this.sellerId,
     this.sellerMakerNote,
     this.compareAtPrice,
     this.rating = 4.5,
@@ -92,6 +93,7 @@ class Product {
   final double price;
   final double? compareAtPrice;
   final String sellerName;
+  final int? sellerId;
 
   /// The seller's own words for the "FROM THE MAKER" section, as received from
   /// the server. Null when the seller hasn't written one (live mode) or when
@@ -246,11 +248,6 @@ class Product {
   final bool sellerOnVacation;
 }
 
-/// The OTP a mock buyer would read from their app. Live mode never receives
-/// the code from the server — the buyer shows it and the rider types it — so
-/// this constant exists only for seeded demo jobs and widget tests.
-const String kMockDeliveryOtp = '482913';
-
 class DeliveryJob {
   const DeliveryJob({
     required this.id,
@@ -269,7 +266,6 @@ class DeliveryJob {
     this.parcelCount = 1,
     this.codAmount = 0,
     this.prepaid = false,
-    this.deliveryOtp = kMockDeliveryOtp,
     this.serverStatus,
     this.pickupSessionId,
     this.pickupAttempts = 0,
@@ -346,10 +342,6 @@ class DeliveryJob {
   /// COD amount, and the COD ledger must not grow by this delivery.
   final bool prepaid;
 
-  /// The code the buyer reads out at the door. Carried on the job in mock
-  /// mode; in live mode the server keeps it and checks the typed value.
-  final String deliveryOtp;
-
   /// WebZefanya's `OrderStatus` value (e.g. `OUT_FOR_DELIVERY`) for a job
   /// read from the live API; null for mock and checkout-dispatched jobs. When
   /// present it is authoritative over any milestone this device recorded.
@@ -394,7 +386,6 @@ class DeliveryJob {
         parcelCount: parcelCount,
         codAmount: codAmount,
         prepaid: prepaid,
-        deliveryOtp: deliveryOtp,
         serverStatus: serverStatus,
         pickupSessionId: pickupSessionId,
         pickupAttempts: pickupAttempts,

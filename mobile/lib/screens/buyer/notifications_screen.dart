@@ -9,9 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../state/notification_state.dart';
+import '../../state/order_state.dart';
+import '../../widgets/inline_error_notice.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
+import '../../widgets/app_page_route.dart';
+import 'order_detail_screen.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -26,42 +30,95 @@ class NotificationsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-        children: [
-          EditorialHeader(
-            eyebrow: 'STAY IN THE LOOP',
-            title: 'Notifications',
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
-            trailing: state.unreadCount == 0
-                ? null
-                : TextButton(
-                    onPressed: state.markAllRead,
-                    child: const Text('Mark all as read'),
-                  ),
-          ),
-          Text(
-            state.unreadCount == 0
-                ? 'All caught up'
-                : '${state.unreadCount} unread',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
+      body: RefreshIndicator(
+        onRefresh: state.load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+          children: [
+            EditorialHeader(
+              eyebrow: 'STAY IN THE LOOP',
+              title: 'Notifications',
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+              trailing: state.unreadCount == 0
+                  ? null
+                  : TextButton(
+                      onPressed: state.loading || state.updating
+                          ? null
+                          : state.markAllRead,
+                      child: const Text('Mark all as read'),
+                    ),
             ),
-          ),
-          const SizedBox(height: 14),
-          for (var i = 0; i < items.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _NotificationTile(
-                item: items[i],
-                unread: !state.isRead(items[i].id),
-                index: i,
-                onTap: () => state.markRead(items[i].id),
+            if (state.loading || state.updating)
+              const LinearProgressIndicator(
+                semanticsLabel: 'Updating notifications',
               ),
-            ),
-        ],
+            if (state.error case final error?) ...[
+              InlineErrorNotice(error),
+              TextButton(onPressed: state.load, child: const Text('Retry')),
+            ],
+            if (state.error == null && (!state.loading || items.isNotEmpty))
+              Text(
+                state.unreadCount == 0
+                    ? 'All caught up'
+                    : '${state.unreadCount} unread',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            const SizedBox(height: 14),
+            for (var i = 0; i < items.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _NotificationTile(
+                  item: items[i],
+                  unread: !state.isRead(items[i].id),
+                  index: i,
+                  onTap: () => _openNotification(context, state, items[i]),
+                ),
+              ),
+            if (state.hasMore)
+              TextButton(
+                onPressed: state.loading || state.updating
+                    ? null
+                    : state.loadMore,
+                child: const Text('Load more notifications'),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _openNotification(
+    BuildContext context,
+    NotificationState state,
+    AppNotification item,
+  ) async {
+    if (state.loading || state.updating) return;
+    await state.markRead(item.id);
+    if (!context.mounted ||
+        !state.isLive ||
+        item.orderId == null ||
+        ModalRoute.isCurrentOf(context) != true ||
+        state.error != null) {
+      return;
+    }
+    final navigator = Navigator.of(context);
+    final orders = context.read<OrderState>();
+    final shipments = orders.orders
+        .where((order) => order.serverOrderId == item.orderId)
+        .toList(growable: false);
+    if (shipments.length == 1) {
+      navigator.push<void>(
+        AppPageRoute(
+          builder: (_) => OrderDetailScreen(order: shipments.single),
+        ),
+      );
+      return;
+    }
+    orders.requestOrdersTab();
+    navigator.popUntil((route) => route.isFirst);
   }
 }
 

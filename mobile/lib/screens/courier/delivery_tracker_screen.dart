@@ -14,11 +14,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/dev_flags.dart' show FeatureFlags;
 import '../../data/api/api_exception.dart'
     show ApiException, ValidationException;
+import '../../services/media_picker.dart'
+    show mediaProblemMessage, mediaProblemOf;
 import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../data/mock_data.dart' show DeliveryJob;
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
+import '../../utils/motion.dart';
 import '../../utils/timed_snackbar.dart';
 import '../shared/chat_screen.dart';
 import '../../widgets/app_page_route.dart';
@@ -28,7 +31,6 @@ import '../../widgets/staggered_reveal.dart';
 import 'widgets/delivery_completion_view.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../utils/open_maps.dart';
-import '../../utils/delivery_pass.dart';
 import 'courier_qr_scanner.dart';
 
 class DeliveryTrackerScreen extends StatefulWidget {
@@ -42,6 +44,7 @@ class DeliveryTrackerScreen extends StatefulWidget {
 
 class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   String? _proofImagePath;
+  bool _proofPicking = false;
 
   bool get _proofUploaded => _proofImagePath != null;
 
@@ -116,48 +119,103 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   /// Mark delivery failed — separate from _advance so it doesn't
   /// require the proof upload check and has its own action path.
   ///
-  /// The reason is required: a failed attempt without one tells the buyer
-  /// and Logistics nothing they can act on. "Buyer refused" is the one
-  /// reason that ends the attempt chain immediately (RID-FAIL-003); every
-  /// other reason is retried, up to CourierState's three-attempt limit.
+  /// Live mode records the attempt and leaves the next action to Logistics.
   Future<void> _markFailed(CourierState courier) async {
+    final live = courier.isServerAuthoritative;
+    var notes = '';
+    String? notesError;
     final reason = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: live,
       backgroundColor: AppColors.surface,
       shape: editorialShape(0, ShapeTier.card),
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
-        return SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
-                child: Text(
-                  'Why did delivery fail?',
-                  style: theme.textTheme.titleMedium,
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final choices = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+                  child: Text(
+                    'Why did delivery fail?',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
-              ),
-              for (final option in const [
-                'Buyer not available',
-                'Buyer refused',
-                'Wrong address',
-                'Payment not ready',
-                'Other',
-              ])
-                ListTile(
-                  title: Text(option),
-                  onTap: () => Navigator.of(sheetContext).pop(option),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
+                if (live)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+                    child: TextField(
+                      maxLength: 970,
+                      maxLines: 2,
+                      onChanged: (value) {
+                        notes = value;
+                        if (notesError != null) {
+                          setSheetState(() => notesError = null);
+                        }
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Notes',
+                        helperText: 'Required for Other',
+                        errorText: notesError,
+                      ),
+                    ),
+                  ),
+                for (final option in [
+                  'Buyer not available',
+                  'Buyer refused',
+                  'Wrong address',
+                  if (!live) 'Payment not ready',
+                  if (live && courier.jobById(widget.jobId)?.hasCod == true)
+                    'Insufficient COD payment',
+                  'Other',
+                ])
+                  ListTile(
+                    title: Text(option),
+                    onTap: () {
+                      if (live && option == 'Other' && notes.trim().isEmpty) {
+                        setSheetState(
+                          () => notesError = 'Enter the failure details.',
+                        );
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop(option);
+                    },
+                  ),
+                const SizedBox(height: 8),
+              ],
+            );
+            return SafeArea(
+              top: false,
+              child: live
+                  ? Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.viewInsetsOf(context).bottom,
+                      ),
+                      child: SingleChildScrollView(child: choices),
+                    )
+                  : choices,
+            );
+          },
         );
       },
     );
     if (reason == null || !mounted) return;
+
+    if (live) {
+      await _submitParcelAction(
+        courier,
+        pickup: false,
+        failureReason: reason,
+        failureNotes:
+            reason == 'Insufficient COD payment' && notes.trim().isNotEmpty
+            ? 'Insufficient COD payment. ${notes.trim()}'
+            : notes,
+      );
+      return;
+    }
 
     if (reason == 'Buyer refused') {
       courier.advanceMilestone(
@@ -191,6 +249,41 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     );
   }
 
+  Future<void> _submitParcelAction(
+    CourierState courier, {
+    required bool pickup,
+    String? trackingNumber,
+    String? failureReason,
+    String? failureNotes,
+  }) async {
+    try {
+      final confirmed = await courier.confirmParcelAction(
+        widget.jobId,
+        pickup: pickup,
+        trackingNumber: trackingNumber,
+        failureReason: failureReason,
+        failureNotes: failureNotes,
+      );
+      if (!mounted || !confirmed) return;
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            pickup
+                ? 'Pickup confirmed.'
+                : 'Delivery attempt recorded as failed.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      showTimedSnackBar(
+        context,
+        SnackBar(content: Text(_serverMessage(error))),
+      );
+    }
+  }
+
   /// Reports a lost or damaged parcel to WebZefanya (live mode).
   ///
   /// The server decides everything that follows: it accepts a report only
@@ -217,11 +310,16 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       if (!mounted) return;
       showTimedSnackBar(
         context,
-        const SnackBar(content: Text('Incident reported. This parcel is on hold until Admin resolves it.')),
+        const SnackBar(
+          content: Text(
+            'Incident reported. This parcel is on hold until Admin resolves it.',
+          ),
+        ),
       );
     } on ApiException catch (error) {
       if (!mounted) return;
-      final message = error is ValidationException && error.fieldErrors.isNotEmpty
+      final message =
+          error is ValidationException && error.fieldErrors.isNotEmpty
           ? error.fieldErrors.values.first
           : error.message;
       showTimedSnackBar(context, SnackBar(content: Text(message)));
@@ -232,209 +330,200 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     courier.advanceMilestone(widget.jobId, DeliveryMilestone.inTransit);
   }
 
-  /// The handover check before a delivery can be completed.
-  ///
-  /// Two independent facts are verified at the door: the code the buyer reads
-  /// out, and — for a COD parcel — the exact cash amount. The sheet stays open
-  /// on a wrong value so the rider can correct it without losing the photo or
-  /// the typed code. After five wrong codes [CourierState] locks entry for 15
-  /// minutes; the sheet says so rather than letting the button look broken.
   Future<void> _confirmDelivery(CourierState courier) async {
+    if (_submitting ||
+        courier.isDeliveryCompleting(widget.jobId) ||
+        ModalRoute.isCurrentOf(context) == false) {
+      return;
+    }
+    if (courier.isDeliveryCompletionUnconfirmed(widget.jobId)) {
+      await _checkCompletion(courier);
+      return;
+    }
     final job = courier.jobById(widget.jobId);
-    if (job == null) return;
+    final photo = _proofImagePath;
+    if (job == null || photo == null) return;
 
-    final otpController = TextEditingController();
-    final amountController = TextEditingController();
-    String? error;
-
-    final confirmed = await showModalBottomSheet<({String otp, double? cash})>(
+    var category = 'buyer';
+    var name = '';
+    var relationship = '';
+    var handedOver = false;
+    var accepted = false;
+    var collected = false;
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      sheetAnimationStyle: reduceMotion(context)
+          ? AnimationStyle.noAnimation
+          : null,
       backgroundColor: AppColors.surface,
       shape: editorialShape(0, ShapeTier.card),
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final sheetTheme = Theme.of(context);
-            final locked = courier.otpLockRemaining(widget.jobId);
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                20 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('CONFIRM HANDOVER', style: AppType.eyebrow),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Scan the buyer's delivery pass or ask for the 6-digit "
-                    'code.',
-                    style: sheetTheme.textTheme.bodyMedium,
-                  ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, update) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('CONFIRM HANDOVER', style: AppType.eyebrow),
+                const SizedBox(height: 8),
+                const Text(
+                  'Use a photo of the parcel at handover. Keep faces, IDs and private documents out of the photo.',
+                ),
+                CheckboxListTile(
+                  key: const ValueKey('physical-handover'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('I physically handed over the parcel'),
+                  value: handedOver,
+                  onChanged: (value) =>
+                      update(() => handedOver = value == true),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('recipient-category'),
+                  initialValue: category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Received by'),
+                  items: const [
+                    DropdownMenuItem(value: 'buyer', child: Text('Buyer')),
+                    DropdownMenuItem(
+                      value: 'representative',
+                      child: Text('Authorized representative'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      update(() => category = value ?? 'buyer'),
+                ),
+                if (category == 'representative') ...[
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    key: const ValueKey('delivery-pass-scan'),
-                    onPressed: locked != null
-                        ? null
-                        : () async {
-                            final scanned = await Navigator.of(context)
-                                .push<String>(
-                                  MaterialPageRoute(
-                                    builder: (_) => CourierQrScanner(
-                                      key: ValueKey(
-                                        'delivery-pass-scanner-${job.id}',
-                                      ),
-                                      expectedTrackingNumber: job.id,
-                                      manualEntryLabel: 'delivery code',
-                                      manualHint: '6 digits',
-                                    ),
-                                  ),
-                                );
-                            if (scanned == null || !context.mounted) return;
-
-                            final result = readDeliveryPassScan(
-                              scanned,
-                              jobId: job.id,
-                            );
-                            if (result.error != null) {
-                              setSheetState(() => error = result.error);
-                              return;
-                            }
-                            otpController.text = result.code!;
-                            setSheetState(() => error = null);
-                          },
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: const Text("Scan buyer's QR"),
+                  const Text(
+                    'Confirm the buyer authorized this person before handing over the parcel.',
                   ),
-                  if (courier.isServerAuthoritative) ...[
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      key: const ValueKey('delivery-code-send'),
-                      onPressed: () => _requestCode(courier),
-                      icon: const Icon(Icons.sms_outlined),
-                      label: const Text('Send code to buyer'),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  TextField(
-                    key: const ValueKey('delivery-otp-field'),
-                    controller: otpController,
-                    enabled: locked == null,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
+                  TextFormField(
+                    key: const ValueKey('recipient-name'),
+                    initialValue: name,
+                    maxLength: 120,
                     decoration: const InputDecoration(
-                      labelText: 'Delivery OTP',
-                      hintText: '6 digits',
-                      counterText: '',
+                      labelText: 'Representative name',
                     ),
+                    onChanged: (value) => update(() => name = value.trim()),
                   ),
-                  if (job.hasCod) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const ValueKey('cod-amount-field'),
-                      controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Cash collected',
-                        hintText: formatPeso(job.codAmount),
-                        prefixText: '₱ ',
-                      ),
+                  TextFormField(
+                    key: const ValueKey('recipient-relationship'),
+                    initialValue: relationship,
+                    maxLength: 120,
+                    decoration: const InputDecoration(
+                      labelText: 'Relationship to buyer',
                     ),
-                  ],
-                  if (locked != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Entry is locked. Try again in '
-                      '${(locked.inSeconds / 60).ceil()} minutes.',
-                      style: sheetTheme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.danger,
-                      ),
-                    ),
-                  ],
-                  if (error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      error!,
-                      key: const ValueKey('handover-error'),
-                      style: sheetTheme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.danger,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    key: const ValueKey('confirm-delivery-submit'),
-                    onPressed: () {
-                      final otpProblem = courier.validateDeliveryOtp(
-                        widget.jobId,
-                        otpController.text,
-                      );
-                      final codProblem = otpProblem != null
-                          ? null
-                          : courier.validateCodAmount(
-                              widget.jobId,
-                              amountController.text,
-                            );
-                      final problem = otpProblem ?? codProblem;
-                      if (problem != null) {
-                        setSheetState(() => error = problem);
-                        return;
-                      }
-                      Navigator.of(sheetContext).pop((
-                        otp: otpController.text.trim(),
-                        cash: job.hasCod
-                            ? _parseCash(amountController.text)
-                            : null,
-                      ));
-                    },
-                    child: const Text('Complete Delivery'),
+                    onChanged: (value) =>
+                        update(() => relationship = value.trim()),
                   ),
                 ],
-              ),
-            );
-          },
-        );
-      },
+                CheckboxListTile(
+                  key: const ValueKey('recipient-accepted'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('The recipient accepted the parcel'),
+                  value: accepted,
+                  onChanged: (value) => update(() => accepted = value == true),
+                ),
+                if (job.hasCod)
+                  CheckboxListTile(
+                    key: const ValueKey('cod-collected'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'I collected exactly ${formatPeso(job.codAmount)}',
+                    ),
+                    value: collected,
+                    onChanged: (value) =>
+                        update(() => collected = value == true),
+                  ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  key: const ValueKey('confirm-delivery-submit'),
+                  onPressed:
+                      handedOver &&
+                          accepted &&
+                          (!job.hasCod || collected) &&
+                          (category == 'buyer' ||
+                              (name.isNotEmpty && relationship.isNotEmpty))
+                      ? () => Navigator.of(sheetContext).pop(true)
+                      : null,
+                  child: const Text('Complete Delivery'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-
-    otpController.dispose();
-    amountController.dispose();
-    if (confirmed == null || !mounted) return;
-
-    // Live mode: WebZefanya checks the photo, the buyer's code and the cash,
-    // and records the delivery once. Only its answer completes the job here.
+    if (confirmed != true || !mounted || _submitting) return;
     if (courier.isServerAuthoritative) {
-      final photo = _proofImagePath;
-      if (_submitting || photo == null) return;
       setState(() => _submitting = true);
       try {
         await courier.submitDelivery(
           widget.jobId,
           proofPhotoPath: photo,
-          deliveryOtp: confirmed.otp,
-          codAmount: confirmed.cash,
+          recipientCategory: category,
+          receivedBy: category == 'representative' ? name : null,
+          recipientRelationship: category == 'representative'
+              ? relationship
+              : null,
+          codAmount: job.hasCod ? job.codAmount : null,
         );
       } on ApiException catch (error) {
         if (!mounted) return;
-        setState(() => _submitting = false);
-        showTimedSnackBar(context, SnackBar(content: Text(_serverMessage(error))));
+        if (courier.isDeliveryCompletionUnconfirmed(widget.jobId)) {
+          await _checkCompletion(courier);
+        } else {
+          showTimedSnackBar(
+            context,
+            SnackBar(content: Text(_serverMessage(error))),
+          );
+        }
         return;
+      } finally {
+        if (mounted) setState(() => _submitting = false);
       }
-      if (!mounted) return;
-      setState(() => _submitting = false);
     }
+    if (!mounted) return;
+    _completeDelivery(courier, outcome: DeliveryMilestone.delivered);
+  }
 
-    _completeDelivery(
-      courier,
-      outcome: DeliveryMilestone.delivered,
-      deliveryOtp: confirmed.otp,
-      codAmount: confirmed.cash,
+  Future<void> _checkCompletion(CourierState courier) async {
+    setState(() => _submitting = true);
+    bool? delivered;
+    try {
+      delivered = await courier.reconcileDeliveryCompletion(widget.jobId);
+    } on ApiException {
+      // Keep the outcome unknown until an authorized server read confirms it.
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+    if (!mounted) return;
+    if (delivered == true) {
+      showTimedSnackBar(
+        context,
+        const SnackBar(content: Text('Delivery confirmed by the server.')),
+      );
+      Navigator.of(context).maybePop();
+      return;
+    }
+    showTimedSnackBar(
+      context,
+      SnackBar(
+        content: Text(
+          delivered == false
+              ? 'Delivery is still open. Review the handover before trying again.'
+              : 'Delivery status is unconfirmed. Check status before trying again.',
+        ),
+      ),
     );
   }
 
@@ -444,31 +533,6 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       return error.fieldErrors.values.first;
     }
     return error.message;
-  }
-
-  /// Live mode: asks WebZefanya to send the buyer a new delivery code.
-  Future<void> _requestCode(CourierState courier) async {
-    try {
-      await courier.requestDeliveryCode(widget.jobId);
-      if (!mounted) return;
-      showTimedSnackBar(
-        context,
-        const SnackBar(content: Text('Delivery code sent to the buyer.')),
-      );
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      showTimedSnackBar(context, SnackBar(content: Text(_serverMessage(error))));
-    }
-  }
-
-  /// The cash figure typed at the door, as a number.
-  ///
-  /// The field is numeric but a rider may paste "₱700.00" or "700,00"; the
-  /// validation in [CourierState] already rejected anything that is not the
-  /// exact amount, so this only needs to recover the number it accepted.
-  double? _parseCash(String input) {
-    final normalized = input.replaceAll(RegExp(r'[^0-9.]'), '');
-    return double.tryParse(normalized);
   }
 
   bool _isToday(DateTime when) {
@@ -506,23 +570,10 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   void _completeDelivery(
     CourierState courier, {
     required DeliveryMilestone outcome,
-    String? deliveryOtp,
-    double? codAmount,
   }) {
     final returned = outcome == DeliveryMilestone.returnToSender;
 
-    // Write the handover to the server before the local job disappears.
-    // DELIVERED carries the code and cash the rider just checked; a RETURNED
-    // outcome already reached this state through _markFailed, whose terminal
-    // guard makes this call a no-op. Without the write, the courier's screen
-    // would say "delivered" while the buyer's tracker stayed at Out for
-    // Delivery.
-    courier.advanceMilestone(
-      widget.jobId,
-      outcome,
-      deliveryOtp: deliveryOtp,
-      codAmount: codAmount,
-    );
+    courier.advanceMilestone(widget.jobId, outcome);
 
     final firstToday = !courier.completedJobs.any(
       (c) => _isToday(c.completedAt),
@@ -552,7 +603,6 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final ext = theme.extension<AppThemeExtension>()!;
     final courier = context.watch<CourierState>();
     final job = courier.jobById(widget.jobId);
 
@@ -567,11 +617,49 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       // somehow completed/removed while this screen was still open.
       return Scaffold(
         appBar: AppBar(title: const Text('Delivery')),
-        body: const Center(child: Text('This job is no longer available.')),
+        body: Center(
+          child: courier.isDeliveryCompletionUnconfirmed(widget.jobId)
+              ? TextButton(
+                  onPressed: _submitting
+                      ? null
+                      : () => _checkCompletion(courier),
+                  child: Text(
+                    _submitting
+                        ? 'Checking delivery…'
+                        : 'Check delivery status',
+                  ),
+                )
+              : const Text('This job is no longer available.'),
+        ),
       );
     }
 
     final milestone = courier.milestoneFor(widget.jobId);
+    final sellerFirst = switch (milestone) {
+      DeliveryMilestone.assignedToRider ||
+      DeliveryMilestone.inTransit ||
+      DeliveryMilestone.delivered ||
+      DeliveryMilestone.failedDelivery => false,
+      _ => true,
+    };
+    final seller = _buildLocationCard(
+      theme,
+      icon: Icons.storefront_outlined,
+      title: job.shopName,
+      subtitle: job.pickupAddress,
+      roleLabel: 'Seller',
+      contactPhone: job.sellerPhone,
+      index: 0,
+    );
+    final buyer = _buildLocationCard(
+      theme,
+      icon: Icons.person_outline,
+      title: job.buyerName,
+      subtitle: job.deliveryArea,
+      roleLabel: 'Buyer',
+      contactPhone: job.buyerPhone,
+      index: 1,
+    );
 
     // A background handoff the server refused: say so once, then clear it.
     // The jobs were already re-read, so the stepper shows the server's status.
@@ -591,6 +679,10 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       backgroundColor: Colors
           .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(
+        toolbarHeight: (MediaQuery.textScalerOf(context).scale(14) * 3.2).clamp(
+          56.0,
+          100.0,
+        ),
         // Job ID is a reference code, not a human label. Show it as
         // a subtitle so the screen reads as "Delivery", not "JOB-0001".
         title: Column(
@@ -598,10 +690,19 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'DELIVERY',
+              milestone == DeliveryMilestone.returnToSender
+                  ? 'RETURN'
+                  : sellerFirst
+                  ? 'PICKUP'
+                  : 'DELIVERY',
               style: AppType.eyebrow.copyWith(letterSpacing: 1.2),
             ),
-            Text(job.id, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              job.id,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall,
+            ),
           ],
         ),
         actions: [
@@ -616,41 +717,33 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         children: [
           StaggeredReveal(index: 0, child: _buildStepper(theme, milestone)),
-          const SizedBox(height: 24),
-          StaggeredReveal(
-            index: 1,
-            child: _buildLocationCard(
-              theme,
-              icon: Icons.storefront_outlined,
-              title: job.shopName,
-              subtitle: job.pickupAddress,
-              roleLabel: 'Seller',
-              contactPhone: job.sellerPhone,
-              index: 0,
-            ),
-          ),
+          const SizedBox(height: 12),
+          StaggeredReveal(index: 1, child: sellerFirst ? seller : buyer),
+          if (milestone == DeliveryMilestone.inTransit) ...[
+            if (job.hasCod)
+              _summaryLine(
+                theme,
+                'COD amount',
+                formatPeso(job.codAmount),
+                isBold: true,
+              ),
+            const SizedBox(height: 12),
+            _buildProofUpload(theme),
+          ],
           const SizedBox(height: 12),
           StaggeredReveal(
             index: 2,
-            child: _buildLocationCard(
+            child: _buildOrderSummary(
               theme,
-              icon: Icons.person_outline,
-              title: job.buyerName,
-              subtitle: job.deliveryArea,
-              roleLabel: 'Buyer',
-              contactPhone: job.buyerPhone,
-              index: 1,
+              job,
+              showCod: milestone != DeliveryMilestone.inTransit || !job.hasCod,
             ),
           ),
-          const SizedBox(height: 20),
-          StaggeredReveal(index: 3, child: _buildOrderSummary(theme, job)),
-          if (milestone == DeliveryMilestone.inTransit) ...[
-            const SizedBox(height: 20),
-            StaggeredReveal(index: 4, child: _buildProofUpload(theme, ext)),
-          ],
+          const SizedBox(height: 12),
+          StaggeredReveal(index: 3, child: sellerFirst ? buyer : seller),
         ],
       ),
       bottomNavigationBar: _buildActionBar(theme, courier, milestone),
@@ -771,64 +864,78 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
         color: AppColors.surfaceMuted,
         borderRadius: editorialRadius(index, ShapeTier.card),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.tertiary,
-            child: Icon(icon, color: AppColors.textOnLight, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(roleLabel, style: theme.textTheme.labelSmall),
-                Text(title, style: theme.textTheme.titleSmall),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (contactPhone != null && contactPhone.isNotEmpty)
-                  Text(
-                    contactPhone,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          _circleAction(
-            Icons.call_outlined,
-            () => _callNumber(contactPhone, title),
-            semanticLabel: 'Call $title',
-          ),
-          const SizedBox(width: 8),
-          if (FeatureFlags.chatLive)
-            _circleAction(
-              Icons.chat_bubble_outline,
-              () => Navigator.of(context).push(
-                AppPageRoute(
-                  builder: (_) =>
-                      ChatScreen(contactName: title, contactRole: roleLabel),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.tertiary,
+                child: Icon(icon, color: AppColors.textOnLight, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(roleLabel, style: theme.textTheme.labelSmall),
+                    Text(title, style: theme.textTheme.titleSmall),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                    if (contactPhone != null && contactPhone.isNotEmpty)
+                      Text(
+                        contactPhone,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              semanticLabel: 'Message $title',
-            ),
-          // Open in Maps: hands the address to the device's maps app.
-          // Address only — no buyer phone is shown or passed anywhere
-          // here (see OPEN QUESTIONS: call-buyer privacy).
-          if (roleLabel == 'Buyer') ...[
-            const SizedBox(width: 8),
-            _circleAction(
-              Icons.map_outlined,
-              () => openAddressInMaps(context, subtitle),
-              semanticLabel: 'Open delivery address in Maps',
-            ),
-          ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              _circleAction(
+                Icons.call_outlined,
+                () => _callNumber(contactPhone, title),
+                semanticLabel: 'Call $title',
+              ),
+              if (FeatureFlags.chatLive)
+                _circleAction(
+                  Icons.chat_bubble_outline,
+                  () => Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) => ChatScreen(
+                        contactName: title,
+                        contactRole: roleLabel,
+                      ),
+                    ),
+                  ),
+                  semanticLabel: 'Message $title',
+                ),
+              // Open in Maps: hands the address to the device's maps app.
+              // Address only — no buyer phone is shown or passed anywhere
+              // here (see OPEN QUESTIONS: call-buyer privacy).
+              if (roleLabel == 'Buyer') ...[
+                _circleAction(
+                  Icons.map_outlined,
+                  () {
+                    if (context.read<CourierState>().isServerAuthoritative) {
+                      openAddressInMaps(context, subtitle);
+                    } else {
+                      _showDemoContactNotice();
+                    }
+                  },
+                  semanticLabel: 'Open delivery address in Maps',
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );
@@ -837,6 +944,10 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
   /// Opens the device dialer for the number the server shared with this
   /// job. If no number was shared, says so instead of pretending to call.
   Future<void> _callNumber(String? phone, String name) async {
+    if (!context.read<CourierState>().isServerAuthoritative) {
+      _showDemoContactNotice();
+      return;
+    }
     if (phone == null || phone.isEmpty) {
       showTimedSnackBar(
         context,
@@ -856,6 +967,11 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     );
   }
 
+  void _showDemoContactNotice() => showTimedSnackBar(
+    context,
+    const SnackBar(content: Text('Calls and Maps are disabled in demo mode.')),
+  );
+
   Widget _circleAction(
     IconData icon,
     VoidCallback onTap, {
@@ -868,7 +984,9 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       child: PressableScale(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(8),
+          width: 48,
+          height: 48,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppColors.surface,
             shape: BoxShape.circle,
@@ -879,7 +997,11 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     );
   }
 
-  Widget _buildOrderSummary(ThemeData theme, DeliveryJob job) {
+  Widget _buildOrderSummary(
+    ThemeData theme,
+    DeliveryJob job, {
+    required bool showCod,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -904,15 +1026,17 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
           if (job.buyerPhone != null && job.buyerPhone!.isNotEmpty)
             _summaryLine(theme, 'Buyer contact', job.buyerPhone!),
           _summaryLine(theme, 'Payment method', job.paymentLabel),
-          _summaryLine(
-            theme,
-            'COD amount',
-            job.prepaid ? '₱0.00 · Paid' : formatPeso(job.codAmount),
-          ),
+          if (showCod)
+            _summaryLine(
+              theme,
+              'COD amount',
+              job.prepaid ? '₱0.00 · Paid' : formatPeso(job.codAmount),
+            ),
           const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            spacing: 10,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('YOUR DELIVERY FEE', style: AppType.eyebrow),
               // The fee is what the courier is actually here for on this
@@ -939,25 +1063,50 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
         children: [
           Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
           const SizedBox(width: 12),
-          Text(
-            value,
-            style:
-                (isBold
-                        ? theme.textTheme.titleSmall
-                        : theme.textTheme.bodyMedium)
-                    ?.copyWith(
-                      fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
-                      color: isBold
-                          ? AppColors.primaryDark
-                          : AppColors.textPrimary,
-                    ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style:
+                  (isBold
+                          ? theme.textTheme.titleSmall
+                          : theme.textTheme.bodyMedium)
+                      ?.copyWith(
+                        fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
+                        color: isBold
+                            ? AppColors.primaryDark
+                            : AppColors.textPrimary,
+                      ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProofUpload(ThemeData theme, AppThemeExtension ext) {
+  Future<void> _captureProof() async {
+    if (_proofPicking) return;
+    setState(() => _proofPicking = true);
+    try {
+      final picked = await pickAndSaveImage(
+        context,
+        filenamePrefix: 'proof_${widget.jobId}',
+        cameraOnly: true,
+      );
+      if (picked != null && mounted) _proofImagePath = picked.path;
+    } on Exception catch (error) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          SnackBar(content: Text(mediaProblemMessage(mediaProblemOf(error)))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _proofPicking = false);
+    }
+  }
+
+  Widget _buildProofUpload(ThemeData theme) {
     // editorialRadius(1) so this card leans opposite to the location
     // cards above it — consistent with the alternating-lean pattern
     // everywhere else in the app.
@@ -982,26 +1131,21 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                 color: AppColors.primaryDark,
               ),
               const SizedBox(width: 8),
-              Text('Proof of Delivery', style: theme.textTheme.titleSmall),
+              Flexible(
+                child: Text(
+                  'Proof of Delivery',
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           InkWell(
-            onTap: () async {
-              final picked = await pickAndSaveImage(
-                context,
-                filenamePrefix: 'proof_${widget.jobId}',
-                // RID-DLV-008: proof must be taken live, not chosen from
-                // the gallery, so the photo proves the parcel was there.
-                cameraOnly: true,
-              );
-              if (picked != null && mounted) {
-                setState(() => _proofImagePath = picked.path);
-              }
-            },
+            onTap: _proofPicking ? null : _captureProof,
             borderRadius: editorialRadius(0, ShapeTier.accent),
             child: Container(
-              height: 110,
+              constraints: const BoxConstraints(minHeight: 90),
+              padding: const EdgeInsets.all(12),
               width: double.infinity,
               decoration: BoxDecoration(
                 color: _proofUploaded
@@ -1112,6 +1256,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                           builder: (_) => CourierQrScanner(
                             key: ValueKey('qr-scanner-$expected'),
                             expectedTrackingNumber: expected,
+                            riderTaskLabel: 'Scan the seller’s parcel label',
                           ),
                         ),
                       );
@@ -1165,6 +1310,14 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
+    if (courier.isServerAuthoritative) {
+      await _submitParcelAction(
+        courier,
+        pickup: true,
+        trackingNumber: enteredText.trim(),
+      );
+      return;
+    }
     _advance(
       courier,
       DeliveryMilestone.arrivedAtSeller,
@@ -1177,6 +1330,24 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     CourierState courier,
     DeliveryMilestone milestone,
   ) {
+    final live = courier.isServerAuthoritative;
+    final parcelActionPending = courier.isParcelActionPending(widget.jobId);
+    final parcelActionUnconfirmed = courier.isParcelActionUnconfirmed(
+      widget.jobId,
+    );
+    final logisticsStep = courier.isServerAuthoritative
+        ? switch (milestone) {
+            DeliveryMilestone.pickedUp =>
+              'Hand the parcel to the sorting center. Logistics will confirm receipt.',
+            DeliveryMilestone.atSortingCenter =>
+              'Waiting for Logistics to sort the parcel.',
+            DeliveryMilestone.sorted =>
+              'Waiting for Logistics to assign a delivery rider.',
+            DeliveryMilestone.failedDelivery =>
+              'Return the parcel to the station. Logistics will confirm receipt and arrange the next step.',
+            _ => null,
+          }
+        : null;
     final (label, enabled, isFinalStep) = switch (milestone) {
       DeliveryMilestone.accepted => ('Confirm Arrived at Seller', true, false),
       DeliveryMilestone.arrivedAtSeller => (
@@ -1224,7 +1395,8 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (milestone == DeliveryMilestone.inTransit &&
+            if (!live &&
+                milestone == DeliveryMilestone.inTransit &&
                 courier.attemptsFor(widget.jobId) > 0)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -1236,7 +1408,7 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                   ),
                 ),
               ),
-            if (milestone == DeliveryMilestone.failedDelivery)
+            if (!live && milestone == DeliveryMilestone.failedDelivery)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
@@ -1265,34 +1437,85 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
             if (!enabled && milestone == DeliveryMilestone.inTransit)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'Attach a live proof-of-delivery photo to continue.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                child: TextButton.icon(
+                  onPressed: _proofPicking ? null : _captureProof,
+                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                  label: const Text('Take proof photo to continue'),
                 ),
               ),
-            ElevatedButton(
-              onPressed: !enabled
-                  ? null
-                  : isFinalStep
-                  ? milestone == DeliveryMilestone.inTransit
-                        ? () => _confirmDelivery(courier)
-                        : () => _completeDelivery(courier, outcome: milestone)
-                  : milestone == DeliveryMilestone.arrivedAtSeller
-                  ? () => _confirmPickup(courier)
-                  : milestone == DeliveryMilestone.failedDelivery
-                  ? () => _retryDelivery(courier)
-                  : () => _advance(courier, milestone),
-              child: Text(label),
-            ),
+            if (parcelActionPending)
+              Text(
+                milestone == DeliveryMilestone.inTransit
+                    ? 'Recording delivery attempt…'
+                    : 'Confirming pickup…',
+                textAlign: TextAlign.center,
+                semanticsLabel: 'Waiting for server confirmation',
+              )
+            else if (parcelActionUnconfirmed ||
+                courier.isDeliveryStartUnconfirmed(widget.jobId))
+              TextButton(
+                onPressed: courier.loadingJobs
+                    ? null
+                    : () async {
+                        try {
+                          await courier.refreshJobs();
+                        } on ApiException {
+                          // The queue retains the error for the next retry.
+                        }
+                      },
+                child: Text(
+                  parcelActionUnconfirmed
+                      ? 'Parcel update unconfirmed. Refresh status'
+                      : 'Delivery start unconfirmed. Refresh status',
+                ),
+              )
+            else if (logisticsStep != null)
+              Text(logisticsStep, textAlign: TextAlign.center)
+            else
+              ElevatedButton(
+                onPressed:
+                    _submitting ||
+                        parcelActionPending ||
+                        parcelActionUnconfirmed ||
+                        courier.isDeliveryCompleting(widget.jobId) ||
+                        (!enabled &&
+                            !courier.isDeliveryCompletionUnconfirmed(
+                              widget.jobId,
+                            )) ||
+                        courier.isStartingDelivery(widget.jobId)
+                    ? null
+                    : isFinalStep
+                    ? milestone == DeliveryMilestone.inTransit
+                          ? () => _confirmDelivery(courier)
+                          : () => _completeDelivery(courier, outcome: milestone)
+                    : milestone == DeliveryMilestone.arrivedAtSeller
+                    ? () => _confirmPickup(courier)
+                    : milestone == DeliveryMilestone.failedDelivery
+                    ? () => _retryDelivery(courier)
+                    : () => _advance(courier, milestone),
+                child: Text(
+                  _submitting || courier.isDeliveryCompleting(widget.jobId)
+                      ? 'Submitting delivery…'
+                      : courier.isDeliveryCompletionUnconfirmed(widget.jobId)
+                      ? 'Check delivery status'
+                      : courier.isStartingDelivery(widget.jobId)
+                      ? 'Starting delivery…'
+                      : label,
+                ),
+              ),
             // "Mark as Failed" only shown while in transit — the one
             // stage where real delivery attempts happen.
             if (milestone == DeliveryMilestone.inTransit) ...[
               const SizedBox(height: 8),
               OutlinedButton(
-                onPressed: () => _markFailed(courier),
+                onPressed:
+                    _submitting ||
+                        parcelActionPending ||
+                        parcelActionUnconfirmed ||
+                        courier.isDeliveryCompleting(widget.jobId) ||
+                        courier.isDeliveryCompletionUnconfirmed(widget.jobId)
+                    ? null
+                    : () => _markFailed(courier),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
                   side: BorderSide(color: AppColors.danger),
@@ -1389,7 +1612,12 @@ class _IncidentSheetState extends State<_IncidentSheet> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -1418,7 +1646,8 @@ class _IncidentSheetState extends State<_IncidentSheet> {
                   controller: _reason,
                   maxLength: 255,
                   decoration: const InputDecoration(labelText: 'Reason'),
-                  validator: (v) => (v ?? '').trim().isEmpty ? 'Enter a reason' : null,
+                  validator: (v) =>
+                      (v ?? '').trim().isEmpty ? 'Enter a reason' : null,
                 ),
                 TextFormField(
                   key: const ValueKey('incident-description'),
@@ -1426,8 +1655,12 @@ class _IncidentSheetState extends State<_IncidentSheet> {
                   maxLength: 1000,
                   minLines: 2,
                   maxLines: 5,
-                  decoration: const InputDecoration(labelText: 'What happened?'),
-                  validator: (v) => (v ?? '').trim().isEmpty ? 'Describe what happened' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'What happened?',
+                  ),
+                  validator: (v) => (v ?? '').trim().isEmpty
+                      ? 'Describe what happened'
+                      : null,
                 ),
                 if (_type == 'damaged') ...[
                   const SizedBox(height: 8),
@@ -1445,15 +1678,25 @@ class _IncidentSheetState extends State<_IncidentSheet> {
                         });
                       }
                     },
-                    icon: Icon(_photoPath == null ? Icons.add_a_photo_outlined : Icons.check_circle_outline),
-                    label: Text(_photoPath == null ? 'Add a photo of the damage' : 'Photo added'),
+                    icon: Icon(
+                      _photoPath == null
+                          ? Icons.add_a_photo_outlined
+                          : Icons.check_circle_outline,
+                    ),
+                    label: Text(
+                      _photoPath == null
+                          ? 'Add a photo of the damage'
+                          : 'Photo added',
+                    ),
                   ),
                   if (_photoMissing)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         'Attach a photo when reporting a damaged parcel.',
-                        style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.danger,
+                        ),
                       ),
                     ),
                 ],

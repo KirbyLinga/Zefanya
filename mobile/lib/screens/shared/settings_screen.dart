@@ -284,18 +284,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
-      return;
+      // AuthState already cleared the local session. Leave account settings
+      // even if the server could not revoke the previous token.
     }
     if (!context.mounted) return;
-    await CloudTransition.run(
-      context,
-      swap: () {
-        if (wasRider) {
-          context.read<CourierState>().goOffline();
-        }
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      },
-    );
+    void unwind() {
+      if (!context.mounted) return;
+      if (wasRider) context.read<CourierState>().goOffline();
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+
+    if (kUseLiveApi) {
+      unwind();
+    } else {
+      await CloudTransition.run(context, swap: unwind);
+    }
   }
 }
 
@@ -585,7 +588,7 @@ class DeveloperOptionsScreen extends StatelessWidget {
             key: const ValueKey('developer-qr-generator'),
             icon: Icons.qr_code,
             title: 'QR generator',
-            subtitle: 'Render a Zefanya delivery pass for handover testing.',
+            subtitle: 'Render a parcel tracking QR for scanner testing.',
             onTap: () => Navigator.of(
               context,
             ).push(AppPageRoute(builder: (_) => const DevQrGeneratorScreen())),

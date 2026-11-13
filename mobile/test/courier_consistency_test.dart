@@ -381,13 +381,21 @@ void main() {
       await tester.tap(find.text('Earnings'));
       await tester.pumpAndSettle();
       expect(earnings.last, selectedEarnings);
-      expect(find.text('₱2,000.00'), findsNothing);
-      await tester.ensureVisible(find.text('Retry'));
-      await tester.tap(find.text('Retry'));
+      expect(find.text('₱2,000.00'), findsOneWidget);
+      final stale = find.text(
+        'Showing the last loaded earnings for these dates.',
+      );
+      expect(stale, findsOneWidget);
+      final retry = find.text('Retry');
+      await Scrollable.ensureVisible(tester.element(retry), alignment: .45);
+      await tester.pumpAndSettle();
+      await tester.tap(retry.hitTestable());
       await tester.pumpAndSettle();
       expect(earnings.length, 4);
       expect(earnings.last, selectedEarnings);
       expect(find.text('₱4,000.00'), findsOneWidget);
+      expect(stale, findsNothing);
+      expect(find.text('₱2,000.00'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('Page 2 of 2'),
         150,

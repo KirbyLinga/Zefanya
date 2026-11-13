@@ -64,6 +64,8 @@ class _NoInternetBannerState extends State<NoInternetBanner> {
     }
 
     final theme = Theme.of(context);
+    // The app-wide banner can be mounted above the Navigator's overlay.
+    final hasOverlay = Overlay.maybeOf(context) != null;
 
     return Container(
       // A banner that eats the whole width but not the height: it sits at the
@@ -87,9 +89,12 @@ class _NoInternetBannerState extends State<NoInternetBanner> {
             ),
           ),
           IconButton(
-            tooltip: 'Retry',
+            tooltip: hasOverlay ? 'Retry' : null,
             onPressed: widget.onRetry,
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              Icons.refresh,
+              semanticLabel: hasOverlay ? null : 'Retry',
+            ),
             splashRadius: 20,
           ),
         ],

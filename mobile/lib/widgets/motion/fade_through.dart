@@ -30,28 +30,26 @@ class FadeThroughIndexedStack extends StatefulWidget {
   final Duration duration;
 
   @override
-  State<FadeThroughIndexedStack> createState() => _FadeThroughIndexedStackState();
+  State<FadeThroughIndexedStack> createState() =>
+      _FadeThroughIndexedStackState();
 }
 
 class _FadeThroughIndexedStackState extends State<FadeThroughIndexedStack>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
-  late int _currentIndex;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.index;
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
       value: 1.0,
     );
-    _fade = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    );
+    _fade = _controller
+        .drive(CurveTween(curve: Curves.easeOutCubic))
+        .drive(Tween<double>(begin: .86, end: 1));
   }
 
   @override
@@ -59,21 +57,10 @@ class _FadeThroughIndexedStackState extends State<FadeThroughIndexedStack>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index) {
       if (reduceMotion(context)) {
-        _currentIndex = widget.index;
-        _controller.value = 1.0;
+        _controller.value = 1;
       } else {
-        // Quick fade-out -> swap index -> fade-in
-        final halfDuration = Duration(
-          milliseconds: (widget.duration.inMilliseconds / 2).round(),
-        );
-        _controller.duration = halfDuration;
-        _controller.reverse().then((_) {
-          if (!mounted) return;
-          setState(() {
-            _currentIndex = widget.index;
-          });
-          _controller.forward();
-        });
+        _controller.duration = widget.duration;
+        _controller.forward(from: 0);
       }
     }
   }
@@ -86,19 +73,23 @@ class _FadeThroughIndexedStackState extends State<FadeThroughIndexedStack>
 
   @override
   Widget build(BuildContext context) {
-    if (reduceMotion(context)) {
-      return IndexedStack(
-        index: widget.index,
-        children: widget.children,
-      );
-    }
-
+    final reduced = reduceMotion(context);
+    final stack = IndexedStack(
+      index: widget.index,
+      children: [
+        for (final (index, child) in widget.children.indexed)
+          TickerMode(
+            enabled: index == widget.index,
+            child: HeroMode(
+              enabled: index == widget.index && !reduced,
+              child: child,
+            ),
+          ),
+      ],
+    );
     return FadeTransition(
-      opacity: _fade,
-      child: IndexedStack(
-        index: _currentIndex,
-        children: widget.children,
-      ),
+      opacity: reduced ? const AlwaysStoppedAnimation(1.0) : _fade,
+      child: stack,
     );
   }
 }
@@ -125,10 +116,7 @@ class FadeThroughSwitch extends StatelessWidget {
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (widgetChild, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: widgetChild,
-        );
+        return FadeTransition(opacity: animation, child: widgetChild);
       },
       child: child,
     );

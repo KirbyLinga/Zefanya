@@ -153,10 +153,19 @@ class LiveReturnRepository extends LiveRepository implements ReturnRepository {
   Future<void> load() async {}
 
   @override
-  Future<List<ReturnRequest>> all() async {
+  Future<List<ReturnRequest>> all() async => (await returnPage(1)).items;
+
+  Future<({List<ReturnRequest> items, bool hasMore})> returnPage(
+    int page,
+  ) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
-    final data = unwrapMap(await client.getJson('/buyer/orders'));
+    final data = unwrapMap(
+      await client.getJson(
+        '/buyer/orders',
+        query: page == 1 ? null : {'page': '$page'},
+      ),
+    );
     final requests = <ReturnRequest>[];
     for (final order in (data['data'] as List?) ?? const []) {
       if (order is! Map) continue;
@@ -165,22 +174,31 @@ class LiveReturnRepository extends LiveRepository implements ReturnRepository {
         final status = shipment['return_status']?.toString();
         if (status == null || status.isEmpty) continue;
         final id = shipment['id'].toString();
-        requests.add(ReturnRequest(
-          id: id,
-          orderId: id,
-          description: '',
-          photoPaths: const [],
-          submittedAt: DateTime.tryParse(shipment['updated_at']?.toString() ?? '') ?? DateTime.now(),
-          status: switch (status) {
-            'RETURN_REJECTED' => ReturnStatus.rejected,
-            'RETURN_IN_DISPUTE' => ReturnStatus.escalated,
-            'RETURNED_TO_SELLER' => ReturnStatus.refunded,
-            _ => ReturnStatus.submitted,
-          },
-        ));
+        requests.add(
+          ReturnRequest(
+            id: id,
+            orderId: id,
+            description: '',
+            photoPaths: const [],
+            submittedAt:
+                DateTime.tryParse(shipment['updated_at']?.toString() ?? '') ??
+                DateTime.now(),
+            status: switch ((status, shipment['refund_recorded'])) {
+              ('RETURNED_TO_SELLER', true) => ReturnStatus.refunded,
+              ('RETURN_REJECTED', _) => ReturnStatus.rejected,
+              ('RETURN_IN_DISPUTE', _) => ReturnStatus.escalated,
+              ('RETURNED_TO_SELLER', _) => ReturnStatus.returned,
+              _ => ReturnStatus.submitted,
+            },
+          ),
+        );
       }
     }
-    return List.unmodifiable(requests);
+    final meta = data['meta'];
+    return (
+      items: List<ReturnRequest>.unmodifiable(requests),
+      hasMore: meta is Map && meta['has_more'] == true,
+    );
   }
 
   @override
@@ -197,7 +215,9 @@ class LiveReturnRepository extends LiveRepository implements ReturnRepository {
     await client.postMultipart(
       '/buyer/orders/$parent/shipments/$orderId/return',
       fields: {'reason': reason, 'description': description.trim()},
-      files: {for (var i = 0; i < photoPaths.length; i++) 'photos[$i]': photoPaths[i]},
+      files: {
+        for (var i = 0; i < photoPaths.length; i++) 'photos[$i]': photoPaths[i],
+      },
     );
 
     return ReturnRequest(
@@ -216,7 +236,10 @@ class LiveReturnRepository extends LiveRepository implements ReturnRepository {
     final parent = await _parentOrderId(requestId);
     await client.postJson(
       '/buyer/orders/$parent/shipments/$requestId/return/escalate',
-      body: {'reason': "The buyer asked for an admin review of the seller's rejection."},
+      body: {
+        'reason':
+            "The buyer asked for an admin review of the seller's rejection.",
+      },
     );
 
     return ReturnRequest(
@@ -231,10 +254,14 @@ class LiveReturnRepository extends LiveRepository implements ReturnRepository {
   }
 
   Future<String> _parentOrderId(String shipmentId) async {
-    final shipment = unwrapMap(await client.getJson('/buyer/shipments/$shipmentId'));
+    final shipment = unwrapMap(
+      await client.getJson('/buyer/shipments/$shipmentId'),
+    );
     final parent = shipment['order_id']?.toString();
     if (parent == null || parent.isEmpty) {
-      throw const MalformedResponseException(message: 'The server did not say which order this shipment belongs to.');
+      throw const MalformedResponseException(
+        message: 'The server did not say which order this shipment belongs to.',
+      );
     }
     return parent;
   }

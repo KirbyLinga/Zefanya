@@ -42,33 +42,33 @@ import 'money.dart';
 
 /// One product from `GET /api/products`.
 Product productFromJson(Map<String, Object?> json) => Product(
-      id: _text(json['id']),
-      name: _text(json['name']),
-      category: _text(json['category']),
-      // Centavos on the wire; `pesosFromJsonOr` is the one conversion.
-      price: pesosFromJsonOr(json['price_minor'], 0),
-      sellerName: _shopName(json['seller']),
-      sellerMakerNote: _makerNote(json['seller']),
-      description: _text(json['description']),
-      // Cover first — the server orders it, and `Product.photos` falls back to
-      // its own labelled placeholder when this is empty, so an empty list here
-      // stays empty rather than becoming a stock photo.
-      images: _textList(json['images']),
-      // Not sent, so not shown. See gap 1 in the header.
-      compareAtPrice: null,
-      // Real aggregate from the reviews table, when there are any. The
-      // constructor's own defaults are the *mock* catalogue's numbers (4.5
-      // stars), which is why they are overwritten here explicitly instead of
-      // left to default: an average over no ratings is not a fact about anything,
-      // and a mock number on a live product would be a claim nobody made.
-      rating: _number(json['rating_avg']),
-      ratingCount: _int(json['rating_count']),
-      // The server's per-star histogram, keyed '1'..'5'. Empty means "not
-      // sent", and the bars hide rather than deriving counts from the average.
-      ratingDistribution: _ratingDistribution(json['rating_distribution']),
-      soldCount: 0,
-      stock: json['stock'] == null ? 24 : _int(json['stock']),
-    );
+  id: _text(json['id']),
+  name: _text(json['name']),
+  category: _text(json['category']),
+  // Centavos on the wire; `pesosFromJsonOr` is the one conversion.
+  price: pesosFromJsonOr(json['price_minor'], 0),
+  sellerName: _shopName(json['seller']),
+  sellerMakerNote: _makerNote(json['seller']),
+  description: _text(json['description']),
+  // Cover first — the server orders it, and `Product.photos` falls back to
+  // its own labelled placeholder when this is empty, so an empty list here
+  // stays empty rather than becoming a stock photo.
+  images: _textList(json['images']),
+  // Not sent, so not shown. See gap 1 in the header.
+  compareAtPrice: null,
+  // Real aggregate from the reviews table, when there are any. The
+  // constructor's own defaults are the *mock* catalogue's numbers (4.5
+  // stars), which is why they are overwritten here explicitly instead of
+  // left to default: an average over no ratings is not a fact about anything,
+  // and a mock number on a live product would be a claim nobody made.
+  rating: _number(json['rating_avg']),
+  ratingCount: _int(json['rating_count']),
+  // The server's per-star histogram, keyed '1'..'5'. Empty means "not
+  // sent", and the bars hide rather than deriving counts from the average.
+  ratingDistribution: _ratingDistribution(json['rating_distribution']),
+  soldCount: 0,
+  stock: json['stock'] == null ? 24 : _int(json['stock']),
+);
 
 /// One category from `GET /api/categories`, as the label a chip renders.
 String categoryLabelFromJson(Map<String, Object?> json) => _text(json['label']);
@@ -146,8 +146,18 @@ DateTime? _expiryDate(Object? value) {
 /// the app formats, and it already spells months out locally
 /// (`courier_profit_screen.dart`).
 const List<String> _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 String _text(Object? value) => value?.toString().trim() ?? '';
@@ -201,12 +211,13 @@ Map<int, int> _ratingDistribution(Object? value) {
   final result = <int, int>{};
   for (final entry in value.entries) {
     final star = int.tryParse(entry.key.toString());
-    final count = entry.value is int ? entry.value : int.tryParse(entry.value.toString()) ?? 0;
+    final count = entry.value is int
+        ? entry.value
+        : int.tryParse(entry.value.toString()) ?? 0;
     if (star != null && star >= 1 && star <= 5) result[star] = count;
   }
   return Map.unmodifiable(result);
 }
-
 
 // ---------------------------------------------------------------------------
 // WebZefanya (`/api/buyer/products`, `/api/buyer/products/{id}`)
@@ -219,9 +230,12 @@ Map<int, int> _ratingDistribution(Object? value) {
 /// never invented. Variants carry the server's SKU id so the cart adds the
 /// exact SKU that was priced.
 Product productFromWebZefanyaJson(Map<String, Object?> json) {
-  final price = json['price'] is Map ? (json['price'] as Map).cast<String, Object?>() : const <String, Object?>{};
+  final price = json['price'] is Map
+      ? (json['price'] as Map).cast<String, Object?>()
+      : const <String, Object?>{};
   final minMinor = (price['min_minor'] as num?)?.toInt() ?? 0;
-  final regularMinor = (price['regular_min_minor'] as num?)?.toInt() ?? minMinor;
+  final regularMinor =
+      (price['regular_min_minor'] as num?)?.toInt() ?? minMinor;
 
   final category = json['category'];
   final images = json['images'] is List
@@ -229,7 +243,8 @@ Product productFromWebZefanyaJson(Map<String, Object?> json) {
       : [if (_text(json['image_url']).isNotEmpty) _text(json['image_url'])];
 
   final options = <VariationType>[
-    for (final row in json['options'] is List ? json['options'] as List : const [])
+    for (final row
+        in json['options'] is List ? json['options'] as List : const [])
       if (row is Map)
         VariationType(
           name: _text(row['name']),
@@ -248,23 +263,35 @@ Product productFromWebZefanyaJson(Map<String, Object?> json) {
       final selections = <String, String>{};
       for (var i = 0; i < options.length && i < values.length; i++) {
         final value = values[i]?.toString();
-        if (value != null && value.isNotEmpty) selections[options[i].name] = value;
+        if (value != null && value.isNotEmpty) {
+          selections[options[i].name] = value;
+        }
       }
       if (selections.length != options.length) continue;
-      final variantPrice = row['price'] is Map ? (row['price'] as Map)['min_minor'] : null;
-      final variantStock = row['available'] == true ? (row['stock'] as num?)?.toInt() ?? 0 : 0;
+      final variantPrice = row['price'] is Map
+          ? (row['price'] as Map)['min_minor']
+          : null;
+      final variantStock = row['available'] == true
+          ? (row['stock'] as num?)?.toInt() ?? 0
+          : 0;
       total += variantStock;
-      skus.add(ProductVariant(
-        id: row['id']?.toString(),
-        selections: selections,
-        price: variantPrice is num ? variantPrice / 100 : minMinor / 100,
-        stock: variantStock,
-      ));
+      skus.add(
+        ProductVariant(
+          id: row['id']?.toString(),
+          selections: selections,
+          price: variantPrice is num ? variantPrice / 100 : minMinor / 100,
+          stock: variantStock,
+        ),
+      );
     }
     stock = total;
-  } else if (rawVariants is List && rawVariants.length == 1 && rawVariants.first is Map) {
+  } else if (rawVariants is List &&
+      rawVariants.length == 1 &&
+      rawVariants.first is Map) {
     final only = rawVariants.first as Map;
-    stock = only['available'] == true ? (only['stock'] as num?)?.toInt() ?? 0 : 0;
+    stock = only['available'] == true
+        ? (only['stock'] as num?)?.toInt() ?? 0
+        : 0;
   }
 
   return Product(
@@ -274,6 +301,7 @@ Product productFromWebZefanyaJson(Map<String, Object?> json) {
     price: minMinor / 100,
     compareAtPrice: regularMinor > minMinor ? regularMinor / 100 : null,
     sellerName: _shopName(json['seller']),
+    sellerId: (json['seller'] as Map?)?['id'] as int?,
     description: _text(json['description']),
     images: images,
     rating: _number(json['rating']),
@@ -301,7 +329,9 @@ Voucher? voucherFromWebZefanyaJson(Map<String, Object?> json) {
   final code = _text(json['code']);
   final type = _text(json['type']);
   final value = _number(json['value']);
-  if (code.isEmpty || value <= 0 || (type != 'percent' && type != 'fixed')) return null;
+  if (code.isEmpty || value <= 0 || (type != 'percent' && type != 'fixed')) {
+    return null;
+  }
 
   final summary = _text(json['summary']);
   final label = type == 'percent'
@@ -319,6 +349,8 @@ Voucher? voucherFromWebZefanyaJson(Map<String, Object?> json) {
     discountRate: type == 'percent' ? value / 100 : 0,
     fixedDiscount: type == 'fixed' ? value / 100 : null,
     maxDiscount: cap is num ? cap / 100 : double.infinity,
-    scope: _text(json['scope']) == 'shop' ? VoucherScope.store : VoucherScope.platform,
+    scope: _text(json['scope']) == 'shop'
+        ? VoucherScope.store
+        : VoucherScope.platform,
   );
 }

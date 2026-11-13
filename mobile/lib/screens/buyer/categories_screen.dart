@@ -23,6 +23,7 @@ import '../../state/catalog_state.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/cart_button.dart';
 import '../../widgets/editorial_header.dart';
+import '../../widgets/empty_state.dart';
 
 /// The icon each category label renders behind its arch.
 ///
@@ -58,6 +59,71 @@ const Map<String, IconData> categoryIcons = {
   'Beauty': Icons.spa_outlined,
 };
 
+/// Reuses the web catalogue's licensed category artwork. Server-added labels
+/// without a matching image keep a neutral category icon.
+class CategoryArtwork extends StatelessWidget {
+  const CategoryArtwork({
+    super.key,
+    required this.category,
+    this.iconSize = 22,
+    this.alignment = Alignment.center,
+    this.tone,
+  });
+
+  final String category;
+  final double iconSize;
+  final Alignment alignment;
+  final Color? tone;
+
+  static const _assets = {
+    'Books and Media': 'books-and-media',
+    'Health and Beauty': 'health-and-beauty',
+    'Sports and Outdoors': 'sports-and-outdoors',
+    'Home and Garden': 'home-and-garden',
+    'Kids and Baby': 'kids-and-baby',
+    "Men's Apparel": 'mens-apparel',
+    "Women's Apparel": 'womens-apparel',
+    'Electronics and Gadgets': 'electronics-and-gadgets',
+    'Pet Supplies': 'pet-supplies',
+    'Food and Gourmet': 'food-and-gourmet',
+    'Automotive & Motorcycle': 'automotive-motorcycle',
+    'Furniture and Office Equipment': 'furniture-and-office-equipment',
+    'Jewelry and Watches': 'jewelry-and-watches',
+    'Office and School Supplies': 'office-and-school-supplies',
+    'Fashion': 'mens-apparel',
+    'Home & Living': 'home-and-garden',
+    'Beauty': 'health-and-beauty',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = _assets[category];
+    final fallback = ColoredBox(
+      color: productTint(category),
+      child: Center(
+        child: Icon(
+          categoryIcons[category] ?? Icons.category_outlined,
+          size: iconSize,
+          color: AppColors.tintInk,
+        ),
+      ),
+    );
+    return ExcludeSemantics(
+      child: asset == null
+          ? fallback
+          : Image.asset(
+              'assets/categories/$asset-320.webp',
+              fit: BoxFit.cover,
+              alignment: alignment,
+              color: tone,
+              colorBlendMode: tone == null ? null : BlendMode.multiply,
+              excludeFromSemantics: true,
+              errorBuilder: (_, _, _) => fallback,
+            ),
+    );
+  }
+}
+
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
 
@@ -76,8 +142,27 @@ class CategoriesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
-    final ranked = _rankedCategories(context.watch<CatalogState>());
-    if (ranked.isEmpty) return const SizedBox.shrink();
+    final catalog = context.watch<CatalogState>();
+    final ranked = _rankedCategories(catalog);
+    if (ranked.isEmpty) {
+      return SafeArea(
+        child: catalog.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: EmptyState(
+                  icon: Icons.category_outlined,
+                  title: catalog.loadFailure == null
+                      ? 'No categories yet'
+                      : 'Could not load categories',
+                  subtitle: 'Refresh to check for available categories.',
+                  action: TextButton(
+                    onPressed: () => catalog.refresh().ignore(),
+                    child: const Text('Refresh categories'),
+                  ),
+                ),
+              ),
+      );
+    }
     final feature = ranked.first;
     final rest = ranked.sublist(1);
 
@@ -109,7 +194,6 @@ class CategoriesScreen extends StatelessWidget {
                   child: _FeatureCategoryTile(
                     category: feature.$1,
                     count: feature.$2,
-                    icon: categoryIcons[feature.$1] ?? Icons.category_outlined,
                     onTap: () => Navigator.of(context).push(
                       AppPageRoute(
                         builder: (_) =>
@@ -121,9 +205,9 @@ class CategoriesScreen extends StatelessWidget {
               ),
               if (rest.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: DiagonalSectionBreak(
-                    color: AppColors.tertiary.withValues(alpha: 0.16),
-                    height: 28,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    child: Divider(height: 1, color: AppColors.divider),
                   ),
                 ),
                 SliverPadding(
@@ -148,8 +232,7 @@ class CategoriesScreen extends StatelessWidget {
                       final bodyLine =
                           scaler.scale(bodyStyle?.fontSize ?? 12) *
                           (bodyStyle?.height ?? 1.4);
-                      final contentH =
-                          52 + (titleLine * 2) + 2 + bodyLine + 32 + 16;
+                      final contentH = 56 + (titleLine * 2) + bodyLine + 40;
                       return SliverGrid(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
@@ -165,9 +248,6 @@ class CategoriesScreen extends StatelessWidget {
                           return _CategoryTile(
                             category: category,
                             count: count,
-                            icon:
-                                categoryIcons[category] ??
-                                Icons.category_outlined,
                             index: i,
                             onTap: () => Navigator.of(context).push(
                               AppPageRoute(
@@ -199,20 +279,18 @@ class _FeatureCategoryTile extends StatelessWidget {
   const _FeatureCategoryTile({
     required this.category,
     required this.count,
-    required this.icon,
     required this.onTap,
   });
 
   final String category;
   final int count;
-  final IconData icon;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final tint = productTint(category);
+    final largeText = MediaQuery.textScalerOf(context).scale(14) >= 22;
 
     return PressableScale(
       onTap: onTap,
@@ -220,7 +298,7 @@ class _FeatureCategoryTile extends StatelessWidget {
       child: ClipRRect(
         borderRadius: editorialRadius(0, ShapeTier.card),
         child: Container(
-          height: 168,
+          height: largeText ? 216 : 138,
           color: AppColors.surfaceMuted,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,7 +312,7 @@ class _FeatureCategoryTile extends StatelessWidget {
                     children: [
                       Text(
                         category,
-                        style: AppType.sectionDisplay.copyWith(fontSize: 28),
+                        style: AppType.sectionDisplay.copyWith(fontSize: 24),
                         // Bounded for the same reason as the tile's: 28px of
                         // "Furniture and Office Equipment" is four lines inside a
                         // 168px panel, and the panel does not grow.
@@ -269,22 +347,11 @@ class _FeatureCategoryTile extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                width: 128,
+                width: largeText ? 92 : 126,
                 child: Arch(
                   footRadius: 10,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          tint,
-                          Color.lerp(tint, AppColors.primaryDark, 0.45)!,
-                        ],
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(icon, size: 44, color: AppColors.textOnDark),
+                  child: SizedBox.expand(
+                    child: CategoryArtwork(category: category, iconSize: 40),
                   ),
                 ),
               ),
@@ -300,14 +367,12 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.category,
     required this.count,
-    required this.icon,
     required this.index,
     required this.onTap,
   });
 
   final String category;
   final int count;
-  final IconData icon;
   final int index;
   final VoidCallback onTap;
 
@@ -319,8 +384,13 @@ class _CategoryTile extends StatelessWidget {
       onTap: onTap,
       semanticLabel: '$category, $count item${count == 1 ? '' : 's'}',
       child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
         clipBehavior: Clip.antiAlias,
-        shape: editorialShape(index, ShapeTier.card),
+        shape: RoundedRectangleBorder(
+          borderRadius: editorialRadius(index, ShapeTier.card),
+          side: BorderSide(color: AppColors.divider),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -331,17 +401,10 @@ class _CategoryTile extends StatelessWidget {
               // just the feature tile at the top.
               Arch(
                 footRadius: 6,
-                child: Container(
-                  width: 40,
-                  height: 52,
-                  // Full-opacity tint: productTint is already a hue lean on
-                  // the card ground, so at 0.6 it composited away into the
-                  // card and the patch stopped reading as a distinct square.
-                  // tintInk for the glyph — the fill inverts per mode, so
-                  // the icon has to as well.
-                  color: productTint(category),
-                  alignment: Alignment.center,
-                  child: Icon(icon, color: AppColors.tintInk, size: 20),
+                child: SizedBox(
+                  width: 52,
+                  height: 56,
+                  child: CategoryArtwork(category: category),
                 ),
               ),
               const Spacer(),

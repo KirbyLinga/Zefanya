@@ -11,7 +11,6 @@
 //   RID-PROF-006  a suspended rider cannot go online
 //   RID-AVAIL-003 going offline with a picked-up job keeps the job
 //   RID-PICK-001  pickup details: seller, address, contact, tracking, parcels
-//   RID-DLV-004   delivery OTP: 5 digits, five wrong, 15-minute lock
 //   RID-DLV-005   COD amount must match exactly
 //   RID-DLV-006   a prepaid order asks for no COD and adds no balance
 //   RID-EARN-001  history lists date, tracking number, result and pay
@@ -65,7 +64,6 @@ Future<(CourierState, String)> _courierWithJob({
   String buyer = 'Marielle Santos',
   String tracking = 'ZEF-RID-01',
   int parcels = 1,
-  String otp = kMockDeliveryOtp,
   CourierState? state,
   Order order = _order,
 }) async {
@@ -81,7 +79,6 @@ Future<(CourierState, String)> _courierWithJob({
     trackingNumber: tracking,
     codAmount: codAmount,
     prepaid: prepaid,
-    deliveryOtp: otp,
   );
   return (courier, courier.jobForOrder(order.id)!.id);
 }
@@ -120,11 +117,7 @@ void _phone(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
-Future<File> _docFile(
-  Directory dir,
-  String name, {
-  int bytes = 1024,
-}) async {
+Future<File> _docFile(Directory dir, String name, {int bytes = 1024}) async {
   final file = File('${dir.path}/$name');
   // Sync IO on purpose: widget tests run on a fake clock, so an awaited
   // dart:io Future (createTemp/writeAsBytes) never completes there.
@@ -138,8 +131,9 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('RID-PROF-001', () {
-    testWidgets('profile shows the rider record and opens both documents',
-        (tester) async {
+    testWidgets('profile shows the rider record and opens both documents', (
+      tester,
+    ) async {
       _phone(tester);
       final dir = Directory.systemTemp.createTempSync('rid_prof_001');
       addTearDown(() => dir.deleteSync(recursive: true));
@@ -196,8 +190,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('rider-document-license')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byKey(const ValueKey('document-preview-Licence')),
-          findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('document-preview-Licence')),
+        findsOneWidget,
+      );
       await tester.tap(find.text('Close'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
@@ -209,62 +205,68 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('rider-document-orcr')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byKey(const ValueKey('document-preview-OR/CR')),
-          findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('document-preview-OR/CR')),
+        findsOneWidget,
+      );
     });
   });
 
   group('RID-PROF-002', () {
-    test('a changed vehicle replaces the plate and asks for re-verification',
-        () async {
-      final auth = AuthState();
-      auth.saveRiderRegistration(
-        company: 'Bilis Hatid Express Inc.',
-        vehicleType: 'Motorcycle',
-        plate: '123ABC',
-        licenseNumber: 'N01-23-456789',
-        licenseExpiry: DateTime(2030, 3, 22),
-      );
-
-      final problem = auth.updateRiderVehicle(
-        company: 'Bilis Hatid Express Inc.',
-        vehicleType: 'Motorcycle',
-        plate: 'XYZ 9876',
-        licenseNumber: 'N01-23-456789',
-        licenseExpiry: DateTime(2030, 3, 22),
-        today: DateTime(2026, 10, 25),
-      );
-
-      expect(problem, isNull);
-      expect(auth.riderPlate, 'XYZ 9876');
-      expect(auth.riderReverificationRequired, isTrue);
-      expect(auth.riderPlate, isNot('123ABC'));
-    });
-  });
-
-  group('RID-PROF-003', () {
-    test('a plate used by another rider is refused and the old plate stays',
-        () async {
-      final auth = AuthState();
-      auth.saveRiderRegistration(plate: '123ABC', vehicleType: 'Motorcycle');
-
-      // Both spellings of the same plate: the registry compares the
-      // normalised form, so neither may slip through on punctuation.
-      for (final plate in ['ABC 1234', 'ABC-1234']) {
-        final problem = auth.updateRiderVehicle(
+    test(
+      'a changed vehicle replaces the plate and asks for re-verification',
+      () async {
+        final auth = AuthState();
+        auth.saveRiderRegistration(
+          company: 'Bilis Hatid Express Inc.',
           vehicleType: 'Motorcycle',
-          plate: plate,
+          plate: '123ABC',
           licenseNumber: 'N01-23-456789',
           licenseExpiry: DateTime(2030, 3, 22),
         );
 
-        expect(
-          problem,
-          'That plate number is already registered to another rider.',
+        final problem = auth.updateRiderVehicle(
+          company: 'Bilis Hatid Express Inc.',
+          vehicleType: 'Motorcycle',
+          plate: 'XYZ 9876',
+          licenseNumber: 'N01-23-456789',
+          licenseExpiry: DateTime(2030, 3, 22),
+          today: DateTime(2026, 10, 25),
         );
-        expect(auth.riderPlate, '123ABC');
-      }
-    });
+
+        expect(problem, isNull);
+        expect(auth.riderPlate, 'XYZ 9876');
+        expect(auth.riderReverificationRequired, isTrue);
+        expect(auth.riderPlate, isNot('123ABC'));
+      },
+    );
+  });
+
+  group('RID-PROF-003', () {
+    test(
+      'a plate used by another rider is refused and the old plate stays',
+      () async {
+        final auth = AuthState();
+        auth.saveRiderRegistration(plate: '123ABC', vehicleType: 'Motorcycle');
+
+        // Both spellings of the same plate: the registry compares the
+        // normalised form, so neither may slip through on punctuation.
+        for (final plate in ['ABC 1234', 'ABC-1234']) {
+          final problem = auth.updateRiderVehicle(
+            vehicleType: 'Motorcycle',
+            plate: plate,
+            licenseNumber: 'N01-23-456789',
+            licenseExpiry: DateTime(2030, 3, 22),
+          );
+
+          expect(
+            problem,
+            'That plate number is already registered to another rider.',
+          );
+          expect(auth.riderPlate, '123ABC');
+        }
+      },
+    );
   });
 
   group('RID-PROF-004', () {
@@ -272,8 +274,10 @@ void main() {
       final today = DateTime(2026, 10, 25);
       final yesterday = today.subtract(const Duration(days: 1));
 
-      expect(validateLicenseExpiry(yesterday, today: today),
-          contains('expired'));
+      expect(
+        validateLicenseExpiry(yesterday, today: today),
+        contains('expired'),
+      );
       expect(validateLicenseExpiry(today, today: today), isNull);
 
       final auth = AuthState();
@@ -300,51 +304,54 @@ void main() {
   });
 
   group('RID-PROF-005', () {
-    test('only a 5.0 MB JPG is accepted; a rejected file keeps the old one',
-        () async {
-      final dir = await Directory.systemTemp.createTemp('rid_prof_005');
-      addTearDown(() => dir.delete(recursive: true));
-      final jpg = await _docFile(
-        dir,
-        'licence.jpg',
-        bytes: kRiderDocumentMaxBytes,
-      );
-      final tooBig = await _docFile(
-        dir,
-        'too_big.jpg',
-        bytes: kRiderDocumentMaxBytes + 1,
-      );
-      final text = await _docFile(dir, 'notes.txt');
+    test(
+      'only a 5.0 MB JPG is accepted; a rejected file keeps the old one',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('rid_prof_005');
+        addTearDown(() => dir.delete(recursive: true));
+        final jpg = await _docFile(
+          dir,
+          'licence.jpg',
+          bytes: kRiderDocumentMaxBytes,
+        );
+        final tooBig = await _docFile(
+          dir,
+          'too_big.jpg',
+          bytes: kRiderDocumentMaxBytes + 1,
+        );
+        final text = await _docFile(dir, 'notes.txt');
 
-      expect(validateRiderDocumentPath(jpg.path), isNull);
-      expect(validateRiderDocumentPath(tooBig.path), contains('5 MB'));
-      expect(validateRiderDocumentPath(text.path), contains('JPG'));
+        expect(validateRiderDocumentPath(jpg.path), isNull);
+        expect(validateRiderDocumentPath(tooBig.path), contains('5 MB'));
+        expect(validateRiderDocumentPath(text.path), contains('JPG'));
 
-      final auth = AuthState();
-      auth.saveRiderRegistration(
-        vehicleType: 'Motorcycle',
-        plate: 'XYZ 9876',
-        licenseNumber: 'N01-23-456789',
-        licenseExpiry: DateTime(2030, 3, 22),
-        licensePath: jpg.path,
-      );
+        final auth = AuthState();
+        auth.saveRiderRegistration(
+          vehicleType: 'Motorcycle',
+          plate: 'XYZ 9876',
+          licenseNumber: 'N01-23-456789',
+          licenseExpiry: DateTime(2030, 3, 22),
+          licensePath: jpg.path,
+        );
 
-      final rejected = auth.updateRiderVehicle(
-        vehicleType: 'Motorcycle',
-        plate: 'XYZ 9876',
-        licenseNumber: 'N01-23-456789',
-        licenseExpiry: DateTime(2030, 3, 22),
-        licensePath: tooBig.path,
-        today: DateTime(2026, 10, 25),
-      );
-      expect(rejected, contains('5 MB'));
-      expect(auth.riderLicensePath, jpg.path);
-    });
+        final rejected = auth.updateRiderVehicle(
+          vehicleType: 'Motorcycle',
+          plate: 'XYZ 9876',
+          licenseNumber: 'N01-23-456789',
+          licenseExpiry: DateTime(2030, 3, 22),
+          licensePath: tooBig.path,
+          today: DateTime(2026, 10, 25),
+        );
+        expect(rejected, contains('5 MB'));
+        expect(auth.riderLicensePath, jpg.path);
+      },
+    );
   });
 
   group('RID-PROF-006', () {
-    testWidgets('a suspended rider cannot go online and sees the message',
-        (tester) async {
+    testWidgets('a suspended rider cannot go online and sees the message', (
+      tester,
+    ) async {
       _phone(tester);
       final courier = CourierState();
       await courier.load();
@@ -370,22 +377,21 @@ void main() {
   });
 
   group('RID-AVAIL-003', () {
-    test('going offline with an active job keeps the job deliverable',
-        () async {
-      final (courier, jobId) = await _courierWithJob();
-      expect(courier.goOnline(), isNull);
-      courier.advanceMilestone(jobId, DeliveryMilestone.assignedToRider);
+    test(
+      'going offline with an active job keeps the job deliverable',
+      () async {
+        final (courier, jobId) = await _courierWithJob();
+        expect(courier.goOnline(), isNull);
+        courier.advanceMilestone(jobId, DeliveryMilestone.assignedToRider);
 
-      courier.goOffline();
+        courier.goOffline();
 
-      expect(courier.isOnline, isFalse);
-      expect(
-        courier.jobsForDelivery.map((j) => j.job.id),
-        contains(jobId),
-      );
-      courier.completeJob(jobId);
-      expect(courier.isCompleted(jobId), isTrue);
-    });
+        expect(courier.isOnline, isFalse);
+        expect(courier.jobsForDelivery.map((j) => j.job.id), contains(jobId));
+        courier.completeJob(jobId);
+        expect(courier.isCompleted(jobId), isTrue);
+      },
+    );
   });
 
   group('RID-PICK-001', () {
@@ -421,59 +427,24 @@ void main() {
     });
   });
 
-  group('RID-DLV-004', () {
-    test('5 digits is refused, five wrong codes lock 15 minutes, then the '
-        'correct code works', () async {
-      var now = DateTime(2026, 10, 25, 12);
-      final courier = CourierState(clock: () => now);
-      final (state, jobId) = await _courierWithJob(state: courier);
-      expect(state, same(courier));
-
-      expect(
-        courier.validateDeliveryOtp(jobId, '12345'),
-        contains('6-digit'),
-      );
-      expect(courier.otpFailuresFor(jobId), 0);
-
-      for (var attempt = 1; attempt <= 4; attempt++) {
-        final problem = courier.validateDeliveryOtp(jobId, '000000');
-        expect(problem, contains('incorrect'));
-        expect(courier.otpFailuresFor(jobId), attempt);
-      }
-      expect(
-        courier.validateDeliveryOtp(jobId, '000000'),
-        contains('locked for 15 minutes'),
-      );
-      expect(courier.isOtpLocked(jobId), isTrue);
-
-      // The correct code is still refused while the lock is running.
-      expect(
-        courier.validateDeliveryOtp(jobId, kMockDeliveryOtp),
-        contains('Try again in'),
-      );
-
-      now = now.add(const Duration(minutes: 15));
-      expect(courier.isOtpLocked(jobId), isFalse);
-      expect(courier.validateDeliveryOtp(jobId, kMockDeliveryOtp), isNull);
-    });
-  });
-
   group('RID-DLV-005', () {
-    test('COD must match exactly; one centavo either side is refused',
-        () async {
-      final (courier, jobId) = await _courierWithJob(codAmount: 500);
+    test(
+      'COD must match exactly; one centavo either side is refused',
+      () async {
+        final (courier, jobId) = await _courierWithJob(codAmount: 500);
 
-      expect(
-        courier.validateCodAmount(jobId, '499.99'),
-        contains('does not match'),
-      );
-      expect(
-        courier.validateCodAmount(jobId, '500.01'),
-        contains('does not match'),
-      );
-      expect(courier.validateCodAmount(jobId, '500.00'), isNull);
-      expect(courier.validateCodAmount(jobId, '₱500'), isNull);
-    });
+        expect(
+          courier.validateCodAmount(jobId, '499.99'),
+          contains('does not match'),
+        );
+        expect(
+          courier.validateCodAmount(jobId, '500.01'),
+          contains('does not match'),
+        );
+        expect(courier.validateCodAmount(jobId, '500.00'), isNull);
+        expect(courier.validateCodAmount(jobId, '₱500'), isNull);
+      },
+    );
   });
 
   group('RID-DLV-006', () {
@@ -495,10 +466,16 @@ void main() {
   });
 
   group('RID-EARN-001', () {
-    testWidgets('history shows result, tracking number and pay', (tester) async {
+    testWidgets('history shows result, tracking number and pay', (
+      tester,
+    ) async {
       _phone(tester);
+      var now = DateTime(2026, 11, 11, 12);
+      final state = CourierState(clock: () => now);
+      await state.load();
       final (courier, deliveredId) = await _courierWithJob(
         tracking: 'ZEF-EARN-01',
+        state: state,
       );
       courier.completeJob(deliveredId);
 
@@ -518,25 +495,30 @@ void main() {
         codAmount: 700,
       );
       final returnedId = courier.jobForOrder(returnedOrder.id)!.id;
+      now = now.add(const Duration(minutes: 1));
       courier.completeJob(returnedId, returned: true);
 
       await tester.pumpWidget(
         _app(
           auth: AuthState(),
           courier: courier,
-          home: const CourierProfitScreen(),
+          home: CourierProfitScreen(now: now),
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
 
       await tester.scrollUntilVisible(
+        find.byKey(ValueKey('transaction-result-$returnedId')),
+        300,
+      );
+      expect(find.textContaining('Returned · ZEF-EARN-02'), findsOneWidget);
+      expect(find.text(formatPeso(50)), findsWidgets);
+      await tester.scrollUntilVisible(
         find.byKey(ValueKey('transaction-result-$deliveredId')),
         300,
       );
       expect(find.textContaining('Delivered · ZEF-EARN-01'), findsOneWidget);
-      expect(find.textContaining('Returned · ZEF-EARN-02'), findsOneWidget);
       expect(find.text(formatPeso(85)), findsWidgets);
-      expect(find.text(formatPeso(50)), findsWidgets);
     });
   });
 
@@ -578,28 +560,30 @@ void main() {
   });
 
   group('RID-EARN-004', () {
-    test('pending remittance leaves the balance; confirmation clears it',
-        () async {
-      final (courier, first) = await _courierWithJob(codAmount: 500);
-      courier.completeJob(first);
-      final (_, second) = await _courierWithJob(
-        state: courier,
-        codAmount: 1300,
-        tracking: 'ZEF-EARN-05',
-        order: _secondOrder('ORD-RID-5'),
-      );
-      courier.completeJob(second);
-      expect(courier.codOutstanding, 1800);
+    test(
+      'pending remittance leaves the balance; confirmation clears it',
+      () async {
+        final (courier, first) = await _courierWithJob(codAmount: 500);
+        courier.completeJob(first);
+        final (_, second) = await _courierWithJob(
+          state: courier,
+          codAmount: 1300,
+          tracking: 'ZEF-EARN-05',
+          order: _secondOrder('ORD-RID-5'),
+        );
+        courier.completeJob(second);
+        expect(courier.codOutstanding, 1800);
 
-      expect(courier.requestRemittance(1800), isNull);
-      expect(courier.codOutstanding, 1800);
-      expect(courier.pendingRemittanceTotal, 1800);
+        expect(courier.requestRemittance(1800), isNull);
+        expect(courier.codOutstanding, 1800);
+        expect(courier.pendingRemittanceTotal, 1800);
 
-      final pending = courier.remittances.single;
-      expect(courier.confirmRemittance(pending.id), isTrue);
-      expect(courier.codOutstanding, 0);
-      expect(courier.pendingRemittanceTotal, 0);
-    });
+        final pending = courier.remittances.single;
+        expect(courier.confirmRemittance(pending.id), isTrue);
+        expect(courier.codOutstanding, 0);
+        expect(courier.pendingRemittanceTotal, 0);
+      },
+    );
   });
 
   group('RID-EARN-005', () {

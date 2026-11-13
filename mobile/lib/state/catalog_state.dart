@@ -25,17 +25,20 @@ import 'package:flutter/foundation.dart';
 import '../data/api/api_exception.dart';
 import '../data/mock_data.dart' show Product;
 import '../data/repositories/catalog_repository.dart';
+
 class CatalogState extends ChangeNotifier {
   /// [repository] defaults to the mock so existing call sites and tests are
   /// unaffected; `main()` passes the resolved bundle's.
   CatalogState({CatalogRepository? repository})
-      : _repository = repository ?? MockCatalogRepository();
+    : _repository = repository ?? MockCatalogRepository();
 
   final CatalogRepository _repository;
 
   List<Product> _products = const [];
   List<String> _categories = const [];
   ApiException? _loadFailure;
+  bool _loading = false;
+  bool get isLoading => _loading;
 
   /// Why the catalogue is empty, when the reason is a failed request rather than
   /// an empty shop.
@@ -58,6 +61,13 @@ class CatalogState extends ChangeNotifier {
     return null;
   }
 
+  Future<Product?>? fetchLiveProduct(String id) {
+    final repository = _repository;
+    return repository is LiveCatalogRepository
+        ? repository.productById(id)
+        : null;
+  }
+
   /// Category labels in display order, including the leading `'All'` the chips
   /// render (that entry is the app's own no-filter chip, not a server row).
   List<String> get categories => List.unmodifiable(_categories);
@@ -73,9 +83,9 @@ class CatalogState extends ChangeNotifier {
 
   /// Everything one shop sells — the seller screen.
   List<Product> bySeller(String sellerName) => [
-        for (final product in _products)
-          if (product.sellerName == sellerName) product,
-      ];
+    for (final product in _products)
+      if (product.sellerName == sellerName) product,
+  ];
 
   /// Free-text search over name and category — the same two fields the server
   /// matches (`ProductController::index`), so a live search and a mock search
@@ -117,9 +127,10 @@ class CatalogState extends ChangeNotifier {
     const stopWords = {'with', 'from', 'that', 'this', 'your', 'shop'};
     final candidates = <String>{};
     for (final product in _products) {
-      for (final word in '${product.name} ${product.category}'
-          .toLowerCase()
-          .split(RegExp(r'[^a-z0-9]+'))) {
+      for (final word
+          in '${product.name} ${product.category}'.toLowerCase().split(
+            RegExp(r'[^a-z0-9]+'),
+          )) {
         if (word.length >= 4 && !stopWords.contains(word)) {
           candidates.add(word);
         }
@@ -174,6 +185,8 @@ class CatalogState extends ChangeNotifier {
   /// where the failure belongs. `ApiNotConfiguredException` still throws — that is
   /// a build mistake, not a runtime condition (see `StartupState`).
   Future<void> load() async {
+    _loading = true;
+    notifyListeners();
     try {
       final products = await _repository.products();
       final categories = await _repository.categories();
@@ -187,9 +200,10 @@ class CatalogState extends ChangeNotifier {
       _products = const [];
       _categories = const [];
       _loadFailure = error;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
-
-    notifyListeners();
   }
 
   /// Re-fetches the catalogue. Called by pull-to-refresh on Home and Categories.
@@ -198,6 +212,9 @@ class CatalogState extends ChangeNotifier {
   /// and the screen can show an error message — but [_loadFailure] is also updated
   /// so a rebuild from state still has something true to render.
   Future<void> refresh() async {
+    if (_loading) return;
+    _loading = true;
+    notifyListeners();
     try {
       final products = await _repository.products();
       final categories = await _repository.categories();
@@ -208,6 +225,7 @@ class CatalogState extends ChangeNotifier {
       _loadFailure = error;
       rethrow;
     } finally {
+      _loading = false;
       notifyListeners();
     }
   }

@@ -44,6 +44,7 @@ import 'catalog_repository.dart';
 import 'chat_repository.dart';
 import 'courier_repository.dart';
 import 'google_auth_repository.dart';
+import 'linehaul_repository.dart';
 import 'order_repository.dart';
 import 'return_repository.dart';
 import 'review_repository.dart';
@@ -67,6 +68,7 @@ class Repositories {
     required this.courier,
     required this.returns,
     AddressRepository? address,
+    this.linehaul,
     this.client,
   }) : address = address ?? const MockAddressRepository();
 
@@ -89,6 +91,7 @@ class Repositories {
   final ChatRepository chat;
   final CourierRepository courier;
   final ReturnRepository returns;
+  final LinehaulRepository? linehaul;
 
   /// The network client, present only in live mode.
   ///
@@ -120,6 +123,7 @@ class Repositories {
     returns: MockReturnRepository(),
     chat: MockChatRepository(),
     courier: const MockCourierRepository(),
+    linehaul: const LinehaulRepository.demo(),
   );
 
   /// The live set, built against [client].
@@ -143,6 +147,7 @@ class Repositories {
     returns: LiveReturnRepository(client),
     chat: LiveChatRepository(client),
     courier: LiveCourierRepository(client),
+    linehaul: LinehaulRepository(client),
     client: client,
   );
 

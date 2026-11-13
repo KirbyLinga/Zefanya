@@ -118,7 +118,7 @@ void main() {
       );
       expect(find.textContaining('excluded from this amount'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('Next'),
+        find.text('Next').hitTestable(),
         100,
         scrollable: find.byType(Scrollable).first,
       );
@@ -126,7 +126,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(queries.last['page'], '2');
       await tester.scrollUntilVisible(
-        find.text('This week'),
+        find.text('This week').hitTestable(),
         -100,
         scrollable: find.byType(Scrollable).first,
       );

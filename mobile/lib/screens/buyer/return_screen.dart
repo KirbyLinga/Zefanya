@@ -99,12 +99,12 @@ class _ReturnScreenState extends State<ReturnScreen> {
     String? error;
     try {
       error = await context.read<OrderState>().returns.submit(
-            order: widget.order,
-            description: _description.text,
-            photoPaths: List.of(_photos),
+        order: widget.order,
+        description: _description.text,
+        photoPaths: List.of(_photos),
         defectReason: _defectReason,
-            deliveredAt: widget.deliveredAt,
-          );
+        deliveredAt: widget.deliveredAt,
+      );
     } on ApiException catch (failure) {
       error = failure.message;
     } catch (_) {
@@ -136,8 +136,10 @@ class _ReturnScreenState extends State<ReturnScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
       children: [
-        Text('${widget.order.shopName} — ${widget.order.id}',
-            style: AppType.eyebrow),
+        Text(
+          '${widget.order.shopName} — ${widget.order.id}',
+          style: AppType.eyebrow,
+        ),
         const SizedBox(height: 8),
         Text('Return or refund', style: AppType.sectionDisplay),
         const SizedBox(height: 8),
@@ -145,8 +147,9 @@ class _ReturnScreenState extends State<ReturnScreen> {
           'Tell the seller what went wrong and attach photos of the item. '
           'Online reports are available for seven days after delivery. '
           'Contact support for help with other available remedies.',
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 22),
         if (widget.order.buyerConfirmed)
@@ -178,8 +181,9 @@ class _ReturnScreenState extends State<ReturnScreen> {
               Text(
                 'Attach 1 to $returnPhotoLimit photos. They are kept in the '
                 'order you add them.',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -270,8 +274,9 @@ class _ReturnScreenState extends State<ReturnScreen> {
           'Your request for ${widget.order.id} is open. The seller\'s '
           'response will appear on this order.',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 24),
         ElevatedButton(
@@ -284,11 +289,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
 }
 
 class _AddPhotoButton extends StatelessWidget {
-  const _AddPhotoButton({
-    super.key,
-    required this.count,
-    required this.onTap,
-  });
+  const _AddPhotoButton({super.key, required this.count, required this.onTap});
 
   final int count;
   final VoidCallback onTap;
@@ -322,8 +323,9 @@ class _AddPhotoButton extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 '$count/$returnPhotoLimit',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -384,9 +386,9 @@ class _ReturnPhotoThumb extends StatelessWidget {
               ),
               child: Text(
                 '${index + 1}',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -427,16 +429,16 @@ class ReturnStatusCard extends StatelessWidget {
   final ReturnRequest request;
 
   Color get _statusColor => switch (request.status) {
-        ReturnStatus.submitted => AppColors.warning,
-        ReturnStatus.rejected => AppColors.danger,
-        ReturnStatus.escalated => AppColors.primaryDark,
-        ReturnStatus.refunded => AppColors.tertiary,
-      };
+    ReturnStatus.submitted => AppColors.warning,
+    ReturnStatus.rejected => AppColors.danger,
+    ReturnStatus.escalated => AppColors.primaryDark,
+    ReturnStatus.returned => AppColors.tertiary,
+    ReturnStatus.refunded => AppColors.tertiary,
+  };
 
   Future<void> _escalate(BuildContext context) async {
     try {
-      final error =
-          await context.read<OrderState>().returns.escalate(request);
+      final error = await context.read<OrderState>().returns.escalate(request);
       if (!context.mounted) return;
       showTimedSnackBar(
         context,
@@ -472,8 +474,10 @@ class ReturnStatusCard extends StatelessWidget {
             children: [
               Expanded(child: Text('RETURN / REFUND', style: AppType.eyebrow)),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: radiusOf(ShapeTier.pill),
@@ -491,10 +495,7 @@ class ReturnStatusCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(_title, style: theme.textTheme.titleSmall),
           const SizedBox(height: 6),
-          Text(
-            request.description,
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text(request.description, style: theme.textTheme.bodyMedium),
           if (request.photoPaths.isNotEmpty) ...[
             const SizedBox(height: 12),
             Wrap(
@@ -533,22 +534,27 @@ class ReturnStatusCard extends StatelessWidget {
             Text(
               'This request is open. Order Received is unavailable until the '
               'seller responds.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ] else if (request.status == ReturnStatus.escalated) ...[
             const SizedBox(height: 12),
             Text(
               'This request has been escalated for another review.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ] else ...[
             const SizedBox(height: 12),
             Text(
-              'The refund for this order has been processed.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              request.status == ReturnStatus.refunded
+                  ? 'The refund for this order has been recorded.'
+                  : 'The seller received the returned parcel.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -557,9 +563,10 @@ class ReturnStatusCard extends StatelessWidget {
   }
 
   String get _title => switch (request.status) {
-        ReturnStatus.submitted => 'Waiting for the seller',
-        ReturnStatus.rejected => 'Request rejected',
-        ReturnStatus.escalated => 'Escalated',
-        ReturnStatus.refunded => 'Refunded',
-      };
+    ReturnStatus.submitted => 'Waiting for the seller',
+    ReturnStatus.rejected => 'Request rejected',
+    ReturnStatus.escalated => 'Escalated',
+    ReturnStatus.returned => 'Returned to seller',
+    ReturnStatus.refunded => 'Refunded',
+  };
 }

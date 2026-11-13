@@ -36,12 +36,19 @@ void showTimedSnackBar(
   // i.e. exactly the "it never times out" bug.
   messenger.removeCurrentSnackBar();
 
-  final controller = messenger.showSnackBar(snackBar);
-  debugPrint('[timed_snackbar] shown, will remove in ${duration.inMilliseconds}ms');
+  final controller = messenger.showSnackBar(
+    snackBar,
+    snackBarAnimationStyle: _skipSelfRemoval(context)
+        ? AnimationStyle.noAnimation
+        : null,
+  );
 
   // Widget-test harness: no self-removal timer (it would keep the fake
   // clock scheduling forever — the cart swipe hang).
-  if (_skipSelfRemoval(context)) return;
+  if (_skipSelfRemoval(context) ||
+      (MediaQuery.maybeOf(context)?.accessibleNavigation ?? false)) {
+    return;
+  }
 
   // Track whether THIS SnackBar has already gone (swiped away, action
   // tapped, or replaced) so the timer below never removes a newer one.
@@ -49,8 +56,7 @@ void showTimedSnackBar(
   controller.closed.then((_) => closed = true);
 
   Timer(duration, () {
-    debugPrint('[timed_snackbar] timer fired, alreadyClosed=$closed');
-    if (!closed) {
+    if (!closed && messenger.mounted) {
       messenger.removeCurrentSnackBar(reason: SnackBarClosedReason.timeout);
     }
   });

@@ -28,9 +28,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:zefanya/data/api/api_client.dart';
+import 'package:zefanya/data/api/token_store.dart';
 import 'package:zefanya/data/mock_data.dart';
 import 'package:zefanya/data/repositories/repositories.dart';
 import 'package:zefanya/screens/buyer/courier_tracker_screen.dart';
@@ -61,8 +66,11 @@ CourierState _dispatched({String? courierName = 'Rico Delos Santos'}) {
     // "no courier yet" case.
     courier.advanceMilestone(jobId, DeliveryMilestone.sorted);
   } else {
-    courier.advanceMilestone(jobId, DeliveryMilestone.assignedToRider,
-        courierName: courierName);
+    courier.advanceMilestone(
+      jobId,
+      DeliveryMilestone.assignedToRider,
+      courierName: courierName,
+    );
   }
   return courier;
 }
@@ -114,25 +122,80 @@ Future<void> _pump(
 }
 
 void main() {
+  testWidgets(
+    'live tracking retains the shipment status when refresh fails without a local job',
+    (tester) async {
+      var fail = false;
+      final requests = <String>[];
+      final client = ApiClient(
+        baseUrl: 'https://example.test/api',
+        tokenStore: InMemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          requests.add(request.url.path);
+          return http.Response(
+            fail
+                ? '{"message":"Unavailable"}'
+                : '{"data":{"status":"OUT_FOR_DELIVERY","status_label":"With the delivery rider"}}',
+            fail ? 503 : 200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<Repositories>.value(value: Repositories.live(client)),
+            ChangeNotifierProvider(create: (_) => CourierState()),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: const CourierTrackerScreen(order: _order),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 900));
+      expect(find.text('With the delivery rider'), findsOneWidget);
+      expect(find.textContaining('Last checked:'), findsOneWidget);
+      fail = true;
+      await tester.tap(find.byTooltip('Refresh shipment'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('With the delivery rider'), findsOneWidget);
+      expect(find.text('Could not refresh this shipment.'), findsOneWidget);
+      expect(requests, [
+        '/api/buyer/shipments/ORD-55555',
+        '/api/buyer/shipments/ORD-55555',
+      ]);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('courier tracker with a named rider — light', (tester) async {
     await _pump(tester, courier: _dispatched(), brightness: Brightness.light);
-    await expectLater(find.byType(CourierTrackerScreen),
-        matchesGoldenFile('courier_tracker_light.png'));
+    await expectLater(
+      find.byType(CourierTrackerScreen),
+      matchesGoldenFile('courier_tracker_light.png'),
+    );
   });
 
   testWidgets('courier tracker with a named rider — dark', (tester) async {
     await _pump(tester, courier: _dispatched(), brightness: Brightness.dark);
-    await expectLater(find.byType(CourierTrackerScreen),
-        matchesGoldenFile('courier_tracker_dark.png'));
+    await expectLater(
+      find.byType(CourierTrackerScreen),
+      matchesGoldenFile('courier_tracker_dark.png'),
+    );
   });
 
-  testWidgets('the no-rider state is a state, not an empty card',
-      (tester) async {
-    await _pump(tester,
-        courier: _dispatched(courierName: null),
-        brightness: Brightness.light);
+  testWidgets('the no-rider state is a state, not an empty card', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      courier: _dispatched(courierName: null),
+      brightness: Brightness.light,
+    );
 
     // The card is present and says what is true. If someone later "tidies"
     // this by hiding the card until a rider exists, this fails — and that
@@ -144,28 +207,35 @@ void main() {
     expect(find.byTooltip('Message null'), findsNothing);
   });
 
-  testWidgets('the named-rider card offers contact with that rider',
-      (tester) async {
-    await _pump(tester, courier: _dispatched(), brightness: Brightness.light);
+  testWidgets(
+    'the named-rider card offers contact only when chat is available',
+    (tester) async {
+      await _pump(tester, courier: _dispatched(), brightness: Brightness.light);
 
-    expect(find.text('YOUR COURIER'), findsOneWidget);
-    expect(find.text('Rico Delos Santos'), findsOneWidget);
-    expect(find.byTooltip('Message Rico Delos Santos'), findsOneWidget);
-    // No rating appears: this device holds none for that rider, and a rider
-    // with no ratings must not be shown "0.0".
-    expect(find.textContaining('deliveries rated'), findsNothing);
-    expect(find.textContaining('delivery rated'), findsNothing);
-  });
+      expect(find.text('YOUR COURIER'), findsOneWidget);
+      expect(find.text('Rico Delos Santos'), findsOneWidget);
+      expect(
+        find.byTooltip('Message Rico Delos Santos'),
+        kUseLiveApi ? findsNothing : findsOneWidget,
+      );
+      // No rating appears: this device holds none for that rider, and a rider
+      // with no ratings must not be shown "0.0".
+      expect(find.textContaining('deliveries rated'), findsNothing);
+      expect(find.textContaining('delivery rated'), findsNothing);
+    },
+  );
 
   testWidgets('the card survives 1.3x text on a narrow phone', (tester) async {
     // The app clamps system text scale at 1.3x (see main.dart). A row of
     // avatar + two text lines + an icon button is exactly where that bites,
     // and a RenderFlex overflow is silent in code review.
-    await _pump(tester,
-        courier: _dispatched(),
-        brightness: Brightness.light,
-        size: const Size(320, 640),
-        textScale: 1.3);
+    await _pump(
+      tester,
+      courier: _dispatched(),
+      brightness: Brightness.light,
+      size: const Size(320, 640),
+      textScale: 1.3,
+    );
 
     expect(tester.takeException(), isNull);
   });

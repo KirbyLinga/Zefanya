@@ -100,7 +100,10 @@ class AuthState extends ChangeNotifier {
   final AuthRepository _repository;
   final AccountSecurityRepository _accountSecurity;
   final GoogleAuthRepository _googleAuth;
+  // This Laravel checkout exposes browser OAuth only.
+  bool get supportsGoogleSignIn => _googleAuth is! LiveGoogleAuthRepository;
   final GoogleSignInService _googleSignIn;
+  bool _demoSession = false;
 
   UserRole? role;
   AccountStatus status = AccountStatus.loggedOut;
@@ -211,6 +214,10 @@ class AuthState extends ChangeNotifier {
 
   static const _roleKey = 'auth_role';
   static const _statusKey = 'auth_status';
+
+  /// Kept after logout so an existing installation can skip first-run UI.
+  static bool hasSavedSessionHistory(SharedPreferences preferences) =>
+      preferences.containsKey(_statusKey);
   // Additive: an existing install has no value here, `load()` reads that as
   // null, and null renders as the admin-gate copy — which is what that build
   // was already showing. No migration needed and nothing changes on upgrade.
@@ -376,6 +383,18 @@ class AuthState extends ChangeNotifier {
       role = null;
       status = AccountStatus.loggedOut;
     }
+
+    final repository = _repository;
+    final savedRole = role;
+    if (status == AccountStatus.active &&
+        savedRole != null &&
+        repository is LiveAuthRepository &&
+        !await repository.verifySavedSession(savedRole)) {
+      _clearLocalAccount();
+      await clearOrdersTab();
+      await _save();
+      notifyListeners();
+    }
   }
 
   List<AddressEntry> _decodeAddresses(String? raw) {
@@ -415,6 +434,7 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    if (_demoSession) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_statusKey, status.name);
     // Stored as the *wire* string rather than the enum's name, so what sits on
@@ -492,6 +512,27 @@ class AuthState extends ChangeNotifier {
     );
     _applyResult(result, fallbackName: name);
     await _save();
+  }
+
+  /// A demo session only uses the mock repository and stays in memory.
+  Future<void> startDemo(UserRole role) async {
+    if (_repository is! MockAuthRepository ||
+        status != AccountStatus.loggedOut) {
+      return;
+    }
+    final (name, email) = switch (role) {
+      UserRole.buyer => ('Demo Buyer', 'buyer@demo.invalid'),
+      UserRole.courier => ('Demo Rider', 'rider@demo.invalid'),
+      UserRole.linehaul => ('Demo Transport Courier', 'transport@demo.invalid'),
+    };
+    final result = await _repository.login(
+      role: role,
+      email: email,
+      password: '',
+    );
+    if (status != AccountStatus.loggedOut) return;
+    _demoSession = true;
+    _applyResult(result, fallbackName: name);
   }
 
   /// Signs in with Google, or discovers that this identity has no account yet.
@@ -723,7 +764,9 @@ class AuthState extends ChangeNotifier {
     final repository = _repository;
     final address = email;
     if (repository is! ResumesRiderRegistration || address == null) {
-      throw const ApiNotImplementedException('POST /api/rider/registration/resume');
+      throw const ApiNotImplementedException(
+        'POST /api/rider/registration/resume',
+      );
     }
     verificationId = await (repository as ResumesRiderRegistration)
         .resumeRiderRegistration(email: address, password: password);
@@ -1264,6 +1307,21 @@ class AuthState extends ChangeNotifier {
     // cleared — so we read it now.
     final sessionRole = role ?? UserRole.buyer;
 
+    _clearLocalAccount();
+    // Navigation memory belongs to the account, not the device.
+    if (!_demoSession) await clearOrdersTab();
+    notifyListeners();
+    if (_demoSession) {
+      _demoSession = false;
+      return;
+    }
+    await _save();
+    // Offer the account chooser on the next Google sign-in.
+    await _googleSignIn.signOut();
+    await _repository.logout(role: sessionRole);
+  }
+
+  void _clearLocalAccount() {
     role = null;
     status = AccountStatus.loggedOut;
     registrationStatus = null;
@@ -1296,16 +1354,5 @@ class AuthState extends ChangeNotifier {
     riderOrCrPath = null;
     riderReverificationRequired = false;
     pendingGoogleIdentity = null;
-    // Navigation memory belongs to the account, not the device — same
-    // reason recentAddresses clears above.
-    await clearOrdersTab();
-    notifyListeners();
-    await _save();
-    // Best-effort, and before the repository call: the next Google tap should
-    // offer the account chooser, but a Google SDK failure must not stop the
-    // server-side revoke below.
-    await _googleSignIn.signOut();
-    await _repository.logout(role: sessionRole);
   }
 }
-

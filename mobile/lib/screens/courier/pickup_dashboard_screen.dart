@@ -21,6 +21,8 @@ import 'rider_waybill_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/form_sheet_body.dart';
+import '../../widgets/inline_error_notice.dart';
 import '../../widgets/shimmer_box.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/motion/ease_in_frame.dart';
@@ -33,15 +35,18 @@ class PickupDashboardScreen extends StatefulWidget {
 }
 
 class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refresh();
+    });
   }
 
   Future<void> _refresh() async {
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
       await context.read<CourierState>().refreshJobs();
@@ -58,34 +63,49 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
     final jobs = context.watch<CourierState>().jobsForPickup;
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
-      appBar: AppBar(),
-      body: _isLoading
-          ? _buildLoadingState()
-          : RefreshIndicator(
-              color: AppColors.primaryDark,
-              onRefresh: _refresh,
-              child: jobs.isEmpty
-                  ? ListView(
-                      padding: EdgeInsets.zero,
-                      children: [
-                        const EditorialHeader(
-                          eyebrow: 'FOR PICKUP',
-                          title: 'Assigned to You',
-                          trailing: _AvailabilityToggle(),
-                          padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
-                        ),
-                        const RiderWindDownBanner(margin: EdgeInsets.fromLTRB(20, 0, 20, 12)),
-                        const _ReturnPickupsSection(padding: EdgeInsets.symmetric(horizontal: 20)),
-                        const SizedBox(height: 40),
-                        _buildEmptyState(context),
-                      ],
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-                      children: _pickupList(context, jobs),
+      backgroundColor: Colors
+          .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: AppColors.primaryDark,
+          onRefresh: _refresh,
+          child: jobs.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 120),
+                  children: [
+                    const EditorialHeader(
+                      eyebrow: 'FOR PICKUP',
+                      title: 'Assigned to You',
+                      padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
                     ),
-            ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: RiderAvailabilityToggle(),
+                      ),
+                    ),
+                    const RiderWindDownBanner(
+                      margin: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    ),
+                    const _ReturnPickupsSection(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                    ),
+                    if (_isLoading)
+                      _buildLoadingState()
+                    else
+                      _buildEmptyState(context),
+                  ],
+                )
+              : ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                  children: _pickupList(context, jobs),
+                ),
+        ),
+      ),
     );
   }
 
@@ -100,11 +120,16 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
         child: EditorialHeader(
           eyebrow: 'FOR PICKUP',
           title: 'Assigned to You',
-          trailing: _AvailabilityToggle(),
           padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
         ),
       ),
+      const Align(
+        alignment: Alignment.centerLeft,
+        child: RiderAvailabilityToggle(),
+      ),
       const RiderWindDownBanner(margin: EdgeInsets.only(bottom: 12)),
+      if (courier.loadFailure case final failure?)
+        RiderQueueRefreshNotice(failure: failure, onRetry: _refresh),
     ];
     var index = 0;
 
@@ -116,8 +141,11 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
           child: DeliveryJobCard(
             assignedJob: job,
             index: i,
+            pickup: true,
             onTap: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: job.job.id)),
+              AppPageRoute(
+                builder: (_) => DeliveryTrackerScreen(jobId: job.job.id),
+              ),
             ),
           ),
         ),
@@ -129,7 +157,9 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
             child: TextButton.icon(
               key: ValueKey('waybill-${job.job.id}'),
               onPressed: () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => RiderWaybillScreen(jobId: job.job.id)),
+                AppPageRoute(
+                  builder: (_) => RiderWaybillScreen(jobId: job.job.id),
+                ),
               ),
               icon: const Icon(Icons.receipt_long_outlined, size: 18),
               label: const Text('Waybill'),
@@ -168,6 +198,8 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
 
   Widget _buildLoadingState() {
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
       itemCount: 3,
       itemBuilder: (context, i) => ShimmerBox(
@@ -177,7 +209,10 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
           // Matches the real card's asymmetric corners, same reasoning as
           // the buyer grid's skeletons: shape shouldn't visibly change
           // when content replaces it.
-          decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: editorialRadius(i, ShapeTier.card)),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: editorialRadius(i, ShapeTier.card),
+          ),
         ),
       ),
     );
@@ -188,6 +223,9 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
   /// nothing actually failed.
   Widget _buildEmptyState(BuildContext context) {
     final courier = context.watch<CourierState>();
+    if (courier.loadingJobs) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final failure = courier.loadFailure;
 
     if (failure != null) {
@@ -196,7 +234,10 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
         title: 'We couldn\'t load your pickups',
         subtitle: Microcopy.calmError(failure.message),
         action: failure.isRetryable
-            ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
+            ? TextButton(
+                onPressed: () => _retry(courier),
+                child: const Text('Retry'),
+              )
             : null,
         tint: AppColors.tertiary,
       );
@@ -222,14 +263,45 @@ class _PickupDashboardScreenState extends State<PickupDashboardScreen> {
   }
 }
 
+class RiderQueueRefreshNotice extends StatelessWidget {
+  const RiderQueueRefreshNotice({
+    super.key,
+    required this.failure,
+    required this.onRetry,
+  });
+
+  final ApiException failure;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Semantics(
+      liveRegion: true,
+      child: Wrap(
+        spacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Showing last loaded jobs. ${Microcopy.calmError(failure.message)}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (failure.isRetryable)
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    ),
+  );
+}
+
 /// The Online/Offline control the rider uses to start and stop receiving work.
 ///
 /// Going offline is never blocked — a job already picked up stays with the
 /// rider — while going online is refused for a suspended account with the
 /// reason shown inline. The switch mirrors [CourierState] rather than holding
 /// its own bool, so the dashboard and the profile cannot disagree.
-class _AvailabilityToggle extends StatelessWidget {
-  const _AvailabilityToggle();
+class RiderAvailabilityToggle extends StatelessWidget {
+  const RiderAvailabilityToggle({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -246,39 +318,68 @@ class _AvailabilityToggle extends StatelessWidget {
     final busy = courier.availabilityBusy;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              courier.isOnline ? 'ONLINE' : 'OFFLINE',
-              style: AppType.eyebrow.copyWith(
-                color: courier.isOnline
-                    ? AppColors.tertiary
-                    : AppColors.textSecondary,
-              ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            border: Border.all(color: AppColors.divider),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      busy
+                          ? 'UPDATING…'
+                          : courier.isOnline
+                          ? 'ONLINE'
+                          : 'OFFLINE',
+                      style: AppType.eyebrow.copyWith(
+                        color: courier.isOnline
+                            ? AppColors.successText
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  label: 'Rider availability',
+                  child: Switch(
+                    key: const ValueKey('availability-switch'),
+                    value: courier.isOnline,
+                    // Disabled while the server has not answered, so a second tap
+                    // cannot send a second request.
+                    onChanged: suspended || busy
+                        ? null
+                        : (value) async {
+                            final problem = await courier.setOnline(value);
+                            if (problem != null && context.mounted) {
+                              showTimedSnackBar(
+                                context,
+                                SnackBar(
+                                  content: Text(Microcopy.calmError(problem)),
+                                ),
+                              );
+                            }
+                          },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 6),
-            Switch(
-              key: const ValueKey('availability-switch'),
-              value: courier.isOnline,
-              // Disabled while the server has not answered, so a second tap
-              // cannot send a second request.
-              onChanged: suspended || busy
-                  ? null
-                  : (value) async {
-                      final problem = await courier.setOnline(value);
-                      if (problem != null && context.mounted) {
-                        showTimedSnackBar(
-                          context,
-                          SnackBar(content: Text(Microcopy.calmError(problem))),
-                        );
-                      }
-                    },
-            ),
-          ],
+          ),
         ),
+        const SizedBox(height: 6),
+        if (!courier.isOnline && !suspended)
+          const Text(
+            'Offline pauses new assignments. Existing jobs stay available.',
+          ),
         if (suspended)
           Text(
             courier.suspensionReason ?? 'Account suspended',
@@ -329,7 +430,9 @@ class _StopHeader extends StatelessWidget {
           ),
           Text(
             'Earned ${formatPeso(stop.earned)} so far',
-            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           if (stop.canFinish && !courier.isWindingDown) ...[
             const SizedBox(height: 10),
@@ -351,31 +454,33 @@ class _StopHeader extends StatelessWidget {
     final remaining = stop.remaining;
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('FINISH STOP', style: AppType.eyebrow),
-              const SizedBox(height: 8),
-              Text(
-                remaining > 0
-                    ? '$remaining parcel${remaining == 1 ? '' : 's'} not collected will stay assigned to you for the next visit.'
-                    : 'Every parcel at this stop is collected.',
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
+      builder: (sheetContext) => FormSheetBody(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('FINISH STOP', style: AppType.eyebrow),
+            const SizedBox(height: 8),
+            Text(
+              remaining > 0
+                  ? '$remaining parcel${remaining == 1 ? '' : 's'} not collected will stay assigned to you for the next visit.'
+                  : 'Every parcel at this stop is collected.',
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const ValueKey('finish-stop-confirm'),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                child: const Text('Finish Stop'),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const ValueKey('finish-stop-confirm'),
-                  onPressed: () => Navigator.of(sheetContext).pop(true),
-                  child: const Text('Finish Stop'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -386,7 +491,11 @@ class _StopHeader extends StatelessWidget {
       if (finished == null || !context.mounted) return;
       showTimedSnackBar(
         context,
-        const SnackBar(content: Text('Stop finished. Parcels not collected stay assigned to you.')),
+        const SnackBar(
+          content: Text(
+            'Stop finished. Parcels not collected stay assigned to you.',
+          ),
+        ),
       );
     } on ApiException catch (error) {
       if (!context.mounted) return;
@@ -428,6 +537,9 @@ class _PickupFailureButton extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
+      shape: editorialShape(0, ShapeTier.card),
       builder: (_) => ChangeNotifierProvider.value(
         value: context.read<CourierState>(),
         child: _PickupFailureSheet(job: job, hostContext: context),
@@ -468,74 +580,74 @@ class _PickupFailureSheetState extends State<_PickupFailureSheet> {
     final attempt = widget.job.pickupAttempts + 1;
     final finalAttempt = attempt >= courier.maxPickupAttempts;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('FAILED PICKUP', style: AppType.eyebrow),
-              const SizedBox(height: 6),
-              Text(widget.job.shopName, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                'Attempt $attempt of ${courier.maxPickupAttempts}',
-                key: const ValueKey('pickup-failure-attempt'),
-                style: theme.textTheme.bodySmall,
-              ),
-              if (finalAttempt) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'This is the last allowed attempt. If the server records it, the order is cancelled and the stock goes back to the seller.',
-                  key: const ValueKey('pickup-failure-final-warning'),
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
-                ),
-              ],
-              const SizedBox(height: 12),
-              if (reasons.isEmpty)
-                const Text('Pull down to refresh your pickups, then try again.')
-              else
-                RadioGroup<String>(
-                  groupValue: _reason,
-                  onChanged: _sending ? (_) {} : (value) => setState(() => _reason = value),
-                  child: Column(
-                    children: [
-                      for (final reason in reasons)
-                        RadioListTile<String>(
-                          key: ValueKey('pickup-failure-reason-${reason.value}'),
-                          value: reason.value,
-                          title: Text(reason.label),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                    ],
-                  ),
-                ),
-              TextField(
-                key: const ValueKey('pickup-failure-notes'),
-                controller: _notes,
-                enabled: !_sending,
-                maxLength: 1000,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Notes (optional)'),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(_error!, style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger)),
-                ),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const ValueKey('pickup-failure-submit'),
-                  onPressed: _reason == null || _sending ? null : _submit,
-                  child: Text(_sending ? 'Sending…' : 'Report failed pickup'),
-                ),
-              ),
-            ],
+    return FormSheetBody(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('FAILED PICKUP', style: AppType.eyebrow),
+          const SizedBox(height: 6),
+          Text(widget.job.shopName, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'Attempt $attempt of ${courier.maxPickupAttempts}',
+            key: const ValueKey('pickup-failure-attempt'),
+            style: theme.textTheme.bodySmall,
           ),
-        ),
+          if (finalAttempt) ...[
+            const SizedBox(height: 8),
+            Text(
+              'This is the last allowed attempt. If the server records it, the order is cancelled and the stock goes back to the seller.',
+              key: const ValueKey('pickup-failure-final-warning'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.danger,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (reasons.isEmpty)
+            const Text('Pull down to refresh your pickups, then try again.')
+          else
+            RadioGroup<String>(
+              groupValue: _reason,
+              onChanged: _sending
+                  ? (_) {}
+                  : (value) => setState(() => _reason = value),
+              child: Column(
+                children: [
+                  for (final reason in reasons)
+                    RadioListTile<String>(
+                      key: ValueKey('pickup-failure-reason-${reason.value}'),
+                      value: reason.value,
+                      title: Text(reason.label),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                ],
+              ),
+            ),
+          TextField(
+            key: const ValueKey('pickup-failure-notes'),
+            controller: _notes,
+            enabled: !_sending,
+            maxLength: 1000,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Notes (optional)'),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InlineErrorNotice(_error!),
+            ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: const ValueKey('pickup-failure-submit'),
+              onPressed: _reason == null || _sending ? null : _submit,
+              child: Text(_sending ? 'Sending…' : 'Report failed pickup'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -589,7 +701,9 @@ class _ReturnPickupsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final courier = context.watch<CourierState>();
     final returns = courier.returnPickups;
-    if (!courier.isServerAuthoritative || courier.isWindingDown || returns.isEmpty) {
+    if (!courier.isServerAuthoritative ||
+        courier.isWindingDown ||
+        returns.isEmpty) {
       return const SizedBox.shrink();
     }
     final theme = Theme.of(context);
@@ -603,7 +717,8 @@ class _ReturnPickupsSection extends StatelessWidget {
           const SizedBox(height: 16),
           Text('RETURNS TO COLLECT', style: AppType.eyebrow),
           const SizedBox(height: 8),
-          for (final item in returns) _ReturnPickupCard(item: item, theme: theme),
+          for (final item in returns)
+            _ReturnPickupCard(item: item, theme: theme),
         ],
       ),
     );
@@ -633,12 +748,17 @@ class _ReturnPickupCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(item.trackingNumber, style: theme.textTheme.titleSmall),
-          if ((item.buyerName ?? '').isNotEmpty) Text(item.buyerName!, style: theme.textTheme.bodyMedium),
-          if ((item.pickupAddress ?? '').isNotEmpty) Text(item.pickupAddress!, style: theme.textTheme.bodySmall),
-          if ((item.buyerPhone ?? '').isNotEmpty) Text(item.buyerPhone!, style: theme.textTheme.bodySmall),
+          if ((item.buyerName ?? '').isNotEmpty)
+            Text(item.buyerName!, style: theme.textTheme.bodyMedium),
+          if ((item.pickupAddress ?? '').isNotEmpty)
+            Text(item.pickupAddress!, style: theme.textTheme.bodySmall),
+          if ((item.buyerPhone ?? '').isNotEmpty)
+            Text(item.buyerPhone!, style: theme.textTheme.bodySmall),
           Text(
             '${item.itemCount} item${item.itemCount == 1 ? '' : 's'}${(item.reason ?? '').isEmpty ? '' : ' · ${item.reason}'}',
-            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -660,6 +780,7 @@ class _ReturnPickupCard extends StatelessWidget {
         builder: (_) => CourierQrScanner(
           key: ValueKey('return-scanner-${item.id}'),
           expectedTrackingNumber: item.trackingNumber,
+          riderTaskLabel: 'Scan the return parcel label',
         ),
       ),
     );
@@ -667,11 +788,16 @@ class _ReturnPickupCard extends StatelessWidget {
     if (tracking.isEmpty || !context.mounted) return;
 
     try {
-      final sent = await courier.collectReturn(item.id, trackingNumber: tracking);
+      final sent = await courier.collectReturn(
+        item.id,
+        trackingNumber: tracking,
+      );
       if (!sent || !context.mounted) return;
       showTimedSnackBar(
         context,
-        const SnackBar(content: Text('Parcel collected. Bring it to your Station Hub.')),
+        const SnackBar(
+          content: Text('Parcel collected. Bring it to your Station Hub.'),
+        ),
       );
     } on ApiException catch (error) {
       if (!context.mounted) return;
@@ -682,4 +808,3 @@ class _ReturnPickupCard extends StatelessWidget {
     }
   }
 }
-

@@ -45,7 +45,7 @@ String _jobId(CourierState courier) => courier.jobForOrder(_order.id)!.id;
 
 String _trackingNumber(CourierState courier) =>
     (courier.jobById(_jobId(courier))!.trackingNumber ??
-        courier.jobById(_jobId(courier))!.id)
+            courier.jobById(_jobId(courier))!.id)
         .trim()
         .toUpperCase();
 
@@ -75,9 +75,45 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  testWidgets('matching manual entry advances the milestone', (
-    tester,
-  ) async {
+  testWidgets(
+    'Rider scanner keeps manual verification reachable with the keyboard open',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: const CourierQrScanner(
+            expectedTrackingNumber: 'ZEF-REHEARSAL-01',
+            riderTaskLabel: 'Scan the seller’s parcel label',
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('ZEF-REHEARSAL-01'), findsOneWidget);
+      final input = find.byKey(const ValueKey('qr-manual-entry'));
+      final confirm = find.byKey(const ValueKey('qr-manual-confirm'));
+      await tester.showKeyboard(input);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 255);
+      await tester.pump();
+      await tester.ensureVisible(confirm);
+      await tester.pump();
+      await tester.tap(confirm);
+      await tester.pump();
+      expect(find.text('Enter the tracking number.'), findsOneWidget);
+      expect(find.byType(CourierQrScanner), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('matching manual entry advances the milestone', (tester) async {
     final courier = await _dispatched();
     final jobId = _jobId(courier);
     final expectedTracking = _trackingNumber(courier);
@@ -125,10 +161,7 @@ void main() {
 
     expect(courier.milestoneFor(jobId), DeliveryMilestone.arrivedAtSeller);
 
-    expect(
-      find.textContaining('does not match this parcel'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('does not match this parcel'), findsOneWidget);
   });
 
   testWidgets('manual entry field accepts tracking number', (tester) async {
@@ -153,21 +186,32 @@ void main() {
     expect(courier.milestoneFor(jobId), DeliveryMilestone.pickedUp);
   });
 
-  testWidgets('courier QR scanner widget renders without error', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: CourierQrScanner(
-          key: const Key('qr-scanner'),
-          expectedTrackingNumber: 'ANY-CODE',
+  testWidgets(
+    'courier QR scan window is centered and sized in logical pixels',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: CourierQrScanner(
+            key: const Key('qr-scanner'),
+            expectedTrackingNumber: 'ANY-CODE',
+          ),
         ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 500));
-
-    // Just verify the scanner widget renders without throwing
-    expect(find.byType(MobileScanner), findsOneWidget);
-  });
+      );
+      for (final size in [const Size(360, 800), const Size(800, 360)]) {
+        tester.view.physicalSize = size;
+        await tester.pump(const Duration(milliseconds: 500));
+        final finder = find.byType(MobileScanner);
+        final preview = tester.getSize(finder);
+        final window = tester.widget<MobileScanner>(finder).scanWindow!;
+        expect(window.center.dx, closeTo(preview.width / 2, 0.01));
+        expect(window.center.dy, closeTo(preview.height / 2, 0.01));
+        expect(window.width, closeTo(preview.shortestSide * 0.72, 0.01));
+        expect(window.height, closeTo(window.width, 0.01));
+        expect(window.width, greaterThan(40));
+      }
+    },
+  );
 }

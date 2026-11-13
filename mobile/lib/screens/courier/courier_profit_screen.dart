@@ -21,11 +21,27 @@ import '../../utils/weekly_buckets.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/motion/ease_in_frame.dart';
+import 'rider_history_screen.dart';
 
 class CourierProfitScreen extends StatelessWidget {
-  const CourierProfitScreen({super.key});
+  const CourierProfitScreen({super.key, this.now});
 
-  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final DateTime? now;
+
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
   /// "Sep 19, 2:14 PM" — no intl dependency needed for one format.
   static String _formatWhen(DateTime d) {
@@ -40,80 +56,109 @@ class CourierProfitScreen extends StatelessWidget {
     AppColors.watch(context);
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
-    final completed = courier.completedJobs;
+    final earningsAvailable =
+        courier.hasConfirmedEarnings && courier.earningsFailure == null;
+    final completed = earningsAvailable
+        ? courier.completedJobs
+        : const <CompletedJob>[];
 
     // Live mode: pickups are credited too, so "Completed" counts deliveries.
-    final deliveries =
-        completed.where((c) => c.resultLabel != 'Picked up').length;
+    final deliveries = completed
+        .where((c) => c.resultLabel != 'Picked up')
+        .length;
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+      backgroundColor: Colors
+          .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(),
       body: RefreshIndicator(
         // Live mode re-reads the server's earnings; mock mode has nothing to fetch.
         onRefresh: courier.refreshEarnings,
         child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-        children: [
-          const EaseInFrame(
-            index: 0,
-            child: EditorialHeader(
-              eyebrow: 'YOUR MONEY',
-              title: 'Earnings',
-              padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
-            ),
-          ),
-          EaseInFrame(
-            index: 1,
-            child: Column(
-              children: [
-                _buildSummaryCard(
-                  theme,
-                  weekEarnings: courier.weekEarnings,
-                  todayEarnings: courier.todayEarnings,
-                  totalDeliveries: deliveries,
-                ),
-                const SizedBox(height: 16),
-                _buildBreakdownCard(theme, feesEarned: courier.totalEarnings),
-                const SizedBox(height: 16),
-                _buildCodCard(context, theme, courier),
-                if (courier.isServerAuthoritative) ...[
-                  const SizedBox(height: 16),
-                  _buildPayoutsCard(theme, courier),
-                ],
-                const SizedBox(height: 20),
-                _WeeklyChart(completed: completed),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          EaseInFrame(
-            index: 2,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('COMPLETED JOBS', style: AppType.eyebrow),
-                    const SizedBox(height: 4),
-                    Text('Recent Transactions', style: theme.textTheme.titleSmall),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (completed.isEmpty)
-            _buildEmptyTransactions(theme)
-          else
-            for (var i = 0; i < completed.length; i++)
-              EaseInFrame(
-                index: (i + 3).clamp(3, 6),
-                child: _buildTransactionTile(theme, completed[i], i),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+          children: [
+            const EaseInFrame(
+              index: 0,
+              child: EditorialHeader(
+                eyebrow: 'RIDER RECORDS',
+                title: 'Earnings',
+                padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
               ),
-        ],
+            ),
+            if (courier.hasServerRecords && !courier.isWindingDown)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const RiderHistoryScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.history),
+                  label: const Text('Delivery history'),
+                ),
+              ),
+            EaseInFrame(
+              index: 1,
+              child: Column(
+                children: [
+                  if (earningsAvailable)
+                    _buildSummaryCard(
+                      theme,
+                      weekEarnings: courier.weekEarnings,
+                      todayEarnings: courier.todayEarnings,
+                      totalDeliveries: deliveries,
+                    ),
+                  const SizedBox(height: 16),
+                  if (earningsAvailable)
+                    _buildBreakdownCard(
+                      theme,
+                      feesEarned: courier.totalEarnings,
+                    ),
+                  if (courier.isServerAuthoritative) ...[
+                    const SizedBox(height: 16),
+                    _buildPayoutsCard(theme, courier),
+                  ],
+                  const SizedBox(height: 16),
+                  _buildCodCard(context, theme, courier),
+                  const SizedBox(height: 20),
+                  if (earningsAvailable)
+                    _WeeklyChart(completed: completed, now: now),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            EaseInFrame(
+              index: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('COMPLETED JOBS', style: AppType.eyebrow),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Recent Transactions',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (!earningsAvailable)
+              Text(
+                courier.earningsFailure == null
+                    ? 'Loading earnings…'
+                    : 'Earnings unavailable. Pull down to retry.',
+              )
+            else if (completed.isEmpty)
+              _buildEmptyTransactions(theme)
+            else
+              for (var i = 0; i < completed.length; i++)
+                EaseInFrame(
+                  index: (i + 3).clamp(3, 6),
+                  child: _buildTransactionTile(theme, completed[i], i),
+                ),
+          ],
         ),
       ),
     );
@@ -131,14 +176,23 @@ class CourierProfitScreen extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.25), shape: BoxShape.circle),
-            child: Icon(Icons.payments_outlined, color: AppColors.primaryDark, size: 18),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.25),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.payments_outlined,
+              color: AppColors.primaryDark,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Nothing here yet. Finish a delivery and it lands on this list.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
         ],
@@ -163,7 +217,10 @@ class CourierProfitScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.primaryDark, Color.lerp(AppColors.primaryDark, Colors.black, 0.25)!],
+            colors: [
+              AppColors.roseGround,
+              Color.lerp(AppColors.roseGround, Colors.black, 0.18)!,
+            ],
           ),
         ),
         child: Stack(
@@ -178,7 +235,10 @@ class CourierProfitScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [AppColors.textOnDark.withValues(alpha: 0.12), AppColors.textOnDark.withValues(alpha: 0.0)],
+                    colors: [
+                      AppColors.textOnDark.withValues(alpha: 0.12),
+                      AppColors.textOnDark.withValues(alpha: 0.0),
+                    ],
                   ),
                 ),
               ),
@@ -202,11 +262,23 @@ class CourierProfitScreen extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _summaryStat(theme, 'Today', formatPeso(todayEarnings)),
+                      child: _summaryStat(
+                        theme,
+                        'Today',
+                        formatPeso(todayEarnings),
+                      ),
                     ),
-                    Container(width: 1, height: 32, color: AppColors.secondary.withValues(alpha: 0.4)),
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color: AppColors.secondary.withValues(alpha: 0.4),
+                    ),
                     Expanded(
-                      child: _summaryStat(theme, 'Completed', '$totalDeliveries ${totalDeliveries == 1 ? 'delivery' : 'deliveries'}'),
+                      child: _summaryStat(
+                        theme,
+                        'Completed',
+                        '$totalDeliveries ${totalDeliveries == 1 ? 'delivery' : 'deliveries'}',
+                      ),
                     ),
                   ],
                 ),
@@ -222,15 +294,26 @@ class CourierProfitScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: AppColors.secondary)),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: AppColors.secondary,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(value, style: theme.textTheme.titleSmall?.copyWith(color: AppColors.textOnDark)),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: AppColors.textOnDark,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildBreakdownCard(ThemeData theme, {required double feesEarned}) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
@@ -239,33 +322,20 @@ class CourierProfitScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Earnings Breakdown', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 12),
-          _breakdownRow(theme, 'Delivery fees', feesEarned, AppColors.primaryDark),
-          const Divider(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Total', style: theme.textTheme.titleSmall),
+              Text('Total earned', style: theme.textTheme.titleSmall),
               Text(
                 formatPeso(feesEarned),
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+                style: AppType.priceNumeral(22, color: AppColors.textPrimary),
               ),
             ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _breakdownRow(ThemeData theme, String label, double value, Color dotColor) {
-    return Row(
-      children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
-        Text(formatPeso(value), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-      ],
     );
   }
 
@@ -275,7 +345,9 @@ class CourierProfitScreen extends StatelessWidget {
     CourierState courier,
   ) {
     // Live mode: the server's records only. No remit button, no local ledger.
-    if (courier.isServerAuthoritative) return _buildServerCodCard(theme, courier);
+    if (courier.isServerAuthoritative) {
+      return _buildServerCodCard(theme, courier);
+    }
     final collected = courier.codCollections;
     return Container(
       key: const ValueKey('cod-balance-card'),
@@ -290,10 +362,7 @@ class CourierProfitScreen extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  'COD BALANCE TO REMIT',
-                  style: AppType.eyebrow,
-                ),
+                child: Text('COD BALANCE TO REMIT', style: AppType.eyebrow),
               ),
               Text(
                 formatPeso(courier.codOutstanding),
@@ -360,8 +429,8 @@ class CourierProfitScreen extends StatelessWidget {
 
   /// What Logistics actually paid (`GET /api/rider/payouts`), read-only.
   Widget _buildPayoutsCard(ThemeData theme, CourierState courier) {
-    final pay = courier.serverPayouts;
     final failure = courier.payoutsFailure;
+    final pay = failure == null ? courier.serverPayouts : null;
 
     return Container(
       key: const ValueKey('rider-payouts-card'),
@@ -377,22 +446,40 @@ class CourierProfitScreen extends StatelessWidget {
           const SizedBox(height: 8),
           if (pay == null)
             Text(
-              failure == null ? 'Loading your payments…' : Microcopy.calmError(failure.message),
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              failure == null
+                  ? 'Loading your payments…'
+                  : Microcopy.calmError(failure.message),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             )
           else ...[
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 10,
               children: [
-                Expanded(child: _payFigure(theme, 'Paid to you', pay.paid, 'payouts-paid')),
-                Expanded(child: _payFigure(theme, 'Pending pay', pay.pending, 'payouts-pending')),
-                Expanded(child: _payFigure(theme, 'Earned this month', pay.earnedThisMonth, 'payouts-month')),
+                _payFigure(theme, 'Paid to you', pay.paid, 'payouts-paid'),
+                _payFigure(
+                  theme,
+                  'Pending pay',
+                  pay.pending,
+                  'payouts-pending',
+                ),
+                _payFigure(
+                  theme,
+                  'Earned this month',
+                  pay.earnedThisMonth,
+                  'payouts-month',
+                ),
               ],
             ),
             const SizedBox(height: 10),
             if (pay.payouts.isEmpty)
               Text(
                 'No payments recorded yet.',
-                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               )
             else
               for (final payout in pay.payouts.take(5))
@@ -413,12 +500,16 @@ class CourierProfitScreen extends StatelessWidget {
                           padding: const EdgeInsets.only(right: 6),
                           child: Text(
                             'Reversed',
-                            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.danger),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.danger,
+                            ),
                           ),
                         ),
                       Text(
                         formatPeso(payout.amount, showDecimals: true),
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -429,11 +520,21 @@ class CourierProfitScreen extends StatelessWidget {
     );
   }
 
-  Widget _payFigure(ThemeData theme, String label, double amount, String key) => Column(
+  Widget _payFigure(ThemeData theme, String label, double amount, String key) =>
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
-          Text(formatPeso(amount, showDecimals: true), key: ValueKey(key), style: theme.textTheme.titleSmall),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            formatPeso(amount, showDecimals: true),
+            key: ValueKey(key),
+            style: theme.textTheme.titleSmall,
+          ),
         ],
       );
 
@@ -441,45 +542,38 @@ class CourierProfitScreen extends StatelessWidget {
   /// creates one record on the server; Logistics confirms the handover. The
   /// rider can only read this.
   Widget _buildServerCodCard(ThemeData theme, CourierState courier) {
-    final cash = courier.serverCash;
     final failure = courier.cashFailure;
-
-    Widget figure(String label, double amount, String key) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
-              Text(formatPeso(amount, showDecimals: true), key: ValueKey(key), style: theme.textTheme.titleSmall),
-            ],
-          ),
-        );
+    final cash = failure == null ? courier.serverCash : null;
 
     Widget record(RiderCodRecord row) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  row.trackingNumber ?? 'Parcel',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-              Text(
-                row.isHeld
-                    ? (row.overdue ? 'Overdue' : 'With you')
-                    : 'Confirmed ${formatPeso(row.receivedAmount ?? row.amount, showDecimals: true)}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: row.isHeld && row.overdue ? AppColors.danger : AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                formatPeso(row.amount, showDecimals: true),
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ],
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          Text(
+            row.trackingNumber ?? 'Parcel',
+            style: theme.textTheme.bodySmall,
           ),
-        );
+          Text(
+            row.isHeld
+                ? (row.overdue ? 'Overdue' : 'With you')
+                : 'Confirmed ${formatPeso(row.receivedAmount ?? row.amount, showDecimals: true)}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: row.isHeld && row.overdue
+                  ? AppColors.danger
+                  : AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            formatPeso(row.amount, showDecimals: true),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Container(
       key: const ValueKey('cod-balance-card'),
@@ -491,29 +585,50 @@ class CourierProfitScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(child: Text('COD CASH WITH YOU', style: AppType.eyebrow)),
+              Text('COD CASH WITH YOU', style: AppType.eyebrow),
               Text(
-                formatPeso(cash?.holding ?? 0, showDecimals: true),
+                cash == null
+                    ? (failure == null ? 'Loading…' : 'Unavailable')
+                    : formatPeso(cash.holding, showDecimals: true),
                 key: const ValueKey('cod-outstanding'),
                 style: AppType.priceNumeral(24),
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Cash to hand over to Logistics',
+            style: theme.textTheme.bodySmall,
+          ),
           if (cash == null) ...[
             const SizedBox(height: 6),
             Text(
-              failure == null ? 'Loading your COD records…' : Microcopy.calmError(failure.message),
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              failure == null
+                  ? 'Loading your COD records…'
+                  : Microcopy.calmError(failure.message),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ] else ...[
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 10,
               children: [
-                figure('Collected', cash.collected, 'cod-collected'),
-                figure('Remitted', cash.remitted, 'cod-remitted'),
-                figure('This month', cash.remittedThisMonth, 'cod-remitted-month'),
+                _payFigure(theme, 'Collected', cash.collected, 'cod-collected'),
+                _payFigure(theme, 'Remitted', cash.remitted, 'cod-remitted'),
+                _payFigure(
+                  theme,
+                  'This month',
+                  cash.remittedThisMonth,
+                  'cod-remitted-month',
+                ),
               ],
             ),
             if (cash.overdueCount > 0) ...[
@@ -521,14 +636,18 @@ class CourierProfitScreen extends StatelessWidget {
               Text(
                 '${cash.overdueCount} collection${cash.overdueCount == 1 ? '' : 's'} held longer than ${cash.overdueAfterDays} days. Hand the cash to your Logistics company.',
                 key: const ValueKey('cod-overdue'),
-                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.danger,
+                ),
               ),
             ],
             if (cash.held.isEmpty && cash.remittedRecords.isEmpty) ...[
               const SizedBox(height: 6),
               Text(
                 'Cash you collect at the door appears here until Logistics confirms receiving it.',
-                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ] else ...[
               const SizedBox(height: 10),
@@ -538,7 +657,9 @@ class CourierProfitScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Logistics records and confirms every cash handover.',
-              style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -643,7 +764,10 @@ class CourierProfitScreen extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
-                colors: [AppColors.tertiary, Color.lerp(AppColors.tertiary, AppColors.primaryDark, 0.35)!],
+                colors: [
+                  AppColors.tertiary,
+                  Color.lerp(AppColors.tertiary, AppColors.primaryDark, 0.35)!,
+                ],
               ),
             ),
             child: Icon(Icons.check, color: AppColors.textOnDark, size: 18),
@@ -653,20 +777,26 @@ class CourierProfitScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(c.job.id, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  c.job.id,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 Text(
                   '${c.resultLabel} · ${c.trackingNumber}',
                   key: ValueKey('transaction-result-${c.job.id}'),
                   style: theme.textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                Text('${c.job.shopName} · ${_formatWhen(c.completedAt)}', style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  '${c.job.shopName} · ${_formatWhen(c.completedAt)}',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                Text(formatPeso(c.payout), style: AppType.priceNumeral(20)),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(formatPeso(c.payout), style: AppType.priceNumeral(20)),
         ],
       ),
     );
@@ -680,9 +810,10 @@ class CourierProfitScreen extends StatelessWidget {
 /// week's max, today in the brand fill. An empty week renders flat
 /// ticks, not zeros pretending to be data.
 class _WeeklyChart extends StatelessWidget {
-  const _WeeklyChart({required this.completed});
+  const _WeeklyChart({required this.completed, required this.now});
 
   final List<CompletedJob> completed;
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
@@ -694,8 +825,8 @@ class _WeeklyChart extends StatelessWidget {
       for (final c in completed)
         DatedPayout(amount: c.payout, when: c.completedAt),
     ];
-    final amounts = last7DayTotals(payouts);
-    final labels = last7DayLabels();
+    final amounts = last7DayTotals(payouts, now: now);
+    final labels = last7DayLabels(now: now);
     final max = amounts.fold(0.0, (m, a) => a > m ? a : m);
     final weekTotal = amounts.fold(0.0, (s, a) => s + a);
 
@@ -707,70 +838,81 @@ class _WeeklyChart extends StatelessWidget {
           : 'Last 7 days earnings: ${formatPeso(weekTotal)} total',
       excludeSemantics: true,
       child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: editorialRadius(1, ShapeTier.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Last 7 days', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 12),
-          SizedBox(
-            // 120, not 116: a day with earnings stacks amount text + 4 +
-            // bar (up to 76) + 6 + weekday label, which measured 118. The
-            // bars themselves are unchanged; the old height clipped the top
-            // of the tallest day by 2px.
-            height: 120,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (amounts[i] > 0)
-                          Text(
-                            formatPeso(amounts[i]),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: editorialRadius(1, ShapeTier.card),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Last 7 days', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 12),
+            if (MediaQuery.textScalerOf(context).scale(12) > 15 ||
+                amounts.any((amount) => amount >= 10000))
+              for (var i = 0; i < labels.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text('${labels[i]} · ${formatPeso(amounts[i])}'),
+                )
+            else
+              SizedBox(
+                // 120, not 116: a day with earnings stacks amount text + 4 +
+                // bar (up to 76) + 6 + weekday label, which measured 118. The
+                // bars themselves are unchanged; the old height clipped the top
+                // of the tallest day by 2px.
+                height: 120,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (var i = 0; i < 7; i++)
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (amounts[i] > 0)
+                              Text(
+                                formatPeso(amounts[i]),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Container(
+                              height: max <= 0
+                                  ? 4
+                                  : (4 + 72 * (amounts[i] / max)).clamp(4, 76),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: i == 6
+                                    ? AppColors.primaryDark
+                                    : AppColors.tertiary.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ),
-                          ),
-                        const SizedBox(height: 4),
-                        Container(
-                          height: max <= 0
-                              ? 4
-                              : (4 + 72 * (amounts[i] / max)).clamp(4, 76),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: i == 6
-                                ? AppColors.primaryDark
-                                : AppColors.tertiary.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                            const SizedBox(height: 6),
+                            Text(
+                              labels[i],
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: i == 6
+                                    ? AppColors.textPrimary
+                                    : AppColors.textSecondary,
+                                fontWeight: i == 6
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          labels[i],
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: i == 6
-                                ? AppColors.textPrimary
-                                : AppColors.textSecondary,
-                            fontWeight:
-                                i == 6 ? FontWeight.w700 : FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../../data/api/api_exception.dart';
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/linehaul_history.dart';
 import '../../widgets/editorial_header.dart';
+import '../../widgets/inline_error_notice.dart';
 
 class LinehaulHistoryScreen extends StatefulWidget {
   const LinehaulHistoryScreen({
@@ -26,7 +27,7 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
   LinehaulHistoryPage? _page;
   int _requestedPage = 1;
   Future<void> refresh() =>
-      _busy ? Future.value() : _load(page: _requestedPage);
+      _busy ? Future.value() : _load(page: _requestedPage, retain: true);
   static DateTime _today() {
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
     return DateTime(now.year, now.month, now.day);
@@ -40,22 +41,19 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
     _load();
   }
 
-  Future<void> _load({int page = 1}) async {
+  Future<void> _load({int page = 1, bool retain = false}) async {
     setState(() {
       _requestedPage = page;
       _busy = true;
       _error = null;
-      _page = null;
+      if (!retain) _page = null;
     });
     try {
-      final response = await widget.repository.client.getJson(
-        '/courier/history',
-        query: {
-          'from': DateFormat('yyyy-MM-dd').format(_from),
-          'to': DateFormat('yyyy-MM-dd').format(_to),
-          'page': '$page',
-        },
-      );
+      final response = await widget.repository.history({
+        'from': DateFormat('yyyy-MM-dd').format(_from),
+        'to': DateFormat('yyyy-MM-dd').format(_to),
+        'page': '$page',
+      });
       final data = response['data'];
       if (data is! Map) throw const MalformedResponseException();
       final result = LinehaulHistoryPage(data.cast<String, Object?>());
@@ -94,14 +92,26 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
   Widget _row(LinehaulHistoryEntry entry) {
     final trip = entry.trip;
     if (widget.tripBuilder != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Recorded ${DateFormat.yMMMd().add_jm().format(entry.recordedAt.toUtc().add(const Duration(hours: 8)))} Philippine time',
+      final recorded = DateFormat.yMMMd().add_jm().format(
+        entry.recordedAt.toUtc().add(const Duration(hours: 8)),
+      );
+      return Card(
+        child: ExpansionTile(
+          key: PageStorageKey(entry.key),
+          title: Text('Trip #${trip.id}'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${trip.origin} → ${trip.destination}'),
+              Text(trip.status, style: Theme.of(context).textTheme.labelLarge),
+              Text(
+                '$recorded Philippine time',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
-          widget.tripBuilder!(trip),
-        ],
+          children: [widget.tripBuilder!(trip)],
+        ),
       );
     }
     final pay = trip.tripPay;
@@ -173,10 +183,6 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
               title: 'Trip history',
               padding: EdgeInsets.only(bottom: 12),
             ),
-            const Text(
-              'Past trips by Philippine date. Older records may use their last recorded update.',
-            ),
-            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               children: [
@@ -206,11 +212,17 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
               ],
             ),
             Text(
-              '${DateFormat.yMMMd().format(_from)} – ${DateFormat.yMMMd().format(_to)}',
+              '${DateFormat.yMMMd().format(_from)} – ${DateFormat.yMMMd().format(_to)} · Philippine time',
             ),
-            if (_busy) const Center(child: CircularProgressIndicator()),
+            const SizedBox(height: 8),
+            if (_busy)
+              const LinearProgressIndicator(
+                semanticsLabel: 'Loading trip history',
+              ),
             if (_error != null) ...[
-              Text(_error!),
+              InlineErrorNotice(_error!),
+              if (page != null)
+                const Text('Showing the last loaded history for these dates.'),
               TextButton(
                 onPressed: _busy ? null : refresh,
                 child: const Text('Retry'),
@@ -229,14 +241,14 @@ class LinehaulHistoryScreenState extends State<LinehaulHistoryScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   TextButton(
-                    onPressed: page.page > 1
+                    onPressed: !_busy && page.page > 1
                         ? () => _load(page: page.page - 1)
                         : null,
                     child: const Text('Previous'),
                   ),
                   Text('Page ${page.page} of ${page.lastPage}'),
                   TextButton(
-                    onPressed: page.page < page.lastPage
+                    onPressed: !_busy && page.page < page.lastPage
                         ? () => _load(page: page.page + 1)
                         : null,
                     child: const Text('Next'),

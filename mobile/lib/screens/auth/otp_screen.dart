@@ -141,7 +141,10 @@ class _OtpScreenState extends State<OtpScreen> {
     if (_isRenewing) return false;
     final auth = context.read<AuthState>();
     if (!auth.canResumeRiderRegistration) {
-      setState(() => _error = 'Your verification link has expired. Register again or contact support.');
+      setState(
+        () => _error =
+            'Your verification link has expired. Register again or contact support.',
+      );
       return false;
     }
 
@@ -154,7 +157,8 @@ class _OtpScreenState extends State<OtpScreen> {
     if (password == null || password.isEmpty) {
       setState(() {
         _isRenewing = false;
-        _error = 'Your verification link has expired. Enter your password to continue.';
+        _error =
+            'Your verification link has expired. Enter your password to continue.';
       });
       return false;
     }
@@ -182,14 +186,14 @@ class _OtpScreenState extends State<OtpScreen> {
   /// for a wrong or expired code, the wait for a cooldown, and the transport's
   /// message for a network failure.
   String _messageFor(ApiException e) => switch (e) {
-        RequestRejectedException(isRateLimited: true, :final retryAfter) =>
-          retryAfter == null
-              ? 'Too many attempts. Please wait a moment and try again.'
-              : 'Too many attempts. Try again in ${retryAfter.inSeconds}s.',
-        final ValidationException v =>
-          v.forField('otp') ?? v.forField('email') ?? v.message,
-        _ => e.message,
-      };
+    RequestRejectedException(isRateLimited: true, :final retryAfter) =>
+      retryAfter == null
+          ? 'Too many attempts. Please wait a moment and try again.'
+          : 'Too many attempts. Try again in ${retryAfter.inSeconds}s.',
+    final ValidationException v =>
+      v.forField('otp') ?? v.forField('email') ?? v.message,
+    _ => e.message,
+  };
 
   Future<void> _submit({bool afterRenewal = false}) async {
     if (_isSubmitting || _isRenewing) return;
@@ -235,14 +239,16 @@ class _OtpScreenState extends State<OtpScreen> {
 
     // Unwind rather than push: AuthGate (main.dart) is this app's single route
     // root and now resolves to whichever gate the account is actually at.
-    await CloudTransition.run(
-      context,
-      swap: () {
-        if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      },
-    );
+    if (kUseLiveApi) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      await CloudTransition.run(
+        context,
+        swap: () {
+          if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        },
+      );
+    }
   }
 
   Future<void> _resend({bool afterRenewal = false}) async {
@@ -339,6 +345,7 @@ class _OtpScreenState extends State<OtpScreen> {
         ),
       ),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         // Every child is keyed, and the reason is the error block below: it
         // appears and disappears between two of these children, and without keys
@@ -359,16 +366,14 @@ class _OtpScreenState extends State<OtpScreen> {
             key: const ValueKey('otp-copy'),
             index: 0,
             child: Text(
-              'Enter the confirmation code we emailed to $email. Confirming it is '
-              'what moves your application on to review. If it has not arrived, '
-              'check the spam folder — a code from a new sender often lands there.',
+              'Enter the code sent to $email. If it hasn’t arrived, check your spam folder.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.55,
                 color: AppColors.textSecondary,
               ),
             ),
           ),
-          const SizedBox(key: ValueKey('otp-gap-2'), height: 26),
+          const SizedBox(key: ValueKey('otp-gap-2'), height: 18),
           StaggeredReveal(
             key: const ValueKey('otp-code-field'),
             index: 1,
@@ -398,7 +403,7 @@ class _OtpScreenState extends State<OtpScreen> {
               index: 2,
               child: _fieldError(theme, _error!),
             ),
-          const SizedBox(key: ValueKey('otp-gap-3'), height: 26),
+          const SizedBox(key: ValueKey('otp-gap-3'), height: 18),
           StaggeredReveal(
             key: const ValueKey('otp-confirm'),
             index: 3,
@@ -598,7 +603,11 @@ class _RenewLinkDialogState extends State<_RenewLinkDialog> {
               labelText: 'Password',
               suffixIcon: IconButton(
                 tooltip: _obscure ? 'Show password' : 'Hide password',
-                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
                 onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ),

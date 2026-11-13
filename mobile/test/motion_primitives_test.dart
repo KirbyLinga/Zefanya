@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:zefanya/theme/app_theme.dart';
+import 'package:zefanya/widgets/app_page_route.dart';
 import 'package:zefanya/widgets/motion/cloud_transition.dart';
 import 'package:zefanya/widgets/motion/ease_in_frame.dart';
 import 'package:zefanya/widgets/motion/fade_through.dart';
@@ -25,10 +26,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: EaseInFrame(
-              index: 0,
-              child: Text('Entering text'),
-            ),
+            body: EaseInFrame(index: 0, child: Text('Entering text')),
           ),
         ),
       );
@@ -75,17 +73,15 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     });
 
-    testWidgets('reduced motion shows end state immediately without timer',
-        (tester) async {
+    testWidgets('reduced motion shows end state immediately without timer', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MediaQuery(
           data: MediaQueryData(disableAnimations: true),
           child: MaterialApp(
             home: Scaffold(
-              body: EaseInFrame(
-                index: 3,
-                child: Text('Instant Item'),
-              ),
+              body: EaseInFrame(index: 3, child: Text('Instant Item')),
             ),
           ),
         ),
@@ -99,8 +95,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     });
 
-    testWidgets('disposing while delayed cancels timer cleanly',
-        (tester) async {
+    testWidgets('disposing while delayed cancels timer cleanly', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -112,7 +109,9 @@ void main() {
         ),
       );
 
-      await tester.pump(const Duration(milliseconds: 50)); // disposed before 200ms
+      await tester.pump(
+        const Duration(milliseconds: 50),
+      ); // disposed before 200ms
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 50));
       // No pending timer exception thrown
@@ -121,8 +120,44 @@ void main() {
   });
 
   group('FadeThroughIndexedStack', () {
-    testWidgets('swaps tabs with smooth fade and keeps states mounted',
-        (tester) async {
+    testWidgets('only the visible tab participates in a product Hero flight', (
+      tester,
+    ) async {
+      const tag = 'shared-product';
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          home: const Scaffold(
+            body: FadeThroughIndexedStack(
+              index: 1,
+              children: [
+                Hero(tag: tag, child: Text('Retained copy')),
+                Hero(tag: tag, child: Text('Visible copy')),
+              ],
+            ),
+          ),
+        ),
+      );
+      navigator.currentState!.push<void>(
+        AppPageRoute(
+          builder: (_) => const Scaffold(
+            body: Hero(tag: tag, child: Text('Product detail')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Product detail'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Visible copy').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('swaps tabs with smooth fade and keeps states mounted', (
+      tester,
+    ) async {
       int activeTab = 0;
 
       await tester.pumpWidget(
@@ -152,6 +187,15 @@ void main() {
       // Tap to switch to Tab 1
       await tester.tap(find.byType(FloatingActionButton));
       await tester.pump();
+      expect(find.text('Tab 1 Content').hitTestable(), findsOneWidget);
+      final fade = find.descendant(
+        of: find.byType(FadeThroughIndexedStack),
+        matching: find.byType(FadeTransition),
+      );
+      expect(
+        tester.widget<FadeTransition>(fade).opacity.value,
+        greaterThan(.8),
+      );
 
       // Halfway through transition
       await tester.pump(const Duration(milliseconds: 100));
@@ -164,8 +208,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     });
 
-    testWidgets('reduced motion swaps instantly without animation',
-        (tester) async {
+    testWidgets('reduced motion swaps instantly without animation', (
+      tester,
+    ) async {
       int activeTab = 0;
 
       await tester.pumpWidget(
@@ -207,8 +252,9 @@ void main() {
   });
 
   group('CloudTransition', () {
-    testWidgets('calls swap exactly once and completes transition',
-        (tester) async {
+    testWidgets('calls swap exactly once and completes transition', (
+      tester,
+    ) async {
       int swapCallCount = 0;
       bool completed = false;
 
@@ -259,8 +305,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('reduced motion runs 120ms cross-fade and calls swap',
-        (tester) async {
+    testWidgets('reduced motion runs 120ms cross-fade and calls swap', (
+      tester,
+    ) async {
       int swapCallCount = 0;
       bool completed = false;
 
@@ -309,8 +356,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('hard timeout forces cleanup if swap throws or hangs',
-        (tester) async {
+    testWidgets('hard timeout forces cleanup if swap throws or hangs', (
+      tester,
+    ) async {
       bool completed = false;
 
       await tester.pumpWidget(

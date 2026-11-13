@@ -175,9 +175,7 @@ Order orderFromShipmentJson(Map<String, Object?> json) {
     productQuantities: _productQuantities(rows),
     cancelled: wire == 'CANCELLED',
     buyerConfirmed: wire == 'COMPLETED',
-    cancellationAllowed:
-        json['can_cancel'] as bool? ??
-        wire == 'PLACED',
+    cancellationAllowed: json['can_cancel'] as bool? ?? wire == 'PLACED',
     completedAt: DateTime.tryParse(_text(json['completed_at'])),
     deliveredAt: DateTime.tryParse(
       _text(

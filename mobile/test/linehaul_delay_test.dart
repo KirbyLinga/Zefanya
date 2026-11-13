@@ -409,6 +409,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('History'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Trip #12').hitTestable());
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Last delay report'),
         180,

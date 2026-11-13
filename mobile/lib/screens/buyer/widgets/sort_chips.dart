@@ -39,6 +39,11 @@ class ProductSortChips extends StatelessWidget {
             ChoiceChip(
               label: Text(_options[i].$2),
               selected: sort == _options[i].$1,
+              selectedColor: AppColors.roseGround,
+              checkmarkColor: AppColors.textOnDark,
+              labelStyle: sort == _options[i].$1
+                  ? TextStyle(color: AppColors.textOnDark)
+                  : null,
               onSelected: (_) => onChanged(_options[i].$1),
             ),
           ],

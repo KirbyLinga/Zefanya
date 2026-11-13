@@ -47,15 +47,18 @@ abstract class TokenStore {
 
 /// Production implementation, backed by the platform keystore/keychain.
 class SecureTokenStore implements TokenStore {
-  SecureTokenStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+  SecureTokenStore({
+    FlutterSecureStorage? storage,
+    String storageKey = 'zefanya.bearer_token',
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       _key = storageKey;
 
   final FlutterSecureStorage _storage;
 
   /// Namespaced, so this app's token can't collide with another app's on a
   /// shared iOS keychain (where the default accessibility group is per-team,
   /// not per-app).
-  static const _key = 'zefanya.bearer_token';
+  final String _key;
 
   @override
   Future<String?> read() => _storage.read(key: _key);

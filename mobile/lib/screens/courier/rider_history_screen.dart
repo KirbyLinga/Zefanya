@@ -23,7 +23,8 @@ class RiderHistoryScreen extends StatefulWidget {
 }
 
 class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
-  bool _loading = true;
+  bool _loading = false;
+  bool _recentOnly = false;
 
   @override
   void initState() {
@@ -32,9 +33,13 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
   }
 
   Future<void> _refresh() async {
+    if (_loading) return;
     setState(() => _loading = true);
-    await context.read<CourierState>().refreshHistory();
-    if (mounted) setState(() => _loading = false);
+    try {
+      await context.read<CourierState>().refreshHistory();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -42,6 +47,17 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
     final courier = context.watch<CourierState>();
     final history = courier.history ?? const <RiderHistoryEntry>[];
     final failure = courier.historyFailure;
+    final now = DateTime.now();
+    final earliest = DateTime(now.year, now.month, now.day - 6);
+    final visible = _recentOnly
+        ? history
+              .where(
+                (entry) =>
+                    entry.deliveredAt != null &&
+                    !entry.deliveredAt!.isBefore(earliest),
+              )
+              .toList()
+        : history;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Delivery history')),
@@ -49,26 +65,59 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _refresh,
-              child: history.isEmpty
-                  ? ListView(
-                      children: [
-                        const SizedBox(height: 60),
-                        EmptyState(
-                          icon: failure == null ? Icons.history : Icons.cloud_off_outlined,
-                          title: failure == null ? 'No finished deliveries yet' : 'We couldn\'t load your history',
-                          subtitle: failure == null
-                              ? 'Delivered and returned parcels appear here.'
-                              : Microcopy.calmError(failure.message),
-                          tint: AppColors.tertiary,
-                        ),
-                      ],
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-                      itemCount: history.length,
-                      separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.divider),
-                      itemBuilder: (context, i) => _HistoryTile(entry: history[i]),
-                    ),
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                itemCount: visible.isEmpty ? 2 : visible.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('All shown'),
+                            selected: !_recentOnly,
+                            onSelected: (_) =>
+                                setState(() => _recentOnly = false),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Last 7 days'),
+                            selected: _recentOnly,
+                            onSelected: (_) =>
+                                setState(() => _recentOnly = true),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  if (visible.isEmpty) {
+                    return EmptyState(
+                      icon: failure == null
+                          ? Icons.history
+                          : Icons.cloud_off_outlined,
+                      title: failure != null
+                          ? 'We couldn\'t load your history'
+                          : _recentOnly
+                          ? 'No deliveries in the last 7 days'
+                          : 'No finished deliveries yet',
+                      subtitle: failure == null
+                          ? 'Delivered and returned parcels appear here.'
+                          : Microcopy.calmError(failure.message),
+                      tint: AppColors.tertiary,
+                      action: failure?.isRetryable == true
+                          ? TextButton(
+                              onPressed: _refresh,
+                              child: const Text('Retry'),
+                            )
+                          : null,
+                    );
+                  }
+                  return _HistoryTile(entry: visible[index - 1]);
+                },
+              ),
             ),
     );
   }
@@ -85,30 +134,53 @@ class _HistoryTile extends StatelessWidget {
     final when = entry.deliveredAt;
     final earning = entry.earning;
 
-    return ListTile(
+    return Container(
       key: ValueKey('rider-history-${entry.sellerOrderId}'),
-      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-      title: Text(entry.trackingNumber ?? 'Parcel ${entry.sellerOrderId}', style: theme.textTheme.titleSmall),
-      subtitle: Text(
-        [
-          entry.returned ? 'Returned' : entry.statusLabel,
-          if ((entry.sellerName ?? '').isNotEmpty) entry.sellerName!,
-          if (when != null) '${when.year}-${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')}',
-        ].join(' · '),
-        style: theme.textTheme.bodySmall,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(10),
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (earning != null) Text(formatPeso(earning, showDecimals: true), style: theme.textTheme.bodyMedium),
-          if (entry.proofId != null)
-            TextButton(
-              key: ValueKey('view-proof-${entry.proofId}'),
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28)),
-              onPressed: () => showProofPhoto(context, entry.proofId!),
-              child: const Text('View proof'),
-            ),
+          Text(
+            entry.returned ? 'Returned' : entry.statusLabel,
+            style: AppType.eyebrow,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            entry.trackingNumber ?? 'Parcel ${entry.sellerOrderId}',
+            style: theme.textTheme.titleSmall,
+          ),
+          Text(
+            [
+              if ((entry.sellerName ?? '').isNotEmpty) entry.sellerName!,
+              if (when != null)
+                '${when.year}-${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')}',
+            ].join(' · '),
+            style: theme.textTheme.bodySmall,
+          ),
+          Wrap(
+            spacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (earning != null)
+                Text(
+                  'Earned ${formatPeso(earning, showDecimals: true)}',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              if (entry.proofId != null)
+                TextButton(
+                  key: ValueKey('view-proof-${entry.proofId}'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: () => showProofPhoto(context, entry.proofId!),
+                  child: const Text('View proof'),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -118,6 +190,7 @@ class _HistoryTile extends StatelessWidget {
 /// Opens the rider's own proof-of-delivery photo, fetched with their token.
 Future<void> showProofPhoto(BuildContext context, String proofId) {
   final courier = context.read<CourierState>();
+  final photo = courier.proofPhoto(proofId);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -125,10 +198,13 @@ Future<void> showProofPhoto(BuildContext context, String proofId) {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: FutureBuilder(
-          future: courier.proofPhoto(proofId),
+          future: photo,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const SizedBox(height: 240, child: Center(child: CircularProgressIndicator()));
+              return const SizedBox(
+                height: 240,
+                child: Center(child: CircularProgressIndicator()),
+              );
             }
             final error = snapshot.error;
             if (error != null || snapshot.data == null) {
@@ -136,7 +212,9 @@ Future<void> showProofPhoto(BuildContext context, String proofId) {
                 height: 160,
                 child: Center(
                   child: Text(
-                    error is ApiException ? Microcopy.calmError(error.message) : 'The photo could not be loaded.',
+                    error is ApiException
+                        ? Microcopy.calmError(error.message)
+                        : 'The photo could not be loaded.',
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -150,11 +228,17 @@ Future<void> showProofPhoto(BuildContext context, String proofId) {
                 const SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(
-                    snapshot.data!,
-                    key: ValueKey('proof-photo-$proofId'),
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Text('This photo cannot be shown.'),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * .60,
+                    ),
+                    child: Image.memory(
+                      snapshot.data!,
+                      key: ValueKey('proof-photo-$proofId'),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) =>
+                          const Text('This photo cannot be shown.'),
+                    ),
                   ),
                 ),
               ],

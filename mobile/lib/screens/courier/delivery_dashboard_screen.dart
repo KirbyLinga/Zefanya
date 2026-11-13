@@ -11,6 +11,8 @@ import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
 import '../../utils/money_format.dart';
 import 'delivery_tracker_screen.dart';
+import 'pickup_dashboard_screen.dart'
+    show RiderAvailabilityToggle, RiderQueueRefreshNotice;
 import 'widgets/delivery_job_card.dart';
 import 'widgets/wind_down_banner.dart';
 import 'rider_history_screen.dart';
@@ -29,17 +31,42 @@ class DeliveryDashboardScreen extends StatelessWidget {
     AppColors.watch(context);
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
-    final jobs = courier.jobsForDelivery;
+    final assigned = courier.jobsForDelivery;
+    String section(AssignedJob job) => switch (job.milestone) {
+      DeliveryMilestone.failedDelivery ||
+      DeliveryMilestone.returnToSender => 'Needs attention',
+      DeliveryMilestone.assignedToRider => 'Ready to start',
+      _ => 'In progress',
+    };
+    final jobs = [
+      for (final label in ['Needs attention', 'In progress', 'Ready to start'])
+        ...assigned.where((job) => section(job) == label),
+    ];
+    final completionChecks = [
+      for (final id in courier.unconfirmedDeliveryIds)
+        if (courier.jobById(id) == null)
+          ListTile(
+            leading: const Icon(Icons.fact_check_outlined),
+            title: const Text('Check delivery status'),
+            subtitle: Text('Shipment #$id'),
+            onTap: () => Navigator.of(context).push(
+              AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: id)),
+            ),
+          ),
+    ];
 
     // This is where a courier lands after completing a job, so today's
     // takings belong here and not only on a tab they have to go and find —
     // see the tempo note in DeliveryTrackerScreen._completeDelivery. Hidden
     // at zero rather than showing "₱0", because an empty tally is noise on
     // the first run of the day.
-    final tally = courier.todayEarnings > 0 ? _todayTally(theme, courier) : null;
+    final tally = courier.todayEarnings > 0
+        ? _todayTally(theme, courier)
+        : null;
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+      backgroundColor: Colors
+          .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       // Live mode: the rider's WebZefanya notifications (assignments, cash,
       // payouts). Mock mode keeps the bare bar it always had.
       appBar: AppBar(
@@ -49,65 +76,110 @@ class DeliveryDashboardScreen extends StatelessWidget {
               key: const ValueKey('rider-history-button'),
               tooltip: 'Delivery history',
               icon: const Icon(Icons.history),
-              onPressed: () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => const RiderHistoryScreen()),
-              ),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(AppPageRoute(builder: (_) => const RiderHistoryScreen())),
             ),
           if (courier.isServerAuthoritative) const NotificationBell(),
         ],
       ),
       body: jobs.isEmpty
-          ? Column(
-              children: [
-                EditorialHeader(
-                  eyebrow: 'FOR DELIVERY',
-                  title: 'Out for Delivery',
-                  trailing: tally,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                ),
-                const RiderWindDownBanner(margin: EdgeInsets.fromLTRB(20, 0, 20, 12)),
-                Expanded(child: _buildEmptyState(theme, courier)),
-              ],
+          ? RefreshIndicator(
+              onRefresh: () => _retry(courier),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 120),
+                children: [
+                  EditorialHeader(
+                    eyebrow: 'FOR DELIVERY',
+                    title: 'Deliveries',
+                    trailing: tally,
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: RiderAvailabilityToggle(),
+                    ),
+                  ),
+                  const RiderWindDownBanner(
+                    margin: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  ),
+                  ...completionChecks,
+                  _buildEmptyState(theme, courier),
+                ],
+              ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-              itemCount: jobs.length + 1,
-              itemBuilder: (context, i) {
-                if (i == 0) {
+          : RefreshIndicator(
+              onRefresh: () => _retry(courier),
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                itemCount: jobs.length + 1,
+                itemBuilder: (context, i) {
+                  if (i == 0) {
+                    return EaseInFrame(
+                      index: 0,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          EditorialHeader(
+                            eyebrow: 'FOR DELIVERY',
+                            title: 'Deliveries',
+                            trailing: tally,
+                            padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                          ),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: RiderAvailabilityToggle(),
+                          ),
+                          const RiderWindDownBanner(
+                            margin: EdgeInsets.only(bottom: 12),
+                          ),
+                          ...completionChecks,
+                          if (courier.loadFailure case final failure?)
+                            RiderQueueRefreshNotice(
+                              failure: failure,
+                              onRetry: () => _retry(courier),
+                            ),
+                        ],
+                      ),
+                    );
+                  }
+                  final job = jobs[i - 1];
+                  final card = DeliveryJobCard(
+                    assignedJob: job,
+                    index: i - 1,
+                    onTap: () => Navigator.of(context).push(
+                      AppPageRoute(
+                        builder: (_) =>
+                            DeliveryTrackerScreen(jobId: job.job.id),
+                      ),
+                    ),
+                  );
                   return EaseInFrame(
-                    index: 0,
+                    index: (i - 1).clamp(0, 5),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        EditorialHeader(
-                          eyebrow: 'FOR DELIVERY',
-                          title: 'Out for Delivery',
-                          trailing: tally,
-                          padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
-                        ),
-                        const RiderWindDownBanner(margin: EdgeInsets.only(bottom: 12)),
+                        if (i == 1 || section(job) != section(jobs[i - 2]))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              section(job),
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ),
+                        card,
+                        if (courier.hasServerRecords &&
+                            job.job.serverStatus != null)
+                          _WaybillLink(jobId: job.job.id),
                       ],
                     ),
                   );
-                }
-                final job = jobs[i - 1];
-                final card = DeliveryJobCard(
-                  assignedJob: job,
-                  index: i - 1,
-                  onTap: () => Navigator.of(context).push(
-                    AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: job.job.id)),
-                  ),
-                );
-                return EaseInFrame(
-                  index: (i - 1).clamp(0, 5),
-                  child: courier.hasServerRecords && job.job.serverStatus != null
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [card, _WaybillLink(jobId: job.job.id)],
-                        )
-                      : card,
-                );
-              },
+                },
+              ),
             ),
     );
   }
@@ -120,10 +192,12 @@ class DeliveryDashboardScreen extends StatelessWidget {
   Widget _todayTally(ThemeData theme, CourierState courier) {
     final now = DateTime.now();
     final count = courier.completedJobs
-        .where((c) =>
-            c.completedAt.year == now.year &&
-            c.completedAt.month == now.month &&
-            c.completedAt.day == now.day)
+        .where(
+          (c) =>
+              c.completedAt.year == now.year &&
+              c.completedAt.month == now.month &&
+              c.completedAt.day == now.day,
+        )
         .length;
 
     return Column(
@@ -131,11 +205,16 @@ class DeliveryDashboardScreen extends StatelessWidget {
       children: [
         Text('TODAY', style: AppType.eyebrow),
         const SizedBox(height: 4),
-        Text(formatPeso(courier.todayEarnings), style: AppType.priceNumeral(24)),
+        Text(
+          formatPeso(courier.todayEarnings),
+          style: AppType.priceNumeral(24),
+        ),
         const SizedBox(height: 2),
         Text(
           '$count delivered',
-          style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     );
@@ -151,6 +230,9 @@ class DeliveryDashboardScreen extends StatelessWidget {
   /// answers no to — offering Retry there teaches a person to mash a button that
   /// cannot work.
   Widget _buildEmptyState(ThemeData theme, CourierState courier) {
+    if (courier.loadingJobs) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final failure = courier.loadFailure;
 
     if (failure != null) {
@@ -159,7 +241,10 @@ class DeliveryDashboardScreen extends StatelessWidget {
         title: 'We couldn\'t load your deliveries',
         subtitle: Microcopy.calmError(failure.message),
         action: failure.isRetryable
-            ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
+            ? TextButton(
+                onPressed: () => _retry(courier),
+                child: const Text('Retry'),
+              )
             : null,
         tint: AppColors.tertiary,
       );
@@ -195,18 +280,17 @@ class _WaybillLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Align(
-        alignment: Alignment.centerRight,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: TextButton.icon(
-            key: ValueKey('waybill-$jobId'),
-            onPressed: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => RiderWaybillScreen(jobId: jobId)),
-            ),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('Waybill'),
-          ),
-        ),
-      );
+    alignment: Alignment.centerRight,
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextButton.icon(
+        key: ValueKey('waybill-$jobId'),
+        onPressed: () => Navigator.of(
+          context,
+        ).push(AppPageRoute(builder: (_) => RiderWaybillScreen(jobId: jobId))),
+        icon: const Icon(Icons.receipt_long_outlined, size: 18),
+        label: const Text('Waybill'),
+      ),
+    ),
+  );
 }
-

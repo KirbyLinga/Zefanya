@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:provider/provider.dart';
 import '../../data/api/api_exception.dart'
-    show ApiNotConfiguredException, ValidationException;
+    show
+        ApiNotConfiguredException,
+        MalformedResponseException,
+        RequestRejectedException,
+        ValidationException;
 import '../../data/repositories/linehaul_repository.dart';
 import '../../data/repositories/repositories.dart';
 import '../../state/auth_state.dart';
@@ -15,8 +19,10 @@ import '../../theme/app_theme.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/editorial_status_badge.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/nav_icons.dart';
+import '../../widgets/motion/fade_through.dart';
 import '../../widgets/zefanya_mark.dart';
 import '../../utils/timed_snackbar.dart';
 import 'courier_qr_scanner.dart';
@@ -53,8 +59,12 @@ class LinehaulPortal extends StatefulWidget {
 class _LinehaulPortalState extends State<LinehaulPortal>
     with WidgetsBindingObserver {
   late LinehaulRepository _repository;
+  late final bool _hasRepository;
+  bool get _isDemo => _hasRepository && _repository.isDemo;
+  bool get _canOperate => !_isDemo && !_busy && !_refreshingTrips;
   late Future<List<LinehaulTrip>> _trips;
   bool _busy = false;
+  bool _refreshingTrips = false;
   int _tab = 0;
   (String, DateTime)? _dismissedReassignment;
   final _visitedTabs = <int>{0};
@@ -80,11 +90,12 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final client = context.read<Repositories>().client;
-    if (client == null) {
+    final repository = context.read<Repositories>().linehaul;
+    _hasRepository = repository != null;
+    if (repository == null) {
       _trips = Future.error(const ApiNotConfiguredException());
     } else {
-      _repository = LinehaulRepository(client);
+      _repository = repository;
       _trips = _repository.trips();
       unawaited(_loadDuty());
     }
@@ -103,9 +114,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     final wasForeground = _foreground;
     _foreground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.detached) _stopTripSharing();
-    if (_foreground &&
-        !wasForeground &&
-        context.read<Repositories>().client != null) {
+    if (_foreground && !wasForeground && _hasRepository) {
       unawaited(_loadDuty());
       if (!_busy) _reload();
       if (_tab == 1) {
@@ -380,13 +389,9 @@ class _LinehaulPortalState extends State<LinehaulPortal>
           'Checklist not passed. You remain Off Duty; Logistics has been notified.',
         ),
       const SizedBox(height: 8),
-      const Text(
-        'Keep the app open while On Duty. Location updates stop in the background; assignment readiness expires after five minutes without an update.',
-      ),
-      const SizedBox(height: 12),
       if (_duty != null && !_duty!.setupRequired)
         FilledButton(
-          onPressed: _dutyBusy ? null : _changeDuty,
+          onPressed: _dutyBusy || _isDemo ? null : _changeDuty,
           child: Text(
             _dutyBusy
                 ? 'Updating duty…'
@@ -415,6 +420,11 @@ class _LinehaulPortalState extends State<LinehaulPortal>
           },
           child: const Text('Open location settings'),
         ),
+      Text(
+        _isDemo
+            ? 'Sample duty status. Location and duty changes are disabled.'
+            : 'Keep the app open while On Duty. Location updates stop in the background; assignment readiness expires after five minutes without an update.',
+      ),
     ],
   );
 
@@ -483,28 +493,33 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   }
 
   void _reload() {
-    final client = context.read<Repositories>().client;
-    if (client != null) {
+    if (_hasRepository && !_refreshingTrips) {
       final revision = _sharingRevision;
-      final trips = _repository.trips().then((trips) {
-        final leg = _sharingLeg;
-        if (mounted &&
-            revision == _sharingRevision &&
-            leg != null &&
-            !trips.any(
-              (trip) =>
-                  (trip.id, trip.offerVersion) == leg &&
-                  trip.status == 'In Transit' &&
-                  !trip.needsRescan,
-            )) {
-          _stopTripSharing('Location sharing ended for this trip.');
-        }
-        return trips;
-      });
+      final trips = _repository
+          .trips()
+          .then((trips) {
+            final leg = _sharingLeg;
+            if (mounted &&
+                revision == _sharingRevision &&
+                leg != null &&
+                !trips.any(
+                  (trip) =>
+                      (trip.id, trip.offerVersion) == leg &&
+                      trip.status == 'In Transit' &&
+                      !trip.needsRescan,
+                )) {
+              _stopTripSharing('Location sharing ended for this trip.');
+            }
+            return trips;
+          })
+          .whenComplete(() {
+            if (mounted) setState(() => _refreshingTrips = false);
+          });
       // Observe immediate failures before the next frame subscribes the builder.
       // The original future still carries the error for its Retry state.
       trips.ignore();
       setState(() {
+        _refreshingTrips = true;
         _trips = trips;
       });
     }
@@ -515,7 +530,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     String action, {
     Map<String, Object?> body = const {},
   }) async {
-    if (_busy) return;
+    if (!_canOperate) return;
     final locationRequirement = switch (action) {
       'depart' => trip.departureLocation,
       'arrive' => trip.arrivalLocation,
@@ -536,16 +551,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       _busy = true;
     });
     try {
-      final position =
-          locationRequirement == LinehaulLocationRequirement.required
-          ? await widget.locationSource.current()
-          : null;
-      if (!mounted) return;
-      await _repository.act(
-        trip.id,
-        action,
-        body: {...body, if (position != null) 'location': position.toJson()},
-      );
+      await _submitTripAction(trip, action, locationRequirement, body);
       if (mounted) {
         if (action == 'arrive' && _sharingLeg == (trip.id, trip.offerVersion)) {
           _stopTripSharing();
@@ -559,12 +565,15 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       }
     } on ApiException catch (error) {
       if (mounted) {
+        if (_needsTripReconciliation(error)) {
+          _reload();
+        }
         final message =
             (action == 'decline' || action == 'depart' || action == 'arrive') &&
                 error is ValidationException &&
                 error.fieldErrors.isNotEmpty
             ? error.fieldErrors.values.join('\n')
-            : error.message;
+            : _tripActionMessage(error);
         showTimedSnackBar(context, SnackBar(content: Text(message)));
       }
     } finally {
@@ -572,30 +581,145 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     }
   }
 
-  Future<void> _scan(LinehaulTrip trip) async {
-    var method = 'manual';
-    final value = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => CourierQrScanner(
-          manualHint: 'Parcel tracking number',
-          allowCode128: true,
-          onInputMethod: (value) => method = value,
-        ),
-      ),
-    );
-    if (value != null && value.trim().isNotEmpty && mounted) {
-      // Both camera and manual entry pass through the same server scan guard.
-      await _act(
-        trip,
-        trip.needsRescan ? 'takeover-scan' : 'scan',
-        body: {
-          'tracking_number': value.trim(),
-          'method': method,
-          if (trip.needsRescan) 'offer_version': trip.offerVersion,
-        },
+  Future<void> _submitTripAction(
+    LinehaulTrip trip,
+    String action,
+    LinehaulLocationRequirement requirement,
+    Map<String, Object?> body,
+  ) async {
+    if (requirement == LinehaulLocationRequirement.setupRequired) {
+      throw const CourierLocationException(
+        'This hub needs verified coordinates. Contact Logistics.',
       );
     }
+    final position = requirement == LinehaulLocationRequirement.required
+        ? await widget.locationSource.current()
+        : null;
+    if (!mounted) return;
+    await _repository.act(
+      trip.id,
+      action,
+      body: {...body, if (position != null) 'location': position.toJson()},
+    );
   }
+
+  Future<void> _scan(LinehaulTrip trip) async {
+    if (!_canOperate) return;
+    var snapshot = trip;
+    var needsReconciliation = false;
+    Future<bool> reconcileScan() async {
+      needsReconciliation = true;
+      try {
+        final trips = await _repository.trips();
+        for (final candidate in trips) {
+          if (candidate.id == trip.id &&
+              candidate.offerVersion == trip.offerVersion) {
+            snapshot = candidate;
+            needsReconciliation = false;
+            return true;
+          }
+        }
+      } on ApiException {
+        // Keep scanning locked until the current manifest can be verified.
+      }
+      return false;
+    }
+
+    int confirmed() => snapshot.items.where((parcel) => parcel.loaded).length;
+    TripScanFeedback feedback(
+      String message, {
+      bool accepted = false,
+      bool retryable = false,
+    }) => (
+      message: message,
+      confirmed: confirmed(),
+      expected: snapshot.items.length,
+      accepted: accepted,
+      retryable: retryable,
+    );
+    setState(() => _busy = true);
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => CourierQrScanner(
+            manualHint: 'Parcel tracking number',
+            tripTaskLabel:
+                'Trip #${trip.id} · ${trip.needsRescan ? 'Rescan' : 'Load parcels'}',
+            allowCode128: true,
+            confirmedParcels: confirmed(),
+            expectedParcels: trip.items.length,
+            onTripScan: (code, method) async {
+              if (needsReconciliation && !await reconcileScan()) {
+                return feedback(
+                  'Manifest status unconfirmed. Check the connection or reopen the trip.',
+                );
+              }
+              if (code.isEmpty || code.length > 100) {
+                return feedback('Enter a valid parcel tracking number.');
+              }
+              bool loaded() => snapshot.items.any(
+                (parcel) =>
+                    parcel.tracking.toUpperCase() == code.toUpperCase() &&
+                    parcel.loaded,
+              );
+              if (loaded()) {
+                return feedback('Parcel already scanned.');
+              }
+              try {
+                snapshot = await _repository.act(
+                  trip.id,
+                  trip.needsRescan ? 'takeover-scan' : 'scan',
+                  body: {
+                    'tracking_number': code,
+                    'method': method,
+                    if (trip.needsRescan) 'offer_version': trip.offerVersion,
+                  },
+                );
+                return loaded()
+                    ? feedback('Parcel confirmed.', accepted: true)
+                    : feedback(
+                        'The server did not confirm this parcel. Try again.',
+                      );
+              } on ApiException catch (error) {
+                if (_needsTripReconciliation(error)) {
+                  if (!await reconcileScan()) {
+                    return feedback(
+                      'Manifest status unconfirmed. Check the connection or reopen the trip.',
+                    );
+                  }
+                  if (loaded()) {
+                    return feedback('Parcel confirmed.', accepted: true);
+                  }
+                  return feedback(_tripActionMessage(error), retryable: true);
+                }
+                return feedback(_tripError(error));
+              }
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+        _reload();
+      }
+    }
+  }
+
+  String _tripError(ApiException error) =>
+      error is ValidationException && error.fieldErrors.isNotEmpty
+      ? error.fieldErrors.values.join('\n')
+      : error.message;
+
+  bool _needsTripReconciliation(ApiException error) =>
+      error.isRetryable ||
+      error is MalformedResponseException ||
+      (error is RequestRejectedException && error.isConflict);
+
+  String _tripActionMessage(ApiException error) =>
+      error.isRetryable || error is MalformedResponseException
+      ? 'Trip update unconfirmed. Checking the current trip status.'
+      : _tripError(error);
 
   Future<void> _decline(LinehaulTrip trip) async {
     final reason = await showDialog<String>(
@@ -612,34 +736,117 @@ class _LinehaulPortalState extends State<LinehaulPortal>
   }
 
   Future<void> _depart(LinehaulTrip trip) async {
+    if (!_canOperate) return;
     var value = '';
-    final seal = await showDialog<String>(
+    String? error;
+    var submitting = false;
+    setState(() => _busy = true);
+    final refreshTrip = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Confirm departure'),
-        content: TextField(
-          onChanged: (text) => value = text,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(
-            labelText: 'Seal number',
-            hintText: 'BH-0004521',
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => PopScope(
+          canPop: !submitting,
+          child: AlertDialog(
+            title: const Text('Confirm departure'),
+            scrollable: true,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Trip #${trip.id} · ${trip.items.length} parcels loaded'),
+                const SizedBox(height: 8),
+                const Text('Enter the seal attached to this shipment.'),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (text) => value = text,
+                  enabled: !submitting,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: 'Seal number',
+                    hintText: 'BH-0004521',
+                    errorText: error,
+                    errorMaxLines: 4,
+                  ),
+                ),
+                if (submitting) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(
+                    semanticsLabel: 'Verifying departure',
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        final seal = value.trim();
+                        if (!RegExp(r'^BH-\d{7}$').hasMatch(seal)) {
+                          update(
+                            () => error = 'Enter BH- followed by seven digits.',
+                          );
+                          return;
+                        }
+                        update(() {
+                          submitting = true;
+                          error = null;
+                        });
+                        try {
+                          await _submitTripAction(
+                            trip,
+                            'depart',
+                            trip.departureLocation,
+                            {'seal_number': seal},
+                          );
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext, true);
+                          }
+                          return;
+                        } on ApiException catch (problem) {
+                          if (_needsTripReconciliation(problem)) {
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext, true);
+                            }
+                            if (mounted) {
+                              showTimedSnackBar(
+                                this.context,
+                                SnackBar(
+                                  content: Text(_tripActionMessage(problem)),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          error = _tripError(problem);
+                        } on CourierLocationException catch (problem) {
+                          error = problem.message;
+                        }
+                        if (dialogContext.mounted) {
+                          update(() => submitting = false);
+                        }
+                      },
+                child: Text(submitting ? 'Checking…' : 'Depart'),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, value.trim()),
-            child: const Text('Depart'),
-          ),
-        ],
       ),
     );
-    if (seal != null && mounted) {
-      await _act(trip, 'depart', body: {'seal_number': seal});
+    if (mounted) {
+      setState(() => _busy = false);
+      if (refreshTrip == true) {
+        _reload();
+        unawaited(_historyKey.currentState?.refresh() ?? Future<void>.value());
+      }
     }
   }
 
@@ -662,6 +869,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     final note = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Your handover note'),
         content: TextField(
           maxLength: 500,
@@ -700,8 +908,16 @@ class _LinehaulPortalState extends State<LinehaulPortal>
     final theme = Theme.of(context);
     final loaded = trip.items.where((item) => item.loaded).length;
     final received = trip.items.where((item) => item.received).length;
+    final discrepancies = trip.items.where((item) => item.issue != null).length;
     final completed = trip.status == 'Completed';
     final declined = trip.status == 'Declined';
+    final active = const [
+      'Assigned',
+      'Loading',
+      'In Transit',
+      'Arrived',
+    ].contains(trip.status);
+    final allLoaded = trip.items.isNotEmpty && loaded == trip.items.length;
     final parcelLabel =
         (declined
                 ? trip.parcelCount ?? 0
@@ -711,7 +927,12 @@ class _LinehaulPortalState extends State<LinehaulPortal>
             1
         ? 'parcel'
         : 'parcels';
-    final tint = completed ? AppColors.successText : AppColors.primaryDark;
+    final tint = completed ? AppColors.successText : theme.colorScheme.primary;
+    final needsDuty =
+        _duty?.available == false &&
+        (trip.status == 'Assigned' ||
+            trip.status == 'Loading' ||
+            trip.needsRescan);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: _CourierCard(
@@ -725,55 +946,130 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               runSpacing: 10,
               children: [
                 Text('Trip #${trip.id}', style: theme.textTheme.titleLarge),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: .10),
-                    borderRadius: radiusOf(ShapeTier.control),
-                  ),
-                  child: Text(
-                    trip.status,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: tint,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                EditorialStatusBadge(label: trip.status, tint: tint),
               ],
             ),
-            const SizedBox(height: 22),
-            _hub(
-              'FROM',
-              trip.origin,
-              Icons.trip_origin,
-              address: trip.originAddress,
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 1,
-                  height: 20,
-                  child: ColoredBox(color: AppColors.divider),
-                ),
+            if (active) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${trip.origin} → ${trip.destination}',
+                style: theme.textTheme.titleSmall,
               ),
-            ),
-            _hub(
-              'TO',
-              trip.destination,
-              Icons.location_on_outlined,
-              address: trip.destinationAddress,
-            ),
-            if (const [
-              'Assigned',
-              'Loading',
-              'In Transit',
-              'Arrived',
-            ].contains(trip.status)) ...[
+              const SizedBox(height: 8),
+              if (trip.status == 'Assigned')
+                FilledButton(
+                  onPressed: _canOperate ? () => _act(trip, 'accept') : null,
+                  child: const Text('Accept trip'),
+                ),
+              if (trip.status == 'Loading' || trip.needsRescan) ...[
+                Text(
+                  '$loaded of ${trip.items.length} parcels ${trip.needsRescan ? 'rescanned' : 'loaded'}',
+                ),
+                if (!allLoaded)
+                  FilledButton(
+                    onPressed: _canOperate ? () => _scan(trip) : null,
+                    child: Text(
+                      trip.needsRescan
+                          ? 'Rescan parcel'
+                          : 'Scan or enter parcel',
+                    ),
+                  ),
+                if (trip.needsRescan)
+                  FilledButton(
+                    onPressed: !_canOperate || !allLoaded
+                        ? null
+                        : () => _act(
+                            trip,
+                            'takeover-continue',
+                            body: {'offer_version': trip.offerVersion},
+                          ),
+                    child: const Text('Continue trip'),
+                  )
+                else if (allLoaded)
+                  if (trip.departureLocation ==
+                      LinehaulLocationRequirement.setupRequired)
+                    const Text(
+                      'Logistics must configure the origin hub before departure.',
+                    )
+                  else
+                    FilledButton(
+                      onPressed: _canOperate ? () => _depart(trip) : null,
+                      child: const Text('Depart'),
+                    ),
+                if (!allLoaded && trip.items.isNotEmpty)
+                  LinearProgressIndicator(
+                    value: loaded / trip.items.length,
+                    semanticsLabel: trip.needsRescan
+                        ? 'Takeover rescan progress'
+                        : 'Parcel loading progress',
+                  ),
+                if (trip.needsRescan && !allLoaded)
+                  const Text(
+                    'Rescan every parcel before continuing this trip.',
+                  ),
+              ],
+              if (trip.status == 'In Transit' && !trip.needsRescan)
+                if (trip.arrivalLocation ==
+                    LinehaulLocationRequirement.setupRequired)
+                  const Text(
+                    'Logistics must configure the destination hub before arrival.',
+                  )
+                else
+                  FilledButton(
+                    onPressed: _canOperate ? () => _act(trip, 'arrive') : null,
+                    child: const Text('Report arrival'),
+                  ),
+              if (trip.status == 'Arrived') ...[
+                Text(
+                  'Arrived — Awaiting Logistics Receipt',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const Text(
+                  'Awaiting parcel receipt by Logistics. Refresh after handover.',
+                ),
+                Text('$received of ${trip.items.length} parcels received'),
+              ],
+              if (discrepancies > 0)
+                Text(
+                  '$discrepancies ${discrepancies == 1 ? 'parcel has a recorded issue' : 'parcels have recorded issues'}. See Parcel details.',
+                  style: theme.textTheme.labelLarge,
+                ),
+              if (needsDuty && !_isDemo)
+                TextButton(
+                  onPressed: () => _selectTab(3),
+                  style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+                  child: Text(
+                    _duty!.onDuty
+                        ? 'Check duty and location'
+                        : 'Review duty requirements',
+                  ),
+                ),
+              if (trip.reassignmentReason != null)
+                Text('Reassigned by Logistics: ${trip.reassignmentReason}'),
+              if (trip.status == 'In Transit' && trip.delay != null)
+                Text(
+                  'Courier-reported ETA: ${DateFormat.yMMMd().add_jm().format(trip.delay!.newEta.toLocal())}',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              if (trip.status == 'Assigned' && trip.canDecline)
+                OutlinedButton(
+                  onPressed: _canOperate ? () => _decline(trip) : null,
+                  child: const Text('Decline trip'),
+                ),
+              if (trip.canReportDelay)
+                OutlinedButton.icon(
+                  onPressed: _canOperate ? () => _reportDelay(trip) : null,
+                  icon: const Icon(Icons.schedule_outlined),
+                  label: const Text('Report delay'),
+                ),
+              if (trip.canReportBreakdown)
+                OutlinedButton.icon(
+                  onPressed: _canOperate
+                      ? () => _reportDelay(trip, breakdown: true)
+                      : null,
+                  icon: const Icon(Icons.car_repair_outlined),
+                  label: const Text('Report breakdown'),
+                ),
               const SizedBox(height: 16),
               if (DeviceCourierDirections.destinationUri(
                     trip.destination,
@@ -781,7 +1077,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   ) !=
                   null)
                 OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _navigate(trip),
+                  onPressed: _canOperate ? () => _navigate(trip) : null,
                   icon: const Icon(Icons.directions_outlined),
                   label: const Text('Directions to destination'),
                 )
@@ -799,73 +1095,102 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   style: theme.textTheme.bodySmall,
                 ),
             ],
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,
-                borderRadius: radiusOf(ShapeTier.control),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.inventory_2_outlined,
-                    size: 20,
-                    color: AppColors.primaryDark,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      declined
-                          ? '${trip.parcelCount ?? 0} $parcelLabel in original offer'
-                          : completed
-                          ? '$received $parcelLabel received'
-                          : '$loaded of ${trip.items.length} $parcelLabel loaded',
-                      style: theme.textTheme.bodySmall,
+            ExpansionTile(
+              key: PageStorageKey('hub-${trip.id}'),
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Hub details'),
+              initiallyExpanded: !active,
+              expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _hub(
+                  'FROM',
+                  trip.origin,
+                  Icons.trip_origin,
+                  address: trip.originAddress,
+                ),
+                const SizedBox(height: 12),
+                _hub(
+                  'TO',
+                  trip.destination,
+                  Icons.location_on_outlined,
+                  address: trip.destinationAddress,
+                ),
+              ],
+            ),
+            if (trip.status != 'Loading' && !trip.needsRescan)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: radiusOf(ShapeTier.control),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: 20,
+                      color: AppColors.primaryDark,
                     ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        declined
+                            ? '${trip.parcelCount ?? 0} $parcelLabel in original offer'
+                            : completed
+                            ? '$received $parcelLabel received'
+                            : '$loaded of ${trip.items.length} $parcelLabel loaded',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (!declined)
+              ExpansionTile(
+                key: PageStorageKey('trip-details-${trip.id}'),
+                tilePadding: EdgeInsets.zero,
+                expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                initiallyExpanded: !active,
+                title: const Text('Trip details'),
+                children: [
+                  Text(
+                    trip.scheduledDepartureAt == null
+                        ? 'Planned departure not set'
+                        : 'Planned departure: ${DateFormat.yMMMd().add_jm().format(trip.scheduledDepartureAt!.toLocal())}',
                   ),
+                  Text(
+                    '${trip.parcelCount ?? trip.items.length} ${(trip.parcelCount ?? trip.items.length) == 1 ? 'parcel' : 'parcels'} in this batch',
+                  ),
+                  Text(
+                    trip.recordedWeightGrams == null
+                        ? 'Parcel weight not fully recorded'
+                        : 'Recorded parcel weight: ${NumberFormat('0.###').format(trip.recordedWeightGrams! / 1000)} kg',
+                  ),
+                  if (trip.acceptedAt != null)
+                    Text(
+                      'Accepted: ${DateFormat.yMMMd().add_jm().format(trip.acceptedAt!.toLocal())}',
+                    ),
+                  if (trip.departedAt != null)
+                    Text(
+                      'Departed: ${DateFormat.yMMMd().add_jm().format(trip.departedAt!.toLocal())}',
+                    ),
+                  if (trip.arrivedAt != null)
+                    Text(
+                      'Arrived: ${DateFormat.yMMMd().add_jm().format(trip.arrivedAt!.toLocal())}',
+                    ),
                 ],
               ),
-            ),
-            if (!declined) ...[
-              const SizedBox(height: 16),
-              Text('Trip details', style: theme.textTheme.titleMedium),
-              Text(
-                trip.scheduledDepartureAt == null
-                    ? 'Planned departure not set'
-                    : 'Planned departure: ${DateFormat.yMMMd().add_jm().format(trip.scheduledDepartureAt!.toLocal())}',
-              ),
-              Text(
-                '${trip.parcelCount ?? trip.items.length} ${trip.items.length == 1 ? 'parcel' : 'parcels'} in this batch',
-              ),
-              Text(
-                trip.recordedWeightGrams == null
-                    ? 'Parcel weight not fully recorded'
-                    : 'Recorded parcel weight: ${NumberFormat('0.###').format(trip.recordedWeightGrams! / 1000)} kg',
-              ),
-              if (trip.acceptedAt != null)
-                Text(
-                  'Accepted: ${DateFormat.yMMMd().add_jm().format(trip.acceptedAt!.toLocal())}',
-                ),
-              if (trip.departedAt != null)
-                Text(
-                  'Departed: ${DateFormat.yMMMd().add_jm().format(trip.departedAt!.toLocal())}',
-                ),
-              if (trip.arrivedAt != null)
-                Text(
-                  'Arrived: ${DateFormat.yMMMd().add_jm().format(trip.arrivedAt!.toLocal())}',
-                ),
-            ],
             if (trip.delay != null) ...[
               const SizedBox(height: 16),
               Text(
                 trip.status == 'In Transit' ? 'Delayed' : 'Last delay report',
                 style: theme.textTheme.titleMedium,
               ),
-              Text(
-                'Courier-reported ETA: ${DateFormat.yMMMd().add_jm().format(trip.delay!.newEta.toLocal())}',
-                style: theme.textTheme.bodyMedium,
-              ),
+              if (trip.status != 'In Transit')
+                Text(
+                  'Courier-reported ETA: ${DateFormat.yMMMd().add_jm().format(trip.delay!.newEta.toLocal())}',
+                  style: theme.textTheme.bodyMedium,
+                ),
               Text(trip.delay!.reason, style: theme.textTheme.bodyMedium),
               Text(
                 'Reported ${DateFormat.yMMMd().add_jm().format(trip.delay!.reportedAt.toLocal())}',
@@ -901,6 +1226,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
             ],
             if (!declined)
               ExpansionTile(
+                key: PageStorageKey('parcels-${trip.id}'),
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 title: Text(
@@ -943,25 +1269,15 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                                   Text('Your note: ${item.courierNote}')
                                 else
                                   TextButton(
-                                    onPressed: _busy
-                                        ? null
-                                        : () => _handoverNote(trip, item),
+                                    onPressed: _canOperate
+                                        ? () => _handoverNote(trip, item)
+                                        : null,
                                     child: const Text('Add handover note'),
                                   ),
                               ],
                             ),
                     ),
                 ],
-              ),
-            if (trip.status == 'Assigned')
-              FilledButton(
-                onPressed: _busy ? null : () => _act(trip, 'accept'),
-                child: const Text('Accept trip'),
-              ),
-            if (trip.status == 'Assigned' && trip.canDecline)
-              OutlinedButton(
-                onPressed: _busy ? null : () => _decline(trip),
-                child: const Text('Decline trip'),
               ),
             if (declined) ...[
               const SizedBox(height: 16),
@@ -980,44 +1296,8 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 'This offer was not completed. Logistics manages the next assignment.',
               ),
             ],
-            if (trip.status == 'Loading') ...[
-              OutlinedButton(
-                onPressed: _busy ? null : () => _scan(trip),
-                child: const Text('Scan or enter parcel'),
-              ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: _busy ? null : () => _depart(trip),
-                child: const Text('Depart'),
-              ),
-            ],
-            if (trip.reassignmentReason != null)
+            if (!active && trip.reassignmentReason != null)
               Text('Reassigned by Logistics: ${trip.reassignmentReason}'),
-            if (trip.needsRescan) ...[
-              const Text('Rescan every parcel before continuing this trip.'),
-              OutlinedButton(
-                onPressed: _busy ? null : () => _scan(trip),
-                child: const Text('Rescan parcel'),
-              ),
-              FilledButton(
-                onPressed:
-                    _busy ||
-                        trip.items.isEmpty ||
-                        trip.items.any((parcel) => !parcel.loaded)
-                    ? null
-                    : () => _act(
-                        trip,
-                        'takeover-continue',
-                        body: {'offer_version': trip.offerVersion},
-                      ),
-                child: const Text('Continue trip'),
-              ),
-            ],
-            if (trip.status == 'In Transit' && !trip.needsRescan)
-              FilledButton(
-                onPressed: _busy ? null : () => _act(trip, 'arrive'),
-                child: const Text('Report arrival'),
-              ),
             if (trip.status == 'In Transit' &&
                 !trip.needsRescan &&
                 widget.tripLocationSource.supported &&
@@ -1047,29 +1327,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 ),
               ),
             ],
-            if (trip.canReportDelay)
-              OutlinedButton.icon(
-                onPressed: _busy ? null : () => _reportDelay(trip),
-                icon: const Icon(Icons.schedule_outlined),
-                label: const Text('Report delay'),
-              ),
-            if (trip.canReportBreakdown)
-              OutlinedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () => _reportDelay(trip, breakdown: true),
-                icon: const Icon(Icons.car_repair_outlined),
-                label: const Text('Report breakdown'),
-              ),
-            if (trip.status == 'Arrived')
-              Text(
-                'Awaiting parcel receipt by Logistics. Refresh after handover.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.6,
-                ),
-              ),
-            if (completed)
+            if (completed || trip.status == 'Received with Issues')
               Text(
                 trip.status == 'Received with Issues'
                     ? 'Closed by Logistics with recorded issues.'
@@ -1158,14 +1416,16 @@ class _LinehaulPortalState extends State<LinehaulPortal>
         const EditorialHeader(
           eyebrow: 'YOUR ZEFANYA',
           title: 'Your profile',
-          padding: EdgeInsets.only(bottom: 24),
+          padding: EdgeInsets.only(bottom: 12),
         ),
+        _CourierCard(child: _dutyCard()),
+        const SizedBox(height: 12),
         _CourierCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppColors.primaryDark,
                   borderRadius: radiusOf(ShapeTier.card),
@@ -1190,8 +1450,6 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                           if (auth.email != null)
                             Text(
                               auth.email!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(color: AppColors.textOnDark),
                             ),
@@ -1214,13 +1472,10 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
               const Divider(),
-              const SizedBox(height: 12),
-              const Text('Hub-to-hub parcel transfers'),
-              const SizedBox(height: 20),
               OutlinedButton.icon(
-                onPressed: _busy || context.read<Repositories>().client == null
+                onPressed: _busy || !_hasRepository
                     ? null
                     : () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
@@ -1231,8 +1486,6 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 icon: const Icon(Icons.badge_outlined),
                 label: const Text('Company & profile'),
               ),
-              const SizedBox(height: 24),
-              _dutyCard(),
             ],
           ),
         ),
@@ -1270,7 +1523,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
               ),
               actions: [
                 IconButton(
-                  onPressed: _busy ? null : _reload,
+                  onPressed: _busy || _refreshingTrips ? null : _reload,
                   icon: const Icon(Icons.refresh),
                   tooltip: 'Refresh trips',
                 ),
@@ -1290,13 +1543,14 @@ class _LinehaulPortalState extends State<LinehaulPortal>
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: IndexedStack(
+          child: FadeThroughIndexedStack(
             index: _tab,
             children: [
               FutureBuilder<List<LinehaulTrip>>(
                 future: _trips,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
+                  if (snapshot.connectionState != ConnectionState.done &&
+                      !snapshot.hasData) {
                     return const Center(child: ZefanyaLoader(size: 48));
                   }
                   if (snapshot.hasError) {
@@ -1327,6 +1581,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   final reassignment = _reassignmentNotice(all);
                   return RefreshIndicator(
                     onRefresh: () async {
+                      if (_busy) return;
                       _reload();
                       try {
                         await _trips;
@@ -1335,26 +1590,31 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                       }
                     },
                     child: ListView(
+                      key: const PageStorageKey('linehaul-trips'),
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
                       children: [
-                        EditorialHeader(
-                          eyebrow: 'HUB TO HUB',
-                          title: 'Your journeys',
-                          padding: const EdgeInsets.only(bottom: 12),
-                        ),
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: Text(
-                            'From loading to handover, one parcel at a time.',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  height: 1.5,
-                                ),
+                            'Your journeys',
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ),
-                        if (_busy) const LinearProgressIndicator(),
+                        if ((_busy || _refreshingTrips) &&
+                            ModalRoute.isCurrentOf(context) == true)
+                          LinearProgressIndicator(
+                            semanticsLabel: _refreshingTrips
+                                ? 'Refreshing trips'
+                                : 'Updating trip',
+                          ),
+                        if (_isDemo)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              'Sample trips. Trip actions require live mode.',
+                            ),
+                          ),
                         if (reassignment != null) reassignment,
                         if (trips.isEmpty)
                           _CourierCard(
@@ -1375,8 +1635,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                   );
                 },
               ),
-              if (_visitedTabs.contains(1) &&
-                  context.read<Repositories>().client != null)
+              if (_visitedTabs.contains(1) && _hasRepository)
                 SafeArea(
                   bottom: false,
                   child: LinehaulHistoryScreen(
@@ -1388,8 +1647,7 @@ class _LinehaulPortalState extends State<LinehaulPortal>
                 )
               else
                 const SizedBox.shrink(),
-              if (_visitedTabs.contains(2) &&
-                  context.read<Repositories>().client != null)
+              if (_visitedTabs.contains(2) && _hasRepository)
                 SafeArea(
                   bottom: false,
                   child: LinehaulEarningsScreen(
@@ -1497,6 +1755,6 @@ class _CourierCard extends StatelessWidget {
       borderRadius: editorialRadius(0, ShapeTier.card),
       side: BorderSide(color: AppColors.divider),
     ),
-    child: Padding(padding: const EdgeInsets.all(20), child: child),
+    child: Padding(padding: const EdgeInsets.all(16), child: child),
   );
 }

@@ -67,30 +67,38 @@ class ProfileScreen extends StatelessWidget {
     final isCourier = auth.role == UserRole.courier;
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+      backgroundColor:
+          Colors.transparent, // the app-wide gradient in main.dart paints this
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s24),
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.s20,
+            AppSpacing.s16,
+            AppSpacing.s20,
+            isCourier ? 120 : AppSpacing.s24,
+          ),
           children: [
             EaseInFrame(
               index: 0,
               child: _buildHeroCard(context, theme, ext, auth, isCourier),
             ),
             const SizedBox(height: AppSpacing.s24),
+            if (isCourier) ...[
+              const EaseInFrame(index: 1, child: RiderProfileSection()),
+              const SizedBox(height: AppSpacing.s24),
+            ],
             if (!isCourier) ...[
-              const EaseInFrame(
-                index: 1,
-                child: _RecentlyLookedAt(),
-              ),
+              const EaseInFrame(index: 1, child: _RecentlyLookedAt()),
             ],
             // Curve transitions from the hero into the record zone —
             // without it the drop from the gradient card to the plain
             // left-spine ledger reads as the design running out, not
             // as two intentional zones.
-            CurvedSectionBreak(
-              color: AppColors.surfaceMuted.withValues(alpha: 0.7),
-              height: 36,
-            ),
+            if (!isCourier)
+              CurvedSectionBreak(
+                color: AppColors.surfaceMuted.withValues(alpha: 0.7),
+                height: 36,
+              ),
             const SizedBox(height: AppSpacing.s8),
             EaseInFrame(
               index: 2,
@@ -107,7 +115,9 @@ class ProfileScreen extends StatelessWidget {
                         auth.phone,
                         emptyPrompt: 'Add phone',
                         onTap: () => Navigator.of(context).push(
-                          AppPageRoute(builder: (_) => const EditProfileScreen()),
+                          AppPageRoute(
+                            builder: (_) => const EditProfileScreen(),
+                          ),
                         ),
                       ),
                       _LedgerRow(
@@ -116,7 +126,9 @@ class ProfileScreen extends StatelessWidget {
                         auth.sex,
                         emptyPrompt: 'Add sex',
                         onTap: () => Navigator.of(context).push(
-                          AppPageRoute(builder: (_) => const EditProfileScreen()),
+                          AppPageRoute(
+                            builder: (_) => const EditProfileScreen(),
+                          ),
                         ),
                       ),
                       _LedgerRow(
@@ -137,10 +149,6 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
-            if (isCourier) ...[
-              const SizedBox(height: AppSpacing.s24),
-              const EaseInFrame(index: 3, child: RiderProfileSection()),
-            ],
           ],
         ),
       ),
@@ -160,12 +168,24 @@ class ProfileScreen extends StatelessWidget {
       // shape language as Home's cover story and feature tiles.
       borderRadius: editorialRadiusRaw(0, big: ext.heroRadius * 1.4, small: 8),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s16, AppSpacing.s16, AppSpacing.s16),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s16,
+          AppSpacing.s16,
+          AppSpacing.s16,
+          AppSpacing.s16,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.primaryDark, Color.lerp(AppColors.primaryDark, Colors.black, 0.25)!],
+            colors: [
+              isCourier ? AppColors.roseGround : AppColors.primaryDark,
+              Color.lerp(
+                isCourier ? AppColors.roseGround : AppColors.primaryDark,
+                Colors.black,
+                .25,
+              )!,
+            ],
           ),
         ),
         child: Stack(
@@ -196,9 +216,7 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     AvatarDisplay(
                       onTap: () => Navigator.of(context).push(
-                        AppPageRoute(
-                          builder: (_) => const EditProfileScreen(),
-                        ),
+                        AppPageRoute(builder: (_) => const EditProfileScreen()),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s16),
@@ -209,7 +227,7 @@ class ProfileScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isCourier ? 'COURIER' : 'BUYER',
+                              isCourier ? 'RIDER' : 'BUYER',
                               style: AppType.eyebrow.copyWith(
                                 color: AppColors.secondary,
                               ),
@@ -226,7 +244,9 @@ class ProfileScreen extends StatelessWidget {
                             Text(
                               auth.email ?? '',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: AppColors.textOnDark.withValues(alpha: 0.8),
+                                color: AppColors.textOnDark.withValues(
+                                  alpha: 0.8,
+                                ),
                               ),
                             ),
                           ],
@@ -266,7 +286,10 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s16),
-                Divider(color: AppColors.textOnDark.withValues(alpha: 0.18), height: 1),
+                Divider(
+                  color: AppColors.textOnDark.withValues(alpha: 0.18),
+                  height: 1,
+                ),
                 const SizedBox(height: AppSpacing.s16),
                 _StatStrip(isCourier: isCourier, auth: auth),
               ],
@@ -276,7 +299,6 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
-
 }
 
 // ---------------------------------------------------------------------
@@ -284,8 +306,18 @@ class ProfileScreen extends StatelessWidget {
 // ---------------------------------------------------------------------
 
 const List<String> _monthAbbrev = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 String _memberSinceLabel(DateTime? since) =>
@@ -313,8 +345,11 @@ class _StatStrip extends StatelessWidget {
     if (isCourier) {
       final courier = context.watch<CourierState>();
       primaryValue = '${courier.completedJobs.length}';
-      primaryLabel = 'DELIVERIES DONE';
-      secondValue = formatPeso(courier.totalEarnings);
+      primaryLabel = 'JOBS RECORDED';
+      secondValue =
+          courier.hasConfirmedEarnings && courier.earningsFailure == null
+          ? formatPeso(courier.totalEarnings)
+          : '—';
       secondLabel = 'EARNED';
     } else {
       final viewed = context.watch<RecentlyViewedState>().items.length;
@@ -329,10 +364,7 @@ class _StatStrip extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 5,
-          child: _stat(primaryLabel, primaryValue, 44),
-        ),
+        Expanded(flex: 5, child: _stat(primaryLabel, primaryValue, 44)),
         Container(
           width: 1,
           height: 62,
@@ -427,7 +459,9 @@ class _RecentlyLookedAt extends StatelessWidget {
               final product = shown[i];
               return GestureDetector(
                 onTap: () => Navigator.of(context).push(
-                  AppPageRoute(builder: (_) => ProductDetailsScreen(product: product)),
+                  AppPageRoute(
+                    builder: (_) => ProductDetailsScreen(product: product),
+                  ),
                 ),
                 child: ClipRRect(
                   // Alternating lean, same as any other row of these —
@@ -510,7 +544,10 @@ class _LedgerCard extends StatelessWidget {
     final prompt = row.emptyPrompt ?? "Add ${row.label.toLowerCase()}";
 
     final content = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s16,
+        vertical: AppSpacing.s12,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [

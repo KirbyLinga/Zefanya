@@ -69,7 +69,6 @@ DeliveryJob? deliveryJobFromJson(Map<String, Object?> json) {
     // build explicitly includes it (the mock fixtures/test server). An absent
     // code is empty, not the mock value — guessing a live OTP would be worse
     // than the handover failing closed.
-    deliveryOtp: json['delivery_otp']?.toString() ?? '',
   );
 }
 
@@ -83,8 +82,7 @@ double _double(Object? value) {
 /// A parcel from WebZefanya's `GET /api/rider/jobs` (RiderParcelResource).
 ///
 /// Every amount is the server's: COD arrives in minor units and is shown as
-/// pesos only. The server never sends the delivery OTP, so [DeliveryJob.deliveryOtp]
-/// is empty and the tracker leaves the code check to the server. The per-job
+/// pesos only. The per-job
 /// fee is not part of this payload (earnings are read from `/api/rider/earnings`),
 /// so it is 0 rather than an invented figure.
 DeliveryJob? deliveryJobFromRiderParcel(Map<String, Object?> json) {
@@ -99,7 +97,8 @@ DeliveryJob? deliveryJobFromRiderParcel(Map<String, Object?> json) {
     shopName: json['seller_name']?.toString() ?? 'Seller',
     pickupAddress: json['pickup_area']?.toString() ?? '',
     buyerName: json['buyer_name']?.toString() ?? '',
-    deliveryArea: json['delivery_address']?.toString() ??
+    deliveryArea:
+        json['delivery_address']?.toString() ??
         json['delivery_area']?.toString() ??
         '',
     packageSize: json['weight']?.toString() ?? '',
@@ -110,7 +109,6 @@ DeliveryJob? deliveryJobFromRiderParcel(Map<String, Object?> json) {
     parcelCount: (json['item_count'] as num?)?.toInt() ?? 1,
     codAmount: requiresCod && codMinor is num ? codMinor / 100 : 0,
     prepaid: !requiresCod,
-    deliveryOtp: '',
     serverStatus: json['status']?.toString(),
     pickupSessionId: json['pickup_session_id']?.toString(),
     pickupAttempts: (json['pickup_attempts'] as num?)?.toInt() ?? 0,
@@ -209,7 +207,8 @@ class RiderJobsMeta {
 }
 
 RiderJobsMeta riderJobsMetaFromJson(Map<String, Object?> data) {
-  final failure = (data['pickup_failure'] as Map?)?.cast<String, Object?>() ?? const {};
+  final failure =
+      (data['pickup_failure'] as Map?)?.cast<String, Object?>() ?? const {};
   final online = data['online'];
 
   return RiderJobsMeta(
@@ -293,22 +292,25 @@ class RiderCashSnapshot {
 }
 
 RiderCashSnapshot riderCashFromJson(Map<String, Object?> data) {
-  final summary = (data['summary'] as Map?)?.cast<String, Object?>() ?? const {};
+  final summary =
+      (data['summary'] as Map?)?.cast<String, Object?>() ?? const {};
   double pesos(Object? minor) => (_int(minor) ?? 0) / 100;
   List<RiderCodRecord> rows(Object? list) => [
-        for (final row in (list as List?) ?? const [])
-          if (row is Map && row['id'] != null)
-            RiderCodRecord(
-              id: '${row['id']}',
-              status: '${row['status'] ?? ''}',
-              amount: pesos(row['amount_minor']),
-              trackingNumber: row['tracking_number']?.toString(),
-              receivedAmount: row['received_amount_minor'] == null ? null : pesos(row['received_amount_minor']),
-              collectedAt: DateTime.tryParse('${row['collected_at']}')?.toLocal(),
-              confirmedAt: DateTime.tryParse('${row['confirmed_at']}')?.toLocal(),
-              overdue: row['overdue'] == true,
-            ),
-      ];
+    for (final row in (list as List?) ?? const [])
+      if (row is Map && row['id'] != null)
+        RiderCodRecord(
+          id: '${row['id']}',
+          status: '${row['status'] ?? ''}',
+          amount: pesos(row['amount_minor']),
+          trackingNumber: row['tracking_number']?.toString(),
+          receivedAmount: row['received_amount_minor'] == null
+              ? null
+              : pesos(row['received_amount_minor']),
+          collectedAt: DateTime.tryParse('${row['collected_at']}')?.toLocal(),
+          confirmedAt: DateTime.tryParse('${row['confirmed_at']}')?.toLocal(),
+          overdue: row['overdue'] == true,
+        ),
+  ];
 
   return RiderCashSnapshot(
     collected: pesos(summary['collected_minor']),
@@ -350,9 +352,12 @@ class RiderReturnPickup {
   final DateTime? assignedAt;
 }
 
-List<RiderReturnPickup> riderReturnPickupsFromJson(Map<String, Object?> data) => [
+List<RiderReturnPickup> riderReturnPickupsFromJson(Map<String, Object?> data) =>
+    [
       for (final row in (data['returns'] as List?) ?? const [])
-        if (row is Map && row['id'] != null && '${row['tracking_number'] ?? ''}'.isNotEmpty)
+        if (row is Map &&
+            row['id'] != null &&
+            '${row['tracking_number'] ?? ''}'.isNotEmpty)
           RiderReturnPickup(
             id: '${row['id']}',
             trackingNumber: '${row['tracking_number']}',
@@ -465,11 +470,11 @@ RiderEarningsSnapshot riderEarningsFromJson(Map<String, Object?> data) {
 }
 
 int? _int(Object? value) => switch (value) {
-      final int v => v,
-      final num v => v.round(),
-      final String v => int.tryParse(v),
-      _ => null,
-    };
+  final int v => v,
+  final num v => v.round(),
+  final String v => int.tryParse(v),
+  _ => null,
+};
 
 // ---------------------------------------------------------------------------
 // GET /api/rider/providers
@@ -484,11 +489,11 @@ class RiderProviderOption {
 }
 
 List<RiderProviderOption> riderProvidersFromJson(Map<String, Object?> data) => [
-      for (final row in (data['providers'] as List?) ?? const [])
-        if (row is Map)
-          if (_int(row['id']) case final id?)
-            RiderProviderOption(id: id, name: '${row['name'] ?? ''}'),
-    ];
+  for (final row in (data['providers'] as List?) ?? const [])
+    if (row is Map)
+      if (_int(row['id']) case final id?)
+        RiderProviderOption(id: id, name: '${row['name'] ?? ''}'),
+];
 
 // ---------------------------------------------------------------------------
 // GET /api/rider/history
@@ -526,21 +531,23 @@ class RiderHistoryEntry {
 }
 
 List<RiderHistoryEntry> riderHistoryFromJson(Map<String, Object?> data) => [
-      for (final row in (data['history'] as List?) ?? const [])
-        if (row is Map && row['id'] != null)
-          RiderHistoryEntry(
-            sellerOrderId: '${row['id']}',
-            status: '${row['status'] ?? ''}',
-            statusLabel: '${row['status_label'] ?? row['status'] ?? ''}',
-            trackingNumber: row['tracking_number']?.toString(),
-            sellerName: row['seller_name']?.toString(),
-            deliveryArea: row['delivery_area']?.toString(),
-            returned: row['returned'] == true,
-            earning: row['earning_minor'] == null ? null : (_int(row['earning_minor']) ?? 0) / 100,
-            deliveredAt: DateTime.tryParse('${row['delivered_at']}')?.toLocal(),
-            proofId: row['proof_id']?.toString(),
-          ),
-    ];
+  for (final row in (data['history'] as List?) ?? const [])
+    if (row is Map && row['id'] != null)
+      RiderHistoryEntry(
+        sellerOrderId: '${row['id']}',
+        status: '${row['status'] ?? ''}',
+        statusLabel: '${row['status_label'] ?? row['status'] ?? ''}',
+        trackingNumber: row['tracking_number']?.toString(),
+        sellerName: row['seller_name']?.toString(),
+        deliveryArea: row['delivery_area']?.toString(),
+        returned: row['returned'] == true,
+        earning: row['earning_minor'] == null
+            ? null
+            : (_int(row['earning_minor']) ?? 0) / 100,
+        deliveredAt: DateTime.tryParse('${row['delivered_at']}')?.toLocal(),
+        proofId: row['proof_id']?.toString(),
+      ),
+];
 
 // ---------------------------------------------------------------------------
 // GET /api/rider/payouts
@@ -582,7 +589,8 @@ class RiderPayoutsSnapshot {
 }
 
 RiderPayoutsSnapshot riderPayoutsFromJson(Map<String, Object?> data) {
-  final summary = (data['summary'] as Map?)?.cast<String, Object?>() ?? const {};
+  final summary =
+      (data['summary'] as Map?)?.cast<String, Object?>() ?? const {};
   double pesos(Object? minor) => (_int(minor) ?? 0) / 100;
 
   return RiderPayoutsSnapshot(
@@ -659,25 +667,31 @@ WaybillParty? _party(Object? json) {
 }
 
 RiderWaybill riderWaybillFromJson(Map<String, Object?> data) => RiderWaybill(
-      context: '${data['context'] ?? ''}',
-      sellerOrderId: '${data['seller_order_id'] ?? ''}',
-      statusLabel: '${data['status_label'] ?? ''}',
-      trackingNumber: data['tracking_number']?.toString(),
-      weight: data['weight']?.toString(),
-      itemCount: _int(data['item_count']) ?? 0,
-      seller: _party(data['seller']),
-      buyer: _party(data['buyer']),
-      destinationArea: data['destination_area']?.toString(),
-      paymentLabel: data['payment_label']?.toString(),
-      collectCod: (_int(data['collect_cod_minor']) ?? 0) / 100,
-    );
+  context: '${data['context'] ?? ''}',
+  sellerOrderId: '${data['seller_order_id'] ?? ''}',
+  statusLabel: '${data['status_label'] ?? ''}',
+  trackingNumber: data['tracking_number']?.toString(),
+  weight: data['weight']?.toString(),
+  itemCount: _int(data['item_count']) ?? 0,
+  seller: _party(data['seller']),
+  buyer: _party(data['buyer']),
+  destinationArea: data['destination_area']?.toString(),
+  paymentLabel: data['payment_label']?.toString(),
+  collectCod: (_int(data['collect_cod_minor']) ?? 0) / 100,
+);
 
 // ---------------------------------------------------------------------------
 // GET /api/rider/profile: station and coverage
 // ---------------------------------------------------------------------------
 
 class RiderCoverage {
-  const RiderCoverage({this.stationName, this.stationMunicipality, this.areaName, this.areaMunicipality, this.areaBarangay});
+  const RiderCoverage({
+    this.stationName,
+    this.stationMunicipality,
+    this.areaName,
+    this.areaMunicipality,
+    this.areaBarangay,
+  });
 
   final String? stationName;
   final String? stationMunicipality;
@@ -686,11 +700,15 @@ class RiderCoverage {
   final String? areaBarangay;
 
   String? get stationLabel => _joinNonEmpty([stationName, stationMunicipality]);
-  String? get areaLabel => _joinNonEmpty([areaBarangay, areaMunicipality]) ?? areaName;
+  String? get areaLabel =>
+      _joinNonEmpty([areaBarangay, areaMunicipality]) ?? areaName;
 }
 
 String? _joinNonEmpty(List<String?> parts) {
-  final kept = [for (final p in parts) if (p != null && p.trim().isNotEmpty) p.trim()];
+  final kept = [
+    for (final p in parts)
+      if (p != null && p.trim().isNotEmpty) p.trim(),
+  ];
   return kept.isEmpty ? null : kept.join(', ');
 }
 
@@ -705,4 +723,3 @@ RiderCoverage riderCoverageFromJson(Map<String, Object?> data) {
     areaBarangay: area?['barangay']?.toString(),
   );
 }
-

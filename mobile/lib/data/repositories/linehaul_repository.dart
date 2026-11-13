@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import 'linehaul_vehicle_repository.dart';
@@ -302,12 +304,95 @@ class LinehaulParcel {
 }
 
 class LinehaulRepository {
-  const LinehaulRepository(this.client);
-  final ApiClient client;
+  const LinehaulRepository(ApiClient client) : _client = client;
+  const LinehaulRepository.demo() : _client = null;
 
-  Future<LinehaulProfile> profile() async => LinehaulProfile.fromJson(
-    unwrapMap(await client.getJson('/courier/profile')),
-  );
+  final ApiClient? _client;
+  bool get isDemo => _client == null;
+  ApiClient get client => _client ?? (throw const ApiNotConfiguredException());
+
+  Future<LinehaulProfile> profile() async => isDemo
+      ? const LinehaulProfile(
+          name: 'Demo Transport Courier',
+          email: 'transport@demo.invalid',
+          status: 'Demo',
+          emailVerified: false,
+          company: 'Zefanya Demo Logistics',
+          homeHub: 'Pila Hub',
+        )
+      : LinehaulProfile.fromJson(
+          unwrapMap(await client.getJson('/courier/profile')),
+        );
+
+  static const _demoTrip = {
+    'origin': 'Pila Hub',
+    'destination': 'Calamba Hub',
+    'origin_address': 'Pila, Laguna',
+    'destination_address': 'Calamba, Laguna',
+  };
+
+  Future<Map<String, Object?>> history(Map<String, String> query) async {
+    if (!isDemo) return client.getJson('/courier/history', query: query);
+    final (timestamp, included) = _demoReportDate(query);
+    return {
+      'data': {
+        'page': 1,
+        'last_page': 1,
+        'timezone': 'Asia/Manila',
+        'total': included ? 1 : 0,
+        'trips': [
+          if (included)
+            {
+              ..._demoTrip,
+              'id': 101,
+              'status': 'Completed',
+              'history_key': 'demo-101',
+              'recorded_at': timestamp,
+              'items': [
+                {
+                  'tracking_number': 'DEMO-PARCEL-101',
+                  'loaded': true,
+                  'received': true,
+                },
+              ],
+            },
+        ],
+      },
+    };
+  }
+
+  Future<Map<String, Object?>> earnings(Map<String, String> query) async {
+    if (!isDemo) return client.getJson('/courier/earnings', query: query);
+    final (timestamp, included) = _demoReportDate(query);
+    return {
+      'data': {
+        'page': 1,
+        'last_page': 1,
+        'timezone': 'Asia/Manila',
+        'earned_minor': included ? 125000 : 0,
+        'earned_trips': included ? 1 : 0,
+        'unconfirmed_trips': 0,
+        'completed_trips': included ? 1 : 0,
+        'trips': [
+          if (included)
+            {
+              'trip_id': 101,
+              'result': 'Completed',
+              'completed_at': timestamp,
+              'trip_pay': {'status': 'earned', 'amount_minor': 125000},
+            },
+        ],
+      },
+    };
+  }
+
+  (String, bool) _demoReportDate(Map<String, String> query) {
+    final manila = DateTime.now().toUtc().add(const Duration(hours: 8));
+    final day = DateFormat('yyyy-MM-dd').format(manila);
+    final included =
+        day.compareTo(query['from']!) >= 0 && day.compareTo(query['to']!) <= 0;
+    return ('${day}T08:00:00+08:00', included);
+  }
 
   Future<void> reportBreakdown(
     String tripId, {
@@ -337,8 +422,14 @@ class LinehaulRepository {
     LinehaulDelay.fromJson((data['delay'] as Map).cast<String, Object?>());
   }
 
-  Future<LinehaulDuty> duty() async =>
-      LinehaulDuty.fromJson(unwrapMap(await client.getJson('/courier/duty')));
+  Future<LinehaulDuty> duty() async => isDemo
+      ? const LinehaulDuty(
+          onDuty: false,
+          available: false,
+          setupRequired: false,
+          status: 'Off Duty',
+        )
+      : LinehaulDuty.fromJson(unwrapMap(await client.getJson('/courier/duty')));
 
   Future<LinehaulDuty> changeDuty(
     String action,
@@ -348,6 +439,27 @@ class LinehaulRepository {
   );
 
   Future<List<LinehaulTrip>> trips() async {
+    if (isDemo) {
+      return [
+        LinehaulTrip.fromJson({
+          ..._demoTrip,
+          'id': 102,
+          'status': 'Loading',
+          'items': [
+            {
+              'tracking_number': 'DEMO-PARCEL-102',
+              'loaded': true,
+              'received': false,
+            },
+            {
+              'tracking_number': 'DEMO-PARCEL-103',
+              'loaded': false,
+              'received': false,
+            },
+          ],
+        }),
+      ];
+    }
     final response = await client.getJson('/courier/trips');
     final rows = response['data'];
     if (rows is! List) throw const MalformedResponseException();

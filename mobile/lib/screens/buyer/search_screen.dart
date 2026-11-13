@@ -32,7 +32,6 @@ import '../../utils/money_format.dart';
 import '../../utils/product_sort.dart';
 import '../../utils/search_filter.dart';
 import '../../utils/motion.dart';
-import '../../widgets/editorial_shapes.dart';
 import '../../widgets/motion/ease_in_frame.dart';
 import '../../widgets/zefanya_mark.dart';
 import 'product_details_screen.dart';
@@ -216,12 +215,13 @@ class _PriceRangeDialogState extends State<_PriceRangeDialog> {
 }
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.focusRequests});
+  const SearchScreen({super.key, this.focusRequests, this.onBrowseCategories});
 
   /// Bump this notifier to focus the search field (and raise the keyboard).
   /// Home's search bar does this when tapped, after switching to this tab,
   /// so "tap search, start typing" actually works in one motion.
   final ValueNotifier<int>? focusRequests;
+  final VoidCallback? onBrowseCategories;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -244,13 +244,13 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _supportsCod = false;
 
   SearchFilter get _filter => SearchFilter(
-        minPrice: _minPrice,
-        maxPrice: _maxPrice,
-        minRating: _minRating,
-        shipsFrom: _shipsFrom,
-        freeShipping: _freeShipping,
-        supportsCod: _supportsCod,
-      );
+    minPrice: _minPrice,
+    maxPrice: _maxPrice,
+    minRating: _minRating,
+    shipsFrom: _shipsFrom,
+    freeShipping: _freeShipping,
+    supportsCod: _supportsCod,
+  );
 
   static const _priceBounds = [300.0, 500.0, 1000.0];
 
@@ -428,6 +428,26 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           children: [
             _buildSearchField(theme),
+            if (catalog.isLoading) const LinearProgressIndicator(),
+            if (catalog.loadFailure != null && !catalog.isLoading)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  children: [
+                    Text(
+                      catalog.products.isEmpty
+                          ? 'Catalogue unavailable.'
+                          : 'Could not refresh the catalogue. Showing saved results.',
+                    ),
+                    TextButton(
+                      onPressed: () => catalog.refresh().ignore(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               // Branch on _matches (query hits), not _results (filtered):
               // a filter that hides everything must still show the chips
@@ -440,7 +460,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 duration: reduceMotion(context)
                     ? Duration.zero
                     : const Duration(milliseconds: 220),
-                child: _query.isEmpty
+                child:
+                    catalog.products.isEmpty &&
+                        (catalog.isLoading || catalog.loadFailure != null)
+                    ? const SizedBox.shrink()
+                    : _query.isEmpty
                     ? _buildSuggestions(
                         theme,
                         key: const ValueKey('search-suggestions'),
@@ -450,34 +474,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         theme,
                         key: const ValueKey('search-no-results'),
                       )
-                    : Column(
-                        key: const ValueKey('search-results'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildResultsHeader(),
-                          EaseInFrame(
-                            index: 0,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ProductSortChips(
-                                  sort: _sort,
-                                  onChanged: (sort) =>
-                                      setState(() => _sort = sort),
-                                ),
-                                const SizedBox(height: 8),
-                                _buildFilterChips(_computeShipsFromOptions(catalog)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Filters hid everything the query matched: say so
-                          // and offer the way out, instead of a dead end
-                          // with no visible way to clear.
-                          if (_results.isEmpty) _buildFilterEmpty(theme),
-                          Expanded(child: _buildResultsGrid(context)),
-                        ],
-                      ),
+                    : _buildResultsGrid(context, catalog, theme),
               ),
             ),
           ],
@@ -493,10 +490,12 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+              constraints: const BoxConstraints(minHeight: 52),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.24),
-                borderRadius: editorialRadius(0, ShapeTier.card),
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.divider),
               ),
               child: Row(
                 children: [
@@ -518,9 +517,12 @@ class _SearchScreenState extends State<SearchScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                       decoration: const InputDecoration(
+                        filled: false,
                         isDense: true,
                         border: InputBorder.none,
-                        hintText: 'What are you looking for?',
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        hintText: 'Search products',
                       ),
                     ),
                   ),
@@ -551,8 +553,20 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildSuggestions(ThemeData theme, {Key? key}) {
     return ListView(
       key: key,
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       children: [
+        if (widget.onBrowseCategories != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: widget.onBrowseCategories,
+              icon: const Icon(Icons.grid_view_outlined, size: 18),
+              label: const Text('Browse categories'),
+            ),
+          ),
+          Divider(color: AppColors.divider),
+          const SizedBox(height: 12),
+        ],
         // ---- Recent search history --------------------------------
         if (_history.isNotEmpty) ...[
           Row(
@@ -610,58 +624,61 @@ class _SearchScreenState extends State<SearchScreen> {
     final suggestion = context.watch<CatalogState>().suggestSearch(_query);
     return Center(
       key: key,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ZefanyaMark(
-            size: 46,
-            color: AppColors.neutral.withValues(alpha: 0.4),
-            strokeWidth: 4,
-          ),
-          const SizedBox(height: 22),
-          Text(Microcopy.searchEmptyEyebrow, style: AppType.eyebrow),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              Microcopy.searchNoResults(_query),
-              style: AppType.sectionDisplay.copyWith(fontSize: 26),
-              textAlign: TextAlign.center,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ZefanyaMark(
+              size: 46,
+              color: AppColors.neutral.withValues(alpha: 0.4),
+              strokeWidth: 4,
             ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              Microcopy.searchEmptySubtitle,
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          if (suggestion != null) ...[
+            const SizedBox(height: 22),
+            Text(Microcopy.searchEmptyEyebrow, style: AppType.eyebrow),
             const SizedBox(height: 10),
-            TextButton.icon(
-              key: const ValueKey('search-suggestion'),
-              onPressed: () => _applyTerm(suggestion),
-              icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
-              label: Text('Did you mean “$suggestion”?'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                Microcopy.searchNoResults(_query),
+                style: AppType.sectionDisplay.copyWith(fontSize: 26),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                Microcopy.searchEmptySubtitle,
+                style: theme.textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            if (suggestion != null) ...[
+              const SizedBox(height: 10),
+              TextButton.icon(
+                key: const ValueKey('search-suggestion'),
+                onPressed: () => _applyTerm(suggestion),
+                icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
+                label: Text('Did you mean “$suggestion”?'),
+              ),
+            ],
+            // Tappable retries from the existing popular terms (same list
+            // as the idle state) — a dead end that offers a way out.
+            // Dim-only: authored order is kept (reordering here would
+            // jump per keystroke); non-matches dim against the query.
+            const SizedBox(height: 18),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: TryLookingFor(
+                terms: _popularSearches,
+                query: _query,
+                reorder: false,
+                onSelect: _applyTerm,
+              ),
             ),
           ],
-          // Tappable retries from the existing popular terms (same list
-          // as the idle state) — a dead end that offers a way out.
-          // Dim-only: authored order is kept (reordering here would
-          // jump per keystroke); non-matches dim against the query.
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: TryLookingFor(
-              terms: _popularSearches,
-              query: _query,
-              reorder: false,
-              onSelect: _applyTerm,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -736,16 +753,16 @@ class _SearchScreenState extends State<SearchScreen> {
     // exactly that). Grid still renders _results.
     final count = _matches.length;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text('$count', style: AppType.priceNumeral(38)),
+          Text('$count', style: AppType.priceNumeral(28)),
           const SizedBox(width: 10),
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              count == 1 ? 'PIECE\nFOUND' : 'PIECES\nFOUND',
+              count == 1 ? 'PIECE FOUND' : 'PIECES FOUND',
               style: AppType.eyebrow.copyWith(height: 1.5),
             ),
           ),
@@ -754,42 +771,73 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildResultsGrid(BuildContext context) {
+  Widget _buildResultsGrid(
+    BuildContext context,
+    CatalogState catalog,
+    ThemeData theme,
+  ) {
     return RefreshIndicator(
+      key: const ValueKey('search-results'),
       color: AppColors.primaryDark,
       onRefresh: () => context.read<CatalogState>().refresh(),
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.68,
-        ),
-        itemCount: _results.length,
-        itemBuilder: (context, i) {
-          final product = _results[i];
-          return EaseInFrame(
-            index: i.clamp(0, 5),
-            child: ProductCard(
-              product: product,
-              index: i,
-              heroTag: 'search-${product.id}',
-              onTap: () {
-                _onSubmitted(_query); // save to history when tapping a result
-                Navigator.of(context).push(
-                  AppPageRoute(
-                    builder: (_) => ProductDetailsScreen(
-                      product: product,
-                      heroTag: 'search-${product.id}',
-                    ),
+        slivers: [
+          SliverToBoxAdapter(child: _buildResultsHeader()),
+          SliverToBoxAdapter(
+            child: ProductSortChips(
+              sort: _sort,
+              onChanged: (sort) => setState(() => _sort = sort),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: ChipTheme(
+              data: ChipTheme.of(context).copyWith(
+                selectedColor: AppColors.hueOnSurface(
+                  AppColors.primaryDark,
+                  .28,
+                ),
+                checkmarkColor: AppColors.textPrimary,
+                labelStyle: theme.textTheme.labelMedium?.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              child: _buildFilterChips(_computeShipsFromOptions(catalog)),
+            ),
+          ),
+          if (_results.isEmpty)
+            SliverToBoxAdapter(child: _buildFilterEmpty(theme)),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+            sliver: SliverGrid(
+              gridDelegate: ProductCard.gridDelegate(context),
+              delegate: SliverChildBuilderDelegate((context, i) {
+                final product = _results[i];
+                return EaseInFrame(
+                  index: i.clamp(0, 5),
+                  child: ProductCard(
+                    product: product,
+                    index: i,
+                    heroTag: 'search-${product.id}',
+                    onTap: () {
+                      _onSubmitted(
+                        _query,
+                      ); // save to history when tapping a result
+                      Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) => ProductDetailsScreen(
+                            product: product,
+                            heroTag: 'search-${product.id}',
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
-              },
+              }, childCount: _results.length),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

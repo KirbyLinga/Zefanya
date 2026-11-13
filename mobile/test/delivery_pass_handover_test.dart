@@ -1,11 +1,4 @@
-// test/delivery_pass_handover_test.dart
-//
-// The courier half of the receiving flow. The handover sheet is reached
-// through the real tracker screen (including its proof-photo gate), then
-// the QR scanner's manual fallback supplies a pass. This pins the wiring
-// the pure codec tests cannot: that a scan fills the delivery-code field,
-// and that a malformed or wrong-order pass never completes a delivery.
-
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -16,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/data/api/api_exception.dart';
 import 'package:zefanya/screens/courier/delivery_tracker_screen.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/courier_state.dart';
@@ -25,7 +19,7 @@ const _order = Order(
   id: 'ORD-HANDOVER-PASS-1',
   shopName: 'Zefanya Studio',
   status: OrderStatus.inTransit,
-  eta: 'Today, 4–6 PM',
+  eta: 'Today, 4â€“6 PM',
   itemSummary: 'Linen Blend Wrap Dress',
 );
 
@@ -52,8 +46,32 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<String?> getApplicationDocumentsPath() async => documentsPath;
 }
 
-Future<(CourierState, String)> _atTheDoor() async {
-  final courier = CourierState();
+class _ControlledDeliveryRider extends CourierState {
+  int submissions = 0;
+  Completer<void> response = Completer<void>();
+
+  @override
+  bool get isServerAuthoritative => true;
+
+  @override
+  Future<void> submitDelivery(
+    String jobId, {
+    required String proofPhotoPath,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
+    double? codAmount,
+  }) {
+    submissions++;
+    return response.future;
+  }
+}
+
+Future<(CourierState, String)> _atTheDoor({
+  bool cod = false,
+  CourierState? state,
+}) async {
+  final courier = state ?? CourierState();
   await courier.load();
   courier.dispatchForOrder(
     order: _order,
@@ -61,18 +79,24 @@ Future<(CourierState, String)> _atTheDoor() async {
     deliveryArea: 'Sta. Cruz, Laguna',
     fee: 120,
     trackingNumber: 'ZEF-PASS-1',
-    prepaid: true,
+    prepaid: !cod,
+    codAmount: cod ? 549 : 0,
   );
   final jobId = courier.jobForOrder(_order.id)!.id;
-  courier.advanceMilestone(jobId, DeliveryMilestone.inTransit);
+  if (courier.isServerAuthoritative) {
+    courier.updateMilestoneFromServer(jobId, DeliveryMilestone.inTransit);
+  } else {
+    courier.advanceMilestone(jobId, DeliveryMilestone.inTransit);
+  }
   return (courier, jobId);
 }
 
 Future<void> _pump(
   WidgetTester tester,
   CourierState courier,
-  String jobId,
-) async {
+  String jobId, {
+  bool disableAnimations = true,
+}) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
   tester.view.physicalSize = const Size(390, 844);
@@ -88,9 +112,9 @@ Future<void> _pump(
       child: MaterialApp(
         theme: AppTheme.light,
         home: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(390, 844),
-            disableAnimations: true,
+          data: MediaQueryData(
+            size: const Size(390, 844),
+            disableAnimations: disableAnimations,
           ),
           child: DeliveryTrackerScreen(jobId: jobId),
         ),
@@ -104,33 +128,25 @@ Future<void> _attachProofAndOpenHandover(WidgetTester tester) async {
   final proof = find.text('Tap to attach a photo');
   await tester.scrollUntilVisible(proof, 300);
   await tester.tap(proof);
-  // The picker copies the file through real file I/O, which fake time does
-  // not advance. Give the copy a moment to finish before the next frame.
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 150)),
-  );
+  // The picker copies the file through real file I/O. Wait for its visible
+  // completion instead of assuming it always finishes within 150 ms.
+  final attached = find.text('Photo attached');
+  final timeout = Stopwatch()..start();
+  while (attached.evaluate().isEmpty &&
+      timeout.elapsed < const Duration(seconds: 5)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+  }
   await tester.pumpAndSettle();
-  expect(find.text('Photo attached'), findsOneWidget);
+  expect(attached, findsOneWidget);
 
   await tester.tap(find.text('Confirm Order Delivered'));
   await tester.pumpAndSettle();
   expect(find.text('CONFIRM HANDOVER'), findsOneWidget);
-  expect(find.byKey(const ValueKey('delivery-pass-scan')), findsOneWidget);
-}
-
-Future<void> _scanManually(WidgetTester tester, String value) async {
-  await tester.tap(find.byKey(const ValueKey('delivery-pass-scan')));
-  // The scanner's camera placeholder keeps an indeterminate spinner
-  // running, so pumpAndSettle would never finish here.
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 500));
-
-  final field = find.byKey(const ValueKey('qr-manual-entry'));
-  expect(field, findsOneWidget);
-  await tester.enterText(field, value);
-  await tester.tap(find.byKey(const ValueKey('qr-manual-confirm')));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 500));
+  expect(find.byKey(const ValueKey('delivery-otp-field')), findsNothing);
+  expect(find.byKey(const ValueKey('delivery-code-send')), findsNothing);
 }
 
 void main() {
@@ -156,60 +172,90 @@ void main() {
     }
   });
 
-  testWidgets('a scanned pass fills the delivery code and completes the '
-      'handover', (tester) async {
-    final (courier, jobId) = await _atTheDoor();
-    await _pump(tester, courier, jobId);
-    await _attachProofAndOpenHandover(tester);
+  final submit = find.byKey(const ValueKey('confirm-delivery-submit'));
 
-    await _scanManually(tester, 'ZEFANYA:DELIVERY:$jobId:482913');
-
-    final otpField = tester.widget<TextField>(
-      find.byKey(const ValueKey('delivery-otp-field')),
-    );
-    expect(otpField.controller!.text, '482913');
-    expect(find.byKey(const ValueKey('handover-error')), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('confirm-delivery-submit')));
+  Future<void> check(WidgetTester tester, String key) async {
+    final field = find.byKey(ValueKey(key));
+    await tester.ensureVisible(field);
+    await tester.tap(field);
     await tester.pumpAndSettle();
+  }
 
-    expect(courier.isCompleted(jobId), isTrue);
-    expect(find.text('Delivered'), findsOneWidget);
-    expect(find.textContaining('added to your earnings'), findsOneWidget);
-  });
-
-  testWidgets('a pass for another order is refused and does not fill the '
-      'code', (tester) async {
-    final (courier, jobId) = await _atTheDoor();
-    await _pump(tester, courier, jobId);
-    await _attachProofAndOpenHandover(tester);
-
-    await _scanManually(tester, 'ZEFANYA:DELIVERY:REQ-9999:482913');
-
-    expect(
-      find.text('That delivery pass belongs to a different order.'),
-      findsOneWidget,
-    );
-    final otpField = tester.widget<TextField>(
-      find.byKey(const ValueKey('delivery-otp-field')),
-    );
-    expect(otpField.controller!.text, isEmpty);
-    expect(courier.isCompleted(jobId), isFalse);
-  });
-
-  testWidgets('an unrelated QR code is refused with a clear message', (
+  testWidgets('Buyer handover requires both confirmations and a proof photo', (
     tester,
   ) async {
     final (courier, jobId) = await _atTheDoor();
     await _pump(tester, courier, jobId);
-    await _attachProofAndOpenHandover(tester);
-
-    await _scanManually(tester, 'ZEF-5521-01');
-
     expect(
-      find.text('That QR is not a Zefanya delivery pass.'),
-      findsOneWidget,
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Confirm Order Delivered'),
+          )
+          .onPressed,
+      isNull,
     );
-    expect(courier.isCompleted(jobId), isFalse);
+    await _attachProofAndOpenHandover(tester);
+    expect(tester.widget<ElevatedButton>(submit).onPressed, isNull);
+    await check(tester, 'physical-handover');
+    expect(tester.widget<ElevatedButton>(submit).onPressed, isNull);
+    await check(tester, 'recipient-accepted');
+    expect(find.byKey(const ValueKey('cod-collected')), findsNothing);
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(courier.completedJobs, hasLength(1));
+  });
+
+  testWidgets(
+    'Representative requires name, relationship and exact COD confirmation',
+    (tester) async {
+      final (courier, jobId) = await _atTheDoor(cod: true);
+      await _pump(tester, courier, jobId);
+      await _attachProofAndOpenHandover(tester);
+      await check(tester, 'physical-handover');
+      await tester.tap(find.byKey(const ValueKey('recipient-category')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Authorized representative').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('recipient-name')),
+        'Maria Cruz',
+      );
+      await check(tester, 'recipient-accepted');
+      await check(tester, 'cod-collected');
+      expect(find.textContaining('549'), findsWidgets);
+      expect(tester.widget<ElevatedButton>(submit).onPressed, isNull);
+      final relation = find.byKey(const ValueKey('recipient-relationship'));
+      await tester.ensureVisible(relation);
+      await tester.enterText(relation, 'Parent');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(courier.completedJobs, hasLength(1));
+    },
+  );
+
+  testWidgets('Live submission waits and rejects without local completion', (
+    tester,
+  ) async {
+    final courier = _ControlledDeliveryRider();
+    final (_, jobId) = await _atTheDoor(state: courier);
+    await _pump(tester, courier, jobId);
+    await _attachProofAndOpenHandover(tester);
+    await check(tester, 'physical-handover');
+    await check(tester, 'recipient-accepted');
+    await tester.tap(submit);
+    await tester.tap(submit, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(courier.submissions, 1);
+    expect(find.text('Submitting delivery…'), findsOneWidget);
+    expect(courier.completedJobs, isEmpty);
+    courier.response.completeError(
+      const UnauthorizedException(message: 'Sign in again.'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in again.'), findsOneWidget);
+    expect(courier.completedJobs, isEmpty);
   });
 }

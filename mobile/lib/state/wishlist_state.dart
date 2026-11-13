@@ -26,9 +26,8 @@ class WishlistState extends ChangeNotifier {
   /// wishlist (`/api/buyer/wishlist`), so they follow the account across
   /// devices. Followed sellers stay on the device: WebZefanya has no API for
   /// store follows yet.
-  WishlistState({CatalogRepository? catalog, ApiClient? client})
-      : _catalog = catalog ?? const MockCatalogRepository(),
-        _client = client;
+  WishlistState({CatalogRepository? catalog, this._client})
+    : _catalog = catalog ?? const MockCatalogRepository();
 
   final CatalogRepository _catalog;
   final ApiClient? _client;
@@ -52,9 +51,9 @@ class WishlistState extends ChangeNotifier {
 
   /// Saved products, newest first. Ids no longer in the catalogue are skipped.
   List<Product> get items => [
-        for (final id in _productIds)
-          if (_products[id] case final p?) p,
-      ];
+    for (final id in _productIds)
+      if (_products[id] case final p?) p,
+  ];
 
   bool isSaved(String productId) => _productIds.contains(productId);
 
@@ -140,7 +139,9 @@ class WishlistState extends ChangeNotifier {
       final ids = <String>[];
       for (final row in (data['data'] as List?) ?? const []) {
         if (row is! Map || row['product'] is! Map) continue;
-        final product = productFromWebZefanyaJson((row['product'] as Map).cast<String, Object?>());
+        final product = productFromWebZefanyaJson(
+          (row['product'] as Map).cast<String, Object?>(),
+        );
         if (product.id.isEmpty) continue;
         ids.add(product.id);
         _products[product.id] = product;
@@ -158,9 +159,13 @@ class WishlistState extends ChangeNotifier {
   Future<void> _syncLive(ApiClient client, String productId, bool saved) async {
     try {
       if (saved) {
-        await client.putJson('/buyer/wishlist/${Uri.encodeComponent(productId)}');
+        await client.putJson(
+          '/buyer/wishlist/${Uri.encodeComponent(productId)}',
+        );
       } else {
-        await client.deleteJson('/buyer/wishlist/${Uri.encodeComponent(productId)}');
+        await client.deleteJson(
+          '/buyer/wishlist/${Uri.encodeComponent(productId)}',
+        );
       }
     } on ApiException {
       if (saved) {

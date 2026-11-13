@@ -39,6 +39,8 @@ class OrderConfirmationDialog extends StatelessWidget {
     required this.total,
     required this.onTrack,
     required this.onDone,
+    this.onViewOrders,
+    this.payOnDelivery = false,
   });
 
   /// Every order this checkout created — one per seller, in the order they
@@ -53,6 +55,8 @@ class OrderConfirmationDialog extends StatelessWidget {
 
   /// Leaves — back to the top of the app.
   final VoidCallback onDone;
+  final VoidCallback? onViewOrders;
+  final bool payOnDelivery;
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +84,10 @@ class OrderConfirmationDialog extends StatelessWidget {
             const SizedBox(height: 20),
             Text('Order Placed!', style: theme.textTheme.titleLarge),
             const SizedBox(height: 12),
-            Text('TOTAL PAID', style: AppType.eyebrow),
+            Text(
+              payOnDelivery ? 'TOTAL TO PAY ON DELIVERY' : 'TOTAL PAID',
+              style: AppType.eyebrow,
+            ),
             const SizedBox(height: 4),
             // Same oversized-numeral treatment as every price elsewhere —
             // the total is the number this dialog exists to confirm.
@@ -104,8 +111,9 @@ class OrderConfirmationDialog extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     first.shopName,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: AppColors.textSecondary),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   if (extra > 0) ...[
                     const SizedBox(height: 8),
@@ -116,8 +124,9 @@ class OrderConfirmationDialog extends StatelessWidget {
                       extra == 1
                           ? 'This checkout also created 1 more order, from another shop.'
                           : 'This checkout also created $extra more orders, from other shops.',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ],
@@ -138,6 +147,11 @@ class OrderConfirmationDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
+            if (extra > 0 && onViewOrders != null)
+              TextButton(
+                onPressed: onViewOrders,
+                child: const Text('View all orders'),
+              ),
             TextButton(onPressed: onDone, child: const Text('Done')),
           ],
         ),

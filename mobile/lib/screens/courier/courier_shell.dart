@@ -9,8 +9,12 @@
 // state/courier_state.dart), so both dashboard tabs just show
 // whatever's currently assigned to this courier.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
+import '../../state/courier_state.dart';
 import '../../state/notification_state.dart';
 import '../../widgets/floating_nav_bar.dart';
 import '../../widgets/motion/fade_through.dart';
@@ -29,10 +33,19 @@ class CourierShell extends StatefulWidget {
 
 class _CourierShellState extends State<CourierShell> {
   int _index = 0;
+  bool _refreshingJobs = false;
 
   static const _items = [
-    NavBarItem(glyph: NavGlyph.parcel, label: 'For Pickup'),
-    NavBarItem(glyph: NavGlyph.scooter, label: 'For Delivery'),
+    NavBarItem(
+      glyph: NavGlyph.parcel,
+      label: 'For Pickup',
+      shortLabel: 'Pickups',
+    ),
+    NavBarItem(
+      glyph: NavGlyph.scooter,
+      label: 'For Delivery',
+      shortLabel: 'Deliveries',
+    ),
     NavBarItem(glyph: NavGlyph.peso, label: 'Earnings'),
     NavBarItem(glyph: NavGlyph.profile, label: 'Profile'),
   ];
@@ -58,6 +71,19 @@ class _CourierShellState extends State<CourierShell> {
     ProfileScreen(title: 'Courier Profile'),
   ];
 
+  Future<void> _refreshJobs() async {
+    final courier = context.read<CourierState>();
+    if (!courier.isServerAuthoritative || _refreshingJobs) return;
+    _refreshingJobs = true;
+    try {
+      await courier.refreshJobs();
+    } on ApiException {
+      // The queue retains the error and the last confirmed jobs.
+    } finally {
+      _refreshingJobs = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,7 +92,10 @@ class _CourierShellState extends State<CourierShell> {
       bottomNavigationBar: FloatingNavBar(
         items: _items,
         currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        onTap: (i) {
+          if (i != _index) setState(() => _index = i);
+          if (i == 0 || i == 1) unawaited(_refreshJobs());
+        },
       ),
       // Dev tooling lives behind Settings > About (seven taps). Nothing
       // developer-only floats over the app by default in any build.

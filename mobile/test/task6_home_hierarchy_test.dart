@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/mock_data.dart';
 import 'package:zefanya/screens/buyer/buyer_shell.dart';
+import 'package:zefanya/screens/buyer/category_products_screen.dart';
+import 'package:zefanya/screens/buyer/widgets/product_card.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
 import 'package:zefanya/state/catalog_state.dart';
@@ -16,76 +18,138 @@ import 'package:zefanya/state/review_state.dart';
 import 'package:zefanya/state/theme_state.dart';
 import 'package:zefanya/state/wishlist_state.dart';
 import 'package:zefanya/theme/app_theme.dart';
+import 'package:zefanya/widgets/floating_nav_bar.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('Buyer Home hierarchy renders search, categories, and Just for you in order', (tester) async {
-    AppColors.apply(Brightness.light);
-    GoogleFonts.config.allowRuntimeFetching = false;
-    tester.view.physicalSize = const Size(390, 1400);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
+  testWidgets(
+    'Buyer Home hierarchy renders search, categories, and Just for you in order',
+    (tester) async {
+      AppColors.apply(Brightness.light);
+      GoogleFonts.config.allowRuntimeFetching = false;
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
-    final catalog = CatalogState();
-    await catalog.load();
+      final catalog = CatalogState();
+      await catalog.load();
 
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(disableAnimations: true),
-        child: MultiProvider(
-          providers: [
-            ChangeNotifierProvider.value(value: catalog),
-            ChangeNotifierProvider(create: (_) => AuthState()),
-            ChangeNotifierProvider(create: (_) => CartState()),
-            ChangeNotifierProvider(create: (_) => CourierState()),
-            ChangeNotifierProvider(create: (_) => NotificationState()),
-            ChangeNotifierProvider(create: (_) => OrderState()),
-            ChangeNotifierProvider(create: (_) => RecentlyViewedState()),
-            ChangeNotifierProvider(create: (_) => ReviewState()),
-            ChangeNotifierProvider(create: (_) => WishlistState()),
-            ChangeNotifierProvider(create: (_) => ThemeState()),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.light,
-            home: const BuyerShell(),
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: MultiProvider(
+            providers: [
+              ChangeNotifierProvider.value(value: catalog),
+              ChangeNotifierProvider(create: (_) => AuthState()),
+              ChangeNotifierProvider(create: (_) => CartState()),
+              ChangeNotifierProvider(create: (_) => CourierState()),
+              ChangeNotifierProvider(create: (_) => NotificationState()),
+              ChangeNotifierProvider(create: (_) => OrderState()),
+              ChangeNotifierProvider(create: (_) => RecentlyViewedState()),
+              ChangeNotifierProvider(create: (_) => ReviewState()),
+              ChangeNotifierProvider(create: (_) => WishlistState()),
+              ChangeNotifierProvider(create: (_) => ThemeState()),
+            ],
+            child: MaterialApp(theme: AppTheme.light, home: const BuyerShell()),
           ),
         ),
-      ),
-    );
+      );
 
-    // Initial pump bare for animation ticker
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+      // Initial pump bare for animation ticker
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
 
-    // Verify masthead wordmark
-    expect(find.text('Zefanya'), findsWidgets);
+      // Verify masthead wordmark
+      expect(find.text('Zefanya'), findsWidgets);
 
-    // Verify search field exists with hint
-    expect(find.text('Search products, brands...'), findsOneWidget);
+      // Verify search field exists with hint
+      expect(find.text('Search products, brands...'), findsOneWidget);
 
-    // Verify search field container height >= 48
-    final searchContainer = tester.widget<Container>(
-      find.ancestor(
-        of: find.text('Search products, brands...'),
-        matching: find.byType(Container),
-      ).first,
-    );
-    expect(searchContainer.constraints?.minHeight ?? 48.0, greaterThanOrEqualTo(48.0));
+      // Verify search field container height >= 48
+      final searchContainer = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.text('Search products, brands...'),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(
+        searchContainer.constraints?.minHeight ?? 48.0,
+        greaterThanOrEqualTo(48.0),
+      );
 
-    // Verify category quick links. Each rail names its own destination so
-    // screen readers (and tests) don't see two identical "See all" actions.
-    expect(find.text('CATEGORIES'), findsOneWidget);
-    expect(find.text('See all categories'), findsOneWidget);
-    expect(find.text('See all deals'), findsOneWidget);
+      // Verify category quick links. Each rail names its own destination so
+      // screen readers (and tests) don't see two identical "See all" actions.
+      expect(find.text('CATEGORIES'), findsOneWidget);
+      expect(find.text('See all categories'), findsOneWidget);
+      expect(find.text('On sale'), findsOneWidget);
+      expect(find.text('See all deals'), findsNothing);
+      expect(find.text('Ends soon'), findsNothing);
 
-    // Verify "Just for you" heading is present and "EVERYTHING ELSE" is absent
-    expect(find.text('Just for you'), findsOneWidget);
-    expect(find.text('EVERYTHING ELSE'), findsNothing);
-  });
+      // Verify "Just for you" heading is present and "EVERYTHING ELSE" is absent
+      expect(find.text('Just for you'), findsOneWidget);
+      expect(find.text('EVERYTHING ELSE'), findsNothing);
+
+      final hero = find.byKey(const ValueKey('editorial-hero-pages'));
+      await tester.drag(hero, const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      final vertical = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first;
+      final homePosition = tester.state<ScrollableState>(vertical).position;
+      homePosition.jumpTo(40);
+      await tester.pump();
+      await tester.tap(
+        find
+            .descendant(of: hero, matching: find.text('Explore category'))
+            .hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      final page = tester.widget<CategoryProductsScreen>(
+        find.byType(CategoryProductsScreen),
+      );
+      expect(page.category, 'Home & Living');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(homePosition.pixels, 40);
+      expect(
+        find
+            .descendant(of: hero, matching: find.text('Home & Living'))
+            .hitTestable(),
+        findsOneWidget,
+      );
+
+      tester.view.physicalSize = const Size(360, 740);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('On sale'),
+        150,
+        scrollable: vertical,
+      );
+      final saleCard = find
+          .descendant(
+            of: find.byKey(const ValueKey('buyer-sale-shelf')),
+            matching: find.byType(ProductCard),
+          )
+          .first;
+      await tester.ensureVisible(saleCard);
+      await tester.pumpAndSettle();
+      final cardBounds = tester.getRect(saleCard);
+      final navigationTop = tester.getTopLeft(find.byType(FloatingNavBar)).dy;
+      expect(cardBounds.top, greaterThanOrEqualTo(0));
+      expect(cardBounds.bottom, lessThan(navigationTop));
+      expect(saleCard.hitTestable(), findsOneWidget);
+    },
+  );
 
   test('Catalog ordering is deterministic by rating descending', () {
     final products = List<Product>.from(mockProducts);

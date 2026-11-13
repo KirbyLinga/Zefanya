@@ -27,6 +27,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -523,30 +524,44 @@ void main() {
   });
 
   group('BUY-CHK-001 checkout with the worked example', () {
-    testWidgets('summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083', (tester) async {
-      final cart = await _cart();
-      cart.addItem(_mock('p2'));
-      cart.addItem(_mock('p6'));
-      expect(cart.applyVoucher('MCH50').status, VoucherApplyStatus.applied);
-      expect(cart.applyVoucher('PLAT100').status, VoucherApplyStatus.applied);
-      expect(cart.applyVoucher('FREESHIP').status, VoucherApplyStatus.applied);
+    testWidgets(
+      'summary shows the mode-appropriate estimate for the worked example',
+      (tester) async {
+        final cart = await _cart();
+        cart.addItem(_mock('p2'));
+        cart.addItem(_mock('p6'));
+        expect(cart.applyVoucher('MCH50').status, VoucherApplyStatus.applied);
+        expect(cart.applyVoucher('PLAT100').status, VoucherApplyStatus.applied);
+        expect(
+          cart.applyVoucher('FREESHIP').status,
+          VoucherApplyStatus.applied,
+        );
 
-      await _pumpCheckout(tester, auth: _seededAuth(), cart: cart);
+        await _pumpCheckout(tester, auth: _seededAuth(), cart: cart);
 
-      await tester.tap(find.text('Order Summary'));
-      await tester.pump(const Duration(milliseconds: 250));
+        await tester.tap(find.text('Order Summary'));
+        await tester.pump(const Duration(milliseconds: 250));
 
-      expect(find.text('Subtotal'), findsOneWidget);
-      expect(find.text('₱1,098'), findsOneWidget);
-      expect(find.text('Shipping fee'), findsOneWidget);
-      expect(find.text('₱185'), findsOneWidget);
-      expect(find.text('Store voucher (MCH50)'), findsOneWidget);
-      expect(find.text('Platform voucher (PLAT100)'), findsOneWidget);
-      expect(find.text('Shipping voucher (FREESHIP)'), findsOneWidget);
-      expect(find.text('- ₱50'), findsNWidgets(2));
-      expect(find.text('- ₱100'), findsOneWidget);
-      expect(find.text('₱1,083'), findsWidgets);
-    });
+        expect(find.text('Subtotal'), findsOneWidget);
+        expect(find.text('₱1,098'), findsOneWidget);
+        expect(find.text('Shipping fee'), findsOneWidget);
+        expect(find.text('₱185'), findsOneWidget);
+        if (kUseLiveApi) {
+          expect(find.text('Store voucher (MCH50)'), findsNothing);
+          expect(find.text('Platform voucher (PLAT100)'), findsNothing);
+          expect(find.text('Shipping voucher (FREESHIP)'), findsNothing);
+          expect(find.text('₱1,083'), findsNothing);
+          expect(find.text('₱1,283'), findsWidgets);
+          return;
+        }
+        expect(find.text('Store voucher (MCH50)'), findsOneWidget);
+        expect(find.text('Platform voucher (PLAT100)'), findsOneWidget);
+        expect(find.text('Shipping voucher (FREESHIP)'), findsOneWidget);
+        expect(find.text('- ₱50'), findsNWidgets(2));
+        expect(find.text('- ₱100'), findsOneWidget);
+        expect(find.text('₱1,083'), findsWidgets);
+      },
+    );
 
     test('the cart becomes one order per seller and empties', () async {
       final cart = await _cart();

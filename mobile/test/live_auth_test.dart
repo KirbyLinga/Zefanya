@@ -52,8 +52,10 @@ class _FakeServer {
 
   int get calls => paths.length;
 
-  late final http.Client client =
-      MockClient.streaming((request, bodyStream) async {
+  late final http.Client client = MockClient.streaming((
+    request,
+    bodyStream,
+  ) async {
     methods.add(request.method);
     paths.add(request.url.path);
     urls.add(request.url.toString());
@@ -96,8 +98,8 @@ const _expiredResend =
 /// The live repository, its token store, and the transport it talks through.
 class _Live {
   _Live(List<http.Response> script)
-      : server = _FakeServer(script),
-        tokens = InMemoryTokenStore() {
+    : server = _FakeServer(script),
+      tokens = InMemoryTokenStore() {
     client = ApiClient(
       baseUrl: 'https://api.zefanya.test',
       tokenStore: tokens,
@@ -113,20 +115,54 @@ class _Live {
 }
 
 RegistrationProfile _profile({String? govIdPath}) => RegistrationProfile(
-      lastName: 'Dela Cruz',
-      firstName: 'Juan',
-      middleInitial: 'D',
-      sex: 'Male',
-      phone: '0917 123 4567',
-      birthday: DateTime(1998, 4, 7),
-      province: 'Cebu',
-      municipality: 'Cebu City',
-      barangay: 'Lahug',
-      street: '12 Mabini Street',
-      govIdPath: govIdPath,
-    );
+  lastName: 'Dela Cruz',
+  firstName: 'Juan',
+  middleInitial: 'D',
+  sex: 'Male',
+  phone: '0917 123 4567',
+  birthday: DateTime(1998, 4, 7),
+  province: 'Cebu',
+  municipality: 'Cebu City',
+  barangay: 'Lahug',
+  street: '12 Mabini Street',
+  govIdPath: govIdPath,
+);
 
 void main() {
+  test('a saved live dashboard requires an accepted role session', () async {
+    for (final (role, prefix) in [
+      (UserRole.buyer, 'buyer'),
+      (UserRole.courier, 'rider'),
+      (UserRole.linehaul, 'courier'),
+    ]) {
+      for (final status in [200, 401, 403]) {
+        SharedPreferences.setMockInitialValues({
+          'auth_role': role.name,
+          'auth_status': AccountStatus.active.name,
+          'auth_name': 'Saved account',
+        });
+        final live = _Live([
+          _json({'data': {}}, status),
+        ]);
+        await live.tokens.write('saved-token');
+        final state = AuthState(repository: live.repository);
+        addTearDown(state.dispose);
+
+        await state.load();
+
+        expect(live.server.paths, ['/$prefix/profile']);
+        expect(live.server.methods, ['GET']);
+        expect(state.isLoggedIn, status == 200);
+        expect(await live.tokens.read(), status == 200 ? 'saved-token' : null);
+        if (status != 200) {
+          expect(state.name, isNull);
+          final prefs = await SharedPreferences.getInstance();
+          expect(prefs.getString('auth_status'), AccountStatus.loggedOut.name);
+        }
+      }
+    }
+  });
+
   late Directory dir;
   late String idPath;
 
@@ -140,67 +176,71 @@ void main() {
 
   // ── Registration ─────────────────────────────────────────────────────────
 
-  test('registration posts the profile as multipart with the ID attached',
-      () async {
-    final live = _Live([
-      _json({
-        'ok': true,
-        'verification_id': '42',
-        'email': 'juan@example.com',
-        'registration_status': 'pending_verification',
-      }, 201),
-    ]);
+  test(
+    'registration posts the profile as multipart with the ID attached',
+    () async {
+      final live = _Live([
+        _json({
+          'ok': true,
+          'verification_id': '42',
+          'email': 'juan@example.com',
+          'registration_status': 'pending_verification',
+        }, 201),
+      ]);
 
-    final result = await live.repository.register(
-      role: UserRole.buyer,
-      email: 'juan@example.com',
-      password: 'Password1!',
-      profile: _profile(govIdPath: idPath),
-    );
+      final result = await live.repository.register(
+        role: UserRole.buyer,
+        email: 'juan@example.com',
+        password: 'Password1!',
+        profile: _profile(govIdPath: idPath),
+      );
 
-    expect(live.server.methods.single, 'POST');
-    expect(live.server.paths.single, '/register/buyer');
-    expect(
-      live.server.headers.single['content-type'],
-      contains('multipart/form-data'),
-    );
+      expect(live.server.methods.single, 'POST');
+      expect(live.server.paths.single, '/register/buyer');
+      expect(
+        live.server.headers.single['content-type'],
+        contains('multipart/form-data'),
+      );
 
-    final body = live.server.bodies.single;
-    // The file is a part. Sending its path as a JSON field would produce a 422
-    // about a missing upload, from code that looked correct while reading it.
-    expect(body, contains('name="upload_id"'));
-    expect(body, contains('filename="gov_id.jpg"'));
-    // And its *bytes*, not just its name: the fixture above is the four-byte
-    // JPEG signature, so this fails if the part is ever sent empty.
-    expect(body, contains(String.fromCharCodes([0xFF, 0xD8, 0xFF, 0xD9])));
-    // The server's vocabulary, not the form's — `toBuyerFields` did the work.
-    expect(body, contains('name="last_name"'));
-    expect(body, contains('name="birthday"'));
-    expect(body, contains('name="contact_no"'));
-    expect(body, contains('name="sex"'));
-    expect(body, contains('name="address_mode"'));
-    expect(body, contains('name="password_confirmation"'));
-    // The form's relaxed phone is tightened on the way out: the server's rule is
-    // `^09\d{9}$`, and the spaces the form accepts would fail it.
-    expect(body, contains('09171234567'));
-    // Code slots are omitted rather than blanked: this app's picker has names
-    // and no PSGC codes, so "no code" is stated once, not asserted twice.
-    expect(body, isNot(contains('province_code')));
+      final body = live.server.bodies.single;
+      // The file is a part. Sending its path as a JSON field would produce a 422
+      // about a missing upload, from code that looked correct while reading it.
+      expect(body, contains('name="upload_id"'));
+      expect(body, contains('filename="gov_id.jpg"'));
+      // And its *bytes*, not just its name: the fixture above is the four-byte
+      // JPEG signature, so this fails if the part is ever sent empty.
+      expect(body, contains(String.fromCharCodes([0xFF, 0xD8, 0xFF, 0xD9])));
+      // The server's vocabulary, not the form's — `toBuyerFields` did the work.
+      expect(body, contains('name="last_name"'));
+      expect(body, contains('name="birthday"'));
+      expect(body, contains('name="contact_no"'));
+      expect(body, contains('name="sex"'));
+      expect(body, contains('name="address_mode"'));
+      expect(body, contains('name="password_confirmation"'));
+      // The form's relaxed phone is tightened on the way out: the server's rule is
+      // `^09\d{9}$`, and the spaces the form accepts would fail it.
+      expect(body, contains('09171234567'));
+      // Code slots are omitted rather than blanked: this app's picker has names
+      // and no PSGC codes, so "no code" is stated once, not asserted twice.
+      expect(body, isNot(contains('province_code')));
 
-    expect(
-      result.registrationStatus,
-      RemoteRegistrationStatus.pendingVerification,
-    );
-    // The gate *and* a usable handle: `canConfirmEmail` is what the app's
-    // pending screen gates its "Enter Code" button on, so a registration that
-    // returned the gate without the id would leave that button unrenderable.
-    expect(result.canConfirmEmail, isTrue);
-    expect(result.verificationId, '42');
-    expect(result.email, 'juan@example.com');
-  });
+      expect(
+        result.registrationStatus,
+        RemoteRegistrationStatus.pendingVerification,
+      );
+      // The gate *and* a usable handle: `canConfirmEmail` is what the app's
+      // pending screen gates its "Enter Code" button on, so a registration that
+      // returned the gate without the id would leave that button unrenderable.
+      expect(result.canConfirmEmail, isTrue);
+      expect(result.verificationId, '42');
+      expect(result.email, 'juan@example.com');
+    },
+  );
 
   test('registration without an ID is refused without a request', () async {
-    final live = _Live([_json({'ok': true})]);
+    final live = _Live([
+      _json({'ok': true}),
+    ]);
 
     await expectLater(
       live.repository.register(
@@ -210,8 +250,11 @@ void main() {
         profile: _profile(),
       ),
       throwsA(
-        isA<ValidationException>()
-            .having((e) => e.forField('upload_id'), 'message', isNotNull),
+        isA<ValidationException>().having(
+          (e) => e.forField('upload_id'),
+          'message',
+          isNotNull,
+        ),
       ),
     );
 
@@ -276,32 +319,34 @@ void main() {
     expect(result.status, AccountStatus.pendingApproval);
   });
 
-  test('a refused code surfaces the server sentence and changes nothing',
-      () async {
-    final live = _Live([
-      _json({
-        'ok': false,
-        'message': "That code doesn't match. Please try again.",
-      }, 422),
-    ]);
+  test(
+    'a refused code surfaces the server sentence and changes nothing',
+    () async {
+      final live = _Live([
+        _json({
+          'ok': false,
+          'message': "That code doesn't match. Please try again.",
+        }, 422),
+      ]);
 
-    await expectLater(
-      live.repository.verifyOtp(
-        role: UserRole.buyer,
-        verificationId: '42',
-        code: '000000',
-      ),
-      // A 422 with no `errors` bag: the server said no without saying which
-      // field was wrong, and the screen renders this sentence verbatim.
-      throwsA(
-        isA<ValidationException>().having(
-          (e) => e.message,
-          'the server sentence',
-          "That code doesn't match. Please try again.",
+      await expectLater(
+        live.repository.verifyOtp(
+          role: UserRole.buyer,
+          verificationId: '42',
+          code: '000000',
         ),
-      ),
-    );
-  });
+        // A 422 with no `errors` bag: the server said no without saying which
+        // field was wrong, and the screen renders this sentence verbatim.
+        throwsA(
+          isA<ValidationException>().having(
+            (e) => e.message,
+            'the server sentence',
+            "That code doesn't match. Please try again.",
+          ),
+        ),
+      );
+    },
+  );
 
   test('resend posts to the handle path and reads nothing back', () async {
     final live = _Live([
@@ -317,29 +362,33 @@ void main() {
 
   // ── The courier half ─────────────────────────────────────────────────────
 
-  test('a courier code without a server-signed handle is not posted anywhere',
-      () async {
-    final live = _Live([_json({'ok': true})]);
+  test(
+    'a courier code without a server-signed handle is not posted anywhere',
+    () async {
+      final live = _Live([
+        _json({'ok': true}),
+      ]);
 
-    // Rider OTP routes are signed by the server; an id alone cannot address
-    // them, so the app refuses rather than guessing a URL.
-    await expectLater(
-      live.repository.verifyOtp(
-        role: UserRole.courier,
-        verificationId: '9',
-        code: '123456',
-      ),
-      throwsA(
-        isA<ApiNotImplementedException>().having(
-          (e) => e.endpoint,
-          'endpoint',
-          '/register/logistics/verify-otp/9',
+      // Rider OTP routes are signed by the server; an id alone cannot address
+      // them, so the app refuses rather than guessing a URL.
+      await expectLater(
+        live.repository.verifyOtp(
+          role: UserRole.courier,
+          verificationId: '9',
+          code: '123456',
         ),
-      ),
-    );
+        throwsA(
+          isA<ApiNotImplementedException>().having(
+            (e) => e.endpoint,
+            'endpoint',
+            '/register/logistics/verify-otp/9',
+          ),
+        ),
+      );
 
-    expect(live.server.calls, 0);
-  });
+      expect(live.server.calls, 0);
+    },
+  );
 
   // ── Signing in ───────────────────────────────────────────────────────────
 
@@ -349,7 +398,11 @@ void main() {
     final live = _Live([
       _json({
         'success': true,
-        'data': {'token': '1|plaintext', 'token_type': 'Bearer', 'role': 'buyer'},
+        'data': {
+          'token': '1|plaintext',
+          'token_type': 'Bearer',
+          'role': 'buyer',
+        },
       }),
       _json({
         'success': true,
@@ -369,10 +422,10 @@ void main() {
     );
 
     expect(live.server.paths, ['/buyer/login', '/buyer/profile']);
-    expect(
-      jsonDecode(live.server.bodies.first),
-      {'email': 'juan@example.com', 'password': 'Password1!'},
-    );
+    expect(jsonDecode(live.server.bodies.first), {
+      'email': 'juan@example.com',
+      'password': 'Password1!',
+    });
     expect(live.server.headers.last['authorization'], 'Bearer 1|plaintext');
 
     // Stored, not merely returned: this token is the only credential the app
@@ -385,7 +438,9 @@ void main() {
   });
 
   test('wrong credentials read as such, not as an expired session', () async {
-    final live = _Live([_json({'success': false, 'message': 'Unauthenticated.'}, 401)]);
+    final live = _Live([
+      _json({'success': false, 'message': 'Unauthenticated.'}, 401),
+    ]);
 
     await expectLater(
       live.repository.login(
@@ -394,8 +449,11 @@ void main() {
         password: 'wrong',
       ),
       throwsA(
-        isA<UnauthorizedException>()
-            .having((e) => e.message, 'message', 'Incorrect email or password.'),
+        isA<UnauthorizedException>().having(
+          (e) => e.message,
+          'message',
+          'Incorrect email or password.',
+        ),
       ),
     );
     expect(await live.tokens.read(), isNull);
@@ -451,7 +509,11 @@ void main() {
       ),
       throwsA(
         isA<PendingApprovalException>()
-            .having((e) => e.registrationStatus, 'status', 'pending_verification')
+            .having(
+              (e) => e.registrationStatus,
+              'status',
+              'pending_verification',
+            )
             .having((e) => e.awaitingEmailVerification, 'email gate', isTrue)
             // Carried rather than dropped: this is the handle the login screen
             // turns into the confirm step, and a refusal that lost it would
@@ -466,35 +528,37 @@ void main() {
     expect(await live.tokens.read(), isNull);
   });
 
-  test('an email gate with no handle is not offered as a confirmable one',
-      () async {
-    // The gate open with nothing to send against — the shape the OTP screen has
-    // to survive. `canConfirmEmail` is what the pending screen gates its confirm
-    // step on, so this is the line between "we could not offer it" and "we
-    // offered it and the submit had nothing to address".
-    final live = _Live([
-      _json({
-        'ok': false,
-        'code': 'PENDING_VERIFICATION',
-        'registration_status': 'pending_verification',
-        'message': 'Confirm your email address to continue.',
-      }, 403),
-    ]);
+  test(
+    'an email gate with no handle is not offered as a confirmable one',
+    () async {
+      // The gate open with nothing to send against — the shape the OTP screen has
+      // to survive. `canConfirmEmail` is what the pending screen gates its confirm
+      // step on, so this is the line between "we could not offer it" and "we
+      // offered it and the submit had nothing to address".
+      final live = _Live([
+        _json({
+          'ok': false,
+          'code': 'PENDING_VERIFICATION',
+          'registration_status': 'pending_verification',
+          'message': 'Confirm your email address to continue.',
+        }, 403),
+      ]);
 
-    await expectLater(
-      live.repository.login(
-        role: UserRole.buyer,
-        email: 'juan@example.com',
-        password: 'Password1!',
-      ),
-      throwsA(
-        isA<PendingApprovalException>()
-            .having((e) => e.awaitingEmailVerification, 'email gate', isTrue)
-            .having((e) => e.verificationId, 'handle', isNull)
-            .having((e) => e.canConfirmEmail, 'confirmable', isFalse),
-      ),
-    );
-  });
+      await expectLater(
+        live.repository.login(
+          role: UserRole.buyer,
+          email: 'juan@example.com',
+          password: 'Password1!',
+        ),
+        throwsA(
+          isA<PendingApprovalException>()
+              .having((e) => e.awaitingEmailVerification, 'email gate', isTrue)
+              .having((e) => e.verificationId, 'handle', isNull)
+              .having((e) => e.canConfirmEmail, 'confirmable', isFalse),
+        ),
+      );
+    },
+  );
 
   test('a 200 without a token is malformed, not a session', () async {
     final live = _Live([
@@ -528,11 +592,15 @@ void main() {
   });
 
   test('a failed logout still forgets the token locally', () async {
-    final live = _Live([_json({'message': 'The server had a problem.'}, 500)]);
+    final live = _Live([
+      _json({'message': 'The server had a problem.'}, 500),
+    ]);
     await live.tokens.write('1|plaintext');
 
     await expectLater(
-        live.repository.logout(role: UserRole.buyer), throwsA(isA<ServerException>()));
+      live.repository.logout(role: UserRole.buyer),
+      throwsA(isA<ServerException>()),
+    );
 
     // Someone who asked to be signed out and is offline must not be left holding
     // a usable token because the request could not be sent.
@@ -540,7 +608,9 @@ void main() {
   });
 
   test('refresh forgets a rejected token and reports no session', () async {
-    final live = _Live([_json({'message': 'Unauthenticated.'}, 401)]);
+    final live = _Live([
+      _json({'message': 'Unauthenticated.'}, 401),
+    ]);
     await live.tokens.write('1|stale');
 
     expect(await live.repository.refresh(role: UserRole.buyer), isNull);
@@ -601,78 +671,128 @@ void main() {
     expect(result.role, UserRole.courier);
   });
 
-  test('courier refresh renews the restored token, then calls /rider/profile',
-      () async {
-    final live = _Live([
-      // A restored token's expiry is unknown, so it is renewed first.
-      _json({
-        'success': true,
-        'data': {
-          'token': '3|renewed-token',
-          'expires_at': DateTime.now().add(const Duration(hours: 1)).toUtc().toIso8601String(),
-          'role': 'rider',
-        },
-      }),
-      _json({
-        'success': true,
-        'data': {
-          'first_name': 'Rico',
-          'last_name': 'Reyes',
-          'email': 'rico@example.com',
-          'status': 'active',
-        },
-      }),
-    ]);
-    await live.tokens.write('2|courier-token');
+  test(
+    'courier refresh renews the restored token, then calls /rider/profile',
+    () async {
+      final live = _Live([
+        // A restored token's expiry is unknown, so it is renewed first.
+        _json({
+          'success': true,
+          'data': {
+            'token': '3|renewed-token',
+            'expires_at': DateTime.now()
+                .add(const Duration(hours: 1))
+                .toUtc()
+                .toIso8601String(),
+            'role': 'rider',
+          },
+        }),
+        _json({
+          'success': true,
+          'data': {
+            'first_name': 'Rico',
+            'last_name': 'Reyes',
+            'email': 'rico@example.com',
+            'status': 'active',
+          },
+        }),
+      ]);
+      await live.tokens.write('2|courier-token');
 
-    final result = await live.repository.refresh(role: UserRole.courier);
+      final result = await live.repository.refresh(role: UserRole.courier);
 
-    expect(live.server.paths, ['/rider/token/refresh', '/rider/profile']);
-    expect(live.server.headers.first['authorization'], 'Bearer 2|courier-token');
-    expect(live.server.headers.last['authorization'], 'Bearer 3|renewed-token');
-    expect(await live.tokens.read(), '3|renewed-token');
-    expect(result!.role, UserRole.courier);
-    expect(result.status, AccountStatus.active);
-  });
+      expect(live.server.paths, ['/rider/token/refresh', '/rider/profile']);
+      expect(
+        live.server.headers.first['authorization'],
+        'Bearer 2|courier-token',
+      );
+      expect(
+        live.server.headers.last['authorization'],
+        'Bearer 3|renewed-token',
+      );
+      expect(await live.tokens.read(), '3|renewed-token');
+      expect(result!.role, UserRole.courier);
+      expect(result.status, AccountStatus.active);
+    },
+  );
 
-  test('a rider token close to expiry is renewed before the next request',
-      () async {
-    final live = _Live([
-      _json({
-        'success': true,
-        'data': {
-          'token': '2|courier-token',
-          'expires_at': DateTime.now().add(const Duration(minutes: 5)).toUtc().toIso8601String(),
-          'role': 'rider',
-        },
-      }),
-      _json({
-        'success': true,
-        'data': {
-          'token': '3|renewed-token',
-          'expires_at': DateTime.now().add(const Duration(hours: 1)).toUtc().toIso8601String(),
-          'role': 'rider',
-        },
-      }),
-      _json({'success': true, 'data': {'status': 'active', 'email': 'rico@example.com'}}),
-      _json({'success': true, 'data': {'status': 'active', 'email': 'rico@example.com'}}),
-    ]);
+  test(
+    'a rider token close to expiry is renewed before the next request',
+    () async {
+      final live = _Live([
+        _json({
+          'success': true,
+          'data': {
+            'token': '2|courier-token',
+            'expires_at': DateTime.now()
+                .add(const Duration(minutes: 5))
+                .toUtc()
+                .toIso8601String(),
+            'role': 'rider',
+          },
+        }),
+        _json({
+          'success': true,
+          'data': {
+            'token': '3|renewed-token',
+            'expires_at': DateTime.now()
+                .add(const Duration(hours: 1))
+                .toUtc()
+                .toIso8601String(),
+            'role': 'rider',
+          },
+        }),
+        _json({
+          'success': true,
+          'data': {'status': 'active', 'email': 'rico@example.com'},
+        }),
+        _json({
+          'success': true,
+          'data': {'status': 'active', 'email': 'rico@example.com'},
+        }),
+      ]);
 
-    await live.repository.login(role: UserRole.courier, email: 'rico@example.com', password: 'password');
-    // The renewed token is good for an hour: the next request is not renewed.
-    await live.client.getJson('/rider/profile');
+      await live.repository.login(
+        role: UserRole.courier,
+        email: 'rico@example.com',
+        password: 'password',
+      );
+      // The renewed token is good for an hour: the next request is not renewed.
+      await live.client.getJson('/rider/profile');
 
-    expect(live.server.paths, ['/rider/login', '/rider/token/refresh', '/rider/profile', '/rider/profile']);
-    expect(live.server.headers.last['authorization'], 'Bearer 3|renewed-token');
-  });
+      expect(live.server.paths, [
+        '/rider/login',
+        '/rider/token/refresh',
+        '/rider/profile',
+        '/rider/profile',
+      ]);
+      expect(
+        live.server.headers.last['authorization'],
+        'Bearer 3|renewed-token',
+      );
+    },
+  );
 
   test('a buyer token is never sent to the rider renewal route', () async {
     final live = _Live([
-      _json({'success': true, 'data': {'token': '1|buyer-token', 'expires_at': DateTime.now().toUtc().toIso8601String()}}),
-      _json({'success': true, 'data': {'status': 'approved', 'email': 'ana@example.com'}}),
+      _json({
+        'success': true,
+        'data': {
+          'token': '1|buyer-token',
+          'expires_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      }),
+      _json({
+        'success': true,
+        'data': {'status': 'approved', 'email': 'ana@example.com'},
+      }),
     ]);
 
-    await live.repository.login(role: UserRole.buyer, email: 'ana@example.com', password: 'password');
+    await live.repository.login(
+      role: UserRole.buyer,
+      email: 'ana@example.com',
+      password: 'password',
+    );
 
     expect(live.server.paths, ['/buyer/login', '/buyer/profile']);
   });
@@ -702,7 +822,10 @@ void main() {
           'resend_url': resend,
         },
       }, 201),
-      _json({'message': 'Email verified.', 'data': {'rider_id': 7, 'status': 'pending'}}),
+      _json({
+        'message': 'Email verified.',
+        'data': {'rider_id': 7, 'status': 'pending'},
+      }),
     ]);
 
     final riderProfile = RegistrationProfile(
@@ -754,7 +877,10 @@ void main() {
     expect(body, isNot(contains('name="license_number"')));
     expect(body, isNot(contains('name="upload_id"')));
     expect(result.role, UserRole.courier);
-    expect(result.registrationStatus, RemoteRegistrationStatus.pendingVerification);
+    expect(
+      result.registrationStatus,
+      RemoteRegistrationStatus.pendingVerification,
+    );
     expect(result.canConfirmEmail, isTrue);
 
     final confirmed = await live.repository.verifyOtp(
@@ -767,58 +893,97 @@ void main() {
     expect(live.server.urls.last, verify);
     expect(live.server.headers.last.containsKey('authorization'), isFalse);
     expect(live.server.bodies.last, contains('"otp":"123456"'));
-    expect(confirmed.registrationStatus, RemoteRegistrationStatus.pendingApproval);
+    expect(
+      confirmed.registrationStatus,
+      RemoteRegistrationStatus.pendingApproval,
+    );
   });
 
   // ── Rider verification links: expiry, recovery, cooldown ─────────────────
 
   group('rider verification links', () {
-    final fresh = RiderVerificationHandle(_signedVerify, _signedResend).encode();
-    final expired = RiderVerificationHandle(_expiredVerify, _expiredResend).encode();
+    final fresh = RiderVerificationHandle(
+      _signedVerify,
+      _signedResend,
+    ).encode();
+    final expired = RiderVerificationHandle(
+      _expiredVerify,
+      _expiredResend,
+    ).encode();
 
     test('resend posts to the server-issued resend URL unchanged', () async {
-      final live = _Live([_json({'message': 'A new verification code has been sent.'})]);
+      final live = _Live([
+        _json({'message': 'A new verification code has been sent.'}),
+      ]);
 
-      await live.repository.resendOtp(role: UserRole.courier, verificationId: fresh);
+      await live.repository.resendOtp(
+        role: UserRole.courier,
+        verificationId: fresh,
+      );
 
       expect(live.server.urls.single, _signedResend);
       expect(live.server.headers.single.containsKey('authorization'), isFalse);
     });
 
     test('an expired link is not sent; it reads as an expired link', () async {
-      final live = _Live([_json({'message': 'unused'})]);
+      final live = _Live([
+        _json({'message': 'unused'}),
+      ]);
 
       await expectLater(
-        live.repository.resendOtp(role: UserRole.courier, verificationId: expired),
+        live.repository.resendOtp(
+          role: UserRole.courier,
+          verificationId: expired,
+        ),
         throwsA(isA<VerificationLinkExpiredException>()),
       );
       await expectLater(
-        live.repository.verifyOtp(role: UserRole.courier, verificationId: expired, code: '123456'),
+        live.repository.verifyOtp(
+          role: UserRole.courier,
+          verificationId: expired,
+          code: '123456',
+        ),
         throwsA(isA<VerificationLinkExpiredException>()),
       );
       expect(live.server.calls, 0);
       expect(RiderVerificationHandle.parse(expired)!.isExpired, isTrue);
-      expect(RiderVerificationHandle.parse(fresh)!.expiresAt, DateTime.utc(2100));
-    });
-
-    test("a 403 from the server's signed middleware reads as an expired link", () async {
-      final live = _Live([_json({'message': 'Invalid signature.'}, 403)]);
-
-      await expectLater(
-        live.repository.resendOtp(role: UserRole.courier, verificationId: fresh),
-        throwsA(isA<VerificationLinkExpiredException>()),
+      expect(
+        RiderVerificationHandle.parse(fresh)!.expiresAt,
+        DateTime.utc(2100),
       );
     });
 
+    test(
+      "a 403 from the server's signed middleware reads as an expired link",
+      () async {
+        final live = _Live([
+          _json({'message': 'Invalid signature.'}, 403),
+        ]);
+
+        await expectLater(
+          live.repository.resendOtp(
+            role: UserRole.courier,
+            verificationId: fresh,
+          ),
+          throwsA(isA<VerificationLinkExpiredException>()),
+        );
+      },
+    );
+
     test('a link for another host is refused without a request', () async {
-      final live = _Live([_json({'message': 'unused'})]);
+      final live = _Live([
+        _json({'message': 'unused'}),
+      ]);
       final foreign = RiderVerificationHandle(
         'https://evil.example/api/rider/registration/7/verify-otp?expires=4102444800&signature=x',
         'https://evil.example/api/rider/registration/7/resend-otp?expires=4102444800&signature=y',
       ).encode();
 
       await expectLater(
-        live.repository.resendOtp(role: UserRole.courier, verificationId: foreign),
+        live.repository.resendOtp(
+          role: UserRole.courier,
+          verificationId: foreign,
+        ),
         throwsA(isA<MalformedResponseException>()),
       );
       expect(live.server.calls, 0);
@@ -827,17 +992,31 @@ void main() {
     test('the server cooldown arrives as a 429 with its wait', () async {
       final live = _Live([
         _json({
-          'message': 'Too many verification codes requested. Please try again later.',
-          'errors': {'otp': ['Too many verification codes requested. Please try again later.']},
+          'message':
+              'Too many verification codes requested. Please try again later.',
+          'errors': {
+            'otp': [
+              'Too many verification codes requested. Please try again later.',
+            ],
+          },
           'retry_after': 42,
         }, 429),
       ]);
 
       await expectLater(
-        live.repository.resendOtp(role: UserRole.courier, verificationId: fresh),
-        throwsA(isA<RequestRejectedException>()
-            .having((e) => e.isRateLimited, 'isRateLimited', isTrue)
-            .having((e) => e.retryAfter, 'retryAfter', const Duration(seconds: 42))),
+        live.repository.resendOtp(
+          role: UserRole.courier,
+          verificationId: fresh,
+        ),
+        throwsA(
+          isA<RequestRejectedException>()
+              .having((e) => e.isRateLimited, 'isRateLimited', isTrue)
+              .having(
+                (e) => e.retryAfter,
+                'retryAfter',
+                const Duration(seconds: 42),
+              ),
+        ),
       );
     });
 
@@ -845,56 +1024,87 @@ void main() {
       final live = _Live([
         _json({
           'message': 'That code does not match. Please try again.',
-          'errors': {'otp': ['That code does not match. Please try again.']},
+          'errors': {
+            'otp': ['That code does not match. Please try again.'],
+          },
         }, 422),
       ]);
 
       await expectLater(
-        live.repository.verifyOtp(role: UserRole.courier, verificationId: fresh, code: '000000'),
-        throwsA(isA<ValidationException>().having(
-            (e) => e.forField('otp'), 'otp', 'That code does not match. Please try again.')),
+        live.repository.verifyOtp(
+          role: UserRole.courier,
+          verificationId: fresh,
+          code: '000000',
+        ),
+        throwsA(
+          isA<ValidationException>().having(
+            (e) => e.forField('otp'),
+            'otp',
+            'That code does not match. Please try again.',
+          ),
+        ),
       );
     });
 
-    test('resume trades email + password for fresh links, which AuthState stores', () async {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      SharedPreferences.setMockInitialValues({});
-      final live = _Live([
-        _json({
-          'message': 'Registration resumed.',
-          'data': {
-            'rider_id': 7,
-            'status': 'unverified',
-            'verify_url': _signedVerify,
-            'resend_url': _signedResend,
-          },
-        }),
-      ]);
-      final auth = AuthState(repository: live.repository)
-        ..role = UserRole.courier
-        ..email = 'rider@example.com'
-        ..verificationId = expired;
+    test(
+      'resume trades email + password for fresh links, which AuthState stores',
+      () async {
+        TestWidgetsFlutterBinding.ensureInitialized();
+        SharedPreferences.setMockInitialValues({});
+        final live = _Live([
+          _json({
+            'message': 'Registration resumed.',
+            'data': {
+              'rider_id': 7,
+              'status': 'unverified',
+              'verify_url': _signedVerify,
+              'resend_url': _signedResend,
+            },
+          }),
+        ]);
+        final auth = AuthState(repository: live.repository)
+          ..role = UserRole.courier
+          ..email = 'rider@example.com'
+          ..verificationId = expired;
 
-      expect(auth.canResumeRiderRegistration, isTrue);
-      await auth.resumeRiderRegistration('Password1!');
+        expect(auth.canResumeRiderRegistration, isTrue);
+        await auth.resumeRiderRegistration('Password1!');
 
-      expect(live.server.paths.single, '/rider/registration/resume');
-      expect(live.server.bodies.single, contains('"email":"rider@example.com"'));
-      expect(live.server.headers.single.containsKey('authorization'), isFalse);
-      expect(auth.verificationId, fresh);
-      expect(RiderVerificationHandle.parse(auth.verificationId!)!.isExpired, isFalse);
-    });
+        expect(live.server.paths.single, '/rider/registration/resume');
+        expect(
+          live.server.bodies.single,
+          contains('"email":"rider@example.com"'),
+        );
+        expect(
+          live.server.headers.single.containsKey('authorization'),
+          isFalse,
+        );
+        expect(auth.verificationId, fresh);
+        expect(
+          RiderVerificationHandle.parse(auth.verificationId!)!.isExpired,
+          isFalse,
+        );
+      },
+    );
 
     test('a wrong password on resume is the server field error', () async {
       final live = _Live([
         _json({
-          'message': 'Unable to resume this registration with those credentials.',
-          'errors': {'email': ['Unable to resume this registration with those credentials.']},
+          'message':
+              'Unable to resume this registration with those credentials.',
+          'errors': {
+            'email': [
+              'Unable to resume this registration with those credentials.',
+            ],
+          },
         }, 422),
       ]);
 
       await expectLater(
-        live.repository.resumeRiderRegistration(email: 'rider@example.com', password: 'wrong'),
+        live.repository.resumeRiderRegistration(
+          email: 'rider@example.com',
+          password: 'wrong',
+        ),
         throwsA(isA<ValidationException>()),
       );
     });

@@ -9,12 +9,20 @@
 // p9 is the fixture. It has Color × Size, Black/M is out of stock while White/M
 // is available, and S/L carry different prices/stocks.
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/data/api/api_client.dart';
+import 'package:zefanya/data/api/token_store.dart';
 import 'package:zefanya/data/mock_data.dart';
+import 'package:zefanya/data/repositories/catalog_repository.dart';
 import 'package:zefanya/screens/buyer/cart_screen.dart';
 import 'package:zefanya/screens/buyer/checkout_screen.dart';
 import 'package:zefanya/screens/buyer/product_details_screen.dart';
@@ -75,7 +83,11 @@ Finder _galleryImage(String url) => find.byWidgetPredicate(
   (widget) => widget is ProductImage && widget.imageUrl == url,
 );
 
-Future<CartState> _pumpDetails(WidgetTester tester) async {
+Future<CartState> _pumpDetails(
+  WidgetTester tester, {
+  Product? product,
+  CatalogRepository? repository,
+}) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
   SharedPreferences.setMockInitialValues({});
@@ -95,11 +107,13 @@ Future<CartState> _pumpDetails(WidgetTester tester) async {
           ChangeNotifierProvider(create: (_) => ReviewState()),
           ChangeNotifierProvider(create: (_) => OrderState()),
           ChangeNotifierProvider(create: (_) => CourierState()),
-          ChangeNotifierProvider(create: (_) => CatalogState()),
+          ChangeNotifierProvider(
+            create: (_) => CatalogState(repository: repository),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light,
-          home: ProductDetailsScreen(product: _tee),
+          home: ProductDetailsScreen(product: product ?? _tee),
         ),
       ),
     ),
@@ -144,6 +158,76 @@ Future<void> _pumpCart(WidgetTester tester, CartState cart) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('a Live product loads full variants before enabling purchase', (
+    tester,
+  ) async {
+    final response = Completer<http.Response>();
+    final repository = LiveCatalogRepository(
+      ApiClient(
+        baseUrl: 'https://api.example.test',
+        tokenStore: InMemoryTokenStore(),
+        httpClient: MockClient((request) {
+          expect(request.url.path, '/buyer/products/17');
+          return response.future;
+        }),
+      ),
+    );
+    final cart = await _pumpDetails(
+      tester,
+      repository: repository,
+      product: const Product(
+        id: '17',
+        name: 'Linen shirt',
+        category: 'Fashion',
+        price: 400,
+        sellerName: 'Linen shop',
+        stock: 3,
+      ),
+    );
+    final buyNow = find.widgetWithText(ElevatedButton, 'Buy Now');
+    expect(tester.widget<ElevatedButton>(buyNow).onPressed, isNull);
+    expect(find.text('Shipping ₱60'), findsNothing);
+    expect(find.text('Add code'), findsNothing);
+    expect(
+      find.textContaining('Shipping is calculated at checkout'),
+      findsOneWidget,
+    );
+    response.complete(
+      http.Response(
+        jsonEncode({
+          'data': {
+            'id': 17,
+            'name': 'Linen shirt',
+            'seller': {'id': 4, 'name': 'Linen shop'},
+            'price': {'min_minor': 40000},
+            'options': [
+              {
+                'name': 'Size',
+                'values': ['M'],
+              },
+            ],
+            'variants': [
+              {
+                'id': 29,
+                'values': ['M'],
+                'price': {'min_minor': 40000},
+                'stock': 3,
+                'available': true,
+              },
+            ],
+          },
+        }),
+        200,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapOption(tester, 'Size', 'M');
+    await tester.tap(find.text('Add to Cart'));
+    await tester.pumpAndSettle();
+    expect(cart.items.single.variant, 'M');
+    expect(cart.items.single.product.variantForLabel('M')?.id, '29');
+  });
 
   testWidgets('BUY-PDP-001: both variation types are required', (tester) async {
     final cart = await _pumpDetails(tester);

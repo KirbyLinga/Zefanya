@@ -9,19 +9,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 
 import 'package:zefanya/data/dto/registration_payload.dart';
 import 'package:zefanya/data/api/api_exception.dart';
-import 'package:zefanya/data/mock_data.dart' show Order;
+import 'package:zefanya/data/mock_data.dart' show DeliveryJob, Order;
+import 'package:zefanya/data/repositories/courier_repository.dart';
 import 'package:zefanya/data/repositories/order_repository.dart';
 import 'package:zefanya/data/repositories/review_repository.dart';
 import 'package:zefanya/data/google_identity.dart';
 import 'package:zefanya/data/repositories/google_auth_repository.dart';
 import 'package:zefanya/data/repositories/repositories.dart';
 import 'package:zefanya/main.dart';
+import 'package:zefanya/screens/auth/registration_screen.dart';
 import 'package:zefanya/screens/buyer/buyer_shell.dart';
+import 'package:zefanya/screens/buyer/cart_screen.dart';
+import 'package:zefanya/screens/buyer/orders_status_screen.dart';
 import 'package:zefanya/screens/courier/courier_shell.dart';
 import 'package:zefanya/screens/courier/linehaul_portal.dart';
+import 'package:zefanya/screens/landing_screen.dart';
+import 'package:zefanya/screens/onboarding_screen.dart';
 import 'package:zefanya/services/google_sign_in_service.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
@@ -58,6 +65,8 @@ Future<void> _pumpGate(
   AuthState auth, {
   OrderState? orders,
   ReviewState? reviews,
+  CourierState? rider,
+  bool showApp = false,
 }) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
@@ -81,7 +90,7 @@ Future<void> _pumpGate(
         ChangeNotifierProvider(
           create: (_) => ChatState(repository: repositories.chat),
         ),
-        ChangeNotifierProvider(create: (_) => CourierState()),
+        ChangeNotifierProvider(create: (_) => rider ?? CourierState()),
         ChangeNotifierProvider(create: (_) => NotificationState()),
         ChangeNotifierProvider(
           create: (_) => orders ?? OrderState(repository: repositories.order),
@@ -98,7 +107,9 @@ Future<void> _pumpGate(
         ),
         ChangeNotifierProvider(create: (_) => ThemeState()),
       ],
-      child: MaterialApp(theme: AppTheme.light, home: const AuthGate()),
+      child: showApp
+          ? const MarketplaceApp()
+          : MaterialApp(theme: AppTheme.light, home: const AuthGate()),
     ),
   );
   await tester.pump();
@@ -135,7 +146,169 @@ class _LoginReviews extends MockReviewRepository {
   }
 }
 
+class _DispatchRefresh extends MockCourierRepository {
+  int reads = 0;
+
+  @override
+  bool get isServerAuthoritative => true;
+
+  @override
+  Future<List<DeliveryJob>> assignedJobs() async => ++reads == 1
+      ? const []
+      : const [
+          DeliveryJob(
+            id: 'dispatched-after-login',
+            shopName: 'Newly dispatched shop',
+            pickupAddress: 'Pila',
+            buyerName: 'Demo Buyer',
+            deliveryArea: 'Pila',
+            packageSize: 'Small parcel',
+            fee: 30,
+            serverStatus: 'ASSIGNED_TO_RIDER',
+          ),
+        ];
+}
+
 void main() {
+  testWidgets('a rapid repeat cart tap needs only one Back action', (
+    tester,
+  ) async {
+    await _pumpGate(tester, await _signedIn(UserRole.buyer));
+    final button = find.byTooltip('Open cart').hitTestable();
+    final target = tester.getCenter(button);
+    await tester.tapAt(target);
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+    expect(find.byType(CartScreen, skipOffstage: false), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(CartScreen), findsNothing);
+    expect(find.byType(BuyerShell), findsOneWidget);
+  });
+
+  testWidgets('checkout navigation selects the mounted Orders tab', (
+    tester,
+  ) async {
+    final orders = OrderState();
+    await _pumpGate(tester, await _signedIn(UserRole.buyer), orders: orders);
+    final existing = tester.state(
+      find.byType(OrdersStatusScreen, skipOffstage: false),
+    );
+    orders.requestOrdersTab();
+    await tester.pumpAndSettle();
+    final visible = find.byType(OrdersStatusScreen).hitTestable();
+    expect(visible, findsOneWidget);
+    expect(tester.state(visible), same(existing));
+    expect(Navigator.of(tester.element(visible)).canPop(), isFalse);
+    await tester.tap(find.text('Home').hitTestable());
+    await tester.pumpAndSettle();
+    orders.requestOrdersTab();
+    await tester.pumpAndSettle();
+    expect(tester.state(visible), same(existing));
+  });
+
+  if (!kUseLiveApi) {
+    testWidgets('all demo roles open locally with a persistent demo label', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        OnboardingScreen.completionKey: true,
+        'auth_role': 'buyer',
+      });
+      final auth = AuthState();
+      await _pumpGate(tester, auth, showApp: true);
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
+      final banner = find.text('DEMO MODE · Sample data');
+      expect(banner, findsOneWidget);
+
+      for (final (label, shell) in [
+        ('Buyer demo', BuyerShell),
+        ('Rider demo', CourierShell),
+        ('Transport Courier demo', LinehaulPortal),
+      ]) {
+        await tester.tap(find.text('Choose a demo role ▾'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+        expect(find.byType(shell), findsOneWidget);
+        expect(banner, findsOneWidget);
+        if (shell != LinehaulPortal) {
+          await auth.logout();
+          await tester.pumpAndSettle();
+        }
+      }
+
+      expect(find.text('Trip #102'), findsOneWidget);
+      final scan = find.widgetWithText(FilledButton, 'Scan or enter parcel');
+      expect(tester.widget<FilledButton>(scan).onPressed, isNull);
+      for (final (tab, content) in [
+        ('History', 'Trip #101'),
+        ('Earnings', 'Sample earned pay'),
+        (
+          'Profile',
+          'Sample duty status. Location and duty changes are disabled.',
+        ),
+      ]) {
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+        expect(find.text(content), findsOneWidget);
+        expect(banner, findsOneWidget);
+      }
+
+      final profile = find.text('Company & profile');
+      await tester.ensureVisible(profile);
+      await tester.tap(profile);
+      await tester.pumpAndSettle();
+      expect(find.text('Zefanya Demo Logistics'), findsOneWidget);
+      final vehicle = find.widgetWithText(OutlinedButton, 'Vehicle records');
+      await tester.scrollUntilVisible(
+        vehicle,
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(tester.widget<OutlinedButton>(vehicle).onPressed, isNull);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_role'), 'buyer');
+      expect(prefs.getString('auth_status'), isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('opening Rider Deliveries refreshes a new server assignment', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _DispatchRefresh();
+    await _pumpGate(
+      tester,
+      await _signedIn(UserRole.courier),
+      rider: CourierState(repository: repository),
+    );
+    expect(repository.reads, 1);
+    expect(find.text('Newly dispatched shop'), findsNothing);
+    await tester.tap(find.text('Deliveries'));
+    await tester.pumpAndSettle();
+    expect(repository.reads, 2);
+    expect(find.text('Newly dispatched shop'), findsOneWidget);
+  });
+
+  testWidgets('welcome opens the existing Buyer registration directly', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      OnboardingScreen.completionKey: true,
+    });
+    await _pumpGate(tester, AuthState());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create Buyer account'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 900));
+    expect(find.byType(RegistrationScreen), findsOneWidget);
+    expect(find.byType(LandingScreen), findsNothing);
+  });
+
   testWidgets('buyer entry refreshes server reviews after signed-out startup', (
     tester,
   ) async {
@@ -155,6 +328,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final auth = await _signedIn(role);
       await _pumpGate(tester, auth);
+      expect(find.byType(LandingScreen), findsNothing);
+      expect(find.byType(OnboardingScreen), findsNothing);
       await auth.logout();
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
@@ -163,6 +338,11 @@ void main() {
       expect(find.byType(CourierShell), findsNothing);
       expect(find.byType(LinehaulPortal), findsNothing);
       expect(auth.isLoggedIn, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpGate(tester, AuthState());
+      await tester.pumpAndSettle();
+      expect(find.byType(LandingScreen), findsOneWidget);
+      expect(find.byType(OnboardingScreen), findsNothing);
     });
   }
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -202,13 +382,16 @@ void main() {
     expect(find.byType(CourierShell), findsNothing);
   });
 
-  testWidgets('linehaul session opens only the Courier portal and fails closed without a live client', (tester) async {
-    await _pumpGate(tester, await _signedIn(UserRole.linehaul));
-    expect(find.byType(LinehaulPortal), findsOneWidget);
-    expect(find.byType(CourierShell), findsNothing);
-    expect(find.byType(BuyerShell), findsNothing);
-    expect(find.text('Accept trip'), findsNothing);
-  });
+  testWidgets(
+    'linehaul session opens only the Courier portal and fails closed without a live client',
+    (tester) async {
+      await _pumpGate(tester, await _signedIn(UserRole.linehaul));
+      expect(find.byType(LinehaulPortal), findsOneWidget);
+      expect(find.byType(CourierShell), findsNothing);
+      expect(find.byType(BuyerShell), findsNothing);
+      expect(find.text('Accept trip'), findsNothing);
+    },
+  );
 
   test(
     'a first-time Google identity becomes pending, never an active courier',

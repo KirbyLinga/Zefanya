@@ -20,16 +20,18 @@ class NotificationBell extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: unread == 0
-          ? 'Notifications'
-          : 'Notifications, $unread unread',
+      label: unread == 0 ? 'Notifications' : 'Notifications, $unread unread',
       child: Tooltip(
         message: 'Notifications',
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: () => Navigator.of(
-            context,
-          ).push(AppPageRoute(builder: (_) => const NotificationsScreen())),
+          onTap: () {
+            final state = context.read<NotificationState>();
+            if (state.isLive) state.load();
+            Navigator.of(
+              context,
+            ).push(AppPageRoute(builder: (_) => const NotificationsScreen()));
+          },
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Stack(

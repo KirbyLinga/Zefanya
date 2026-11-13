@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -59,8 +60,10 @@ void main() {
 
       expect(chat.conversations, hasLength(1));
       expect(chat.conversations.single.contactName, 'Sage & Clay');
-      expect(chat.conversations.single.lastMessage?.text,
-          'Your order is on the way.');
+      expect(
+        chat.conversations.single.lastMessage?.text,
+        'Your order is on the way.',
+      );
       expect(chat.conversations.single.unreadCount, 1);
       expect(chat.totalUnread, 1);
 
@@ -90,17 +93,17 @@ void main() {
       await chat.seedIfEmpty('Rattan & Reed', _incoming('Hello'));
       await chat.seedIfEmpty('Sage & Clay', _incoming('Hello'));
 
-      expect(
-        chat.conversations.map((c) => c.contactName),
-        ['Sage & Clay', 'Rattan & Reed'],
-      );
+      expect(chat.conversations.map((c) => c.contactName), [
+        'Sage & Clay',
+        'Rattan & Reed',
+      ]);
 
       await chat.addMessage('Rattan & Reed', _incoming('Still there?'));
 
-      expect(
-        chat.conversations.map((c) => c.contactName),
-        ['Rattan & Reed', 'Sage & Clay'],
-      );
+      expect(chat.conversations.map((c) => c.contactName), [
+        'Rattan & Reed',
+        'Sage & Clay',
+      ]);
     });
   });
 
@@ -118,8 +121,9 @@ void main() {
       );
     });
 
-    testWidgets('a conversation shows its last line and an unread dot',
-        (tester) async {
+    testWidgets('a conversation shows its last line and an unread dot', (
+      tester,
+    ) async {
       final chat = await _chatWithUnread();
       await tester.pumpWidget(_app(chat, const ChatInboxScreen()));
       await tester.pump();
@@ -179,8 +183,9 @@ void main() {
       expect(find.text('0'), findsNothing);
     });
 
-    testWidgets('mock-mode Home shows the Messages entry beside the cart',
-        (tester) async {
+    testWidgets('Home shows Messages only when chat is available', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(390, 1400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -206,17 +211,18 @@ void main() {
               ChangeNotifierProvider(create: (_) => WishlistState()),
               ChangeNotifierProvider(create: (_) => ThemeState()),
             ],
-            child: MaterialApp(
-              theme: AppTheme.light,
-              home: const BuyerShell(),
-            ),
+            child: MaterialApp(theme: AppTheme.light, home: const BuyerShell()),
           ),
         ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
 
-      expect(find.byKey(const ValueKey('open-chat-inbox')), findsOneWidget);
+      expect(find.byTooltip('Open cart').hitTestable(), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('open-chat-inbox')),
+        kUseLiveApi ? findsNothing : findsOneWidget,
+      );
     });
   });
 }

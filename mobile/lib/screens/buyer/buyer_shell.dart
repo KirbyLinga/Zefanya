@@ -12,10 +12,11 @@ import '../../state/cart_state.dart';
 import '../../state/catalog_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
+import '../../state/notification_state.dart';
+import '../../state/chat_state.dart';
 import '../../state/review_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/microcopy.dart';
-import '../../utils/money_format.dart';
 import '../../utils/scroll_to_top.dart';
 import '../../widgets/cart_button.dart';
 import '../../widgets/chat_inbox_button.dart';
@@ -32,8 +33,8 @@ import 'product_details_screen.dart';
 import 'search_screen.dart';
 import 'vouchers_screen.dart';
 import 'widgets/product_card.dart';
+import 'widgets/editorial_hero.dart';
 import 'widgets/featured_deck.dart';
-import 'widgets/promo_carousel.dart';
 import 'widgets/product_stack_showcase.dart';
 import 'widgets/seller_story_card.dart';
 import 'widgets/recently_viewed_rail.dart';
@@ -61,6 +62,7 @@ class BuyerShell extends StatefulWidget {
 
 class _BuyerShellState extends State<BuyerShell> {
   int _index = 0;
+  late int _lastOrdersTabRequest;
 
   /// Bumped to focus the Search tab's field — see SearchScreen.focusRequests.
   final _searchFocusRequests = ValueNotifier<int>(0);
@@ -74,6 +76,7 @@ class _BuyerShellState extends State<BuyerShell> {
   @override
   void initState() {
     super.initState();
+    _lastOrdersTabRequest = context.read<OrderState>().ordersTabRequests;
     // Startup can fetch orders before a bearer token exists. Entering the
     // authenticated shell must replace that cached failure with fresh history.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -127,9 +130,12 @@ class _BuyerShellState extends State<BuyerShell> {
     // Count orders that have moved to a new status since last viewed.
     // "In transit" and "out for delivery" are the two stages the buyer
     // actively wants to know about — toShip is expected, toRate is done.
-    final orders = context.watch<OrderState>().resolvedOrders(
-      context.watch<CourierState>(),
-    );
+    final orderState = context.watch<OrderState>();
+    if (_lastOrdersTabRequest != orderState.ordersTabRequests) {
+      _lastOrdersTabRequest = orderState.ordersTabRequests;
+      _index = 3;
+    }
+    final orders = orderState.resolvedOrders(context.watch<CourierState>());
     final activeOrders = orders
         .where(
           (o) =>
@@ -141,7 +147,11 @@ class _BuyerShellState extends State<BuyerShell> {
     final items = [
       const NavBarItem(glyph: NavGlyph.home, label: 'Home'),
       const NavBarItem(glyph: NavGlyph.search, label: 'Search'),
-      const NavBarItem(glyph: NavGlyph.categories, label: 'Categories'),
+      const NavBarItem(
+        glyph: NavGlyph.categories,
+        label: 'Categories',
+        shortLabel: 'Browse',
+      ),
       NavBarItem(
         glyph: NavGlyph.orders,
         label: 'Orders',
@@ -170,10 +180,16 @@ class _BuyerShellState extends State<BuyerShell> {
           ),
           KeyedSubtree(
             key: _tabKeys[1],
-            child: SearchScreen(focusRequests: _searchFocusRequests),
+            child: SearchScreen(
+              focusRequests: _searchFocusRequests,
+              onBrowseCategories: () => _onTabTap(2),
+            ),
           ),
           KeyedSubtree(key: _tabKeys[2], child: const CategoriesScreen()),
-          KeyedSubtree(key: _tabKeys[3], child: const OrdersStatusScreen()),
+          KeyedSubtree(
+            key: _tabKeys[3],
+            child: OrdersStatusScreen(onBrowseProducts: () => _onTabTap(0)),
+          ),
           KeyedSubtree(
             key: _tabKeys[4],
             child: const ProfileScreen(title: 'Buyer Profile'),
@@ -220,21 +236,6 @@ class _BuyerHomeScreen extends StatefulWidget {
 }
 
 class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
-  bool _isLoading = true;
-
-  // Which product leads (featured tile) and which pair shows in the
-  // Style Edit stack — picked once per app launch instead of always leading with
-  // the same product. A fixed selection made every screenshot and every scroll
-  // during development show the identical hero no matter what else changed, which
-  // reads as staleness on its own, separate from anything actually wrong with the
-  // design.
-  //
-  // Read from `CatalogState`, not `mockProducts`: this is the home grid, and in a
-  // live build the catalogue is the server's. `read` rather than `watch` because
-  // the pick is deliberately frozen for the session — a re-shuffle mid-scroll
-  // would move the hero under the person's thumb.
-  late final List<Product> _shuffled;
-
   /// Drives "Shop the shelf" from the deck's end card: scrolls Home
   /// down to The Shelf. Owned here (not in the deck) so the deck stays
   /// a pure presentational widget — it reports taps, Home scrolls.
@@ -247,11 +248,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     super.dispose();
   }
 
-  /// The seller featured in the "From the maker" card. Chosen from a
-  /// different shop than the cover story's, so the same seller (and its
-  /// product) doesn't headline two adjacent sections of one scroll.
-  late final Product? _storyProduct;
-
   static List<Product> _sortDeterministic(List<Product> products) {
     final list = List<Product>.from(products);
     list.sort((a, b) {
@@ -260,23 +256,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
       return a.id.compareTo(b.id);
     });
     return list;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _shuffled = _sortDeterministic(context.read<CatalogState>().products);
-    _storyProduct = _shuffled.isEmpty
-        ? null
-        : _shuffled.firstWhere(
-            (p) => p.sellerName != _shuffled.first.sellerName,
-            orElse: () => _shuffled.first,
-          );
-    // Brief simulated load so the grid doesn't just snap into place —
-    // swap for a real product-fetch call once the API is wired up.
-    Future.delayed(const Duration(milliseconds: 450), () {
-      if (mounted) setState(() => _isLoading = false);
-    });
   }
 
   /// The band color for the "Style Edit" section. Uses surface at full
@@ -288,50 +267,33 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   /// active on the first build.
   Color get _bandColor => AppColors.surface;
 
-  Widget _buildCategoryQuickLinks(
-    BuildContext context,
-    ThemeData theme,
-    AppThemeExtension ext,
-  ) {
+  Widget _buildCategoryQuickLinks(BuildContext context, ThemeData theme) {
     final catalog = context.watch<CatalogState>();
     final categories = catalog.categories.where((c) => c != 'All').toList();
     if (categories.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, AppSpacing.s4, 0, AppSpacing.s16),
+      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('CATEGORIES', style: AppType.eyebrow),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: AppSpacing.s48),
-                  child: Container(
-                    alignment: Alignment.centerRight,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: widget.onBrowseCategories,
-                      child: Text(
-                        'See all categories',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.primaryDark,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
+                TextButton(
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: widget.onBrowseCategories,
+                  child: const Text('See all categories'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.s12),
           SizedBox(
-            height: 124,
+            height: 52 + MediaQuery.textScalerOf(context).scale(12) * 3.8,
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               scrollDirection: Axis.horizontal,
@@ -340,9 +302,8 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                   const SizedBox(width: AppSpacing.s12),
               itemBuilder: (context, i) {
                 final cat = categories[i];
-                final icon = categoryIcons[cat] ?? Icons.category_outlined;
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
+                return InkWell(
+                  borderRadius: BorderRadius.circular(8),
                   onTap: () => Navigator.of(context).push(
                     AppPageRoute(
                       builder: (_) => CategoryProductsScreen(category: cat),
@@ -351,32 +312,31 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(ext.cardRadius),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: Icon(
-                          icon,
-                          size: 24,
-                          color: AppColors.primaryDark,
+                      SizedBox(
+                        width: 78,
+                        height: 46,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(17),
+                            topRight: Radius.circular(5),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          child: CategoryArtwork(category: cat),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.s8),
+                      const SizedBox(height: 5),
                       SizedBox(
-                        width: 64,
+                        width: 82,
                         child: Text(
                           cat,
                           textAlign: TextAlign.center,
-                          maxLines: 2,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w500,
                             fontSize: 12,
+                            height: 1.15,
                           ),
                         ),
                       ),
@@ -395,25 +355,21 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final ext = theme.extension<AppThemeExtension>()!;
     final auth = context.watch<AuthState>();
     final greeting = Microcopy.greeting(
       widget.now ?? DateTime.now(),
       name: auth.firstName ?? auth.name,
     ).toUpperCase();
 
-    final catalogProducts = _shuffled.isNotEmpty
-        ? _shuffled
-        : _sortDeterministic(context.watch<CatalogState>().products);
-    final gridProducts = catalogProducts;
-    final storyProduct =
-        _storyProduct ??
-        (catalogProducts.isEmpty
-            ? null
-            : catalogProducts.firstWhere(
-                (p) => p.sellerName != catalogProducts.first.sellerName,
-                orElse: () => catalogProducts.first,
-              ));
+    final catalog = context.watch<CatalogState>();
+    final catalogProducts = _sortDeterministic(catalog.products);
+    final features = EditorialHero.selectCategories(catalog.categories);
+    final storyProduct = catalogProducts.isEmpty
+        ? null
+        : catalogProducts.firstWhere(
+            (p) => p.sellerName != catalogProducts.first.sellerName,
+            orElse: () => catalogProducts.first,
+          );
 
     return Scaffold(
       backgroundColor: Colors
@@ -454,7 +410,9 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                                       alignment: Alignment.centerLeft,
                                       child: Text(
                                         'Zefanya',
-                                        style: AppType.masthead,
+                                        style: AppType.masthead.copyWith(
+                                          fontSize: 42,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -475,11 +433,12 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                             ],
                           ),
                         ),
-                        // The bell has no backend yet; showing it in a live
-                        // build would promise notifications the server cannot
-                        // send. It returns with S6.9.
-                        if (!kUseLiveApi) const NotificationBell(),
-                        if (FeatureFlags.chatLive) ...[
+                        if (!kUseLiveApi ||
+                            context.read<NotificationState?>()?.isLive == true)
+                          const NotificationBell(),
+                        if (FeatureFlags.chatLive ||
+                            context.read<ChatState?>()?.liveRepository !=
+                                null) ...[
                           const SizedBox(width: AppSpacing.s4),
                           const ChatInboxButton(),
                         ],
@@ -510,8 +469,9 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                           minHeight: AppSpacing.s48,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(ext.pillRadius),
+                          color: AppColors.surfaceMuted,
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: TextField(
                           readOnly: true,
@@ -544,31 +504,19 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                   ),
                 ),
               ),
-              // ---- Promo carousel ----------------------------------
               SliverToBoxAdapter(
-                child: EaseInFrame(
-                  index: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 0, 0, AppSpacing.s16),
-                    child: PromoCarousel(
-                      autoAdvance: widget.isActive,
-                      onTapSlide: _onPromoTap,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                  child: EditorialHero(
+                    key: ValueKey(features.join('\u0000')),
+                    categories: features,
+                    onBrowse: widget.onBrowseCategories,
+                    onCategory: (category) => Navigator.of(context).push(
+                      AppPageRoute(
+                        builder: (_) =>
+                            CategoryProductsScreen(category: category),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-              // ---- Voucher strip -----------------------------------
-              SliverToBoxAdapter(
-                child: EaseInFrame(
-                  index: 3,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.s20,
-                      0,
-                      AppSpacing.s20,
-                      AppSpacing.s16,
-                    ),
-                    child: Row(children: [Expanded(child: _VoucherStrip())]),
                   ),
                 ),
               ),
@@ -576,24 +524,19 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
               SliverToBoxAdapter(
                 child: EaseInFrame(
                   index: 3,
-                  child: _buildCategoryQuickLinks(context, theme, ext),
+                  child: _buildCategoryQuickLinks(context, theme),
                 ),
               ),
               // ---- Flash sale --------------------------------------
               SliverToBoxAdapter(
                 child: EaseInFrame(index: 4, child: _FlashSaleSection()),
               ),
-              if (_isLoading)
+              const SliverToBoxAdapter(child: _VoucherStrip()),
+              if (catalog.isLoading && catalogProducts.isEmpty)
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.68,
-                        ),
+                    gridDelegate: ProductCard.gridDelegate(context),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) => ShimmerBox(
                         child: Container(
@@ -623,7 +566,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                     child: Text('Just for you', style: AppType.sectionDisplay),
                   ),
                 ),
-                ..._buildShelfSlivers(gridProducts),
+                ..._buildShelfSlivers(catalogProducts),
                 // ---- Recently viewed ---------------------------------
                 SliverToBoxAdapter(
                   child: Padding(
@@ -655,7 +598,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                   sliver: SliverToBoxAdapter(
                     child: FeaturedDeck(
                       products: catalogProducts.take(5).toList(),
-                      heroTagPrefix: 'home',
+                      heroTagPrefix: 'home-featured',
                       isActive: widget.isActive,
                     ),
                   ),
@@ -676,7 +619,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
                         Text('Style Edit', style: theme.textTheme.titleLarge),
                         const SizedBox(height: 8),
                         Text(
-                          'Two pieces that keep ending up in the same basket.',
+                          'Explore two pieces from the catalogue.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -724,35 +667,6 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
     );
   }
 
-  /// Where each promo slide leads. Keyed to the order of
-  /// `mockPromoSlides` in data/mock_data.dart: new arrivals, the Home &
-  /// Living sale, shipping.
-  ///
-  /// Still an index rather than a field on the slide, on purpose:
-  /// navigation targets are app structure, not campaign content, and
-  /// handing the data layer a route would mean a marketer could aim a
-  /// banner at any screen in the app. If slides ever reorder, this and the
-  /// list move together — which is why both sides say so.
-  void _onPromoTap(int index) {
-    final navigator = Navigator.of(context);
-    if (index == 0) {
-      navigator.push(
-        AppPageRoute(
-          builder: (_) => const CategoryProductsScreen(category: 'Fashion'),
-        ),
-      );
-    } else if (index == 1) {
-      navigator.push(
-        AppPageRoute(
-          builder: (_) =>
-              const CategoryProductsScreen(category: 'Home & Living'),
-        ),
-      );
-    } else {
-      navigator.push(AppPageRoute(builder: (_) => const VouchersScreen()));
-    }
-  }
-
   /// First break happens a little sooner than the repeats after it, so
   /// the very first interruption still arrives around the same spot it
   /// always did (after 4 grid tiles) regardless of how long the feed
@@ -783,12 +697,7 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
           SliverPadding(
             padding: EdgeInsets.fromLTRB(20, isFirstChunk ? 0 : 16, 20, 0),
             sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.68,
-              ),
+              gridDelegate: ProductCard.gridDelegate(context),
               delegate: SliverChildBuilderDelegate(
                 (context, i) => _gridTile(chunk[i], chunkStart + i),
                 childCount: chunk.length,
@@ -878,86 +787,65 @@ class _BuyerHomeScreenState extends State<_BuyerHomeScreen> {
   }
 }
 
-/// Flash-sale banner: a time-boxed section with a countdown and sold-count
-/// progress bar. Products are selected by having a [compareAtPrice] (on sale).
-class _FlashSaleSection extends StatefulWidget {
+/// A shelf for catalogue products with a confirmed lower selling price.
+class _FlashSaleSection extends StatelessWidget {
   const _FlashSaleSection();
 
   @override
-  State<_FlashSaleSection> createState() => _FlashSaleSectionState();
-}
-
-class _FlashSaleSectionState extends State<_FlashSaleSection> {
-  /// Mock sale ends 48 hours from now. In live mode this comes from the API.
-  final _saleEnds = DateTime.now().add(const Duration(hours: 48));
-
-  @override
   Widget build(BuildContext context) {
-    AppColors.watch(context);
-    final theme = Theme.of(context);
-
-    final catalog = context.watch<CatalogState>();
-    final saleItems = catalog.products
-        .where((p) => p.compareAtPrice != null && p.compareAtPrice! > p.price)
+    final products = context
+        .watch<CatalogState>()
+        .products
+        .where((product) => (product.compareAtPrice ?? 0) > product.price)
         .take(4)
         .toList();
-
-    if (saleItems.isEmpty) return const SizedBox.shrink();
-
+    if (products.isEmpty) return const SizedBox.shrink();
     return Column(
+      key: const ValueKey('buyer-sale-shelf'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s20,
-            AppSpacing.s16,
-            AppSpacing.s20,
-            AppSpacing.s12,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'FLASH SALE',
-                    style: AppType.eyebrow.copyWith(color: AppColors.danger),
-                  ),
-                  const SizedBox(height: AppSpacing.s4),
-                  Text(
-                    'Ends soon',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: AppSpacing.s48),
-                child: Container(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'See all deals',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppColors.primaryDark,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
+              Divider(height: 1, color: AppColors.divider),
+              const SizedBox(height: 9),
+              Text('THE SALE EDIT', style: AppType.eyebrow),
+              const SizedBox(height: 4),
+              Text(
+                'On sale',
+                style: AppType.sectionDisplay.copyWith(fontSize: 29),
               ),
             ],
           ),
         ),
         SizedBox(
-          height: 268,
-          child: _FlashSaleProductList(
-            saleItems: saleItems,
-            saleEnds: _saleEnds,
+          height: ProductCard.cardExtent(context),
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: products.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final product = products[index];
+              final tag = 'flash-${product.id}';
+              return SizedBox(
+                width: index == 0 ? 202 : 162,
+                child: ProductCard(
+                  promotional: true,
+                  index: index,
+                  product: product,
+                  heroTag: tag,
+                  onTap: () => Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) =>
+                          ProductDetailsScreen(product: product, heroTag: tag),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -965,324 +853,30 @@ class _FlashSaleSectionState extends State<_FlashSaleSection> {
   }
 }
 
-/// Flash-sale product cards with countdown timer and sold progress bar.
-class _FlashSaleProductList extends StatelessWidget {
-  const _FlashSaleProductList({
-    required this.saleItems,
-    required this.saleEnds,
-  });
-
-  final List<Product> saleItems;
-  final DateTime saleEnds;
-
-  @override
-  Widget build(BuildContext context) {
-    AppColors.watch(context);
-    final theme = Theme.of(context);
-    final ext = theme.extension<AppThemeExtension>()!;
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-      scrollDirection: Axis.horizontal,
-      itemCount: saleItems.length,
-      separatorBuilder: (_, i) => const SizedBox(width: AppSpacing.s12),
-      itemBuilder: (context, i) {
-        final product = saleItems[i];
-        final originalPrice = product.compareAtPrice ?? product.price;
-        final discountPct = originalPrice > 0
-            ? ((1 - product.price / originalPrice) * 100).round()
-            : 0;
-        final soldProgress = (product.soldCount / 1000).clamp(0.0, 1.0);
-        final timeLeft = saleEnds.difference(DateTime.now());
-        final hours = timeLeft.inHours.remainder(24).toString().padLeft(2, '0');
-        final minutes = timeLeft.inMinutes
-            .remainder(60)
-            .toString()
-            .padLeft(2, '0');
-        final seconds = timeLeft.inSeconds
-            .remainder(60)
-            .toString()
-            .padLeft(2, '0');
-
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => Navigator.of(context).push(
-            AppPageRoute(
-              builder: (_) => ProductDetailsScreen(
-                product: product,
-                heroTag: 'flash-${product.id}',
-              ),
-            ),
-          ),
-          child: Container(
-            width: 180,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(ext.cardRadius),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Countdown timer
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s12,
-                    AppSpacing.s8,
-                    AppSpacing.s12,
-                    AppSpacing.s4,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.timer, size: 14, color: AppColors.danger),
-                      const SizedBox(width: AppSpacing.s4),
-                      Text(
-                        '$hours:$minutes:$seconds',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppColors.danger,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Discount badge
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s12,
-                    0,
-                    AppSpacing.s12,
-                    AppSpacing.s8,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.s8,
-                      AppSpacing.s4,
-                      AppSpacing.s8,
-                      AppSpacing.s4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppSpacing.s8),
-                    ),
-                    child: Text(
-                      '-$discountPct%',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppColors.danger,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                // Product image
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.s12,
-                      0,
-                      AppSpacing.s12,
-                      AppSpacing.s8,
-                    ),
-                    child: ProductImage(product: product),
-                  ),
-                ),
-                // Product name
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s12,
-                    0,
-                    AppSpacing.s12,
-                    AppSpacing.s4,
-                  ),
-                  child: Text(
-                    product.name,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                // Price row
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s12,
-                    0,
-                    AppSpacing.s12,
-                    AppSpacing.s4,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        formatPeso(product.price),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.s8),
-                      Text(
-                        formatPeso(originalPrice),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppColors.textSecondary,
-                          decoration: TextDecoration.lineThrough,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Sold progress bar
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s12,
-                    0,
-                    AppSpacing.s12,
-                    AppSpacing.s12,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${product.soldCount} sold',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            '${(soldProgress * 100).round()}%',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.s4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppSpacing.s4),
-                        child: LinearProgressIndicator(
-                          value: soldProgress,
-                          minHeight: AppSpacing.s8,
-                          backgroundColor: AppColors.divider,
-                          valueColor: AlwaysStoppedAnimation(
-                            AppColors.tertiary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// A horizontally scrollable strip of active vouchers displayed on Home.
+/// A compact route to the existing voucher list.
 class _VoucherStrip extends StatelessWidget {
   const _VoucherStrip();
 
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
-    final theme = Theme.of(context);
-    final ext = theme.extension<AppThemeExtension>()!;
     final vouchers = context.watch<CartState>().vouchers;
 
     if (vouchers.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: 128,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-        scrollDirection: Axis.horizontal,
-        itemCount: vouchers.length,
-        separatorBuilder: (_, i) => const SizedBox(width: AppSpacing.s12),
-        itemBuilder: (context, i) {
-          final voucher = vouchers[i];
-          return Container(
-            width: 220,
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(ext.cardRadius),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        voucher.title.isNotEmpty ? voucher.title : voucher.code,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.s8),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.s8,
-                        AppSpacing.s4,
-                        AppSpacing.s8,
-                        AppSpacing.s4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.tertiary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppSpacing.s8),
-                      ),
-                      child: Text(
-                        voucher.discountLabel,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppColors.tertiary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                Text(
-                  'Min spend ${formatPeso(voucher.minSpend)}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                Text(
-                  voucher.expiryLabel,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: ListTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: AppColors.divider),
+        ),
+        leading: const Icon(Icons.local_offer_outlined),
+        title: const Text('Browse vouchers'),
+        trailing: const Icon(Icons.arrow_forward, size: 18),
+        onTap: () => Navigator.of(
+          context,
+        ).push(AppPageRoute(builder: (_) => const VouchersScreen())),
       ),
     );
   }

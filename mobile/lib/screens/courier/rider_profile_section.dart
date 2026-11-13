@@ -40,7 +40,9 @@ class RiderProfileSection extends StatelessWidget {
 
     if (courier.hasServerRecords && courier.coverage == null) {
       // Read once, after this frame; the rows appear when it answers.
-      WidgetsBinding.instance.addPostFrameCallback((_) => courier.refreshCoverageOnce());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => courier.refreshCoverageOnce(),
+      );
     }
 
     return Column(
@@ -54,16 +56,33 @@ class RiderProfileSection extends StatelessWidget {
             color: AppColors.surface, // Opaque surface token behind data rows
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.divider),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
           child: Column(
             children: [
+              _row(
+                context,
+                label: 'Verification',
+                value: auth.riderReverificationRequired
+                    ? 'For re-verification'
+                    : status,
+                valueColor: courier.isSuspended
+                    ? AppColors.danger
+                    : auth.riderReverificationRequired
+                    ? AppColors.warning
+                    : AppColors.successText,
+              ),
+              Divider(height: 1, color: AppColors.divider),
+              _row(
+                context,
+                label: 'Availability',
+                value:
+                    courier.isOnline &&
+                        !courier.isWindingDown &&
+                        !courier.isSuspended
+                    ? 'Online'
+                    : 'Offline',
+              ),
+              Divider(height: 1, color: AppColors.divider),
               _row(
                 context,
                 label: 'Company',
@@ -74,11 +93,19 @@ class RiderProfileSection extends StatelessWidget {
               // (GET /api/rider/profile). Read-only; Logistics assigns them.
               if (courier.coverage?.stationLabel != null) ...[
                 Divider(height: 1, thickness: 1, color: AppColors.divider),
-                _row(context, label: 'Station', value: courier.coverage!.stationLabel),
+                _row(
+                  context,
+                  label: 'Station hub',
+                  value: courier.coverage!.stationLabel,
+                ),
               ],
               if (courier.coverage?.areaLabel != null) ...[
                 Divider(height: 1, thickness: 1, color: AppColors.divider),
-                _row(context, label: 'Coverage', value: courier.coverage!.areaLabel),
+                _row(
+                  context,
+                  label: 'Coverage',
+                  value: courier.coverage!.areaLabel,
+                ),
               ],
               Divider(height: 1, thickness: 1, color: AppColors.divider),
               _row(
@@ -107,19 +134,6 @@ class RiderProfileSection extends StatelessWidget {
                 label: 'Licence expiry',
                 value: _date(auth.riderLicenseExpiry),
                 emptyPrompt: 'Add licence expiry',
-              ),
-              Divider(height: 1, thickness: 1, color: AppColors.divider),
-              _row(
-                context,
-                label: 'Verification',
-                value: auth.riderReverificationRequired
-                    ? 'For re-verification'
-                    : status,
-                valueColor: courier.isSuspended
-                    ? AppColors.danger
-                    : auth.riderReverificationRequired
-                    ? AppColors.warning
-                    : AppColors.tertiary,
               ),
             ],
           ),
@@ -160,9 +174,9 @@ class RiderProfileSection extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton.icon(
             key: const ValueKey('rider-edit-vehicle'),
-            onPressed: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => const RiderVehicleScreen()),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(AppPageRoute(builder: (_) => const RiderVehicleScreen())),
             icon: const Icon(Icons.two_wheeler_outlined, size: 18),
             label: const Text('Edit Vehicle & Documents'),
           ),
@@ -222,9 +236,9 @@ class RiderProfileSection extends StatelessWidget {
         button: true,
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.of(context).push(
-            AppPageRoute(builder: (_) => const RiderVehicleScreen()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(AppPageRoute(builder: (_) => const RiderVehicleScreen())),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: rowWidget,

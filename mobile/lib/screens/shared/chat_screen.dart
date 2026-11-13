@@ -35,14 +35,17 @@
 //      ambiguity point 3 exists to fix, so reduced motion shouldn't
 //      silently bring it back for anyone with the setting on.
 
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../state/chat_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/chat_validation.dart';
 import '../../utils/image_picker_helper.dart';
 import '../../utils/motion.dart';
-import '../../utils/timed_snackbar.dart';
 import '../../widgets/pressable_scale.dart';
 
 /// Wide corners vs the short "anchor" corner nearest the speaker.
@@ -58,10 +61,16 @@ class ChatScreen extends StatefulWidget {
     required this.contactName,
     required this.contactRole,
     this.attachmentPicker,
+    this.conversationId,
+    this.sellerId,
+    this.productId,
   });
 
   final String contactName;
   final String contactRole;
+  final int? conversationId;
+  final int? sellerId;
+  final int? productId;
 
   /// Test seam. Production uses the gallery/camera sheet; a test can return an
   /// oversized or unsupported file without touching a platform channel.
@@ -78,8 +87,18 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hasText = false;
   ChatAttachment? _pendingAttachment;
   bool _isPickingAttachment = false;
+  String? _composerError;
+  List<ChatMessage> _liveMessages = [];
+  int? _conversationId;
+  bool _loading = false;
+  bool _loadFailed = false;
+  bool _sending = false;
 
-  bool get _canSend => _hasText || _pendingAttachment != null;
+  bool get _live => widget.conversationId != null || widget.sellerId != null;
+  bool get _canSend =>
+      !_sending &&
+      (!_live || (!_loading && !_loadFailed && _conversationId != null)) &&
+      (_hasText || _pendingAttachment != null);
 
   @override
   void initState() {
@@ -92,6 +111,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // opened — no-op if there's already history (incl. from a
     // previous session, since ChatState is persisted).
     final chat = context.read<ChatState>();
+    if (_live) {
+      _conversationId = widget.conversationId;
+      _loadLiveMessages();
+      return;
+    }
     chat.registerContact(widget.contactName, widget.contactRole);
     chat.seedIfEmpty(
       widget.contactName,
@@ -103,6 +127,30 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Future<void> _loadLiveMessages() async {
+    if (_loading || _sending) return;
+    final repository = context.read<ChatState>().liveRepository!;
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final id = _conversationId ??= await repository.openBuyerConversation(
+        widget.sellerId!,
+        widget.productId!,
+      );
+      if (!mounted) return;
+      final messages = await repository.buyerMessages(id);
+      if (!mounted) return;
+      setState(() => _liveMessages = messages);
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) setState(() => _loadFailed = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -111,6 +159,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<ChatAttachment?> _pickWithPicker() async {
+    if (_live && kIsWeb) {
+      final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (image == null) return null;
+      return ChatAttachment(
+        name: image.name,
+        sizeBytes: await image.length(),
+        path: image.path,
+      );
+    }
     final picked = await pickAndSaveImage(context, filenamePrefix: 'chat');
     if (picked == null) return null;
     return ChatAttachment(
@@ -121,14 +178,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _pickAttachment() async {
-    if (_isPickingAttachment) return;
-    if (!context.read<ChatState>().supportsAttachments) {
-      showTimedSnackBar(
-        context,
-        const SnackBar(
-          content: Text('Attachments are not available on this server yet.'),
-        ),
-      );
+    if (_isPickingAttachment || _sending) return;
+    if (!_live && !context.read<ChatState>().supportsAttachments) {
+      setState(() {
+        _composerError = 'Attachments are not available on this server yet.';
+      });
       return;
     }
 
@@ -137,39 +191,81 @@ class _ChatScreenState extends State<ChatScreen> {
       final picked =
           await (widget.attachmentPicker?.call(context) ?? _pickWithPicker());
       if (!mounted || picked == null) return;
-      final problem = validateChatAttachment(picked);
-      if (problem != null) {
-        showTimedSnackBar(
-          context,
-          SnackBar(content: Text(chatAttachmentProblemMessage(problem))),
-        );
+      if (_live &&
+          !RegExp(
+            r'\.(jpe?g|png)$',
+            caseSensitive: false,
+          ).hasMatch(picked.name)) {
+        setState(() => _composerError = 'Photos must be JPG or PNG files.');
         return;
       }
-      setState(() => _pendingAttachment = picked);
+      final problem = validateChatAttachment(picked);
+      if (problem != null) {
+        setState(() => _composerError = chatAttachmentProblemMessage(problem));
+        return;
+      }
+      setState(() {
+        _pendingAttachment = picked;
+        _composerError = null;
+      });
     } catch (_) {
       if (!mounted) return;
-      showTimedSnackBar(
-        context,
-        const SnackBar(content: Text('Could not open that file.')),
-      );
+      setState(() => _composerError = 'Could not open that file.');
     } finally {
       if (mounted) setState(() => _isPickingAttachment = false);
     }
   }
 
-  void _send() {
+  Future<void> _send() async {
+    if (_live && !_canSend) return;
     final text = _controller.text;
     final problem = validateChatMessage(
       text,
       hasAttachment: _pendingAttachment != null,
     );
     if (problem != null) {
-      showTimedSnackBar(context, SnackBar(content: Text(problem)));
+      setState(() => _composerError = problem);
       return;
     }
 
     final chat = context.read<ChatState>();
     final attachment = _pendingAttachment;
+    if (_live) {
+      setState(() {
+        _sending = true;
+        _composerError = null;
+      });
+      try {
+        final bytes = attachment == null
+            ? null
+            : await XFile(attachment.path!).readAsBytes();
+        if (!mounted) return;
+        final sent = await chat.liveRepository!.sendBuyerMessage(
+          _conversationId!,
+          text.trim(),
+          image: bytes == null
+              ? null
+              : (bytes: bytes, filename: attachment!.name),
+        );
+        if (!mounted) return;
+        setState(() {
+          _liveMessages.add(sent);
+          _pendingAttachment = null;
+        });
+        if (_controller.text == text) _controller.clear();
+        _scrollToBottom();
+      } catch (_) {
+        if (mounted) {
+          setState(
+            () => _composerError =
+                'Could not confirm that the message was sent. Refresh the conversation before retrying.',
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _sending = false);
+      }
+      return;
+    }
     chat.addMessage(
       widget.contactName,
       ChatMessage(
@@ -180,7 +276,10 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
     _controller.clear();
-    setState(() => _pendingAttachment = null);
+    setState(() {
+      _pendingAttachment = null;
+      _composerError = null;
+    });
     _scrollToBottom();
 
     // A live thread gets the other side's messages from the server; only the
@@ -238,11 +337,13 @@ class _ChatScreenState extends State<ChatScreen> {
     AppColors.watch(context);
     final theme = Theme.of(context);
     final chat = context.watch<ChatState>();
-    final messages = chat.messagesFor(widget.contactName);
+    final messages = _live
+        ? _liveMessages
+        : chat.messagesFor(widget.contactName);
     // A thread on screen is read. The greeting is seeded asynchronously after
     // initState, and a simulated reply arrives while the thread is open, so
     // this checks every build rather than only on open.
-    if (chat.unreadFor(widget.contactName) > 0) {
+    if (!_live && chat.unreadFor(widget.contactName) > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.read<ChatState>().markRead(widget.contactName);
       });
@@ -313,24 +414,37 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Call ${widget.contactName}',
-            onPressed: () {
-              // clearSnackBars() first — this icon has no cooldown, so
-              // mashing it queued a fresh 4s "Calling..." behind each
-              // previous one instead of just restarting the one shown.
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(
-                  SnackBar(content: Text('Calling ${widget.contactName}...')),
-                );
-            },
-            icon: const Icon(Icons.call_outlined),
-          ),
+          if (_live)
+            IconButton(
+              tooltip: 'Refresh messages',
+              onPressed: _loading || _sending ? null : _loadLiveMessages,
+              icon: const Icon(Icons.refresh),
+            )
+          else
+            IconButton(
+              tooltip: 'Call ${widget.contactName}',
+              onPressed: () {
+                // clearSnackBars() first — this icon has no cooldown, so
+                // mashing it queued a fresh 4s "Calling..." behind each
+                // previous one instead of just restarting the one shown.
+                ScaffoldMessenger.of(context)
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    SnackBar(content: Text('Calling ${widget.contactName}...')),
+                  );
+              },
+              icon: const Icon(Icons.call_outlined),
+            ),
         ],
       ),
       body: Column(
         children: [
+          if (_loading || _sending) const LinearProgressIndicator(),
+          if (_loadFailed)
+            TextButton(
+              onPressed: _loadLiveMessages,
+              child: const Text('Could not load conversation. Retry'),
+            ),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -352,10 +466,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   theme: theme,
                   message: message,
                   isRunEnd: isRunEnd,
+                  image: message.imageId == null
+                      ? null
+                      : _BuyerMessageImage(
+                          key: ValueKey(message.imageId),
+                          conversationId: _conversationId!,
+                          messageId: message.imageId!,
+                        ),
                 );
               },
             ),
           ),
+          if (_composerError case final error?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  error,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ),
           _buildInputBar(theme),
         ],
       ),
@@ -482,16 +616,53 @@ class _ChatScreenState extends State<ChatScreen> {
 
 /// One message. The short corner is always on the speaker's side, so
 /// the silhouette alone says who's talking.
+class _BuyerMessageImage extends StatefulWidget {
+  const _BuyerMessageImage({
+    super.key,
+    required this.conversationId,
+    required this.messageId,
+  });
+
+  final int conversationId;
+  final int messageId;
+
+  @override
+  State<_BuyerMessageImage> createState() => _BuyerMessageImageState();
+}
+
+class _BuyerMessageImageState extends State<_BuyerMessageImage> {
+  late final Future<Uint8List> _bytes = context
+      .read<ChatState>()
+      .liveRepository!
+      .buyerMessageImage(widget.conversationId, widget.messageId);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: _bytes,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) return const Text('Photo unavailable');
+      if (!snapshot.hasData) return const LinearProgressIndicator();
+      return Image.memory(
+        snapshot.requireData,
+        semanticLabel: 'Message photo',
+        errorBuilder: (_, _, _) => const Text('Photo unavailable'),
+      );
+    },
+  );
+}
+
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.theme,
     required this.message,
     required this.isRunEnd,
+    this.image,
   });
 
   final ThemeData theme;
   final ChatMessage message;
   final bool isRunEnd;
+  final Widget? image;
 
   @override
   Widget build(BuildContext context) {
@@ -528,6 +699,7 @@ class _Bubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (image != null) image!,
                 if (message.attachment != null) ...[
                   Row(
                     mainAxisSize: MainAxisSize.min,

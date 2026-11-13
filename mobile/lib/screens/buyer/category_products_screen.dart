@@ -69,7 +69,12 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           Container(
             decoration: BoxDecoration(
               color: AppColors.surface,
-              border: Border(bottom: BorderSide(color: AppColors.ruleOnGround(hue), width: 3)),
+              border: Border(
+                bottom: BorderSide(
+                  color: AppColors.ruleOnGround(hue),
+                  width: 3,
+                ),
+              ),
             ),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: Row(
@@ -127,12 +132,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                   )
                 : GridView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.68,
-                    ),
+                    gridDelegate: ProductCard.gridDelegate(context),
                     itemCount: products.length,
                     itemBuilder: (context, i) {
                       final product = products[i];

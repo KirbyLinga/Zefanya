@@ -123,6 +123,55 @@ void main() {
     },
   );
 
+  for (final code in [409, 504]) {
+    testWidgets('trip action $code blocks repeat until state is reconciled', (
+      tester,
+    ) async {
+      var actionCount = 0;
+      var tripReads = 0;
+      final client = ApiClient(
+        baseUrl: 'https://example.test/api',
+        tokenStore: InMemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          if (request.url.path.endsWith('/accept')) {
+            actionCount++;
+            return http.Response('{"message":"Check the current trip."}', code);
+          }
+          if (request.url.path.endsWith('/trips')) {
+            tripReads++;
+            if (tripReads == 2) {
+              return http.Response('{"message":"Offline"}', 503);
+            }
+            return answer([trip(tripReads == 1 ? 'Assigned' : 'Loading')]);
+          }
+          return answer(<String, Object?>{});
+        }),
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<Repositories>.value(value: Repositories.live(client)),
+            ChangeNotifierProvider(create: (_) => AuthState()),
+          ],
+          child: const MaterialApp(home: LinehaulPortal()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Accept trip'));
+      await tester.tap(find.text('Accept trip'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your trips could not be loaded'), findsOneWidget);
+      expect(find.text('Accept trip'), findsNothing);
+      expect(actionCount, 1);
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(find.text('Loading'), findsOneWidget);
+      expect(actionCount, 1);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+    });
+  }
+
   testWidgets(
     'server refusal keeps trip Loading on a small screen with large text',
     (tester) async {
@@ -135,7 +184,9 @@ void main() {
         baseUrl: 'https://example.test/api',
         tokenStore: InMemoryTokenStore(),
         httpClient: MockClient((request) async {
-          if (request.method == 'GET') return answer([trip(status)]);
+          if (request.method == 'GET') {
+            return answer([trip(status, loaded: status == 'Loading')]);
+          }
           if (request.url.path.endsWith('/accept')) {
             status = 'Loading';
             return answer(trip(status));
@@ -165,6 +216,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.text('Accept trip').hitTestable(), findsOneWidget);
       await tester.ensureVisible(find.text('Accept trip'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Accept trip'));
@@ -174,10 +226,20 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Depart'));
       await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'invalid');
+      await tester.tap(find.widgetWithText(FilledButton, 'Depart').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Enter BH- followed by seven digits.'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'BH-0004521');
       await tester.tap(find.widgetWithText(FilledButton, 'Depart').last);
       await tester.pumpAndSettle();
       expect(find.text('Scan every parcel before departure.'), findsOneWidget);
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'BH-0004521',
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
       expect(find.text('Loading'), findsOneWidget);
       expect(find.text('In Transit'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -252,13 +314,27 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('History'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Parcel details'));
+      final outcome = find.text('Received with Issues');
+      await Scrollable.ensureVisible(tester.element(outcome), alignment: .45);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Parcel details'));
+      expect(outcome.hitTestable(), findsOneWidget);
+      await tester.tap(outcome.hitTestable());
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Parcel details').hitTestable(),
+        110,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Parcel details').hitTestable());
       await tester.pumpAndSettle();
       expect(find.text('Missing at handover · reported'), findsOneWidget);
       expect(find.text('Received damaged · reported'), findsOneWidget);
-      await tester.ensureVisible(find.text('Add handover note'));
+      await tester.scrollUntilVisible(
+        find.text('Add handover note').hitTestable(),
+        110,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add handover note'));
       await tester.pumpAndSettle();

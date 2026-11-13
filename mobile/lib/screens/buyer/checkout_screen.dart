@@ -10,6 +10,8 @@ import '../../config/dev_flags.dart' show kUseLiveApi;
 import '../../config/pricing.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart' show Order, Voucher, VoucherScope;
+import '../../data/repositories/order_repository.dart'
+    show CheckoutOutcomeUnknown, CheckoutReview;
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
 import '../../state/courier_state.dart';
@@ -19,9 +21,12 @@ import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
 import 'address_book_screen.dart';
 import 'courier_tracker_screen.dart';
+import 'orders_status_screen.dart';
 import 'widgets/order_confirmation_dialog.dart';
+import 'widgets/shop_voucher_picker.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
+import '../../widgets/inline_error_notice.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../../widgets/zefanya_mark.dart';
@@ -30,12 +35,13 @@ import '../../widgets/editorial_shapes.dart';
 enum PaymentMethod { cod, eWallet }
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key, this.checkoutItems});
+  const CheckoutScreen({super.key, this.checkoutItems, this.voucherCode});
 
   /// Buy Now's isolated line(s). When non-null, checkout reads these
   /// instead of the cart's selected lines and does not clear the cart
   /// afterwards — the cart was never part of this purchase.
   final List<CartItem>? checkoutItems;
+  final String? voucherCode;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -45,6 +51,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentMethod _selectedMethod = PaymentMethod.cod;
 
   final _notesController = TextEditingController();
+  final _voucherController = TextEditingController();
+  List<String> _serverVoucherCodes = const [];
+  bool _checkingVoucher = false;
+  String? _voucherError;
+  (String, int)? _voucherQuote;
   static const int _notesMaxLength = 200;
 
   final _addressKey = GlobalKey();
@@ -58,6 +69,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _termsError;
   bool _agreedToTerms = false;
   bool _isPlacingOrder = false;
+  bool _outcomeUnknown = false;
+  bool _checkingPending = false;
 
   /// Collapses the per-line breakdown to one total row, expanded on
   /// tap. Starts collapsed: the total is what a checkout screen is
@@ -65,15 +78,91 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _summaryExpanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    final orders = context.read<OrderState?>();
+    if (orders?.usesServerCheckoutAddress == true) {
+      _checkingPending = true;
+      _restorePendingCheckout(orders!);
+    }
+    final code = widget.voucherCode;
+    if (code == null) return;
+    _voucherController.text = code;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final items =
+          widget.checkoutItems ?? context.read<CartState>().selectedItems;
+      if (items.isNotEmpty) _reviewVoucherCodes(items, [code]);
+    });
+  }
+
+  Future<void> _restorePendingCheckout(OrderState orders) async {
+    var pending = true;
+    try {
+      pending = await orders.hasPendingCheckout();
+    } catch (_) {
+      // A failed storage read cannot establish that a new checkout is safe.
+    }
+    if (mounted) {
+      setState(() {
+        _outcomeUnknown = pending;
+        _checkingPending = false;
+      });
+    }
+  }
+
+  Future<void> _reconcileCheckout(List<CartItem> items) async {
+    if (_checkingPending) return;
+    final orders = context.read<OrderState>();
+    final cart = context.read<CartState>();
+    setState(() => _checkingPending = true);
+    final result = await orders.reconcileCheckout();
+    if (!mounted) return;
+    setState(() {
+      _checkingPending = false;
+      _outcomeUnknown = result.status == 'unknown';
+    });
+    if (result.status == 'placed') {
+      if (widget.checkoutItems == null &&
+          orders.checkoutIdentity(items) == result.identity &&
+          orders.checkoutIdentity(cart.selectedItems) == result.identity) {
+        cart.clearSelected();
+      }
+      orders.refresh().ignore();
+      _openOrders(Navigator.of(context), orders);
+    } else {
+      showTimedSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            result.status == 'rejected'
+                ? 'The previous checkout was closed without placing an order. You can try again.'
+                : 'The previous checkout is still unconfirmed. Check again before placing another order.',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _notesController.dispose();
+    _voucherController.dispose();
     super.dispose();
   }
 
   Future<void> _placeOrder(List<CartItem> selectedItems, double total) async {
+    if (_isPlacingOrder ||
+        _checkingVoucher ||
+        _outcomeUnknown ||
+        _checkingPending) {
+      return;
+    }
     final auth = context.read<AuthState>();
+    final orderState = context.read<OrderState>();
     final deliveryAddress = auth.defaultAddress?.summary ?? auth.addressSummary;
-    final hasNoAddress = deliveryAddress.isEmpty;
+    final hasNoAddress =
+        !orderState.usesServerCheckoutAddress && deliveryAddress.isEmpty;
     final hasNoItems = selectedItems.isEmpty;
     final noteTooLong = _notesController.text.length > _notesMaxLength;
     final termsNotAccepted = !_agreedToTerms;
@@ -82,7 +171,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // server still re-checks this (it owns usage limits and the clock); this
     // local check stops an obviously dead code from being sent.
     final cart = context.read<CartState>();
-    final appliedVouchers = widget.checkoutItems == null
+    final appliedVouchers =
+        !orderState.usesServerCheckoutAddress && widget.checkoutItems == null
         ? cart.appliedVouchers
         : const <Voucher>[];
     String? voucherProblem;
@@ -187,11 +277,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Live mode: WebZefanya prices the order (items, shipping per shop,
     // vouchers). Show the buyer the server's total and place only that.
-    final orderState = context.read<OrderState>();
-    final voucherCodes = kUseLiveApi ? cart.appliedVoucherCodes : const <String>[];
+    final voucherCodes = kUseLiveApi ? _serverVoucherCodes : const <String>[];
     double? serverTotal;
+    CheckoutReview? serverReview;
     try {
-      serverTotal = await orderState.quoteTotal(selectedItems, voucherCodes: voucherCodes);
+      if (orderState.usesServerCheckoutAddress) {
+        serverReview = await orderState.reviewServerCheckout(
+          selectedItems,
+          voucherCodes: voucherCodes,
+        );
+        serverTotal = serverReview?.total;
+      } else {
+        serverTotal = await orderState.quoteTotal(
+          selectedItems,
+          voucherCodes: voucherCodes,
+        );
+      }
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _isPlacingOrder = false);
@@ -201,22 +302,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!mounted) return;
     if (serverTotal != null) {
       final confirmedTotal = serverTotal;
+      final reviewedAddress = serverReview?.address;
+      var decided = false;
+      void finishReview(BuildContext dialogContext, bool proceed) {
+        if (decided) return;
+        decided = true;
+        Navigator.of(dialogContext).pop(proceed);
+      }
+
       final proceed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
+          scrollable: reviewedAddress != null,
           title: const Text('Confirm your order'),
           content: Text(
             'Total to pay on delivery: ${formatPeso(confirmedTotal)}\n'
-            'This includes shipping and any vouchers, as calculated by the store.',
+            'This includes shipping and any vouchers, as calculated by the store.'
+            '${reviewedAddress == null ? '' : '\n\nDeliver to: $reviewedAddress'}',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
+              onPressed: () => finishReview(dialogContext, false),
               child: const Text('Cancel'),
             ),
             FilledButton(
               key: const ValueKey('confirm-server-total'),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
+              onPressed: () => finishReview(dialogContext, true),
               child: const Text('Place order'),
             ),
           ],
@@ -242,7 +353,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         selectedItems,
         voucherCodes: voucherCodes,
         expectedTotal: serverTotal,
+        expectedAddressFingerprint: serverReview?.addressFingerprint,
       );
+    } on CheckoutOutcomeUnknown {
+      if (!mounted) return;
+      setState(() {
+        _isPlacingOrder = false;
+        _outcomeUnknown = true;
+      });
+      return;
     } on ApiException catch (error) {
       // The cart is deliberately NOT cleared on failure — a checkout that
       // emptied the cart and then failed to place the order would be the worst
@@ -293,7 +412,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     // Record the just-used address for the one-tap shortcut next
     // time — before clearing the cart, while the summary still reads.
-    auth.recordRecentAddress(deliveryAddress);
+    auth.recordRecentAddress(serverReview?.address ?? deliveryAddress);
 
     if (widget.checkoutItems == null) {
       // Record usage before removing the lines: the counters are per buyer and
@@ -304,8 +423,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     if (!mounted) return;
     setState(() => _isPlacingOrder = false);
-
-    if (!mounted) return;
 
     // Guaranteed non-empty above (an empty selection returns before this), but
     // the confirmation's primary action dereferences the first order, so it's
@@ -325,7 +442,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       barrierDismissible: false,
       builder: (_) => OrderConfirmationDialog(
         orders: placed,
-        total: total,
+        total: serverTotal ?? total,
+        payOnDelivery: _selectedMethod == PaymentMethod.cod,
+        onViewOrders: () {
+          _openOrders(navigator, orderState);
+        },
         // Opens the same tracker the Orders tab pushes, for the order this
         // checkout just created. Push *after* unwinding, so the buyer ends on
         // [root, tracker] rather than a tracker buried under checkout.
@@ -346,6 +467,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  void _openOrders(NavigatorState navigator, OrderState orders) {
+    navigator.popUntil((route) => route.isFirst);
+    if (kUseLiveApi) {
+      orders.requestOrdersTab();
+    } else {
+      navigator.push(AppPageRoute(builder: (_) => const OrdersStatusScreen()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -354,6 +484,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final selectedItems =
         widget.checkoutItems ??
         cart.items.where((i) => i.selected && i.isAvailable).toList();
+    final serverCheckout =
+        kUseLiveApi && context.read<OrderState>().usesServerCheckoutAddress;
+    final preview = _voucherQuote;
+    final reviewedTotal =
+        preview != null && preview.$1 == _voucherSelection(selectedItems)
+        ? preview.$2 / 100
+        : null;
     final quote = quoteCart(
       selectedItems,
       // In live mode the server owns totals: don't apply local vouchers.
@@ -363,59 +500,192 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       buyerUsesFor: (voucher) => cart.buyerUsesFor(voucher.code),
     );
 
-    return Scaffold(
-      backgroundColor: Colors
-          .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
-      appBar: AppBar(),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, 120),
-        children: [
-          const EditorialHeader(
-            eyebrow: 'ALMOST THERE',
-            title: 'Checkout',
-            padding: EdgeInsets.fromLTRB(0, AppSpacing.s12, 0, AppSpacing.s16),
+    return PopScope(
+      canPop: !_isPlacingOrder,
+      child: Scaffold(
+        backgroundColor: Colors
+            .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+        appBar: AppBar(automaticallyImplyLeading: !_isPlacingOrder),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s20,
+            0,
+            AppSpacing.s20,
+            120,
           ),
-          StaggeredReveal(
-            index: 0,
-            child: KeyedSubtree(
-              key: _addressKey,
-              child: _buildAddressSection(context, theme, ext),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s20),
-          StaggeredReveal(
-            index: 1,
-            child: KeyedSubtree(
-              key: _itemsKey,
-              child: _buildOrderSummarySection(
-                theme,
-                ext,
-                selectedItems,
-                quote,
+          children: [
+            const EditorialHeader(
+              eyebrow: 'ALMOST THERE',
+              title: 'Checkout',
+              padding: EdgeInsets.fromLTRB(
+                0,
+                AppSpacing.s12,
+                0,
+                AppSpacing.s16,
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s20),
-          StaggeredReveal(
-            index: 2,
-            child: KeyedSubtree(
-              key: _noteKey,
-              child: _buildNotesSection(theme, ext),
+            StaggeredReveal(
+              index: 0,
+              child: KeyedSubtree(
+                key: _addressKey,
+                child: _buildAddressSection(context, theme, ext),
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s20),
-          StaggeredReveal(index: 3, child: _buildPaymentSection(theme, ext)),
-          const SizedBox(height: AppSpacing.s16),
-          StaggeredReveal(
-            index: 4,
-            child: KeyedSubtree(
-              key: _termsKey,
-              child: _buildTermsCheckbox(theme),
+            const SizedBox(height: AppSpacing.s20),
+            StaggeredReveal(
+              index: 1,
+              child: KeyedSubtree(
+                key: _itemsKey,
+                child: _buildOrderSummarySection(
+                  theme,
+                  ext,
+                  selectedItems,
+                  quote,
+                  serverCheckout: serverCheckout,
+                  reviewedTotal: reviewedTotal,
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.s20),
+            if (serverCheckout && selectedItems.isNotEmpty) ...[
+              _buildServerVouchers(selectedItems),
+              const SizedBox(height: AppSpacing.s20),
+            ],
+            StaggeredReveal(
+              index: 2,
+              child: KeyedSubtree(
+                key: _noteKey,
+                child: _buildNotesSection(theme, ext),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s20),
+            StaggeredReveal(index: 3, child: _buildPaymentSection(theme, ext)),
+            const SizedBox(height: AppSpacing.s16),
+            StaggeredReveal(
+              index: 4,
+              child: KeyedSubtree(
+                key: _termsKey,
+                child: _buildTermsCheckbox(theme),
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomBar(
+          theme,
+          selectedItems,
+          reviewedTotal ?? (serverCheckout ? quote.merchandise : quote.total),
+          totalLabel: reviewedTotal != null
+              ? 'Store preview'
+              : serverCheckout
+              ? 'Items subtotal'
+              : 'Total Payment',
+        ),
       ),
-      bottomNavigationBar: _buildBottomBar(theme, selectedItems, quote.total),
+    );
+  }
+
+  String _voucherSelection(List<CartItem> items) => items
+      .map((item) => '${item.product.id}:${item.variant}:${item.quantity}')
+      .join('|');
+
+  Future<void> _reviewVoucherCodes(
+    List<CartItem> items,
+    List<String> codes,
+  ) async {
+    if (_checkingVoucher || _isPlacingOrder || _outcomeUnknown) return;
+    final selection = _voucherSelection(items);
+    setState(() {
+      _checkingVoucher = true;
+      _voucherError = null;
+    });
+    try {
+      final payable = await context.read<OrderState>().reviewServerVouchers(
+        items,
+        codes,
+      );
+      if (!mounted) return;
+      setState(() {
+        _serverVoucherCodes = List.unmodifiable(codes);
+        _voucherQuote = (selection, payable);
+        _voucherController.clear();
+      });
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _voucherError = error.message);
+    } finally {
+      if (mounted) setState(() => _checkingVoucher = false);
+    }
+  }
+
+  Widget _buildServerVouchers(List<CartItem> items) {
+    final enabled = !_isPlacingOrder && !_checkingVoucher && !_outcomeUnknown;
+    final preview = _voucherQuote;
+    void apply() {
+      final code = _voucherController.text.trim().toUpperCase();
+      if (!RegExp(r'^[A-Z0-9]{4,12}$').hasMatch(code)) {
+        setState(
+          () => _voucherError =
+              'Enter a voucher code with 4–12 letters or numbers.',
+        );
+        return;
+      }
+      if (_serverVoucherCodes.contains(code)) return;
+      _reviewVoucherCodes(items, [..._serverVoucherCodes, code]);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _voucherController,
+          enabled: enabled,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(labelText: 'Voucher code'),
+          onSubmitted: enabled ? (_) => apply() : null,
+        ),
+        OutlinedButton(
+          onPressed: enabled ? apply : null,
+          child: const Text('Apply voucher'),
+        ),
+        if (items.any((item) => item.product.sellerId != null))
+          TextButton(
+            onPressed: enabled
+                ? () async {
+                    final code = await pickShopVoucher(context, items);
+                    if (!mounted || code == null) return;
+                    _voucherController.text = code;
+                    apply();
+                  }
+                : null,
+            child: const Text('Browse shop vouchers'),
+          ),
+        if (_checkingVoucher)
+          const LinearProgressIndicator(semanticsLabel: 'Checking voucher'),
+        if (_voucherError case final error?) InlineErrorNotice(error),
+        if (_serverVoucherCodes.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final code in _serverVoucherCodes)
+                InputChip(
+                  label: Text(code),
+                  onDeleted: enabled
+                      ? () {
+                          final codes = _serverVoucherCodes
+                              .where((value) => value != code)
+                              .toList();
+                          setState(() {
+                            _serverVoucherCodes = codes;
+                            _voucherQuote = null;
+                            _voucherError = null;
+                          });
+                        }
+                      : null,
+                ),
+            ],
+          ),
+        if (preview != null && preview.$1 == _voucherSelection(items))
+          Text('Store preview: ${formatPeso(preview.$2 / 100)}'),
+      ],
     );
   }
 
@@ -520,6 +790,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ThemeData theme,
     AppThemeExtension ext,
   ) {
+    if (context.watch<OrderState>().usesServerCheckoutAddress) {
+      return _sectionCard(
+        ext,
+        accentColor: AppColors.primaryDark,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionHeader(
+              theme,
+              Icons.location_on_outlined,
+              'Delivery Address',
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            const Text(
+              'Review your account’s delivery address with the order total. '
+              'To change it, update your default address on Zefanya web.',
+            ),
+          ],
+        ),
+      );
+    }
     final auth = context.watch<AuthState>();
     final saved = auth.defaultAddress;
     final summary = saved?.summary ?? auth.addressSummary;
@@ -662,8 +953,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ThemeData theme,
     AppThemeExtension ext,
     List<CartItem> items,
-    CartQuote quote,
-  ) {
+    CartQuote quote, {
+    required bool serverCheckout,
+    required double? reviewedTotal,
+  }) {
+    final displayTotal =
+        reviewedTotal ?? (serverCheckout ? quote.merchandise : quote.total);
     // "Nothing selected" is the only item error that fixes itself when lines
     // appear. A stock or purchase-limit refusal must stay on screen: the lines
     // are still there, and clearing the sentence would hide why Place Order
@@ -681,24 +976,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _summaryHeader(theme, quote.total, cartProductCount(items)),
+          _summaryHeader(theme, displayTotal, cartProductCount(items)),
           if (hasError) ...[
             const SizedBox(height: AppSpacing.s8),
-            Row(
-              children: [
-                Icon(Icons.error_outline, size: 16, color: AppColors.danger),
-                const SizedBox(width: AppSpacing.s4),
-                Expanded(
-                  child: Text(
-                    _itemsError!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            InlineErrorNotice(_itemsError!),
           ],
           if (_summaryExpanded) ...[
             const SizedBox(height: AppSpacing.s8),
@@ -737,11 +1018,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _orderLine(
               theme,
               'Shipping fee',
-              quote.shipping == 0 ? 'Free' : formatPeso(quote.shipping),
-              valueColor: quote.shipping == 0 ? AppColors.successText : null,
+              serverCheckout
+                  ? 'Calculated by store'
+                  : quote.shipping == 0
+                  ? 'Free'
+                  : formatPeso(quote.shipping),
+              valueColor: !serverCheckout && quote.shipping == 0
+                  ? AppColors.successText
+                  : null,
             ),
             const Divider(height: 24),
-            _orderLine(theme, 'Total', formatPeso(quote.total), isBold: true),
+            if (!serverCheckout || reviewedTotal != null)
+              _orderLine(
+                theme,
+                'Total',
+                formatPeso(displayTotal),
+                isBold: true,
+              ),
           ],
         ],
       ),
@@ -973,7 +1266,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           if (hasError) ...[
             Padding(
-              padding: const EdgeInsets.only(left: AppSpacing.s12, bottom: AppSpacing.s4, top: AppSpacing.s4),
+              padding: const EdgeInsets.only(
+                left: AppSpacing.s12,
+                bottom: AppSpacing.s4,
+                top: AppSpacing.s4,
+              ),
               child: Row(
                 children: [
                   Icon(Icons.error_outline, size: 14, color: AppColors.danger),
@@ -999,10 +1296,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildBottomBar(
     ThemeData theme,
     List<CartItem> selectedItems,
-    double total,
-  ) {
+    double total, {
+    required String totalLabel,
+  }) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s12, AppSpacing.s20, AppSpacing.s16),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s12,
+        AppSpacing.s20,
+        AppSpacing.s16,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surface,
         boxShadow: [
@@ -1015,32 +1318,66 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: _outcomeUnknown
+            ? Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Total Payment', style: theme.textTheme.bodySmall),
-                  Text(formatPeso(total), style: AppType.priceNumeral(32)),
+                  const Text(
+                    'Order result unknown. Check the previous checkout before trying again.',
+                  ),
+                  FilledButton(
+                    onPressed: _checkingPending
+                        ? null
+                        : () => _reconcileCheckout(selectedItems),
+                    child: Text(
+                      _checkingPending ? 'Checking…' : 'Check checkout status',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _checkingPending
+                        ? null
+                        : () {
+                            final orders = context.read<OrderState>();
+                            orders.refresh().ignore();
+                            _openOrders(Navigator.of(context), orders);
+                          },
+                    child: const Text('Check Orders'),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(totalLabel, style: theme.textTheme.bodySmall),
+                        Text(
+                          formatPeso(total),
+                          style: AppType.priceNumeral(32),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed:
+                        _isPlacingOrder || _checkingVoucher || _checkingPending
+                        ? null
+                        : () => _placeOrder(selectedItems, total),
+                    child:
+                        _isPlacingOrder &&
+                            ModalRoute.isCurrentOf(context) == true
+                        ? ZefanyaLoader(
+                            size: 18,
+                            color: AppColors.textOnDark,
+                            strokeWidth: 4,
+                          )
+                        : const Text('Place Order'),
+                  ),
                 ],
               ),
-            ),
-            ElevatedButton(
-              onPressed: _isPlacingOrder
-                  ? null
-                  : () => _placeOrder(selectedItems, total),
-              child: _isPlacingOrder
-                  ? ZefanyaLoader(
-                      size: 18,
-                      color: AppColors.textOnDark,
-                      strokeWidth: 4,
-                    )
-                  : const Text('Place Order'),
-            ),
-          ],
-        ),
       ),
     );
   }

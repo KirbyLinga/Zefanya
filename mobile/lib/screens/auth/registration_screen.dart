@@ -58,7 +58,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../data/api/api_exception.dart';
 import '../../data/dto/registration_payload.dart';
 import '../../data/google_identity.dart';
 import '../../data/ph_address_catalog.dart';
@@ -277,7 +276,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (_riderServer == null) {
       try {
         final courier = context.read<Repositories>().courier;
-        if (courier is RiderServerData) _riderServer = courier as RiderServerData;
+        if (courier is RiderServerData) {
+          _riderServer = courier as RiderServerData;
+        }
       } on ProviderNotFoundException {
         return; // No repositories above this screen (a widget test): mock form.
       }
@@ -306,11 +307,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       });
     }
     try {
-      final providers = await server.registrationProviders(barangayCode: barangay);
+      final providers = await server.registrationProviders(
+        barangayCode: barangay,
+      );
       // A later address change started a newer request: this answer is stale.
-      if (mounted && request == _providerRequest) setState(() => _providers = providers);
+      if (mounted && request == _providerRequest) {
+        setState(() => _providers = providers);
+      }
     } on ApiException {
-      if (mounted && request == _providerRequest) setState(() => _providersFailed = true);
+      if (mounted && request == _providerRequest) {
+        setState(() => _providersFailed = true);
+      }
     }
   }
 
@@ -573,7 +580,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // courier note in registration_payload.dart.
       govIdPath: _govIdFile?.path,
       riderCompany: _companyController.text,
-      riderVehicleType: _vehicleTypes.contains(_vehicleType) ? _vehicleType : _vehicleTypes.first,
+      riderVehicleType: _vehicleTypes.contains(_vehicleType)
+          ? _vehicleType
+          : _vehicleTypes.first,
       riderPlate: _plateController.text,
       riderLicenseNumber: _licenseNumberController.text,
       riderLicenseExpiry: _licenseExpiry,
@@ -754,6 +763,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       child: Form(
                         key: _formKeys[id],
                         child: ListView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                           children: _fieldsFor(id, theme),
                         ),
@@ -910,45 +921,45 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // The web rider form has no middle initial and no sex; a rider's form
       // asks for the same fields as the web one.
       if (_role != UserRole.courier) ...[
-      const SizedBox(height: 16),
-      _labeledField(
-        theme,
-        'Middle Initial',
-        TextFormField(
-          controller: _middleInitialController,
-          focusNode: _middleInitialFocus,
-          keyboardType: TextInputType.name,
-          textInputAction: TextInputAction.next,
-          onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-          maxLength: 2,
-          decoration: const InputDecoration(
-            hintText: 'D  (optional)',
-            counterText: '',
+        const SizedBox(height: 16),
+        _labeledField(
+          theme,
+          'Middle Initial',
+          TextFormField(
+            controller: _middleInitialController,
+            focusNode: _middleInitialFocus,
+            keyboardType: TextInputType.name,
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+            maxLength: 2,
+            decoration: const InputDecoration(
+              hintText: 'D  (optional)',
+              counterText: '',
+            ),
           ),
         ),
-      ),
-      const SizedBox(height: 16),
-      _labeledField(
-        theme,
-        'Sex',
-        DropdownButtonFormField<String>(
-          initialValue: _sex,
-          // isExpanded on every dropdown in this file. Without it the button's
-          // internal Row is as wide as its *hint*, so a long hint ('Select
-          // municipality') or a large text scale pushes the arrow off the field
-          // and overflows it. Found by a test that walks the whole form — the
-          // address step had never been rendered before, because of the stepping
-          // bug the AnimatedSwitcher wrapper was causing.
-          isExpanded: true,
-          decoration: const InputDecoration(hintText: 'Select sex'),
-          items: const [
-            DropdownMenuItem(value: 'Male', child: Text('Male')),
-            DropdownMenuItem(value: 'Female', child: Text('Female')),
-          ],
-          onChanged: (v) => setState(() => _sex = v),
-          validator: (v) => v == null ? 'Select sex' : null,
+        const SizedBox(height: 16),
+        _labeledField(
+          theme,
+          'Sex',
+          DropdownButtonFormField<String>(
+            initialValue: _sex,
+            // isExpanded on every dropdown in this file. Without it the button's
+            // internal Row is as wide as its *hint*, so a long hint ('Select
+            // municipality') or a large text scale pushes the arrow off the field
+            // and overflows it. Found by a test that walks the whole form — the
+            // address step had never been rendered before, because of the stepping
+            // bug the AnimatedSwitcher wrapper was causing.
+            isExpanded: true,
+            decoration: const InputDecoration(hintText: 'Select sex'),
+            items: const [
+              DropdownMenuItem(value: 'Male', child: Text('Male')),
+              DropdownMenuItem(value: 'Female', child: Text('Female')),
+            ],
+            onChanged: (v) => setState(() => _sex = v),
+            validator: (v) => v == null ? 'Select sex' : null,
+          ),
         ),
-      ),
       ],
       const SizedBox(height: 16),
       _labeledField(
@@ -1286,7 +1297,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             controller: _houseNumberController,
             textInputAction: TextInputAction.next,
             maxLength: 50,
-            decoration: const InputDecoration(hintText: 'e.g. Blk 4 Lot 12', counterText: ''),
+            decoration: const InputDecoration(
+              hintText: 'e.g. Blk 4 Lot 12',
+              counterText: '',
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -1298,7 +1312,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             controller: _addressDetailController,
             textInputAction: TextInputAction.next,
             maxLength: 255,
-            decoration: const InputDecoration(hintText: 'e.g. near the barangay hall', counterText: ''),
+            decoration: const InputDecoration(
+              hintText: 'e.g. near the barangay hall',
+              counterText: '',
+            ),
           ),
         ),
       ],
@@ -1324,7 +1341,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
 
     if (!_showAllProviders && noBarangay) {
-      return const Text('Choose your barangay on the address step to see the logistics companies serving it.');
+      return const Text(
+        'Choose your barangay on the address step to see the logistics companies serving it.',
+      );
     }
     if (providers == null) {
       return _providersFailed
@@ -1340,9 +1359,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_showAllProviders
-              ? 'No logistics providers are currently available.'
-              : 'No logistics company serves ${_address.barangay ?? 'your barangay'} yet.'),
+          Text(
+            _showAllProviders
+                ? 'No logistics providers are currently available.'
+                : 'No logistics company serves ${_address.barangay ?? 'your barangay'} yet.',
+          ),
           if (!_showAllProviders) showAll,
         ],
       );
@@ -1375,18 +1396,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return DropdownButtonFormField<int>(
       // Keyed by the list it shows, so a new list starts a fresh field rather
       // than keeping a selection that is no longer among its items.
-      key: ValueKey('registration-provider-$_showAllProviders-${_address.barangayCode}'),
-      initialValue: providers.any((p) => p.id == _providerId) ? _providerId : null,
+      key: ValueKey(
+        'registration-provider-$_showAllProviders-${_address.barangayCode}',
+      ),
+      initialValue: providers.any((p) => p.id == _providerId)
+          ? _providerId
+          : null,
       isExpanded: true,
       decoration: const InputDecoration(hintText: 'Select logistics provider'),
       items: [
         for (final p in providers)
-          DropdownMenuItem(value: p.id, child: Text(p.name, overflow: TextOverflow.ellipsis)),
+          DropdownMenuItem(
+            value: p.id,
+            child: Text(p.name, overflow: TextOverflow.ellipsis),
+          ),
       ],
       onChanged: (id) => setState(() {
         _providerId = id;
         _companyController.text =
-            providers.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? '';
+            providers.where((p) => p.id == id).map((p) => p.name).firstOrNull ??
+            '';
       }),
       validator: (id) => id == null ? 'Select a logistics provider' : null,
     );
@@ -1420,7 +1449,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         theme,
         'Vehicle Type',
         DropdownButtonFormField<String>(
-          initialValue: _vehicleTypes.contains(_vehicleType) ? _vehicleType : _vehicleTypes.first,
+          initialValue: _vehicleTypes.contains(_vehicleType)
+              ? _vehicleType
+              : _vehicleTypes.first,
           isExpanded: true,
           decoration: const InputDecoration(hintText: 'Select vehicle type'),
           items: _vehicleTypes

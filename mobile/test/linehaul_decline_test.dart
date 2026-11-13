@@ -195,6 +195,8 @@ void main() {
       await tester.tap(find.text('History'));
       await tester.pumpAndSettle();
       expect(find.text('Declined'), findsOneWidget);
+      await tester.tap(find.text('Declined'));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Reason: Vehicle problem'),
         180,

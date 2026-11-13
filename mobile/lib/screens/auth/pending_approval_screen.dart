@@ -116,7 +116,11 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
     }
   }
 
-  Future<void> _checkStatusWithFeedback(BuildContext context, AuthState auth, bool awaitingEmail) async {
+  Future<void> _checkStatusWithFeedback(
+    BuildContext context,
+    AuthState auth,
+    bool awaitingEmail,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     await _checkStatus();
     if (!mounted) return;
@@ -128,9 +132,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
             awaitingEmail
                 ? "We're still waiting on that confirmation code."
                 : kShowDevTools
-                    ? 'Still under review — check back soon.'
-                    : "Approvals aren't live yet — nothing to check "
-                        "just yet, but thanks for checking in.",
+                ? 'Still under review — check back soon.'
+                : "Approvals aren't live yet — nothing to check "
+                      "just yet, but thanks for checking in.",
           ),
         ),
       );
@@ -146,13 +150,16 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
     final awaitingEmail = auth.awaitsEmailVerification;
     final canConfirmEmail = auth.canConfirmEmail;
     final email = auth.email;
-    final reviewer = role == UserRole.courier ? 'the Logistics/Sorting Center' : 'our admin team';
+    final reviewer = role == UserRole.courier
+        ? 'the Logistics/Sorting Center'
+        : 'our admin team';
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+      backgroundColor:
+          Colors.transparent, // the app-wide gradient in main.dart paints this
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -164,13 +171,17 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
               // hero, seller portrait), and the monogram trace is the
               // app's loading state — which is exactly what this is.
               const StaggeredReveal(index: 0, child: _WaitingArch()),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
 
               StaggeredReveal(
                 index: 1,
                 child: Column(
                   children: [
-                    Text('THANKS FOR SIGNING UP', style: AppType.eyebrow, textAlign: TextAlign.center),
+                    Text(
+                      'THANKS FOR SIGNING UP',
+                      style: AppType.eyebrow,
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 10),
                     Text(
                       // The email gate takes precedence over the dev-tools split
@@ -181,7 +192,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                       // case — no backend at all.
                       awaitingEmail
                           ? 'Check Your Email'
-                          : (kShowDevTools ? 'Under Review' : "You're on the List"),
+                          : (kShowDevTools
+                                ? 'Under Review'
+                                : "You're on the List"),
                       style: AppType.sectionDisplay,
                       textAlign: TextAlign.center,
                     ),
@@ -201,24 +214,24 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                       // don't know which registration this is" — so the copy
                       // points at the email rather than at this app.
                       ? (canConfirmEmail
-                          ? 'We emailed a confirmation code to '
-                              '${email ?? 'the address on your application'}. '
-                              'Enter it below to move your application on to '
-                              'review.'
-                          : 'We emailed a confirmation code to '
-                              '${email ?? 'the address on your application'}. '
-                              'Confirming that code is what moves your '
-                              'application on to review, so check that inbox '
-                              '— including the spam folder, where a code from a '
-                              'new sender often lands.')
+                            ? 'We emailed a confirmation code to '
+                                  '${email ?? 'the address on your application'}. '
+                                  'Enter it below to move your application on to '
+                                  'review.'
+                            : 'We emailed a confirmation code to '
+                                  '${email ?? 'the address on your application'}. '
+                                  'Confirming that code is what moves your '
+                                  'application on to review, so check that inbox '
+                                  '— including the spam folder, where a code from a '
+                                  'new sender often lands.')
                       : kShowDevTools
-                          ? '$reviewer is verifying your submitted credentials and '
-                              'documents. We\'ll notify you by email the moment your '
-                              'account is approved.'
-                          : "Account review isn't live yet — we're still building the "
-                              "piece that lets $reviewer approve new sign-ups. Your "
-                              "application is saved, and this screen will reflect it "
-                              "the moment that's ready. Thanks for your patience.",
+                      ? '$reviewer is verifying your submitted credentials and '
+                            'documents. We\'ll notify you by email the moment your '
+                            'account is approved.'
+                      : "Account review isn't live yet — we're still building the "
+                            "piece that lets $reviewer approve new sign-ups. Your "
+                            "application is saved, and this screen will reflect it "
+                            "the moment that's ready. Thanks for your patience.",
                   style: theme.textTheme.bodyMedium?.copyWith(
                     height: 1.55,
                     color: AppColors.textSecondary,
@@ -246,7 +259,10 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                 const SizedBox(height: 24),
               ],
 
-              StaggeredReveal(index: 4, child: _buildStatusBadge(theme, ext, awaitingEmail)),
+              StaggeredReveal(
+                index: 4,
+                child: _buildStatusBadge(theme, ext, awaitingEmail),
+              ),
               const SizedBox(height: 34),
 
               StaggeredReveal(
@@ -262,9 +278,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                     // AuthState.canConfirmEmail.
                     if (awaitingEmail && canConfirmEmail) ...[
                       ElevatedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          AppPageRoute(builder: (_) => const OtpScreen()),
-                        ),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).push(AppPageRoute(builder: (_) => const OtpScreen())),
                         child: const Text('Enter Code'),
                       ),
                       const SizedBox(height: 12),
@@ -272,7 +288,11 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                     ElevatedButton(
                       onPressed: _checking
                           ? null
-                          : () => _checkStatusWithFeedback(context, auth, awaitingEmail),
+                          : () => _checkStatusWithFeedback(
+                              context,
+                              auth,
+                              awaitingEmail,
+                            ),
                       child: _checking
                           ? ZefanyaLoader(
                               size: 18,
@@ -287,7 +307,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                         context.read<AuthState>().logout();
                         // AuthGate (in main.dart) rebuilds to LoginScreen once
                         // the state changes above — this unwinds back to it.
-                        Navigator.of(context).popUntil((route) => route.isFirst);
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
                       },
                       child: const Text('Back to Login'),
                     ),
@@ -303,7 +325,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                       if (!canConfirmEmail)
                         TextButton(
                           onPressed: () {
-                            context.read<AuthState>().debugStartEmailVerification();
+                            context
+                                .read<AuthState>()
+                                .debugStartEmailVerification();
                             Navigator.of(context).push(
                               AppPageRoute(builder: (_) => const OtpScreen()),
                             );
@@ -315,8 +339,12 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
                       // Remove once real admin approval is wired up.
                       TextButton(
                         onPressed: () {
-                          context.read<AuthState>().debugApprovePendingAccount();
-                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          context
+                              .read<AuthState>()
+                              .debugApprovePendingAccount();
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
                         },
                         child: const Text('Simulate Approval (Test)'),
                       ),
@@ -331,7 +359,11 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
     );
   }
 
-  Widget _buildStatusBadge(ThemeData theme, AppThemeExtension ext, bool awaitingEmail) {
+  Widget _buildStatusBadge(
+    ThemeData theme,
+    AppThemeExtension ext,
+    bool awaitingEmail,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -345,7 +377,10 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: AppColors.warning,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 8),
           // "Pending Verification" implies verification is underway, which is
@@ -363,7 +398,9 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen>
             child: Text(
               awaitingEmail
                   ? 'Status: Awaiting Confirmation'
-                  : (kShowDevTools ? 'Status: Pending Verification' : 'Status: Awaiting Launch'),
+                  : (kShowDevTools
+                        ? 'Status: Pending Verification'
+                        : 'Status: Awaiting Launch'),
               style: theme.textTheme.labelMedium,
             ),
           ),

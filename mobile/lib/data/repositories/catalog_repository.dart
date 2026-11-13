@@ -103,23 +103,27 @@ class MockCatalogRepository implements CatalogRepository {
   Future<List<Product>> products({CatalogQuery? query}) async {
     final q = query;
     if (q == null || q.isEmpty) return mockProducts;
-    return mockProducts.where((p) {
-      if (q.category != null && q.category != 'All' && p.category != q.category) {
-        return false;
-      }
-      if (q.seller != null && p.sellerName != q.seller) return false;
-      if (q.search != null) {
-        final needle = q.search!.toLowerCase();
-        // Name and category only. A search matching the description too would
-        // return nearly everything for a two-word query, which reads as broken
-        // rather than thorough.
-        if (!p.name.toLowerCase().contains(needle) &&
-            !p.category.toLowerCase().contains(needle)) {
-          return false;
-        }
-      }
-      return true;
-    }).toList(growable: false);
+    return mockProducts
+        .where((p) {
+          if (q.category != null &&
+              q.category != 'All' &&
+              p.category != q.category) {
+            return false;
+          }
+          if (q.seller != null && p.sellerName != q.seller) return false;
+          if (q.search != null) {
+            final needle = q.search!.toLowerCase();
+            // Name and category only. A search matching the description too would
+            // return nearly everything for a two-word query, which reads as broken
+            // rather than thorough.
+            if (!p.name.toLowerCase().contains(needle) &&
+                !p.category.toLowerCase().contains(needle)) {
+              return false;
+            }
+          }
+          return true;
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -138,7 +142,8 @@ class MockCatalogRepository implements CatalogRepository {
       products(query: CatalogQuery(category: category));
 
   @override
-  Future<String?> makerNote(String sellerName) async => makerNoteFor(sellerName);
+  Future<String?> makerNote(String sellerName) async =>
+      makerNoteFor(sellerName);
 
   @override
   Future<List<PromoSlide>> promoSlides() async => mockPromoSlides;
@@ -176,7 +181,8 @@ class MockCatalogRepository implements CatalogRepository {
 /// with no base URL is a *misconfiguration*, and reporting that is more useful
 /// than reporting a missing endpoint — the first is fixed by setting a flag, the
 /// second by building an API.
-class LiveCatalogRepository extends LiveRepository implements CatalogRepository {
+class LiveCatalogRepository extends LiveRepository
+    implements CatalogRepository {
   LiveCatalogRepository(super.client);
 
   /// WebZefanya filters by ids; the app's screens filter by labels/names.
@@ -191,22 +197,34 @@ class LiveCatalogRepository extends LiveRepository implements CatalogRepository 
     final parameters = await _parameters(query);
     if (parameters == null) return const [];
 
-    final body = unwrapMap(
-      await client.getJson('/buyer/products', query: parameters, authenticated: false),
-    );
-    final rows = body['data'];
-    final products = <Product>[];
-    for (final row in rows is List ? rows : const []) {
-      if (row is! Map) continue;
-      final json = row.cast<String, Object?>();
-      final product = productFromWebZefanyaJson(json);
-      final sellerId = sellerIdFromWebZefanyaJson(json);
-      if (sellerId != null && product.sellerName.isNotEmpty) {
-        _sellerIds[product.sellerName] = sellerId;
+    final products = <String, Product>{};
+    var page = 1;
+    while (true) {
+      final body = unwrapMap(
+        await client.getJson(
+          '/buyer/products',
+          query: {...parameters, if (page > 1) 'page': '$page'},
+          authenticated: false,
+        ),
+      );
+      final rows = body['data'];
+      if (rows is! List || rows.isEmpty) break;
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final product = productFromWebZefanyaJson(row.cast<String, Object?>());
+        if (product.sellerId case final sellerId?
+            when product.sellerName.isNotEmpty) {
+          _sellerIds[product.sellerName] = '$sellerId';
+        }
+        products.putIfAbsent(product.id, () => product);
       }
-      products.add(product);
+      final meta = body['meta'];
+      if (meta is! Map || meta['page'] != page || meta['has_more'] != true) {
+        break;
+      }
+      page++;
     }
-    return List.unmodifiable(products);
+    return List.unmodifiable(products.values);
   }
 
   @override
@@ -214,7 +232,10 @@ class LiveCatalogRepository extends LiveRepository implements CatalogRepository 
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
     try {
-      final body = await client.getJson('/buyer/products/$id', authenticated: false);
+      final body = await client.getJson(
+        '/buyer/products/$id',
+        authenticated: false,
+      );
       return productFromWebZefanyaJson(unwrapMap(body));
     } on NotFoundException {
       return null;
@@ -225,7 +246,10 @@ class LiveCatalogRepository extends LiveRepository implements CatalogRepository 
   Future<List<String>> categories() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
-    final body = await client.getJson('/buyer/categories', authenticated: false);
+    final body = await client.getJson(
+      '/buyer/categories',
+      authenticated: false,
+    );
 
     final labels = <String>['All'];
     for (final row in unwrapList(body)) {

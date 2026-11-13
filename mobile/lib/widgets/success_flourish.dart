@@ -46,10 +46,11 @@ class SuccessFlourish extends StatefulWidget {
   State<SuccessFlourish> createState() => _SuccessFlourishState();
 }
 
-class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProviderStateMixin {
+class _SuccessFlourishState extends State<SuccessFlourish>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: const Duration(milliseconds: 650),
   );
 
   // Named breakpoints on the single 0..1 timeline, rather than chaining
@@ -117,12 +118,16 @@ class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProv
 
           if (checkProgress >= 1 && !_checkTicked) {
             _checkTicked = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) => HapticFeedback.selectionClick());
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => HapticFeedback.selectionClick(),
+            );
           }
 
           // Mark fades out exactly as the checkmark fades in, so the two
           // cross-fade rather than both being visible at once.
-          final markOpacity = t < _holdEnd ? 1.0 : (1 - checkProgress).clamp(0.0, 1.0);
+          final markOpacity = t < _holdEnd
+              ? 1.0
+              : (1 - checkProgress).clamp(0.0, 1.0);
           final checkOpacity = checkProgress.clamp(0.0, 1.0);
 
           return Stack(
@@ -146,14 +151,29 @@ class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProv
                 width: widget.size,
                 height: widget.size,
                 decoration: BoxDecoration(
-                  borderRadius: editorialRadiusRaw(0, big: widget.size * 0.42, small: widget.size * 0.14),
+                  borderRadius: editorialRadiusRaw(
+                    0,
+                    big: widget.size * 0.42,
+                    small: widget.size * 0.14,
+                  ),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.tertiary, Color.lerp(AppColors.tertiary, AppColors.primaryDark, 0.35)!],
+                    colors: [
+                      AppColors.tertiary,
+                      Color.lerp(
+                        AppColors.tertiary,
+                        AppColors.primaryDark,
+                        0.35,
+                      )!,
+                    ],
                   ),
                   boxShadow: [
-                    BoxShadow(color: AppColors.tertiary.withValues(alpha: 0.35), blurRadius: 24, spreadRadius: 2),
+                    BoxShadow(
+                      color: AppColors.tertiary.withValues(alpha: 0.35),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                    ),
                   ],
                 ),
                 child: Stack(
@@ -165,7 +185,9 @@ class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProv
                         child: CustomPaint(
                           size: Size(widget.size * 0.5, widget.size * 0.5),
                           painter: _TracePainter(
-                            path: buildZefanyaMarkPath(Size(widget.size * 0.5, widget.size * 0.5)),
+                            path: buildZefanyaMarkPath(
+                              Size(widget.size * 0.5, widget.size * 0.5),
+                            ),
                             progress: markProgress,
                             color: AppColors.textOnDark,
                             strokeWidth: widget.size * 0.05,
@@ -178,7 +200,9 @@ class _SuccessFlourishState extends State<SuccessFlourish> with SingleTickerProv
                         child: CustomPaint(
                           size: Size(widget.size * 0.5, widget.size * 0.5),
                           painter: _TracePainter(
-                            path: _buildCheckPath(Size(widget.size * 0.5, widget.size * 0.5)),
+                            path: _buildCheckPath(
+                              Size(widget.size * 0.5, widget.size * 0.5),
+                            ),
                             progress: checkProgress,
                             color: AppColors.textOnDark,
                             strokeWidth: widget.size * 0.06,
@@ -241,5 +265,7 @@ class _TracePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TracePainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.strokeWidth != strokeWidth;
 }

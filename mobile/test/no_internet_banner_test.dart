@@ -12,6 +12,35 @@ import 'package:zefanya/services/connection_watcher.dart';
 import 'package:zefanya/widgets/no_internet_banner.dart';
 
 void main() {
+  testWidgets('Retry works above the Navigator without an overlay', (
+    tester,
+  ) async {
+    final watcher = ConnectionWatcher.instance;
+    watcher.markOffline();
+    addTearDown(watcher.markOnline);
+    var retried = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => Column(
+          children: [
+            Material(
+              child: NoInternetBanner(
+                onRetry: () => retried = true,
+                onRefresh: () {},
+              ),
+            ),
+            Expanded(child: child!),
+          ],
+        ),
+        home: const Scaffold(),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('No internet connection'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.refresh));
+    expect(retried, isTrue);
+  });
+
   testWidgets('mounted banner follows offline and online transitions', (
     tester,
   ) async {

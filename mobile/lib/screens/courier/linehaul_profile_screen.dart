@@ -128,8 +128,10 @@ class _LinehaulProfileScreenState extends State<LinehaulProfileScreen> {
                     _section('Your company', Icons.local_shipping_outlined, [
                       _detail('Logistics company', profile.company),
                       _detail('Home hub', profile.homeHub),
-                      const Text(
-                        'These details come from your company account. Contact Logistics if they need correcting.',
+                      Text(
+                        widget.repository.isDemo
+                            ? 'Sample company and hub information.'
+                            : 'These details come from your company account. Contact Logistics if they need correcting.',
                       ),
                     ]),
                     _section('Vehicle & documents', Icons.folder_outlined, [
@@ -138,15 +140,17 @@ class _LinehaulProfileScreenState extends State<LinehaulProfileScreen> {
                       ),
                       const SizedBox(height: 16),
                       OutlinedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => LinehaulVehicleScreen(
-                              repository: LinehaulVehicleRepository(
-                                widget.repository.client,
+                        onPressed: widget.repository.isDemo
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => LinehaulVehicleScreen(
+                                    repository: LinehaulVehicleRepository(
+                                      widget.repository.client,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
                         child: const Text('Vehicle records'),
                       ),
                     ]),
