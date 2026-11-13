@@ -11,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * Read-only projection of a SellerOrder already scoped to the rider by
  * RiderOperationsService. Every amount is server-computed (minor units);
- * the delivery OTP, its hash and proof-photo paths are never exposed.
+ * private proof-photo paths and recipient evidence are never exposed.
  * Buyer contact details are only included on the delivery leg, where the
  * rider actually needs them; the pickup leg sees the destination area only.
  *

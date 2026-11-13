@@ -70,6 +70,18 @@
             @if ($sellerOrder->deliveryProof)
                 <div class="space-y-2 text-base">
                     <p class="font-semibold text-[var(--text-ink)]">Delivery proof logged</p>
+                    @php($acknowledgement = $sellerOrder->deliveryProof->recipient_acknowledgement)
+                    @if ($acknowledgement && (int) $sellerOrder->deliveryProof->courier?->logistics_provider_id === (int) auth('logistics')->id())
+                        <p class="text-xs text-[var(--text-muted)]">
+                            Rider recorded acceptance by {{ $acknowledgement['category'] === 'representative' ? 'an authorized representative' : 'the buyer' }}.
+                            @if ($acknowledgement['category'] === 'representative')
+                                {{ $sellerOrder->deliveryProof->received_by }} ({{ $acknowledgement['relationship'] }}).
+                            @endif
+                            @if ($acknowledgement['cod_collected'])
+                                Exact COD collection confirmed.
+                            @endif
+                        </p>
+                    @endif
                     <p class="text-xs text-[var(--text-muted)]">By {{ $sellerOrder->deliveryProof->deliveryCourier?->name ?? '—' }} on {{ $sellerOrder->deliveryProof->created_at->format('M d, Y H:i') ?? '—' }}</p>
                 </div>
             @else
@@ -216,7 +228,7 @@
             <button type="submit" class="min-h-11 rounded-lg bg-primary-800 px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">Apply and log status change</button>
         </form>
     @else
-        <p class="mt-3 rounded-lg bg-[var(--bg-page)] p-3 text-sm text-[var(--text-ink)]">{{ $openIncident ? 'Resolve the open incident before changing status.' : 'No Logistics status override is available at this step. Delivery requires the assigned rider, buyer code and proof; returns require physical receipt.' }}</p>
+        <p class="mt-3 rounded-lg bg-[var(--bg-page)] p-3 text-sm text-[var(--text-ink)]">{{ $openIncident ? 'Resolve the open incident before changing status.' : 'No Logistics status override is available at this step. Delivery requires the assigned rider, handover acknowledgement and proof; returns require physical receipt.' }}</p>
     @endif
 </section>
 @endsection

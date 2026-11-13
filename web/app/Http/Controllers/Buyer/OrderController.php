@@ -9,7 +9,6 @@ use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
 use App\Services\Buyer\BuyerOrderCancellation;
 use App\Services\Buyer\BuyerShipmentConfirmation;
-use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelReturnService;
 use App\Services\Logistics\RouteExecutionService;
 use Illuminate\Http\JsonResponse;
@@ -182,9 +181,6 @@ class OrderController extends Controller
             'canConfirm' => $order->canBeConfirmed(),
             'routeDetails' => $order->sellerOrders->mapWithKeys(fn (SellerOrder $parcel): array => [
                 $parcel->id => app(RouteExecutionService::class)->trackingSummary($parcel),
-            ]),
-            'deliveryCodes' => $order->sellerOrders->mapWithKeys(fn (SellerOrder $parcel): array => [
-                $parcel->id => app(DeliveryOtpService::class)->activeCodeFor($parcel),
             ]),
             'returnableShipmentIds' => $order->sellerOrders->filter(fn (SellerOrder $parcel) => $returns->canBuyerRequest($parcel))->modelKeys(),
         ]);

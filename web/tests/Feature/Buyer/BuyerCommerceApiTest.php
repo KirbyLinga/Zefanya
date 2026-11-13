@@ -3,6 +3,7 @@
 namespace Tests\Feature\Buyer;
 
 use App\Enums\OrderStatus;
+use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentMethod;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\BuyerAddress;
@@ -11,6 +12,7 @@ use App\Models\Buyer\Wishlist;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductImage;
 use App\Models\Catalog\ProductVariant;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\Payment;
@@ -296,6 +298,27 @@ class BuyerCommerceApiTest extends TestCase
         $this->assertSame(1, Order::query()->where('buyer_id', $this->buyer->id)->count());
     }
 
+    public function test_checkout_reconciliation_is_owner_scoped_and_closes_an_unused_token(): void
+    {
+        $lineId = $this->addToCart();
+        $payload = $this->placePayload([$lineId]);
+        $token = ['checkout_token' => $payload['checkout_token']];
+        $endpoint = '/api/buyer/checkout/reconcile';
+
+        $this->api($this->otherBuyer())->postJson($endpoint, $token)->assertNotFound();
+        $this->api()->postJson($endpoint, $token)->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->api()->postJson($endpoint, $token)->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->api()->postJson('/api/buyer/checkout', $payload)->assertConflict();
+        $this->assertDatabaseCount('orders', 0);
+
+        $payload = $this->placePayload([$lineId]);
+        $placed = $this->api()->postJson('/api/buyer/checkout', $payload)->assertCreated();
+        $this->api()->postJson($endpoint, ['checkout_token' => $payload['checkout_token']])
+            ->assertOk()->assertJsonPath('data.status', 'placed')
+            ->assertJsonPath('data.order.id', $placed->json('data.id'));
+        $this->assertDatabaseCount('orders', 1);
+    }
+
     public function test_a_price_change_after_review_is_a_409_and_writes_nothing(): void
     {
         $lineId = $this->addToCart();
@@ -399,6 +422,30 @@ class BuyerCommerceApiTest extends TestCase
         $this->api()->postJson("/api/buyer/orders/{$orderId}/shipments/{$shipment->id}/return", ['reason' => 'Not a reason'])
             ->assertStatus(422)->assertJsonValidationErrors(['reason', 'description', 'photos']);
         $this->api($this->otherBuyer())->postJson("/api/buyer/orders/{$orderId}/shipments/{$shipment->id}/return", [])->assertNotFound();
+    }
+
+    public function test_refund_recording_is_separate_from_physical_return_and_scoped_to_the_buyer(): void
+    {
+        $lineId = $this->addToCart();
+        $orderId = $this->api()->postJson('/api/buyer/checkout', $this->placePayload([$lineId]))->assertCreated()->json('data.id');
+        $shipment = SellerOrder::query()->where('order_id', $orderId)->sole();
+        $return = ParcelReturn::query()->forceCreate([
+            'seller_order_id' => $shipment->id,
+            'status' => ParcelReturnStatus::Completed,
+            'reason' => 'Damaged item',
+            'requested_at' => now(),
+        ]);
+
+        $url = "/api/buyer/orders/{$orderId}";
+        $this->api()->getJson($url)->assertOk()
+            ->assertJsonPath('data.shipments.0.return_status', ParcelReturnStatus::Completed->value)
+            ->assertJsonPath('data.shipments.0.refund_recorded', false);
+
+        $return->forceFill(['refunded_at' => now(), 'refund_reference' => 'private-reference'])->save();
+        $this->api()->getJson('/api/buyer/orders')->assertOk()
+            ->assertJsonPath('data.data.0.shipments.0.refund_recorded', true)
+            ->assertJsonMissingPath('data.data.0.shipments.0.refund_reference');
+        $this->api($this->otherBuyer())->getJson($url)->assertNotFound();
     }
 
     private function notify(Buyer $buyer, string $type): DatabaseNotification

@@ -31,7 +31,7 @@ class NotificationController extends Controller
                 'id' => $notif->id,
                 'type' => $notif->data['type'] ?? 'notification',
                 'title' => $this->getNotificationTitle($notif),
-                'message' => $notif->data['message'] ?? 'You have a new notification',
+                'message' => BuyerNotificationTitle::message((array) $notif->data),
                 'url' => $orderId ? route('buyer.orders.show', $orderId) : null,
                 'created_at' => $notif->created_at->toIso8601String(),
             ];

@@ -60,16 +60,6 @@
         <section class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 shadow-sm">
             <h2 class="mb-3 font-sans text-[13px] font-semibold text-[var(--text-ink)]">Delivery evidence</h2>
 
-            <div class="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
-                <h3 class="text-sm font-semibold text-primary-900">Buyer delivery confirmation</h3>
-                <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">Send a six-digit code to the buyer's order page in Zefanya. Ask for it only after handing over the parcel. Codes expire in 10 minutes; wait 60 seconds between requests.</p>
-                <form method="POST" action="{{ route('rider.deliveries.otp', $sellerOrder) }}" class="mt-3">
-                    @csrf
-                    <input type="hidden" name="verification_token" value="{{ $verificationToken }}">
-                    <button type="submit" class="min-h-10 rounded-lg border border-primary-300 bg-[var(--bg-surface)] px-4 text-xs font-semibold text-primary-900 transition-colors hover:bg-primary-800 hover:text-white focus-visible:outline-2 focus-visible:outline-primary-700">Send / resend delivery code</button>
-                </form>
-                @error('delivery_otp')<p role="alert" class="mt-2 text-xs text-red-800">{{ $message }}</p>@enderror
-            </div>
             <form
                 id="proofForm"
                 data-seller-order-id="{{ $sellerOrder->id }}"
@@ -86,10 +76,23 @@
                 @endphp
                 <input type="hidden" name="verification_token" value="{{ $verificationToken }}">
 
-                <div>
-                    <label for="delivery_otp" class="mb-1 block text-xs font-semibold text-[var(--text-ink)]">Buyer delivery code *</label>
-                    <input id="delivery_otp" name="delivery_otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required class="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 font-mono text-lg tracking-widest text-[var(--text-ink)] focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-200" placeholder="6-digit code">
-                </div>
+                <fieldset class="space-y-3">
+                    <legend class="font-semibold">Handover confirmation</legend>
+                    <label class="block"><input type="checkbox" name="physical_handover" value="1" @checked(old('physical_handover')) required> I physically handed over the parcel.</label>
+                    <label class="block"><input type="checkbox" name="recipient_accepted" value="1" @checked(old('recipient_accepted')) required> The recipient accepted the parcel.</label>
+                    <label class="block" for="recipient_category">Who received it?</label>
+                    <select id="recipient_category" name="recipient_category" required class="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3">
+                        <option value="">Choose recipient</option>
+                        <option value="buyer" @selected(old('recipient_category') === 'buyer')>Buyer</option>
+                        <option value="representative" @selected(old('recipient_category') === 'representative')>Authorized representative</option>
+                    </select>
+                    <p class="text-xs">Confirm the buyer authorized their representative before handing over the parcel. Record their name and relationship below.</p>
+                    <label class="block" for="recipient_relationship">Relationship to buyer</label>
+                    <input id="recipient_relationship" name="recipient_relationship" maxlength="120" value="{{ old('recipient_relationship') }}" class="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3">
+                    @foreach (['physical_handover', 'recipient_accepted', 'recipient_category', 'recipient_relationship', 'received_by'] as $field)
+                        @error($field)<p role="alert" class="text-sm text-red-800">{{ $message }}</p>@enderror
+                    @endforeach
+                </fieldset>
                 <div class="rounded-xl border-2 border-dashed border-primary-400 bg-[var(--bg-page)] p-4 sm:p-5">
                     <div class="mb-4 flex items-start gap-3">
                         <span class="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white">
@@ -99,7 +102,7 @@
                             <label for="proof_photo" class="block font-sans text-sm font-semibold text-[var(--text-ink)]">
                                 Upload delivery photo <span class="text-[var(--status-danger)]">*</span>
                             </label>
-                            <p id="proof-photo-instructions" class="mt-1 font-sans text-xs leading-relaxed text-[var(--text-body)]">Choose a clear photo showing the delivered parcel. A photo is required to confirm delivery.</p>
+                            <p id="proof-photo-instructions" class="mt-1 font-sans text-xs leading-relaxed text-[var(--text-body)]">Photograph the parcel at handover. Keep faces, IDs and private documents out of the photo.</p>
                         </div>
                     </div>
                     <input id="proof_photo" name="proof_photo" type="file" accept="image/jpeg,image/png,image/webp" required
@@ -117,7 +120,7 @@
                         Received by
                     </label>
                     <input id="received_by" name="received_by" type="text" maxlength="120"
-                           value="{{ old('received_by', $addr['name'] ?? '') }}"
+                           value="{{ old('received_by') }}"
                            placeholder="Name of the person who accepted the parcel"
                            class="h-10 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-page)] px-3 font-sans text-[12.5px] text-[var(--text-ink)]"
                            autocomplete="off">
@@ -129,7 +132,7 @@
                             COD amount collected (₱) <span class="text-rose-700">*</span>
                         </label>
                         <input id="cod_amount" name="cod_amount" type="text" inputmode="decimal" required
-                               value="{{ old('cod_amount', $due) }}"
+                               value="{{ old('cod_amount') }}"
                                class="h-10 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-page)] px-3 font-sans text-[12.5px] text-[var(--text-ink)]"
                                autocomplete="off">
                     </div>

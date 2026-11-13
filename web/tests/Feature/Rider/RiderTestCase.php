@@ -31,7 +31,7 @@ use Tests\TestCase;
  */
 abstract class RiderTestCase extends TestCase
 {
-    use CreatesAssignableFleet, LazilyRefreshDatabase, \Tests\Support\ProvidesDeliveryOtp;
+    use CreatesAssignableFleet, LazilyRefreshDatabase;
 
     protected LogisticsProvider $provider;
 
@@ -149,8 +149,8 @@ abstract class RiderTestCase extends TestCase
      */
     protected function withHandoff(SellerOrder $parcel, string $action, array $payload = [], ?Rider $rider = null): array
     {
-        if ($action === ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY && ! array_key_exists('delivery_otp', $payload)) {
-            $payload['delivery_otp'] = $this->deliveryOtp($parcel);
+        if ($action === ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY) {
+            $payload += ['physical_handover' => true, 'recipient_accepted' => true, 'recipient_category' => 'buyer'];
         }
 
         return array_merge($payload, [

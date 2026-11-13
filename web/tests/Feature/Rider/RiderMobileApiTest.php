@@ -8,10 +8,8 @@ use App\Models\Logistics\DeliveryProof;
 use App\Models\Rider\Rider;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Notification;
 
 /**
  * Rider mobile bearer-token API (/api/rider/...): every endpoint delegates to
@@ -65,7 +63,6 @@ class RiderMobileApiTest extends RiderTestCase
     public function test_jobs_lists_only_my_parcels_and_never_exposes_the_delivery_code(): void
     {
         $mine = $this->outForDelivery(150000);
-        $this->deliveryOtp($mine);
         $other = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
         $this->parcel(OrderStatus::OutForDelivery, ['delivery_courier_id' => $other->id]);
 
@@ -128,16 +125,10 @@ class RiderMobileApiTest extends RiderTestCase
         $this->api()->postJson("/api/rider/deliveries/{$parcel->id}/start")->assertOk();
     }
 
-    public function test_send_otp_notifies_the_buyer_and_never_returns_the_code(): void
+    public function test_delivery_code_endpoint_is_retired(): void
     {
         $parcel = $this->outForDelivery();
-
-        $response = $this->api()->postJson("/api/rider/deliveries/{$parcel->id}/otp", [
-            'verification_token' => $this->handoffToken($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY),
-        ])->assertOk();
-
-        $code = Notification::sent($this->buyer, DeliveryOtpCode::class)->last()->code;
-        $this->assertStringNotContainsString($code, $response->getContent());
+        $this->api()->postJson("/api/rider/deliveries/{$parcel->id}/otp")->assertNotFound();
     }
 
     public function test_deliver_with_cod_records_proof_and_payment_once(): void
@@ -157,6 +148,9 @@ class RiderMobileApiTest extends RiderTestCase
 
         // Duplicate submission (e.g. retry after a lost response) writes nothing new.
         $this->api()->post("/api/rider/deliveries/{$parcel->id}/deliver", [
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'proof_photo' => UploadedFile::fake()->image('again.jpg'),
             'cod_amount' => '1500.00',
         ])->assertOk();

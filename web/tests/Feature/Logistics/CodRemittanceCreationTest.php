@@ -19,12 +19,10 @@ use App\Services\Rider\RiderOperationsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class CodRemittanceCreationTest extends TestCase
 {
-    use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
     private LogisticsProvider $provider;
@@ -126,7 +124,9 @@ class CodRemittanceCreationTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
@@ -158,7 +158,9 @@ class CodRemittanceCreationTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
@@ -168,7 +170,9 @@ class CodRemittanceCreationTest extends TestCase
         $this->assertSame(CodRemittance::PENDING_REMITTANCE, CodRemittance::first()->status);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof2.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,

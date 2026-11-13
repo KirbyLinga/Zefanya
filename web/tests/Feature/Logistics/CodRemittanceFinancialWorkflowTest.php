@@ -29,12 +29,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class CodRemittanceFinancialWorkflowTest extends TestCase
 {
-    use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
     public function test_cash_discrepancy_keeps_the_obligation_open_until_audited_recovery(): void
@@ -218,7 +216,9 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -245,7 +245,9 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -269,7 +271,9 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -301,7 +305,9 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -332,7 +338,9 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -422,7 +430,9 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,

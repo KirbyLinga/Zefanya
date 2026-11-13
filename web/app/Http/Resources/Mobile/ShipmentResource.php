@@ -5,7 +5,6 @@ namespace App\Http\Resources\Mobile;
 use App\Enums\OrderStatus;
 use App\Models\Shared\OrderItem;
 use App\Models\Shared\SellerOrder;
-use App\Services\Logistics\DeliveryOtpService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,9 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * One per-seller shipment as the Buyer mobile app sees it.
  *
  * Stored amounts only (minor units) — nothing is recomputed here. Seller-
- * private figures (commission, seller net, funding split) are omitted. The
- * active delivery code is the buyer's own, exactly as the buyer web order
- * page shows it while the parcel is out for delivery.
+ * private figures (commission, seller net, funding split) are omitted.
  *
  * @mixin SellerOrder
  */
@@ -27,7 +24,6 @@ class ShipmentResource extends JsonResource
         /** @var SellerOrder $shipment */
         $shipment = $this->resource;
         $payment = $shipment->payment;
-        $code = app(DeliveryOtpService::class)->activeCodeFor($shipment);
 
         return [
             'id' => $shipment->id,
@@ -60,10 +56,6 @@ class ShipmentResource extends JsonResource
                 'method' => $payment->method?->value,
                 'status' => $payment->status?->value,
                 'amount_minor' => (int) $payment->amount_minor,
-            ],
-            'delivery_code' => $code === null ? null : [
-                'code' => $code['code'],
-                'expires_at' => $code['expires_at']?->toIso8601String(),
             ],
             'can_confirm_receipt' => $shipment->status === OrderStatus::Delivered,
             'created_at' => $shipment->created_at?->toIso8601String(),

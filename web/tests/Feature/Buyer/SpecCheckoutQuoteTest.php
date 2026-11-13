@@ -64,7 +64,10 @@ class SpecCheckoutQuoteTest extends TestCase
                 $writes[] = $query->sql;
             }
         });
+        $checkout = app(\App\Services\Buyer\CheckoutService::class);
         $response = $this->postJson('/api/v1/buyer/checkout/quote', $payload)->assertOk()
+            ->assertJsonPath('data.deliver_to.full', $checkout->addressSnapshot($buyer)['full'])
+            ->assertJsonPath('data.address_fingerprint', $checkout->addressFingerprint($buyer))
             ->assertJsonPath('data.totals.merchandise_subtotal_minor', 109800)
             ->assertJsonPath('data.totals.shipping_total_minor', 18500)
             ->assertJsonPath('data.totals.merchandise_discount_minor', 15000)

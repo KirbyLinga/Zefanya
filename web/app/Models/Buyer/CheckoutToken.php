@@ -4,6 +4,7 @@ namespace App\Models\Buyer;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * One-time token that guards buyer checkout against double-submits.
@@ -39,10 +40,13 @@ class CheckoutToken extends Model
      */
     public static function issue(int $buyerId): self
     {
-        static::query()
+        $expired = static::query()
             ->where('buyer_id', $buyerId)
-            ->where('expires_at', '<', now())
-            ->delete();
+            ->where('expires_at', '<', now());
+        if (Schema::hasColumn('checkout_tokens', 'order_id')) {
+            $expired->whereNull('order_id')->whereNull('reconciled_rejected_at');
+        }
+        $expired->delete();
 
         return static::query()->create([
             'token' => bin2hex(random_bytes(32)),

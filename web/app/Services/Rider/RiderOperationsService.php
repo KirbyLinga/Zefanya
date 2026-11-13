@@ -16,7 +16,6 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\RiderParcelActivity;
 use App\Services\Logistics\CourierAssignmentService;
-use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Seller\SellerOrderStatusService;
@@ -295,7 +294,7 @@ class RiderOperationsService
      * all inside ONE transaction so a failed hop leaves neither evidence nor
      * a payment in a half-written state.
      *
-     * @param  array{photo: UploadedFile, received_by?: ?string, notes?: ?string, cod_amount_minor?: ?int, verification_method?: ?string, delivery_otp?: ?string}  $data
+     * @param  array{photo: UploadedFile, received_by?: ?string, notes?: ?string, cod_amount_minor?: ?int, verification_method?: ?string, physical_handover: bool, recipient_accepted: bool, recipient_category: string, recipient_relationship?: ?string}  $data
      */
     public function completeDelivery(Rider $rider, SellerOrder $sellerOrder, array $data): SellerOrder
     {
@@ -304,13 +303,10 @@ class RiderOperationsService
         $courier = $this->operationalCourier($rider, allowWindDown: true);
         $fresh = $sellerOrder->fresh() ?? $sellerOrder;
         $this->assertDeliveryOwnership($courier, $fresh);
-        $verifiedOtp = in_array($fresh->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
-            ? null
-            : app(DeliveryOtpService::class)->verify($rider, $fresh, $data['delivery_otp'] ?? null);
         $storedPath = null;
 
         try {
-            [$order, $changed] = DB::transaction(function () use ($rider, $sellerOrder, $data, $verifiedOtp, &$storedPath): array {
+            [$order, $changed] = DB::transaction(function () use ($rider, $sellerOrder, $data, &$storedPath): array {
                 $courier = $this->lockDeliveryAuthorization($rider);
                 $order = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
                 ParcelIncidentService::assertOperationsAllowed($order);
@@ -327,7 +323,16 @@ class RiderOperationsService
                     throw StaleStateException::field('parcel', 'This parcel is not out for delivery.');
                 }
 
-                app(DeliveryOtpService::class)->consume($order, $verifiedOtp);
+                $category = $data['recipient_category'] ?? null;
+                $representative = $category === 'representative';
+                if (($data['physical_handover'] ?? false) !== true
+                    || ($data['recipient_accepted'] ?? false) !== true
+                    || ! in_array($category, ['buyer', 'representative'], true)
+                    || ($representative && (trim($data['received_by'] ?? '') === '' || trim($data['recipient_relationship'] ?? '') === ''))) {
+                    throw ValidationException::withMessages([
+                        'recipient_accepted' => 'Confirm physical handover and acceptance, and record the name and relationship of any authorized representative.',
+                    ]);
+                }
 
                 $collectedPayment = $this->recordCodCollection($order, $courier, $data['cod_amount_minor'] ?? null);
 
@@ -336,7 +341,13 @@ class RiderOperationsService
                 if ($proof === null) {
                     /** @var UploadedFile $photo */
                     $photo = $data['photo'];
-                    $storedPath = $photo->store('delivery-proofs/'.$order->id, 'local');
+                    $path = $photo->store('delivery-proofs/'.$order->id, 'local');
+                    if ($path === false) {
+                        throw ValidationException::withMessages([
+                            'proof_photo' => 'The proof photo could not be saved. Attach it again and retry.',
+                        ]);
+                    }
+                    $storedPath = $path;
 
                     DeliveryProof::query()->create([
                         'seller_order_id' => $order->id,
@@ -347,6 +358,13 @@ class RiderOperationsService
                         'photo_size' => $photo->getSize(),
                         'received_by' => $data['received_by'] ?? null,
                         'notes' => $data['notes'] ?? null,
+                        'recipient_acknowledgement' => [
+                            'category' => $category,
+                            'relationship' => $representative ? trim($data['recipient_relationship']) : null,
+                            'physical_handover' => true,
+                            'recipient_accepted' => true,
+                            'cod_collected' => $collectedPayment !== null,
+                        ],
                         'submitted_at' => now(),
                     ]);
                 }
@@ -354,7 +372,7 @@ class RiderOperationsService
                 $this->status->transition(
                     $order,
                     OrderStatus::Delivered,
-                    note: 'Parcel delivered to buyer with proof of delivery.'.ParcelHandoffVerification::noteSuffix($data['verification_method'] ?? null),
+                    note: 'Parcel handed to the recipient with proof of delivery.'.ParcelHandoffVerification::noteSuffix($data['verification_method'] ?? null),
                     changedBy: $rider->fullName(),
                     actor: OrderActor::Rider,
                     actorId: $courier->id,

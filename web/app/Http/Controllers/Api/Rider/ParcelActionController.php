@@ -11,7 +11,6 @@ use App\Http\Requests\Api\Rider\CompleteDeliveryApiRequest;
 use App\Http\Requests\Api\Rider\MarkDeliveryFailedApiRequest;
 use App\Http\Resources\Mobile\RiderParcelResource;
 use App\Models\Shared\SellerOrder;
-use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelTrackingVerificationService;
 use App\Services\Rider\RiderOperationsService;
@@ -25,7 +24,7 @@ use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 /**
- * Rider mobile parcel handoffs: scan, pickup, start delivery, delivery code,
+ * Rider mobile parcel handoffs: scan, pickup, start delivery,
  * proof of delivery (with COD) and failed delivery.
  *
  * Each action mirrors the Rider web controller step for step: assert the
@@ -112,20 +111,6 @@ class ParcelActionController extends Controller
         });
     }
 
-    /** POST /api/rider/deliveries/{sellerOrder}/otp — sends the code to the buyer; never returns it. */
-    public function sendOtp(Request $request, SellerOrder $sellerOrder, DeliveryOtpService $otp): JsonResponse
-    {
-        $rider = $request->user();
-        $this->operations->assertDeliveryAssigned($rider, $sellerOrder);
-
-        return $this->guarded(function () use ($request, $rider, $sellerOrder, $otp): JsonResponse {
-            $this->handoff->assertValidForRider($rider, $sellerOrder, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $this->token($request));
-            $otp->send($rider, $sellerOrder);
-
-            return $this->success('Delivery code sent to the buyer. It expires in 10 minutes.');
-        });
-    }
-
     /** POST /api/rider/deliveries/{sellerOrder}/deliver (multipart) */
     public function deliver(CompleteDeliveryApiRequest $request, SellerOrder $sellerOrder): JsonResponse
     {
@@ -134,7 +119,7 @@ class ParcelActionController extends Controller
 
         return $this->guarded(function () use ($request, $rider, $sellerOrder): JsonResponse {
             $token = $this->token($request);
-            // Assert only — the token is consumed after POD/COD/OTP succeed.
+            // Assert only — the token is consumed after handover evidence and COD validation succeed.
             $method = $this->assertToken($rider, $sellerOrder, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $token, [OrderStatus::Delivered, OrderStatus::Completed]);
 
             $parcel = $this->operations->completeDelivery($rider, $sellerOrder, [
@@ -143,7 +128,10 @@ class ParcelActionController extends Controller
                 'notes' => $request->input('delivery_notes'),
                 'cod_amount_minor' => $request->codAmountMinor(),
                 'verification_method' => $method,
-                'delivery_otp' => $request->input('delivery_otp'),
+                'physical_handover' => $request->boolean('physical_handover'),
+                'recipient_accepted' => $request->boolean('recipient_accepted'),
+                'recipient_category' => $request->input('recipient_category'),
+                'recipient_relationship' => $request->input('recipient_relationship'),
             ]);
             $this->consume($rider, $sellerOrder, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $token, $method);
 

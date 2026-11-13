@@ -46,7 +46,6 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
         Route::get('/deliveries', [DeliveryAssignmentsController::class, 'index'])->name('deliveries.index');
         Route::post('/deliveries/{sellerOrder}/start', [DeliveryAssignmentsController::class, 'start'])->name('deliveries.start');
         Route::get('/deliveries/{sellerOrder}/proof', [DeliveryAssignmentsController::class, 'proofForm'])->name('deliveries.proof');
-        Route::post('/deliveries/{sellerOrder}/otp', [DeliveryAssignmentsController::class, 'sendDeliveryOtp'])->middleware('throttle:5,1')->name('deliveries.otp');
         Route::post('/deliveries/{sellerOrder}/deliver', [DeliveryAssignmentsController::class, 'deliver'])->name('deliveries.deliver');
         Route::get('/deliveries/{sellerOrder}/failed', [DeliveryAssignmentsController::class, 'failedForm'])->name('deliveries.failed.form');
         Route::post('/deliveries/{sellerOrder}/failed', [DeliveryAssignmentsController::class, 'failed'])->name('deliveries.failed');

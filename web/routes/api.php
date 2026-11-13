@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\Buyer\OrderController;
 use App\Http\Controllers\Api\Buyer\ProfileController;
 use App\Http\Controllers\Api\Buyer\ReviewController;
 use App\Http\Controllers\Api\Buyer\WishlistController;
+use App\Http\Controllers\Api\LinehaulController;
+use App\Http\Controllers\Api\LinehaulVehicleController;
 use App\Http\Controllers\Api\Rider\CashController as RiderCashController;
 use App\Http\Controllers\Api\Rider\IncidentController as RiderIncidentController;
 use App\Http\Controllers\Api\Rider\JobController as RiderJobController;
@@ -33,23 +35,23 @@ use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/courier/login', [\App\Http\Controllers\Api\LinehaulController::class, 'login'])->middleware('throttle:api-login');
+Route::post('/courier/login', [LinehaulController::class, 'login'])->middleware('throttle:api-login');
 Route::prefix('courier')->middleware(['auth:sanctum', 'api.role:linehaul', 'throttle:60,1'])->group(function (): void {
-    Route::get('/profile', [\App\Http\Controllers\Api\LinehaulController::class, 'profile']);
-    Route::get('/vehicle', [\App\Http\Controllers\Api\LinehaulVehicleController::class, 'show']);
-    Route::post('/vehicle', [\App\Http\Controllers\Api\LinehaulVehicleController::class, 'store']);
-    Route::get('/vehicle/documents/{document}', [\App\Http\Controllers\Api\LinehaulVehicleController::class, 'document'])->where('document', 'drivers_license|or_cr|nbi_clearance');
-    Route::post('/logout', [\App\Http\Controllers\Api\LinehaulController::class, 'logout']);
-    Route::get('/trips', [\App\Http\Controllers\Api\LinehaulController::class, 'trips']);
-    Route::get('/earnings', [\App\Http\Controllers\Api\LinehaulController::class, 'earnings']);
-    Route::get('/history', [\App\Http\Controllers\Api\LinehaulController::class, 'history']);
-    Route::get('/duty', [\App\Http\Controllers\Api\LinehaulController::class, 'duty']);
-    Route::put('/push-registration', [\App\Http\Controllers\Api\LinehaulController::class, 'changePush'])->middleware('throttle:10,1,courier-push:');
-    Route::post('/duty/{dutyAction}', [\App\Http\Controllers\Api\LinehaulController::class, 'changeDuty'])->where('dutyAction', 'on|off|heartbeat');
-    Route::post('/trips/{manifest}/decline', [\App\Http\Controllers\Api\LinehaulController::class, 'decline']);
-    Route::post('/trips/{manifest}/delay', [\App\Http\Controllers\Api\LinehaulController::class, 'reportDelay']);
-    Route::post('/trips/{manifest}/breakdown', [\App\Http\Controllers\Api\LinehaulController::class, 'reportBreakdown']);
-    Route::post('/trips/{manifest}/{action}', [\App\Http\Controllers\Api\LinehaulController::class, 'act'])
+    Route::get('/profile', [LinehaulController::class, 'profile']);
+    Route::get('/vehicle', [LinehaulVehicleController::class, 'show']);
+    Route::post('/vehicle', [LinehaulVehicleController::class, 'store']);
+    Route::get('/vehicle/documents/{document}', [LinehaulVehicleController::class, 'document'])->where('document', 'drivers_license|or_cr|nbi_clearance');
+    Route::post('/logout', [LinehaulController::class, 'logout']);
+    Route::get('/trips', [LinehaulController::class, 'trips']);
+    Route::get('/earnings', [LinehaulController::class, 'earnings']);
+    Route::get('/history', [LinehaulController::class, 'history']);
+    Route::get('/duty', [LinehaulController::class, 'duty']);
+    Route::put('/push-registration', [LinehaulController::class, 'changePush'])->middleware('throttle:10,1,courier-push:');
+    Route::post('/duty/{dutyAction}', [LinehaulController::class, 'changeDuty'])->where('dutyAction', 'on|off|heartbeat');
+    Route::post('/trips/{manifest}/decline', [LinehaulController::class, 'decline']);
+    Route::post('/trips/{manifest}/delay', [LinehaulController::class, 'reportDelay']);
+    Route::post('/trips/{manifest}/breakdown', [LinehaulController::class, 'reportBreakdown']);
+    Route::post('/trips/{manifest}/{action}', [LinehaulController::class, 'act'])
         ->where('action', 'accept|scan|depart|arrive|exception-note|takeover-scan|takeover-continue');
 });
 
@@ -138,6 +140,7 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
         Route::middleware('throttle:20,1')->group(function (): void {
             Route::patch('/shipments/{shipment}/products/{product}/review', [ReviewController::class, 'save'])->name('reviews.save');
             Route::post('/checkout/quote', [CheckoutController::class, 'quote'])->name('checkout.quote');
+            Route::post('/checkout/reconcile', [CheckoutController::class, 'reconcile'])->name('checkout.reconcile');
             Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
             Route::post('/orders/{order}/shipments/{shipment}/cancel', [OrderActionController::class, 'cancel'])->name('orders.cancel');
             Route::post('/orders/{order}/shipments/{shipment}/return', [OrderActionController::class, 'requestReturn'])->name('orders.return');
@@ -193,8 +196,6 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
             Route::post('/jobs/{sellerOrder}/incidents', [RiderIncidentController::class, 'store'])->name('jobs.incidents.store');
         });
         // Same limit as the web route: the buyer receives a new code each time.
-        Route::post('/deliveries/{sellerOrder}/otp', [RiderParcelActionController::class, 'sendOtp'])
-            ->middleware('throttle:5,1')->name('deliveries.otp');
     });
 
     // Fully operational riders only.

@@ -6,6 +6,7 @@ use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Buyer\CheckoutController as WebCheckoutController;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
+use App\Http\Requests\Api\Buyer\ReconcileCheckoutRequest;
 use App\Http\Resources\Mobile\ShipmentResource;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
@@ -19,6 +20,7 @@ use App\Services\Buyer\VoucherSessionService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +43,35 @@ class CheckoutController extends Controller
     use ApiResponses;
 
     public function __construct(private readonly CheckoutService $checkout) {}
+
+    public function reconcile(ReconcileCheckoutRequest $request): JsonResponse
+    {
+        abort_unless(Schema::hasColumn('checkout_tokens', 'order_id'), 503);
+        $buyer = $this->buyer($request);
+        $result = DB::transaction(function () use ($buyer, $request): array {
+            $token = CheckoutToken::query()->where('buyer_id', $buyer->id)
+                ->where('token', $request->validated('checkout_token'))
+                ->lockForUpdate()->firstOrFail();
+            if ($token->order_id !== null) {
+                $order = Order::query()->where('buyer_id', $buyer->id)->findOrFail($token->order_id);
+
+                return ['status' => 'placed', 'order' => $this->present($order)];
+            }
+            if ($token->reconciled_rejected_at !== null) {
+                return ['status' => 'rejected'];
+            }
+            if ($token->used) {
+                return ['status' => 'unknown'];
+            }
+            // Serialize against claim(). A submission that has not claimed the
+            // token can no longer place an order after this response.
+            $token->forceFill(['used' => true, 'reconciled_rejected_at' => now()])->save();
+
+            return ['status' => 'rejected'];
+        });
+
+        return $this->success('Checkout checked.', $result);
+    }
 
     public function quote(Request $request, BuyerAddressBook $addresses, CheckoutCarrierService $carriers): JsonResponse
     {

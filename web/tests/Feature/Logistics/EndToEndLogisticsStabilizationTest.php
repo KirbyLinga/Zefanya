@@ -18,7 +18,6 @@ use App\Models\Rider\Rider;
 use App\Models\Seller\SellerShippingProvider;
 use App\Models\Shared\Incidents;
 use App\Models\Shared\SellerOrder;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Logistics\RouteExecutionService;
@@ -189,13 +188,14 @@ class EndToEndLogisticsStabilizationTest extends TestCase
         $this->post(route('rider.deliveries.start', $parcel), ['verification_token' => $token])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertTracking($f, $parcel, 'With delivery rider', $f['b']['station']->name, null);
         $token = $this->riderScan($delivery, $parcel);
-        $this->post(route('rider.deliveries.otp', $parcel), ['verification_token' => $token])->assertRedirect()->assertSessionHasNoErrors();
-        $code = Notification::sent($f['buyer'], DeliveryOtpCode::class)->last()->code;
         $payment = $parcel->payment;
         $this->assertSame(PaymentStatus::Pending, $payment->status);
         $token = $this->riderScan($delivery, $parcel);
         $this->post(route('rider.deliveries.deliver', $parcel), [
-            'verification_token' => $token, 'delivery_otp' => $code,
+            'verification_token' => $token,
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer', 'cod_amount' => number_format($payment->amount_minor / 100, 2, '.', ''),
         ])->assertRedirect(route('rider.deliveries.index'))->assertSessionHasNoErrors();

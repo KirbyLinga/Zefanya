@@ -105,17 +105,7 @@
                                 @endif
                             </div>
                             @if ($sellerOrder->status === \App\Enums\OrderStatus::OutForDelivery)
-                                @php($deliveryCode = $deliveryCodes[$sellerOrder->id] ?? null)
-                                <div class="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
-                                    <h3 class="font-sans text-sm font-semibold text-primary-900">Delivery code</h3>
-                                    @if ($deliveryCode)
-                                        <p class="mt-2 font-mono text-3xl font-semibold tracking-widest text-primary-900">{{ $deliveryCode['code'] }}</p>
-                                        <p class="mt-2 text-xs leading-relaxed text-[var(--text-ink)]">Give this code to your rider only after you have your parcel and have checked any cash payment. It expires at {{ $deliveryCode['expires_at']->timezone('Asia/Manila')->format('g:i A') }}.</p>
-                                    @else
-                                        <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">When your rider arrives, they will request a code and it will appear here.</p>
-                                        <a href="{{ route('buyer.orders.show', $order) }}" class="mt-2 inline-block text-xs font-semibold text-primary-900 underline">Refresh this page</a>
-                                    @endif
-                                </div>
+                                <p class="mb-5 text-sm text-[var(--text-ink)]">You or someone you authorize can accept the parcel. Check the parcel and any cash payment at handover.</p>
                             @endif
                             <x-shipment-tracking :shipment="$sellerOrder" buyer-facing />
                             @include('Buyer.Orders.delivery-dispute', ['dispute' => app(\App\Services\Buyer\DeliveryDisputeService::class)->buyerView($sellerOrder)])

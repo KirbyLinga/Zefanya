@@ -29,9 +29,12 @@ class CompleteDeliveryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'delivery_otp' => ['nullable', 'digits:6'],
+            'physical_handover' => ['required', 'accepted'],
+            'recipient_accepted' => ['required', 'accepted'],
+            'recipient_category' => ['required', 'in:buyer,representative'],
+            'recipient_relationship' => ['required_if:recipient_category,representative', 'nullable', 'string', 'max:120'],
             'proof_photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'received_by' => ['nullable', 'string', 'max:120'],
+            'received_by' => ['required_if:recipient_category,representative', 'nullable', 'string', 'max:120'],
             'delivery_notes' => ['nullable', 'string', 'max:1000'],
             'cod_amount' => ['nullable', 'string', 'regex:/^\d{1,9}(\.\d{1,2})?$/'],
         ];
@@ -45,7 +48,10 @@ class CompleteDeliveryRequest extends FormRequest
         throw new HttpResponseException(
             redirect($this->getRedirectUrl())
                 ->withErrors($validator, $this->errorBag)
-                ->withInput($this->except('delivery_otp'))
+                ->withInput($this->only([
+                    'physical_handover', 'recipient_accepted', 'recipient_category',
+                    'received_by', 'recipient_relationship', 'delivery_notes', 'cod_amount',
+                ]))
         );
     }
 

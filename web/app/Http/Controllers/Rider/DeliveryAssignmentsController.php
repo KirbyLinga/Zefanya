@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Logistics\MarkDeliveryFailedRequest;
 use App\Http\Requests\Rider\CompleteDeliveryRequest;
 use App\Models\Shared\SellerOrder;
-use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Rider\RiderOperationsService;
 use Illuminate\Http\RedirectResponse;
@@ -126,29 +125,6 @@ class DeliveryAssignmentsController extends Controller
         ]);
     }
 
-    public function sendDeliveryOtp(
-        Request $request,
-        SellerOrder $sellerOrder,
-        RiderOperationsService $operations,
-        ParcelHandoffVerification $handoffVerify,
-        DeliveryOtpService $otp,
-    ): RedirectResponse {
-        $rider = $request->user('rider');
-        $operations->assertDeliveryAssigned($rider, $sellerOrder);
-        try {
-            $handoffVerify->assertValidForRider($rider, $sellerOrder, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $request->input('verification_token'));
-            $otp->send($rider, $sellerOrder);
-        } catch (ValidationException $exception) {
-            return back()->withErrors($exception->errors());
-        } catch (\Exception $exception) {
-            report($exception);
-
-            return back()->with('error', 'The delivery code could not be sent. Try again.');
-        }
-
-        return back()->with('success', 'Delivery code sent to the buyer\'s order page. It expires in 10 minutes.');
-    }
-
     public function deliver(
         CompleteDeliveryRequest $request,
         SellerOrder $sellerOrder,
@@ -182,7 +158,10 @@ class DeliveryAssignmentsController extends Controller
                 'notes' => $request->input('delivery_notes'),
                 'cod_amount_minor' => $request->codAmountMinor(),
                 'verification_method' => $method,
-                'delivery_otp' => $request->input('delivery_otp'),
+                'physical_handover' => $request->boolean('physical_handover'),
+                'recipient_accepted' => $request->boolean('recipient_accepted'),
+                'recipient_category' => $request->input('recipient_category'),
+                'recipient_relationship' => $request->input('recipient_relationship'),
             ]);
 
             if (! $alreadyDone) {
@@ -194,9 +173,9 @@ class DeliveryAssignmentsController extends Controller
                 ));
             }
         } catch (ValidationException $e) {
-            return back()->withInput($request->except('delivery_otp'))->withErrors($e->errors());
+            return back()->withInput($request->safe()->except('proof_photo'))->withErrors($e->errors());
         } catch (\InvalidArgumentException $e) {
-            return back()->withInput($request->except('delivery_otp'))->with('error', $e->getMessage());
+            return back()->withInput($request->safe()->except('proof_photo'))->with('error', $e->getMessage());
         }
 
         return redirect()->route('rider.deliveries.index')

@@ -20,7 +20,6 @@ use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\SellerOrder;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use Database\Seeders\DeliveryScenarioSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -127,13 +126,13 @@ class DeliveryScenarioSeederTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertSame(OrderStatus::AssignedToRider, $parcel->fresh()->status, (string) session('error'));
         $this->post(route('rider.deliveries.start', $parcel), ['verification_token' => $this->riderScan($delivery, $parcel)])->assertSessionHasNoErrors();
-        $this->post(route('rider.deliveries.otp', $parcel), ['verification_token' => $this->riderScan($delivery, $parcel)])->assertSessionHasNoErrors();
-        $code = Notification::sent($buyer, DeliveryOtpCode::class)->last()->code;
-        $this->actingAs($buyer, 'buyer')->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertSee($code);
+        $this->actingAs($buyer, 'buyer')->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertSee('someone you authorize');
         $payment = $parcel->fresh()->payment;
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $this->riderScan($delivery, $parcel),
-            'delivery_otp' => $code,
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
             'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount' => number_format($payment->amount_minor / 100, 2, '.', ''),

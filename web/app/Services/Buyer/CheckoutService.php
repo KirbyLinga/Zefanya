@@ -437,6 +437,11 @@ class CheckoutService
             // Phase 4: Plan multi-leg routes for all seller orders
             $this->planRoutesForOrder($order, $deliverTo, $lockedSellers);
 
+            if (Schema::hasColumn('checkout_tokens', 'order_id')) {
+                CheckoutToken::query()->where('buyer_id', $buyer->id)
+                    ->where('token', $formToken)->update(['order_id' => $order->id]);
+            }
+
             return $order;
         });
     }

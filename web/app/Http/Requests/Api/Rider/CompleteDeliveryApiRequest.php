@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Bearer-token variant of the web proof-of-delivery request.
  *
- * Same rules and messages (photo type/size, OTP format, COD peso format) as
+ * Same rules and messages (photo type/size, handover acknowledgement, COD peso format) as
  * the web form; adds the scan verification token and always answers with a
  * 422 JSON body instead of a redirect.
  */

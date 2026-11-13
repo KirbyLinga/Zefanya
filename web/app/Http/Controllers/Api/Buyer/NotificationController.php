@@ -33,7 +33,7 @@ class NotificationController extends Controller
                 'id' => $notification->id,
                 'type' => $notification->data['type'] ?? 'notification',
                 'title' => BuyerNotificationTitle::for((array) $notification->data),
-                'message' => $notification->data['message'] ?? 'You have a new notification',
+                'message' => BuyerNotificationTitle::message((array) $notification->data),
                 'order_id' => $orderIds->get($notification->data['seller_order_id'] ?? null),
                 'read' => $notification->read_at !== null,
                 'created_at' => $notification->created_at?->toIso8601String(),

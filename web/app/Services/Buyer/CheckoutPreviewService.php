@@ -51,7 +51,11 @@ class CheckoutPreviewService
         $application = $vouchers->resolve($base->sellerGroups, $base->subtotalCentavos, $fees, $notice);
         $summary = new CartSummary($items, $application);
 
+        $checkout = app(CheckoutService::class);
+
         return [
+            'deliver_to' => $checkout->addressSnapshot($deliverTo),
+            'address_fingerprint' => $checkout->addressFingerprint($deliverTo),
             'items' => $items->map(fn (CartItem $item): array => [
                 'product_id' => $item->product_id, 'variant_id' => $item->variant_id,
                 'name' => $item->product->name, 'quantity' => $item->quantity,
