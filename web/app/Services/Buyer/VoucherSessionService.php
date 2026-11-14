@@ -22,6 +22,51 @@ final class VoucherSessionService
     public const LEGACY_KEY = 'cart_voucher';
 
     /**
+     * In-memory slot => code state for stateless (bearer-token) callers; null
+     * means the browser session is the store, as on the web.
+     *
+     * @var array<int|string, string>|null
+     */
+    private ?array $memory = null;
+
+    /** Buyer whose per-buyer limits apply when there is no web session. */
+    private ?int $buyerId = null;
+
+    /**
+     * A copy that keeps the slot => code state in memory instead of the
+     * session, for the Buyer mobile API: the app sends the buyer's chosen
+     * codes with each request and every rule below re-validates them, exactly
+     * as the session copy does. Writes stay in memory; read them back with
+     * appliedState().
+     *
+     * @param  array<int|string, mixed>  $state
+     */
+    public function forStatelessBuyer(int $buyerId, array $state): self
+    {
+        $copy = new self;
+        $copy->buyerId = $buyerId;
+        $copy->memory = [];
+        foreach ($state as $slot => $code) {
+            if (is_string($code) && trim($code) !== '') {
+                $copy->memory[is_int($slot) ? $slot : (string) $slot] = strtoupper(trim($code));
+            }
+        }
+
+        return $copy;
+    }
+
+    /**
+     * The normalized slot => code state after resolve/apply/remove (stateless
+     * copy) or the session state (web).
+     *
+     * @return array<int|string, string>
+     */
+    public function appliedState(): array
+    {
+        return $this->state();
+    }
+
+    /**
      * Resolve, validate, and stack every voucher currently stored for the cart.
      *
      * @param  Collection<int, array{seller: Seller, items: Collection}>  $sellerGroups
@@ -171,6 +216,12 @@ final class VoucherSessionService
 
     public function clear(): void
     {
+        if ($this->memory !== null) {
+            $this->memory = [];
+
+            return;
+        }
+
         session()->forget([self::SESSION_KEY, self::LEGACY_KEY]);
     }
 
@@ -220,7 +271,7 @@ final class VoucherSessionService
 
         // Checkout re-runs this with the buyer and voucher rows locked, so two
         // tabs cannot both pass the limit.
-        $buyerId = auth('buyer')->id();
+        $buyerId = $this->buyerId ?? auth('buyer')->id();
         if ($voucher->per_buyer_limit !== null && $buyerId !== null
             && $voucher->usesByBuyer((int) $buyerId) >= $voucher->per_buyer_limit) {
             return 'You have already used this voucher the maximum number of times.';
@@ -236,6 +287,10 @@ final class VoucherSessionService
      */
     private function state(): array
     {
+        if ($this->memory !== null) {
+            return $this->memory;
+        }
+
         $raw = session(self::SESSION_KEY, []);
         $state = [];
 
@@ -294,6 +349,12 @@ final class VoucherSessionService
     {
         if ($state === []) {
             $this->clear();
+
+            return;
+        }
+
+        if ($this->memory !== null) {
+            $this->memory = $state;
 
             return;
         }

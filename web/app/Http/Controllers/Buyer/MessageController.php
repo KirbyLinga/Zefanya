@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreChatMessageRequest;
+use App\Models\Buyer\Buyer;
 use App\Models\Shared\Conversation;
 use App\Models\Shared\Message;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -23,21 +24,9 @@ class MessageController extends Controller
     public function index(): View
     {
         $buyer = Auth::guard('buyer')->user();
-        $conversations = $buyer->conversations()
-            ->with(['seller', 'product', 'order', 'messages'])
-            ->orderBy('last_message_at', 'desc')
-            ->get();
+        ['conversations' => $conversations, 'unreadCounts' => $unreadCounts] = $this->inboxData($buyer);
 
-        // Calculate unread counts per conversation
-        $unreadCounts = [];
-        foreach ($conversations as $conversation) {
-            $unreadCounts[$conversation->id] = $conversation->messages()
-                ->where('sender_role', 'seller')
-                ->where('read_at', null)
-                ->count();
-        }
-
-        return view('Buyer.Messages.index', compact('conversations', 'unreadCounts'));
+        return view(request()->boolean('widget') ? 'Buyer.Messages.widget' : 'Buyer.Messages.index', compact('conversations', 'unreadCounts'));
     }
 
     public function show(Conversation $conversation)
@@ -45,7 +34,9 @@ class MessageController extends Controller
         $buyer = Auth::guard('buyer')->user();
 
         if (! Gate::forUser($buyer)->allows('view', $conversation)) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return request()->boolean('widget') && ! request()->wantsJson()
+                ? response()->view('Buyer.Messages.widget', ['widgetError' => 'This conversation is unavailable. Please choose another conversation.'], 403)
+                : response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // ?after= lets the open thread poll for only what it has not shown yet.
@@ -71,14 +62,32 @@ class MessageController extends Controller
                     'sender_name' => $m->sender_role === 'buyer' ? $conversation->buyer->fullName() : $conversation->seller->business_name,
                     'body' => htmlspecialchars($m->body, ENT_QUOTES, 'UTF-8'),
                     'image_url' => $m->imageUrl('buyer'),
-                    'html' => view('Messages._bubble', ['message' => $m, 'role' => 'buyer'])->render(),
+                    'html' => view('Messages._bubble', ['message' => $m, 'role' => 'buyer', 'conversation' => $conversation])->render(),
                     'created_at' => $m->created_at->format('M d, Y H:i'),
                     'read_at' => $m->read_at,
                 ]),
             ]);
         }
 
-        return view('Buyer.Messages.show', compact('conversation', 'messages'));
+        return view(request()->boolean('widget') ? 'Buyer.Messages.widget' : 'Buyer.Messages.show', array_merge(
+            compact('conversation', 'messages'),
+            $this->inboxData($buyer),
+        ));
+    }
+
+    private function inboxData(Buyer $buyer): array
+    {
+        $conversations = $buyer->conversations()
+            ->with(['seller', 'product', 'order', 'messages'])
+            ->withCount(['messages as unread_count' => fn ($query) => $query
+                ->where('sender_role', 'seller')->whereNull('read_at')])
+            ->orderByDesc('last_message_at')
+            ->get();
+
+        return [
+            'conversations' => $conversations,
+            'unreadCounts' => $conversations->pluck('unread_count', 'id')->all(),
+        ];
     }
 
     public function store(StoreChatMessageRequest $request): JsonResponse

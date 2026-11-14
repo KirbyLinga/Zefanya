@@ -23,7 +23,7 @@
         })();
     </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
+    <x-fonts />
 
     @vite([
         'resources/css/app.css',

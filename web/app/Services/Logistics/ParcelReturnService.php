@@ -37,6 +37,7 @@ use App\Services\Seller\SellerSettlementService;
 use App\Services\Seller\StockService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -358,6 +359,23 @@ class ParcelReturnService
      * The assigned rider has the parcel in hand. The waybill must match, and the
      * rider's station takes custody, so the existing reverse flow starts from there.
      */
+    /**
+     * Buyer returns assigned to this rider and not yet collected, oldest
+     * assignment first (the Rider web page and the Rider mobile API).
+     *
+     * @return Collection<int, ParcelReturn>
+     */
+    public function pendingBuyerCollectionsFor(Rider $rider): Collection
+    {
+        return ParcelReturn::query()
+            ->where('status', State::Requested->value)
+            ->whereNull('collected_at')
+            ->whereHas('collectionCourier', fn ($courier) => $courier->where('rider_id', $rider->id))
+            ->with(['sellerOrder.order.buyer', 'sellerOrder.orderItems'])
+            ->oldest('collection_assigned_at')
+            ->get();
+    }
+
     public function confirmBuyerCollection(ParcelReturn $record, Rider $rider, string $tracking): void
     {
         DB::transaction(function () use ($record, $rider, $tracking): void {

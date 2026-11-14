@@ -20,7 +20,7 @@ class ShippingRateService
      *
      * @return array{first_kg_minor: int, additional_kg_minor: int}|null
      */
-    public function rateFor(LogisticsProvider $provider, string $zone): ?array
+    public function rateFor(LogisticsProvider $provider, string $zone, ?string $route = null): ?array
     {
         $own = LogisticsShippingRate::query()
             ->where('logistics_provider_id', $provider->getKey())
@@ -28,7 +28,9 @@ class ShippingRateService
             ->whereNotNull('first_kg_minor')
             ->first();
 
-        return $this->resolveRate($own, $zone);
+        return $own === null && $route !== null
+            ? (\App\Models\Shared\ShippingRate::cards()[$route] ?? $this->resolveRate($own, $zone))
+            : $this->resolveRate($own, $zone);
     }
 
     /** Read the relevant providers' rate cards in one query for a checkout snapshot. */
@@ -38,6 +40,11 @@ class ShippingRateService
             ->whereNotNull('first_kg_minor')->get()->groupBy('logistics_provider_id');
         $snapshot = [];
         foreach ($providers as $provider) {
+            $specCards = \App\Models\Shared\ShippingRate::cards();
+            if ($specCards !== []) {
+                $snapshot[$provider->id]['_spec_routes'] = $specCards;
+                $snapshot[$provider->id]['_overrides'] = $cards->get($provider->id)?->pluck('zone')->all() ?? [];
+            }
             foreach (array_keys(LogisticsShippingRate::ZONES) as $zone) {
                 $own = $cards->get($provider->id)?->firstWhere('zone', $zone);
                 $snapshot[$provider->id][$zone] = $this->resolveRate($own, $zone);

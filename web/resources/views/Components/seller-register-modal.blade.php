@@ -159,10 +159,17 @@
                     <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-seller_type"></span>
                 </div>
                 <div class="mb-5 hidden" id="sellerSecCertificateFields">
-                    <label class="mb-2 block font-sans text-xs font-semibold text-neutral-600" for="sellerSecCertificate">SEC certificate (corporations) *</label>
-                    <input type="file" name="sec_certificate" id="sellerSecCertificate" accept=".jpg,.jpeg,.png,.pdf" disabled class="upload-input">
-                    <p class="mt-1 font-sans text-xs text-neutral-500">JPG, PNG or PDF, maximum 5 MB.</p>
-                    <span class="field-error mt-1 block font-sans text-xs text-[#a5333d]" id="server-sec_certificate"></span>
+                    <span class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600">SEC certificate (corporations) *</span>
+                    {{-- Same upload card as the valid ID and business permit below. --}}
+                    <label for="sellerSecCertificate" class="upload-zone mb-1 flex items-center gap-3">
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white shadow-sm"><i data-lucide="file-text" width="18" height="18"></i></span>
+                        <span>
+                            <span class="block font-sans text-sm font-semibold text-neutral-800" id="sellerSecCertificateName">Choose an SEC certificate</span>
+                            <span class="block font-sans text-xs text-neutral-500">JPG, PNG, or PDF · Max 5MB</span>
+                        </span>
+                    </label>
+                    <input type="file" name="sec_certificate" id="sellerSecCertificate" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" disabled class="sr-only">
+                    <span class="field-error mt-1 block font-sans text-[11.5px] text-[#a5333d]" id="server-sec_certificate"></span>
                 </div>
                 <div class="mb-5">
                     <label class="mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-600" for="sellerBusinessName">Business / store name *</label>

@@ -13,7 +13,7 @@
     $hasHalf    = ((float) $starRating - $fullStars) >= 0.5;
     $storeUrl   = route('buyer.stores.show', $store);
 @endphp
-<div class="buyer-product-card h-full bg-white overflow-hidden">
+<div class="buyer-product-card {{ ($compact ?? false) ? 'h-auto shrink-0' : 'h-full' }} bg-white overflow-hidden">
     {{-- Store header (compact) --}}
     <div class="flex items-center gap-2 px-4 py-3 pb-2">
         <a href="{{ $storeUrl }}"
@@ -84,6 +84,7 @@
                         <img src="{{ $thumbnail }}"
                              alt="{{ $product->name }}"
                              loading="lazy" decoding="async"
+                             onerror="this.hidden = true"
                              class="h-full w-full object-cover object-top transition-transform duration-300 hover:scale-105">
                     @endif
                 </a>

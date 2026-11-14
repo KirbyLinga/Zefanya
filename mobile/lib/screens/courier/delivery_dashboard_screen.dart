@@ -5,35 +5,68 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_exception.dart';
 import '../../state/courier_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import 'delivery_tracker_screen.dart';
 import 'widgets/delivery_job_card.dart';
+import 'widgets/wind_down_banner.dart';
+import 'rider_history_screen.dart';
+import 'rider_waybill_screen.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/staggered_reveal.dart';
+import '../../widgets/motion/ease_in_frame.dart';
+import '../../widgets/notification_bell.dart';
 
 class DeliveryDashboardScreen extends StatelessWidget {
   const DeliveryDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
-    final jobs = context.watch<CourierState>().jobsForDelivery;
+    final courier = context.watch<CourierState>();
+    final jobs = courier.jobsForDelivery;
+
+    // This is where a courier lands after completing a job, so today's
+    // takings belong here and not only on a tab they have to go and find —
+    // see the tempo note in DeliveryTrackerScreen._completeDelivery. Hidden
+    // at zero rather than showing "₱0", because an empty tally is noise on
+    // the first run of the day.
+    final tally = courier.todayEarnings > 0 ? _todayTally(theme, courier) : null;
 
     return Scaffold(
       backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
-      appBar: AppBar(),
+      // Live mode: the rider's WebZefanya notifications (assignments, cash,
+      // payouts). Mock mode keeps the bare bar it always had.
+      appBar: AppBar(
+        actions: [
+          if (courier.hasServerRecords && !courier.isWindingDown)
+            IconButton(
+              key: const ValueKey('rider-history-button'),
+              tooltip: 'Delivery history',
+              icon: const Icon(Icons.history),
+              onPressed: () => Navigator.of(context).push(
+                AppPageRoute(builder: (_) => const RiderHistoryScreen()),
+              ),
+            ),
+          if (courier.isServerAuthoritative) const NotificationBell(),
+        ],
+      ),
       body: jobs.isEmpty
           ? Column(
               children: [
-                const EditorialHeader(
+                EditorialHeader(
                   eyebrow: 'FOR DELIVERY',
                   title: 'Out for Delivery',
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  trailing: tally,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 ),
-                Expanded(child: _buildEmptyState(theme)),
+                const RiderWindDownBanner(margin: EdgeInsets.fromLTRB(20, 0, 20, 12)),
+                Expanded(child: _buildEmptyState(theme, courier)),
               ],
             )
           : ListView.builder(
@@ -41,34 +74,139 @@ class DeliveryDashboardScreen extends StatelessWidget {
               itemCount: jobs.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  return const EditorialHeader(
-                    eyebrow: 'FOR DELIVERY',
-                    title: 'Out for Delivery',
-                    padding: EdgeInsets.fromLTRB(0, 12, 0, 16),
+                  return EaseInFrame(
+                    index: 0,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        EditorialHeader(
+                          eyebrow: 'FOR DELIVERY',
+                          title: 'Out for Delivery',
+                          trailing: tally,
+                          padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                        ),
+                        const RiderWindDownBanner(margin: EdgeInsets.only(bottom: 12)),
+                      ],
+                    ),
                   );
                 }
                 final job = jobs[i - 1];
-                return StaggeredReveal(
+                final card = DeliveryJobCard(
+                  assignedJob: job,
                   index: i - 1,
-                  child: DeliveryJobCard(
-                    assignedJob: job,
-                    index: i - 1,
-                    onTap: () => Navigator.of(context).push(
-                      AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: job.job.id)),
-                    ),
+                  onTap: () => Navigator.of(context).push(
+                    AppPageRoute(builder: (_) => DeliveryTrackerScreen(jobId: job.job.id)),
                   ),
+                );
+                return EaseInFrame(
+                  index: (i - 1).clamp(0, 5),
+                  child: courier.hasServerRecords && job.job.serverStatus != null
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [card, _WaybillLink(jobId: job.job.id)],
+                        )
+                      : card,
                 );
               },
             ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return const EmptyState(
+  /// The courier's day so far, in the header of the screen they return to
+  /// after every delivery.
+  ///
+  /// Deliberately small — a running total, not a dashboard. The Earnings tab
+  /// is where these numbers are the subject rather than context.
+  Widget _todayTally(ThemeData theme, CourierState courier) {
+    final now = DateTime.now();
+    final count = courier.completedJobs
+        .where((c) =>
+            c.completedAt.year == now.year &&
+            c.completedAt.month == now.month &&
+            c.completedAt.day == now.day)
+        .length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text('TODAY', style: AppType.eyebrow),
+        const SizedBox(height: 4),
+        Text(formatPeso(courier.todayEarnings), style: AppType.priceNumeral(24)),
+        const SizedBox(height: 2),
+        Text(
+          '$count delivered',
+          style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  /// The empty board says *which* kind of empty it is: "nothing out for delivery"
+  /// and "we could not ask" are different facts, and only one of them is about the
+  /// courier's day. That distinction is exactly what
+  /// [CourierRepository.assignedJobs] throws for.
+  ///
+  /// Retry appears only when the failure says trying again could work
+  /// (`ApiException.isRetryable`), which an endpoint that has not been built
+  /// answers no to — offering Retry there teaches a person to mash a button that
+  /// cannot work.
+  Widget _buildEmptyState(ThemeData theme, CourierState courier) {
+    final failure = courier.loadFailure;
+
+    if (failure != null) {
+      return EmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'We couldn\'t load your deliveries',
+        subtitle: Microcopy.calmError(failure.message),
+        action: failure.isRetryable
+            ? TextButton(onPressed: () => _retry(courier), child: const Text('Retry'))
+            : null,
+        tint: AppColors.tertiary,
+      );
+    }
+
+    return EmptyState(
       icon: Icons.local_shipping_outlined,
-      title: 'Nothing out for delivery yet',
-      subtitle: 'Picked-up items will show up here',
+      title: Microcopy.deliveriesEmptyTitle,
+      subtitle: Microcopy.deliveriesEmptySubtitle,
       tint: AppColors.tertiary,
     );
   }
+
+  /// Re-reads the dispatcher's jobs.
+  ///
+  /// The failure is not handled here on purpose: the state keeps it and this
+  /// screen rebuilds from `loadFailure`, so catching it again would swallow the
+  /// same error twice.
+  Future<void> _retry(CourierState courier) async {
+    try {
+      await courier.refreshJobs();
+    } on ApiException {
+      // Rendered above, from the state.
+    }
+  }
 }
+
+/// Opens the private digital waybill for a live job.
+class _WaybillLink extends StatelessWidget {
+  const _WaybillLink({required this.jobId});
+
+  final String jobId;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextButton.icon(
+            key: ValueKey('waybill-$jobId'),
+            onPressed: () => Navigator.of(context).push(
+              AppPageRoute(builder: (_) => RiderWaybillScreen(jobId: jobId)),
+            ),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: const Text('Waybill'),
+          ),
+        ),
+      );
+}
+

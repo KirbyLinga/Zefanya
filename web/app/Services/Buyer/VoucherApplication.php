@@ -265,8 +265,8 @@ final class VoucherApplication
 
     /**
      * Split a discount across weights. Platform discounts use subtotal weights
-     * and put the remainder on the largest store, subject to its remaining
-     * merchandise. Shipping uses the largest fractional remainder.
+     * and distribute rounding cents by largest fractional remainder, subject
+     * to remaining merchandise. Shipping uses the same rounding rule.
      * The result always sums exactly to the discount and never exceeds a
      * weight.
      *
@@ -298,10 +298,17 @@ final class VoucherApplication
 
         $left = $discount - array_sum($allocated);
         if ($capacities !== null) {
-            // Platform shares use store subtotals. Give all leftover centavos
-            // to the largest store with room; seller id breaks equal-subtotal ties.
+            // Allocate rounding cents by fractional remainder, using seller id
+            // for stable ties. This preserves the workbook's 63.66 / 36.34 split.
             $keys = array_keys($weights);
-            usort($keys, fn ($a, $b): int => ($weights[$b] <=> $weights[$a]) ?: ($a <=> $b));
+            usort($keys, fn ($a, $b): int => ($remainders[$b] <=> $remainders[$a]) ?: ($a <=> $b));
+            foreach ($keys as $key) {
+                if ($left > 0 && $allocated[$key] < max(0, $capacities[$key] ?? 0)) {
+                    $allocated[$key]++;
+                    $left--;
+                }
+            }
+            // A fully discounted shop can donate more than a rounding cent.
             foreach ($keys as $key) {
                 $extra = min($left, max(0, ($capacities[$key] ?? 0) - $allocated[$key]));
                 $allocated[$key] += $extra;

@@ -61,6 +61,9 @@ class Rule08ProductReviewsTest extends TestCase
             'seller_id' => $seller->id,
         ]);
         $sellerOrder->forceFill(['status' => $status->value])->save();
+        if ($status === OrderStatus::Completed) {
+            \App\Models\Shared\StatusHistory::record($sellerOrder, OrderStatus::Delivered, OrderStatus::Completed);
+        }
 
         return OrderItem::factory()->create([
             'seller_order_id' => $sellerOrder->id,
@@ -270,7 +273,7 @@ class Rule08ProductReviewsTest extends TestCase
         $this->assertSame('Edited once', $review->body);
     }
 
-    public function test_buy_rate_005_thirty_day_boundary_is_inclusive(): void
+    public function test_buy_rate_005_exact_thirty_day_boundary_is_closed(): void
     {
         Carbon::setTestNow('2026-09-01 12:00:00');
 
@@ -285,9 +288,9 @@ class Rule08ProductReviewsTest extends TestCase
         $this->actingAs($buyer, 'buyer')->patch(route('buyer.reviews.update', $review), [
             'rating' => 4,
             'body' => 'Boundary edit',
-        ])->assertSessionHasNoErrors();
+        ])->assertSessionHasErrors('review');
 
-        $this->assertSame('Boundary edit', $review->refresh()->body);
+        $this->assertSame('Great item', $review->refresh()->body);
     }
 
     public function test_buy_rate_005_buyer_cannot_edit_after_thirty_days(): void

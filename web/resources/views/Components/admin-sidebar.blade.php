@@ -1,7 +1,7 @@
 @php
     $navLink = 'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 font-sans text-[13px] font-medium text-[var(--sidebar-text)] no-underline transition-colors hover:bg-[var(--sidebar-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sidebar-active-border)] [&>span]:text-inherit [&>i]:size-[18px] [.is-collapsed_&]:justify-center [.is-collapsed_&]:gap-0 [.is-collapsed_&]:px-0 [.is-collapsed_&>span]:hidden';
     $admin = auth('admin')->user();
-    // Mirrors routes/admin.php: support only has the dashboard and its own 2FA page.
+    // Mirrors routes/admin.php: support only has access to the dashboard.
     $canManage = in_array($admin?->role, ['admin', 'super_admin'], true);
     $canModerate = $canManage || $admin?->role === 'moderator';
     $heading = 'mt-4 px-3 pb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-muted)] [.is-collapsed_&]:hidden';
@@ -82,11 +82,6 @@
                 <p class="font-sans text-[11px] text-[var(--sidebar-muted)]">{{ \Illuminate\Support\Str::headline($admin?->role ?? 'admin') }}</p>
             </div>
         </div>
-    {{-- Each admin's own security page, open to every role, so it lives with the profile. --}}
-    <a href="{{ route('admin.two-factor.show') }}" aria-label="Two-factor security" title="Two-factor security" @if(request()->routeIs('admin.two-factor.show')) aria-current="page" @endif class="{{ $navLink }}">
-        <i data-lucide="shield-check" width="20" height="20" class="shrink-0" aria-hidden="true"></i>
-        <span>Two-factor security</span>
-    </a>
     <form method="POST" action="{{ route('admin.logout') }}" class="mt-2">
         @csrf
         <button type="submit" aria-label="Log out" title="Log out" class="{{ $navLink }} w-full cursor-pointer">
