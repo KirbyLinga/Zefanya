@@ -3,10 +3,13 @@
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DocumentController;
+use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\HubApprovalController;
 use App\Http\Controllers\Admin\IncidentController;
 use App\Http\Controllers\Admin\LogisticsRemittanceController;
+use App\Http\Controllers\Admin\LostParcelController;
 use App\Http\Controllers\Admin\OperationsAuditLogController;
+use App\Http\Controllers\Admin\OrderMonitoringController;
 use App\Http\Controllers\Admin\PartnershipController;
 use App\Http\Controllers\Admin\PlatformSettingController;
 use App\Http\Controllers\Admin\ProductController;
@@ -14,6 +17,7 @@ use App\Http\Controllers\Admin\RegistrationController;
 use App\Http\Controllers\Admin\ReturnController;
 use App\Http\Controllers\Admin\SellerPayoutController;
 use App\Http\Controllers\Admin\SellerSettlementController;
+use App\Http\Controllers\Admin\TransportOverviewController;
 use App\Http\Controllers\Admin\UserAccountController;
 use App\Http\Controllers\Admin\VoucherController;
 use Illuminate\Support\Facades\Route;
@@ -49,14 +53,22 @@ Route::middleware('auth:admin')->group(function () {
         Route::patch('/settings/{platformSetting}', [PlatformSettingController::class, 'update'])->name('settings.update');
         // Read-only on purpose: the audit log has no edit or delete routes.
         Route::get('/audit-logs', [OperationsAuditLogController::class, 'index'])->name('audit-logs.index');
+        // Monitoring only; Logistics retains all assignment and custody actions.
+        Route::get('/orders', [OrderMonitoringController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{sellerOrder}', [OrderMonitoringController::class, 'show'])->whereNumber('sellerOrder')->name('orders.show');
 
         Route::get('/logistics-remittances', [LogisticsRemittanceController::class, 'index'])->name('logistics-remittances.index');
         Route::post('/logistics-remittances/{remittance}/confirm', [LogisticsRemittanceController::class, 'confirm'])->name('logistics-remittances.confirm');
         Route::post('/logistics-remittances/{remittance}/reject', [LogisticsRemittanceController::class, 'reject'])->name('logistics-remittances.reject');
+        Route::post('/logistics-remittances/allocation-policy', [LogisticsRemittanceController::class, 'approveAllocationPolicy'])->name('logistics-remittances.allocation-policy');
         Route::post('/logistics-remittances/origin/{provider}/pay', [LogisticsRemittanceController::class, 'payOrigin'])->name('logistics-remittances.pay-origin');
         Route::post('/logistics-remittances/historical/{parcel}/reconcile', [LogisticsRemittanceController::class, 'reconcileHistorical'])->name('logistics-remittances.reconcile-historical');
         Route::post('/logistics-remittances/historical/{parcel}/pay-destination', [LogisticsRemittanceController::class, 'payDestination'])->name('logistics-remittances.pay-destination');
         Route::post('/logistics-remittances/origin-payments/{payout}/reverse', [LogisticsRemittanceController::class, 'reverseOriginPayment'])->name('logistics-remittances.reverse-origin-payment');
+
+        // Read-only report: no route here moves money.
+        Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
+        Route::get('/finance/export', [FinanceController::class, 'export'])->middleware('throttle:20,1')->name('finance.export');
 
         Route::get('/seller-payouts', [SellerPayoutController::class, 'index'])->name('seller-payouts.index');
         Route::post('/seller-payouts/{payout}/pay', [SellerPayoutController::class, 'pay'])->name('seller-payouts.pay');
@@ -100,6 +112,9 @@ Route::middleware('auth:admin')->group(function () {
         Route::post('/registrations/logistics/{logistics_provider}/approve', [RegistrationController::class, 'approveLogistics'])->name('registrations.logistics.approve');
         Route::post('/registrations/logistics/{logistics_provider}/reject', [RegistrationController::class, 'rejectLogistics'])->name('registrations.logistics.reject');
 
+        // Read-only: no route here moves a parcel or changes custody.
+        Route::get('/transport', [TransportOverviewController::class, 'index'])->name('transport.index');
+
         // Hub Approvals (Logistics Hubs & Stations) + Admin Province Hub provisioning
         Route::get('/hubs', [HubApprovalController::class, 'index'])->name('hubs.index');
         Route::post('/hubs/province/provision', [HubApprovalController::class, 'provisionProvinceHub'])->name('hubs.province.provision');
@@ -116,11 +131,20 @@ Route::middleware('auth:admin')->group(function () {
         Route::post('/returns/{return}/reverse-route', [ReturnController::class, 'authorizeReverseRoute'])->name('returns.reverse-route');
         Route::post('/returns/{return}/dispute', [ReturnController::class, 'resolveDispute'])->name('returns.dispute');
         Route::post('/returns/{return}/fault', [ReturnController::class, 'setFault'])->name('returns.fault');
+        Route::post('/returns/{return}/refund/authorize', [ReturnController::class, 'authorizeRefund'])->name('returns.refund.authorize');
+        Route::post('/returns/{return}/refund/evidence', [ReturnController::class, 'submitRefundEvidence'])->name('returns.refund.evidence');
+        Route::post('/returns/{return}/refund/confirm', [ReturnController::class, 'confirmRefund'])->name('returns.refund.confirm');
+        Route::get('/returns/{return}/refund/evidence/{event}', [ReturnController::class, 'refundEvidence'])->whereNumber('event')->name('returns.refund.evidence-file');
         Route::post('/returns/{return}/refund', [ReturnController::class, 'recordRefund'])->name('returns.refund');
         Route::post('/returns/{return}/refund/void', [ReturnController::class, 'voidRefund'])->name('returns.refund.void');
         Route::post('/return-charges/{charge}/settle', [ReturnController::class, 'settleCharge'])->name('return-charges.settle');
         Route::get('/returns/{return}/refund-proof', [ReturnController::class, 'refundProof'])->name('returns.refund-proof');
         Route::post('/returns/{return}/stock', [ReturnController::class, 'stock'])->name('returns.stock');
+        Route::post('/returns/{return}/close', [ReturnController::class, 'close'])->name('returns.close');
+        Route::post('/returns/{return}/collection-retry', [ReturnController::class, 'authorizeCollectionRetry'])->name('returns.collection-retry');
+        Route::post('/returns/{return}/disposition', [ReturnController::class, 'recordDisposition'])->name('returns.disposition');
+        Route::post('/returns/{return}/receipt-dispute/resume', [ReturnController::class, 'resumeHandover'])->name('returns.receipt-dispute.resume');
+        Route::get('/returns/{return}/receipt-dispute/photos/{index}', [ReturnController::class, 'receiptDisputePhoto'])->whereNumber('index')->name('returns.receipt-dispute.photo');
         Route::get('/partnerships', [PartnershipController::class, 'index'])->name('partnerships.index');
         Route::post('/partnerships/exceptions/{exception}/resolve', [PartnershipController::class, 'resolveException'])->name('partnerships.exceptions.resolve');
         Route::post('/partnerships/{link}/approve', [PartnershipController::class, 'approve'])->name('partnerships.approve');
@@ -139,17 +163,30 @@ Route::middleware('auth:admin')->group(function () {
 
         // ── Admin product oversight (SEL-13) ────────────────────────────────
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+        Route::get('/products/pending', [ProductController::class, 'pending'])->name('products.pending');
         Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
+        Route::post('/products/{product}/approve', [ProductController::class, 'approve'])->name('products.approve');
+        Route::post('/products/{product}/reject', [ProductController::class, 'reject'])->name('products.reject');
         Route::post('/products/{product}/restrict', [ProductController::class, 'restrict'])->name('products.restrict');
         Route::post('/products/{product}/unrestrict', [ProductController::class, 'unrestrict'])->name('products.unrestrict');
 
         // ── Lost/damaged incident management (new) ──────────────────────────
         Route::prefix('incidents')->group(function (): void {
             Route::get('/', [IncidentController::class, 'index'])->name('incidents.index');
+            Route::post('/confirm-lost', [IncidentController::class, 'confirmLost'])->name('incidents.confirm-lost');
             Route::get('/{incident}', [IncidentController::class, 'show'])->name('incidents.detail');
             Route::post('/{incident}/resolve', [IncidentController::class, 'resolve'])->name('incidents.resolve');
             Route::post('/{incident}/reject', [IncidentController::class, 'reject'])->name('incidents.reject');
             Route::delete('/{incident}', [IncidentController::class, 'destroy'])->name('incidents.destroy');
+        });
+
+        // Parcels confirmed lost: liability, the manual compensation confirmation, found parcels.
+        Route::prefix('lost-parcels')->group(function (): void {
+            Route::get('/', [LostParcelController::class, 'index'])->name('lost-parcels.index');
+            Route::post('/{case}/liability', [LostParcelController::class, 'assign'])->name('lost-parcels.assign');
+            Route::post('/{case}/pay', [LostParcelController::class, 'pay'])->name('lost-parcels.pay');
+            Route::post('/{case}/adjust', [LostParcelController::class, 'adjust'])->name('lost-parcels.adjust');
+            Route::post('/{case}/disposition', [LostParcelController::class, 'disposition'])->name('lost-parcels.disposition');
         });
     });
 });

@@ -177,7 +177,7 @@ class FulfillmentLifecycleTest extends TestCase
             'type' => 'App\\Notifications\\Buyer\\OrderDelivered',
         ]);
 
-        // ── 9.5. COD payment pending (settled only on buyer confirmation) ───────
+        // ── 9.5. A COD payment without collection evidence remains pending ──
         $codPayment = Payment::factory()->create([
             'seller_order_id' => $sellerOrder->id,
             'amount_minor' => $sellerOrder->subtotal_minor,
@@ -190,9 +190,8 @@ class FulfillmentLifecycleTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $sellerOrder->status);
         $this->assertSame(10, StatusHistory::where('seller_order_id', $sellerOrder->id)->count());
 
-        // COD payment settled on confirmation.
-        $this->assertSame(PaymentStatus::Paid, $codPayment->fresh()->status);
-        $this->assertNotNull($codPayment->fresh()->paid_at);
+        $this->assertSame(PaymentStatus::Pending, $codPayment->fresh()->status);
+        $this->assertNull($codPayment->fresh()->paid_at);
 
         // Parent checkout-order status should have rolled up to Completed
         // (single seller_order, now Completed → parent rolls up).

@@ -10,7 +10,7 @@
         <h1>Email verified</h1>
 
         @if (session('success'))
-            <p>{{ session('success') }}</p>
+            <x-flash type="success" :message="session('success')" spacing="" />
         @else
             <p>Your email is verified. Please wait for the administrator's approval, which will be sent to your email.</p>
         @endif

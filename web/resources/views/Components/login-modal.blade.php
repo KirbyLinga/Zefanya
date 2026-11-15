@@ -6,7 +6,7 @@
      (the navbar's Login link already gets a data-login-trigger attribute below) --}}
 
 <div class="login-modal-overlay" id="loginModalOverlay" aria-hidden="true">
-    <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+    <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle" tabindex="-1">
 
         <button type="button" class="login-modal__close" id="loginModalClose" aria-label="Close login form">
             <i data-lucide="x" width="18" height="18"></i>
@@ -20,14 +20,14 @@
         <p class="login-modal__subtitle">Log in to continue to Zefanya.</p>
 
         @if (session('auth.status_message'))
-            <div class="login-modal__error">
+            <div class="login-modal__error" id="loginModalErrorSummary" role="alert" tabindex="-1">
                 {{ session('auth.status_message') }}
                 @if (session('auth.resume_url'))
                     <div><a href="{{ session('auth.resume_url') }}" style="text-decoration: underline;">{{ session('auth.resume_label') ?? 'Verify your email' }}</a></div>
                 @endif
             </div>
         @elseif ($errors->any())
-            <div class="login-modal__error">
+            <div class="login-modal__error" id="loginModalErrorSummary" role="alert" tabindex="-1">
                 {{ $errors->first() }}
             </div>
         @endif
@@ -44,8 +44,12 @@
                 placeholder="you@example.com"
                 value="{{ old('email') }}"
                 required
-                autofocus
+                autocomplete="username"
+                @if ($errors->has('email')) aria-invalid="true" aria-describedby="loginEmailError" @endif
             />
+            @if ($errors->has('email'))
+                <p class="login-modal__field-error" id="loginEmailError">{{ $errors->first('email') }}</p>
+            @endif
 
             <label class="login-modal__label" for="loginPassword">Password</label>
             <div class="login-modal__password-wrap">
@@ -56,11 +60,16 @@
                     id="loginPassword"
                     placeholder="••••••••"
                     required
+                    autocomplete="current-password"
+                    @if ($errors->has('password')) aria-invalid="true" aria-describedby="loginPasswordError" @endif
                 />
-                <button type="button" class="login-modal__toggle-visibility" id="togglePassword" aria-label="Show password">
+                <button type="button" class="login-modal__toggle-visibility" id="togglePassword" aria-label="Show password" aria-pressed="false" aria-controls="loginPassword">
                     <i data-lucide="eye" width="18" height="18"></i>
                 </button>
             </div>
+            @if ($errors->has('password'))
+                <p class="login-modal__field-error" id="loginPasswordError">{{ $errors->first('password') }}</p>
+            @endif
 
             <div class="login-modal__row">
                 <label class="login-modal__remember">
@@ -109,36 +118,91 @@
 (function () {
     var overlay = document.getElementById('loginModalOverlay');
     if (!overlay) return;
+    if (overlay.dataset.loginModalInitialized === 'true') return;
+    overlay.dataset.loginModalInitialized = 'true';
 
+    var dialog = overlay.querySelector('[role="dialog"]');
     var closeBtn = document.getElementById('loginModalClose');
     var toggleBtn = document.getElementById('togglePassword');
     var passwordInput = document.getElementById('loginPassword');
     var loginForm = overlay.querySelector('.login-modal__form');
     var divider = document.getElementById('loginModalDivider');
     var guestLink = document.getElementById('loginModalGuest');
+    var opener = null;
+    var previousBodyOverflow = '';
+    var inertedElements = [];
+
+    function isOpen() {
+        return overlay.classList.contains('is-open');
+    }
+
+    function getFocusableElements() {
+        return Array.prototype.slice.call(dialog.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter(function (element) {
+            return element.getAttribute('aria-hidden') !== 'true' && element.getClientRects().length > 0;
+        });
+    }
+
+    function focusInitialTarget() {
+        var target = dialog.querySelector('[aria-invalid="true"]') ||
+            dialog.querySelector('#loginModalErrorSummary') ||
+            dialog.querySelector('#loginEmail') || getFocusableElements()[0] || dialog;
+        target.focus();
+    }
+
+    function makeBackgroundInert() {
+        var branch = overlay;
+        while (branch && branch.parentElement) {
+            Array.prototype.forEach.call(branch.parentElement.children, function (sibling) {
+                if (sibling !== branch && !inertedElements.some(function (entry) { return entry.element === sibling; })) {
+                    inertedElements.push({ element: sibling, wasInert: sibling.inert });
+                    sibling.inert = true;
+                }
+            });
+            if (branch.parentElement === document.body) break;
+            branch = branch.parentElement;
+        }
+    }
+
+    function restoreBackground() {
+        inertedElements.forEach(function (entry) { entry.element.inert = entry.wasInert; });
+        inertedElements = [];
+    }
 
     function openModal(e, options) {
         if (e) e.preventDefault();
+        if (isOpen()) return;
+        var eventTarget = e && e.currentTarget;
+        opener = eventTarget && eventTarget !== document ? eventTarget :
+            (document.activeElement !== document.body ? document.activeElement : null);
+        previousBodyOverflow = document.body.style.overflow;
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
+        makeBackgroundInert();
 
         // If options.hideGuest is true, hide the "Continue as Guest" section
         if (options && options.hideGuest && divider && guestLink) {
             divider.style.display = 'none';
             guestLink.style.display = 'none';
         }
+        window.requestAnimationFrame(focusInitialTarget);
     }
 
     function closeModal() {
+        if (!isOpen()) return;
         overlay.classList.remove('is-open');
         overlay.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
+        document.body.style.overflow = previousBodyOverflow;
+        restoreBackground();
         // Discard any pending cart/Checkout action so a stale Buy Now or
         // Add-to-Cart does not fire later from a different page.
         if (typeof window.clearPendingAction === 'function') {
             window.clearPendingAction();
         }
+        if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus();
+        opener = null;
     }
 
     // Expose openModal globally so addToCart() can trigger it
@@ -162,15 +226,47 @@
     });
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeModal();
+        if (!isOpen()) return;
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeModal();
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        var focusable = getFocusableElements();
+        if (!focusable.length) {
+            e.preventDefault();
+            dialog.focus();
+            return;
+        }
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+            e.preventDefault();
+            first.focus();
+        }
+    });
+
+    document.addEventListener('focusin', function (e) {
+        if (isOpen() && !dialog.contains(e.target)) focusInitialTarget();
     });
 
     if (toggleBtn && passwordInput) {
         toggleBtn.addEventListener('click', function () {
-            var isPassword = passwordInput.type === 'password';
-            passwordInput.type = isPassword ? 'text' : 'password';
-            toggleBtn.innerHTML = '<i data-lucide="' + (isPassword ? 'eye-off' : 'eye') + '" width="18" height="18"></i>';
+            var reveal = passwordInput.type === 'password';
+            var pos = passwordInput.value.length;
+            passwordInput.type = reveal ? 'text' : 'password';
+            toggleBtn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+            toggleBtn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+            toggleBtn.innerHTML = '<i data-lucide="' + (reveal ? 'eye-off' : 'eye') + '" width="18" height="18"></i>';
             if (window.lucide) lucide.createIcons();
+            setTimeout(function () {
+                passwordInput.focus();
+                try { passwordInput.setSelectionRange(pos, pos); } catch (err) { /* not supported */ }
+            }, 0);
         });
     }
 

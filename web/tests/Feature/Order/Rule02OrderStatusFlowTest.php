@@ -149,7 +149,7 @@ class Rule02OrderStatusFlowTest extends TestCase
             ->assertOk()->assertViewHas('counts', fn ($counts) => $counts['to_receive'] === 1 && $counts['to_ship'] === 0)
             ->assertSee($parcel->order->reference);
         $this->get(route('buyer.orders.index', ['tab' => 'to_ship']))->assertDontSee($parcel->order->reference);
-        $this->assertSame(['Order created', 'Confirmed', 'Preparing', 'Ready for pickup', 'Picked up'], array_column($parcel->fresh()->trackingEvents(), 'title'));
+        $this->assertSame(['Order created', 'Confirmed', 'Preparing', 'Pickup Requested', 'Picked up'], array_column($parcel->fresh()->trackingEvents(), 'title'));
         $this->assertSame(4, StatusHistory::where('seller_order_id', $parcel->id)->count());
         $this->get(route('buyer.orders.show', $parcel->order))->assertOk()->assertSee('Picked up');
     }

@@ -62,6 +62,20 @@ class DeliveryMonitoringTest extends TestCase
             ->assertSee($delivery->name);
     }
 
+    public function test_index_and_detail_show_the_sellers_business_name(): void
+    {
+        $courier = $this->courier();
+        $parcel = $this->order(OrderStatus::OutForDelivery, $courier, $courier);
+        $parcel->seller->forceFill(['business_name' => 'Visible Shop QA'])->save();
+
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.delivery-monitoring.index'))
+            ->assertOk()->assertSee('Visible Shop QA');
+
+        $this->get(route('logistics.delivery-monitoring.show', $parcel))
+            ->assertOk()->assertSee('Visible Shop QA');
+    }
+
     public function test_failed_parcel_shows_reason_label_and_notes(): void
     {
         $pickup = $this->courier();

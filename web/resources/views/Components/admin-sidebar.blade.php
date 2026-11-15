@@ -22,6 +22,13 @@
                 ? \App\Models\Logistics\LogisticsProviderLink::where('status', \App\Models\Logistics\LogisticsProviderLink::PENDING)->count()
                 : 0);
     }
+    $pendingProducts = 0;
+    if ($canModerate && \Illuminate\Support\Facades\Schema::hasTable('products')) {
+        $pendingProducts = \App\Models\Catalog\Product::query()->where('status', 'pending')->count();
+        if (\Illuminate\Support\Facades\Schema::hasTable('product_revisions')) {
+            $pendingProducts += \App\Models\Catalog\ProductRevision::query()->where('status', 'pending')->count();
+        }
+    }
 @endphp
 <div class="w-16 shrink-0 md:w-auto">
 <button type="button" id="adminSidebarBackdrop" class="fixed inset-0 z-40 bg-black/30 md:hidden" aria-label="Close navigation" hidden></button>
@@ -52,19 +59,21 @@
             <p class="{{ $heading }}">Marketplace &amp; operations</p>
             @if ($hasNetwork)
                 <x-admin.nav-item label="Logistics network" icon="network" route="admin.hubs.index" :active="['admin.hubs.*', 'admin.partnerships.*']" :badge="$pendingNetwork" />
+                <x-admin.nav-item label="Transport overview" icon="truck" route="admin.transport.index" :active="['admin.transport.*']" />
             @endif
-            <x-admin.nav-item label="Products" icon="package" route="admin.products.index" :active="['admin.products.*']" />
+            <x-admin.nav-item label="Products" icon="package" route="admin.products.index" :active="['admin.products.index', 'admin.products.show']" />
+            <x-admin.nav-item label="Pending products" icon="inbox" route="admin.products.pending" :active="['admin.products.pending']" :badge="$pendingProducts" />
             @if ($canManage)
+                <x-admin.nav-item label="Order monitoring" icon="scan-search" route="admin.orders.index" :active="['admin.orders.*']" />
                 <x-admin.nav-item label="Vouchers" icon="ticket" route="admin.vouchers.index" :active="['admin.vouchers.*']" />
             @endif
-            <x-admin.nav-item label="Returns & disputes" icon="message-square-warning" route="admin.returns.index" :active="['admin.returns.*']" />
-            <x-admin.nav-item label="Parcel issues" icon="package-x" route="admin.incidents.index" :active="['admin.incidents.*']" />
+            <x-admin.nav-item label="Returns & disputes" icon="message-square-warning" route="admin.returns.index" :active="['admin.returns.*', 'admin.incidents.*']" />
         @endif
 
         @if ($canManage)
             <p class="{{ $heading }}">Money</p>
             <x-admin.nav-item label="Settlements" icon="wallet" route="admin.logistics-remittances.index" :active="['admin.logistics-remittances.*', 'admin.seller-payouts.*']" />
-            <x-admin.nav-item label="Finance" icon="file-bar-chart" />
+            <x-admin.nav-item label="Finance" icon="file-bar-chart" route="admin.finance.index" :active="['admin.finance.*']" />
         @endif
     </nav>
 
@@ -93,6 +102,7 @@
 </aside>
 </div>
 
+@include('Components.mobile-drawer-accessibility')
 <script>
 (function () {
     var sidebar = document.getElementById('adminSidebar');
@@ -100,11 +110,19 @@
     var backdrop = document.getElementById('adminSidebarBackdrop');
     var mobile = window.matchMedia('(max-width: 767px)');
     var key = 'admin.sidebar.collapsed';
+    if (!sidebar || !toggle || sidebar.dataset.drawerInitialized === '1') return;
+    sidebar.dataset.drawerInitialized = '1';
+    var accessibility = window.zfCreateMobileDrawer(sidebar, mobile, {
+        label: 'Admin navigation', hideWhenClosed: false,
+        opener: function () { return toggle; },
+        close: function () { apply(true, false); }
+    });
     function apply(collapsed, persist) {
         sidebar.classList.toggle('is-collapsed', collapsed);
         toggle.setAttribute('aria-expanded', String(!collapsed));
-        toggle.setAttribute('aria-label', collapsed ? 'Expand navigation' : 'Collapse navigation');
+        toggle.setAttribute('aria-label', collapsed ? 'Expand navigation' : (mobile.matches ? 'Close navigation' : 'Collapse navigation'));
         backdrop.hidden = collapsed || !mobile.matches;
+        accessibility.sync(!collapsed, mobile.matches);
         if (persist && !mobile.matches) {
             try { localStorage.setItem(key, collapsed ? '1' : '0'); } catch (e) {}
         }
@@ -118,10 +136,7 @@
     toggle.addEventListener('click', function () {
         apply(!sidebar.classList.contains('is-collapsed'), true);
     });
-    backdrop.addEventListener('click', function () { apply(true, false); toggle.focus(); });
-    sidebar.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && mobile.matches) { apply(true, false); toggle.focus(); }
-    });
+    backdrop.addEventListener('click', function () { apply(true, false); });
     mobile.addEventListener('change', restore);
 })();
 </script>

@@ -77,9 +77,24 @@ class CartControllerTest extends TestCase
         $buyer = Buyer::factory()->create();
         $product = Product::factory()->create();
 
-        $this->actingAs($buyer, 'buyer')
-            ->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 0])
-            ->assertStatus(422);
+        $this->actingAs($buyer, 'buyer');
+        foreach ([0, -1, 0.5, 1.5, 2.9, '9223372036854775808'] as $invalidQuantity) {
+            $this->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => $invalidQuantity])
+                ->assertUnprocessable()->assertJsonValidationErrors('quantity');
+        }
+        $this->assertDatabaseCount('cart_items', 0);
+    }
+
+    public function test_maximum_integer_cart_add_caps_an_existing_line_at_stock(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $product = Product::factory()->create(['stock_quantity' => 4]);
+
+        $this->actingAs($buyer, 'buyer')->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 1])
+            ->assertOk();
+        $this->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => PHP_INT_MAX])
+            ->assertOk()->assertJsonPath('quantity', 4);
+        $this->assertSame(4, $buyer->cartItems()->sole()->quantity);
     }
 
     // ── update ──────────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RiderEarningsTest extends TestCase
@@ -143,19 +144,123 @@ class RiderEarningsTest extends TestCase
         $this->actingAs($this->provider, 'logistics')->get(route('logistics.earnings.index'))
             ->assertOk()
             ->assertSee('Rider pay owed: ₱80.00')
+            ->assertSee('name="payout_revision" value="0"', false)
             ->assertSee('Juan Rider');
     }
 
-    private function payRider(int $throughId, int $expected, string $reference = 'GCASH-77', ?Courier $courier = null)
+    public static function highValueRiderAmounts(): array
+    {
+        return [[1000000], [10000000], [100000000]];
+    }
+
+    #[DataProvider('highValueRiderAmounts')]
+    public function test_high_value_rider_payment_uses_owned_jobs_and_authenticated_logistics_identity(int $minor): void
+    {
+        $first = $this->payableJob();
+        $first->forceFill(['amount_minor' => intdiv($minor, 2)])->save();
+        $last = $this->payableJob();
+        $last->forceFill(['amount_minor' => $minor - intdiv($minor, 2)])->save();
+        $otherProvider = LogisticsProvider::factory()->create(['status' => 'approved']);
+        $this->actingAs($this->provider, 'logistics')->postJson(route('logistics.earnings.pay-rider', $this->courier), [
+            'through_id' => $last->id, 'expected_amount_minor' => $minor, 'payout_revision' => 0,
+            'reference' => 'HIGH-VALUE-RIDER', 'paid_on' => now()->toDateString(),
+            'amount_minor' => 1, 'logistics_provider_id' => $otherProvider->id,
+            'courier_id' => 999999, 'rider_id' => 999999, 'status' => 'REVERSED', 'paid_by_admin_id' => 999999,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $payout = RiderPayout::sole();
+        $this->assertSame($minor, $payout->amount_minor);
+        $this->assertSame($this->provider->id, $payout->logistics_provider_id);
+        $this->assertSame($this->courier->id, $payout->courier_id);
+        $this->assertSame(RiderPayout::PAID, $payout->status);
+        $this->assertSame($payout->id, $first->fresh()->rider_payout_id);
+        $this->assertSame($payout->id, $last->fresh()->rider_payout_id);
+        $audit = OperationsAuditLog::query()->where('action', 'rider_payout_paid')->sole();
+        $this->assertSame('logistics', $audit->actor_type);
+        $this->assertSame($this->provider->id, (int) $audit->actor_id);
+    }
+
+    public static function invalidRiderAmounts(): array
+    {
+        return [[0], [-1], [3001], ['3000.001'], ['1e9'], ['999999999999999999999999'], [[3000]]];
+    }
+
+    #[DataProvider('invalidRiderAmounts')]
+    public function test_invalid_rider_expected_amount_does_not_override_earnings(mixed $amount): void
+    {
+        $earning = $this->payableJob();
+        $this->actingAs($this->provider, 'logistics')->postJson(route('logistics.earnings.pay-rider', $this->courier), [
+            'through_id' => $earning->id, 'expected_amount_minor' => $amount, 'payout_revision' => 0,
+            'reference' => 'INVALID-AMOUNT', 'paid_on' => now()->toDateString(),
+        ])->assertUnprocessable();
+        $this->assertNull($earning->fresh()->rider_payout_id);
+        $this->assertDatabaseCount('rider_payouts', 0);
+        $this->assertDatabaseCount('operations_audit_logs', 0);
+    }
+
+    public function test_suspended_provider_is_blocked_but_suspended_rider_keeps_earned_pay(): void
+    {
+        $earning = $this->payableJob();
+        $this->provider->forceFill(['status' => 'suspended'])->save();
+        $this->payRider($earning->id, $earning->amount_minor)->assertRedirect();
+        $this->assertDatabaseCount('rider_payouts', 0);
+        $this->provider->forceFill(['status' => 'approved'])->save();
+        $this->rider->forceFill(['status' => Rider::STATUS_SUSPENDED])->save();
+        $this->payRider($earning->id, $earning->amount_minor)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($earning->amount_minor, RiderPayout::sole()->amount_minor);
+    }
+
+    private function payRider(int $throughId, int $expected, string $reference = 'GCASH-77', ?Courier $courier = null, ?int $revision = null)
     {
         return $this->actingAs($this->provider, 'logistics')
             ->from(route('logistics.earnings.index'))
             ->post(route('logistics.earnings.pay-rider', $courier ?? $this->courier), [
                 'through_id' => $throughId,
                 'expected_amount_minor' => $expected,
+                'payout_revision' => $revision ?? $this->payoutRevision(),
                 'reference' => $reference,
                 'paid_on' => now()->toDateString(),
             ]);
+    }
+
+    private function payoutRevision(): int
+    {
+        return app(RiderEarningService::class)->unpaidByCourier($this->provider)
+            ->firstWhere('courierId', $this->courier->id)['payoutRevision'] ?? 0;
+    }
+
+    public function test_a_stale_confirmation_cannot_reapply_a_reversed_payout(): void
+    {
+        $earning = $this->payableJob();
+        $revision = $this->payoutRevision();
+        $this->payRider($earning->id, 3000, revision: $revision)->assertSessionHasNoErrors();
+        $original = RiderPayout::query()->sole();
+        $this->reversePayment($original)->assertSessionHasNoErrors();
+
+        $this->payRider($earning->id, 3000, revision: $revision)->assertSessionHasErrors('rider');
+        $this->assertDatabaseCount('rider_payouts', 1);
+        $this->assertNull($earning->fresh()->rider_payout_id);
+        $this->assertSame(1, OperationsAuditLog::query()->where('action', 'rider_payout_paid')->count());
+
+        // A freshly reviewed correction can retain the reference of the real transfer.
+        $this->payRider($earning->id, 3000)->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('rider_payouts', 2);
+        $this->assertNotNull($original->fresh()->reversal);
+    }
+
+    public function test_a_stale_confirmation_cannot_pay_different_jobs_with_the_same_total(): void
+    {
+        $older = $this->payableJob();
+        $this->payRider($older->id, 3000, 'OLDER')->assertSessionHasNoErrors();
+        $original = RiderPayout::query()->sole();
+        $newer = $this->payableJob();
+        $revision = $this->payoutRevision();
+        $this->payRider($newer->id, 3000, 'NEWER', revision: $revision)->assertSessionHasNoErrors();
+        $this->reversePayment($original)->assertSessionHasNoErrors();
+
+        $this->payRider($newer->id, 3000, 'NEWER', revision: $revision)->assertSessionHasErrors('rider');
+        $this->assertDatabaseCount('rider_payouts', 2);
+        $this->assertNull($older->fresh()->rider_payout_id);
+        $this->assertNotNull($newer->fresh()->rider_payout_id);
     }
 
     public function test_a_company_pays_a_batch_of_earnings_once_and_the_rider_sees_it_as_paid(): void
@@ -199,6 +304,21 @@ class RiderEarningsTest extends TestCase
         $this->payRider($throughId, 3000, courier: $outsider)->assertNotFound();
 
         $this->assertSame(0, RiderPayout::query()->count());
+    }
+
+    public function test_only_the_owning_company_can_record_a_payment_and_the_form_must_include_its_revision(): void
+    {
+        $earning = $this->payableJob();
+        $url = route('logistics.earnings.pay-rider', $this->courier);
+        $data = ['through_id' => $earning->id, 'expected_amount_minor' => 3000,
+            'reference' => 'AUTH-CHECK', 'paid_on' => now()->toDateString()];
+
+        $this->postJson($url, $data + ['payout_revision' => 0])->assertUnauthorized();
+        $this->actingAs($this->rider, 'rider')->postJson($url, $data + ['payout_revision' => 0])->assertUnauthorized();
+        $this->actingAs($this->provider, 'logistics')->postJson($url, $data)
+            ->assertUnprocessable()->assertJsonValidationErrors('payout_revision');
+        $this->assertDatabaseCount('rider_payouts', 0);
+        $this->assertNull($earning->fresh()->rider_payout_id);
     }
 
     private function payableJob(): RiderEarning
@@ -304,7 +424,7 @@ class RiderEarningsTest extends TestCase
         Notification::fake();
         try {
             DB::transaction(function () use ($earning): void {
-                app(RiderEarningService::class)->payCourier($this->provider, $this->courier, $earning->id, 3000, 'ROLLBACK', now()->toDateString());
+                app(RiderEarningService::class)->payCourier($this->provider, $this->courier, $earning->id, 3000, 'ROLLBACK', now()->toDateString(), 0);
                 Notification::assertNothingSent();
                 throw new \RuntimeException('Rollback the payment');
             });
@@ -312,6 +432,23 @@ class RiderEarningsTest extends TestCase
             $this->assertSame('Rollback the payment', $exception->getMessage());
         }
         $this->assertSame(0, RiderPayout::query()->count());
+        $this->assertNull($earning->fresh()->rider_payout_id);
+        Notification::assertNothingSent();
+    }
+
+    public function test_a_rider_payout_rolls_back_when_the_audit_insert_fails(): void
+    {
+        $earning = $this->payableJob();
+        Notification::fake();
+        OperationsAuditLog::creating(function (OperationsAuditLog $log): void {
+            if ($log->action === 'rider_payout_paid') {
+                throw new \RuntimeException('Simulated Rider payout audit failure');
+            }
+        });
+
+        $this->payRider($earning->id, 3000)->assertServerError();
+        $this->assertDatabaseCount('rider_payouts', 0);
+        $this->assertDatabaseMissing('operations_audit_logs', ['action' => 'rider_payout_paid']);
         $this->assertNull($earning->fresh()->rider_payout_id);
         Notification::assertNothingSent();
     }
@@ -338,7 +475,7 @@ class RiderEarningsTest extends TestCase
     public function test_guests_and_riders_cannot_reverse_company_payment_records(): void
     {
         $earning = $this->payableJob();
-        app(RiderEarningService::class)->payCourier($this->provider, $this->courier, $earning->id, 3000, 'AUTH-CHECK', now()->toDateString());
+        app(RiderEarningService::class)->payCourier($this->provider, $this->courier, $earning->id, 3000, 'AUTH-CHECK', now()->toDateString(), 0);
         $payout = RiderPayout::query()->sole();
         $url = route('logistics.earnings.reverse-rider-payment', $payout);
         $this->post($url)->assertRedirect();
@@ -364,6 +501,23 @@ class RiderEarningsTest extends TestCase
         ])->save();
 
         return $cash;
+    }
+
+    public function test_an_outstanding_cod_shortage_does_not_reduce_or_block_rider_pay(): void
+    {
+        $earning = $this->payableJob();
+        $earning->forceFill(['amount_minor' => 200000])->save();
+        $cash = $this->cash($this->courier, 250000, CodRemittance::PARTIALLY_REMITTED);
+        $cash->forceFill([
+            'received_amount_minor' => 150000, 'shortage_minor' => 100000,
+            'shortage_rider_id' => $this->rider->id, 'shortage_reason' => 'Cash count was short.',
+        ])->save();
+
+        $this->actingAs($this->rider, 'rider')->get(route('rider.money.index'))
+            ->assertOk()->assertViewHas('cash', fn ($summary) => $summary['holdingMinor'] === 100000);
+        $this->payRider($earning->id, 200000)->assertSessionHasNoErrors();
+        $this->assertSame(200000, RiderPayout::query()->sole()->amount_minor);
+        $this->assertSame(100000, $cash->fresh()->outstandingShortageMinor());
     }
 
     public function test_the_rider_money_page_shows_cash_held_cash_handed_over_and_pay(): void
@@ -410,7 +564,7 @@ class RiderEarningsTest extends TestCase
         $pickup = $this->parcel(OrderStatus::ReadyForPickup, ['courier_id' => $this->courier->id]);
         app(SellerOrderStatusService::class)->transition($pickup, OrderStatus::PickedUp);
         $earning = RiderEarning::query()->sole();
-        app(RiderEarningService::class)->payCourier($this->provider, $this->courier, $earning->id, 3000, 'GCASH-RIDER-1', now()->toDateString());
+        app(RiderEarningService::class)->payCourier($this->provider, $this->courier, $earning->id, 3000, 'GCASH-RIDER-1', now()->toDateString(), 0);
 
         $this->actingAs($this->rider, 'rider')->get(route('rider.money.index'))
             ->assertOk()->assertSee('Ref GCASH-RIDER-1')->assertSee('Payments recorded for you')->assertDontSee('Reversed for correction');

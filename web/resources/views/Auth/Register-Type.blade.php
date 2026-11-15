@@ -25,7 +25,7 @@
 
   <div class="role-grid">
 
-    <a href="#" data-buyer-register-trigger class="role-card">
+    <a href="{{ route('register.buyer') }}" data-buyer-register-trigger class="role-card">
       <div class="role-card__icon">
         <i data-lucide="shopping-bag" width="24" height="24"></i>
       </div>
@@ -34,7 +34,7 @@
       <span class="role-card__cta">REGISTER AS BUYER</span>
     </a>
 
-    <a href="#" data-seller-register-trigger class="role-card">
+    <a href="{{ route('register.seller') }}" data-seller-register-trigger class="role-card">
       <div class="role-card__icon">
         <i data-lucide="store" width="24" height="24"></i>
       </div>
@@ -43,7 +43,7 @@
       <span class="role-card__cta">REGISTER AS SELLER</span>
     </a>
 
-    <a href="#" data-logistics-register-trigger class="role-card">
+    <a href="{{ route('register.logistics') }}" data-logistics-register-trigger class="role-card">
       <div class="role-card__icon">
         <i data-lucide="truck" width="24" height="24"></i>
       </div>

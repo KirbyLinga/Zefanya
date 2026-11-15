@@ -30,6 +30,8 @@
                 <p class="text-[var(--text-ink)]">Logistics: the parcel was damaged in transit. You are not charged for this return.</p>
             @elseif ($record->fault_party === ParcelReturn::FAULT_SELLER)
                 <p class="text-[var(--text-ink)]">You: the item was wrong, defective or not as described. You cover the buyer's refund.</p>
+            @elseif ($record->isPlatformFunded())
+                <p class="text-[var(--text-ink)]">Zefanya: this exception refund is paid by the platform. You are not charged and your earnings are unchanged.</p>
             @endif
         @else
             @php
@@ -46,6 +48,8 @@
             @endif
             @if ($record->isLogisticsFault())
                 <p>The Seller is not charged. Once the refund is recorded, the delivering Logistics company owes Zefanya that amount (see Return charges with Logistics).</p>
+            @elseif ($record->isPlatformFunded())
+                <p>Neither the Seller nor Logistics is charged. A recorded refund is booked as a platform refund expense; a void books a reversal.</p>
             @endif
         @endif
 

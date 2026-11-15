@@ -141,7 +141,8 @@ class AdminDashboardStatsTest extends TestCase
         Buyer::factory()->count(2)->create(['status' => 'pending', 'approved_at' => null]);
         Seller::factory()->pending()->create();
         $this->parcelReturn(['status' => ParcelReturnStatus::InDispute->value]);
-        $this->parcelReturn(['financial_review_required' => true]);
+        $return = $this->parcelReturn(['financial_review_required' => true]);
+        Payment::factory()->paid()->create(['seller_order_id' => $return->seller_order_id]);
 
         $this->dashboard()->assertOk()
             ->assertSee('Needs your action')

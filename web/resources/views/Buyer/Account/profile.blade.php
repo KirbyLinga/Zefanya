@@ -35,12 +35,7 @@
                     </p>
                 </div>
 
-                @if (session('success'))
-                    <div class="mb-6 flex items-center gap-2.5 rounded-lg border border-[var(--pill-success-border)] bg-[var(--pill-success-bg)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-success)]" role="status">
-                        <i data-lucide="check-circle-2" width="15" height="15" class="shrink-0"></i>
-                        <span class="text-[var(--status-success)]">{{ session('success') }}</span>
-                    </div>
-                @endif
+                <x-flash type="success" :message="session('success')" spacing="mb-6" />
 
                 <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
                     <div class="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

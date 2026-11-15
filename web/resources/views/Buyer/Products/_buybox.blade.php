@@ -37,7 +37,7 @@
           <span class="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-buyer-ink-soft">{{ $axis['name'] }}</span>
           <span class="text-[12px] font-medium text-buyer-ink" data-pdp-axis-label="{{ $axisIndex }}"></span>
         </div>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Select {{ $axis['name'] }}">
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Select {{ $axis['name'] }}" aria-describedby="pdp-variant-error" data-pdp-variant-group="{{ $axisIndex }}">
           @foreach ($axis['values'] as $value)
             <button
               type="button"
@@ -59,7 +59,7 @@
   @endif
 
   {{-- Shared error line: variant validation + Buy Now failures --}}
-  <p id="pdp-variant-error" class="mt-2 hidden text-[11.5px] font-semibold text-red-500" @if ($variantAxes !== null) data-selection-message="Please select a variation" @endif></p>
+  <p id="pdp-variant-error" role="alert" aria-live="assertive" class="mt-2 hidden text-[11.5px] font-semibold text-red-500" @if ($variantAxes !== null) data-selection-message="Please select a variation" @endif></p>
 
   {{-- Low-stock warning (single-SKU products) --}}
   @if ($variantAxes === null && $product->buyerIsLowStock())

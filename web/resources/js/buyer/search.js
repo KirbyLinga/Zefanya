@@ -153,7 +153,7 @@
                 }
             });
             document.addEventListener('click', event => { if (!wrap.contains(event.target)) close(); });
-            wrap.querySelector('#catMenuToggle')?.addEventListener('change', event => { if (event.target.checked) close(); });
+            wrap.querySelector('#catMenuToggle')?.addEventListener('click', event => { if (event.currentTarget.getAttribute('aria-expanded') === 'true') close(); });
         });
     }
 

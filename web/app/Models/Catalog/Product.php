@@ -55,6 +55,7 @@ class Product extends Model
         'price' => 'decimal:2',
         'stock_quantity' => 'integer',
         'low_stock_threshold' => 'integer',
+        'approved_at' => 'datetime',
         'weight_grams' => 'integer',
         'dimensions' => 'array',
     ];
@@ -88,6 +89,44 @@ class Product extends Model
             && $this->seller !== null && ! $this->seller->isArchived()
             && $this->seller->status === 'approved'
             && ! $this->isRestricted();
+    }
+
+    /** Seller-facing review state. Pending and rejected listings stay off the public catalog. */
+    public function sellerApprovalLabel(): string
+    {
+        $revision = $this->relationLoaded('latestRevision') ? $this->latestRevision : null;
+        if ($this->status === 'pending' || ($revision !== null && $revision->status === ProductRevision::PENDING)) {
+            return 'Pending';
+        }
+        if ($this->status === 'rejected') {
+            return 'Rejected';
+        }
+        if ($this->approved_at !== null) {
+            return 'Approved';
+        }
+
+        return match ($this->status) {
+            'active' => 'Active',
+            'inactive' => 'Inactive',
+            'pending' => 'Pending',
+            'rejected' => 'Rejected',
+            default => 'Draft',
+        };
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(ProductRevision::class);
+    }
+
+    public function latestRevision(): HasOne
+    {
+        return $this->hasOne(ProductRevision::class)->latestOfMany();
+    }
+
+    public function approvalEvents(): HasMany
+    {
+        return $this->hasMany(ProductApprovalEvent::class);
     }
 
     /**
@@ -358,7 +397,7 @@ class Product extends Model
     {
         $disk = Storage::disk('public');
         $image = ($images ?? $this->images)->sortByDesc('is_primary')
-            ->first(fn (ProductImage $image): bool => $disk->exists($image->path));
+            ->first(fn (ProductImage $image): bool => filled($image->path) && $disk->exists($image->path));
 
         // Public image URLs may be served by storage outside this PHP instance.
         if ($image === null && ! $requireExistingFile) {

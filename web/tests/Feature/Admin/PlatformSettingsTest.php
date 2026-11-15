@@ -120,7 +120,7 @@ class PlatformSettingsTest extends TestCase
             'platform_setting_id' => $setting->id, 'admin_id' => $admin->id, 'setting_key' => 'platform_name',
             'previous_value' => $oldValue, 'new_value' => 'Updated platform record', 'created_at' => now()->toDateTimeString(),
         ]);
-        $this->get(route('admin.settings.index'))->assertSee('Updated platform record')->assertSee($admin->name)->assertSee(now()->format('Y-m-d H:i:s'));
+        $this->get(route('admin.settings.index'))->assertSee('Updated platform record')->assertSee($admin->name)->assertSee(now(config('app.schedule_timezone'))->format('Y-m-d H:i:s'));
     }
 
     public static function invalidValues(): array

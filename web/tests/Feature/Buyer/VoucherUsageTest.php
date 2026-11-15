@@ -8,6 +8,7 @@ use App\Models\Buyer\CartItem;
 use App\Models\Buyer\CheckoutToken;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
+use App\Models\Shared\Order;
 use App\Models\Shared\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\BootstrapsCheckoutCarriers;
@@ -70,5 +71,16 @@ class VoucherUsageTest extends TestCase
             'This voucher has reached its usage limit.',
             $voucher->fresh()->rejectionReason(10000),
         );
+
+        $newLine = CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $product->id, 'quantity' => 1]);
+        $second = CheckoutToken::issue($buyer->id);
+        $this->withSession([CheckoutController::SESSION_KEY => [$newLine->id], 'cart_voucher' => $voucher->code])
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => $second->token,
+                ...$this->checkoutCarrierPayload([$seller]),
+            ])->assertSessionHas('error', fn (string $message): bool => str_contains($message, 'usage limit'));
+        $this->assertFalse($second->fresh()->used);
+        $this->assertSame(1, $voucher->fresh()->times_used);
+        $this->assertSame(1000, Order::query()->sole()->discount_minor);
     }
 }

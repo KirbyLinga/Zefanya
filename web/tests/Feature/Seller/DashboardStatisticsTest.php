@@ -3,6 +3,8 @@
 namespace Tests\Feature\Seller;
 
 use App\Enums\OrderStatus;
+use App\Enums\ParcelReturnStatus;
+use App\Models\Logistics\ParcelReturn;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
@@ -18,6 +20,49 @@ use Tests\TestCase;
 class DashboardStatisticsTest extends TestCase
 {
     use LazilyRefreshDatabase;
+
+    public static function salesReturns(): array
+    {
+        return [
+            'pending request' => [ParcelReturnStatus::Requested, null, false, false],
+            'approved' => [ParcelReturnStatus::Requested, ParcelReturn::APPROVED, false, false],
+            'auto approved' => [ParcelReturnStatus::Requested, ParcelReturn::AUTO_APPROVED, false, false],
+            'in transit' => [ParcelReturnStatus::InTransit, ParcelReturn::APPROVED, false, false],
+            'returned to seller' => [ParcelReturnStatus::Completed, ParcelReturn::APPROVED, false, false],
+            'closed collected return' => [ParcelReturnStatus::Closed, ParcelReturn::APPROVED, false, false],
+            'refunded despite rejection' => [ParcelReturnStatus::Rejected, ParcelReturn::REJECTED, true, false],
+            'refunded despite cancellation' => [ParcelReturnStatus::Cancelled, ParcelReturn::APPROVED, true, false],
+            'rejected without refund' => [ParcelReturnStatus::Rejected, ParcelReturn::REJECTED, false, true],
+            'cancelled without refund' => [ParcelReturnStatus::Cancelled, ParcelReturn::APPROVED, false, true],
+        ];
+    }
+
+    #[DataProvider('salesReturns')]
+    public function test_sales_and_chart_exclude_returns_but_keep_rejected_or_cancelled_unrefunded_sales(
+        ParcelReturnStatus $status, ?string $decision, bool $refunded, bool $countsAsSale,
+    ): void {
+        $this->freezeTime();
+        $seller = Seller::factory()->create(['status' => 'approved']);
+        $this->sellerOrder($seller, OrderStatus::Delivered, 3998000);
+        $returning = $this->sellerOrder($seller, OrderStatus::Delivered, 499000);
+        ParcelReturn::query()->forceCreate([
+            'seller_order_id' => $returning->id, 'status' => $status,
+            'reason' => 'Item arrived damaged', 'requested_at' => now(),
+            'seller_decision' => $decision, 'refunded_at' => $refunded ? now() : null,
+        ]);
+        $expected = 3998000 + ($countsAsSale ? 499000 : 0);
+
+        $response = $this->actingAs($seller, 'seller')->get(route('seller.dashboard'))
+            ->assertOk()
+            ->assertViewHas('totalSales', $expected / 100)
+            ->assertViewHas('totalOrders', 2)
+            ->assertViewHas('completedOrders', 0)
+            ->assertViewHas('netEarningsMinor', 0)
+            ->assertSee('Delivered and completed orders, excluding returns and refunds.');
+
+        $this->assertSame($expected, $response->viewData('salesSummary')['totalMinor']);
+        $this->assertSame($countsAsSale ? 2 : 1, $response->viewData('salesSummary')['orderCount']);
+    }
 
     public function test_empty_dashboard_shows_zero_completed_orders_and_zero_earnings(): void
     {
@@ -236,9 +281,9 @@ class DashboardStatisticsTest extends TestCase
         $this->actingAs($seller, 'seller')->get(route('seller.dashboard'))
             ->assertOk()
             ->assertViewHas('completedOrders', 2)
-            ->assertViewHas('netEarningsMinor', 26600)
+            ->assertViewHas('netEarningsMinor', 25200)
             ->assertViewHas('earningsPendingCount', 0)
-            ->assertSee('₱266.00');
+            ->assertSee('₱252.00');
     }
 
     public function test_unknown_or_partial_financials_are_flagged_instead_of_estimated(): void
@@ -256,7 +301,7 @@ class DashboardStatisticsTest extends TestCase
         $this->actingAs($seller, 'seller')->get(route('seller.dashboard'))
             ->assertOk()
             ->assertViewHas('completedOrders', 3)
-            ->assertViewHas('netEarningsMinor', 9500)
+            ->assertViewHas('netEarningsMinor', 9000)
             ->assertViewHas('earningsPendingCount', 2)
             ->assertSee('2 completed orders awaiting finalized earnings.');
 

@@ -10,13 +10,13 @@
 <main class="auth-hero">
   <div class="auth-hero__intro">
     <h1 class="auth-hero__title">Email verified</h1>
-    <p class="auth-hero__subtitle">
-      @if (session('success'))
-        {{ session('success') }}
-      @else
+    @if (session('success'))
+      <x-flash type="success" :message="session('success')" spacing="" />
+    @else
+      <p class="auth-hero__subtitle">
         Your email is verified. Please wait for the administrator's approval, which will be sent to your email.
-      @endif
-    </p>
+      </p>
+    @endif
   </div>
 
   <div class="auth-divider">

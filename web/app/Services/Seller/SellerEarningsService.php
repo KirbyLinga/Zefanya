@@ -21,8 +21,9 @@ class SellerEarningsService
     /**
      * Pending is finalized net still waiting on remittance. Available is the
      * withdrawable balance. Net is gross merchandise minus seller store sales,
-     * minus seller vouchers, minus 5% commission. Platform vouchers and shipping
-     * are reported and never deducted.
+     * minus seller vouchers, minus the platform commission (saved per order),
+     * minus seller-funded refunds and return charges. Platform vouchers and
+     * shipping are reported and never deducted.
      *
      * @return array{
      *     pendingMinor: int,
@@ -94,12 +95,16 @@ class SellerEarningsService
             'reservedMinor' => $this->payouts->reservedMinor($seller),
             'debtMinor' => $this->payouts->outstandingDebtMinor($seller),
             'paidWithdrawalsMinor' => (int) SellerPayoutRequest::query()->where('seller_id', $seller->id)
-                ->where('status', SellerPayoutRequest::PAID)->sum('amount_minor'),
+                ->where('status', SellerPayoutRequest::PAID)->sum('amount_minor')
+                + (int) SellerSettlement::query()->where('seller_id', $seller->id)->where('status', SellerSettlement::PAID)
+                    ->whereNotNull('paid_at')->with('paidPayoutAllocations')->get()
+                    ->sum(fn (SellerSettlement $settlement): int => $settlement->directPayoutMinor()),
             'grossMinor' => $grossMinor,
             'salesMinor' => $salesMinor,
             'sellerVoucherMinor' => $sellerVoucherMinor,
             'commissionMinor' => $commissionMinor,
             'netMinor' => $netMinor,
+            'returnAdjustmentMinor' => $grossMinor - $salesMinor - $sellerVoucherMinor - $commissionMinor - $netMinor,
             'platformVoucherMinor' => $platformVoucherMinor,
             'shippingMinor' => $shippingMinor,
             'rows' => $rows,
@@ -146,6 +151,7 @@ class SellerEarningsService
             'sellerVoucherMinor' => 0,
             'commissionMinor' => 0,
             'netMinor' => 0,
+            'returnAdjustmentMinor' => 0,
             'platformVoucherMinor' => 0,
             'shippingMinor' => 0,
         ];
@@ -170,6 +176,8 @@ class SellerEarningsService
                 'netMinor' => $line['netMinor'],
             ]);
         }
+
+        $totals['returnAdjustmentMinor'] = $totals['grossMinor'] - $totals['storeSaleMinor'] - $totals['sellerVoucherMinor'] - $totals['commissionMinor'] - $totals['netMinor'];
 
         return $totals + ['rows' => $rows];
     }

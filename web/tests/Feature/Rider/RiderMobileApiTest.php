@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Logistics\DeliveryProof;
 use App\Models\Rider\Rider;
+use App\Models\Rider\RiderEarning;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Buyer\DeliveryOtpCode;
@@ -71,6 +72,7 @@ class RiderMobileApiTest extends RiderTestCase
 
         $response = $this->api()->getJson('/api/rider/jobs')->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.return_pickups', [])
             ->assertJsonCount(1, 'data.deliveries')
             ->assertJsonPath('data.deliveries.0.id', $mine->id)
             ->assertJsonPath('data.deliveries.0.requires_cod_collection', true)
@@ -161,6 +163,15 @@ class RiderMobileApiTest extends RiderTestCase
             'cod_amount' => '1500.00',
         ])->assertOk();
         $this->assertSame(1, DeliveryProof::query()->where('seller_order_id', $parcel->id)->count());
+
+        $this->flushHeaders();
+        $this->actingAsRider()->post(route('rider.deliveries.deliver', $parcel), [
+            'proof_photo' => UploadedFile::fake()->image('web-retry.jpg'),
+            'cod_amount' => '1500.00',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $earning = RiderEarning::query()->where('seller_order_id', $parcel->id)->sole();
+        $this->assertSame(RiderEarning::DELIVERY, $earning->job);
+        $this->assertSame($this->courier->id, (int) $earning->courier_id);
     }
 
     public function test_deliver_rejects_tampered_cod_amount_and_bad_proof_without_state_change(): void

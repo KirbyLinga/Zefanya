@@ -105,23 +105,30 @@
 {{-- Sidebar collapse toggle: vanilla JS, no framework. Reads the persisted
      state from localStorage immediately so there is no expand-flash on
      page load, then wires the hamburger button. --}}
+@include('Components.mobile-drawer-accessibility')
 <script>
     (function () {
         var KEY = 'seller.sidebar.collapsed';
         var sidebar = document.getElementById('sellerSidebar');
         var toggle = document.getElementById('sellerSidebarToggle');
-        if (!sidebar || !toggle) { return; }
+        if (!sidebar || !toggle || sidebar.dataset.drawerInitialized === '1') { return; }
+        sidebar.dataset.drawerInitialized = '1';
 
         var drawer = window.matchMedia('(max-width: 1023.98px)');
         var backdrop = document.getElementById('sellerSidebarBackdrop');
+        var accessibility = window.zfCreateMobileDrawer(sidebar, drawer, {
+            label: 'Seller navigation', hideWhenClosed: true,
+            opener: function () { return document.getElementById('sellerSidebarOpen'); },
+            close: function () { setDrawer(false); }
+        });
 
-        function setDrawer(open) {
+        function setDrawer(open, restoreFocus) {
             // The opener is in the layout's top bar, which renders after this script.
             var opener = document.getElementById('sellerSidebarOpen');
             sidebar.classList.toggle('is-open', open);
             backdrop.classList.toggle('hidden', !open);
             if (opener) { opener.setAttribute('aria-expanded', open ? 'true' : 'false'); }
-            document.body.style.overflow = open ? 'hidden' : '';
+            accessibility.sync(open, restoreFocus !== false);
         }
 
         function apply(collapsed) {
@@ -135,6 +142,7 @@
         var saved = null;
         try { saved = localStorage.getItem(KEY); } catch (e) { /* storage unavailable */ }
         apply(saved === '1');
+        setDrawer(false, false);
 
         toggle.addEventListener('click', function () {
             if (drawer.matches) { setDrawer(false); return; }
@@ -147,11 +155,8 @@
             if (event.target.closest('#sellerSidebarOpen')) { setDrawer(true); }
         });
         backdrop.addEventListener('click', function () { setDrawer(false); });
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') { setDrawer(false); }
-        });
         drawer.addEventListener('change', function () {
-            setDrawer(false);
+            setDrawer(false, drawer.matches);
             var current = null;
             try { current = localStorage.getItem(KEY); } catch (e) { /* storage unavailable */ }
             apply(current === '1');

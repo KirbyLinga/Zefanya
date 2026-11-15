@@ -91,7 +91,8 @@ class UnapprovedSellerDraftTest extends TestCase
         Storage::fake('public');
         $seller = Seller::factory()->create(['status' => 'approved']);
         $product = app(ProductPublishingService::class)->save(new Product, $seller, $this->payload('active'));
-        $this->assertSame('active', $product->status);
+        $this->assertSame('pending', $product->status);
+        $this->assertNull($product->approved_at);
     }
 
     public function test_pending_seller_still_cannot_use_the_product_pages_or_submit_a_draft(): void

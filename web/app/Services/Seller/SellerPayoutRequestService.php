@@ -161,7 +161,7 @@ class SellerPayoutRequestService
 
         $paid = DB::transaction(function () use ($payout, $admin, $reference): bool {
             // Same Seller lock as requests and direct payouts: none can overlap.
-            Seller::query()->whereKey($payout->seller_id)->lockForUpdate()->firstOrFail();
+            $seller = Seller::query()->whereKey($payout->seller_id)->lockForUpdate()->firstOrFail();
             $locked = SellerPayoutRequest::query()->whereKey($payout->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->status === SellerPayoutRequest::PAID) {
@@ -174,6 +174,13 @@ class SellerPayoutRequestService
             $allocations = $locked->allocations()->orderBy('seller_settlement_id')->get();
             $settlements = SellerSettlement::query()->whereKey($allocations->pluck('seller_settlement_id'))
                 ->with(['sellerOrder', 'payment', 'codRemittance'])->lockForUpdate()->get()->keyBy('id');
+
+            // Refunds can add or increase debt after the request was reserved.
+            // Keep the settlement -> debt lock order and require a fresh quote if its deduction changed.
+            $deduction = min((int) $locked->amount_minor, $this->outstandingDebtMinor($seller, true));
+            if ((int) $locked->debt_deducted_minor !== $deduction) {
+                throw ValidationException::withMessages(['payout' => 'The recorded debt deduction no longer matches what the Seller owes. Reject this request and ask the Seller to submit a new one.']);
+            }
 
             foreach ($allocations as $allocation) {
                 $settlement = $settlements->get($allocation->seller_settlement_id);
@@ -219,17 +226,24 @@ class SellerPayoutRequestService
         return $paid;
     }
 
-    /** Oldest debt first. The deduction was capped by the debt at request time, so it cannot exceed it. */
+    /** Apply the recorded deduction to outstanding debt, oldest first. */
     private function repayDebts(int $sellerId, int $amountMinor): void
     {
+        if ($amountMinor === 0) {
+            return;
+        }
+
         foreach (SellerDebt::query()->where('seller_id', $sellerId)->whereColumn('settled_minor', '<', 'amount_minor')->orderBy('id')->lockForUpdate()->get() as $debt) {
-            if ($amountMinor <= 0) {
-                return;
-            }
             $applied = min($amountMinor, $debt->outstandingMinor());
             $debt->forceFill(['settled_minor' => $debt->settled_minor + $applied])->save();
             $amountMinor -= $applied;
+            if ($amountMinor === 0) {
+                return;
+            }
         }
+
+        // A refund or return correction can lower the debt after the seller requested this payout.
+        throw ValidationException::withMessages(['payout' => 'The recorded debt deduction exceeds what the Seller now owes. Reject this request and ask the Seller to submit a new one.']);
     }
 
     /** Releases the reservation, so the earnings can be requested again. */
@@ -328,9 +342,6 @@ class SellerPayoutRequestService
         return $allocation['pending_reason'] === null
             && $settlement->seller_funded_discount_minor === $allocation['seller_minor']
             && $settlement->marketplace_funded_discount_minor === $allocation['marketplace_minor']
-            && $order->commission_minor + $order->seller_net_minor === $order->subtotal_minor - $allocation['seller_minor']
-            && $settlement->collected_amount_minor === $order->subtotal_minor - $allocation['discount_minor'] - $allocation['shipping_discount_minor'] + $order->shipping_fee_minor
-            && $order->commission_minor + $order->seller_net_minor + $settlement->shipping_allocation_minor
-                === $settlement->collected_amount_minor + $allocation['marketplace_minor'];
+            && app(SellerSettlementService::class)->payoutIdentityHolds($settlement, $order, $allocation);
     }
 }

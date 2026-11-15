@@ -10,6 +10,18 @@ use Tests\TestCase;
 
 class ProductImageUrlTest extends TestCase
 {
+    public function test_an_empty_primary_path_does_not_hide_a_gallery_image_served_outside_php(): void
+    {
+        Storage::fake('public');
+        $product = new Product;
+        $product->setRelation('images', new Collection([
+            new ProductImage(['path' => '', 'is_primary' => true]),
+            new ProductImage(['path' => 'products/15/gallery.jpg', 'is_primary' => false]),
+        ]));
+
+        $this->assertSame('/storage/products/15/gallery.jpg', $product->catalogImageUrl(requireExistingFile: false));
+    }
+
     public function test_local_catalog_images_use_the_current_site_instead_of_the_configured_development_host(): void
     {
         config(['filesystems.disks.public.url' => 'http://localhost:8000/storage']);

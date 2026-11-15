@@ -109,6 +109,13 @@ class Voucher extends Model
         return $this->belongsToMany(Product::class, 'voucher_product');
     }
 
+    public function loadEligibleProductsForCheckout(): void
+    {
+        // The voucher is already locked. Read its current pivot without locking unrelated catalog rows.
+        $ids = $this->products()->newPivotQuery()->sharedLock()->pluck('product_id');
+        $this->setRelation('products', Product::hydrate($ids->map(fn ($id): array => ['id' => $id])->all()));
+    }
+
     /**
      * The part of these cart lines this voucher can discount and that counts
      * toward its minimum spend.
@@ -221,7 +228,7 @@ class Voucher extends Model
     }
 
     /** @return Builder<SellerOrder> Every shipment that applied this voucher, in any slot. */
-    private function sellerOrders(): Builder
+    public function sellerOrders(): Builder
     {
         return SellerOrder::query()->where(fn ($query) => $query
             ->where('voucher_id', $this->id)

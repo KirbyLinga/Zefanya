@@ -54,6 +54,7 @@ class ReportController extends Controller
             'sellerVoucherMinor' => 0,
             'commissionMinor' => 0,
             'netMinor' => 0,
+            'returnAdjustmentMinor' => 0,
             'platformVoucherMinor' => 0,
             'shippingMinor' => 0,
             'rows' => collect(),

@@ -18,9 +18,7 @@
                 <a href="{{ route('buyer.orders.index') }}" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 font-sans text-sm font-semibold text-[var(--brand)] transition-colors hover:bg-secondary-200 focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]">← Back to orders</a>
             </header>
 
-            @if (session('success'))
-                <p role="status" class="mb-4 text-sm text-buyer-ink">{{ session('success') }}</p>
-            @endif
+            <x-flash type="success" :message="session('success')" />
             @if ($errors->any())
                 <p role="alert" class="mb-4 text-sm text-red-600">{{ $errors->first() }}</p>
             @endif
@@ -139,7 +137,7 @@
                                                 </span>
                                                 <div class="min-w-0">
                                                     <p class="font-sans text-sm font-semibold text-[var(--text-ink)]">{{ $movement['title'] }}</p>
-                                                    <p class="font-sans text-xs text-[var(--text-muted)]">{{ $movement['at']->format('M d, Y h:i A') }} · {{ $movement['detail'] }}</p>
+                                                    <p class="font-sans text-xs text-[var(--text-muted)]">{{ $movement['at']->timezone(config('app.schedule_timezone'))->format('M d, Y h:i A') }} · {{ $movement['detail'] }}</p>
                                                     @if (filled($movement['custody'] ?? null))
                                                         <p class="mt-1 font-sans text-xs leading-relaxed text-[var(--text-muted)]">{{ $movement['custody'] }}</p>
                                                     @endif
@@ -197,7 +195,15 @@
                                             <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Escalate</button>
                                         </form>
                                 @endif
-                                @if ($sellerOrder->status === OrderStatus::Delivered && ! $sellerOrder->hasActiveReturn())
+                                @if (\App\Models\Logistics\ParcelReturn::recoveryAvailable() && $sellerOrder->parcelReturn?->canBuyerCancel())
+                                    <form method="POST" action="{{ route('buyer.orders.cancelReturn', [$order, $sellerOrder]) }}" class="space-y-2" onsubmit="return confirm('Cancel this return? You keep the item and no refund will be made.')">
+                                        @csrf
+                                        <label for="cancel-return-reason-{{ $sellerOrder->id }}" class="block text-sm font-semibold text-[var(--text-ink)]">Changed your mind? Cancel the return before it is collected (optional reason)</label>
+                                        <textarea id="cancel-return-reason-{{ $sellerOrder->id }}" name="reason" maxlength="500" rows="2" class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-ink)]"></textarea>
+                                        <button type="submit" class="w-full rounded-xl border border-primary-800 px-4 py-3 text-sm font-semibold text-[var(--link)] hover:bg-[var(--bg-page)]">Cancel return</button>
+                                    </form>
+                                @endif
+                                @if ($sellerOrder->canBuyerConfirmReceipt())
                                     <div class="rounded-xl border border-[var(--border)] p-4">
                                         <h3 class="mb-1 text-sm font-semibold text-[var(--text-ink)]">Order Received</h3>
                                         <p class="text-xs leading-relaxed text-[var(--text-muted)]">Confirm only after receiving and checking this parcel. Order completion is still pending. Eligible shipments complete automatically 7 days after delivery if no return or delivery issue remains open.</p>
@@ -217,7 +223,7 @@
                                         @endforeach
                                     </div>
                                 @endif
-                                @if ($sellerOrder->status->canBuyerCancel())
+                                @if ($sellerOrder->status === OrderStatus::Placed)
                                     <div class="pt-2" data-cancel-action="{{ $sellerOrder->id }}">
                                         <button
                                             type="button"
@@ -248,15 +254,13 @@
                 This cannot be undone. The seller will be notified and stock will be restored.
             </p>
             <label for="buyer-cancel-reason" class="mt-4 block font-sans text-sm font-semibold text-[var(--text-ink)]">Reason <span class="text-red-600">*</span></label>
-            <select
+            <textarea
                 id="buyer-cancel-reason"
+                maxlength="500"
+                rows="3"
                 class="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 font-sans text-sm text-[var(--text-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--hover-rose)]"
-            >
-                <option value="">Choose a reason</option>
-                @foreach (\App\Services\Buyer\BuyerOrderCancellation::REASONS as $reason)
-                    <option value="{{ $reason }}">{{ $reason }}</option>
-                @endforeach
-            </select>
+                placeholder="Tell the seller why you are cancelling"
+            ></textarea>
             <p id="buyer-cancel-modal-error" class="mt-2 hidden font-sans text-sm text-red-600" role="alert"></p>
             <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button type="button" id="buyer-cancel-modal-dismiss" class="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2.5 font-sans text-sm font-semibold text-[var(--text-ink)] transition-colors hover:bg-secondary-200">

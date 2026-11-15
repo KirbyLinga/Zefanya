@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Exceptions\CartItemUnavailableException;
 use App\Http\Controllers\Controller;
+use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
@@ -365,6 +366,12 @@ class CartController extends Controller
         }
 
         return DB::transaction(function () use ($buyer, $product, $data): JsonResponse {
+            // Match checkout's buyer → product → seller ordering before reading stock.
+            $buyer = Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
+            $product = Product::query()->whereKey($product->id)->lockForUpdate()->first();
+            if ($product === null) {
+                return response()->json(['success' => false, 'message' => 'This product is no longer available.'], 422);
+            }
             $product->setRelation('seller', Seller::query()->whereKey($product->seller_id)->sharedLock()->first());
             $variant = app(CartVariantResolver::class)->resolve(
                 $product, isset($data['variant_id']) ? (int) $data['variant_id'] : null,

@@ -34,7 +34,7 @@
                         </li>
                         <li class="flex gap-3">
                             <span class="text-primary-800 font-bold">✓</span>
-                            <span>Easy returns within 14 days</span>
+                            <span>In-app return requests within 7 days of delivery</span>
                         </li>
                         <li class="flex gap-3">
                             <span class="text-primary-800 font-bold">✓</span>

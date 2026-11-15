@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\ParcelReturn;
 use App\Models\Rider\Courier;
-use App\Models\Rider\Rider;
+use App\Services\Logistics\LogisticsHubService;
 use App\Services\Logistics\ParcelReturnService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ class ReturnController extends Controller
     {
         $provider = $request->user('logistics');
         $returns = ParcelReturn::query()->visibleToProvider((int) $provider->id)
-            ->with(['sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'originHub', 'originProvider'])->latest('id')->paginate(25)->withQueryString();
+            ->with(['sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'originHub', 'originProvider', 'events'])->latest('id')->paginate(25)->withQueryString();
 
         return view('Logistics.Returns.index', compact('returns'));
     }
@@ -29,8 +29,12 @@ class ReturnController extends Controller
         abort_unless(ParcelReturn::query()->whereKey($return->id)->visibleToProvider((int) $provider->id)->exists(), 404);
         $canOperate = $service->custodyProviderId($return->sellerOrder) === (int) $provider->id && $return->isActive() && ! $return->inDispute();
         $hubs = LogisticsHub::query()->where('logistics_provider_id', $provider->id)->operational()->orderBy('name')->get();
+        $area = $canOperate && $return->awaitingBuyerCollection()
+            ? app(LogisticsHubService::class)->areaForBarangay((int) $provider->id, $return->sellerOrder->buyerBarangayCode())
+            : null;
         $collectionCouriers = Courier::query()->where('logistics_provider_id', $provider->id)
-            ->whereHas('rider', fn ($rider) => $rider->whereIn('status', Rider::ASSIGNABLE_STATUSES))
+            ->eligibleForAssignment()
+            ->whereHas('rider', fn ($query) => $query->where('station_hub_id', $area?->station_hub_id))
             ->with('rider')->get();
 
         return view('Logistics.Returns.show', compact('return', 'provider', 'canOperate', 'hubs', 'collectionCouriers'));
@@ -49,6 +53,17 @@ class ReturnController extends Controller
         $data = $request->validate(['tracking_number' => ['required', 'string', 'max:64'], 'phase' => ['required', Rule::in(['origin', 'handover'])]]);
 
         return response()->json($service->scan($return, $request->user('logistics'), $data['tracking_number'], $data['phase']));
+    }
+
+    public function stationReceipt(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'tracking_number' => ['required', 'string', 'max:64'],
+            'station_hub_id' => ['required', 'integer', 'min:1'],
+        ]);
+        $service->receiveFromBuyerCollection($return, $request->user('logistics'), (int) $data['station_hub_id'], $data['tracking_number']);
+
+        return back()->with('success', 'Physical receipt recorded at the station.');
     }
 
     public function origin(Request $request, ParcelReturn $return, ParcelReturnService $service)
@@ -73,6 +88,19 @@ class ReturnController extends Controller
         $manifest = $service->reverseManifest($return, $request->user('logistics'), (int) $data['destination_hub_id']);
 
         return to_route('logistics.manifests.show', $manifest);
+    }
+
+    public function reportProblem(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['missing', 'damaged'])],
+            'reason' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'photo' => ['required_if:type,damaged', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], ['photo.required_if' => 'Attach a photo when reporting a damaged parcel.']);
+        $service->reportTransitProblem($return, $request->user('logistics'), $data + ['photo' => $request->file('photo')]);
+
+        return back()->with('success', 'Reported to Admin. The parcel is on hold and stays in your custody until Admin decides.');
     }
 
     public function handoff(Request $request, ParcelReturn $return, ParcelReturnService $service)

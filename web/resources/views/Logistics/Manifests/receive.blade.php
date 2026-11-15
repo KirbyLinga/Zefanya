@@ -20,7 +20,7 @@
         <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Receiving at {{ $manifest->destinationHub?->name }}</h1>
         <span class="inline-flex rounded-full border border-[var(--border-strong)] bg-[var(--bg-page)] px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.5px] text-[var(--text-muted)]">{{ $manifest->status->label() }}</span>
     </div>
-    <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">From {{ $manifest->originHub?->name }} · Dispatched {{ $manifest->dispatched_at?->format('M j, Y g:i A') ?? 'pending' }} by {{ $actorName }}</p>
+    <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">From {{ $manifest->originHub?->name }} · Dispatched {{ manila($manifest->dispatched_at, 'M j, Y g:i A', 'pending') }} by {{ $actorName }}</p>
 </div>
 
 <x-logistics-flash :messages="['success', 'warning', 'error']" />
@@ -58,7 +58,7 @@
             <i data-lucide="check-circle-2" class="mt-0.5 size-5 shrink-0 text-emerald-700"></i>
             <div>
                 <h2 class="font-serif text-lg text-emerald-900">Batch fully received</h2>
-                <p class="mt-1 font-sans text-xs leading-relaxed text-emerald-800">All {{ $counts['total'] }} parcels were verified at {{ $manifest->destinationHub?->name }} on {{ $manifest->received_at?->format('M j, Y g:i A') }}. This transfer did not change any parcel's delivery status.</p>
+                <p class="mt-1 font-sans text-xs leading-relaxed text-emerald-800">All {{ $counts['total'] }} parcels were verified at {{ $manifest->destinationHub?->name }} on {{ manila($manifest->received_at, 'M j, Y g:i A') }}. This transfer did not change any parcel's delivery status.</p>
             </div>
         </div>
     </section>
@@ -114,7 +114,7 @@
                             <td class="px-4 py-3">
                                 @if ($item->received_at)
                                     <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-sans text-[10px] font-semibold text-emerald-800"><i data-lucide="check" class="size-3"></i>Received</span>
-                                    <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">{{ $item->received_at->format('M j, Y g:i A') }} · {{ $actorName }}</p>
+                                    <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">{{ manila($item->received_at, 'M j, Y g:i A') }} · {{ $actorName }}</p>
                                 @else
                                     <span class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-sans text-[10px] font-semibold text-amber-800">Pending scan</span>
                                 @endif

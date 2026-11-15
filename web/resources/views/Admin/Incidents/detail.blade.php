@@ -3,16 +3,13 @@
 @section('title', 'Incident #'.$incident->id)
 
 @section('content')
-    @if (session('success'))
-        <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            {{ session('success') }}
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {{ session('error') }}
-        </div>
-    @endif
+<x-admin.tabs :tabs="[
+    ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
+    ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
+    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
+]" />
+    <x-flash type="success" :message="session('success')" spacing="mb-6" />
+    <x-flash type="error" :message="session('error')" spacing="mb-6" />
 
     @if ($errors->any())
         <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -68,7 +65,7 @@
 
         <div class="w-full sm:max-w-lg">
             @can('resolve', $incident)
-                <form method="POST" action="{{ route('admin.incidents.resolve', $incident) }}">
+                    <form method="POST" action="{{ route('admin.incidents.resolve', $incident) }}" data-app-confirm data-confirm-field-name="resolution" data-confirm-danger-values="CLOSE_LOST,CLOSE_DAMAGED" data-confirm-title="Record incident resolution" data-confirm-label="Record Resolution" data-confirm-message="Record a resolution for Incident #{{ $incident->id }}, Parcel #{{ $incident->incident_seller_order_id }}. Permanent closures cannot be undone here.">
                     @csrf
                     <div class="mb-3">
                         <label for="resolution" class="block text-xs font-semibold text-neutral-600 mb-2">Resolution action</label>
@@ -81,7 +78,7 @@
                                 <option value="KEEP_ON_HOLD" @selected(old('resolution') === 'KEEP_ON_HOLD')>KEEP_ON_HOLD — resolve the review but keep movement blocked</option>
                             @endif
                             <option value="RETURN" @selected(old('resolution') === 'RETURN')>RETURN — authorize the existing return workflow</option>
-                            <option value="CLOSE_LOST" @selected(old('resolution') === 'CLOSE_LOST') @disabled(strtolower($incident->type) !== 'lost')>CLOSE_LOST — permanently close a lost parcel</option>
+                            <option value="CLOSE_LOST" @selected(old('resolution') === 'CLOSE_LOST') @disabled(! in_array(strtolower($incident->type), $lossAvailable ? ['lost', 'missing', 'failed_transfer'] : ['lost'], true))>CLOSE_LOST — confirm the parcel lost and close it</option>
                             <option value="CLOSE_DAMAGED" @selected(old('resolution') === 'CLOSE_DAMAGED') @disabled(strtolower($incident->type) !== 'damaged')>CLOSE_DAMAGED — permanently close a damaged parcel</option>
                         </select>
                     </div>
@@ -89,8 +86,18 @@
                         <label for="resolution_note" class="block text-xs font-semibold text-neutral-600 mb-2">Resolution reason</label>
                         <textarea id="resolution_note" name="resolution_note" rows="3" required maxlength="1000" class="w-full border border-neutral-300 rounded-lg p-3 text-sm">{{ old('resolution_note') }}</textarea>
                     </div>
+                    @if ($lossAvailable)
+                        <div class="mb-3">
+                            <label for="liable_provider_id" class="block text-xs font-semibold text-neutral-600 mb-2">If you confirm it lost: liable company</label>
+                            <select id="liable_provider_id" name="resolution_context[liable_provider_id]" class="w-full border border-neutral-300 rounded-lg p-3 text-sm">
+                                <option value="">Decide from verified custody (sender before the receiving scan, receiver after it)</option>
+                                @foreach ($liableProviders as $p)<option value="{{ $p->id }}">{{ $p->business_name }}</option>@endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-neutral-500">Confirming a loss closes this parcel only, restores no stock, and records what the liable company owes the Seller: the saved merchandise value, without shipping or commission.</p>
+                        </div>
+                    @endif
                     <p class="mb-3 text-xs text-neutral-500">Resolutions never create scans, custody transfers, deliveries, refunds or restocks. Rerouting requires a verified physical hub receipt and an active alternative path; KEEP_ON_HOLD leaves movement blocked. RETURN requires an eligible failed delivery.</p>
-                    <button type="submit" class="h-10 px-4 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors" onclick="return confirm('Record this resolution? Permanent closures cannot be undone here.')">Record resolution</button>
+                    <button type="submit" class="h-10 px-4 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">Record resolution</button>
                 </form>
             @else
                 <p class="text-sm text-neutral-600">This incident has been resolved. Its audit history is preserved below.</p>
@@ -116,7 +123,7 @@
                                 <p class="text-sm text-neutral-700">{{ $event->resolution_reason }}</p>
                             @endif
                             <p class="text-xs text-neutral-500">
-                                {{ $event->occurred_at ? $event->occurred_at->setTimezone('UTC')->format('Y-m-d\TH:i:s.vP') : '—' }}
+                                {{ $event->occurred_at ? manila($event->occurred_at->setTimezone('UTC'), 'Y-m-d\TH:i:s.vP') : '—' }}
                                 @if ($event->detail)
                                     <span class="block text-xs text-neutral-400">{{ $event->detail }}</span>
                                 @endif
@@ -139,7 +146,7 @@
             <div class="space-y-3 text-sm">
                 @foreach ($rereoutes as $rereoute)
                     <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                        <p class="font-semibold text-neutral-950">{{ $rereoute->rerouted_at?->format('M d, Y H:i') ?? '—' }} · {{ $rereoute->reason }}</p>
+                        <p class="font-semibold text-neutral-950">{{ manila($rereoute->rerouted_at, 'M d, Y H:i', '—') }} · {{ $rereoute->reason }}</p>
                         <p class="text-xs text-neutral-600">Authorized by {{ $rereoute->authorized_by_type ?? '—' }} #{{ $rereoute->authorized_by_id ?? '—' }}</p>
                         <p class="mt-1 text-xs text-neutral-600">Previous path: {{ count($rereoute->previous_path ?? []) }} leg(s) · New path: {{ count($rereoute->new_path ?? []) }} leg(s) · Completed preserved: {{ count($rereoute->completed_legs ?? []) }} leg(s)</p>
                     </div>

@@ -85,7 +85,7 @@ class MarkReadyDoubleSubmitTest extends TestCase
         $this->actingSeller()
             ->post(route('seller.orders.markReady', $this->sellerOrder))
             ->assertRedirect()
-            ->assertSessionHas('warning');
+            ->assertSessionHas('warning', 'Pickup was already requested for this order.');
 
         $this->sellerOrder->refresh();
         $this->assertSame(OrderStatus::ReadyForPickup, $this->sellerOrder->status);

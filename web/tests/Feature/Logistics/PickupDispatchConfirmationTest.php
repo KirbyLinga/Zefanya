@@ -19,9 +19,8 @@ use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
 
 /**
- * The pickup workflow: automatic routing reserves and notifies a Rider when
- * the parcel becomes ready; Logistics can manually reserve/reassign instead,
- * and the Rider confirms collection with F2.
+ * Seller pickup requests do not assign a rider. Logistics selects one, then
+ * confirms the assignment, which is the only step that notifies the rider.
  */
 class PickupDispatchConfirmationTest extends TestCase
 {
@@ -57,7 +56,7 @@ class PickupDispatchConfirmationTest extends TestCase
         ]);
     }
 
-    public function test_seller_marking_ready_reserves_and_notifies_a_pickup_rider(): void
+    public function test_seller_requesting_pickup_does_not_assign_or_notify_a_rider(): void
     {
         $preparing = $this->parcel->fresh();
         $preparing->forceFill(['status' => OrderStatus::Preparing])->save();
@@ -71,10 +70,11 @@ class PickupDispatchConfirmationTest extends TestCase
 
         $parcel = $preparing->fresh();
         $this->assertSame(OrderStatus::ReadyForPickup, $parcel->status);
-        $this->assertSame($this->first->id, (int) $parcel->courier_id);
-        $this->assertSame(1, $parcel->deliveryAssignments()->where('role', 'pickup')->count());
-        $this->assertFalse($this->first->fresh()->is_available);
-        Notification::assertSentToTimes($this->first->rider, PickupAssigned::class, 1);
+        $this->assertNull($parcel->courier_id);
+        $this->assertSame(0, $parcel->deliveryAssignments()->where('role', 'pickup')->count());
+        $this->assertTrue($this->first->fresh()->is_available);
+        Notification::assertNotSentTo($this->first->rider, PickupAssigned::class);
+        Notification::assertNotSentTo($this->second->rider, PickupAssigned::class);
     }
 
     public function test_incoming_parcels_keeps_selected_carrier_parcels_visible_without_current_origin_coverage(): void
@@ -87,7 +87,7 @@ class PickupDispatchConfirmationTest extends TestCase
             ->assertViewHas('shipments', fn ($shipments) => $shipments->contains('id', $this->parcel->id));
     }
 
-    public function test_manual_reassignment_after_automatic_dispatch_is_preserved_by_automatic_retry(): void
+    public function test_a_pickup_retry_cannot_assign_or_replace_the_rider(): void
     {
         $this->parcel->forceFill(['status' => OrderStatus::Preparing])->save();
         app(SellerOrderStatusService::class)->transition(
@@ -96,21 +96,22 @@ class PickupDispatchConfirmationTest extends TestCase
             actor: OrderActor::Seller,
             actorId: $this->seller->id,
         );
-        Notification::assertSentToTimes($this->first->rider, PickupAssigned::class, 1);
+        Notification::assertNotSentTo($this->first->rider, PickupAssigned::class);
 
         $this->actingAs($this->provider, 'logistics')
-            ->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), [
-                'reassign' => 1,
-                'courier_id' => $this->second->id,
-                'expected_courier_id' => $this->first->id,
-                'reason' => 'Original Rider cannot collect today.',
-            ])
+            ->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), ['courier_id' => $this->first->id])
             ->assertRedirect()
             ->assertSessionHas('success');
+        $this->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), [
+            'reassign' => 1,
+            'courier_id' => $this->second->id,
+            'expected_courier_id' => $this->first->id,
+            'reason' => 'Original Rider cannot collect today.',
+        ])->assertRedirect()->assertSessionHas('success');
 
         $this->post(route('logistics.dispatch.retry', [$this->parcel, 'pickup']))
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHas('error');
 
         $parcel = $this->parcel->fresh();
         $this->assertSame($this->second->id, (int) $parcel->courier_id);
@@ -126,7 +127,7 @@ class PickupDispatchConfirmationTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        Notification::assertSentToTimes($this->first->rider, PickupAssigned::class, 1);
+        Notification::assertNotSentTo($this->first->rider, PickupAssigned::class);
         Notification::assertSentToTimes($this->second->rider, PickupAssigned::class, 1);
     }
 
@@ -313,5 +314,53 @@ class PickupDispatchConfirmationTest extends TestCase
 
         Notification::assertNothingSent();
         $this->assertSame(0, $this->parcel->deliveryAssignments()->count());
+    }
+
+    public function test_a_request_with_no_eligible_rider_stays_pending_for_logistics(): void
+    {
+        $this->first->rider->forceFill(['is_online' => false])->save();
+        $this->second->rider->forceFill(['is_online' => false])->save();
+
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.incoming-parcels.index'))
+            ->assertOk()
+            ->assertSee('No eligible rider is available. This pickup request stays pending.')
+            ->assertSee('#'.$this->parcel->id);
+
+        $this->assertNull($this->parcel->fresh()->courier_id);
+    }
+
+    public function test_assigning_the_same_pickup_twice_does_not_create_another_assignment(): void
+    {
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), ['courier_id' => $this->first->id])
+            ->assertSessionHas('success');
+
+        $this->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), ['courier_id' => $this->second->id])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame($this->first->id, (int) $this->parcel->fresh()->courier_id);
+        $this->assertSame(1, $this->parcel->deliveryAssignments()->where('role', 'pickup')->count());
+    }
+
+    public function test_rider_mobile_jobs_include_a_pickup_only_after_logistics_assigns_it(): void
+    {
+        $token = $this->first->rider->createToken('api-token', ['rider'], now()->addHour())->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/rider/jobs')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.pickups');
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.assignPickupRider', $this->parcel), ['courier_id' => $this->first->id])
+            ->assertSessionHas('success');
+
+        $this->flushHeaders();
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($token)->getJson('/api/rider/jobs')
+            ->assertOk()
+            ->assertJsonPath('data.pickups.0.id', $this->parcel->id);
     }
 }

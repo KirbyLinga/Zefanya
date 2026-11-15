@@ -5,6 +5,7 @@
 @php
     $sidebarActive = $active ?? null;
     $sidebarBuyer = $buyer ?? auth('buyer')->user();
+    $sidebarAddressCount = $sidebarBuyer->relationLoaded('addresses') ? $sidebarBuyer->addresses->count() : $sidebarBuyer->addresses()->count();
 @endphp
 
 <aside class="space-y-6">
@@ -63,7 +64,7 @@
                         <i data-lucide="map-pin" width="16" height="16" class="{{ $sidebarActive === 'address' ? 'text-primary-800' : 'text-neutral-400' }}"></i>
                         Shipping Addresses
                     </span>
-                    <span class="font-sans text-[11.5px] {{ $sidebarActive === 'address' ? 'text-primary-800' : 'text-[var(--text-muted)]' }}">{{ $sidebarBuyer->street ? '1' : '0' }}</span>
+                    <span class="font-sans text-[11.5px] {{ $sidebarActive === 'address' ? 'text-primary-800' : 'text-[var(--text-muted)]' }}">{{ $sidebarAddressCount }}</span>
                 </a>
             </li>
             <li>

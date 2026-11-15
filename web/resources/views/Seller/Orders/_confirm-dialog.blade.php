@@ -10,7 +10,7 @@
             dialog.innerHTML = '<p id="seller-confirm-message" style="margin:0 0 1rem;font-size:0.875rem;line-height:1.5"></p>'
                 + '<div style="display:flex;justify-content:flex-end;gap:0.5rem">'
                 + '<button type="button" data-seller-confirm="cancel" style="min-height:2.25rem;padding:0 1rem;border:1px solid var(--border-strong);border-radius:0.25rem;background:transparent;color:inherit;font-weight:600;cursor:pointer">Cancel</button>'
-                + '<button type="button" data-seller-confirm="ok" style="min-height:2.25rem;padding:0 1rem;border:0;border-radius:0.25rem;background:var(--brand);color:#fff;font-weight:600;cursor:pointer">Confirm</button>'
+                + '<button type="button" data-seller-confirm="ok" style="min-height:2.25rem;padding:0 1rem;border:0;border-radius:0.25rem;background:var(--btn-primary-bg);color:var(--btn-primary-text);font-weight:600;cursor:pointer">Confirm</button>'
                 + '</div>';
             document.body.appendChild(dialog);
         }

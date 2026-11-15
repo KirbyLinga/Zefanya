@@ -94,6 +94,8 @@
         // Tone classes — styled once in products-index.css (theme-aware).
                 // Same swap contract as before; the blade renders sp-tone-active, sp-tone-stock, etc.
         active: { text: 'sp-tone-active', dot: 'sp-dot-active' },
+        pending: { text: 'sp-tone-draft', dot: 'sp-dot-draft' },
+        rejected: { text: 'sp-tone-inactive', dot: 'sp-dot-inactive' },
         draft: { text: 'sp-tone-draft', dot: 'sp-dot-draft' },
         inactive: { text: 'sp-tone-inactive', dot: 'sp-dot-inactive' }
     };

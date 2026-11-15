@@ -55,7 +55,9 @@ function tidy(value) {
 // ============================================================
 
 function initPasswordToggles() {
+    if (window.__zfPasswordReveal) return;
     if (!once('toggles')) return;
+    window.__zfPasswordReveal = true;
 
     document.addEventListener('click', function (e) {
         const btn = e.target.closest && e.target.closest('[data-toggle-visibility]');

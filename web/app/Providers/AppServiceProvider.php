@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Buyer\CartItem;
 use App\Models\Buyer\Wishlist;
 use App\Models\Catalog\Product;
+use App\Models\Logistics\CourierAccount;
 use App\Models\Rider\Rider;
 use App\Models\Shared\Category;
 use App\Models\Shared\Incidents;
@@ -14,6 +15,7 @@ use App\Policies\BuyerOrderPolicy;
 use App\Policies\IncidentsPolicy;
 use App\Policies\SellerOrderFleetPolicy;
 use App\Policies\SellerOrderPolicy;
+use App\Services\Logistics\CourierAccountService;
 use App\Services\Shared\OfferPricing;
 use App\View\Composers\RiderNotificationComposer;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -83,6 +85,46 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Courier Mobile sign-in and activation: per normalized login ID and
+        // per IP in fixed 15-minute windows. Keyed by the ID whether or not it
+        // exists, with one response for every case, so neither the limit nor
+        // its message reveals which IDs are real. Reaching it never ends an
+        // existing session.
+        foreach (['courier-login', 'courier-activate'] as $limiter) {
+            RateLimiter::for($limiter, function (Request $request) use ($limiter) {
+                $id = CourierAccountService::normalizeLoginId($request->input('login_id'));
+                $minutes = (int) config('courier.login_decay_minutes', 15);
+                $response = fn (Request $request, array $headers) => response()->json([
+                    'success' => false,
+                    'message' => 'Too many attempts. Please try again later.',
+                    'data' => null,
+                    'errors' => ['login_id' => ['Too many attempts. Please try again later.']],
+                ], 429, $headers);
+
+                return [
+                    Limit::perMinutes($minutes, (int) config('courier.login_max_per_id', 5))->by($limiter.'-id:'.hash('sha256', $id))->response($response),
+                    Limit::perMinutes($minutes, (int) config('courier.login_max_per_ip', 30))->by($limiter.'-ip:'.$request->ip())->response($response),
+                ];
+            });
+        }
+
+        // Logistics issuing Courier app access codes: per company.
+        RateLimiter::for('courier-issue', fn (Request $request) => Limit::perHour((int) config('courier.issue_max_per_provider_per_hour', 30))
+            ->by('courier-issue:'.($request->user('logistics')?->getAuthIdentifier() ?? $request->ip())));
+
+        // Keep authenticated Courier budgets separate from each other and
+        // from numeric Buyer/Rider buckets, even when account IDs coincide.
+        foreach (['courier-refresh' => 10, 'courier-logout' => 30, 'courier-reads' => 60] as $name => $maximum) {
+            RateLimiter::for($name, function (Request $request) use ($name, $maximum) {
+                // ApiCourier runs first and binds the verified account.
+                $account = $request->user();
+                $subject = $account instanceof CourierAccount
+                    ? 'account:'.$account->getAuthIdentifier() : 'guest:'.$request->ip();
+
+                return Limit::perMinute($maximum)->by($name.':'.$subject);
+            });
+        }
+
         RateLimiter::for('password-email', function (Request $request) {
             $email = Str::lower((string) $request->input('email'));
 
@@ -135,7 +177,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Incidents::class, IncidentsPolicy::class);
         Gate::policy(Order::class, BuyerOrderPolicy::class);
         Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
-        Gate::define('quote-checkout', [\App\Policies\CheckoutPolicy::class, 'quote']);
         Gate::define('remediate-shipment-address', [SellerOrderFleetPolicy::class, 'remediateAddress']);
         Gate::define('advance-shipment', [SellerOrderFleetPolicy::class, 'advance']);
 
@@ -167,6 +208,10 @@ class AppServiceProvider extends ServiceProvider
         Blade::anonymousComponentPath(
             resource_path('views/Components')
         );
+
+        // @manila($date, 'M d, Y g:i A'): display a stored UTC date in the
+        // business timezone (config app.schedule_timezone). Display only.
+        Blade::directive('manila', fn (string $expression): string => "<?php echo e(manila({$expression})); ?>");
 
         // The navbar cart badge (#cartCount) must show the real cart size on
         // EVERY buyer page. A view composer is used instead of passing the

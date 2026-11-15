@@ -28,7 +28,7 @@ class PickupRequested extends Notification
         return [
             'type' => 'pickup_requested',
             'title' => 'Pickup requested',
-            'message' => "{$tracking}: a seller has marked this parcel ready for pickup.",
+            'message' => "{$tracking}: a seller requested pickup. Assign a rider from the pickup queue.",
             'seller_order_id' => $parcel?->id,
             'carrier_provider_id' => $this->carrierProviderId,
             'url' => route('logistics.incoming-parcels.index', ['highlight' => $parcel?->id]),
@@ -48,7 +48,7 @@ class PickupRequested extends Notification
         return (new MailMessage)
             ->subject("Pickup requested — {$tracking}")
             ->greeting('New pickup request')
-            ->line("A seller has marked {$tracking} as ready for pickup.")
+            ->line("A seller requested pickup for {$tracking}. Assign a rider from the pickup queue.")
             ->action('View incoming parcels', route('logistics.incoming-parcels.index', ['highlight' => $parcel?->id]));
     }
 }

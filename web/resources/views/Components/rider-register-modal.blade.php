@@ -186,7 +186,7 @@
                         <input type="checkbox" name="terms" id="riderTerms" value="1" required data-validate-rule="terms" class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border-neutral-300 text-[#9c5c68] accent-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                         <p class="font-sans text-xs leading-5 text-neutral-700">
                             <label for="riderTerms" class="cursor-pointer">I agree to the</label>
-                            <a href="{{ route('buyer.pages.terms-of-service') }}" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Terms of Service</a>
+                            <a href="{{ route('buyer.pages.terms-of-service') }}#riders" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Rider Terms and Code of Conduct</a>
                             <label for="riderTerms" class="cursor-pointer">and</label>
                             <a href="{{ route('buyer.pages.privacy-policy') }}" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Privacy Policy</a>.
                         </p>

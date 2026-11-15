@@ -13,6 +13,7 @@ use App\Models\Rider\RiderEarning;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
+use App\Notifications\Rider\PickupAssigned;
 use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\PickupSessionService;
 use App\Services\Logistics\PickupWindowService;
@@ -21,6 +22,7 @@ use App\Services\Seller\SellerOrderStatusService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\TestCase;
@@ -71,10 +73,23 @@ class PickupSessionTest extends TestCase
         ]);
     }
 
-    private function ready(SellerOrder $parcel): SellerOrder
+    /** The Seller requests pickup. No Rider is chosen, reserved or notified. */
+    private function requestPickup(SellerOrder $parcel): SellerOrder
     {
         app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::ReadyForPickup,
             actor: OrderActor::Seller, actorId: $parcel->seller_id);
+
+        return $parcel->fresh();
+    }
+
+    /** Pickup requested, then Logistics manually assigns and confirms the Rider (default: the first one). */
+    private function ready(SellerOrder $parcel, ?Courier $courier = null): SellerOrder
+    {
+        $parcel = $this->requestPickup($parcel);
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.assignPickupRider', $parcel), ['courier_id' => ($courier ?? $this->first)->id])
+            ->assertSessionHas('success');
+        $this->post(route('logistics.incoming-parcels.confirmPickupDispatch', $parcel))->assertSessionHas('success');
 
         return $parcel->fresh();
     }
@@ -128,13 +143,23 @@ class PickupSessionTest extends TestCase
 
     public function test_marking_ready_books_the_window_and_shows_it_to_the_seller_without_waiting_for_it_to_close(): void
     {
-        $parcel = $this->ready($this->parcel());
+        Notification::fake();
+        $parcel = $this->requestPickup($this->parcel());
 
         $this->assertSame('morning', $parcel->pickup_window_key);
         $this->assertSame('08:00', $parcel->pickup_window_starts_at->copy()->setTimezone('Asia/Manila')->format('H:i'));
         $this->assertSame('12:00', $parcel->pickup_window_ends_at->copy()->setTimezone('Asia/Manila')->format('H:i'));
-        // A rider is reserved straight away, not when the window closes.
-        $this->assertNotNull($parcel->courier_id);
+        // Manual-only pickup: the request stays pending with no Rider until Logistics assigns one.
+        $this->assertSame(OrderStatus::ReadyForPickup, $parcel->status);
+        $this->assertNull($parcel->courier_id);
+        $this->assertNull($parcel->pickup_session_id);
+        $this->assertSame(0, $parcel->deliveryAssignments()->where('role', 'pickup')->count());
+        Notification::assertNotSentTo($this->first->rider, PickupAssigned::class);
+        Notification::assertNotSentTo($this->second->rider, PickupAssigned::class);
+        $this->actingAs($this->provider, 'logistics')->get(route('logistics.incoming-parcels.index'))->assertOk()
+            ->assertSee(route('logistics.incoming-parcels.assignPickupRider', $parcel), false);
+        $this->actingAs($this->first->rider, 'rider')->get(route('rider.pickups.index'))->assertOk()
+            ->assertDontSee('data-pickup-stop', false);
 
         $this->actingAs($this->seller, 'seller')->get(route('seller.orders.show', $parcel))
             ->assertOk()->assertSee('Pickup scheduled:')->assertSee('Today, 8:00 AM – 12:00 PM');
@@ -454,8 +479,9 @@ class PickupSessionTest extends TestCase
 
         // A session opened afterwards uses the new rates.
         Carbon::setTestNow(now()->addMinutes(50));
-        $c = $this->ready($this->parcel());
-        $d = $this->ready($this->parcel());
+        // The first Rider is at the job limit, so Logistics picks the other eligible Rider.
+        $c = $this->ready($this->parcel(), $this->second);
+        $d = $this->ready($this->parcel(), $this->second);
         $this->collect($c);
         $this->collect($d);
         $this->assertSame(4000, $this->earning($c)->amount_minor);

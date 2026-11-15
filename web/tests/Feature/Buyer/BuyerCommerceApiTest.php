@@ -308,6 +308,20 @@ class BuyerCommerceApiTest extends TestCase
         $this->assertSame(5, $this->variant->fresh()->stock_quantity);
     }
 
+    public function test_a_quantity_change_after_review_is_a_409_and_writes_nothing(): void
+    {
+        $lineId = $this->addToCart();
+        $payload = $this->placePayload([$lineId]);
+        $this->api()->patchJson("/api/buyer/cart/items/{$lineId}", ['quantity' => 2])->assertOk();
+
+        $this->api()->postJson('/api/buyer/checkout', $payload)->assertConflict();
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseHas('checkout_tokens', ['token' => $payload['checkout_token'], 'used' => false]);
+        $this->assertSame(5, $this->variant->fresh()->stock_quantity);
+    }
+
     public function test_client_shipping_fees_are_rejected(): void
     {
         $lineId = $this->addToCart();

@@ -9,6 +9,7 @@ use App\Models\Shared\Order;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
+use App\Services\Shared\CommissionFinalizationService;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\Process\Process;
@@ -105,7 +106,8 @@ class Rule05ReturnCompletionConcurrencyTest extends TestCase
             $this->assertSame($first === 'return' ? OrderStatus::Delivered : OrderStatus::Completed, $parcel->fresh()->status);
             $this->assertDatabaseCount('parcel_returns', $first === 'return' ? 1 : 0);
             $this->assertSame($first === 'return' ? 0 : 1, StatusHistory::where('to_status', OrderStatus::Completed)->count());
-            $this->assertSame($first === 'return' ? null : 500, $parcel->fresh()->commission_minor);
+            // No saved rate on this order, so completion finalizes at the current rate.
+            $this->assertSame($first === 'return' ? null : intdiv(10000 * CommissionFinalizationService::COMMISSION_BPS, 10000), $parcel->fresh()->commission_minor);
             $this->assertSame($paymentBefore, $payment->fresh()->getRawOriginal());
         } finally {
             touch($directory.'/release');

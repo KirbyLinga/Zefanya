@@ -115,6 +115,9 @@ final class VoucherSessionService
                 continue;
             }
 
+            if ($lock && $voucher->applies_to_all_products === false) {
+                $voucher->loadEligibleProductsForCheckout();
+            }
             $reason = $this->rejectionReason($voucher, $sellerGroups, $subtotalCentavos, is_string($storedSlot) ? $storedSlot : null);
             if ($reason !== null) {
                 $notices[] = $reason;
@@ -256,6 +259,8 @@ final class VoucherSessionService
             }
 
             $eligibleSubtotal = $voucher->eligibleSubtotal($group['items']);
+        } elseif ($voucher->applies_to_all_products === false) {
+            $eligibleSubtotal = (int) $sellerGroups->sum(fn (array $group): int => $voucher->eligibleSubtotal($group['items']));
         } else {
             $eligibleSubtotal = $subtotalCentavos;
         }

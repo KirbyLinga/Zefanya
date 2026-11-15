@@ -4,6 +4,7 @@ namespace Tests\Feature\Console;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Models\Logistics\CodRemittance;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\Payment;
@@ -64,7 +65,7 @@ class OrdersResyncCommandTest extends TestCase
         $this->assertSame(PaymentStatus::Pending, $order->fresh()->sellerOrders->first()->payment->status);
     }
 
-    public function test_real_run_fixes_stale_order_and_settles_payments(): void
+    public function test_real_run_fixes_stale_order_without_inventing_cash_collection(): void
     {
         // Stale: both slices Delivered but order still PLACED; payments pending.
         $order = $this->makeOrder(OrderStatus::Delivered, OrderStatus::Delivered);
@@ -79,11 +80,26 @@ class OrdersResyncCommandTest extends TestCase
         // Order rolled up to Delivered (both slices Delivered).
         $this->assertSame(OrderStatus::Delivered, $order->fresh()->status);
 
-        // Both COD payments settled.
+        // Delivery status alone supplies no cash evidence.
         foreach ($order->fresh()->sellerOrders as $so) {
-            $this->assertSame(PaymentStatus::Paid, $so->payment->status);
-            $this->assertNotNull($so->payment->paid_at);
+            $this->assertSame(PaymentStatus::Pending, $so->payment->status);
+            $this->assertNull($so->payment->paid_at);
+            $this->assertNull($so->payment->collected_at);
         }
+    }
+
+    public function test_resync_can_settle_existing_exact_collection_snapshots_without_creating_remittances(): void
+    {
+        $order = $this->makeOrder(OrderStatus::Delivered, OrderStatus::Delivered);
+        foreach ($order->sellerOrders as $slice) {
+            $slice->payment->forceFill(['collected_at' => now(), 'collected_amount_minor' => $slice->payment->amount_minor])->save();
+        }
+        Artisan::call('orders:resync');
+        foreach ($order->fresh()->sellerOrders as $slice) {
+            $this->assertSame(PaymentStatus::Paid, $slice->payment->status);
+            $this->assertNotNull($slice->payment->paid_at);
+        }
+        $this->assertSame(0, CodRemittance::query()->count());
     }
 
     public function test_resync_is_idempotent(): void

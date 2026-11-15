@@ -5,15 +5,7 @@
 @use('App\Enums\OrderStatus')
 
 @push('scripts')
-@include('Seller.Orders._confirm-dialog')
-<script>
-    function confirmAccept(btn) {
-        sellerConfirm('Accept this order? You can pack it in the next step.', () => btn.closest('form').submit());
-    }
-    function confirmMarkReady(btn) {
-        sellerConfirm('Mark this order as packed and ready for pickup? This schedules the current eligible or next pickup window. Logistics arranges the pickup rider.', () => btn.closest('form').submit());
-    }
-</script>
+@include('Components.confirm-dialog')
 @endpush
 
 @section('content')
@@ -23,12 +15,12 @@
         <h1 class="font-serif text-2xl text-[var(--text-ink)]">Orders</h1>
         <a href="{{ route('seller.shipments.index') }}" class="inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-[var(--link)] hover:underline">Track pickups &amp; deliveries <i data-lucide="arrow-right" aria-hidden="true" class="size-3.5"></i></a>
     </div>
-    <p class="mt-2 font-sans text-[13px] text-[var(--text-muted)]">Accept, pack and mark orders ready here. Review or cancel before pickup; use Shipments for tracking and waybills.</p>
+    <p class="mt-2 font-sans text-[13px] text-[var(--text-muted)]">Accept, pack and request pickup here. Review or cancel before pickup; use Shipments for tracking and waybills.</p>
     <p class="mt-1 font-sans text-[13px] text-[var(--text-muted)]">First come, first served: oldest orders first, and orders you still need to prepare stay on top.</p>
 </div>
 
 <ol aria-label="Order preparation steps" class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-3 font-sans text-xs">
-    @foreach (['Accept', 'Pack', 'Mark ready'] as $step)
+    @foreach (['Accept', 'Pack', 'Request pickup'] as $step)
         <li class="flex items-center gap-2"><span class="flex size-6 items-center justify-center rounded-full bg-[var(--pill-primary-bg)] text-[11px] font-semibold text-[var(--pill-primary-text)]">{{ $loop->iteration }}</span><span class="font-semibold text-[var(--text-ink)]">{{ $step }}</span></li>
     @endforeach
     <li class="text-[var(--text-muted)]">Then Logistics handles pickup and delivery.</li>
@@ -39,7 +31,7 @@
     $tabs = [
         ['key' => 'all', 'label' => 'All orders'],
         ['key' => 'to_ship', 'label' => 'To ship'],
-        ['key' => 'ready', 'label' => 'Ready for pickup'],
+        ['key' => 'ready', 'label' => 'Pickup Requested'],
         ['key' => 'shipped', 'label' => 'Shipped'],
         ['key' => 'delivered', 'label' => 'Delivered'],
         ['key' => 'cancelled', 'label' => 'Cancelled'],
@@ -125,22 +117,24 @@
                         </td>
                         <td class="px-4 py-4 border-b border-[var(--border-strong)] text-center">
                             @if($sellerOrder->status === OrderStatus::Placed)
-                                <form method="POST" action="{{ route('seller.orders.accept', $sellerOrder) }}">
+                                <form method="POST" action="{{ route('seller.orders.accept', $sellerOrder) }}" data-app-confirm data-confirm-title="Accept order" data-confirm-label="Accept Order" data-confirm-message="Accept this order? You can pack it in the next step.">
                                     @csrf
-                                    <button type="button"
-                                        class="inline-flex min-h-9 items-center justify-center px-3 rounded-lg font-sans font-semibold text-[11.5px] tracking-[0.5px] uppercase text-white bg-primary-700 hover:bg-primary-800"
-                                        onclick="confirmAccept(this)">
+                                    <button type="submit" disabled data-confirm-enable data-submit-loading="Accepting…"
+                                        class="inline-flex min-h-9 items-center justify-center px-3 rounded-lg font-sans font-semibold text-[11.5px] tracking-[0.5px] uppercase text-white bg-primary-700 hover:bg-primary-800">
                                         Accept order
                                     </button>
+                                    <noscript><span class="mt-1 block text-xs text-[var(--text-muted)]">JavaScript is required to confirm and submit this action.</span></noscript>
                                 </form>
                             @elseif(in_array($sellerOrder->status, [OrderStatus::Confirmed, OrderStatus::Preparing]))
-                                <form method="POST" action="{{ route($sellerOrder->status === OrderStatus::Confirmed ? 'seller.orders.pack' : 'seller.orders.markReady', $sellerOrder) }}">
+                                <form method="POST" action="{{ route($sellerOrder->status === OrderStatus::Confirmed ? 'seller.orders.pack' : 'seller.orders.markReady', $sellerOrder) }}" @if ($sellerOrder->status === OrderStatus::Preparing) data-app-confirm data-confirm-title="Request pickup" data-confirm-label="Request Pickup" data-confirm-message="Request pickup for this packed order? This schedules the current eligible or next pickup window. Logistics chooses the rider. No rider is assigned yet." @endif>
                                     @csrf
-                                    <button type="button"
-                                        class="inline-flex min-h-9 items-center justify-center px-3 rounded-lg font-sans font-semibold text-[11.5px] tracking-[0.5px] uppercase text-white bg-primary-700 hover:bg-primary-800"
-                                        onclick="{{ $sellerOrder->status === OrderStatus::Confirmed ? 'this.form.submit()' : 'confirmMarkReady(this)' }}">
-                                        {{ $sellerOrder->status === OrderStatus::Confirmed ? 'Pack order' : 'Mark ready' }}
+                                    <button type="submit" @if ($sellerOrder->status === OrderStatus::Preparing) disabled data-confirm-enable @endif data-submit-loading="{{ $sellerOrder->status === OrderStatus::Confirmed ? 'Packing…' : 'Requesting pickup…' }}"
+                                        class="inline-flex min-h-9 items-center justify-center px-3 rounded-lg font-sans font-semibold text-[11.5px] tracking-[0.5px] uppercase text-white bg-primary-700 hover:bg-primary-800">
+                                        {{ $sellerOrder->status === OrderStatus::Confirmed ? 'Pack order' : 'Request Pickup' }}
                                     </button>
+                                    @if ($sellerOrder->status === OrderStatus::Preparing)
+                                        <noscript><span class="mt-1 block text-xs text-[var(--text-muted)]">JavaScript is required to confirm and submit this action.</span></noscript>
+                                    @endif
                                 </form>
                             @else
                                 <a href="{{ route('seller.orders.show', $sellerOrder) }}" class="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--border-strong)] px-4 font-sans text-[12px] font-semibold text-[var(--link)] transition-colors duration-200 hover:border-primary-700 hover:bg-primary-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">View</a>

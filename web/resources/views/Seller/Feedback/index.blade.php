@@ -9,9 +9,7 @@
             <h1 class="text-2xl font-semibold text-[var(--text-ink)]">Customer Feedback</h1>
             <p class="mt-1 text-sm text-[var(--text-muted)]">Read customer reviews and manage your replies. Select Reply to review to respond.</p>
         </div>
-        @if (session('success'))
-            <p role="status" class="text-sm text-[var(--text-ink)]">{{ session('success') }}</p>
-        @endif
+        <x-flash type="success" :message="session('success')" spacing="" />
     </div>
 
     <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-3">
@@ -30,7 +28,7 @@
                         </p>
                         <p class="mt-1 text-xs text-[var(--text-muted)]">
                             {{ $review->buyer ? trim($review->buyer->first_name.' '.$review->buyer->last_name) : 'Buyer' }}
-                            · {{ $review->created_at->format('M j, Y') }}
+                            · {{ manila($review->created_at, 'M j, Y') }}
                         </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -56,10 +54,10 @@
                         <p class="text-xs font-semibold text-[var(--text-ink)]">
                             Your reply
                             @if ($review->seller_replied_at)
-                                · {{ $review->seller_replied_at->format('M j, Y') }}
+                                · {{ manila($review->seller_replied_at, 'M j, Y') }}
                             @endif
                             @if ($review->seller_reply_edited_at)
-                                <span class="font-normal text-[var(--text-muted)]">(edited {{ $review->seller_reply_edited_at->format('M j, Y') }})</span>
+                                <span class="font-normal text-[var(--text-muted)]">(edited {{ manila($review->seller_reply_edited_at, 'M j, Y') }})</span>
                             @endif
                         </p>
                         <p class="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-[var(--text-ink)]">{{ $review->seller_reply }}</p>

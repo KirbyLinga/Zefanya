@@ -18,9 +18,7 @@
         <h1 class="font-serif text-3xl text-[var(--text-ink)]">Store Profile</h1>
         <p class="mt-2 font-sans text-sm text-[var(--text-muted)]">Update your store identity, contact details, and pickup address.</p>
     </header>
-    @if (session('success'))
-        <div role="status" class="mb-5 rounded-md border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans text-sm text-[var(--text-ink)]">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="mb-5" />
     @if ($errors->any())
         <div role="alert" class="mb-5 rounded-md border border-red-200 bg-red-50 p-4 font-sans text-sm text-red-800">
             <p class="font-semibold">Please review your store details.</p>

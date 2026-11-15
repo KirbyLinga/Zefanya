@@ -56,7 +56,6 @@
                     <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">Customer Service</h4>
                     <ul class="m-0 flex list-none flex-col gap-3 p-0">
                         <li><a href="{{ route('buyer.help.index') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Help Center</a></li>
-                        <li><a href="{{ route('buyer.help.index') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">How to Buy</a></li>
                         <li><a href="{{ route('buyer.pages.shipping-returns') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Return &amp; Refund</a></li>
                         <li><a href="{{ route('buyer.pages.contact') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Contact Us</a></li>
                     </ul>
@@ -79,19 +78,6 @@
                     </ul>
                 </div>
 
-                <div class="flex min-w-0 flex-col gap-5">
-                    <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">Download App</h4>
-                    <div class="flex w-full max-w-[252px] flex-col gap-3">
-                        <div class="flex min-h-11 items-center gap-2.5 rounded-sm border border-line bg-cream px-4 py-3 font-sans text-xs text-neutral-950">
-                            <i data-lucide="apple" width="16" height="16"></i>
-                            <span>APP STORE - Coming soon</span>
-                        </div>
-                        <div class="flex min-h-11 items-center gap-2.5 rounded-sm border border-line bg-cream px-4 py-3 font-sans text-xs text-neutral-950">
-                            <i data-lucide="play" width="16" height="16"></i>
-                            <span>GOOGLE PLAY - Coming soon</span>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="flex items-center justify-between gap-4 border-t border-line pt-6 max-sm:flex-col max-sm:items-start max-sm:gap-4">

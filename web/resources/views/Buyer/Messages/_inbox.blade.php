@@ -29,7 +29,7 @@
                     <a href="{{ route('buyer.messages.show', ['conversation' => $inboxConversation, 'widget' => $floating ? 1 : null]) }}" target="_self" class="conversation-row {{ $isSelected ? 'is-selected' : '' }}" @if($isSelected) aria-current="page" @endif data-conversation data-unread="{{ $unread }}" data-order="{{ $inboxConversation->order_id ? '1' : '0' }}">
                         <span class="seller-avatar" aria-hidden="true">{{ mb_substr($sellerName, 0, 1) }}</span>
                         <span class="conversation-copy"><strong>{{ $sellerName }}</strong><span class="conversation-context">@if($inboxConversation->order)Order #{{ $inboxConversation->order->id }}@elseif($inboxConversation->product){{ $inboxConversation->product->name }}@else No order yet @endif</span><span class="conversation-preview">{{ $inboxConversation->messages->last()?->preview() ?? 'Start a conversation' }}</span></span>
-                        <span class="conversation-meta"><time>{{ $inboxConversation->last_message_at?->isToday() ? $inboxConversation->last_message_at->format('g:i A') : $inboxConversation->last_message_at?->format('M j') }}</time>@if($unread)<span class="unread-count">{{ $unread }}</span>@endif</span>
+                        <span class="conversation-meta"><time>{{ manila($inboxConversation->last_message_at, 'Y-m-d') === now(config('app.schedule_timezone'))->toDateString() ? manila($inboxConversation->last_message_at, 'g:i A') : manila($inboxConversation->last_message_at, 'M j') }}</time>@if($unread)<span class="unread-count">{{ $unread }}</span>@endif</span>
                     </a>
                 @empty
                     <p class="inbox-empty">No messages yet. Start a conversation with a seller to begin messaging.</p>

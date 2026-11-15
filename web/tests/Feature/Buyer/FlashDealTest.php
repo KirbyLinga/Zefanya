@@ -206,6 +206,7 @@ class FlashDealTest extends TestCase
     public function test_sel_flash_006_bundle_percentage_discounts_every_member_bought_together(): void
     {
         [$other] = $this->productAt(1000.00, 'Second Scarf');
+        [$unrelated, $unrelatedVariant] = $this->productAt(500.00, 'Outside the bundle');
         SellerPromotion::query()->create([
             'seller_id' => $this->seller->id,
             'kind' => PromotionKind::BundlePercent,
@@ -221,13 +222,14 @@ class FlashDealTest extends TestCase
         $this->checkoutProducts([
             [$this->product, $this->variant, 1],
             [$other, ProductVariant::query()->where('product_id', $other->id)->firstOrFail(), 1],
+            [$unrelated, $unrelatedVariant, 1],
         ])->assertRedirect();
 
         $lines = SellerOrder::query()->latest('id')->firstOrFail()->orderItems()->orderBy('id')->get();
-        $this->assertCount(2, $lines);
-        $this->assertSame([90000, 90000], $lines->pluck('price_minor')->all());
-        $this->assertSame([100000, 100000], $lines->pluck('regular_price_minor')->all());
-        $this->assertSame(180000, $lines[0]->sellerOrder->subtotal_minor);
+        $this->assertCount(3, $lines);
+        $this->assertSame([90000, 90000, 50000], $lines->pluck('price_minor')->all());
+        $this->assertSame([100000, 100000, 50000], $lines->pluck('regular_price_minor')->all());
+        $this->assertSame(230000, $lines[0]->sellerOrder->subtotal_minor);
     }
 
     public function test_sel_flash_007_buy_x_get_y_adds_a_free_line_and_still_takes_stock(): void

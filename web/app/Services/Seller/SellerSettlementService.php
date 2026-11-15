@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\StaleStateException;
 use App\Models\Admin\Admin;
+use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerDebt;
@@ -126,10 +127,11 @@ class SellerSettlementService
         Admin $admin,
         int $amountMinor,
         string $reference,
+        ?string $reason = null,
     ): SellerSettlement {
         abort_unless(in_array($admin->role, [AdminRole::Admin->value, AdminRole::SuperAdmin->value], true), 403);
 
-        return DB::transaction(function () use ($settlement, $admin, $amountMinor, $reference): SellerSettlement {
+        return DB::transaction(function () use ($settlement, $admin, $amountMinor, $reference, $reason): SellerSettlement {
             // Serialize direct payouts with Seller withdrawal reservations.
             $sellerId = SellerSettlement::query()->whereKey($settlement->getKey())->value('seller_id');
             Seller::query()->whereKey($sellerId)->lockForUpdate()->firstOrFail();
@@ -156,8 +158,9 @@ class SellerSettlementService
                 throw StaleStateException::field('settlement', 'This settlement is no longer pending payout.');
             }
 
-            // A debt can only be repaid through a payout request, which records the deduction.
-            if (SellerDebt::query()->where('seller_id', $locked->seller_id)->whereColumn('settled_minor', '<', 'amount_minor')->exists()) {
+            // Use a current read here too: returns can change debt without taking the Seller lock.
+            if (SellerDebt::query()->where('seller_id', $locked->seller_id)
+                ->whereColumn('settled_minor', '<', 'amount_minor')->lockForUpdate()->first(['id']) !== null) {
                 throw ValidationException::withMessages(['settlement' => 'This Seller owes money from a returned order. Pay them through a payout request so the debt is deducted.']);
             }
 
@@ -191,15 +194,12 @@ class SellerSettlementService
                 || $locked->shipping_allocation_minor !== $order->shipping_fee_minor
                 || $locked->seller_funded_discount_minor !== $allocation['seller_minor']
                 || $locked->marketplace_funded_discount_minor !== $allocation['marketplace_minor']
-                || $locked->commission_bps !== CommissionFinalizationService::COMMISSION_BPS
+                || $locked->commission_bps < 0 || $locked->commission_bps > 10000
                 || $locked->commission_minor < 0 || $locked->seller_payout_minor < 0
                 || $locked->commission_bps !== $order->commission_bps
                 || $locked->commission_minor !== $order->commission_minor
                 || $locked->seller_payout_minor !== $order->seller_net_minor
-                || $locked->commission_minor + $locked->seller_payout_minor !== $order->subtotal_minor - $allocation['seller_minor']
-                || $locked->collected_amount_minor !== $order->subtotal_minor - $allocation['discount_minor'] - $allocation['shipping_discount_minor'] + $order->shipping_fee_minor
-                || $locked->commission_minor + $locked->seller_payout_minor + $locked->shipping_allocation_minor
-                    !== $locked->collected_amount_minor + $locked->marketplace_funded_discount_minor) {
+                || ! $this->payoutIdentityHolds($locked, $order, $allocation)) {
                 throw ValidationException::withMessages([
                     'settlement' => 'The finalized settlement does not reconcile with collected cash, voucher funding, and shipping.',
                 ]);
@@ -221,6 +221,15 @@ class SellerSettlementService
                 'paid_by_admin_id' => $admin->getKey(),
                 'paid_at' => now(),
             ])->save();
+
+            if ($reason !== null) {
+                OperationsAuditLog::record(
+                    $admin, 'seller_direct_payout', $locked, 'Settlement #'.$locked->getKey(),
+                    ['status' => SellerSettlement::PENDING_PAYOUT],
+                    ['status' => 'Paid', 'amount' => '₱'.number_format($amountMinor / 100, 2), 'reference' => $reference],
+                    $reason,
+                );
+            }
 
             return $locked;
         }, 3);
@@ -301,6 +310,67 @@ class SellerSettlementService
     }
 
     /**
+     * A return cancelled before collection (buyer withdrew it, or Admin closed a
+     * no-show) leaves the item with the buyer, so the earnings an approval held
+     * come back. Commission recognition is cleared again, retaining the saved
+     * rate so a historical order is not repriced at later completion.
+     * A charge the Seller already repaid is never reversed, and a settlement that
+     * money already left needs Admin reconciliation instead. Runs once.
+     *
+     * Caller holds the return lock.
+     */
+    public function restoreAfterCancelledReturn(SellerOrder $sellerOrder): void
+    {
+        DB::transaction(function () use ($sellerOrder): void {
+            // Shared lock order: SellerOrder -> Payment -> CodRemittance -> SellerSettlement.
+            $order = SellerOrder::query()->whereKey($sellerOrder->getKey())->lockForUpdate()->firstOrFail();
+            $order->load('parcelReturn');
+            $return = $order->parcelReturn;
+            if ($return === null || ! $return->isCancelled() || $return->refunded_at !== null || $return->earnings_restored_at !== null) {
+                return;
+            }
+
+            $payment = $order->payment()->lockForUpdate()->first();
+            $settlement = null;
+            if ($payment !== null) {
+                $remittance = CodRemittance::query()->where('seller_order_id', $order->getKey())
+                    ->where('payment_id', $payment->getKey())->lockForUpdate()->first();
+                if ($remittance !== null) {
+                    $settlement = SellerSettlement::query()->where('seller_order_id', $order->getKey())
+                        ->where('cod_remittance_id', $remittance->getKey())->lockForUpdate()->first();
+                }
+            }
+
+            // Approval held the earnings on this still-delivered order. Clear
+            // recognition, not the saved rate, before later completion.
+            if ($order->status === OrderStatus::Delivered && $order->commission_finalized_at !== null) {
+                $order->forceFill(['commission_bps' => $this->rateFor($order), 'commission_minor' => null, 'seller_net_minor' => null, 'commission_finalized_at' => null])->save();
+            }
+
+            $alreadyPaid = $settlement !== null && ($settlement->status === SellerSettlement::PAID || (int) $settlement->paid_amount_minor > 0);
+            if ($settlement !== null && ! $alreadyPaid && in_array($settlement->status, [SellerSettlement::PENDING_PAYOUT, SellerSettlement::RELEASED], true)) {
+                $settlement->forceFill([
+                    'status' => SellerSettlement::PENDING_PAYOUT,
+                    'commission_bps' => null,
+                    'commission_minor' => null,
+                    'seller_payout_minor' => null,
+                    'financials_finalized_at' => null,
+                    'pending_reason' => SellerSettlement::COMMISSION_FINALIZATION_MISSING,
+                ])->save();
+            }
+
+            // Charges raised for this return are dropped, never below what the Seller already repaid.
+            $debt = SellerDebt::query()->where('seller_order_id', $order->getKey())
+                ->whereIn('reason', [SellerDebt::AFTER_PAYOUT_RETURN, SellerDebt::RETURN_CHARGES])->lockForUpdate()->first();
+            if ($debt !== null && (int) $debt->amount_minor !== (int) $debt->settled_minor) {
+                $debt->forceFill(['amount_minor' => (int) $debt->settled_minor])->save();
+            }
+
+            $return->forceFill(['earnings_restored_at' => now()])->save();
+        }, 3);
+    }
+
+    /**
      * What the Seller keeps from an order with an approved return. Until a refund is
      * recorded the full amount is assumed refunded, so nothing is kept. A recorded
      * refund comes off the item amount first. The Seller keeps the rest, less the
@@ -357,11 +427,16 @@ class SellerSettlementService
     public function returnBreakdown(SellerOrder $order): ?array
     {
         $return = $order->parcelReturn;
-        $logisticsFault = $return?->isLogisticsFault() === true;
+        // Logistics or Platform funding: the Seller keeps the order and is not charged.
+        $logisticsFault = $return?->sellerNotCharged() === true;
         $returnShipping = $logisticsFault ? 0 : (int) ($return?->return_shipping_fee_minor ?? 0);
 
+        // The order keeps the rate it was finalized at, even while it earns nothing,
+        // so a later partial refund is charged at that rate and not today's.
+        $bps = $this->rateFor($order);
+
         if (! $logisticsFault && $return?->refunded_at === null) {
-            return $this->withPosition(['refunded_items_minor' => 0, 'commission_bps' => 0, 'commission_minor' => 0, 'kept_net_minor' => 0, 'refunded_shipping_minor' => 0, 'return_shipping_minor' => $returnShipping]);
+            return $this->withPosition(['refunded_items_minor' => 0, 'commission_bps' => $bps, 'commission_minor' => 0, 'kept_net_minor' => 0, 'refunded_shipping_minor' => 0, 'return_shipping_minor' => $returnShipping]);
         }
 
         $allocation = $this->funding->allocationFor($order);
@@ -373,16 +448,26 @@ class SellerSettlementService
         $refund = $logisticsFault ? 0 : (int) $return->refund_amount_minor;
         $refundedItems = min($itemAmount, $refund);
         $keptItems = $itemAmount - $refundedItems;
-        $commission = $keptItems > 0 ? Money::percentage($keptItems, CommissionFinalizationService::COMMISSION_BPS, 10000) : 0;
+        $commission = $keptItems > 0 ? Money::percentage($keptItems, $bps, 10000) : 0;
 
         return $this->withPosition([
             'refunded_items_minor' => $refundedItems,
-            'commission_bps' => $keptItems > 0 ? CommissionFinalizationService::COMMISSION_BPS : 0,
+            'commission_bps' => $bps,
             'commission_minor' => $commission,
             'kept_net_minor' => $keptItems - $commission,
             'refunded_shipping_minor' => $refund - $refundedItems,
             'return_shipping_minor' => $returnShipping,
         ]);
+    }
+
+    /**
+     * The order's saved rate. Orders not finalized yet use today's rate. A 0
+     * comes only from returns recorded before rates were kept; those fall back
+     * to today's rate too, because the original rate was not stored.
+     */
+    private function rateFor(SellerOrder $order): int
+    {
+        return (int) ($order->commission_bps ?: CommissionFinalizationService::COMMISSION_BPS);
     }
 
     private function withPosition(array $breakdown): array
@@ -407,8 +492,17 @@ class SellerSettlementService
      */
     private function recordDebtForPaidReturn(SellerSettlement $settlement, SellerOrder $order, ?array $kept): void
     {
+        $logisticsFault = $order->parcelReturn?->sellerNotCharged() === true;
+        if ($kept === null && ! $logisticsFault) {
+            // Missing funding evidence cannot establish a new debt or justify changing an existing one.
+            return;
+        }
+
         $paid = (int) $settlement->paid_amount_minor;
-        $owed = max(0, $paid - (int) ($kept['seller_net_minor'] ?? 0)) + (int) ($kept['shortfall_minor'] ?? 0);
+        // A Logistics fault never creates Seller liability, even if legacy funding cannot be reconciled.
+        $owed = $logisticsFault
+            ? 0
+            : max(0, $paid - $kept['seller_net_minor']) + $kept['shortfall_minor'];
         $debt = SellerDebt::query()->where('seller_order_id', $order->getKey())->lockForUpdate()->first();
 
         if ($debt !== null) {
@@ -434,15 +528,66 @@ class SellerSettlementService
     }
 
     /**
+     * Collected cash stays the original COD snapshot. Commission plus the seller
+     * net either still equals the merchandise after seller-funded discounts, or
+     * it is lower by exactly the recorded seller-funded refund and return charges.
+     *
+     * @param  array{seller_minor: int, marketplace_minor: int, discount_minor: int, shipping_discount_minor: int}  $allocation
+     */
+    public function payoutIdentityHolds(SellerSettlement $settlement, SellerOrder $order, array $allocation): bool
+    {
+        if ($order->subtotal_minor === null
+            || $settlement->collected_amount_minor !== $order->subtotal_minor - $allocation['discount_minor'] - $allocation['shipping_discount_minor'] + $order->shipping_fee_minor) {
+            return false;
+        }
+
+        $itemAmount = (int) $order->subtotal_minor - $allocation['seller_minor'];
+        $commissionAndNet = $settlement->commission_minor + $settlement->seller_payout_minor;
+        if ($commissionAndNet === $itemAmount
+            && $commissionAndNet + $settlement->shipping_allocation_minor === $settlement->collected_amount_minor + $settlement->marketplace_funded_discount_minor) {
+            return true;
+        }
+
+        $order->loadMissing('parcelReturn');
+        $return = $order->parcelReturn;
+        if ($return === null || ! $return->releasesPendingEarnings() || $return->sellerNotCharged() || $return->refunded_at === null) {
+            return false;
+        }
+
+        $kept = $this->returnBreakdown($order);
+        if ($kept === null
+            || $kept['commission_bps'] !== $settlement->commission_bps
+            || $kept['commission_minor'] !== $settlement->commission_minor
+            || $kept['seller_net_minor'] !== $settlement->seller_payout_minor
+            || $kept['seller_net_minor'] <= 0
+            || $kept['shortfall_minor'] !== 0) {
+            return false;
+        }
+
+        $chargedBack = $kept['refunded_items_minor'] + $kept['refunded_shipping_minor'] + $kept['return_shipping_minor'];
+
+        return $itemAmount - $commissionAndNet === $chargedBack;
+    }
+
+    /**
      * @param  array{commission_bps: int, commission_minor: int, seller_net_minor: int, shortfall_minor: int}  $kept
      */
     private function writeReturnSettlement(SellerSettlement $settlement, array $kept, SellerOrder $order): void
     {
+        $allocation = $this->funding->allocationFor($order);
+        $funding = $allocation['pending_reason'] === null ? [
+            'seller_funded_discount_minor' => $allocation['seller_minor'],
+            'marketplace_funded_discount_minor' => $allocation['marketplace_minor'],
+        ] : [];
+
         if ($kept['seller_net_minor'] === 0) {
             $this->writeReleasedSettlement($settlement);
             // Commission still applies to items the Seller kept, even when charges use up the rest.
-            if ($kept['commission_minor'] > 0) {
-                $settlement->forceFill(['commission_bps' => $kept['commission_bps'], 'commission_minor' => $kept['commission_minor']])->save();
+            $settlement->forceFill($funding + ($kept['commission_minor'] > 0
+                ? ['commission_bps' => $kept['commission_bps'], 'commission_minor' => $kept['commission_minor']]
+                : []));
+            if ($settlement->isDirty()) {
+                $settlement->save();
             }
         } else {
             // A partial refund leaves the Seller the rest, payable like any other order.
@@ -453,7 +598,7 @@ class SellerSettlementService
                 'seller_payout_minor' => $kept['seller_net_minor'],
                 'financials_finalized_at' => $settlement->financials_finalized_at ?? now(),
                 'pending_reason' => null,
-            ]);
+            ] + $funding);
             if ($settlement->isDirty()) {
                 $settlement->save();
             }
@@ -486,6 +631,11 @@ class SellerSettlementService
         }
 
         if ($order->parcelReturn?->releasesPendingEarnings()) {
+            // Re-preparing a partly paid return must not replace its historical figures or clear the hold.
+            if ((int) $settlement->paid_amount_minor > 0) {
+                return;
+            }
+
             $kept = $this->keptAfterReturn($order);
             if ($kept === null) {
                 $settlement->forceFill(['seller_payout_minor' => null, 'pending_reason' => SellerSettlement::FINANCIAL_RECONCILIATION_REQUIRED])->save();

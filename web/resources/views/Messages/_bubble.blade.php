@@ -10,7 +10,7 @@
             @endif
             @if($message->body !== '')<p>{{ $message->body }}</p>@endif
         </div>
-        <p class="chat-time"><time datetime="{{ $message->created_at->toIso8601String() }}">{{ $message->created_at->format('g:i A') }}</time></p>
+        <p class="chat-time"><time datetime="{{ $message->created_at->toIso8601String() }}">{{ manila($message->created_at, 'g:i A') }}</time></p>
     </div>
 </div>
 @else
@@ -25,7 +25,7 @@
             <p class="text-gray-900 break-words whitespace-pre-line">{{ $message->body }}</p>
         @endif
         <p class="text-xs text-gray-500 mt-1">
-            {{ $message->created_at->format('g:i a') }}
+            {{ manila($message->created_at, 'g:i a') }}
         </p>
     </div>
 </div>

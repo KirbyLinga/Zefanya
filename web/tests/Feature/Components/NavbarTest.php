@@ -124,4 +124,18 @@ class NavbarTest extends TestCase
             ->assertSee('accountDropdown', false)
             ->assertDontSee('data-hide-guest="true"', false);
     }
+
+    public function test_logo_links_to_buyer_home_and_existing_home_link_remains(): void
+    {
+        $buyer = Buyer::factory()->create();
+
+        $response = $this->actingAs($buyer, 'buyer')->get(route('buyer.home'));
+
+        $response->assertOk()
+            ->assertSee('href="'.route('buyer.home').'"', false)
+            ->assertSee('aria-label="Go to Zefanya Home"', false)
+            ->assertSee('title="Home">Home</a>', false);
+
+        $this->assertSame(1, substr_count($response->getContent(), 'aria-label="Go to Zefanya Home"'));
+    }
 }

@@ -7,6 +7,7 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SellerSettlement extends Model
 {
@@ -67,5 +68,21 @@ class SellerSettlement extends Model
     public function seller(): BelongsTo
     {
         return $this->belongsTo(Seller::class);
+    }
+
+    public function paidPayoutAllocations(): HasMany
+    {
+        return $this->hasMany(SellerPayoutAllocation::class)
+            ->whereHas('payoutRequest', fn ($query) => $query->where('status', SellerPayoutRequest::PAID));
+    }
+
+    /** Recorded cash paid directly, excluding amounts already reported through paid requests. */
+    public function directPayoutMinor(): int
+    {
+        if ($this->status !== self::PAID || $this->paid_at === null) {
+            return 0;
+        }
+
+        return max(0, (int) $this->paid_amount_minor - (int) $this->paidPayoutAllocations->sum('amount_minor'));
     }
 }

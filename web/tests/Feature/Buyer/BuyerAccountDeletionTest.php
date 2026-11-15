@@ -18,6 +18,7 @@ use App\Models\Seller\Seller;
 use App\Models\Shared\Conversation;
 use App\Models\Shared\Order;
 use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -302,7 +303,10 @@ class BuyerAccountDeletionTest extends TestCase
 
     public function test_a_refund_still_owed_blocks_deletion_until_it_is_recorded(): void
     {
-        $return = $this->parcelReturn($this->parcel(), [
+        // A refund is owed only for collected COD (Audit 1.13: same rule as Admin unpaid-refund reporting).
+        $parcel = $this->parcel();
+        Payment::factory()->create(['seller_order_id' => $parcel->id, 'amount_minor' => 150000])->recordCodCollection(150000, 'rider', 1);
+        $return = $this->parcelReturn($parcel, [
             'status' => ParcelReturnStatus::Completed->value,
             'financial_review_required' => true,
         ]);

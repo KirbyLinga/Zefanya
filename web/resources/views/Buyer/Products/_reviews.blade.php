@@ -47,9 +47,7 @@
     @unless ($product->reviews_count)
         <p class="mt-3 rounded-xl bg-secondary-50 px-4 py-3 text-sm text-buyer-ink-soft">No reviews yet. Ratings from buyers will appear here.</p>
     @endunless
-    @if (session('success'))
-        <p role="status" class="mt-3 text-sm text-buyer-ink">{{ session('success') }}</p>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="mt-3" />
 
     @auth('buyer')
         @if ($canReview)
@@ -87,8 +85,8 @@
                 <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_BODY_LENGTH }} characters.</p>
 
                 <label class="block text-sm text-buyer-ink" for="review-photos">Photos (optional)</label>
-                <input id="review-photos" type="file" name="photos[]" accept="image/jpeg,image/png" multiple class="upload-input">
-                <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_PHOTOS }} JPG or PNG photos, 5 MB each.</p>
+                <input id="review-photos" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="upload-input">
+                <p class="text-xs text-buyer-ink-soft">Up to {{ \App\Models\Buyer\Review::MAX_PHOTOS }} JPG, PNG or WebP photos, 3 MB each.</p>
 
                 @include('Buyer.Products._review-errors')
 
@@ -109,7 +107,7 @@
                             </span>
                             <span class="text-sm font-semibold text-buyer-ink">{{ $myReview->rating }}/5</span>
                             @if ($myReview->buyer_edited_at)
-                                <span class="text-xs font-normal text-buyer-ink-soft">Edited {{ $myReview->buyer_edited_at->format('M j, Y') }}</span>
+                                <span class="text-xs font-normal text-buyer-ink-soft">Edited {{ manila($myReview->buyer_edited_at, 'M j, Y') }}</span>
                             @endif
                         </div>
                         @if ($myReview->body)
@@ -134,7 +132,7 @@
                             <form method="POST" action="{{ route('buyer.reviews.update', $myReview) }}" enctype="multipart/form-data" class="mt-4 space-y-3 border-t border-buyer-line pt-4">
                                 @csrf
                                 @method('PATCH')
-                                <p class="text-xs text-buyer-ink-soft">You may edit this review once, within 30 days of order completion.</p>
+                                <p class="text-xs text-buyer-ink-soft">You may edit this review once, within 30 days of posting it.</p>
 
                                 <fieldset>
                                     <legend class="block text-sm text-buyer-ink">Your rating</legend>
@@ -168,7 +166,7 @@
                                 @endif
 
                                 <label class="block text-sm text-buyer-ink" for="edit-review-photos-{{ $myReview->id }}">Add photos (optional)</label>
-                                <input id="edit-review-photos-{{ $myReview->id }}" type="file" name="photos[]" accept="image/jpeg,image/png" multiple class="upload-input">
+                                <input id="edit-review-photos-{{ $myReview->id }}" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple class="upload-input">
 
                                 @include('Buyer.Products._review-errors')
 
@@ -176,7 +174,7 @@
                             </form>
                         @else
                             <p class="mt-3 text-xs text-buyer-ink-soft">
-                                This review can no longer be edited. Buyer reviews may be edited once, within 30 days of order completion.
+                                This review can no longer be edited. Buyer reviews may be edited once, within 30 days of posting.
                             </p>
                         @endif
                     </article>
@@ -202,7 +200,7 @@
                         @endfor
                     </span>
                     <span class="text-xs font-semibold text-buyer-ink">{{ $review->rating }}/5</span>
-                    <time class="text-xs text-buyer-ink-soft">{{ $review->created_at->format('M j, Y') }}</time>
+                    <time class="text-xs text-buyer-ink-soft">{{ $review->created_at->timezone(config('app.schedule_timezone'))->format('M j, Y') }}</time>
                 </div>
                 @if ($review->body)
                     <p class="mt-2 whitespace-pre-line text-sm text-buyer-ink">{{ $review->body }}</p>

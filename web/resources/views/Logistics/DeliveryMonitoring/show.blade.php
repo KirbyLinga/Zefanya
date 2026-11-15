@@ -32,7 +32,7 @@
                 @if ($sellerOrder->tracking_number)
                     <div><dt class="text-xs text-[var(--text-muted)]">Tracking</dt><dd class="font-mono text-xs font-semibold text-[var(--text-ink)]">{{ $sellerOrder->tracking_number }}</dd></div>
                 @endif
-                <div><dt class="text-xs text-[var(--text-muted)]">Seller</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->seller?->name ?? '—' }}</dd></div>
+                <div><dt class="text-xs text-[var(--text-muted)]">Seller</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->seller?->business_name ?? '—' }}</dd></div>
                 <div><dt class="text-xs text-[var(--text-muted)]">Buyer</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->order?->buyer?->fullName() ?? '—' }}</dd></div>
                 <div><dt class="text-xs text-[var(--text-muted)]">Status</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label() }}</dd></div>
                 @if ($sellerOrder->needs_reassignment)
@@ -70,7 +70,7 @@
             @if ($sellerOrder->deliveryProof)
                 <div class="space-y-2 text-base">
                     <p class="font-semibold text-[var(--text-ink)]">Delivery proof logged</p>
-                    <p class="text-xs text-[var(--text-muted)]">By {{ $sellerOrder->deliveryProof->deliveryCourier?->name ?? '—' }} on {{ $sellerOrder->deliveryProof->created_at->format('M d, Y H:i') ?? '—' }}</p>
+                    <p class="text-xs text-[var(--text-muted)]">By {{ $sellerOrder->deliveryProof->deliveryCourier?->name ?? '—' }} on {{ manila($sellerOrder->deliveryProof->created_at, 'M d, Y H:i', '—') }}</p>
                 </div>
             @else
                 <p class="text-xs text-[var(--text-muted)]">No delivery proof recorded.</p>
@@ -96,7 +96,7 @@
             <h2 class="text-base font-semibold text-amber-900 mb-1">Open incident blocks this delivery</h2>
             <p class="text-sm text-amber-800 mb-3">Parcel {{ $sellerOrder->id }} has an unresolved exception. Review it in Parcel exceptions; lost/damaged resolutions may require Admin. Movement remains blocked until an authorized resolution.</p>
             @if ($incident)
-                <p class="text-sm font-semibold text-amber-900">Incident #{{ $incident->id }} ({{ $incident->type }}) — open since {{ $incident->created_at->setTimezone('UTC')->format('M d, Y H:i') }}</p>
+                <p class="text-sm font-semibold text-amber-900">Incident #{{ $incident->id }} ({{ $incident->type }}) — open since {{ manila($incident->created_at->setTimezone('UTC'), 'M d, Y H:i') }}</p>
             @endif
         </div>
     </div>

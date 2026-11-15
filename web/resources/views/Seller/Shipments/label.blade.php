@@ -60,6 +60,16 @@
         th { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #666; }
         .cod { margin-top: 12px; padding: 10px 12px; border: 2px dashed #111; border-radius: 8px; font-size: 14px; font-weight: 700; }
         .foot { margin-top: 14px; font-size: 11px; color: #666; }
+        /* Phones (screen only, print is unchanged): stack the header and boxes. */
+        @media screen and (max-width: 560px) {
+            body { padding: 12px; }
+            .label { padding: 14px; }
+            .head { flex-direction: column; gap: 12px; }
+            .track { text-align: left; }
+            .track-block { justify-content: flex-start; flex-wrap: wrap; }
+            .track .code { overflow-wrap: anywhere; }
+            .grid { grid-template-columns: 1fr; }
+        }
         @media print {
             .toolbar { display: none !important; }
             body { padding: 0; }
@@ -130,7 +140,7 @@
             <tbody>
                 @foreach ($sellerOrder->orderItems as $item)
                     <tr>
-                        <td>{{ $item->product_name }}</td>
+                        <td>{{ $item->product_name }}<br><small>Variation: {{ $item->variant_options === null ? 'Not recorded for this order' : ($item->variantDescription() ?: 'No variations') }}</small></td>
                         <td>× {{ $item->quantity }}</td>
                         <td style="text-align:right;">{{ $item->formattedLineTotal() }}</td>
                     </tr>
@@ -152,7 +162,7 @@
         @endif
 
         <p class="foot">Tracking: {{ $sellerOrder->tracking_number ?? 'not yet assigned' }}
-            @if ($sellerOrder->handover_at) · Handed over {{ $sellerOrder->handover_at->format('M d, Y h:i A') }}@endif
+            @if ($sellerOrder->handover_at) · Handed over {{ manila($sellerOrder->handover_at, 'M d, Y h:i A') }}@endif
         </p>
     </div>
 </body>

@@ -1,19 +1,12 @@
 @extends('Admin.Layouts.app')
 
 @section('title', 'User Accounts')
+@section('content-width', 'max-w-none')
 
 @section('content')
 
-@if (session('success'))
-    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-        {{ session('success') }}
-    </div>
-@endif
-@if (session('error'))
-    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {{ session('error') }}
-    </div>
-@endif
+<x-flash type="success" :message="session('success')" spacing="mb-6" />
+<x-flash type="error" :message="session('error')" spacing="mb-6" />
 
 @if ($errors->any())
     <div role="alert" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -23,53 +16,57 @@
     </div>
 @endif
 
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-neutral-950 mb-1">User Accounts</h1>
-    <p class="text-base text-neutral-600">Search buyers, sellers, and logistics providers by account status. Suspend approved accounts or reactivate suspended accounts.</p>
-</div>
+@php
+    $typeLabel = match ($type) { 'buyer' => 'Buyer', 'logistics' => 'Logistics', default => 'Seller' };
+    $typePlural = match ($type) { 'buyer' => 'buyers', 'logistics' => 'logistics providers', default => 'sellers' };
+    $summary = $accountSummary ?? collect();
+    $cards = [
+        ['label' => 'Total Accounts', 'value' => $summary->sum(), 'caption' => 'Across all account statuses', 'icon' => 'users', 'tone' => 'total'],
+        ['label' => 'Approved Accounts', 'value' => $summary->get('approved', 0), 'caption' => 'Approved to access the platform', 'icon' => 'user-check', 'tone' => 'approved'],
+        ['label' => 'Pending Accounts', 'value' => $summary->get('pending', 0), 'caption' => 'Waiting for account review', 'icon' => 'clock', 'tone' => 'pending'],
+        ['label' => 'Suspended Accounts', 'value' => $summary->get('suspended', 0), 'caption' => 'Platform access is restricted', 'icon' => 'user-x', 'tone' => 'suspended'],
+    ];
+@endphp
+<div class="user-accounts-workspace">
+    <header class="user-accounts-header">
+        <h1>User Accounts</h1>
+        <p>Manage account access and review buyers, sellers, and logistics providers.</p>
+    </header>
 
-<div class="mb-6 bg-white border border-neutral-200 rounded-lg p-5">
-    <form method="GET" action="{{ route('admin.users.index') }}" class="flex flex-col lg:flex-row lg:items-end gap-4">
-        <div class="flex-1">
-            <label for="search" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Search</label>
-            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Name, email, contact…"
-                   class="w-full h-10 px-3 border border-neutral-300 rounded-lg text-base focus:ring-2 focus:ring-primary-400 focus:border-transparent" />
-        </div>
-        <div>
-            <label for="type" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Account Type</label>
-            <select name="type" id="type" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base">
-                <option value="seller" {{ $type === 'seller' ? 'selected' : '' }}>Seller</option>
-                <option value="logistics" {{ $type === 'logistics' ? 'selected' : '' }}>Logistics</option>
-                <option value="buyer" {{ $type === 'buyer' ? 'selected' : '' }}>Buyer</option>
-            </select>
-        </div>
-        <div>
-            <label for="status" class="block text-[11px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-2">Account Status</label>
-            <select name="status" id="status" class="w-full lg:w-40 h-10 px-3 border border-neutral-300 rounded-lg text-base">
-                <option value="" @selected($status === '')>All statuses</option>
-                @foreach ($statuses as $value => $label)
-                    <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-        </div>
-        <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
-            Filter
-        </button>
-    </form>
-</div>
+    <section class="user-account-metrics" aria-label="Account overview">
+        @foreach ($cards as $card)
+            <article class="user-account-metric user-account-tone-{{ $card['tone'] }}">
+                <div class="user-account-metric-heading"><h2>{{ $card['label'] }}</h2><span class="user-account-metric-icon"><i data-lucide="{{ $card['icon'] }}" class="w-5 h-5" aria-hidden="true"></i></span></div>
+                <strong>{{ number_format($card['value']) }}</strong>
+                <p>{{ $card['caption'] }}</p>
+            </article>
+        @endforeach
+    </section>
+    <p class="user-account-metric-scope">Overview for all {{ $typePlural }}. Search and status filters apply to the table.</p>
 
-<div class="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+    <section class="user-account-filter-panel" aria-label="Account filters">
+        <form data-admin-auto-filter method="GET" action="{{ route('admin.users.index') }}" class="user-account-filters">
+            <input type="hidden" name="per_page" value="{{ $perPage ?? 25 }}">
+            <div class="user-account-search"><label for="search">Search accounts</label><div><i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i><input type="search" name="search" id="search" value="{{ $search }}" placeholder="Name, email, contact..."></div></div>
+            <div><label for="type">Account Type</label><select name="type" id="type">@foreach (['seller' => 'Seller', 'logistics' => 'Logistics', 'buyer' => 'Buyer'] as $value => $label)<option value="{{ $value }}" @selected($type === $value)>{{ $label }}</option>@endforeach</select></div>
+            <div><label for="status">Account Status</label><select name="status" id="status"><option value="" @selected($status === '')>All statuses</option>@foreach ($statuses as $value => $label)<option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>@endforeach</select></div>
+            <a href="{{ route('admin.users.index', ['type' => $type]) }}" class="user-account-reset"><i data-lucide="rotate-ccw" class="w-4 h-4" aria-hidden="true"></i>Reset</a>
+        </form>
+        <div class="user-account-results"><p>Showing <strong>{{ $accounts->firstItem() ?? 0 }} to {{ $accounts->lastItem() ?? 0 }}</strong> of <strong>{{ number_format($accounts->total()) }}</strong> {{ $typePlural }}</p><p><i data-lucide="arrow-down-wide-narrow" class="w-4 h-4" aria-hidden="true"></i>Recently updated</p></div>
+    </section>
+
+<section class="user-account-table-panel" aria-label="User accounts">
     @if ($accounts->count() > 0)
-        <table class="w-full text-base">
-            <thead class="bg-neutral-50 border-b border-neutral-200">
+        <div class="user-account-table-scroll" role="region" aria-label="Account records" tabindex="0"><table class="w-full"><caption class="sr-only">{{ $typeLabel }} accounts matching your filters, most recently updated first</caption>
+            <thead class="border-b border-neutral-200">
                 <tr>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700">Name</th>
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700">Email</th>
+                    <th class="text-left">User</th>
+                    <th class="text-left">Email</th><th class="text-left">Account Type</th>
                     @if ($type === 'logistics')
-                        <th class="px-6 py-4 text-left font-semibold text-neutral-700">Province</th>
+                        <th class="text-left">Province</th>
                     @endif
-                    <th class="px-6 py-4 text-left font-semibold text-neutral-700">Status</th>
-                    <th class="px-6 py-4 text-center font-semibold text-neutral-700">Actions</th>
+                    <th class="text-left">Status</th>
+                    <th class="text-left">Store / Business</th><th class="text-left">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-neutral-200">
@@ -79,18 +76,14 @@
                         $blockers = ($provinceBlockers ?? [])[$account->id] ?? [];
                     @endphp
                     <tr class="hover:bg-neutral-50">
-                        <td class="px-6 py-4 font-semibold text-neutral-950">
-                            {{ $account->fullName() }}
-                            @if (! empty($account->business_name))
-                                <p class="text-xs text-neutral-500 font-normal">{{ $account->business_name }}</p>
-                            @endif
-                        </td>
-                        <td class="px-6 py-4 text-neutral-700">{{ $account->email }}</td>
+                        <td><div class="user-account-person"><span class="user-account-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($account->first_name ?? 'U', 0, 1).mb_substr($account->last_name ?? '', 0, 1)) }}</span><div><p>{{ $account->fullName() }}</p><small>ID: ZF-{{ $account->id }}</small></div></div></td>
+                        <td><span class="user-account-email">{{ $account->email }}</span></td>
+                        <td><span class="user-account-type"><i data-lucide="{{ $type === 'buyer' ? 'users' : ($type === 'logistics' ? 'truck' : 'store') }}" class="w-3.5 h-3.5" aria-hidden="true"></i>{{ $typeLabel }}</span></td>
                         @if ($type === 'logistics')
-                            <td class="px-6 py-4 text-sm text-neutral-700">
+                            <td class="text-sm text-neutral-700">
                                 <p class="font-semibold">{{ $account->province_name ?: '—' }}</p>
                                 @if ($account->province_verified_at)
-                                    <p class="text-xs text-green-700 mt-0.5">Verified {{ $account->province_verified_at->format('M d, Y') }}</p>
+                                    <p class="text-xs text-green-700 mt-0.5">Verified {{ manila($account->province_verified_at, 'M d, Y') }}</p>
                                 @else
                                     <p class="text-xs text-amber-700 mt-0.5">Not verified</p>
                                 @endif
@@ -106,13 +99,12 @@
                                             </ul>
                                         </div>
                                     @else
-                                        <form method="POST" action="{{ route('admin.users.logistics.province', $account) }}" class="mt-2 flex flex-col gap-2">
+                                        <form method="POST" action="{{ route('admin.users.logistics.province', $account) }}" class="mt-2 flex flex-col gap-2" data-app-confirm data-confirm-title="Change verified province" data-confirm-label="Change Province" data-confirm-danger="true" data-confirm-message="Change the verified province for {{ $account->business_name ?: $account->fullName() }} (Logistics provider #{{ $account->id }})? Its live Province Hub will be archived.">
                                             @csrf
                                             <input name="province_code" required maxlength="20" placeholder="PSGC province code" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
                                             <input name="province_name" maxlength="120" placeholder="Province name (optional)" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
                                             <input name="region_code" maxlength="20" placeholder="Region code (optional)" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
-                                            <button type="submit" class="h-8 px-3 text-xs font-semibold text-white bg-primary-800 rounded-lg hover:bg-primary-900"
-                                                    onclick="return confirm('Change this provider\'s verified province? Their live Province Hub will be archived.');">
+                                            <button type="submit" class="h-8 px-3 text-xs font-semibold text-white bg-primary-800 rounded-lg hover:bg-primary-900">
                                                 Save province
                                             </button>
                                         </form>
@@ -120,40 +112,54 @@
                                 </details>
                             </td>
                         @endif
-                        <td class="px-6 py-4">
+                        <td >
                             @if ($statusValue === 'suspended')
-                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700">Suspended</span>
+                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold user-account-status-suspended">Suspended</span>
                             @elseif ($statusValue === 'approved')
-                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">Approved</span>
+                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold user-account-status-approved">Approved</span>
                             @else
-                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700">{{ $statuses[$statusValue] ?? ucfirst($statusValue) }}</span>
+                                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold user-account-status-{{ $statusValue }}">{{ $statuses[$statusValue] ?? ucfirst($statusValue) }}</span>
                             @endif
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td><p class="user-account-business">{{ $account->business_name ?: ($type === 'buyer' ? 'Personal account' : 'Not provided') }}</p></td>
+                        <td class="user-account-actions">
+                            <details class="user-account-disclosure user-account-view">
+                                <summary><i data-lucide="eye" class="w-3.5 h-3.5" aria-hidden="true"></i>View<span class="sr-only"> account details for {{ $account->fullName() }}</span></summary>
+                                <dl class="user-account-detail-content">
+                                    <div><dt>Name</dt><dd>{{ $account->fullName() }}</dd></div>
+                                    <div><dt>Email</dt><dd>{{ $account->email }}</dd></div>
+                                    <div><dt>Contact</dt><dd>{{ $account->contact_no ?: 'Not provided' }}</dd></div>
+                                    <div><dt>Account</dt><dd>{{ $typeLabel }} / {{ $statuses[$statusValue] ?? ucfirst($statusValue) }}</dd></div>
+                                    <div><dt>Registered</dt><dd>{{ manila($account->created_at, 'd M Y, g:i A', 'Not available') }}</dd></div>
+                                    <div><dt>Last updated</dt><dd>{{ manila($account->updated_at, 'd M Y, g:i A', 'Not available') }}</dd></div>
+                                </dl>
+                            </details>
                             @if ($statusValue === 'approved')
+                                <details class="user-account-disclosure user-account-suspend"><summary><i data-lucide="pause" class="w-3.5 h-3.5" aria-hidden="true"></i>Suspend<span class="sr-only"> {{ $account->fullName() }}</span></summary>
                                 <form method="POST" action="{{ route(match ($type) {
                                     'buyer' => 'admin.users.buyer.suspend',
                                     'logistics' => 'admin.users.logistics.suspend',
                                     default => 'admin.users.seller.suspend',
-                                }, $account) }}" class="inline" onsubmit="return confirm('Suspend this account?');">
+                                }, $account) }}" class="user-account-reason-form" data-app-confirm data-confirm-title="Suspend account" data-confirm-label="Suspend {{ $typeLabel }}" data-confirm-danger="true" data-confirm-message="Suspend {{ $typeLabel }} account {{ $account->fullName() }} ({{ $account->email }}, Account #{{ $account->id }})? The required reason will be saved with this action.">
                                     @csrf
                                     <label for="suspend-reason-{{ $account->id }}" class="sr-only">Reason for suspension</label>
                                     <input id="suspend-reason-{{ $account->id }}" name="reason" required maxlength="1000" placeholder="Reason for suspension"
                                            class="mb-2 w-full h-10 px-3 border border-neutral-300 rounded-lg text-sm" />
                                     <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100">Suspend</button>
-                                </form>
+                                </form></details>
                             @elseif ($statusValue === 'suspended')
+                                <details class="user-account-disclosure user-account-reactivate"><summary><i data-lucide="rotate-ccw" class="w-3.5 h-3.5" aria-hidden="true"></i>Reactivate<span class="sr-only"> {{ $account->fullName() }}</span></summary>
                                 <form method="POST" action="{{ route(match ($type) {
                                     'buyer' => 'admin.users.buyer.reactivate',
                                     'logistics' => 'admin.users.logistics.reactivate',
                                     default => 'admin.users.seller.reactivate',
-                                }, $account) }}" class="inline" onsubmit="return confirm('Reactivate this account?');">
+                                }, $account) }}" class="user-account-reason-form" data-app-confirm data-confirm-title="Reactivate account" data-confirm-label="Reactivate {{ $typeLabel }}" data-confirm-message="Reactivate {{ $typeLabel }} account {{ $account->fullName() }} ({{ $account->email }}, Account #{{ $account->id }})? The required reason will be saved with this action.">
                                     @csrf
                                     <label for="reactivate-reason-{{ $account->id }}" class="sr-only">Reason for reactivation</label>
                                     <input id="reactivate-reason-{{ $account->id }}" name="reason" required maxlength="1000" placeholder="Reason for reactivation"
                                            class="mb-2 w-full h-10 px-3 border border-neutral-300 rounded-lg text-sm" />
                                     <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-green-700 bg-green-50 rounded-lg hover:bg-green-100">Reactivate</button>
-                                </form>
+                                </form></details>
                                 @if ($type === 'logistics')
                                     @php
                                         $inHand = $outForDelivery[$account->id] ?? 0;
@@ -166,7 +172,7 @@
                                             <p class="mt-0.5 text-amber-800">Riders may finish those until {{ $windDownUntil->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, g:i A') }}.</p>
                                         @endif
                                         <form method="POST" action="{{ route('admin.users.logistics.rider-wind-down', $account) }}" class="mt-2 flex flex-col gap-2"
-                                              onsubmit="return confirm('Change what this company\'s riders may do?');">
+                                              data-app-confirm data-confirm-title="Change rider wind-down" data-confirm-label="Save Wind-down" data-confirm-message="Change the rider wind-down setting for {{ $account->business_name ?: $account->fullName() }} (Logistics provider #{{ $account->id }})? This controls how long riders may finish parcels already out for delivery.">
                                             @csrf
                                             <label for="wind-down-hours-{{ $account->id }}" class="font-semibold">Let riders finish parcels out for delivery</label>
                                             <select id="wind-down-hours-{{ $account->id }}" name="hours" class="h-9 px-2 border border-neutral-300 rounded-lg text-xs">
@@ -189,13 +195,14 @@
                     </tr>
                 @endforeach
             </tbody>
-        </table>
-        <div class="px-6 py-4 border-t border-neutral-200">
+        </table></div>
+        <div class="user-account-pagination"><form data-admin-auto-filter method="GET" action="{{ route('admin.users.index') }}" class="user-account-page-size"><input type="hidden" name="search" value="{{ $search }}"><input type="hidden" name="type" value="{{ $type }}"><input type="hidden" name="status" value="{{ $status }}"><label for="accounts_per_page">Rows per page</label><select name="per_page" id="accounts_per_page">@foreach ([10, 25, 50] as $size)<option value="{{ $size }}" @selected(($perPage ?? 25) === $size)>{{ $size }}</option>@endforeach</select><noscript><button type="submit">Apply</button></noscript></form>
             {{ $accounts->links() }}
         </div>
     @else
         <div class="px-6 py-16 text-center text-neutral-500">No accounts match your filters.</div>
     @endif
+</section>
 </div>
 
 @endsection

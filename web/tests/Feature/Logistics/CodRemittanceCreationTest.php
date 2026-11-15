@@ -18,6 +18,7 @@ use App\Models\Shared\SellerOrder;
 use App\Services\Rider\RiderOperationsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
@@ -177,5 +178,32 @@ class CodRemittanceCreationTest extends TestCase
         $this->assertCount(1, CodRemittance::all());
         $this->assertSame(CodRemittance::PENDING_REMITTANCE, CodRemittance::first()->status);
         $this->assertSame($this->payment->id, CodRemittance::first()->payment_id);
+    }
+
+    public function test_obligation_write_failure_rolls_back_collection_proof_status_and_file(): void
+    {
+        $armed = true;
+        DB::connection()->beforeExecuting(function (string $sql) use (&$armed): void {
+            if ($armed && str_starts_with(strtolower($sql), 'insert into "cod_remittances"')) {
+                $armed = false;
+                throw new \RuntimeException('Controlled COD obligation failure.');
+            }
+        });
+        try {
+            app(RiderOperationsService::class)->completeDelivery($this->rider, $this->sellerOrder, [
+                'delivery_otp' => $this->deliveryOtp($this->sellerOrder),
+                'photo' => UploadedFile::fake()->image('rollback.jpg'), 'cod_amount_minor' => 44900,
+            ]);
+            $this->fail('The controlled obligation failure did not interrupt delivery.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Controlled COD obligation failure.', $exception->getMessage());
+        }
+        $this->assertSame(PaymentStatus::Pending, $this->payment->fresh()->status);
+        $this->assertNull($this->payment->fresh()->collected_at);
+        $this->assertNull($this->payment->fresh()->collected_amount_minor);
+        $this->assertSame(OrderStatus::OutForDelivery, $this->sellerOrder->fresh()->status);
+        $this->assertNull($this->sellerOrder->fresh()->deliveryProof);
+        $this->assertSame(0, CodRemittance::query()->count());
+        $this->assertSame([], Storage::disk('local')->allFiles('delivery-proofs'));
     }
 }

@@ -24,9 +24,7 @@
         <p class="mt-2 text-sm text-neutral-600">Send each seller their money by bank or GCash first, then record the reference here. Zefanya has already confirmed receiving the cash behind every request.</p>
     </div>
 
-    @if (session('success'))
-        <div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" />
     @if ($errors->any())
         <div role="alert" class="rounded-md border border-error bg-white p-4 text-sm text-error">{{ $errors->first() }}</div>
     @endif
@@ -54,8 +52,8 @@
                         </details>
                     </div>
                     <div class="space-y-3">
-                        <form method="POST" action="{{ route('admin.seller-payouts.pay', $payout) }}" class="flex items-end gap-2">
-                            @csrf
+                        <form method="POST" action="{{ route('admin.seller-payouts.pay', $payout) }}" data-payout-review data-seller="{{ $payout->seller?->business_name ?? 'Unknown seller' }}" data-amount="{{ $peso($payout->amount_minor - $payout->debt_deducted_minor) }}" data-destination="{{ $payout->payout_destination ?? 'No details given' }}" class="flex items-end gap-2">
+                            @csrf<input type="hidden" name="_ui_form" value="{{ route('admin.seller-payouts.pay', $payout) }}">
                             <label class="block min-w-0 flex-1 text-[13px] font-semibold text-neutral-950">
                                 Bank or GCash reference
                                 <input name="reference" required maxlength="255" class="{{ $field }} mt-1 font-normal">
@@ -65,7 +63,7 @@
                         <details class="text-[13px]">
                             <summary class="cursor-pointer font-semibold text-neutral-600">Reject this request</summary>
                             <form method="POST" action="{{ route('admin.seller-payouts.reject', $payout) }}" class="mt-2 space-y-2">
-                                @csrf
+                                @csrf<input type="hidden" name="_ui_form" value="{{ route('admin.seller-payouts.reject', $payout) }}">
                                 <input name="reason" required maxlength="500" aria-label="Reason for rejecting" placeholder="e.g. The GCash number is not registered" class="{{ $field }}">
                                 <button type="submit" class="h-10 cursor-pointer rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-950 hover:bg-neutral-100">Reject request</button>
                             </form>
@@ -108,4 +106,61 @@
         @endif
     </section>
 </div>
+<dialog id="payout-review" aria-labelledby="payout-review-title" aria-describedby="payout-review-description" class="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-neutral-200 bg-white p-6 text-neutral-950 shadow-lg backdrop:bg-black/40">
+    <h2 id="payout-review-title" class="font-serif text-xl">Record external payment</h2>
+    <p id="payout-review-description" class="mt-2 text-sm text-neutral-600">Confirm that you have already sent this payment before recording it.</p>
+    <dl class="mt-4 space-y-3 text-sm">
+        <div><dt class="font-semibold">Seller</dt><dd data-review-seller class="break-words"></dd></div>
+        <div><dt class="font-semibold">Amount sent</dt><dd data-review-amount class="break-words"></dd></div>
+        <div><dt class="font-semibold">Destination</dt><dd data-review-destination class="break-words"></dd></div>
+        <div><dt class="font-semibold">Bank or GCash reference</dt><dd data-review-reference class="break-words"></dd></div>
+    </dl>
+    <div class="mt-6 flex flex-wrap justify-end gap-2">
+        <button type="button" data-review-cancel autofocus class="min-h-11 rounded-md border border-neutral-300 px-4 text-sm font-semibold text-neutral-950 hover:bg-neutral-100">Cancel</button>
+        <button type="button" data-review-confirm class="min-h-11 rounded-md bg-primary-800 px-4 text-sm font-semibold text-white hover:bg-primary-900">Record external payment</button>
+    </div>
+</dialog>
+<script>
+(function () {
+    const dialog = document.getElementById('payout-review');
+    let pendingForm = null;
+    document.querySelectorAll('form[data-payout-review]').forEach(form => {
+        form.addEventListener('submit', event => {
+            if (form.hasAttribute('data-payout-confirmed')) {
+                form.removeAttribute('data-payout-confirmed');
+                return;
+            }
+            event.preventDefault();
+            const values = {
+                seller: form.dataset.seller,
+                amount: form.dataset.amount,
+                destination: form.dataset.destination,
+                reference: form.elements.reference.value,
+            };
+            if (typeof dialog.showModal !== 'function') {
+                if (window.confirm(`Record external payment?\nSeller: ${values.seller}\nAmount: ${values.amount}\nDestination: ${values.destination}\nReference: ${values.reference}`)) {
+                    form.setAttribute('data-payout-confirmed', '');
+                    form.requestSubmit();
+                    form.removeAttribute('data-payout-confirmed');
+                }
+                return;
+            }
+            pendingForm = form;
+            Object.entries(values).forEach(([key, value]) => { dialog.querySelector(`[data-review-${key}]`).textContent = value; });
+            dialog.showModal();
+        });
+    });
+    dialog.querySelector('[data-review-cancel]').addEventListener('click', () => dialog.close());
+    dialog.querySelector('[data-review-confirm]').addEventListener('click', () => {
+        const form = pendingForm;
+        dialog.close();
+        if (!form) return;
+        form.setAttribute('data-payout-confirmed', '');
+        form.requestSubmit();
+        form.removeAttribute('data-payout-confirmed');
+    });
+    dialog.addEventListener('close', () => { if (!dialog.open) pendingForm = null; });
+})();
+</script>
+@include('Components.admin-form-recovery')
 @endsection

@@ -123,7 +123,7 @@
         setState('open');
         return true;
     };
-    if (!['closed', 'minimized'].includes(recall('state'))) setState('open');
+    if (recall('state') === 'open') setState('open');
     else if (recall('state') === 'minimized') root.querySelector('[data-chat-launcher-label]').textContent = 'Restore messages';
 })();
 </script>

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Admin\OperationsAuditLog;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Seller\SellerSettlement;
 use App\Services\Seller\SellerSettlementService;
@@ -43,12 +42,6 @@ class SellerSettlementController extends Controller
             $request->user('admin'),
             (int) $data['amount_minor'],
             $data['reference'],
-        );
-
-        OperationsAuditLog::record(
-            $request->user('admin'), 'seller_direct_payout', $paid, 'Settlement #'.$paid->getKey(),
-            ['status' => SellerSettlement::PENDING_PAYOUT],
-            ['status' => 'Paid', 'amount' => '₱'.number_format($data['amount_minor'] / 100, 2), 'reference' => $data['reference']],
             $data['reason'],
         );
 

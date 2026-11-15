@@ -37,7 +37,7 @@ class LiveTrackingSummaryTest extends TestCase
         SellerOrder::factory()->status(OrderStatus::ReadyForPickup)->create(['order_id' => $order->id]);
 
         $this->actingAs($buyer, 'buyer')->get(route('buyer.orders.show', $order))->assertOk()
-            ->assertSeeText('No verified scan recorded yet')->assertSeeText('Awaiting pickup from the seller.')
+            ->assertSeeText('No verified scan recorded yet')->assertSeeText('Pickup requested. Logistics will assign a rider.')
             ->assertSeeText('Physical hub not yet verified')->assertSee('aria-label="Delivery milestones"', false);
     }
 

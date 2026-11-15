@@ -67,10 +67,10 @@ class OrderController extends Controller
     private function firstComeFirstServed(Builder $query): void
     {
         $prepare = [OrderStatus::Placed->value, OrderStatus::Confirmed->value, OrderStatus::Preparing->value];
-        $finished = [OrderStatus::Delivered->value, OrderStatus::Completed->value, OrderStatus::Returned->value, OrderStatus::Cancelled->value];
+        $finished = [OrderStatus::Delivered->value, OrderStatus::Completed->value, OrderStatus::Returned->value, OrderStatus::Cancelled->value, OrderStatus::Lost->value];
 
         $query->orderByRaw(
-            'CASE WHEN status IN (?, ?, ?) THEN 0 WHEN status IN (?, ?, ?, ?) THEN 2 ELSE 1 END',
+            'CASE WHEN status IN (?, ?, ?) THEN 0 WHEN status IN (?, ?, ?, ?, ?) THEN 2 ELSE 1 END',
             [...$prepare, ...$finished],
         )->orderBy('created_at')->orderBy('id');
     }
@@ -215,11 +215,11 @@ class OrderController extends Controller
     }
 
     /**
-     * Mark a seller_order as packed / ready for pickup.
+     * Request pickup for a packed seller order.
      *
-     * Moves the order to READY_FOR_PICKUP. NO courier is auto-assigned here —
-     * the courier is assigned at pickup time by the rider, and the delivery
-     * courier is assigned at the sorting center.
+     * Moves the order to READY_FOR_PICKUP and notifies the carrier. No rider
+     * is assigned or notified here. Logistics assigns the pickup rider from
+     * Incoming Parcels, and the delivery rider is assigned at the sorting center.
      *
      * Double-click safety: the row is re-read UNDER LOCK inside a transaction
      * before acting, and an already-ready order returns early.
@@ -278,7 +278,7 @@ class OrderController extends Controller
         }
 
         if ($alreadyHandled) {
-            return back()->with('warning', 'This order is already marked ready for pickup — nothing more to do here.');
+            return back()->with('warning', 'Pickup was already requested for this order.');
         }
 
         return back()->with('ready', true);

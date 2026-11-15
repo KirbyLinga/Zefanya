@@ -57,14 +57,50 @@ class AdminNavigationTest extends TestCase
         }
     }
 
-    public function test_the_sidebar_has_eleven_items_and_no_more_tools(): void
+    public function test_the_sidebar_has_the_expected_unique_authorized_links(): void
     {
         $this->signedIn('super_admin');
-
         $response = $this->get(route('admin.dashboard'))->assertOk()->assertDontSee('More tools')->assertDontSee('Two-factor security')->assertDontSee('/admin/two-factor', false);
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $nodes = (new \DOMXPath($document))->query('//aside[@id="adminSidebar"]//a[@data-admin-nav-item]/@href');
+        $links = array_map(fn ($node) => $node->nodeValue, iterator_to_array($nodes));
+        $routes = [
+            'admin.dashboard', 'admin.registrations.index', 'admin.users.index', 'admin.hubs.index',
+            'admin.transport.index', 'admin.products.index', 'admin.products.pending', 'admin.orders.index',
+            'admin.vouchers.index', 'admin.returns.index', 'admin.logistics-remittances.index',
+            'admin.finance.index', 'admin.settings.index',
+        ];
+        $this->assertSame(array_map(fn ($name) => route($name), $routes), $links);
+        $this->assertCount(count(array_unique($links)), $links, 'Sidebar routes must not be duplicated.');
+        foreach ($links as $link) {
+            $this->get($link)->assertOk();
+        }
+        $response->assertDontSee('Parcel issues');
+    }
 
-        $this->assertSame(11, substr_count($response->getContent(), 'data-admin-nav-item'));
-        $response->assertSeeInOrder(['Dashboard', 'Accounts', 'Registrations', 'User accounts', 'Marketplace &amp; operations', 'Logistics network', 'Products', 'Vouchers', 'Returns &amp; disputes', 'Parcel issues', 'Money', 'Settlements', 'Finance', 'Settings'], false);
+    public function test_admin_can_open_every_visible_sidebar_destination(): void
+    {
+        $this->signedIn('admin');
+        $content = $this->get(route('admin.dashboard'))->assertOk()->getContent();
+        foreach ($this->navigationLinks($content) as $link) {
+            $this->get($link)->assertOk();
+        }
+    }
+
+    public function test_sidebar_respects_moderator_and_support_permissions_for_new_items(): void
+    {
+        $this->signedIn('admin');
+        $this->get(route('admin.products.pending'))->assertOk();
+        $this->get(route('admin.orders.index'))->assertOk();
+        $this->signedIn('moderator');
+        $this->get(route('admin.dashboard'))->assertOk()->assertSee(route('admin.products.pending'), false)->assertDontSee(route('admin.orders.index'), false);
+        $this->get(route('admin.products.pending'))->assertOk();
+        $this->get(route('admin.orders.index'))->assertForbidden();
+        $this->signedIn('support');
+        $this->get(route('admin.dashboard'))->assertOk()->assertDontSee(route('admin.products.pending'), false)->assertDontSee(route('admin.orders.index'), false);
+        $this->get(route('admin.products.pending'))->assertForbidden();
+        $this->get(route('admin.orders.index'))->assertForbidden();
     }
 
     public function test_unbuilt_items_are_disabled_text_not_links(): void
@@ -73,10 +109,9 @@ class AdminNavigationTest extends TestCase
 
         $content = $this->get(route('admin.dashboard'))->getContent();
 
-        $this->assertSame(1, substr_count($content, 'aria-disabled="true" title="'));
-        foreach (['Finance'] as $label) {
-            $this->assertStringContainsString('<span data-admin-nav-item aria-disabled="true" title="'.$label.': coming soon"', $content);
-        }
+        // Every sidebar page is built now, so nothing is disabled.
+        $this->assertSame(0, substr_count($content, 'aria-disabled="true" title="'));
+        $this->assertStringContainsString(route('admin.finance.index'), $content);
         $this->assertStringNotContainsString(route('admin.settlements.index'), $content);
         $this->assertStringContainsString(route('admin.logistics-remittances.index'), $content);
 
@@ -95,12 +130,14 @@ class AdminNavigationTest extends TestCase
             ->assertDontSee('Settlements')
             ->assertDontSee('Finance')
             ->assertSee(route('admin.products.index'), false)
-            ->assertSee(route('admin.incidents.index'), false)
+            ->assertSee(route('admin.returns.index'), false)
             ->getContent();
 
         foreach ($this->navigationLinks($content) as $link) {
             $this->get($link)->assertOk();
         }
+        $this->get(route('admin.returns.index'))->assertOk()->assertSee(route('admin.incidents.index'), false);
+        $this->get(route('admin.incidents.index'))->assertOk()->assertSee(route('admin.returns.index'), false);
     }
 
     public function test_support_only_gets_the_dashboard(): void
@@ -118,7 +155,7 @@ class AdminNavigationTest extends TestCase
         return [
             'hubs' => ['admin.hubs.index', 'Logistics network'],
             'partnerships' => ['admin.partnerships.index', 'Logistics network'],
-            'incidents' => ['admin.incidents.index', 'Parcel issues'],
+            'incidents' => ['admin.incidents.index', 'Returns &amp; disputes'],
             'returns' => ['admin.returns.index', 'Returns &amp; disputes'],
             'new voucher' => ['admin.vouchers.create', 'Vouchers'],
         ];

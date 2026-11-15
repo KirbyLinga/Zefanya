@@ -38,11 +38,9 @@ class PromotionController extends Controller
         return to_route('seller.promotions.index')->with('success', 'Your deal has been created.');
     }
 
-    public function destroy(Request $request, SellerPromotion $promotion): RedirectResponse
+    public function destroy(Request $request, SellerPromotion $promotion, SellerPromotionService $promotions): RedirectResponse
     {
-        abort_unless($promotion->seller_id === $request->user('seller')->id, 403);
-
-        $promotion->delete();
+        $promotions->delete($request->user('seller'), $promotion);
 
         return to_route('seller.promotions.index')->with('success', 'Your deal has been deleted.');
     }

@@ -35,6 +35,8 @@ class CheckoutController extends Controller
     /** Session key for the one-time checkout form token. */
     public const TOKEN_KEY = 'checkout_form_token';
 
+    private const PRICE_FINGERPRINT_KEY = 'checkout_reviewed_price';
+
     /**
      * Show checkout for the buyer's SELECTED cart items.
      *
@@ -117,7 +119,10 @@ class CheckoutController extends Controller
 
         $carrierService = app(CheckoutCarrierService::class);
         $checkoutToken = app(CheckoutService::class)->issueToken($buyer, $base->sellerGroups);
-        session([self::TOKEN_KEY => $checkoutToken->token]);
+        session([
+            self::TOKEN_KEY => $checkoutToken->token,
+            self::PRICE_FINGERPRINT_KEY => $base->priceFingerprint(),
+        ]);
         $carrierOptions = $carrierService->optionsForCheckout($deliverTo, $base->sellerGroups, $checkoutToken->shipping_rates_snapshot);
         $carriersAvailable = $carrierService->allRoutesAvailable($carrierOptions);
         $old = $request->old('carriers', []);
@@ -232,13 +237,17 @@ class CheckoutController extends Controller
 
         // Anything the buyer did not see stops here and returns them to the
         // checkout page with the new total, so they place the order knowingly.
+        $reviewedToken = session(self::TOKEN_KEY);
+        if (session()->has(self::PRICE_FINGERPRINT_KEY) && $reviewedToken !== $formToken) {
+            return redirect()->to($checkoutReturn)->with('error', 'Your checkout session changed. Please review your cart and place your order again.');
+        }
         $reviewedAddress = $request->input('address_fingerprint');
         if (is_string($reviewedAddress) && ! hash_equals(app(CheckoutService::class)->addressFingerprint($deliverTo), $reviewedAddress)) {
             return redirect()->to($checkoutReturn)
                 ->with('error', 'Your delivery address changed while you were checking out. Please check it and place your order again.');
         }
 
-        $reviewedPrices = $request->input('price_fingerprint');
+        $reviewedPrices = session(self::PRICE_FINGERPRINT_KEY) ?? $request->input('price_fingerprint');
         if (is_string($reviewedPrices) && ! hash_equals($base->priceFingerprint(), $reviewedPrices)) {
             return redirect()->to($checkoutReturn)
                 ->with('error', 'A product price changed while you were checking out. Please review the updated total and place your order again.');
@@ -308,6 +317,9 @@ class CheckoutController extends Controller
 
         // Authoritative money for the order — computed from DB rows only.
         $summary = new CartSummary($items, $application, null);
+        if ($summary->priceFingerprint() !== $base->priceFingerprint()) {
+            return redirect()->to($checkoutReturn)->with('error', 'A product price changed while you were checking out. Please review the updated total and place your order again.');
+        }
 
         try {
             $order = $this->placeOrder($buyer, $items, $summary, $formToken, $carrierQuote, (array) $request->input('notes', []), $address);
@@ -317,16 +329,12 @@ class CheckoutController extends Controller
 
         app(CheckoutService::class)->notifySellers($order);
 
-        // Success: remove the purchased lines and clear the checkout/voucher
-        // session state. Only the SELECTED ids are removed — anything else
-        // left in the cart survives for the next checkout.
-        $buyer->cartItems()->whereIn('id', $parkedIds)->delete();
-
         session()->forget([
             self::SESSION_KEY,
             VoucherSessionService::SESSION_KEY,
             VoucherSessionService::LEGACY_KEY,
             self::TOKEN_KEY,
+            self::PRICE_FINGERPRINT_KEY,
             CheckoutCarrierService::SESSION_KEY,
         ]);
 

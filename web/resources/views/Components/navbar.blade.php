@@ -127,27 +127,28 @@
     <div class="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4 px-12 py-4 max-lg:flex-wrap max-lg:gap-y-3 max-lg:px-8 max-sm:px-4 max-sm:py-3">
 
         {{-- ── Brand ── --}}
-        {{-- Non-clickable in every navbar state (public, guest, buyer): the logo
-             and wordmark are branding only — no href, no tab stop, default
-             cursor. Do not turn this back into an <a>. --}}
-        <span class="inline-flex shrink-0 items-center gap-2" aria-label="Zefanya home">
+        {{-- The logo also provides a Home destination on small screens, where
+             the main Home link is hidden. --}}
+        <a href="{{ route('buyer.home') }}"
+           class="inline-flex shrink-0 items-center gap-2 no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800"
+           aria-label="Go to Zefanya Home">
             <img class="h-10 w-10 rounded-full object-cover max-sm:h-8 max-sm:w-8"
                  src="{{ asset('Images/Zefanya-Logo.png') }}" alt="Zefanya logo" />
             <span class="font-serif text-[26px] font-normal leading-none whitespace-nowrap text-neutral-950 max-sm:text-xl">Zefanya</span>
-        </span>
+        </a>
 
         {{-- ── Search bar + mega-category dropdown (compact, ~420px, centred between logo and icons) ── --}}
         <div class="zf-search-wrap relative">
-            <input type="checkbox" id="catMenuToggle" class="peer hidden" />
+
 
             <div class="zf-search-bar flex min-w-0 items-stretch overflow-hidden rounded-lg border border-line bg-white">
                 {{-- "All Categories" toggle: chevron first, then label --}}
-                <label for="catMenuToggle"
+                <button type="button" id="catMenuToggle" aria-label="All categories" aria-controls="categoryMenu" aria-expanded="false"
                        class="zf-search-cat inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 self-stretch border-r border-line bg-black/[0.04] px-2.5 font-sans font-semibold tracking-[0.3px] whitespace-nowrap text-muted-ink max-sm:px-2">
                     <i data-lucide="chevron-down" width="14" height="14"
                        class="shrink-0 transition-transform duration-150"></i>
                     <span class="max-sm:hidden">All Categories</span>
-                </label>
+                </button>
 
                 {{-- Search input --}}
                 <input class="zf-search-input min-w-0 flex-1 border-0 bg-white px-3 font-sans text-muted-ink placeholder:text-muted-ink/50 focus:outline-none"
@@ -160,8 +161,10 @@
                 </button>
             </div>
 
-            {{-- Mega-category panel (CSS-only, peer-checked) --}}
-            <div class="absolute top-[calc(100%+6px)] left-0 z-50 hidden w-72 rounded-2xl border border-line bg-white p-4 shadow-xl peer-checked:flex flex-col max-lg:w-full">
+            <noscript><a href="{{ route('buyer.categories.index') }}" class="inline-block px-2 py-2 text-sm text-primary-800 underline">Browse categories</a></noscript>
+
+            {{-- Category navigation --}}
+            <div id="categoryMenu" hidden class="absolute top-[calc(100%+6px)] left-0 z-50 w-72 rounded-2xl border border-line bg-white p-4 shadow-xl max-lg:w-full">
                 {{-- Categories list: single scrollable column with icons --}}
                 <div class="flex flex-col gap-0.5 max-h-96 overflow-y-auto">
                     @foreach ($categories as $category)
@@ -187,7 +190,7 @@
         @endif
 
         {{-- ── Right group ── --}}
-        <div class="flex shrink-0 items-center gap-5 max-sm:gap-2">
+        <div class="flex shrink-0 items-center gap-5 max-sm:gap-2 lg:max-xl:gap-3">
 
             {{-- Leading separator (left of cart) --}}
             <div class="h-5 w-px shrink-0 max-sm:hidden" style="background-color: rgba(0,0,0,.14);"></div>
@@ -271,7 +274,7 @@
                                 {{ $buyerInitial }}
                             @endif
                         </span>
-                        <span class="hidden max-w-[110px] truncate sm:inline">{{ $buyerFullName }}</span>
+                        <span class="hidden max-w-[110px] truncate sm:inline lg:hidden xl:inline">{{ $buyerFullName }}</span>
                         <i data-lucide="chevron-down" width="13" height="13"></i>
                     </button>
 
@@ -350,12 +353,12 @@
                     <div class="h-5 w-px shrink-0" style="background-color: rgba(0,0,0,.14);"></div>
 
                     @if ($showRegisterModal)
-                        <a href="#" data-buyer-register-trigger
+                        <a href="{{ route('register.buyer') }}" data-buyer-register-trigger
                            class="font-sans text-[14px] font-medium tracking-[0.3px] text-neutral-600 transition-colors hover:text-primary-800">
                             Register
                         </a>
                     @else
-                        <a href="{{ Route::has('register.type') ? route('register.type') : '#' }}"
+                        <a href="{{ route('register.type') }}"
                            class="font-sans text-[14px] font-medium tracking-[0.3px] text-neutral-600 transition-colors hover:text-primary-800">
                             Register
                         </a>
@@ -366,3 +369,31 @@
         </div>{{-- end right group --}}
     </div>
 </nav>
+<script>
+(function () {
+    const trigger = document.getElementById('catMenuToggle');
+    const menu = document.getElementById('categoryMenu');
+    if (!trigger || !menu) return;
+
+    function close(restoreFocus) {
+        menu.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) trigger.focus();
+    }
+
+    trigger.addEventListener('click', function () {
+        const open = trigger.getAttribute('aria-expanded') !== 'true';
+        trigger.setAttribute('aria-expanded', String(open));
+        menu.hidden = !open;
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !menu.hidden) {
+            event.preventDefault();
+            close(true);
+        }
+    });
+    document.addEventListener('click', function (event) {
+        if (!menu.hidden && !menu.contains(event.target) && !trigger.contains(event.target)) close(false);
+    });
+})();
+</script>

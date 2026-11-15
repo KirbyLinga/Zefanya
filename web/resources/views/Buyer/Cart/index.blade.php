@@ -23,11 +23,7 @@
     </div>
 
     {{-- Server-side flash (e.g. bounced back from checkout with a stale selection) --}}
-    @if (session('error'))
-      <div class="mb-6 rounded-xl border border-[#e8a49c] bg-[#fbe9e7] px-4 py-3 text-[13px] font-medium text-[#a5333d]">
-        {{ session('error') }}
-      </div>
-    @endif
+    <x-flash type="error" :message="session('error')" spacing="mb-6" />
 
     {{-- ── Populated cart (not rendered at all when the cart is empty, so the
          empty page contains no toolbar/summary markup) ──────────────────── --}}

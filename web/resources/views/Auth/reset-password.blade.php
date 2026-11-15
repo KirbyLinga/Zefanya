@@ -26,9 +26,21 @@
         h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 26px; font-weight: 400; margin: 0 0 6px; }
         p.lead { margin: 0 0 22px; color: #57534e; font-size: 14px; line-height: 1.5; }
         label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .3px; color: #57534e; margin-bottom: 6px; }
-        input[type=email], input[type=password] {
+        input[type=email], .pw input {
             width: 100%; padding: 11px 12px; border: 1px solid #d6d3d1; border-radius: 9px; font-size: 14px;
         }
+        .pw { position: relative; }
+        .pw input { padding-right: 40px; }
+        .pw button {
+            position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+            display: flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; border: 0; border-radius: 7px;
+            background: transparent; color: #78716c; cursor: pointer;
+        }
+        .pw button:hover { color: #1c1917; }
+        .pw button:focus-visible { outline: 2px solid #b45309; outline-offset: 2px; }
+        input[type=password]::-ms-reveal,
+        input[type=password]::-ms-clear { display: none; width: 0; height: 0; }
         input:focus { outline: 2px solid #b45309; outline-offset: 1px; border-color: #b45309; }
         .field { margin-bottom: 16px; }
         .btn {
@@ -63,13 +75,23 @@
 
             <div class="field">
                 <label for="password">New password</label>
-                <input id="password" type="password" name="password" required autofocus autocomplete="new-password">
+                <div class="pw">
+                    <input id="password" type="password" name="password" required autofocus autocomplete="new-password">
+                    <button type="button" data-toggle-visibility="password" aria-label="Show password" aria-pressed="false" aria-controls="password">
+                        <svg data-lucide-fallback width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
                 <div class="hint">At least 8 characters.</div>
             </div>
 
             <div class="field">
                 <label for="password_confirmation">Confirm new password</label>
-                <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password">
+                <div class="pw">
+                    <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password">
+                    <button type="button" data-toggle-visibility="password_confirmation" aria-label="Show password" aria-pressed="false" aria-controls="password_confirmation">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
             </div>
 
             <button type="submit" class="btn">Reset password</button>
@@ -77,5 +99,6 @@
 
         <a class="back" href="{{ route('home', ['login' => 1]) }}">Back to sign in</a>
     </div>
+    @include('Components.password-toggle-script')
 </body>
 </html>

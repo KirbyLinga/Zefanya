@@ -5,6 +5,8 @@ namespace Tests\Feature\Seller;
 use App\Enums\OrderStatus;
 use App\Enums\ParcelReturnStatus;
 use App\Enums\PaymentStatus;
+use App\Http\Resources\Mobile\RiderParcelResource;
+use App\Http\Resources\Mobile\ShipmentResource;
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\CodRemittance;
@@ -12,6 +14,7 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsReturnCharge;
 use App\Models\Logistics\ParcelReturn;
 use App\Models\Rider\Courier;
+use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Seller\SellerDebt;
 use App\Models\Seller\SellerSettlement;
@@ -22,18 +25,24 @@ use App\Models\Shared\StatusHistory;
 use App\Notifications\Buyer\ReturnDisputeResolved;
 use App\Notifications\Buyer\ReturnRequestDecided;
 use App\Notifications\Seller\ReturnDisputed;
+use App\Services\Admin\PlatformFinanceService;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Logistics\ParcelReturnService;
+use App\Services\Logistics\ReturnChargeService;
+use App\Services\Seller\SellerPayoutRequestService;
 use App\Services\Seller\SellerSettlementService;
 use App\Services\Shared\CommissionFinalizationService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 /** SEL-RET-001 to 004: reason, description, photos, 3-day deadline, Approve or Reject. */
@@ -91,6 +100,15 @@ class SellerReturnDecisionTest extends TestCase
         $this->requestReturn()->assertCreated();
 
         return ParcelReturn::sole();
+    }
+
+    /** An ordinary refund needs an approved return (Audit 1.13 refund policy). */
+    private function approvedRecord(): ParcelReturn
+    {
+        $record = $this->record();
+        $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
+
+        return $record->fresh();
     }
 
     private function reject(ParcelReturn $record, ?string $reason = 'The item was fine when shipped.'): TestResponse
@@ -654,9 +672,9 @@ class SellerReturnDecisionTest extends TestCase
         $this->parcel->forceFill([
             'subtotal_minor' => 10000,
             'shipping_fee_minor' => 0,
-            'commission_bps' => 500,
-            'commission_minor' => 500,
-            'seller_net_minor' => 9500,
+            'commission_bps' => 1000,
+            'commission_minor' => 1000,
+            'seller_net_minor' => 9000,
         ])->save();
 
         return $settlement;
@@ -676,7 +694,8 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertSame(0, $settlement->commission_minor);
         $this->assertSame(0, $settlement->seller_payout_minor);
         $this->assertNull($settlement->pending_reason);
-        $this->assertSame(0, $this->parcel->commission_bps);
+        // The rate stays on the order; only the amount drops to nothing.
+        $this->assertSame(1000, $this->parcel->commission_bps);
         $this->assertSame(0, $this->parcel->commission_minor);
         $this->assertSame(0, $this->parcel->seller_net_minor);
 
@@ -693,19 +712,32 @@ class SellerReturnDecisionTest extends TestCase
         $record = $this->record();
 
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(500, $this->parcel->fresh()->commission_minor);
-        $this->assertSame(9500, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(1000, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(9000, $this->parcel->fresh()->seller_net_minor);
 
         $this->reject($record);
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
         $this->assertSame(SellerSettlement::COMMISSION_FINALIZATION_MISSING, $settlement->fresh()->pending_reason);
-        $this->assertSame(500, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(1000, $this->parcel->fresh()->commission_minor);
+    }
+
+    public function test_invalid_refund_preserves_the_submitted_form_context_and_values(): void
+    {
+        $this->pendingSettlement();
+        $record = $this->record();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $action = route('admin.returns.refund', $record);
+        $values = ['_ui_form' => $action, 'reference' => 'REF-KEEP', 'amount' => 'bad-amount', 'recipient' => 'Juana', 'paid_on' => '2020-01-02', 'refund_reason' => 'Keep this explanation'];
+
+        $this->actingAs($admin, 'admin')->from(route('admin.returns.index'))->followingRedirects()->post($action, $values)
+            ->assertOk()->assertSee('name="_ui_form"', false)->assertSee('REF-KEEP')->assertSee('bad-amount')->assertSee('Keep this explanation');
+        $this->assertNull($record->fresh()->refunded_at);
     }
 
     public function test_sel_ret_007_a_recorded_refund_releases_pending_earnings_once(): void
     {
         $settlement = $this->pendingSettlement();
-        $record = $this->record();
+        $record = $this->approvedRecord();
         $admin = Admin::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin, 'admin')->get(route('admin.returns.index'))
@@ -722,35 +754,574 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertSame(now('Asia/Manila')->toDateString(), $record->fresh()->refund_paid_on->toDateString());
         $this->assertNull($record->fresh()->refund_proof_path);
         $this->assertNotNull($record->fresh()->refunded_at);
-        // ₱50.25 of ₱100.00 refunded: the Seller keeps ₱49.75 of items, less 5% commission (₱2.49).
+        // ₱50.25 of ₱100.00 refunded: the Seller keeps ₱49.75 of items, less 10% commission (₱4.98).
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
         $this->assertNull($settlement->fresh()->pending_reason);
-        $this->assertSame(249, $settlement->fresh()->commission_minor);
-        $this->assertSame(4726, $settlement->fresh()->seller_payout_minor);
-        $this->assertSame(249, $this->parcel->fresh()->commission_minor);
-        $this->assertSame(4726, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(498, $settlement->fresh()->commission_minor);
+        $this->assertSame(4477, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(498, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(4477, $this->parcel->fresh()->seller_net_minor);
 
         $this->post(route('admin.returns.refund', $record), ['reference' => 'COD-REF-1002'] + $refund)
             ->assertSessionHasErrors('refund');
         $this->assertSame('COD-REF-1001', $record->fresh()->refund_reference);
-        $this->assertSame(4726, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(4477, $settlement->fresh()->seller_payout_minor);
     }
 
-    private function refund(ParcelReturn $record, string $amount): void
+    public function test_refund_retries_by_two_admins_and_a_stale_model_do_not_repeat_financial_effects(): void
+    {
+        Notification::fake();
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'paid_amount_minor' => 9000, 'seller_payout_minor' => 9000])->save();
+        $record = $this->approvedRecord();
+        // Exclude the return-request notification; these assertions concern refund attempts.
+        Notification::fake();
+        $staleRecord = $record->fresh();
+        $firstAdmin = Admin::factory()->create(['role' => 'admin']);
+        $secondAdmin = Admin::factory()->create(['role' => 'admin']);
+        $payload = ['reference' => 'REF-RETRY', 'amount' => '20.00', 'recipient' => 'Juana Cruz',
+            'paid_on' => now()->toDateString(), 'refund_reason' => 'Only one item in the shipment was damaged.'];
+        $url = route('admin.returns.refund', $record);
+
+        $this->actingAs($firstAdmin, 'admin')->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1800, SellerDebt::sole()->amount_minor);
+        $this->assertSame(1, $record->events()->where('event_key', 'like', 'refund_recorded%')->count());
+        $saved = $this->refundFinancialSnapshot();
+
+        // A lost response, then another Admin's already-open form, both retry the obligation.
+        $this->postJson($url, $payload)->assertConflict()->assertJsonValidationErrors('refund');
+        $this->actingAs($secondAdmin, 'admin')->postJson($url, ['reference' => 'REF-OTHER-ADMIN'] + $payload)
+            ->assertConflict()->assertJsonValidationErrors('refund');
+
+        // The service must re-read under lock, even if a caller cached an unrefunded model.
+        $this->assertNull($staleRecord->refunded_at);
+        try {
+            app(ParcelReturnService::class)->recordRefund($staleRecord, $secondAdmin, 'REF-STALE', 2000,
+                'Juana Cruz', now()->toDateString(), reason: $payload['refund_reason']);
+            $this->fail('A stale return model must not allow a second refund.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(409, $exception->status);
+            $this->assertArrayHasKey('refund', $exception->errors());
+        }
+
+        $this->assertEquals($saved, $this->refundFinancialSnapshot());
+        Notification::assertNothingSent();
+    }
+
+    public function test_failed_refund_rolls_back_events_debts_and_charges_and_can_be_retried_once(): void
+    {
+        Notification::fake();
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'paid_amount_minor' => 9000, 'seller_payout_minor' => 9000])->save();
+        $record = $this->record();
+        Notification::fake();
+        $record->forceFill(['status' => ParcelReturnStatus::Completed, 'seller_decision' => ParcelReturn::APPROVED,
+            'origin_provider_id' => CodRemittance::sole()->logistics_provider_id, 'return_shipping_fee_minor' => 500])->save();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $before = $this->refundFinancialSnapshot();
+        $failingCharges = new class extends ReturnChargeService
+        {
+            public function sync(ParcelReturn $record): void
+            {
+                parent::sync($record);
+                throw new \RuntimeException('Simulated failure after refund financial writes.');
+            }
+        };
+        $this->app->instance(ReturnChargeService::class, $failingCharges);
+
+        try {
+            app(ParcelReturnService::class)->recordRefund($record, $admin, 'REF-ROLLBACK', 10000, 'Juana Cruz', now()->toDateString());
+            $this->fail('The simulated downstream failure must escape the transaction.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated failure after refund financial writes.', $exception->getMessage());
+        } finally {
+            $this->app->forgetInstance(ReturnChargeService::class);
+        }
+
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+        $this->assertNull($record->fresh()->refunded_at);
+
+        app(ParcelReturnService::class)->recordRefund($record, $admin, 'REF-ROLLBACK', 10000, 'Juana Cruz', now()->toDateString());
+        $this->assertSame('REF-ROLLBACK', $record->fresh()->refund_reference);
+        $this->assertSame(9500, SellerDebt::sole()->amount_minor);
+        $this->assertSame(500, LogisticsReturnCharge::sole()->amount_minor);
+        $this->assertSame(1, $record->events()->where('event_key', 'like', 'refund_recorded%')->count());
+        Notification::assertNothingSent();
+    }
+
+    private function refundFinancialSnapshot(): array
+    {
+        $snapshot = [];
+        foreach (['parcel_returns', 'parcel_return_events', 'seller_orders', 'seller_settlements', 'seller_debts',
+            'logistics_return_charges', 'operations_audit_logs', 'notifications'] as $table) {
+            $snapshot[$table] = DB::table($table)->orderBy('id')->get()->toArray();
+        }
+
+        return $snapshot;
+    }
+
+    public function test_a_failed_delivery_with_uncollected_cod_cannot_be_refunded(): void
+    {
+        $this->parcel->payment->forceFill(['status' => PaymentStatus::Pending, 'paid_at' => null])->save();
+        $this->parcel->forceFill(['status' => OrderStatus::DeliveryFailed, 'delivery_attempts' => 2])->save();
+        app(ParcelReturnService::class)->ensureAfterSecondFailure($this->parcel, null, null);
+        $record = ParcelReturn::query()->sole();
+        $before = $this->refundFinancialSnapshot();
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.returns.refund', $record), [
+                'reference' => 'NO-COD', 'amount' => '100.00', 'recipient' => 'Juana Cruz', 'paid_on' => today()->toDateString(),
+            ])->assertUnprocessable()->assertJsonValidationErrors('refund');
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+    }
+
+    public function test_refund_amount_is_capped_by_the_recorded_cash_collection(): void
+    {
+        $this->parcel->payment->forceFill(['collected_amount_minor' => 8000, 'collected_at' => now()])->save();
+        $record = $this->approvedRecord();
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.returns.refund', $record), [
+                'reference' => 'ABOVE-COLLECTION', 'amount' => '100.00', 'recipient' => 'Juana Cruz', 'paid_on' => today()->toDateString(),
+            ])->assertUnprocessable()->assertJsonValidationErrors('amount');
+        $this->assertNull($record->fresh()->refunded_at);
+    }
+
+    public function test_a_debt_insert_failure_rolls_back_the_refund_and_its_history(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000])->save();
+        $record = $this->record();
+        $before = $this->refundFinancialSnapshot();
+        SellerDebt::creating(fn () => throw new \RuntimeException('Simulated Seller debt write failure.'));
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.returns.refund', $record), [
+                'reference' => 'DEBT-ROLLBACK', 'amount' => '100.00', 'recipient' => 'Juana Cruz', 'paid_on' => today()->toDateString(),
+            ] + self::REFUND_EXCEPTION + self::SELLER_FUNDS)->assertServerError();
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+    }
+
+    public function test_stale_record_and_void_submissions_cannot_change_a_corrected_refund_or_debt(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000])->save();
+        $record = $this->approvedRecord();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $recordUrl = route('admin.returns.refund', $record);
+        $voidUrl = route('admin.returns.refund.void', $record);
+        $original = ['reference' => 'ORIGINAL', 'amount' => '20.00', 'recipient' => 'Juana Cruz', 'paid_on' => today()->toDateString(),
+            'refund_reason' => 'Only part of the order was faulty.', 'refund_revision' => 0];
+
+        $this->actingAs($admin, 'admin')->postJson($recordUrl, $original)->assertRedirect();
+        $revision = $record->events()->where('event_key', 'refund_recorded')->sole()->id;
+        $void = ['void_reason' => 'The first transfer bounced.', 'refund_revision' => $revision];
+        $this->postJson($voidUrl, $void)->assertRedirect();
+        $this->postJson($recordUrl, $original)->assertConflict()->assertJsonValidationErrors('refund');
+
+        $this->postJson($recordUrl, ['reference' => 'REPLACEMENT', 'amount' => '30.00', 'refund_revision' => $record->refundHistory()->max('id')] + $original)
+            ->assertRedirect();
+        $before = $this->refundFinancialSnapshot();
+        $this->postJson($voidUrl, $void)->assertConflict()->assertJsonValidationErrors('void_reason');
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+        $this->assertSame('REPLACEMENT', $record->fresh()->refund_reference);
+        $this->assertSame(2700, SellerDebt::query()->sole()->outstandingMinor());
+    }
+
+    public function test_preparing_a_partly_paid_refunded_settlement_preserves_its_reconciliation_hold(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $this->parcel->payment->forceFill(['collected_at' => now(), 'collected_amount_minor' => 10000])->save();
+        $settlement->forceFill(['seller_payout_minor' => 9000, 'paid_amount_minor' => 4000, 'pending_reason' => null])->save();
+        $record = $this->approvedRecord();
+        $this->refund($record, '80.00');
+        $this->assertSame(2200, SellerDebt::query()->sole()->outstandingMinor());
+        $before = $settlement->fresh()->getAttributes();
+
+        app(SellerSettlementService::class)->prepare(CodRemittance::query()->sole());
+
+        $this->assertSame($before, $settlement->fresh()->getAttributes());
+        $this->assertSame(SellerSettlement::FINANCIAL_RECONCILIATION_REQUIRED, $settlement->fresh()->pending_reason);
+        $this->assertSame(2200, SellerDebt::query()->sole()->outstandingMinor());
+    }
+
+    public static function malformedRefundDestinationFields(): array
+    {
+        return [
+            ['recipient', ''], ['recipient', '   '], ['recipient', ['Another account']], ['recipient', str_repeat('a', 256)],
+            ['reference', ''], ['reference', '   '], ['reference', ['REF-001']], ['reference', str_repeat('a', 256)],
+        ];
+    }
+
+    #[DataProvider('malformedRefundDestinationFields')]
+    public function test_malformed_destination_fields_do_not_change_refund_financial_records(string $field, mixed $value): void
+    {
+        $record = $this->record();
+        $before = $this->refundFinancialSnapshot();
+        $data = ['reference' => 'REF-001', 'recipient' => 'Buyer A - test account', 'amount' => '100.00', 'paid_on' => today()->toDateString()];
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.returns.refund', $record), array_replace($data, [$field => $value]))
+            ->assertUnprocessable()->assertJsonValidationErrors($field);
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+    }
+
+    public function test_forged_buyer_order_and_return_parameters_do_not_reassociate_a_refund(): void
+    {
+        $record = $this->approvedRecord();
+        $otherBuyer = Buyer::factory()->create();
+        $other = SellerOrder::factory()->create(['order_id' => Order::factory()->create(['buyer_id' => $otherBuyer->id])->id]);
+        $otherPayment = Payment::factory()->paid()->create(['seller_order_id' => $other->id]);
+        $otherReturn = ParcelReturn::query()->forceCreate([
+            'seller_order_id' => $other->id, 'reason' => 'Wrong item received', 'requested_at' => now(), 'financial_review_required' => true,
+        ]);
+        $before = [$other->fresh()->getAttributes(), $otherPayment->fresh()->getAttributes(), $otherReturn->fresh()->getAttributes()];
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin, 'admin')->postJson(route('admin.returns.refund', $record), [
+            'reference' => 'REF-ORDER-A', 'recipient' => 'Buyer A - test account', 'amount' => '100.00', 'paid_on' => today()->toDateString(),
+            'buyer_id' => $otherBuyer->id, 'order_id' => $other->order_id, 'seller_order_id' => $other->id,
+            'return_id' => $otherReturn->id, 'parcel_return_id' => $otherReturn->id,
+            'refund_recipient' => 'FORGED account', 'refund_reference' => 'FORGED reference',
+            'refund_amount_minor' => 999999, 'status' => ParcelReturnStatus::Completed->value,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame($this->parcel->id, $record->fresh()->seller_order_id);
+        $this->assertSame($this->buyer->id, $record->fresh()->sellerOrder->order->buyer_id);
+        $this->assertSame('Buyer A - test account', $record->fresh()->refund_recipient);
+        $this->assertSame('REF-ORDER-A', $record->fresh()->refund_reference);
+        $this->assertSame(10000, $record->fresh()->refund_amount_minor);
+        $this->assertSame(ParcelReturnStatus::Requested, $record->fresh()->status);
+        $event = $record->refundHistory()->sole();
+        $this->assertSame($admin->id, (int) $event->actor_id);
+        $this->assertSame('Buyer A - test account', $event->metadata['recipient']);
+        $this->assertEquals($before, [$other->fresh()->getAttributes(), $otherPayment->fresh()->getAttributes(), $otherReturn->fresh()->getAttributes()]);
+    }
+
+    public function test_recipient_and_reference_are_manual_attestations_without_bank_verification_or_required_proof(): void
+    {
+        $record = $this->approvedRecord();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin, 'admin')->postJson(route('admin.returns.refund', $record), [
+            'reference' => 'FABRICATED-REFERENCE-FOR-AUDIT', 'recipient' => 'Unrelated person - test account',
+            'amount' => '100.00', 'paid_on' => today()->toDateString(),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        // Pin the existing limitation, without inventing a verified-beneficiary policy.
+        $this->assertSame('Unrelated person - test account', $record->fresh()->refund_recipient);
+        $this->assertNull($record->fresh()->refund_proof_path);
+        $event = $record->refundHistory()->sole();
+        $this->assertSame('admin', $event->actor_type);
+        $this->assertSame($admin->id, (int) $event->actor_id);
+        $this->assertSame('FABRICATED-REFERENCE-FOR-AUDIT', $event->metadata['reference']);
+        $this->assertFalse($event->metadata['has_proof']);
+    }
+
+    public function test_cross_order_reference_reuse_remains_traceable_without_an_invented_global_reference_policy(): void
+    {
+        $record = $this->approvedRecord();
+        $other = SellerOrder::factory()->create();
+        Payment::factory()->paid()->create(['seller_order_id' => $other->id]);
+        $otherReturn = ParcelReturn::query()->forceCreate([
+            'seller_order_id' => $other->id, 'reason' => 'Wrong item received', 'requested_at' => now(), 'financial_review_required' => true,
+        ]);
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        foreach ([$record, $otherReturn] as $return) {
+            app(ParcelReturnService::class)->recordRefund($return, $admin, 'REF-001', 10000, 'Test recipient '.$return->id, today()->toDateString());
+            $this->assertSame('REF-001', $return->fresh()->refund_reference);
+            $this->assertSame($return->id, $return->refundHistory()->sole()->parcel_return_id);
+        }
+        $this->assertSame(2, ParcelReturn::query()->whereNotNull('refunded_at')->count());
+    }
+
+    public function test_destination_correction_preserves_original_evidence_and_one_order_debt(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000])->save();
+        $record = $this->approvedRecord();
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $data = ['reference' => 'REF-SAME-TRANSFER', 'recipient' => 'Wrong account - test only', 'amount' => '100.00',
+            'paid_on' => today()->toDateString(), 'proof' => UploadedFile::fake()->image('old-evidence.png')];
+        $this->actingAs($admin, 'admin')->postJson(route('admin.returns.refund', $record), $data)->assertRedirect();
+        $original = $record->refundHistory()->sole();
+        $proof = $record->fresh()->refund_proof_path;
+        $originalMetadata = $original->metadata;
+        $paymentBefore = $this->parcel->payment->fresh()->getAttributes();
+        $this->postJson(route('admin.returns.refund.void', $record), [
+            'void_reason' => 'Transfer to the incorrect account bounced.', 'refund_revision' => $original->id,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $voided = $record->refundHistory()->reorder('id', 'desc')->firstOrFail();
+        $this->assertSame('Wrong account - test only', $voided->metadata['recipient']);
+        $this->assertSame($proof, $voided->metadata['proof_path']);
+        $this->assertSame('REF-SAME-TRANSFER', $voided->metadata['reference']);
+        $this->assertSame(10000, $voided->metadata['amount_minor']);
+        $this->assertSame($data['paid_on'], $voided->metadata['paid_on']);
+        Storage::disk('local')->assertExists($proof);
+        $replacement = ['recipient' => 'Correct account - test only', 'refund_revision' => $voided->id] + $data;
+        unset($replacement['proof']);
+        $this->postJson(route('admin.returns.refund', $record), $replacement)->assertRedirect()->assertSessionHasNoErrors();
+        $beforeReplay = $this->refundFinancialSnapshot();
+        $this->postJson(route('admin.returns.refund', $record), $data)->assertConflict()->assertJsonValidationErrors('refund');
+        $this->assertEquals($beforeReplay, $this->refundFinancialSnapshot());
+        $this->assertEquals($originalMetadata, $original->fresh()->metadata);
+        $this->assertSame('Correct account - test only', $record->fresh()->refund_recipient);
+        $this->assertSame(3, $record->refundHistory()->count());
+        $this->assertSame(9000, SellerDebt::sole()->amount_minor);
+        $this->assertSame(0, SellerDebt::sole()->settled_minor);
+        $this->assertSame($settlement->id, SellerDebt::sole()->seller_settlement_id);
+        $this->assertSame(9000, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame($paymentBefore, $this->parcel->payment->fresh()->getAttributes());
+    }
+
+    public function test_refund_destination_and_proof_are_not_exposed_on_seller_buyer_or_logistics_surfaces(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $record = $this->approvedRecord();
+        $provider = $settlement->codRemittance->provider;
+        $record->forceFill(['origin_provider_id' => $provider->id])->save();
+        $recipient = 'PRIVATE-DESTINATION-TEST-000123456789';
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin, 'admin')->postJson(route('admin.returns.refund', $record), [
+            'reference' => 'PRIVATE-REF-TEST', 'recipient' => $recipient, 'amount' => '100.00',
+            'paid_on' => today()->toDateString(), 'proof' => UploadedFile::fake()->image('private-receipt.png'),
+        ])->assertRedirect();
+        $proof = $record->fresh()->refund_proof_path;
+        $this->get(route('admin.returns.index'))->assertOk()->assertSee($recipient);
+        $this->get(route('admin.returns.refund-proof', $record))->assertOk();
+        auth('admin')->logout();
+
+        $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
+            ->assertOk()->assertDontSee($recipient)->assertDontSee($proof)->assertDontSee('PRIVATE-REF-TEST');
+        $this->getJson(route('admin.returns.refund-proof', $record))->assertUnauthorized();
+        $this->actingAs($this->buyer, 'buyer')->get(route('buyer.orders.show', $this->parcel->order))
+            ->assertOk()->assertDontSee($recipient)->assertDontSee($proof);
+        $this->actingAs($provider, 'logistics')->get(route('logistics.returns.show', $record))
+            ->assertOk()->assertDontSee($recipient)->assertDontSee($proof)->assertDontSee('PRIVATE-REF-TEST');
+        $this->get(route('logistics.audit-logs.index'))->assertOk()->assertDontSee($recipient)->assertDontSee($proof);
+
+        $parcel = $this->parcel->fresh()->load('parcelReturn.events');
+        $request = Request::create('/');
+        foreach ([new ShipmentResource($parcel), new RiderParcelResource($parcel)] as $resource) {
+            $json = json_encode($resource->resolve($request), JSON_THROW_ON_ERROR);
+            $this->assertStringNotContainsString($recipient, $json);
+            $this->assertStringNotContainsString($proof, $json);
+        }
+        $this->actingAs(Buyer::factory()->create(), 'buyer')->get(route('buyer.orders.show', $this->parcel->order))->assertNotFound();
+        $this->flushHeaders();
+        $this->app['auth']->forgetGuards();
+        $token = $this->buyer->createToken('refund-destination-audit', ['buyer'], now()->addHour())->plainTextToken;
+        $this->withToken($token)->getJson(route('api.buyer.orders.show', $this->parcel->order))
+            ->assertOk()->assertDontSee($recipient)->assertDontSee($proof);
+    }
+
+    public static function manipulatedRefundAmounts(): array
+    {
+        return [['0.00'], ['-1.00'], ['100.01'], ['1e2'], ['0.001'], [['100.00']], ['9999999999']];
+    }
+
+    #[DataProvider('manipulatedRefundAmounts')]
+    public function test_manipulated_refund_amounts_cannot_change_financial_records(mixed $amount): void
+    {
+        $record = $this->approvedRecord();
+        $before = $this->refundFinancialSnapshot();
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.returns.refund', $record), [
+                'reference' => 'MANIPULATED', 'amount' => $amount, 'amount_minor' => 1,
+                'recipient' => 'Buyer', 'paid_on' => today()->toDateString(),
+                'refund_reason' => 'Only some items were damaged.', 'refunded_at' => now()->toDateTimeString(),
+            ])->assertUnprocessable()->assertJsonValidationErrors('amount');
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+    }
+
+    public static function unauthorizedRefundActors(): array
+    {
+        return [
+            ['buyer', Buyer::class, []], ['seller', Seller::class, []],
+            ['logistics', LogisticsProvider::class, []], ['rider', Rider::class, []],
+            ['admin', Admin::class, ['role' => 'support']], ['admin', Admin::class, ['role' => 'moderator']],
+        ];
+    }
+
+    #[DataProvider('unauthorizedRefundActors')]
+    public function test_direct_refund_and_void_requests_require_a_money_admin(string $guard, string $model, array $attributes): void
+    {
+        $record = $this->record();
+        auth('buyer')->logout();
+        $this->actingAs($model::factory()->create($attributes), $guard);
+        $before = $this->refundFinancialSnapshot();
+        $expected = $guard === 'admin' ? 403 : 401;
+        $this->postJson(route('admin.returns.refund', $record), [
+            'reference' => 'UNAUTHORIZED', 'amount' => '100.00', 'recipient' => 'Buyer', 'paid_on' => today()->toDateString(),
+        ])->assertStatus($expected);
+        $this->postJson(route('admin.returns.refund.void', $record), [
+            'void_reason' => 'An unrelated actor tried to void it.', 'refund_revision' => 0,
+        ])->assertStatus($expected);
+        $this->assertEquals($before, $this->refundFinancialSnapshot());
+    }
+
+    public function test_cancelled_return_is_not_a_platform_refund_liability(): void
+    {
+        $record = $this->record();
+        app(ParcelReturnService::class)->approveBySeller($record, $this->seller);
+        $this->assertSame(10000, app(PlatformFinanceService::class)->position()['refundsToRecordMinor']);
+        app(ParcelReturnService::class)->cancelByBuyer($record, $this->buyer, 'Found the missing part.');
+
+        $position = app(PlatformFinanceService::class)->position();
+        $this->assertTrue($record->fresh()->isCancelled());
+        $this->assertSame(0, $position['refundsToRecordCount']);
+        $this->assertSame(0, $position['refundsToRecordMinor']);
+        $this->assertSame(0, $position['totalLiabilitiesMinor']);
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')->get(route('admin.dashboard'))
+            ->assertOk()->assertViewHas('attention', fn (array $rows) => collect($rows)->firstWhere('label', 'Refunds to record')['count'] === 0);
+    }
+
+    public function test_platform_refund_liability_is_capped_by_collected_cash(): void
+    {
+        $this->parcel->payment->forceFill(['collected_amount_minor' => 6000, 'collected_at' => now()])->save();
+        $record = $this->record();
+        app(ParcelReturnService::class)->approveBySeller($record, $this->seller);
+
+        $position = app(PlatformFinanceService::class)->position();
+        $this->assertSame(1, $position['refundsToRecordCount']);
+        $this->assertSame(6000, $position['refundsToRecordMinor']);
+        $this->assertSame(6000, $position['totalLiabilitiesMinor']);
+    }
+
+    public function test_uncollected_cod_does_not_become_a_platform_refund_liability(): void
+    {
+        $this->parcel->payment->forceFill(['status' => PaymentStatus::Pending, 'paid_at' => null])->save();
+        $record = $this->record();
+        app(ParcelReturnService::class)->approveBySeller($record, $this->seller);
+
+        $position = app(PlatformFinanceService::class)->position();
+        $this->assertSame(0, $position['refundsToRecordCount']);
+        $this->assertSame(0, $position['refundsToRecordMinor']);
+        $this->assertNull($record->fresh()->refunded_at);
+    }
+
+    public function test_unpaid_refund_survives_time_and_suspension_and_void_reopens_its_balance(): void
+    {
+        $record = $this->record();
+        $returns = app(ParcelReturnService::class);
+        $returns->approveBySeller($record, $this->seller);
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $this->travel(40)->days();
+        $this->actingAs($admin, 'admin')->post(route('admin.users.seller.suspend', $this->seller), ['reason' => 'Account reviewed by support.'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('suspended', $this->seller->fresh()->status);
+        $this->assertSame(10000, app(PlatformFinanceService::class)->position()['refundsToRecordMinor']);
+        $this->get(route('admin.returns.index'))->assertOk()->assertSee(route('admin.returns.refund', $record), false);
+        $returns->recordRefund($record, $admin, 'MANUAL-TRANSFER', 10000, 'Juana Cruz', today()->toDateString());
+        $this->assertSame(0, app(PlatformFinanceService::class)->position()['refundsToRecordMinor']);
+        $returns->voidRefund($record, $admin, 'The transfer bounced back.', (int) $record->refundHistory()->max('id'));
+        $this->assertSame(10000, app(PlatformFinanceService::class)->position()['refundsToRecordMinor']);
+        $this->assertSame(2, $record->refundHistory()->count());
+    }
+
+    /** A refund on a return that was not approved needs a documented exception (Audit 1.13 refund policy). */
+    private const REFUND_EXCEPTION = ['refund_exception_basis' => 'separate_approval', 'refund_exception_note' => 'Approved by the finance lead in ticket FIN-42.'];
+
+    /** An exception refund with no earlier fault decision needs an explicit, justified payer. */
+    private const SELLER_FUNDS = ['refund_funding_party' => 'seller', 'refund_funding_note' => 'The Seller agreed in ticket FIN-42 to fund this refund.'];
+
+    private function refund(ParcelReturn $record, string $amount, bool $exception = false, bool $sellerFunds = false): void
     {
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
-            ->post(route('admin.returns.refund', $record), ['reference' => 'COD-REF-'.$record->id, 'amount' => $amount, 'recipient' => 'Juana Cruz', 'paid_on' => now('Asia/Manila')->toDateString(), 'refund_reason' => 'Only part of the order was faulty.'])
+            ->post(route('admin.returns.refund', $record), ($exception ? self::REFUND_EXCEPTION : []) + ($sellerFunds ? self::SELLER_FUNDS : []) + ['reference' => 'COD-REF-'.$record->id, 'amount' => $amount, 'recipient' => 'Juana Cruz', 'paid_on' => now('Asia/Manila')->toDateString(), 'refund_reason' => 'Only part of the order was faulty.', 'refund_revision' => (int) $record->refundHistory()->max('id')])
             ->assertRedirect()->assertSessionHasNoErrors();
     }
 
     public function test_a_full_refund_leaves_the_seller_nothing(): void
     {
         $settlement = $this->pendingSettlement();
-        $this->refund($this->record(), '100.00');
+        $this->refund($this->approvedRecord(), '100.00');
 
         $this->assertSame(SellerSettlement::RELEASED, $settlement->fresh()->status);
         $this->assertSame(0, $settlement->fresh()->seller_payout_minor);
         $this->assertSame(0, $this->parcel->fresh()->seller_net_minor);
+    }
+
+    public function test_an_order_finalized_at_five_percent_keeps_that_rate_through_a_return(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $this->parcel->forceFill(['commission_bps' => 500, 'commission_minor' => 500, 'seller_net_minor' => 9500])->save();
+        $record = $this->record();
+        $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+        $this->assertSame(0, $this->parcel->fresh()->commission_minor);
+
+        $this->refund($record, '20.00');
+
+        // ₱80.00 of items kept, less 5% (₱4.00), not today's 10%.
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+        $this->assertSame(400, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(7600, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(400, $settlement->fresh()->commission_minor);
+        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+
+        $this->parcel->payment->forceFill(['collected_at' => now(), 'collected_amount_minor' => 10000])->save();
+        $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        app(CommissionFinalizationService::class)->finalize($this->parcel->fresh());
+        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(500, $settlement->fresh()->commission_bps);
+
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $paid = app(SellerSettlementService::class)->confirmPayout($settlement->fresh(), $admin, 7600, 'KEPT-FIVE-PERCENT');
+        $this->assertSame(SellerSettlement::PAID, $paid->status);
+        $this->assertSame(7600, $paid->paid_amount_minor);
+        $this->assertSame(400, $paid->commission_minor);
+        $this->assertSame(500, $paid->commission_bps);
+    }
+
+    public function test_cancelling_an_uncollected_return_preserves_the_saved_five_percent_rate_for_completion(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $this->parcel->forceFill(['commission_bps' => 500, 'commission_minor' => 500, 'seller_net_minor' => 9500,
+            'commission_finalized_at' => now()->subDay()])->save();
+        $record = $this->record();
+        $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.orders.cancelReturn', [$this->parcel->order_id, $this->parcel]))
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+        $this->assertNull($this->parcel->fresh()->commission_finalized_at);
+        $this->assertNull($this->parcel->fresh()->commission_minor);
+        $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        app(CommissionFinalizationService::class)->finalize($this->parcel->fresh());
+        $this->assertSame(500, $this->parcel->fresh()->commission_bps);
+        $this->assertSame(500, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(9500, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(500, $settlement->fresh()->commission_bps);
+        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
+    }
+
+    #[TestWith([false])]
+    #[TestWith([true])]
+    public function test_refund_date_uses_the_current_manila_calendar_day_at_the_utc_boundary(bool $tomorrow): void
+    {
+        $record = $this->approvedRecord();
+        Carbon::setTestNow(Carbon::parse('2026-11-01 16:30:00', 'UTC'));
+        $paidOn = now('Asia/Manila')->addDays($tomorrow ? 1 : 0)->toDateString();
+        $response = $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->postJson(route('admin.returns.refund', $record), [
+                'reference' => 'MANILA-DATE', 'amount' => '100.00', 'recipient' => 'Buyer', 'paid_on' => $paidOn,
+            ]);
+        if ($tomorrow) {
+            $response->assertUnprocessable()->assertJsonValidationErrors('paid_on');
+            $this->assertNull($record->fresh()->refunded_at);
+        } else {
+            $response->assertRedirect()->assertSessionHasNoErrors();
+            $this->assertSame($paidOn, $record->fresh()->refund_paid_on->toDateString());
+            $this->assertSame(10000, $record->fresh()->refund_amount_minor);
+        }
+    }
+
+    public function test_partial_refund_records_the_existing_pre_completion_commission_recognition_discrepancy(): void
+    {
+        // Evidence for Audit 1.10's policy question, not a new recognition rule.
+        $this->pendingSettlement();
+        $this->refund($this->approvedRecord(), '20.00');
+        $this->assertSame(OrderStatus::Delivered, $this->parcel->fresh()->status);
+        $this->assertNotNull($this->parcel->fresh()->commission_finalized_at);
+        $this->assertSame(800, $this->parcel->fresh()->commission_minor);
+        $this->assertSame(800, app(PlatformFinanceService::class)->earnings(false)['commissionMinor']);
     }
 
     public function test_a_partial_refund_after_approval_gives_the_seller_back_the_unrefunded_part(): void
@@ -762,30 +1333,66 @@ class SellerReturnDecisionTest extends TestCase
 
         $this->refund($record, '20.00');
 
-        // ₱80.00 of items kept, less ₱4.00 commission.
+        // ₱80.00 of items kept, less ₱8.00 commission.
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(400, $settlement->fresh()->commission_minor);
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(800, $settlement->fresh()->commission_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
 
         // Completing the order later keeps the same split.
         $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
         app(CommissionFinalizationService::class)->finalize($this->parcel->fresh());
-        $this->assertSame(7600, $this->parcel->fresh()->seller_net_minor);
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(7200, $this->parcel->fresh()->seller_net_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
+    }
+
+    public function test_a_partial_refund_stays_payable_at_the_kept_seller_net(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $this->parcel->payment->forceFill(['collected_at' => now(), 'collected_amount_minor' => 10000])->save();
+        $record = $this->record();
+        $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
+        $this->refund($record, '20.00');
+        $this->parcel->forceFill(['status' => OrderStatus::Completed])->save();
+        app(CommissionFinalizationService::class)->finalize($this->parcel->fresh());
+
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $settlements = app(SellerSettlementService::class);
+        try {
+            $settlements->confirmPayout($settlement->fresh(), $admin, 9000, 'ORIGINAL-NET');
+            $this->fail('The pre-refund seller net must not be paid.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('amount_minor', $exception->errors());
+        }
+
+        $this->assertSame(7200, app(SellerPayoutRequestService::class)->availableBalance($this->seller));
+        $this->actingAs($this->seller, 'seller')->get(route('seller.earnings.index'))
+            ->assertOk()
+            ->assertSee('Returns and charges')
+            ->assertViewHas('grossMinor', 10000)
+            ->assertViewHas('commissionMinor', 800)
+            ->assertViewHas('returnAdjustmentMinor', 2000)
+            ->assertViewHas('netMinor', 7200);
+
+        $paid = $settlements->confirmPayout($settlement->fresh(), $admin, 7200, 'KEPT-NET');
+        $this->assertSame(SellerSettlement::PAID, $paid->status);
+        $this->assertSame(7200, $paid->paid_amount_minor);
+        $this->assertSame(800, $paid->commission_minor);
+        $this->assertSame(10000, $paid->collected_amount_minor);
+        $this->assertSame(0, app(SellerPayoutRequestService::class)->availableBalance($this->seller));
     }
 
     public function test_a_partial_refund_after_payout_charges_the_seller_only_what_was_refunded(): void
     {
         $settlement = $this->pendingSettlement();
-        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9500, 'paid_amount_minor' => 9500, 'pending_reason' => null])->save();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000, 'pending_reason' => null])->save();
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
-        $this->assertSame(9500, SellerDebt::sole()->amount_minor);
+        $this->assertSame(9000, SellerDebt::sole()->amount_minor);
 
         $this->refund($record, '20.00');
 
-        // Paid ₱95.00, keeps ₱76.00, so owes back ₱19.00 (₱20.00 refunded less the ₱1.00 commission on it).
-        $this->assertSame(1900, SellerDebt::sole()->amount_minor);
+        // Paid ₱90.00, keeps ₱72.00, so owes back ₱18.00 (₱20.00 refunded less the ₱2.00 commission on it).
+        $this->assertSame(1800, SellerDebt::sole()->amount_minor);
         $this->assertSame(SellerSettlement::PAID, $settlement->fresh()->status);
     }
 
@@ -825,12 +1432,12 @@ class SellerReturnDecisionTest extends TestCase
         $this->refund($record, '100.00');
 
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
-        $this->assertSame(500, $settlement->fresh()->commission_minor);
+        $this->assertSame(9000, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(1000, $settlement->fresh()->commission_minor);
         $this->assertDatabaseHas('operations_audit_logs', ['action' => 'return_fault_set']);
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
             ->assertSee('You are not charged for this return.')
-            ->assertSee('You keep ₱95.00 from this order after ₱5.00 commission.');
+            ->assertSee('You keep ₱90.00 from this order after ₱10.00 commission.');
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')->get(route('admin.returns.index'))
             ->assertSee('Logistics (damaged in transit) · set by an admin')
             ->assertSee('Courier crushed the box in transit.')
@@ -840,15 +1447,46 @@ class SellerReturnDecisionTest extends TestCase
     public function test_a_logistics_fault_after_payout_cancels_the_sellers_debt(): void
     {
         $settlement = $this->pendingSettlement();
-        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9500, 'paid_amount_minor' => 9500, 'pending_reason' => null])->save();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000, 'pending_reason' => null])->save();
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
-        $this->assertSame(9500, SellerDebt::sole()->amount_minor);
+        $this->assertSame(9000, SellerDebt::sole()->amount_minor);
 
         $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasNoErrors();
 
         $this->assertSame(0, SellerDebt::sole()->outstandingMinor());
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))->assertDontSee('taken back from your next payouts');
+    }
+
+    public function test_a_logistics_fault_does_not_create_a_seller_debt_when_legacy_funding_is_unknown(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000])->save();
+        $this->parcel->order->forceFill(['discount_minor' => 1000])->save();
+        $this->parcel->forceFill(['voucher_discount_minor' => 1000, 'voucher_funding_source' => null])->save();
+        $record = $this->record();
+        $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasNoErrors();
+
+        $this->refund($record, exception: true, amount: '100.00');
+
+        $this->assertDatabaseCount('seller_debts', 0);
+        $this->assertSame(9000, $settlement->fresh()->paid_amount_minor);
+        $this->assertSame(10000, $record->returnCharges()->where('reason', LogisticsReturnCharge::TRANSIT_DAMAGE_REFUND)->sole()->amount_minor);
+    }
+
+    public function test_unknown_legacy_funding_does_not_turn_a_partial_refund_into_debt_for_the_whole_payout(): void
+    {
+        $settlement = $this->pendingSettlement();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000])->save();
+        $this->parcel->order->forceFill(['discount_minor' => 1000])->save();
+        $this->parcel->forceFill(['voucher_discount_minor' => 1000, 'voucher_funding_source' => null])->save();
+        $record = $this->record();
+
+        $this->refund($record, exception: true, sellerFunds: true, amount: '20.00');
+
+        $this->assertSame(2000, $record->fresh()->refund_amount_minor);
+        $this->assertSame(9000, $settlement->fresh()->paid_amount_minor);
+        $this->assertDatabaseCount('seller_debts', 0);
     }
 
     public function test_other_as_the_reason_blocks_the_refund_until_an_admin_decides_who_pays(): void
@@ -867,7 +1505,7 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertNull($record->fresh()->refunded_at);
 
         $this->setFault($record, ParcelReturn::FAULT_SELLER, 'Photos show the wrong colour was sent.')->assertSessionHasNoErrors();
-        $this->refund($record, '10.00');
+        $this->refund($record, exception: true, amount: '10.00');
         $this->assertNotNull($record->fresh()->refunded_at);
     }
 
@@ -880,7 +1518,7 @@ class SellerReturnDecisionTest extends TestCase
         $this->setFault($record, 'buyer')->assertSessionHasErrors('fault_party');
         $this->assertNull($record->fresh()->fault_party);
 
-        $this->refund($record, '100.00');
+        $this->refund($record, exception: true, sellerFunds: true, amount: '100.00');
         $this->assertSame(ParcelReturn::FAULT_SELLER, $record->fresh()->fault_party);
         $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasErrors('fault_party');
         $this->assertSame(ParcelReturn::FAULT_SELLER, $record->fresh()->fault_party);
@@ -895,7 +1533,7 @@ class SellerReturnDecisionTest extends TestCase
 
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))->assertOk()
             ->assertSee('Buyer refunded ₱20.00 (partial refund).')
-            ->assertSee('You keep ₱76.00 from this order after ₱4.00 commission.');
+            ->assertSee('You keep ₱72.00 from this order after ₱8.00 commission.');
     }
 
     /** ₱100.00 of items plus ₱50.00 shipping; the buyer paid ₱150.00. */
@@ -953,12 +1591,12 @@ class SellerReturnDecisionTest extends TestCase
 
         $this->refund($record, '20.00');
 
-        // ₱80.00 kept less ₱4.00 commission = ₱76.00, less the ₱50.00 return trip = ₱26.00.
+        // ₱80.00 kept less ₱8.00 commission = ₱72.00, less the ₱50.00 return trip = ₱22.00.
         $this->assertSame(SellerSettlement::PENDING_PAYOUT, $settlement->fresh()->status);
-        $this->assertSame(2600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(2200, $settlement->fresh()->seller_payout_minor);
         $this->assertSame(0, SellerDebt::sole()->outstandingMinor());
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
-            ->assertSee('You keep ₱26.00 from this order after ₱4.00 commission and ₱50.00 return charges.');
+            ->assertSee('You keep ₱22.00 from this order after ₱8.00 commission and ₱50.00 return charges.');
     }
 
     public function test_a_logistics_fault_charges_the_seller_no_shipping(): void
@@ -969,17 +1607,17 @@ class SellerReturnDecisionTest extends TestCase
         $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasNoErrors();
         $this->refund($record, '150.00');
 
-        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(9000, $settlement->fresh()->seller_payout_minor);
         $this->assertSame(0, SellerDebt::sole()->outstandingMinor());
         $this->actingAs($this->seller, 'seller')->get(route('seller.returns.index'))
             ->assertDontSee('Return shipping charged to you')
-            ->assertSee('You keep ₱95.00 from this order after ₱5.00 commission.');
+            ->assertSee('You keep ₱90.00 from this order after ₱10.00 commission.');
     }
 
     public function test_a_partial_refund_needs_a_reason_that_the_buyer_sees(): void
     {
         $this->pendingSettlement();
-        $record = $this->record();
+        $record = $this->approvedRecord();
         $admin = Admin::factory()->create(['role' => 'admin']);
         $base = ['reference' => 'R-1', 'amount' => '20.00', 'recipient' => 'Juana', 'paid_on' => now('Asia/Manila')->toDateString()];
 
@@ -1013,11 +1651,11 @@ class SellerReturnDecisionTest extends TestCase
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
         $this->refund($record, '20.00');
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
         $admin = Admin::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin, 'admin')->post(route('admin.returns.refund.void', $record), ['void_reason' => 'short'])->assertSessionHasErrors('void_reason');
-        $this->post(route('admin.returns.refund.void', $record), ['void_reason' => 'GCash transfer bounced: wrong number.'])->assertSessionHasNoErrors();
+        $this->post(route('admin.returns.refund.void', $record), ['void_reason' => 'GCash transfer bounced: wrong number.', 'refund_revision' => $record->refundHistory()->sole()->id])->assertSessionHasNoErrors();
 
         $record->refresh();
         $this->assertNull($record->refunded_at);
@@ -1039,8 +1677,8 @@ class SellerReturnDecisionTest extends TestCase
         $this->refund($record, '20.00');
         $this->assertNotNull($record->fresh()->refunded_at);
         $this->assertTrue($record->events()->where('event_key', 'refund_recorded_2')->exists());
-        $this->assertSame(7600, $settlement->fresh()->seller_payout_minor);
-        $this->post(route('admin.returns.refund.void', $record->fresh()), ['void_reason' => 'Second transfer bounced as well.'])->assertSessionHasNoErrors();
+        $this->assertSame(7200, $settlement->fresh()->seller_payout_minor);
+        $this->post(route('admin.returns.refund.void', $record->fresh()), ['void_reason' => 'Second transfer bounced as well.', 'refund_revision' => $record->refundHistory()->max('id')])->assertSessionHasNoErrors();
         $this->assertTrue($record->events()->where('event_key', 'refund_voided_2')->exists());
     }
 
@@ -1068,19 +1706,19 @@ class SellerReturnDecisionTest extends TestCase
         $this->assertNotNull($charge->fresh()->settled_at);
         $this->assertSame('BANK-1', $charge->fresh()->settlement_reference);
         $this->post(route('admin.return-charges.settle', $charge), ['reference' => 'BANK-2'])->assertSessionHasErrors('reference');
-        $this->assertSame(9500, $settlement->fresh()->seller_payout_minor);
+        $this->assertSame(9000, $settlement->fresh()->seller_payout_minor);
     }
 
     public function test_voiding_removes_an_unsettled_transit_charge(): void
     {
         $this->pendingSettlement();
-        $record = $this->record();
+        $record = $this->approvedRecord();
         $this->setFault($record, ParcelReturn::FAULT_LOGISTICS)->assertSessionHasNoErrors();
         $this->refund($record, '100.00');
         $this->assertSame(1, LogisticsReturnCharge::query()->count());
 
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
-            ->post(route('admin.returns.refund.void', $record), ['void_reason' => 'Transfer bounced back to us.'])->assertSessionHasNoErrors();
+            ->post(route('admin.returns.refund.void', $record), ['void_reason' => 'Transfer bounced back to us.', 'refund_revision' => $record->refundHistory()->sole()->id])->assertSessionHasNoErrors();
 
         $this->assertSame(0, LogisticsReturnCharge::query()->count());
     }
@@ -1088,7 +1726,7 @@ class SellerReturnDecisionTest extends TestCase
     public function test_a_lower_debt_never_drops_below_what_the_seller_already_repaid(): void
     {
         $settlement = $this->pendingSettlement();
-        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9500, 'paid_amount_minor' => 9500, 'pending_reason' => null])->save();
+        $settlement->forceFill(['status' => SellerSettlement::PAID, 'seller_payout_minor' => 9000, 'paid_amount_minor' => 9000, 'pending_reason' => null])->save();
         $record = $this->record();
         $this->actingAs($this->seller, 'seller')->post(route('seller.returns.approve', $record))->assertSessionHasNoErrors();
         SellerDebt::sole()->forceFill(['settled_minor' => 5000])->save();
@@ -1102,7 +1740,7 @@ class SellerReturnDecisionTest extends TestCase
     public function test_a_refund_needs_an_amount_recipient_and_date_and_cannot_exceed_what_the_buyer_paid(): void
     {
         $this->pendingSettlement();
-        $record = $this->record();
+        $record = $this->approvedRecord();
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin');
         $paid = $this->parcel->payment->amount_minor;
         $base = ['reference' => 'COD-REF-2001', 'amount' => '10.00', 'recipient' => 'Juana Cruz', 'paid_on' => now('Asia/Manila')->toDateString()];
@@ -1120,7 +1758,7 @@ class SellerReturnDecisionTest extends TestCase
     {
         Storage::fake('local');
         $this->pendingSettlement();
-        $record = $this->record();
+        $record = $this->approvedRecord();
         $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin');
 
         $this->post(route('admin.returns.refund', $record), [

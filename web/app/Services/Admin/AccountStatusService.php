@@ -8,6 +8,7 @@ use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Seller\Seller;
+use App\Services\Logistics\CourierAccountService;
 use Illuminate\Support\Facades\DB;
 
 class AccountStatusService
@@ -31,6 +32,14 @@ class AccountStatusService
             }
 
             $current->forceFill(['status' => $to])->save();
+
+            // Suspending a Logistics company ends its Couriers' app sessions in
+            // this same transaction (provider row already locked). Reapproval
+            // restores nothing: each Courier signs in again. Buyers and Sellers
+            // are not affected; no-op without the courier_accounts table.
+            if ($current instanceof LogisticsProvider && $to === 'suspended') {
+                app(CourierAccountService::class)->endProviderSessions($current);
+            }
 
             // Any rider wind-down belongs to one suspension; it never carries over.
             if ($current instanceof LogisticsProvider && $current->rider_wind_down_until !== null) {

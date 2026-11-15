@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin\AdminProductRestriction;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
+use App\Services\Seller\ProductApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -20,7 +22,7 @@ class ProductController extends Controller
         $status = $request->query('status', '');
         $restricted = $request->query('restricted', '');
 
-        $validStatuses = ['', 'draft', 'active', 'inactive'];
+        $validStatuses = ['', 'draft', 'pending', 'rejected', 'active', 'inactive'];
         if (! in_array($status, $validStatuses, true)) {
             $status = '';
         }
@@ -68,7 +70,12 @@ class ProductController extends Controller
 
     public function show(Product $product): View
     {
-        $product->load(['seller', 'category', 'images', 'variants']);
+        $with = ['seller', 'category', 'images', 'variants.optionValues'];
+        if (Schema::hasTable('product_revisions')) {
+            $with[] = 'latestRevision';
+            $with[] = 'approvalEvents.admin';
+        }
+        $product->load($with);
 
         return view('Admin.Products.show', [
             'product' => $product,
@@ -145,5 +152,40 @@ class ProductController extends Controller
         });
 
         return back()->with('success', '"'.$product->name.'" is no longer restricted.');
+    }
+
+    public function pending(): View
+    {
+        $products = Schema::hasTable('product_revisions')
+            ? Product::query()
+                ->with(['seller', 'category', 'images', 'variants.optionValues', 'latestRevision'])
+                ->where(function ($query): void {
+                    $query->where('status', 'pending')
+                        ->orWhereHas('revisions', fn ($revision) => $revision->where('status', 'pending'));
+                })
+                ->orderByDesc('updated_at')
+                ->paginate(25)
+            : Product::query()->where('status', 'pending')->with(['seller', 'category', 'images', 'variants.optionValues'])->orderByDesc('updated_at')->paginate(25);
+
+        return view('Admin.Products.pending', ['products' => $products]);
+    }
+
+    public function approve(Product $product)
+    {
+        $product = app(ProductApprovalService::class)
+            ->approve($product, Auth::guard('admin')->user());
+
+        return back()->with('success', '"'.$product->name.'" is approved.');
+    }
+
+    public function reject(Request $request, Product $product)
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+        $product = app(ProductApprovalService::class)
+            ->reject($product, Auth::guard('admin')->user(), $data['reason']);
+
+        return back()->with('success', '"'.$product->name.'" was rejected. The seller can edit and resubmit.');
     }
 }

@@ -25,6 +25,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class LogisticsRemittanceTest extends TestCase
@@ -875,6 +876,41 @@ class LogisticsRemittanceTest extends TestCase
         $this->assertTrue($cross->fresh()->isCrossProvider());
 
         $this->actingAs($this->admin(), 'admin')->get(route('admin.dashboard'))
-            ->assertOk()->assertSee('Money to settle')->assertSee('Zefanya owes');
+            ->assertOk()->assertSee('Zefanya owes')->assertSee('Live liabilities and cash in transit are not revenue');
+    }
+
+    #[TestWith(['submit'])]
+    #[TestWith(['confirm'])]
+    #[TestWith(['reject'])]
+    public function test_platform_remittance_audit_failure_rolls_back_batch_and_parcel_links(string $action): void
+    {
+        Notification::fake();
+        $parcel = $this->parcel(8500, 500);
+        $service = app(LogisticsRemittanceService::class);
+        $batch = $action === 'submit' ? null : $service->submit($this->provider, [$parcel->id], 8000, 'ROLLBACK-BATCH');
+        $before = $parcel->fresh()->getRawOriginal();
+        $batchBefore = $batch?->fresh()->getRawOriginal();
+        $logs = OperationsAuditLog::query()->count();
+        $armed = true;
+        DB::connection()->beforeExecuting(function (string $sql) use (&$armed): void {
+            if ($armed && str_starts_with(strtolower($sql), 'insert into "operations_audit_logs"')) {
+                $armed = false;
+                throw new \RuntimeException('Controlled platform remittance failure.');
+            }
+        });
+        try {
+            match ($action) {
+                'submit' => $service->submit($this->provider, [$parcel->id], 8000, 'ROLLBACK-BATCH'),
+                'confirm' => $service->confirm($batch, $this->admin(), 8000),
+                'reject' => $service->reject($batch, $this->admin(), 'Transfer was not received.'),
+            };
+            $this->fail('The controlled audit failure did not interrupt the transaction.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Controlled platform remittance failure.', $exception->getMessage());
+        }
+        $this->assertSame($before, $parcel->fresh()->getRawOriginal());
+        $this->assertSame($batchBefore, $batch?->fresh()->getRawOriginal());
+        $this->assertSame($batch === null ? 0 : 1, LogisticsRemittance::query()->count());
+        $this->assertSame($logs, OperationsAuditLog::query()->count());
     }
 }

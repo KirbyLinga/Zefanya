@@ -95,7 +95,25 @@ class GuestOnlyRoutesTest extends TestCase
     public function test_guest_can_open_shared_login_modal(): void
     {
         $this->get(route('home', ['login' => 1]))->assertOk()
-            ->assertSee('id="loginModalOverlay"', false);
+            ->assertSee('id="loginModalOverlay"', false)
+            ->assertSee('role="dialog" aria-modal="true"', false)
+            ->assertSee('aria-labelledby="loginModalTitle"', false)
+            ->assertSee('autocomplete="username"', false)
+            ->assertSee('autocomplete="current-password"', false);
+    }
+
+    public function test_shared_login_modal_marks_and_describes_server_side_field_errors(): void
+    {
+        $this->from(route('home'))
+            ->post(route('unified.login'), ['email' => 'invalid-email', 'password' => 'secret'])
+            ->assertRedirect(route('home'));
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('id="loginModalErrorSummary" role="alert"', false)
+            ->assertSee('id="loginEmail"', false)
+            ->assertSee('aria-invalid="true" aria-describedby="loginEmailError"', false)
+            ->assertSee('id="loginEmailError"', false);
     }
 
     #[DataProvider('roles')]

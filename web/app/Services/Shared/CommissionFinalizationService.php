@@ -10,7 +10,16 @@ use Illuminate\Support\Facades\DB;
 
 class CommissionFinalizationService
 {
-    public const COMMISSION_BPS = 500;
+    /**
+     * Platform commission in basis points (1000 = 10%). Applied when an order is
+     * finalized and saved on it, so orders finalized at an earlier rate keep it.
+     */
+    public const COMMISSION_BPS = 1000;
+
+    public static function percentLabel(?int $bps = null): string
+    {
+        return rtrim(rtrim(number_format(($bps ?? self::COMMISSION_BPS) / 100, 2), '0'), '.').'%';
+    }
 
     public function __construct(
         private readonly SellerSettlementService $settlements = new SellerSettlementService,
@@ -41,24 +50,30 @@ class CommissionFinalizationService
             $allocation = $this->funding->allocationFor($order);
             $sellerFundedDiscount = $order->seller_funded_discount_minor ?? $allocation['seller_minor'] ?? 0;
             $baseForCommission = $order->subtotal_minor - $sellerFundedDiscount;
-            $commissionMinor = Money::percentage($baseForCommission, self::COMMISSION_BPS, 10000);
+            // A saved rate survives a cancelled return even while recognition
+            // is cleared. New orders without a saved rate use today's default.
+            $bps = $order->commission_bps ?? self::COMMISSION_BPS;
+            if ($bps < 0 || $bps > 10000) {
+                throw new \InvalidArgumentException('The recorded commission rate is invalid.');
+            }
+            $commissionMinor = Money::percentage($baseForCommission, $bps, 10000);
             $sellerNetMinor = $allocation['pending_reason'] === null
                 ? $order->subtotal_minor - $commissionMinor - $allocation['seller_minor']
                 : null;
 
             if ($order->commission_finalized_at === null) {
-                if ($order->commission_bps !== null || $order->commission_minor !== null || $order->seller_net_minor !== null) {
+                if ($order->commission_minor !== null || $order->seller_net_minor !== null) {
                     throw new \InvalidArgumentException('Partial commission records require reconciliation before finalization.');
                 }
 
                 $order->forceFill([
-                    'commission_bps' => self::COMMISSION_BPS,
+                    'commission_bps' => $bps,
                     'commission_minor' => $commissionMinor,
                     'seller_net_minor' => $sellerNetMinor,
                     'commission_finalized_at' => now(),
                 ])->save();
             } else {
-                if ($order->commission_bps !== self::COMMISSION_BPS || $order->commission_minor !== $commissionMinor
+                if ($order->commission_minor !== $commissionMinor
                     || ($sellerNetMinor !== null && $order->seller_net_minor !== null && $order->seller_net_minor !== $sellerNetMinor)) {
                     throw new \InvalidArgumentException('Finalized commission does not match the recorded subtotal and voucher funding.');
                 }

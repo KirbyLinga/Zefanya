@@ -14,7 +14,7 @@
      * (products.low_stock_threshold), resolved inside the row loop.
      */
 
-    $statusOptions = ['active' => 'Active', 'draft' => 'Draft', 'inactive' => 'Inactive'];
+    $statusOptions = ['active' => 'Approved', 'pending' => 'Pending', 'rejected' => 'Rejected', 'draft' => 'Draft', 'inactive' => 'Inactive'];
 
     // Deliberately the screenshot's filter set (the controller still accepts its full list).
     $sortOptions = [
@@ -41,9 +41,7 @@
 @endphp
 
 <div class="sp-page">
-    @if (session('success'))
-        <div class="sp-flash" role="status">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="sp-flash" />
 
     <header class="sp-header">
         <div class="sp-header__titles">
@@ -216,10 +214,15 @@
                                 // Colour contract shared with public/js/seller/products-table.js:
                                 // status tones are THEME-AWARE classes (sp-tone-*/sp-dot-*)
                                 // styled once in products-index.css — no raw hex utilities.
-                                $statusTone = $isOutOfStock
-                                    ? 'stock'
-                                    : ($product->status === 'active' ? 'active' : ($product->status === 'inactive' ? 'inactive' : 'draft'));
-                                $statusLabel = $isOutOfStock ? 'Out of Stock' : ucfirst($product->status);
+                                $approvalLabel = $product->sellerApprovalLabel();
+                                $statusTone = in_array($approvalLabel, ['Pending', 'Rejected'], true)
+                                    ? ($approvalLabel === 'Pending' ? 'draft' : 'inactive')
+                                    : ($isOutOfStock
+                                        ? 'stock'
+                                        : ($product->status === 'active' ? 'active' : ($product->status === 'inactive' ? 'inactive' : 'draft')));
+                                $statusLabel = in_array($approvalLabel, ['Pending', 'Rejected', 'Approved'], true)
+                                    ? $approvalLabel
+                                    : ($isOutOfStock ? 'Out of Stock' : $approvalLabel);
                             @endphp
 
                             <tr data-product-row="{{ $product->id }}" class="sp-table__row">
@@ -229,15 +232,23 @@
                                 </td>
                                 <td>
                                     <div class="sp-product">
-                                        @if ($product->catalogImageUrl())
-                                            <img src="{{ $product->catalogImageUrl() }}" alt="" width="36" height="36" class="sp-product__thumb">
-                                        @else
-                                            <span class="sp-product__thumb sp-product__thumb--empty"><i data-lucide="package" width="16" height="16"></i></span>
-                                        @endif
+                                        @php($imageUrl = $product->catalogImageUrl(requireExistingFile: false))
+                                        <span class="sp-product__thumb sp-product__thumb--empty relative overflow-hidden" aria-hidden="true">
+                                            <svg data-product-image-placeholder width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="m7.5 4.27 9 5.15M21 8l-9 5-9-5m9 5v9" />
+                                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                                            </svg>
+                                            @if ($imageUrl)
+                                                <img src="{{ $imageUrl }}" alt="" width="36" height="36" class="absolute inset-0 h-full w-full object-cover" onerror="this.remove()">
+                                            @endif
+                                        </span>
                                         <span class="sp-product__name">
                                             {{ $product->name }}
                                             @if ($product->needsWeight())
                                                 <span class="sp-pill sp-pill--amber ml-2 align-middle" title="Add a weight so a courier can be assigned.">Needs weight</span>
+                                            @endif
+                                            @if (\Illuminate\Support\Facades\Schema::hasTable('product_revisions') && ($product->rejection_reason || ($product->latestRevision?->status === 'rejected' && $product->latestRevision->rejection_reason)))
+                                                <span class="mt-1 block text-xs text-[var(--text-muted)]">{{ $product->rejection_reason ?: $product->latestRevision->rejection_reason }}</span>
                                             @endif
                                         </span>
                                     </div>

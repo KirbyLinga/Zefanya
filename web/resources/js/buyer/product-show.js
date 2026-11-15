@@ -141,6 +141,18 @@ document.addEventListener('DOMContentLoaded', () => {
     updateQtyDisplay();
   }
 
+  function showVariationError(message) {
+    const error = document.getElementById('pdp-variant-error');
+    if (!error) return;
+    error.textContent = message;
+    error.classList.remove('hidden');
+    const groups = [...document.querySelectorAll('[data-pdp-variant-group]')];
+    const missing = groups.filter(group => selectedValues[Number(group.dataset.pdpVariantGroup)] === null);
+    const invalid = missing.length ? missing : groups;
+    invalid.forEach(group => group.setAttribute('aria-invalid', 'true'));
+    invalid[0]?.querySelector('button:not(:disabled)')?.focus();
+  }
+
   document.querySelectorAll('.js-pdp-variant-value').forEach((btn) => {
     btn.addEventListener('click', () => {
       const axis = parseInt(btn.dataset.axisIndex, 10);
@@ -157,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const variantError = document.getElementById('pdp-variant-error');
       if (variantError) variantError.classList.add('hidden');
+      document.querySelectorAll('[data-pdp-variant-group]').forEach(group => group.removeAttribute('aria-invalid'));
 
       updateVariantUi();
     });
@@ -234,9 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!selectedVariant) {
         if (variantError) {
-          variantError.textContent = variantError.dataset.selectionMessage || 'Please select a variation';
-          variantError.classList.remove('hidden');
-          variantError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          showVariationError(variantError.dataset.selectionMessage || 'Please select a variation');
         }
         return;
       }

@@ -35,7 +35,7 @@ class StoreSaleService
     public function update(StoreSale $sale, array $attributes): StoreSale
     {
         return DB::transaction(function () use ($sale, $attributes): StoreSale {
-            $sale = StoreSale::query()->whereKey($sale->id)->lockForUpdate()->firstOrFail();
+            $sale = $this->lockSale($sale, $attributes['product_id'] ?? null);
             $status = $sale->status();
 
             if ($status === StoreSaleStatus::Ended) {
@@ -63,7 +63,7 @@ class StoreSaleService
     public function end(StoreSale $sale): StoreSale
     {
         return DB::transaction(function () use ($sale): StoreSale {
-            $sale = StoreSale::query()->whereKey($sale->id)->lockForUpdate()->firstOrFail();
+            $sale = $this->lockSale($sale);
 
             if ($sale->status() !== StoreSaleStatus::Ongoing) {
                 throw ValidationException::withMessages(['sale' => 'Only a running sale can be ended.']);
@@ -79,7 +79,7 @@ class StoreSaleService
     public function delete(StoreSale $sale): void
     {
         DB::transaction(function () use ($sale): void {
-            $sale = StoreSale::query()->whereKey($sale->id)->lockForUpdate()->firstOrFail();
+            $sale = $this->lockSale($sale);
 
             if ($sale->status() === StoreSaleStatus::Ongoing) {
                 throw ValidationException::withMessages(['sale' => 'This sale is running. End it before deleting it.']);
@@ -87,6 +87,20 @@ class StoreSaleService
 
             $sale->delete();
         });
+    }
+
+    private function lockSale(StoreSale $sale, ?int $newProductId = null): StoreSale
+    {
+        // Checkout locks the product before consulting its sale.
+        Product::withTrashed()->whereKey(array_unique([$sale->product_id, $newProductId ?? $sale->product_id]))
+            ->orderBy('id')->lockForUpdate()->get();
+        $lockedSale = StoreSale::query()->whereKey($sale->id)->lockForUpdate()->firstOrFail();
+
+        if ($lockedSale->product_id !== $sale->product_id) {
+            throw ValidationException::withMessages(['sale' => 'This sale changed. Reload it and try again.']);
+        }
+
+        return $lockedSale;
     }
 
     private function assertNoOverlap(int $productId, CarbonInterface $startsAt, CarbonInterface $endsAt, ?int $ignoreSaleId = null): void
