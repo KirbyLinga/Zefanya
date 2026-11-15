@@ -9,16 +9,14 @@ use App\Models\Rider\Rider;
 use App\Models\Rider\RiderEarning;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Notification;
 
 /**
  * Rider mobile bearer-token API (/api/rider/...): every endpoint delegates to
  * the same services as the Rider web panel, so these tests focus on the API
  * contract — auth/ability, ownership, scan-token enforcement, JSON 409/422,
- * COD/OTP server authority and idempotent repeats.
+ * COD server authority and idempotent repeats.
  */
 class RiderMobileApiTest extends RiderTestCase
 {
@@ -63,10 +61,9 @@ class RiderMobileApiTest extends RiderTestCase
         $this->actingAsRider()->getJson('/api/rider/jobs')->assertUnauthorized();
     }
 
-    public function test_jobs_lists_only_my_parcels_and_never_exposes_the_delivery_code(): void
+    public function test_jobs_lists_only_my_parcels_without_delivery_codes(): void
     {
         $mine = $this->outForDelivery(150000);
-        $this->deliveryOtp($mine);
         $other = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
         $this->parcel(OrderStatus::OutForDelivery, ['delivery_courier_id' => $other->id]);
 
@@ -76,7 +73,8 @@ class RiderMobileApiTest extends RiderTestCase
             ->assertJsonCount(1, 'data.deliveries')
             ->assertJsonPath('data.deliveries.0.id', $mine->id)
             ->assertJsonPath('data.deliveries.0.requires_cod_collection', true)
-            ->assertJsonPath('data.deliveries.0.cod_amount_minor', 150000);
+            ->assertJsonPath('data.deliveries.0.cod_amount_minor', 150000)
+            ->assertJsonMissingPath('data.deliveries.0.delivery_code');
 
         $this->assertStringNotContainsString('123456', $response->getContent());
         $this->assertStringNotContainsString('code_hash', $response->getContent());
@@ -128,18 +126,6 @@ class RiderMobileApiTest extends RiderTestCase
 
         // Idempotent repeat: no token needed once already out for delivery.
         $this->api()->postJson("/api/rider/deliveries/{$parcel->id}/start")->assertOk();
-    }
-
-    public function test_send_otp_notifies_the_buyer_and_never_returns_the_code(): void
-    {
-        $parcel = $this->outForDelivery();
-
-        $response = $this->api()->postJson("/api/rider/deliveries/{$parcel->id}/otp", [
-            'verification_token' => $this->handoffToken($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY),
-        ])->assertOk();
-
-        $code = Notification::sent($this->buyer, DeliveryOtpCode::class)->last()->code;
-        $this->assertStringNotContainsString($code, $response->getContent());
     }
 
     public function test_deliver_with_cod_records_proof_and_payment_once(): void

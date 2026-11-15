@@ -9,7 +9,7 @@ use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
 use App\Services\Buyer\BuyerOrderCancellation;
 use App\Services\Buyer\BuyerShipmentConfirmation;
-use App\Services\Logistics\DeliveryOtpService;
+use App\Services\Buyer\ProductReviewService;
 use App\Services\Logistics\ParcelReturnService;
 use App\Services\Logistics\RouteExecutionService;
 use Illuminate\Http\JsonResponse;
@@ -36,12 +36,15 @@ class OrderController extends Controller
         OrderStatus::PickedUp,
         OrderStatus::AtSortingCenter,
         OrderStatus::Sorted,
+        OrderStatus::InTransit,
+        OrderStatus::ArrivedAtHub,
         OrderStatus::OutForDelivery,
         OrderStatus::Delivered,
     ];
 
     private const CANCELLED_STATUSES = [
         OrderStatus::Cancelled,
+        OrderStatus::Lost,
     ];
 
     public function __construct(
@@ -183,9 +186,6 @@ class OrderController extends Controller
             'routeDetails' => $order->sellerOrders->mapWithKeys(fn (SellerOrder $parcel): array => [
                 $parcel->id => app(RouteExecutionService::class)->trackingSummary($parcel),
             ]),
-            'deliveryCodes' => $order->sellerOrders->mapWithKeys(fn (SellerOrder $parcel): array => [
-                $parcel->id => app(DeliveryOtpService::class)->activeCodeFor($parcel),
-            ]),
             'returnableShipmentIds' => $order->sellerOrders->filter(fn (SellerOrder $parcel) => $returns->canBuyerRequest($parcel))->modelKeys(),
         ]);
     }
@@ -237,6 +237,47 @@ class OrderController extends Controller
         return back()->with('success', 'An admin will review this rejection. The seller cannot change it until then.');
     }
 
+    /** The buyer withdraws a return before a rider collects it; the item stays with them. */
+    public function cancelReturn(Order $order, SellerOrder $sellerOrder, Request $request, ParcelReturnService $returns): RedirectResponse
+    {
+        $buyer = $request->user('buyer');
+        $this->authorizeForUser($buyer, 'view', $order);
+        abort_unless((int) $sellerOrder->order_id === (int) $order->id, 404);
+        abort_unless($sellerOrder->parcelReturn !== null, 404);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:500']], [
+            'reason.max' => 'Keep the reason to 500 characters or fewer.',
+        ]);
+        $returns->cancelByBuyer($sellerOrder->parcelReturn, $buyer, $data['reason'] ?? null);
+
+        return back()->with('success', 'Return cancelled. You keep the item, and you can confirm receipt of this shipment.');
+    }
+
+    /** Show editable review forms for eligible purchases in this order's confirmed scope. */
+    public function review(Order $order, Request $request, ProductReviewService $reviews): View
+    {
+        $buyer = $request->user('buyer');
+        $this->authorizeForUser($buyer, 'view', $order);
+        $data = $request->validate(['seller_order_id' => ['nullable', 'integer', 'min:1']]);
+        $shipmentId = isset($data['seller_order_id']) ? (int) $data['seller_order_id'] : null;
+        $shipments = $order->sellerOrders()
+            ->when($shipmentId !== null, fn ($query) => $query->whereKey($shipmentId))
+            ->with('orderItems.product')->get();
+        abort_if($shipmentId !== null && $shipments->isEmpty(), 404);
+
+        $items = $shipments->flatMap(fn ($shipment) => $shipment->orderItems)
+            ->filter(fn ($item) => $item->product !== null && ! $item->product->trashed());
+        $eligibleIds = collect();
+        foreach ($items->groupBy('product_id') as $productItems) {
+            $eligibleIds = $eligibleIds->merge(
+                $reviews->reviewableItems($productItems->first()->product, $buyer)->pluck('id'),
+            );
+        }
+        $eligibleIds = $eligibleIds->flip();
+        $reviewItems = $items->filter(fn ($item) => $eligibleIds->has($item->id))->values();
+
+        return view('Buyer.Orders.review', compact('order', 'reviewItems'));
+    }
+
     /** Confirm a selected delivered shipment, or all delivered shipments. */
     public function confirmReceived(Order $order, Request $request): RedirectResponse
     {
@@ -247,7 +288,10 @@ class OrderController extends Controller
             $order, $buyer, isset($data['seller_order_id']) ? (int) $data['seller_order_id'] : null,
         );
 
-        return back()->with('success', 'Order received.');
+        return to_route('buyer.orders.review', array_filter([
+            'order' => $order,
+            'seller_order_id' => $data['seller_order_id'] ?? null,
+        ]))->with('success', 'Order received.');
     }
 
     /**

@@ -15,7 +15,6 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Notifications\Logistics\RiderParcelActivity;
 use App\Services\Logistics\CourierAssignmentService;
-use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Seller\SellerOrderStatusService;
@@ -294,7 +293,7 @@ class RiderOperationsService
      * all inside ONE transaction so a failed hop leaves neither evidence nor
      * a payment in a half-written state.
      *
-     * @param  array{photo: UploadedFile, received_by?: ?string, notes?: ?string, cod_amount_minor?: ?int, verification_method?: ?string, delivery_otp?: ?string}  $data
+     * @param  array{photo: UploadedFile, received_by?: ?string, notes?: ?string, cod_amount_minor?: ?int, verification_method?: ?string}  $data
      */
     public function completeDelivery(Rider $rider, SellerOrder $sellerOrder, array $data): SellerOrder
     {
@@ -303,13 +302,10 @@ class RiderOperationsService
         $courier = $this->operationalCourier($rider, allowWindDown: true);
         $fresh = $sellerOrder->fresh() ?? $sellerOrder;
         $this->assertDeliveryOwnership($courier, $fresh);
-        $verifiedOtp = in_array($fresh->status, [OrderStatus::Delivered, OrderStatus::Completed], true)
-            ? null
-            : app(DeliveryOtpService::class)->verify($rider, $fresh, $data['delivery_otp'] ?? null);
         $storedPath = null;
 
         try {
-            [$order, $changed] = DB::transaction(function () use ($rider, $courier, $sellerOrder, $data, $verifiedOtp, &$storedPath): array {
+            [$order, $changed] = DB::transaction(function () use ($rider, $courier, $sellerOrder, $data, &$storedPath): array {
                 $order = SellerOrder::query()->whereKey($sellerOrder->id)->lockForUpdate()->firstOrFail();
                 ParcelIncidentService::assertOperationsAllowed($order);
 
@@ -324,8 +320,6 @@ class RiderOperationsService
                 if ($order->status !== OrderStatus::OutForDelivery) {
                     throw StaleStateException::field('parcel', 'This parcel is not out for delivery.');
                 }
-
-                app(DeliveryOtpService::class)->consume($order, $verifiedOtp);
 
                 $collectedPayment = $this->recordCodCollection($order, $courier, $data['cod_amount_minor'] ?? null);
 

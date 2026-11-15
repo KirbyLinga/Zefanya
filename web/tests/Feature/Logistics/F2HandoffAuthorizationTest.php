@@ -9,7 +9,6 @@ use App\Models\Buyer\Buyer;
 use App\Models\Catalog\Product;
 use App\Models\Logistics\Area;
 use App\Models\Logistics\CodRemittance;
-use App\Models\Logistics\DeliveryOtp;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Courier;
@@ -30,7 +29,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesAssignableFleet;
 use Tests\Support\IssuesLogisticsHandoff;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 /**
@@ -39,7 +37,7 @@ use Tests\TestCase;
  */
 class F2HandoffAuthorizationTest extends TestCase
 {
-    use CreatesAssignableFleet, IssuesLogisticsHandoff, LazilyRefreshDatabase, ProvidesDeliveryOtp;
+    use CreatesAssignableFleet, IssuesLogisticsHandoff, LazilyRefreshDatabase;
 
     private LogisticsProvider $provider;
 
@@ -104,7 +102,8 @@ class F2HandoffAuthorizationTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
     }
 
     public function test_wrong_station_hub_token_is_rejected(): void
@@ -165,7 +164,8 @@ class F2HandoffAuthorizationTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
     }
 
     public function test_unauthorized_rider_retry_of_completed_pickup_is_rejected(): void
@@ -251,19 +251,25 @@ class F2HandoffAuthorizationTest extends TestCase
             )
             ->assertSessionHas('success');
 
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+
         $this->actingAs($this->provider, 'logistics')
             ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
-        $this->assertSame(
-            1,
-            StatusHistory::query()
-                ->where('seller_order_id', $parcel->id)
-                ->where('to_status', OrderStatus::AtSortingCenter->value)
-                ->count(),
-        );
+        // A retry after the automatic sort changes nothing: no second receipt or sort.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        foreach ([OrderStatus::AtSortingCenter, OrderStatus::Sorted] as $status) {
+            $this->assertSame(
+                1,
+                StatusHistory::query()
+                    ->where('seller_order_id', $parcel->id)
+                    ->where('to_status', $status->value)
+                    ->count(),
+            );
+        }
     }
 
     public function test_scan_required_sort_still_works_with_authoritative_station(): void
@@ -304,19 +310,15 @@ class F2HandoffAuthorizationTest extends TestCase
             $parcel,
             ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY,
         );
-        $otp = $this->deliveryOtp($parcel);
-
         $this->actingAs($this->rider, 'rider')
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
-                'delivery_otp' => $otp,
                 'proof_photo' => UploadedFile::fake()->image('pod.jpg'),
                 'cod_amount' => '1.00',
             ])
             ->assertSessionHasErrors('cod_amount_minor');
 
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
-        $this->assertNull(DeliveryOtp::query()->sole()->used_at);
         $this->assertNull(Payment::query()->sole()->collected_amount_minor);
         $this->assertDatabaseCount('delivery_proofs', 0);
         $this->assertSame(0, CodRemittance::query()->count());
@@ -324,7 +326,6 @@ class F2HandoffAuthorizationTest extends TestCase
         $this->actingAs($this->rider, 'rider')
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
-                'delivery_otp' => $otp,
                 'proof_photo' => UploadedFile::fake()->image('pod2.jpg'),
                 'cod_amount' => '1500.00',
             ])
@@ -332,15 +333,13 @@ class F2HandoffAuthorizationTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
-        $this->assertNotNull(DeliveryOtp::query()->sole()->used_at);
         $this->assertSame(150000, Payment::query()->sole()->collected_amount_minor);
         $this->assertDatabaseCount('delivery_proofs', 1);
         $this->assertSame(1, CodRemittance::query()->count());
 
-        // A consumed token and code cannot start a second collection.
+        // A consumed token cannot start a second collection.
         $this->post(route('rider.deliveries.deliver', $parcel), [
             'verification_token' => $token,
-            'delivery_otp' => $otp,
             'proof_photo' => UploadedFile::fake()->image('pod3.jpg'),
             'cod_amount' => '1500.00',
         ])->assertRedirect();

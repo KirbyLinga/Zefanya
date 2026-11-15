@@ -198,7 +198,7 @@ final class T05Worker extends TestCase
                 app(RiderOperationsService::class)->completeDelivery(
                     Rider::query()->findOrFail($task['rider']), $parcel,
                     ['photo' => UploadedFile::fake()->image('audit16-proof.jpg'),
-                        'delivery_otp' => $task['otp'], 'cod_amount_minor' => $task['amount']]);
+                        'cod_amount_minor' => $task['amount']]);
                 $result = ['success' => true];
             } catch (ValidationException $exception) {
                 $result = ['success' => false, 'validation_fields' => array_keys($exception->errors())];

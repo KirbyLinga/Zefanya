@@ -20,12 +20,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class CodRemittanceCreationTest extends TestCase
 {
-    use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
     private LogisticsProvider $provider;
@@ -127,7 +125,6 @@ class CodRemittanceCreationTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
@@ -159,7 +156,6 @@ class CodRemittanceCreationTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
@@ -169,7 +165,6 @@ class CodRemittanceCreationTest extends TestCase
         $this->assertSame(CodRemittance::PENDING_REMITTANCE, CodRemittance::first()->status);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof2.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 44900,
@@ -191,7 +186,6 @@ class CodRemittanceCreationTest extends TestCase
         });
         try {
             app(RiderOperationsService::class)->completeDelivery($this->rider, $this->sellerOrder, [
-                'delivery_otp' => $this->deliveryOtp($this->sellerOrder),
                 'photo' => UploadedFile::fake()->image('rollback.jpg'), 'cod_amount_minor' => 44900,
             ]);
             $this->fail('The controlled obligation failure did not interrupt delivery.');

@@ -17,7 +17,6 @@ use App\Models\Shared\OrderItem;
 use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -200,8 +199,9 @@ class F2ScanEnforcedLifecycleTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
+        // Received at its only hub, so the same verified scan also sorted it.
         $parcel = $parcel->fresh();
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        $this->assertSame(OrderStatus::Sorted, $parcel->status);
         $this->assertStringContainsString(
             'Verified via manual tracking entry',
             (string) StatusHistory::query()
@@ -224,30 +224,14 @@ class F2ScanEnforcedLifecycleTest extends TestCase
                 ->count(),
         );
 
-        // 4. Logistics scans and confirms sorting.
-        $sortToken = $this->actingAs($this->provider, 'logistics')
-            ->postJson(route('logistics.scan.verify'), [
-                'tracking_number' => $tracking,
-                'method' => 'camera',
-            ])
-            ->assertOk()
-            ->json('actions.0.verification_token');
-
-        $this->actingAs($this->provider, 'logistics')
-            ->post(route('logistics.parcel-sorting.sort', $parcel), [
-                'verification_token' => $sortToken,
-            ])
-            ->assertRedirect();
-
-        $parcel = $parcel->fresh();
-        $this->assertSame(OrderStatus::Sorted, $parcel->status);
-        $this->assertStringContainsString(
-            'Verified via camera QR',
-            (string) StatusHistory::query()
-                ->where('seller_order_id', $parcel->id)
-                ->where('to_status', OrderStatus::Sorted->value)
-                ->value('note'),
-        );
+        // 4. No separate sort scan: the receipt scan sorted the parcel, and the
+        // Sorted history carries that scan's verification method.
+        $sortedNote = (string) StatusHistory::query()
+            ->where('seller_order_id', $parcel->id)
+            ->where('to_status', OrderStatus::Sorted->value)
+            ->value('note');
+        $this->assertStringContainsString('Sorted automatically on Station Hub receipt.', $sortedNote);
+        $this->assertStringContainsString('Verified via manual tracking entry', $sortedNote);
 
         // Assign delivery rider.
         $this->courier->forceFill(['is_available' => true])->save();
@@ -288,13 +272,8 @@ class F2ScanEnforcedLifecycleTest extends TestCase
             ->assertOk()
             ->json('actions.0.verification_token');
 
-        $this->post(route('rider.deliveries.otp', $parcel), ['verification_token' => $podToken])
-            ->assertRedirect()->assertSessionHasNoErrors();
-        $code = Notification::sent($this->buyer, DeliveryOtpCode::class)->sole()->code;
-
         $this->actingAs($this->rider, 'rider')
             ->post(route('rider.deliveries.deliver', $parcel), [
-                'delivery_otp' => $code,
                 'verification_token' => $podToken,
                 'proof_photo' => UploadedFile::fake()->image('pod.jpg'),
                 'received_by' => 'Buyer',
@@ -420,14 +399,17 @@ class F2ScanEnforcedLifecycleTest extends TestCase
             ])
             ->assertRedirect();
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
-        $this->assertSame(
-            1,
-            StatusHistory::query()
-                ->where('seller_order_id', $parcel->id)
-                ->where('to_status', OrderStatus::AtSortingCenter->value)
-                ->count(),
-        );
+        // One receipt and one automatic sort, however many confirmations race.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        foreach ([OrderStatus::AtSortingCenter, OrderStatus::Sorted] as $status) {
+            $this->assertSame(
+                1,
+                StatusHistory::query()
+                    ->where('seller_order_id', $parcel->id)
+                    ->where('to_status', $status->value)
+                    ->count(),
+            );
+        }
     }
 
     private function seedReadyParcel(): SellerOrder

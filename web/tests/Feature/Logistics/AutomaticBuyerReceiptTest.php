@@ -32,12 +32,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class AutomaticBuyerReceiptTest extends TestCase
 {
-    use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
     private LogisticsProvider $provider;
@@ -194,9 +192,9 @@ class AutomaticBuyerReceiptTest extends TestCase
         $this->assertTrue($result);
         $this->assertSame(OrderStatus::Completed, $this->sellerOrder->fresh()->status);
         $this->assertNotNull($this->sellerOrder->fresh()->commission_finalized_at);
-        $this->assertSame(500, $this->sellerOrder->fresh()->commission_bps);
-        $this->assertSame(400, $this->sellerOrder->fresh()->commission_minor);
-        $this->assertSame(7600, $this->sellerOrder->fresh()->seller_net_minor);
+        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_bps);
+        $this->assertSame(800, $this->sellerOrder->fresh()->commission_minor);
+        $this->assertSame(7200, $this->sellerOrder->fresh()->seller_net_minor);
     }
 
     /** @test */
@@ -360,9 +358,9 @@ class AutomaticBuyerReceiptTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $this->sellerOrder->fresh()->status);
 
         // No duplicate commission records.
-        $this->assertSame(500, $this->sellerOrder->fresh()->commission_bps);
-        $this->assertSame(400, $this->sellerOrder->fresh()->commission_minor);
-        $this->assertSame(7600, $this->sellerOrder->fresh()->seller_net_minor);
+        $this->assertSame(1000, $this->sellerOrder->fresh()->commission_bps);
+        $this->assertSame(800, $this->sellerOrder->fresh()->commission_minor);
+        $this->assertSame(7200, $this->sellerOrder->fresh()->seller_net_minor);
         $this->assertNotNull($this->sellerOrder->fresh()->commission_finalized_at);
     }
 
@@ -393,7 +391,6 @@ class AutomaticBuyerReceiptTest extends TestCase
         // are created exactly as in production.
         $operations = app(RiderOperationsService::class);
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -422,9 +419,9 @@ class AutomaticBuyerReceiptTest extends TestCase
 
         // Settlement should now have finalized commission.
         $settlement->refresh();
-        $this->assertSame(500, $settlement->commission_bps);
-        $this->assertSame(400, $settlement->commission_minor);
-        $this->assertSame(7600, $settlement->seller_payout_minor);
+        $this->assertSame(1000, $settlement->commission_bps);
+        $this->assertSame(800, $settlement->commission_minor);
+        $this->assertSame(7200, $settlement->seller_payout_minor);
         $this->assertNotNull($settlement->financials_finalized_at);
         $this->assertNull($settlement->pending_reason);
     }

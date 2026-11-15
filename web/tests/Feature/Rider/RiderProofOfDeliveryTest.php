@@ -159,7 +159,6 @@ class RiderProofOfDeliveryTest extends RiderTestCase
         $this->actingAsRider()
             ->post(route('rider.deliveries.deliver', $parcel), [
                 'verification_token' => $token,
-                'delivery_otp' => $this->deliveryOtp($parcel),
                 'proof_photo' => $this->photo(),
                 'cod_amount' => '1500.00',
             ])

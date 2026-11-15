@@ -60,16 +60,6 @@
         <section class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 shadow-sm">
             <h2 class="mb-3 font-sans text-[13px] font-semibold text-[var(--text-ink)]">Delivery evidence</h2>
 
-            <div class="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
-                <h3 class="text-sm font-semibold text-primary-900">Buyer delivery confirmation</h3>
-                <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">Send a six-digit code to the buyer's order page in Zefanya. Ask for it only after handing over the parcel. Codes expire in 10 minutes; wait 60 seconds between requests.</p>
-                <form method="POST" action="{{ route('rider.deliveries.otp', $sellerOrder) }}" class="mt-3">
-                    @csrf
-                    <input type="hidden" name="verification_token" value="{{ $verificationToken }}">
-                    <button type="submit" class="min-h-10 rounded-lg border border-primary-300 bg-[var(--bg-surface)] px-4 text-xs font-semibold text-primary-900 transition-colors hover:bg-primary-800 hover:text-white focus-visible:outline-2 focus-visible:outline-primary-700">Send / resend delivery code</button>
-                </form>
-                @error('delivery_otp')<p role="alert" class="mt-2 text-xs text-red-800">{{ $message }}</p>@enderror
-            </div>
             <form
                 id="proofForm"
                 data-seller-order-id="{{ $sellerOrder->id }}"
@@ -86,10 +76,6 @@
                 @endphp
                 <input type="hidden" name="verification_token" value="{{ $verificationToken }}">
 
-                <div>
-                    <label for="delivery_otp" class="mb-1 block text-xs font-semibold text-[var(--text-ink)]">Buyer delivery code *</label>
-                    <input id="delivery_otp" name="delivery_otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required class="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 font-mono text-lg tracking-widest text-[var(--text-ink)] focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-200" placeholder="6-digit code">
-                </div>
                 <div class="rounded-xl border-2 border-dashed border-primary-400 bg-[var(--bg-page)] p-4 sm:p-5">
                     <div class="mb-4 flex items-start gap-3">
                         <span class="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-white">

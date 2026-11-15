@@ -4,7 +4,6 @@ namespace Tests\Feature\Buyer;
 
 use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
-use App\Models\Logistics\DeliveryOtp;
 use App\Models\Shared\SellerOrder;
 use Tests\Feature\Rider\RiderTestCase;
 
@@ -31,17 +30,13 @@ class BuyerShipmentApiTest extends RiderTestCase
     public function test_shipments_are_scoped_to_the_token_owner(): void
     {
         $mine = $this->parcel(OrderStatus::OutForDelivery, ['delivery_courier_id' => $this->courier->id]);
-        $this->deliveryOtp($mine);
-        DeliveryOtp::query()->where('seller_order_id', $mine->id)->firstOrFail()
-            ->forceFill(['code_encrypted' => '123456'])->save();
 
         $this->api()->getJson('/api/buyer/shipments')->assertOk()
             ->assertJsonPath('data.data.0.id', $mine->id)
             ->assertJsonMissingPath('data.data.0.commission_minor');
 
-        // The buyer sees their own active delivery code, as on the web order page.
         $this->api()->getJson("/api/buyer/shipments/{$mine->id}")->assertOk()
-            ->assertJsonPath('data.delivery_code.code', '123456');
+            ->assertJsonMissingPath('data.delivery_code');
 
         $stranger = $this->strangerBuyer();
         $this->api($stranger)->getJson('/api/buyer/shipments')->assertOk()->assertJsonCount(0, 'data.data');
@@ -64,9 +59,7 @@ class BuyerShipmentApiTest extends RiderTestCase
         $this->assertSame(OrderStatus::Delivered, $parcel->fresh()->status);
 
         $this->api()->postJson("/api/buyer/orders/{$parcel->order_id}/shipments/{$parcel->id}/confirm-received")
-            ->assertOk()->assertJsonPath('data.status', OrderStatus::Completed->value)
-            ->assertJsonPath('data.completed_at', $parcel->fresh()->completionTime()?->toIso8601String());
-        $this->assertNotNull($parcel->fresh()->completionTime());
+            ->assertOk()->assertJsonPath('data.status', OrderStatus::Completed->value);
 
         // Idempotent repeat.
         $this->api()->postJson("/api/buyer/orders/{$parcel->order_id}/shipments/{$parcel->id}/confirm-received")->assertOk();

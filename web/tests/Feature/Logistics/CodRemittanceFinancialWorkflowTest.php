@@ -29,12 +29,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class CodRemittanceFinancialWorkflowTest extends TestCase
 {
-    use ProvidesDeliveryOtp;
     use RefreshDatabase;
 
     private LogisticsProvider $provider;
@@ -148,7 +146,6 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -175,7 +172,6 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -199,7 +195,6 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -231,7 +226,6 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -257,12 +251,11 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
     }
 
     /** @test */
-    public function test_completed_order_finalizes_five_percent_after_seller_discount_commission(): void
+    public function test_completed_order_finalizes_ten_percent_after_seller_discount_commission(): void
     {
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,
@@ -279,17 +272,17 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
 
         $order = $this->sellerOrder->fresh();
 
-        $this->assertSame(500, $order->commission_bps);
-        $this->assertSame(400, $order->commission_minor);
+        $this->assertSame(1000, $order->commission_bps);
+        $this->assertSame(800, $order->commission_minor);
         $this->assertNotNull($order->commission_finalized_at);
 
-        $this->assertSame(7600, $order->seller_net_minor);
+        $this->assertSame(7200, $order->seller_net_minor);
 
         $settlement = SellerSettlement::where('seller_order_id', $order->id)->first();
         $this->assertNotNull($settlement);
-        $this->assertSame(500, $settlement->commission_bps);
-        $this->assertSame(400, $settlement->commission_minor);
-        $this->assertSame(7600, $settlement->seller_payout_minor);
+        $this->assertSame(1000, $settlement->commission_bps);
+        $this->assertSame(800, $settlement->commission_minor);
+        $this->assertSame(7200, $settlement->seller_payout_minor);
         $this->assertNotNull($settlement->financials_finalized_at);
         $this->assertNull($settlement->pending_reason);
     }
@@ -352,7 +345,6 @@ class CodRemittanceFinancialWorkflowTest extends TestCase
         $operations = app(RiderOperationsService::class);
 
         $operations->completeDelivery($this->rider, $this->sellerOrder->fresh(), [
-            'delivery_otp' => $this->deliveryOtp($this->sellerOrder->fresh()),
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer',
             'cod_amount_minor' => 8500,

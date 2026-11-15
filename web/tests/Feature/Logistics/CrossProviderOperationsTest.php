@@ -10,9 +10,7 @@ use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Shared\Payment;
-use App\Notifications\Buyer\DeliveryOtpCode;
 use App\Services\Logistics\CourierAssignmentService;
-use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Rider\RiderOperationsService;
@@ -81,7 +79,7 @@ class CrossProviderOperationsTest extends TestCase
         $parcel = $f['parcel']->fresh();
         $payment = Payment::factory()->create(['seller_order_id' => $parcel->id, 'amount_minor' => 44900]);
         $courier = $this->courierAt($f['b']);
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->status);
         $this->assertSame($f['a']['provider']->id, $parcel->carrier_provider_id);
         $this->assertSame($f['b']['provider']->id, $parcel->custody_provider_id);
 
@@ -106,10 +104,7 @@ class CrossProviderOperationsTest extends TestCase
         $operations->startDelivery($courier->rider, $parcel->fresh());
         $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
         $this->assertSame(PaymentStatus::Pending, $payment->fresh()->status);
-        app(DeliveryOtpService::class)->send($courier->rider, $parcel->fresh());
-        $code = Notification::sent($f['buyer'], DeliveryOtpCode::class)->sole()->code;
         $operations->completeDelivery($courier->rider, $parcel->fresh(), [
-            'delivery_otp' => $code,
             'photo' => UploadedFile::fake()->image('proof.jpg'),
             'received_by' => 'Buyer', 'cod_amount_minor' => 44900,
         ]);
@@ -168,7 +163,7 @@ class CrossProviderOperationsTest extends TestCase
         $parcel = $f['parcel']->fresh();
         $this->assertSame($f['b']['province']->id, $service->currentHubId($parcel));
         $this->assertSame($f['a']['station']->id, (int) $parcel->origin_station_hub_id);
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->status);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->status);
         $this->assertSame($f['a']['provider']->id, $parcel->carrier_provider_id);
     }
 

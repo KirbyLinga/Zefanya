@@ -26,7 +26,6 @@ class EnsureRiderActive
     private const WIND_DOWN_ROUTES = [
         'rider.deliveries.index',
         'rider.deliveries.proof',
-        'rider.deliveries.otp',
         'rider.deliveries.deliver',
         'rider.deliveries.failed.form',
         'rider.deliveries.failed',

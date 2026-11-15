@@ -37,6 +37,7 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
 
         Route::get('/return-pickups', [ReturnPickupController::class, 'index'])->name('return-pickups.index');
         Route::post('/return-pickups/{return}/collect', [ReturnPickupController::class, 'collect'])->name('return-pickups.collect');
+        Route::post('/return-pickups/{return}/failed', [ReturnPickupController::class, 'failed'])->name('return-pickups.failed');
 
         Route::get('/scan', [ParcelScanController::class, 'index'])->name('scan.index');
         Route::post('/scan/verify', [ParcelScanController::class, 'verify'])->name('scan.verify');
@@ -46,7 +47,6 @@ Route::prefix('rider')->name('rider.')->group(function (): void {
         Route::get('/deliveries', [DeliveryAssignmentsController::class, 'index'])->name('deliveries.index');
         Route::post('/deliveries/{sellerOrder}/start', [DeliveryAssignmentsController::class, 'start'])->name('deliveries.start');
         Route::get('/deliveries/{sellerOrder}/proof', [DeliveryAssignmentsController::class, 'proofForm'])->name('deliveries.proof');
-        Route::post('/deliveries/{sellerOrder}/otp', [DeliveryAssignmentsController::class, 'sendDeliveryOtp'])->middleware('throttle:5,1')->name('deliveries.otp');
         Route::post('/deliveries/{sellerOrder}/deliver', [DeliveryAssignmentsController::class, 'deliver'])->name('deliveries.deliver');
         Route::get('/deliveries/{sellerOrder}/failed', [DeliveryAssignmentsController::class, 'failedForm'])->name('deliveries.failed.form');
         Route::post('/deliveries/{sellerOrder}/failed', [DeliveryAssignmentsController::class, 'failed'])->name('deliveries.failed');

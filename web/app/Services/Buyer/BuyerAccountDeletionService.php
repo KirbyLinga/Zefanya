@@ -103,7 +103,6 @@ class BuyerAccountDeletionService
         $buyer->notifications()->delete();
         $buyer->tokens()->delete();
 
-        DB::table('delivery_otps')->where('buyer_id', $buyer->id)->delete();
         DB::table(config('auth.passwords.buyers.table'))->where('email', $buyer->email)->delete();
         DB::table('newsletter_subscribers')->where('email', $buyer->email)->delete();
 

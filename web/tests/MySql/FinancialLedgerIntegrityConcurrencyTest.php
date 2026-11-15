@@ -12,12 +12,11 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\StatusHistory;
 use App\Services\Logistics\PickupPolicy;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
-use Tests\Support\ProvidesDeliveryOtp;
 use Tests\TestCase;
 
 class FinancialLedgerIntegrityConcurrencyTest extends TestCase
 {
-    use BootstrapsCrossProviderHandoffs, ProvidesDeliveryOtp, UsesLogisticsDatabase;
+    use BootstrapsCrossProviderHandoffs, UsesLogisticsDatabase;
 
     protected function setUp(): void
     {
@@ -41,7 +40,7 @@ class FinancialLedgerIntegrityConcurrencyTest extends TestCase
             'carrier_provider_id' => $network['provider']->id, 'subtotal_minor' => 10000, 'shipping_fee_minor' => 5000])->save();
         $payment = Payment::factory()->create(['seller_order_id' => $parcel->id, 'amount_minor' => 15000]);
         $task = ['action' => 'rider_cod_delivery', 'parcel' => $parcel->id, 'rider' => $rider->id,
-            'amount' => 15000, 'otp' => $this->deliveryOtp($parcel)];
+            'amount' => 15000];
         // Hold after the payment update, inside the actual POD/COD transaction.
         // The other delivery waits at the parcel lock; no direct payment-writer shortcut.
         $results = Race::run($task + ['hold' => 'cod_collection_write'], $task + ['watch' => 'parcel']);

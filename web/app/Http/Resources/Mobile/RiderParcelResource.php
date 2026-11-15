@@ -11,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * Read-only projection of a SellerOrder already scoped to the rider by
  * RiderOperationsService. Every amount is server-computed (minor units);
- * the delivery OTP, its hash and proof-photo paths are never exposed.
+ * delivery secrets and proof-photo paths are never exposed.
  * Buyer contact details are only included on the delivery leg, where the
  * rider actually needs them; the pickup leg sees the destination area only.
  *
@@ -60,10 +60,6 @@ class RiderParcelResource extends JsonResource
             'cod_amount_minor' => $collect ? (int) $payment->amount_minor : 0,
             'delivery_attempts' => (int) ($parcel->delivery_attempts ?? 0),
             'pickup_session_id' => $parcel->pickup_session_id,
-            // Failed pickup attempts already recorded (the server allows two).
-            'pickup_attempts' => $this->leg === 'pickup'
-                ? (int) ($parcel->pickup_attempts_max_attempt_number ?? $parcel->pickupAttempts()->max('attempt_number') ?? 0)
-                : null,
             'updated_at' => $parcel->updated_at?->toIso8601String(),
         ];
     }
