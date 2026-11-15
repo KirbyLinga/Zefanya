@@ -460,16 +460,32 @@ void main() {
         repos.client!.postJson('/rider/availability', body: {'online': true}),
         throwsA(isA<ApiNotImplementedException>()),
       );
-      await expectLater(
-        repos.client!.getJson('/rider/cod'),
-        throwsA(isA<ApiNotImplementedException>()),
-      );
       expect(wire.requests, isEmpty);
+      expect(await repos.client!.getJson('/rider/cod'), {
+        'success': true,
+        'data': <String, Object?>{},
+      });
+      expect(wire.requests, ['GET /api/rider/cod']);
     });
 
     test(
       'every transport shape is guarded: JSON, multipart, binary, renewal',
       () async {
+        const collect = '/rider/return-pickups/1/collect';
+        const fields = {'tracking_number': 'TRK-1'};
+        final releaseWire = _Wire((r, _) => _ok({}));
+        final releaseClient = guardedWebZefanyaClient(
+          baseUrl: _api,
+          tokenStore: InMemoryTokenStore(),
+          httpClient: releaseWire.client,
+          allowVerifiedWrites: true,
+        );
+        await expectLater(
+          releaseClient.postMultipart(collect, fields: fields),
+          throwsA(isA<ApiNotImplementedException>()),
+        );
+        expect(releaseWire.requests, isEmpty);
+
         final wire = _Wire((r, _) => _ok({}));
         final client = _guarded(wire, allowWrites: true);
 
@@ -478,26 +494,26 @@ void main() {
           throwsA(isA<ApiNotImplementedException>()),
         );
         await expectLater(
-          client.postMultipart(
-            '/rider/return-pickups/1/collect',
-            fields: const {},
-          ),
+          client.postMultipart('/courier/duty/on', fields: const {}),
           throwsA(isA<ApiNotImplementedException>()),
         );
         await expectLater(
-          client.getBytes('/rider/proofs/1'),
+          client.getBytes('/courier/trips/1/proof'),
           throwsA(isA<ApiNotImplementedException>()),
         );
         await expectLater(
           client.deleteJson('/rider/jobs'), // wrong method for a real path
           throwsA(isA<ApiNotImplementedException>()),
         );
+        expect(wire.requests, isEmpty);
 
         // Renewal: an unsupported renew route is blocked locally; the request
         // that triggered it still goes out unchanged.
         client.renewPath = '/courier/trips/renew';
         await client.getJson('/rider/jobs');
         expect(wire.requests, ['GET /api/rider/jobs']);
+        await client.postMultipart(collect, fields: fields);
+        expect(wire.requests, ['GET /api/rider/jobs', 'POST /api$collect']);
       },
     );
 

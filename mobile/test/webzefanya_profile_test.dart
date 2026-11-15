@@ -270,7 +270,7 @@ void main() {
       () async {
         final t = _webzefanya((request, _) => _ok({}), allowWrites: true);
         await expectLater(
-          t.repos.client!.getJson('/rider/cod'),
+          t.repos.client!.getJson('/rider/cod/1'),
           throwsA(isA<ApiNotImplementedException>()),
         );
         await expectLater(
@@ -278,6 +278,11 @@ void main() {
           throwsA(isA<ApiNotImplementedException>()),
         );
         expect(t.wire.requests, isEmpty);
+        expect(await t.repos.client!.getJson('/rider/cod'), {
+          'success': true,
+          'data': <String, Object?>{},
+        });
+        expect(t.wire.requests, ['GET /api/rider/cod']);
       },
     );
 

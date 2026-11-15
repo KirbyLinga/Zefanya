@@ -2,6 +2,11 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## Phase 11.6.3: Flutter Rider contract tests
+
+- Update the unsupported-route and injected read-only client tests to assert that the restored Rider COD GET reaches the transport. Preserve rejection of unsupported routes and writes in read-only mode.
+- Update the transport guard test to use unsupported multipart and binary routes. Verify assigned return collection can reach the transport only with the explicit broad-write test configuration and remains blocked by the release write allowlist. The production Rider COD and return-collection UI gates are unchanged.
+
 ## Phase 11.6.2: Voucher allocation and demo recovery
 
 - Apply workbook Assumptions A8 and A9 to new platform voucher allocations. Round proportional shares half up first, then reconcile any signed difference at the largest eligible store with room, with ascending Seller ID as the tie-break. Three independently rounded shares for the two-cent 100/99/98 fixture overshoot by one cent, so its exact expectation is now 0/1/1. Keep amount, capacity, funding and determinism checks. Existing settlement snapshots are not recalculated.
