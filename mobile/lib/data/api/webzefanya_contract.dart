@@ -87,7 +87,6 @@ const List<ApiRoute> kWebZefanyaRoutes = [
   ApiRoute('POST', '/rider/availability'),
   ApiRoute('POST', '/rider/deliveries/{sellerOrder}/deliver'),
   ApiRoute('POST', '/rider/deliveries/{sellerOrder}/failed'),
-  ApiRoute('POST', '/rider/deliveries/{sellerOrder}/otp'),
   ApiRoute('POST', '/rider/deliveries/{sellerOrder}/start'),
   ApiRoute('GET', '/rider/earnings'),
   ApiRoute('GET', '/rider/history'),

@@ -109,7 +109,6 @@ void main() {
         const demo = BackendCapabilities.demo();
         expect(demo.riderReturnCollect, isTrue);
         expect(demo.courierLogin, isTrue);
-        expect(demo.deliveryRequiresBuyerOtp, isFalse);
 
         const wz = BackendCapabilities.webzefanya();
         expect(wz.isWebZefanya, isTrue);
@@ -122,8 +121,6 @@ void main() {
         expect(wz.courierLogin, isFalse);
         expect(wz.buyerReviewSubmit, isFalse);
         expect(wz.buyerDeliveryDispute, isFalse);
-        // Delivery still needs the server's Buyer OTP; nothing removes it here.
-        expect(wz.deliveryRequiresBuyerOtp, isTrue);
       },
     );
   });
@@ -176,7 +173,6 @@ void main() {
     test('a default CourierState keeps every demo capability on', () {
       final state = CourierState();
       expect(state.capabilities.riderPickupFailure, isTrue);
-      expect(state.capabilities.deliveryRequiresBuyerOtp, isFalse);
     });
   });
 
@@ -320,18 +316,17 @@ void main() {
     });
   });
 
-  group('delivery completion keeps the server OTP', () {
+  group('delivery completion', () {
     test(
-      'scan token first, then OTP with that token, then deliver with OTP+photo+COD',
+      'scan token then complete with proof photo and COD without an OTP',
       () async {
         final photo = File('${Directory.systemTemp.path}/wz_pod_test.jpg')
           ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
         addTearDown(() {
           if (photo.existsSync()) photo.deleteSync();
         });
-        // A stand-in for WebZefanya's contract: the OTP is only sent against a
-        // valid scan token (ParcelActionController::sendOtp), and delivery needs
-        // the same kind of token plus the OTP, the photo and exact COD.
+        // A stand-in for WebZefanya's contract: delivery needs the scan token,
+        // proof photo and exact COD, with no buyer code.
         final issued = <String>{};
         var n = 0;
         final t = _webzefanya((request, body) {
@@ -354,16 +349,9 @@ void main() {
               ],
             });
           }
-          if (path.endsWith('/deliveries/11/otp')) {
-            final sent = jsonDecode(body) as Map;
-            return issued.contains(sent['verification_token'])
-                ? _ok({})
-                : _json(409, {'message': 'Scan the parcel again.'});
-          }
           if (path.endsWith('/deliveries/11/deliver')) {
             final ok =
                 issued.any(body.contains) &&
-                body.contains('name="delivery_otp"') &&
                 body.contains('name="proof_photo"');
             return ok
                 ? _ok({'status': 'DELIVERED'})
@@ -374,38 +362,32 @@ void main() {
         final repo = t.repos.courier as WebZefanyaCourierRepository;
 
         await repo.assignedJobs(); // remembers the tracking number
-        await repo.sendDeliveryOtp('11');
-        await repo.completeDeliveryWithOtp(
+        await repo.completeDelivery(
           '11',
           proofPhotoPath: photo.path,
-          deliveryOtp: ' 123456 ',
+          recipientCategory: 'buyer',
           codAmount: 1500,
         );
 
         expect(t.wire.requests, [
           'GET /api/rider/jobs',
-          'POST /api/rider/scan/verify', // OTP issuance needs the scan token...
-          'POST /api/rider/deliveries/11/otp', // ...and sends it
-          'POST /api/rider/scan/verify', // delivery verifies again
+          'POST /api/rider/scan/verify',
           'POST /api/rider/deliveries/11/deliver',
         ]);
-        final otpBody = jsonDecode(t.wire.bodies[2]) as Map;
-        expect(otpBody['verification_token'], 'tok-1');
         final deliver = t.wire.bodies.last;
-        expect(deliver, contains('name="delivery_otp"'));
-        expect(deliver, contains('123456'));
+        expect(deliver, isNot(contains('delivery_otp')));
         expect(deliver, contains('name="verification_token"'));
-        expect(deliver, contains('tok-2'));
+        expect(deliver, contains('tok-1'));
         expect(deliver, contains('name="proof_photo"'));
         expect(deliver, contains('1500.00'));
-        // The demo fork's OTP-free acknowledgement fields are not sent.
+        // The demo fork's acknowledgement fields are not sent.
         expect(deliver, isNot(contains('recipient_accepted')));
         expect(deliver, isNot(contains('recipient_category')));
       },
     );
 
     test(
-      'the OTP is never requested when the parcel scan is refused',
+      'delivery is not sent when the parcel scan is refused',
       () async {
         final t = _webzefanya((request, body) {
           final path = request.url.path;
@@ -425,21 +407,36 @@ void main() {
         final repo = t.repos.courier as WebZefanyaCourierRepository;
         await repo.assignedJobs();
 
+        final photo = File('${Directory.systemTemp.path}/wz_pod_refused.jpg')
+          ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+        addTearDown(() {
+          if (photo.existsSync()) photo.deleteSync();
+        });
         await expectLater(
-          repo.sendDeliveryOtp('11'),
+          repo.completeDelivery(
+            '11',
+            proofPhotoPath: photo.path,
+            recipientCategory: 'buyer',
+          ),
           throwsA(isA<RequestRejectedException>()),
         );
-        expect(t.wire.requests.where((r) => r.contains('/otp')), isEmpty);
+        expect(t.wire.requests.where((r) => r.contains('/deliver')), isEmpty);
       },
     );
 
-    test('with writes off, no scan or OTP request leaves the device', () async {
+    test('with writes off, no scan or delivery request leaves the device', () async {
       final t = _webzefanya((request, _) => _ok({}));
       final repo = t.repos.courier as WebZefanyaCourierRepository;
-      await expectLater(
-        repo.sendDeliveryOtp('11'),
-        throwsA(isA<ValidationException>()), // no tracking number known yet
-      );
+      final photo = File('${Directory.systemTemp.path}/wz_pod_blocked.jpg')
+        ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+      addTearDown(() {
+        if (photo.existsSync()) photo.deleteSync();
+      });
+      await expectLater(repo.completeDelivery(
+        '11',
+        proofPhotoPath: photo.path,
+        recipientCategory: 'buyer',
+      ), throwsA(isA<ValidationException>())); // no tracking number known yet
       expect(t.wire.requests, isEmpty);
 
       // With a known parcel, the scan POST itself is blocked by the guard.
@@ -453,43 +450,13 @@ void main() {
       });
       final knownRepo = known.repos.courier as WebZefanyaCourierRepository;
       await knownRepo.assignedJobs();
-      await expectLater(
-        knownRepo.sendDeliveryOtp('11'),
-        throwsA(isA<ApiNotImplementedException>()),
-      );
+        await expectLater(knownRepo.completeDelivery(
+          '11',
+          proofPhotoPath: photo.path,
+          recipientCategory: 'buyer',
+        ), throwsA(isA<ApiNotImplementedException>()));
       expect(known.wire.requests, ['GET /api/rider/jobs']);
     });
-
-    test(
-      'a short OTP is refused by the state before any delivery request',
-      () async {
-        final t = _webzefanya(
-          (request, _) => _ok({
-            'online': true,
-            'pickups': <Object?>[],
-            'deliveries': [_parcel(11)],
-            'return_pickups': <Object?>[],
-          }),
-          allowWrites: true,
-        );
-        final state = CourierState(
-          repository: t.repos.courier,
-          capabilities: t.repos.capabilities,
-        );
-        await state.refreshJobs();
-        final before = t.wire.requests.length;
-
-        await expectLater(
-          state.submitDeliveryWithOtp(
-            '11',
-            proofPhotoPath: 'photo.jpg',
-            deliveryOtp: '12',
-          ),
-          throwsA(isA<ValidationException>()),
-        );
-        expect(t.wire.requests.length, before);
-      },
-    );
   });
 
   group('authentication expiry, network errors and retry', () {

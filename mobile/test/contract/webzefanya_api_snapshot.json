@@ -298,12 +298,6 @@
     },
     {
       "method": "POST",
-      "path": "/rider/deliveries/{sellerOrder}/otp",
-      "name": "api.rider.deliveries.otp",
-      "middleware": []
-    },
-    {
-      "method": "POST",
       "path": "/rider/deliveries/{sellerOrder}/start",
       "name": "api.rider.deliveries.start",
       "middleware": []

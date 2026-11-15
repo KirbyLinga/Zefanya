@@ -8,7 +8,6 @@
 // superseded by this one.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/dev_flags.dart' show FeatureFlags, kShowDevTools;
@@ -352,13 +351,6 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     var handedOver = false;
     var accepted = false;
     var collected = false;
-    // WebZefanya still requires the Buyer's delivery OTP (replacing it is the
-    // separately approved C-POD change). Only the WebZefanya profile asks.
-    final needsOtp = courier.capabilities.deliveryRequiresBuyerOtp;
-    var otp = '';
-    var otpRequested = false;
-    var otpSending = false;
-    String? otpMessage;
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -442,59 +434,6 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                   value: accepted,
                   onChanged: (value) => update(() => accepted = value == true),
                 ),
-                if (needsOtp) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    key: const ValueKey('send-delivery-otp'),
-                    onPressed: otpSending
-                        ? null
-                        : () async {
-                            update(() {
-                              otpSending = true;
-                              otpMessage = null;
-                            });
-                            try {
-                              await courier.sendDeliveryOtp(widget.jobId);
-                              update(() {
-                                otpRequested = true;
-                                otpMessage =
-                                    'A code was sent to the buyer. Ask the buyer for it.';
-                              });
-                            } on ApiException catch (error) {
-                              update(
-                                () => otpMessage = _serverMessage(error),
-                              );
-                            } finally {
-                              update(() => otpSending = false);
-                            }
-                          },
-                    child: Text(
-                      otpSending
-                          ? 'Sending…'
-                          : otpRequested
-                          ? 'Send the code again'
-                          : 'Send code to buyer',
-                    ),
-                  ),
-                  if (otpMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        otpMessage!,
-                        key: const ValueKey('delivery-otp-message'),
-                      ),
-                    ),
-                  TextFormField(
-                    key: const ValueKey('delivery-otp'),
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      labelText: 'Buyer delivery code (6 digits)',
-                    ),
-                    onChanged: (value) => update(() => otp = value.trim()),
-                  ),
-                ],
                 if (job.hasCod)
                   CheckboxListTile(
                     key: const ValueKey('cod-collected'),
@@ -512,7 +451,6 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
                   onPressed:
                       handedOver &&
                           accepted &&
-                          (!needsOtp || otp.length == 6) &&
                           (!job.hasCod || collected) &&
                           (category == 'buyer' ||
                               (name.isNotEmpty && relationship.isNotEmpty))
@@ -530,26 +468,16 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
     if (courier.isServerAuthoritative) {
       setState(() => _submitting = true);
       try {
-        if (needsOtp) {
-          await courier.submitDeliveryWithOtp(
-            widget.jobId,
-            proofPhotoPath: photo,
-            deliveryOtp: otp,
-            receivedBy: category == 'representative' ? name : null,
-            codAmount: job.hasCod ? job.codAmount : null,
-          );
-        } else {
-          await courier.submitDelivery(
-            widget.jobId,
-            proofPhotoPath: photo,
-            recipientCategory: category,
-            receivedBy: category == 'representative' ? name : null,
-            recipientRelationship: category == 'representative'
-                ? relationship
-                : null,
-            codAmount: job.hasCod ? job.codAmount : null,
-          );
-        }
+        await courier.submitDelivery(
+          widget.jobId,
+          proofPhotoPath: photo,
+          recipientCategory: category,
+          receivedBy: category == 'representative' ? name : null,
+          recipientRelationship: category == 'representative'
+              ? relationship
+              : null,
+          codAmount: job.hasCod ? job.codAmount : null,
+        );
       } on ApiException catch (error) {
         if (!mounted) return;
         if (courier.isDeliveryCompletionUnconfirmed(widget.jobId)) {

@@ -1675,20 +1675,7 @@ class CourierState extends ChangeNotifier {
     });
   }
 
-  /// Asks the server to send the Buyer a delivery OTP (WebZefanya profile).
-  Future<void> sendDeliveryOtp(String jobId) {
-    final repository = _repository;
-    if (repository is! OtpDeliveryServer) {
-      throw const ApiNotImplementedException(
-        'POST /api/rider/deliveries/{id}/otp',
-      );
-    }
-    return (repository as OtpDeliveryServer).sendDeliveryOtp(jobId);
-  }
-
-  /// Records a delivery. The signature is unchanged so existing overrides and
-  /// callers keep working; the WebZefanya Buyer-OTP variant is
-  /// [submitDeliveryWithOtp].
+  /// Records a delivery.
   Future<void> submitDelivery(
     String jobId, {
     required String proofPhotoPath,
@@ -1696,41 +1683,6 @@ class CourierState extends ChangeNotifier {
     String? receivedBy,
     String? recipientRelationship,
     double? codAmount,
-  }) => _submitDelivery(
-    jobId,
-    proofPhotoPath: proofPhotoPath,
-    recipientCategory: recipientCategory,
-    receivedBy: receivedBy,
-    recipientRelationship: recipientRelationship,
-    codAmount: codAmount,
-  );
-
-  /// Records a delivery on a backend that requires the Buyer's OTP (the
-  /// WebZefanya profile). The same duplicate, persistence and unconfirmed-state
-  /// protections as [submitDelivery] apply.
-  Future<void> submitDeliveryWithOtp(
-    String jobId, {
-    required String proofPhotoPath,
-    required String deliveryOtp,
-    String? receivedBy,
-    double? codAmount,
-  }) => _submitDelivery(
-    jobId,
-    proofPhotoPath: proofPhotoPath,
-    recipientCategory: 'buyer',
-    receivedBy: receivedBy,
-    codAmount: codAmount,
-    deliveryOtp: deliveryOtp,
-  );
-
-  Future<void> _submitDelivery(
-    String jobId, {
-    required String proofPhotoPath,
-    required String recipientCategory,
-    String? receivedBy,
-    String? recipientRelationship,
-    double? codAmount,
-    String? deliveryOtp,
   }) async {
     if (isParcelActionPending(jobId) ||
         isParcelActionUnconfirmed(jobId) ||
@@ -1774,38 +1726,16 @@ class CourierState extends ChangeNotifier {
         );
       }
       if (generation != _riderGeneration) throw const UnauthorizedException();
-      final repository = _repository;
-      if (capabilities.deliveryRequiresBuyerOtp &&
-          repository is OtpDeliveryServer) {
-        final code = (deliveryOtp ?? '').trim();
-        if (!RegExp(r'^\d{6}$').hasMatch(code)) {
-          throw const ValidationException(
-            fieldErrors: {
-              'delivery_otp': 'Enter the 6-digit code the buyer received.',
-            },
-          );
-        }
-        await _guardedServerCall(
-          () => (repository as OtpDeliveryServer).completeDeliveryWithOtp(
-            jobId,
-            proofPhotoPath: proofPhotoPath,
-            deliveryOtp: code,
-            receivedBy: receivedBy,
-            codAmount: codAmount,
-          ),
-        );
-      } else {
-        await _guardedServerCall(
-          () => _repository.completeDelivery(
-            jobId,
-            proofPhotoPath: proofPhotoPath,
-            recipientCategory: recipientCategory,
-            receivedBy: receivedBy,
-            recipientRelationship: recipientRelationship,
-            codAmount: codAmount,
-          ),
-        );
-      }
+      await _guardedServerCall(
+        () => _repository.completeDelivery(
+          jobId,
+          proofPhotoPath: proofPhotoPath,
+          recipientCategory: recipientCategory,
+          receivedBy: receivedBy,
+          recipientRelationship: recipientRelationship,
+          codAmount: codAmount,
+        ),
+      );
       if (generation != _riderGeneration) throw const UnauthorizedException();
       await _storeDeliveryCompletion(
         jobId,

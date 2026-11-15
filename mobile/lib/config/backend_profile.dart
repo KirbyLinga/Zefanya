@@ -113,7 +113,6 @@ class BackendCapabilities {
     required this.buyerReviewSubmit,
     required this.buyerCheckoutReconcile,
     required this.buyerDeliveryDispute,
-    required this.deliveryRequiresBuyerOtp,
     required this.proofOfDeliveryPreview,
   });
 
@@ -133,7 +132,6 @@ class BackendCapabilities {
       buyerReviewSubmit = true,
       buyerCheckoutReconcile = true,
       buyerDeliveryDispute = true,
-      deliveryRequiresBuyerOtp = false,
       proofOfDeliveryPreview = false;
 
   /// What WebZefanya provides today, derived from the verified contract
@@ -141,8 +139,7 @@ class BackendCapabilities {
   ///
   /// Courier login is offered only when the build says the backend has the
   /// Courier Mobile API ([kWebZefanyaCourierApp]); the Courier then sees the
-  /// read-only WebZefanya transfer portal. Delivery completion still needs
-  /// the Buyer OTP (it is replaced only by the separately approved C-POD).
+  /// read-only WebZefanya transfer portal.
   const BackendCapabilities.webzefanya()
     : profile = BackendProfile.webzefanya,
       riderReturnCollect = false,
@@ -158,7 +155,6 @@ class BackendCapabilities {
       buyerReviewSubmit = false,
       buyerCheckoutReconcile = false,
       buyerDeliveryDispute = false,
-      deliveryRequiresBuyerOtp = true,
       proofOfDeliveryPreview = true;
 
   final BackendProfile profile;
@@ -201,9 +197,6 @@ class BackendCapabilities {
 
   /// `GET/POST /buyer/shipments/{id}/delivery-dispute` exists.
   final bool buyerDeliveryDispute;
-
-  /// The server demands the Buyer's delivery OTP to record a delivery.
-  final bool deliveryRequiresBuyerOtp;
 
   /// The mocked Proof of Delivery preview screen is reachable.
   final bool proofOfDeliveryPreview;

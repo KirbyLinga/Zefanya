@@ -600,29 +600,6 @@ String failureReasonWire(String? label) => switch (label?.trim()) {
 // WebZefanya profile
 // ---------------------------------------------------------------------------
 
-/// Delivery completion that carries the Buyer's delivery OTP.
-///
-/// A separate interface (like [RiderServerData]) so the mock repository and the
-/// test doubles of [CourierRepository] do not have to implement it. The
-/// WebZefanya server requires the OTP today; replacing it is the separately
-/// approved C-POD change, and nothing here removes or bypasses it.
-abstract class OtpDeliveryServer {
-  /// `POST /rider/deliveries/{id}/otp`: asks the server to send the Buyer a
-  /// code. The server never returns the code.
-  Future<void> sendDeliveryOtp(String jobId);
-
-  /// `POST /rider/deliveries/{id}/deliver` with `delivery_otp` and the proof
-  /// photo. Fields the WebZefanya request does not know are not sent.
-  Future<void> completeDeliveryWithOtp(
-    String jobId, {
-    required String proofPhotoPath,
-    required String deliveryOtp,
-    String? receivedBy,
-    String? notes,
-    double? codAmount,
-  });
-}
-
 /// The Rider data source for WebZefanya.
 ///
 /// Reuses every existing live call (WebZefanya has them) and adapts the places
@@ -632,12 +609,10 @@ abstract class OtpDeliveryServer {
 ///     from `/rider/return-pickups`, which WebZefanya does not have. The rows
 ///     carry no id, so they are read-only: the tracking number identifies them
 ///     and nothing can be collected from the app.
-///   * Delivery completion sends the Buyer's OTP ([OtpDeliveryServer]); the
-///     demo fork's recipient-acknowledgement fields are not sent.
+///   * The demo fork's recipient-acknowledgement fields are not sent.
 ///   * Calls WebZefanya has no route for throw [ApiNotImplementedException]
 ///     locally (also enforced by the client's endpoint guard).
-class WebZefanyaCourierRepository extends LiveCourierRepository
-    implements OtpDeliveryServer {
+class WebZefanyaCourierRepository extends LiveCourierRepository {
   WebZefanyaCourierRepository(super.client);
 
   @override
@@ -702,9 +677,6 @@ class WebZefanyaCourierRepository extends LiveCourierRepository
         'GET /api/rider/deliveries/{id}/completion-status',
       );
 
-  /// The demo fork's OTP-free completion must never run against WebZefanya: it
-  /// would be refused (422) at best. Delivery goes through
-  /// [completeDeliveryWithOtp].
   @override
   Future<void> completeDelivery(
     String jobId, {
@@ -712,36 +684,6 @@ class WebZefanyaCourierRepository extends LiveCourierRepository
     required String recipientCategory,
     String? receivedBy,
     String? recipientRelationship,
-    double? codAmount,
-  }) async => throw const ApiNotImplementedException(
-    'POST /api/rider/deliveries/{id}/deliver (without the Buyer OTP)',
-    contractSection: 'WebZefanya profile: the Buyer OTP is required',
-  );
-
-  /// WebZefanya only sends the code after the Rider has scanned the parcel:
-  /// `sendOtp` asserts the `proof_of_delivery` (server: `complete_delivery`)
-  /// verification token without consuming it, so the same scan can still be
-  /// used to deliver. The token is bound to this Rider, parcel and action, and
-  /// lives ten minutes.
-  @override
-  Future<void> sendDeliveryOtp(String jobId) async {
-    if (!client.isConfigured) throw const ApiNotConfiguredException();
-    final generation = _riderGeneration;
-    final token = await _verify(jobId, 'proof_of_delivery', null);
-    if (generation != _riderGeneration) throw const UnauthorizedException();
-    await client.postJson(
-      '/rider/deliveries/$jobId/otp',
-      body: {'verification_token': token},
-    );
-  }
-
-  @override
-  Future<void> completeDeliveryWithOtp(
-    String jobId, {
-    required String proofPhotoPath,
-    required String deliveryOtp,
-    String? receivedBy,
-    String? notes,
     double? codAmount,
   }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
@@ -752,11 +694,8 @@ class WebZefanyaCourierRepository extends LiveCourierRepository
       '/rider/deliveries/$jobId/deliver',
       fields: {
         'verification_token': token,
-        'delivery_otp': deliveryOtp.trim(),
         if (receivedBy != null && receivedBy.trim().isNotEmpty)
           'received_by': receivedBy.trim(),
-        if (notes != null && notes.trim().isNotEmpty)
-          'delivery_notes': notes.trim(),
         if (codAmount != null) 'cod_amount': codAmount.toStringAsFixed(2),
       },
       files: {'proof_photo': proofPhotoPath},
